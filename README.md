@@ -75,10 +75,13 @@ Run the host check first:
 make setup
 ```
 
+`make` is only required if you want to use the `make ...` shortcuts shown in this README.
+If you prefer, you can use `./bin/vmctl ...` directly and skip that dependency.
+
 Install dependencies on Arch-based systems:
 
 ```bash
-sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog make
 ```
 
 Install dependencies on Debian/Ubuntu:
@@ -86,6 +89,14 @@ Install dependencies on Debian/Ubuntu:
 ```bash
 sudo apt update
 sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog
+```
+
+If you do not want `make`, the minimum practical direct-CLI path is:
+
+```bash
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog
+# or
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 dialog
 ```
 
 ## Quick Start

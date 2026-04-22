@@ -75,10 +75,13 @@ Esegui prima il controllo host:
 make setup
 ```
 
+`make` serve solo se vuoi usare le scorciatoie `make ...` mostrate in questo README.
+Se preferisci, puoi usare direttamente `./bin/vmctl ...` e non installarlo.
+
 Installare le dipendenze su sistemi Arch-based:
 
 ```bash
-sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog make
 ```
 
 Installare le dipendenze su Debian/Ubuntu:
@@ -86,6 +89,14 @@ Installare le dipendenze su Debian/Ubuntu:
 ```bash
 sudo apt update
 sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog
+```
+
+Se non vuoi installare `make`, il minimo pratico per usare la CLI diretta e:
+
+```bash
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog
+# oppure
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 dialog
 ```
 
 ## Avvio Rapido
