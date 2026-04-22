@@ -107,6 +107,15 @@ def ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def looks_like_html(path: Path) -> bool:
+    try:
+        with path.open("rb") as fh:
+            prefix = fh.read(512).lstrip().lower()
+    except OSError:
+        return False
+    return prefix.startswith(b"<!doctype html") or prefix.startswith(b"<html")
+
+
 def download_file(url: str, destination: Path, dry_run: bool = False) -> None:
     print_note(f"Downloading {url} -> {destination}")
     ensure_parent(destination)
@@ -116,18 +125,36 @@ def download_file(url: str, destination: Path, dry_run: bool = False) -> None:
     try:
         request = urllib.request.Request(url, headers={"User-Agent": HTTP_USER_AGENT})
         with urllib.request.urlopen(request) as response, destination.open("wb") as fh:
+            content_type = response.headers.get("Content-Type", "")
+            if "text/html" in content_type.lower():
+                raise VMError(f"Refusing HTML response for ISO download: {url}")
             shutil.copyfileobj(response, fh)
+    except VMError:
+        if destination.exists():
+            destination.unlink()
+        raise
     except (OSError, urllib.error.URLError) as exc:
         if destination.exists():
             destination.unlink()
         raise VMError(f"Failed to download '{url}': {exc}") from exc
 
+    if looks_like_html(destination):
+        destination.unlink()
+        raise VMError(f"Downloaded HTML instead of ISO from '{url}'")
+
 
 def ensure_iso(vm: dict, dry_run: bool = False) -> Path:
     iso_path = resolve_path(vm["iso"])
     if iso_path.is_file():
-        print_status("ok", f"ISO already exists: {iso_path}")
-        return iso_path
+        if looks_like_html(iso_path):
+            print_status("warn", f"Removing invalid cached ISO placeholder: {iso_path}", ok=False)
+            if not dry_run:
+                iso_path.unlink()
+            else:
+                return iso_path
+        else:
+            print_status("ok", f"ISO already exists: {iso_path}")
+            return iso_path
     if iso_path.exists():
         raise VMError(f"ISO path exists but is not a regular file: {iso_path}")
 

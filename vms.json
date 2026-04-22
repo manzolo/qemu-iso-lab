@@ -399,7 +399,7 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
-      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
+      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
       "disk": {
         "path": "artifacts/fedora-cinnamon/disk.qcow2",
         "size": "32G",
@@ -447,7 +447,7 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
-      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "disk": {
         "path": "artifacts/fedora-server/disk.qcow2",
         "size": "20G",
@@ -495,7 +495,7 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Workstation-Live-42-1.1.x86_64.iso",
-      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
       "disk": {
         "path": "artifacts/fedora-workstation/disk.qcow2",
         "size": "36G",
@@ -543,7 +543,7 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Xfce-Live-42-1.1.x86_64.iso",
-      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
       "disk": {
         "path": "artifacts/fedora-xfce/disk.qcow2",
         "size": "28G",

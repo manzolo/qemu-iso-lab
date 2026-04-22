@@ -107,6 +107,7 @@ class VmctlTests(unittest.TestCase):
         class FakeResponse:
             def __init__(self):
                 self._chunks = [b"payload", b""]
+                self.headers = {"Content-Type": "application/octet-stream"}
 
             def __enter__(self):
                 return self
@@ -124,6 +125,39 @@ class VmctlTests(unittest.TestCase):
         self.assertEqual(request.full_url, "https://example.invalid/test.iso")
         self.assertEqual(request.headers["User-agent"], self.vmctl.HTTP_USER_AGENT)
         self.assertEqual(destination.read_bytes(), b"payload")
+
+    def test_download_file_rejects_html_response(self):
+        destination = self.root / "isos" / "fedora.iso"
+
+        class FakeResponse:
+            def __init__(self):
+                self.headers = {"Content-Type": "text/html; charset=utf-8"}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self, size=-1):
+                return b"<!doctype html><html></html>"
+
+        with mock.patch.object(self.vmctl.urllib.request, "urlopen", return_value=FakeResponse()):
+            with self.assertRaises(self.vmctl.VMError):
+                self.vmctl.download_file("https://example.invalid/fedora.iso", destination)
+
+        self.assertFalse(destination.exists())
+
+    def test_ensure_iso_removes_invalid_cached_html_and_redownloads(self):
+        iso_path = self.root / self.vm_config["iso"]
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_text("<!doctype html><html></html>", encoding="utf-8")
+
+        with mock.patch.object(self.vmctl, "download_file") as download_file:
+            resolved = self.vmctl.ensure_iso(self.vm_config)
+
+        self.assertEqual(resolved, iso_path)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=False)
 
     def test_cmd_prep_fails_without_iso_url(self):
         self.vm_config.pop("iso_url")
