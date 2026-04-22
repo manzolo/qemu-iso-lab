@@ -4,11 +4,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pty
 import selectors
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -173,6 +175,42 @@ def run(cmd: list[str], dry_run: bool = False, quiet: bool = False) -> None:
             subprocess.run(cmd, check=True)
 
 
+def run_progress(cmd: list[str], dry_run: bool = False) -> None:
+    print_command(cmd)
+    if dry_run:
+        return
+    if not getattr(sys.stdout, "isatty", lambda: False)():
+        subprocess.run(cmd, check=True)
+        return
+
+    master_fd, slave_fd = pty.openpty()
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdin=None,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True,
+        )
+    finally:
+        os.close(slave_fd)
+
+    try:
+        while True:
+            try:
+                chunk = os.read(master_fd, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            os.write(sys.stdout.fileno(), chunk)
+        returncode = process.wait()
+        if returncode != 0:
+            raise subprocess.CalledProcessError(returncode, cmd)
+    finally:
+        os.close(master_fd)
+
+
 def run_pipeline(commands: list[list[str]], dry_run: bool = False) -> None:
     print(f"{style('$', BOLD, BLUE)} {' | '.join(shell_join(cmd) for cmd in commands)}")
     if dry_run:
@@ -265,7 +303,7 @@ def lsblk_devices() -> list[dict]:
             "--json",
             "-b",
             "-o",
-            "PATH,NAME,TYPE,SIZE,MODEL,MOUNTPOINTS,PKNAME,PTTYPE,FSTYPE",
+            "PATH,NAME,TYPE,SIZE,START,LOG-SEC,MODEL,MOUNTPOINTS,PKNAME,PTTYPE,FSTYPE",
         ]
     )
     payload = json.loads(output)
@@ -312,6 +350,7 @@ def inspect_block_device(device: str) -> dict:
         "model": str(node.get("model") or "").strip(),
         "mountpoints": mountpoints,
         "children": node.get("children") or [],
+        "logical_sector_size": int(node.get("log-sec", 512) or 512),
         "signatures": signatures,
         "pttype": node.get("pttype"),
         "fstype": node.get("fstype"),
@@ -335,6 +374,9 @@ def inspect_block_device_basic(device: str) -> dict:
         "model": str(node.get("model") or "").strip(),
         "mountpoints": collect_mountpoints(node),
         "children": node.get("children") or [],
+        "logical_sector_size": int(node.get("log-sec", 512) or 512),
+        "pttype": node.get("pttype"),
+        "fstype": node.get("fstype"),
         "is_root_disk": root_block_device() == device,
     }
 
@@ -425,6 +467,48 @@ def validate_flash_target(vm: dict, disk_path: Path, device: str, force_target: 
         )
 
     return info, source_layout, virtual_size
+
+
+def validate_import_source(device: str) -> dict:
+    info = inspect_block_device_basic(device)
+    if info["is_root_disk"]:
+        raise VMError(f"Refusing to read from the host root disk: {device}")
+    if info["mountpoints"]:
+        raise VMError(f"Refusing mounted source device: {device}")
+    return info
+
+
+def round_up(value: int, alignment: int) -> int:
+    if value <= 0:
+        return alignment
+    return ((value + alignment - 1) // alignment) * alignment
+
+
+def partition_extent_bytes(node: dict, logical_sector_size: int) -> int:
+    start = int(node.get("start", 0) or 0)
+    size = int(node.get("size", 0) or 0)
+    return (start * logical_sector_size) + size
+
+
+def suggested_import_bytes(info: dict) -> tuple[int, bool]:
+    children = [child for child in info.get("children") or [] if child.get("type") == "part"]
+    if not children:
+        return int(info["size"]), False
+
+    logical_sector_size = int(info.get("logical_sector_size", 512) or 512)
+    last_partition_end = max(partition_extent_bytes(child, logical_sector_size) for child in children)
+    layout = str(info.get("pttype") or "").lower()
+    if layout == "gpt":
+        backup_gpt_bytes = logical_sector_size * 33
+        bounded_size = min(int(info["size"]), round_up(last_partition_end + backup_gpt_bytes, 1024**2))
+        if bounded_size <= 0:
+            return int(info["size"]), False
+        return bounded_size, bounded_size < int(info["size"])
+
+    bounded_size = min(int(info["size"]), round_up(last_partition_end, 1024**2))
+    if bounded_size <= 0:
+        return int(info["size"]), False
+    return bounded_size, bounded_size < int(info["size"])
 
 
 def looks_like_html(path: Path) -> bool:
@@ -965,6 +1049,17 @@ def cmd_list_target_devices(args: argparse.Namespace) -> int:
     return 0
 
 
+def maybe_restore_sudo_owner(path: Path) -> None:
+    sudo_uid = os.environ.get("SUDO_UID")
+    sudo_gid = os.environ.get("SUDO_GID")
+    if not sudo_uid or not sudo_gid:
+        return
+    try:
+        os.chown(path, int(sudo_uid), int(sudo_gid))
+    except (OSError, ValueError):
+        return
+
+
 def cmd_flash(args: argparse.Namespace) -> int:
     config = load_config()
     vm = get_vm(config, args.vm)
@@ -1085,6 +1180,130 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
         dry_run=False,
     )
     run(["sync"], dry_run=False, quiet=True)
+    return 0
+
+
+def cmd_import_device(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    disk = vm["disk"]
+    disk_path = resolve_path(disk["path"])
+
+    if args.confirm_device != args.device:
+        raise VMError("import-device requires --confirm-device to exactly match --device")
+
+    require_command("qemu-img")
+    require_command("dd")
+    require_command("lsblk")
+    require_command("findmnt")
+    require_command("sudo")
+
+    info = validate_import_source(args.device)
+    import_bytes, is_compacted = suggested_import_bytes(info)
+    layout = str(info.get("pttype") or "").lower()
+    if is_compacted and layout == "gpt":
+        require_command("sgdisk")
+
+    print_header(f"Import physical disk into VM: {args.vm}")
+    print_kv("source", args.device)
+    print_kv("size", format_bytes(info["size"]))
+    print_kv("model", info["model"] or "-")
+    print_kv("target", pretty_path(disk_path))
+    print_kv("format", disk["format"])
+    print_kv("import", format_bytes(import_bytes))
+    if disk_path.exists():
+        print_status("warn", f"Existing VM disk will be overwritten: {pretty_path(disk_path)}", ok=False)
+    if is_compacted:
+        if layout == "gpt":
+            print_status("ok", "GPT source will be compacted and its backup GPT will be relocated")
+        else:
+            print_status("ok", "Trailing free space after the last partition will be skipped")
+
+    helper_cmd = [
+        "sudo",
+        str(Path(__file__).resolve()),
+        "import-helper",
+        "--vm",
+        args.vm,
+        "--device",
+        args.device,
+        "--confirm-device",
+        args.confirm_device,
+    ]
+    run(helper_cmd, dry_run=args.dry_run)
+    if args.dry_run:
+        print_status("ok", f"Would import {args.device} into {pretty_path(disk_path)} via sudo helper")
+    else:
+        print_status("ok", f"Imported {args.device} into {pretty_path(disk_path)}")
+    return 0
+
+
+def cmd_import_helper(args: argparse.Namespace) -> int:
+    if os.geteuid() != 0:
+        raise VMError("import-helper must run as root")
+    if args.confirm_device != args.device:
+        raise VMError("import-helper requires --confirm-device to exactly match --device")
+
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    disk = vm["disk"]
+    disk_path = resolve_path(disk["path"])
+    ensure_parent(disk_path)
+
+    require_command("qemu-img")
+    require_command("dd")
+    require_command("lsblk")
+    require_command("findmnt")
+
+    info = validate_import_source(args.device)
+    import_bytes, is_compacted = suggested_import_bytes(info)
+    layout = str(info.get("pttype") or "").lower()
+    convert_cmd = ["qemu-img", "convert", "-p", "-f", "raw", "-O", disk["format"]]
+    if disk.get("subformat"):
+        convert_cmd += ["-o", f"subformat={disk['subformat']}"]
+    if is_compacted and layout == "gpt":
+        require_command("sgdisk")
+        with tempfile.TemporaryDirectory(dir=str(disk_path.parent), prefix=f"{disk_path.stem}.import-") as temp_dir:
+            temp_raw = Path(temp_dir) / "source.raw"
+            print_note(f"Stage 1/2: copying {format_bytes(import_bytes)} from {args.device}")
+            run(
+                [
+                    "dd",
+                    f"if={args.device}",
+                    f"of={temp_raw}",
+                    "iflag=fullblock,count_bytes",
+                    f"count={import_bytes}",
+                    "bs=4M",
+                    "conv=sparse",
+                    "status=progress",
+                ],
+                dry_run=False,
+            )
+            print_note("Stage 2/2: repairing GPT backup header and converting to VM disk")
+            run(["sgdisk", "-e", str(temp_raw)], dry_run=False, quiet=True)
+            run(["sgdisk", "-v", str(temp_raw)], dry_run=False, quiet=True)
+            run_progress(convert_cmd + [str(temp_raw), str(disk_path)], dry_run=False)
+    elif is_compacted:
+        print_note(f"Stage 1/1: copying {format_bytes(import_bytes)} from {args.device} and converting to VM disk")
+        run_pipeline(
+            [
+                [
+                    "dd",
+                    f"if={args.device}",
+                    "iflag=fullblock,count_bytes",
+                    f"count={import_bytes}",
+                    "bs=4M",
+                    "status=progress",
+                ],
+                convert_cmd + ["-", str(disk_path)],
+            ],
+            dry_run=False,
+        )
+    else:
+        print_note("Stage 1/1: converting full device to VM disk")
+        run_progress(convert_cmd + [args.device, str(disk_path)], dry_run=False)
+    maybe_restore_sudo_owner(disk_path)
+    print_status("ok", f"Imported {args.device} into {pretty_path(disk_path)}")
     return 0
 
 
@@ -1215,6 +1434,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--confirm-device", required=True)
     p.add_argument("--force-target", action="store_true", help=argparse.SUPPRESS)
     p.set_defaults(func=cmd_flash_helper)
+
+    p = subparsers.add_parser("import-device", help=argparse.SUPPRESS)
+    p.add_argument("vm")
+    p.add_argument("--device", required=True)
+    p.add_argument("--confirm-device", required=True)
+    p.set_defaults(func=cmd_import_device)
+
+    p = subparsers.add_parser("import-helper", help=argparse.SUPPRESS)
+    p.add_argument("--vm", required=True)
+    p.add_argument("--device", required=True)
+    p.add_argument("--confirm-device", required=True)
+    p.set_defaults(func=cmd_import_helper)
 
     p = subparsers.add_parser("list-empty-devices", help=argparse.SUPPRESS)
     p.set_defaults(func=cmd_list_empty_devices)

@@ -301,6 +301,25 @@ run_action() {
             fi
             run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$typed_device" --force-target
             ;;
+        import-device)
+            local selected_device
+            local typed_device
+            mapfile -t device_items < <(list_target_device_menu_items)
+            if [[ ${#device_items[@]} -eq 0 ]]; then
+                msg_box "No Eligible Devices" "No non-root whole-disk devices are currently available for import."
+                return 0
+            fi
+            selected_device=$(MENU_WIDTH=96 MENU_LIST_HEIGHT=10 menu_choose "Import Device" "Choose a physical disk to read into the VM image" "${device_items[@]}") || return 0
+            if ! confirm_box "Dangerous Import" "Import physical device '$selected_device' into VM '$current_vm'?\n\nThis will overwrite the VM disk image."; then
+                return 0
+            fi
+            typed_device=$(input_box "Type Source Device" "Type the device path again to confirm VM disk overwrite:" "$selected_device") || return 0
+            if [[ "$typed_device" != "$selected_device" ]]; then
+                msg_box "Confirmation Failed" "Typed device path does not match. Import cancelled."
+                return 0
+            fi
+            run_vmctl import-device "$current_vm" --device "$selected_device" --confirm-device "$typed_device"
+            ;;
         clean-all)
             if confirm_box "Confirm Clean All" "Remove artifacts for all configured VMs?"; then
                 run_vmctl clean --all
@@ -349,6 +368,7 @@ advanced_menu_loop() {
             "Current VM: $current_vm" \
             flash "Write VM disk to an empty physical device" \
             flash-force "Force-write VM disk to a non-empty physical device" \
+            import-device "Read a physical device into the VM disk image" \
             back "Back") || return 0
         run_action "$selected" || return 0
     done
