@@ -240,7 +240,10 @@ def run_pipeline(commands: list[list[str]], dry_run: bool = False) -> None:
 
 
 def ensure_parent(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise VMError(f"Unable to create parent directory for {path}: {exc}") from exc
 
 
 def shell_join(cmd: list[str]) -> str:
@@ -574,8 +577,11 @@ def ensure_iso(vm: dict, dry_run: bool = False) -> Path:
 
 def ensure_vm_dirs(name: str) -> Path:
     base = ROOT / "artifacts" / name
-    (base / "logs").mkdir(parents=True, exist_ok=True)
-    (base / "runtime").mkdir(parents=True, exist_ok=True)
+    try:
+        (base / "logs").mkdir(parents=True, exist_ok=True)
+        (base / "runtime").mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise VMError(f"Unable to prepare artifact directories for '{name}': {exc}") from exc
     return base
 
 
@@ -708,10 +714,21 @@ def disk_args(vm: dict, allow_missing: bool = False) -> list[str]:
     if not disk_path.exists() and not allow_missing:
         raise VMError(f"Disk image not found: {disk_path}")
     interface = disk.get("interface", "virtio")
-    return [
-        "-drive",
-        f"file={disk_path},format={disk['format']},if={interface}",
-    ]
+    if interface == "virtio":
+        return [
+            "-drive",
+            f"file={disk_path},format={disk['format']},if=virtio",
+        ]
+    if interface == "sata":
+        return [
+            "-device",
+            "ich9-ahci,id=ahci0",
+            "-drive",
+            f"id=disk0,file={disk_path},format={disk['format']},if=none",
+            "-device",
+            "ide-hd,drive=disk0,bus=ahci0.0",
+        ]
+    raise VMError(f"Unsupported disk interface: {interface}")
 
 
 def video_args(vm: dict, variant: str | None) -> list[str]:
@@ -772,7 +789,8 @@ def common_args(
 
     network_mode = vm.get("network", "user")
     if network_mode == "user":
-        args += ["-netdev", "user,id=n1", "-device", "virtio-net-pci,netdev=n1"]
+        network_device = vm.get("network_device", "virtio-net-pci")
+        args += ["-netdev", "user,id=n1", "-device", f"{network_device},netdev=n1"]
     else:
         raise VMError(f"Unsupported network mode: {network_mode}")
 
@@ -1060,6 +1078,28 @@ def maybe_restore_sudo_owner(path: Path) -> None:
         return
 
 
+def maybe_restore_sudo_owner_tree(path: Path) -> None:
+    sudo_uid = os.environ.get("SUDO_UID")
+    sudo_gid = os.environ.get("SUDO_GID")
+    if not sudo_uid or not sudo_gid:
+        return
+    try:
+        uid = int(sudo_uid)
+        gid = int(sudo_gid)
+    except ValueError:
+        return
+
+    current = path
+    while True:
+        try:
+            os.chown(current, uid, gid)
+        except OSError:
+            pass
+        if current == ROOT or current.parent == current:
+            break
+        current = current.parent
+
+
 def cmd_flash(args: argparse.Namespace) -> int:
     config = load_config()
     vm = get_vm(config, args.vm)
@@ -1303,6 +1343,7 @@ def cmd_import_helper(args: argparse.Namespace) -> int:
         print_note("Stage 1/1: converting full device to VM disk")
         run_progress(convert_cmd + [args.device, str(disk_path)], dry_run=False)
     maybe_restore_sudo_owner(disk_path)
+    maybe_restore_sudo_owner_tree(disk_path.parent)
     print_status("ok", f"Imported {args.device} into {pretty_path(disk_path)}")
     return 0
 

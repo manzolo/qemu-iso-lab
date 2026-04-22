@@ -527,7 +527,8 @@ class VmctlTests(unittest.TestCase):
              mock.patch.object(self.vmctl, "run") as run_cmd, \
              mock.patch.object(self.vmctl, "run_progress") as run_progress, \
              mock.patch.object(self.vmctl, "run_pipeline") as run_pipeline, \
-             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner:
+             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner, \
+             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner_tree") as restore_tree:
             exit_code = self.vmctl.cmd_import_helper(args)
 
         self.assertEqual(exit_code, 0)
@@ -548,6 +549,7 @@ class VmctlTests(unittest.TestCase):
             dry_run=False,
         )
         restore_owner.assert_called_once_with(disk_path)
+        restore_tree.assert_called_once_with(disk_path.parent)
 
     def test_cmd_import_helper_compacts_gpt_and_repairs_backup_header(self):
         disk_path = self.root / self.vm_config["disk"]["path"]
@@ -585,7 +587,8 @@ class VmctlTests(unittest.TestCase):
              mock.patch.object(self.vmctl, "run_progress") as run_progress, \
              mock.patch.object(self.vmctl.tempfile, "TemporaryDirectory", return_value=FakeTempDir(temp_root)), \
              mock.patch.object(self.vmctl, "run_pipeline") as run_pipeline, \
-             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner:
+             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner, \
+             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner_tree") as restore_tree:
             exit_code = self.vmctl.cmd_import_helper(args)
 
         self.assertEqual(exit_code, 0)
@@ -613,6 +616,7 @@ class VmctlTests(unittest.TestCase):
         )
         run_pipeline.assert_not_called()
         restore_owner.assert_called_once_with(disk_path)
+        restore_tree.assert_called_once_with(disk_path.parent)
 
     def test_validate_import_source_rejects_mounted_disk(self):
         with mock.patch.object(
@@ -631,6 +635,11 @@ class VmctlTests(unittest.TestCase):
         ):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.validate_import_source("/dev/sdz")
+
+    def test_ensure_vm_dirs_wraps_permission_errors(self):
+        with mock.patch.object(self.vmctl.Path, "mkdir", side_effect=PermissionError("denied")):
+            with self.assertRaises(self.vmctl.VMError):
+                self.vmctl.ensure_vm_dirs(self.vm_name)
 
     def test_suggested_import_bytes_trims_trailing_space_for_dos(self):
         import_bytes, compacted = self.vmctl.suggested_import_bytes(
@@ -701,6 +710,26 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("none", qemu_cmd)
         self.assertIn("-serial", qemu_cmd)
         self.assertIn("-no-reboot", qemu_cmd)
+
+    def test_common_args_honors_custom_network_device(self):
+        self.create_disk()
+        self.vm_config["network_device"] = "e1000e"
+
+        with mock.patch.object(self.vmctl, "require_command"):
+            qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
+
+        self.assertIn("e1000e,netdev=n1", qemu_cmd)
+
+    def test_common_args_supports_sata_disk_interface(self):
+        disk_path = self.create_disk()
+        self.vm_config["disk"]["interface"] = "sata"
+
+        with mock.patch.object(self.vmctl, "require_command"):
+            qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
+
+        self.assertIn("ich9-ahci,id=ahci0", qemu_cmd)
+        self.assertIn(f"id=disk0,file={disk_path},format=qcow2,if=none", qemu_cmd)
+        self.assertIn("ide-hd,drive=disk0,bus=ahci0.0", qemu_cmd)
 
     def test_cmd_boot_check_dry_run_uses_ci_settings(self):
         self.create_disk()

@@ -1,0 +1,100 @@
+{
+  "vms": {
+    "windows10-template": {
+      "name": "Windows 10 Template",
+      "meta": {
+        "catalog_slug": "windows-10-template",
+        "family": "windows",
+        "role": "import-template",
+        "release_model": "custom"
+      },
+      "iso": "isos/windows10-template.iso",
+      "disk": {
+        "path": "artifacts/windows10-template/disk.qcow2",
+        "size": "64G",
+        "format": "qcow2",
+        "interface": "sata"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/windows10-template/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 8192,
+      "cpus": 4,
+      "network": "user",
+      "network_device": "e1000e",
+      "audio": true,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "windows11-template": {
+      "name": "Windows 11 Template",
+      "meta": {
+        "catalog_slug": "windows-11-template",
+        "family": "windows",
+        "role": "import-template",
+        "release_model": "custom"
+      },
+      "iso": "isos/windows11-template.iso",
+      "disk": {
+        "path": "artifacts/windows11-template/disk.qcow2",
+        "size": "96G",
+        "format": "qcow2",
+        "interface": "sata"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/windows11-template/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 12288,
+      "cpus": 4,
+      "network": "user",
+      "network_device": "e1000e",
+      "audio": true,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  }
+}

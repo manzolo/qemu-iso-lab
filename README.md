@@ -190,6 +190,15 @@ Each VM entry in `vms.json` typically defines:
 - `audio`
 - `video`
 
+Import-oriented profiles may omit `iso_url` on purpose. These are intended for flows such as `import-device`, where you bring an existing physical installation into a VM disk rather than booting a distro installer ISO.
+
+The repository now includes `windows10-template` and `windows11-template` as conservative import targets:
+
+- both use `q35` + EFI;
+- both default to a `sata` disk to avoid an immediate virtio storage driver dependency on first boot;
+- both use `e1000e` networking for broader out-of-the-box Windows compatibility;
+- `windows11-template` is usable for imported guests, but native Windows 11 requirements such as TPM/Secure Boot are not yet modeled by `vmctl`.
+
 Example:
 
 ```json
