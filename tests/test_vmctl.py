@@ -106,7 +106,7 @@ class VmctlTests(unittest.TestCase):
         vars_path = self.root / self.vm_config["firmware"]["vars_path"]
         vars_path.parent.mkdir(parents=True, exist_ok=True)
         vars_path.write_text("vars", encoding="utf-8")
-        args = argparse.Namespace()
+        args = argparse.Namespace(all=False)
 
         with mock.patch.object(self.vmctl.shutil, "which", return_value="/usr/bin/qemu-img"), \
              mock.patch.object(self.vmctl, "image_info", return_value={"virtual-size": 2 * 1024**3}), \
@@ -119,6 +119,23 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("ready", output)
         self.assertIn(self.vmctl.format_bytes(disk_path.stat().st_size), output)
         self.assertIn(self.vmctl.format_bytes(2 * 1024**3), output)
+
+    def test_cmd_status_hides_untouched_vms_by_default(self):
+        other_vm = json.loads(json.dumps(self.vm_config))
+        other_vm["disk"]["path"] = "artifacts/othervm/disk.qcow2"
+        self.create_disk()
+        (self.config_dir / "profiles" / "other.json").write_text(
+            json.dumps({"vms": {"othervm": other_vm}}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_status(argparse.Namespace(all=False))
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn(self.vm_name, output)
+        self.assertNotIn("othervm", output)
 
     def test_cmd_prep_downloads_iso_when_missing(self):
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
@@ -847,8 +864,47 @@ class VmctlTests(unittest.TestCase):
         output = "".join(call.args[0] for call in stdout.write.call_args_list)
         self.assertEqual(exit_code, 1)
         self.assertIn("[missing] qemu-img", output)
-        self.assertIn("[missing] testvm:", output)
+        self.assertIn("Unable to locate OVMF firmware files for EFI guest.", output)
+        self.assertIn("Affected EFI profiles: testvm", output)
         self.assertIn("sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog", output)
+
+    def test_cmd_setup_can_install_missing_packages_after_confirmation(self):
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.write_config_dir()
+        firmware_dir = self.root / "firmware"
+        firmware_dir.mkdir(parents=True, exist_ok=True)
+        (firmware_dir / "OVMF_CODE_4M.fd").write_text("code", encoding="utf-8")
+        (firmware_dir / "OVMF_VARS_4M.fd").write_text("vars", encoding="utf-8")
+        args = argparse.Namespace()
+
+        which_calls = {"count": 0}
+
+        def fake_which(name):
+            which_calls["count"] += 1
+            if which_calls["count"] <= 4:
+                if name in {"qemu-system-x86_64", "python3"}:
+                    return f"/usr/bin/{name}"
+                return None
+            return "/usr/bin/fake"
+
+        with mock.patch.object(self.vmctl.shutil, "which", side_effect=fake_which), \
+             mock.patch.object(self.vmctl, "prompt_yes_no", return_value=True), \
+             mock.patch.object(self.vmctl, "run") as run_cmd, \
+             mock.patch("sys.stdout", new_callable=mock.MagicMock()):
+            exit_code = self.vmctl.cmd_setup(args)
+
+        self.assertEqual(exit_code, 0)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(executed[0], ["sudo", "apt", "update"])
+        self.assertEqual(
+            executed[1],
+            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "make", "dialog"],
+        )
 
     def test_cmd_setup_passes_when_requirements_and_firmware_are_available(self):
         self.vm_config["firmware"] = {

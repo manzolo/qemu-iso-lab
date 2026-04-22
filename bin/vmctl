@@ -600,6 +600,16 @@ def read_os_release() -> dict[str, str]:
 
 
 def host_install_hints() -> list[str]:
+    commands = host_install_commands()
+    if commands is not None:
+        return [shell_join(cmd) for cmd in commands]
+    return [
+        "Install QEMU, Python 3, make, and OVMF/edk2 firmware with your distro package manager.",
+        "Optional: install dialog if you want to use make tui.",
+    ]
+
+
+def host_install_commands() -> list[list[str]] | None:
     os_release = read_os_release()
     distro_tokens = {
         token
@@ -609,16 +619,23 @@ def host_install_hints() -> list[str]:
     }
 
     if {"arch", "cachyos", "manjaro"} & distro_tokens:
-        return ["sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog make"]
+        return [["sudo", "pacman", "-S", "qemu-desktop", "qemu-base", "edk2-ovmf", "python", "dialog", "make"]]
     if {"debian", "ubuntu"} & distro_tokens:
         return [
-            "sudo apt update",
-            "sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog",
+            ["sudo", "apt", "update"],
+            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "make", "dialog"],
         ]
-    return [
-        "Install QEMU, Python 3, make, and OVMF/edk2 firmware with your distro package manager.",
-        "Optional: install dialog if you want to use make tui.",
-    ]
+    return None
+
+
+def prompt_yes_no(prompt: str) -> bool:
+    if not getattr(sys.stdin, "isatty", lambda: False)():
+        return False
+    try:
+        answer = input(f"{prompt} [y/N] ").strip().lower()
+    except EOFError:
+        return False
+    return answer in {"y", "yes"}
 
 
 def iter_ovmf_candidates(fw: dict) -> list[tuple[Path, Path]]:
@@ -937,12 +954,33 @@ def nvram_status(vm: dict) -> str:
     return "ready" if vars_path.is_file() else "missing"
 
 
+def vm_has_local_state(vm: dict) -> bool:
+    disk_path = resolve_path(vm["disk"]["path"])
+    if disk_path.exists():
+        return True
+    iso_path = resolve_path(vm["iso"])
+    if iso_path.exists():
+        return True
+    firmware = vm.get("firmware", {})
+    if firmware.get("type") == "efi":
+        vars_path = resolve_path(firmware["vars_path"])
+        if vars_path.exists():
+            return True
+    return False
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     config = load_config()
     rows = []
     for name, vm in sorted(config["vms"].items()):
+        if not args.all and not vm_has_local_state(vm):
+            continue
         disk, actual, virtual = disk_status(vm)
         rows.append((name, disk, iso_status(vm), nvram_status(vm), actual, virtual))
+
+    if not rows:
+        print_status("ok", "No local VM state found. Use --all to show the full catalog.")
+        return 0
 
     name_width = max(len("PROFILE"), max(len(row[0]) for row in rows))
     disk_width = max(len("DISK"), max(len(row[1]) for row in rows))
@@ -1428,21 +1466,33 @@ def cmd_setup(args: argparse.Namespace) -> int:
     if not efi_vms:
         print_status("ok", "No EFI profiles configured")
     else:
-        for name, vm in efi_vms:
-            try:
-                _, details = firmware_status(vm)
-                print_status("ok", f"{name}: {details}")
-            except VMError as exc:
-                print_status("missing", f"{name}: {exc}", ok=False)
-                status_ok = False
+        try:
+            _, details = firmware_status(efi_vms[0][1])
+            print_status("ok", details)
+        except VMError as exc:
+            print_status("missing", str(exc), ok=False)
+            print_status("warn", f"Affected EFI profiles: {', '.join(name for name, _ in efi_vms)}", ok=False)
+            status_ok = False
 
     if status_ok:
         print_status("ok", "Setup check passed.")
         return 0
 
     print_header("Suggested install commands")
+    install_commands = host_install_commands()
     for cmd in host_install_hints():
         print_kv("cmd", cmd)
+
+    if install_commands and not getattr(args, "_skip_prompt", False) and prompt_yes_no("Install missing packages now?"):
+        print_header("Installing packages")
+        try:
+            for cmd in install_commands:
+                run(cmd, dry_run=False)
+        except subprocess.CalledProcessError as exc:
+            raise VMError(f"Package installation failed: {' '.join(exc.cmd)}") from exc
+        print_note("Re-running setup checks")
+        args._skip_prompt = True
+        return cmd_setup(args)
     return 1
 
 
@@ -1487,6 +1537,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_list)
 
     p = subparsers.add_parser("status")
+    p.add_argument("--all", action="store_true", help="show the full catalog, including untouched VMs")
     p.set_defaults(func=cmd_status)
 
     p = subparsers.add_parser("show")
