@@ -2,7 +2,7 @@
 
 `QEMU ISO Lab` e un piccolo toolkit locale per gestire macchine virtuali di test partendo da profili definiti in JSON.
 
-Il progetto e nato da un setup specifico per CachyOS, ma si sta evolvendo in un catalogo riusabile di guest per installazioni da ISO, boot check e test con QEMU.
+Fornisce un catalogo riusabile di guest per installazioni da ISO, import da dischi fisici, boot check e test con QEMU.
 
 Per la versione inglese, vedi [README.md](README.md).
 
@@ -12,7 +12,7 @@ Le note aggiuntive sono in [docs/](docs/), incluso [CI_BOOT_STRATEGY.md](docs/CI
 
 Il progetto attualmente fornisce:
 
-- un catalogo VM in `vms.json`;
+- un catalogo VM suddiviso tra `vms/catalog.json` e `vms/profiles/*.json`;
 - una CLI Python in `bin/vmctl`;
 - una piccola TUI in `bin/vmtui`;
 - un frontend sottile in `Makefile`, incluso un controllo host `setup`;
@@ -20,10 +20,7 @@ Il progetto attualmente fornisce:
 - artifacts isolati per VM sotto `artifacts/<vm>/`;
 - un boot smoke test leggero basato su `alpine-ci`.
 
-Profili di esempio attuali:
-
-- `cachyos`
-- `alpine-ci`
+I profili attuali includono guest desktop, guest installer/minimal, template Windows per import e il guest di smoke test `alpine-ci`.
 
 ## Struttura Del Progetto
 
@@ -33,7 +30,9 @@ Profili di esempio attuali:
 ├── README.md
 ├── README.it.md
 ├── VM_MANAGER_PLAN.md
-├── vms.json
+├── vms/
+│   ├── catalog.json
+│   └── profiles/
 ├── bin/
 │   ├── vmctl
 │   └── vmtui
@@ -51,7 +50,6 @@ Requisiti minimi host:
 - `qemu-system-x86_64`
 - `qemu-img`
 - Python 3
-- `make`
 
 Opzionali:
 
@@ -101,21 +99,22 @@ sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 dialog
 
 ## Avvio Rapido
 
-### Flusso Locale Desktop
+### Flusso Locale Guest
 
-Usa questo percorso per un guest locale normale come `cachyos`:
+Usa questo percorso per un guest locale normale:
 
 ```bash
 make setup
-make show VM=cachyos
-make prep VM=cachyos
-make install VM=cachyos
+make list
+make show VM=<name>
+make prep VM=<name>
+make install VM=<name>
 ```
 
 Dopo aver installato il guest sul disco:
 
 ```bash
-make start VM=cachyos
+make start VM=<name>
 ```
 
 ### Boot Check Reale Minimo
@@ -150,14 +149,15 @@ Con `make`:
 ```bash
 make setup
 make list
-make show VM=cachyos
-make fetch-iso VM=cachyos
-make prep VM=cachyos
-make install VM=cachyos
-make start VM=cachyos
-make start VM=cachyos VIDEO=safe
+make status
+make show VM=<name>
+make fetch-iso VM=<name>
+make prep VM=<name>
+make install VM=<name>
+make start VM=<name>
+make start VM=<name> VIDEO=safe
 make boot-check VM=alpine-ci
-make clean VM=cachyos
+make clean VM=<name>
 make clean-all
 ```
 
@@ -166,28 +166,29 @@ Direttamente con `vmctl`:
 ```bash
 ./bin/vmctl setup
 ./bin/vmctl list
-./bin/vmctl show cachyos
-./bin/vmctl fetch-iso cachyos
-./bin/vmctl prep cachyos
-./bin/vmctl install cachyos
-./bin/vmctl start cachyos
-./bin/vmctl start cachyos --video safe
+./bin/vmctl status
+./bin/vmctl show <name>
+./bin/vmctl fetch-iso <name>
+./bin/vmctl prep <name>
+./bin/vmctl install <name>
+./bin/vmctl start <name>
+./bin/vmctl start <name> --video safe
 ./bin/vmctl boot-check alpine-ci
-./bin/vmctl clean cachyos
+./bin/vmctl clean <name>
 ./bin/vmctl clean --all
 ```
 
 Esempi `dry-run`:
 
 ```bash
-./bin/vmctl --dry-run prep cachyos
-./bin/vmctl --dry-run install cachyos
-./bin/vmctl --dry-run start cachyos --video safe
+./bin/vmctl --dry-run prep <name>
+./bin/vmctl --dry-run install <name>
+./bin/vmctl --dry-run start <name> --video safe
 ```
 
 ## Modello Dei Profili VM
 
-Ogni voce in `vms.json` definisce tipicamente:
+Ogni voce in `vms/profiles/*.json` definisce tipicamente:
 
 - `name`
 - `iso`
@@ -214,22 +215,21 @@ Esempio:
 
 ```json
 {
-  "cachyos": {
-    "name": "CachyOS",
-    "iso": "isos/cachyos-desktop-linux-260308.iso",
-    "iso_url": "https://iso.cachyos.org/desktop/260308/cachyos-desktop-linux-260308.iso",
+  "my-vm": {
+    "name": "My VM",
+    "iso": "isos/example.iso",
+    "iso_url": "https://example.invalid/example.iso",
     "disk": {
-      "path": "artifacts/cachyos/disk.vhd",
-      "size": "30G",
-      "format": "vpc",
-      "subformat": "fixed",
+      "path": "artifacts/my-vm/disk.qcow2",
+      "size": "32G",
+      "format": "qcow2",
       "interface": "virtio"
     },
     "firmware": {
       "type": "efi",
       "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
       "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-      "vars_path": "artifacts/cachyos/OVMF_VARS.fd"
+      "vars_path": "artifacts/my-vm/OVMF_VARS.fd"
     },
     "machine": "q35",
     "memory_mb": 4096,
@@ -244,7 +244,7 @@ Esempio:
 
 Per i profili `efi`, `vmctl`:
 
-- preferisce i path `code` e `vars_template` definiti in `vms.json`;
+- preferisce i path `code` e `vars_template` definiti nel profilo;
 - fa fallback su path OVMF comuni se quelli configurati non esistono;
 - accetta gli override ambiente `OVMF_CODE` e `OVMF_VARS_TEMPLATE`;
 - usa `OVMF_CODE` come firmware in sola lettura;
@@ -283,8 +283,8 @@ artifacts/<vm>/
 Contenuto tipico:
 
 ```text
-artifacts/cachyos/
-├── disk.vhd
+artifacts/my-vm/
+├── disk.qcow2
 ├── OVMF_VARS.fd
 ├── logs/
 └── runtime/
@@ -294,7 +294,7 @@ Questo evita collisioni tra profili guest diversi.
 
 ## Profili Video
 
-Il profilo `cachyos` include attualmente:
+Le varianti video dipendono dal profilo. Esempi comuni:
 
 - `std`
 - `safe`
@@ -315,7 +315,7 @@ Alcuni compositor Wayland, come `niri`, possono comunque comportarsi male in VM 
 Flusso minimo:
 
 1. Copiare la ISO sotto `isos/`, oppure definire `iso_url`.
-2. Aggiungere un nuovo oggetto VM in `vms.json`.
+2. Aggiungere un nuovo oggetto VM in uno dei file sotto `vms/profiles/`.
 3. Scegliere formato disco, tipo di firmware e impostazioni runtime.
 4. Preparare e avviare:
 
