@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual machine artifacts
+artifacts/*/disk.*
+artifacts/*/OVMF_VARS.fd
+artifacts/*/logs/
+artifacts/*/runtime/
+
+# Local ISO images
+isos/*.iso
+
+# Local overrides
+.env
+.env.*

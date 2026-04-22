@@ -1,0 +1,88 @@
+{
+  "vms": {
+    "cachyos": {
+      "name": "CachyOS",
+      "iso": "isos/cachyos-desktop-linux-260308.iso",
+      "iso_url": "https://iso.cachyos.org/desktop/260308/cachyos-desktop-linux-260308.iso",
+      "disk": {
+        "path": "artifacts/cachyos/disk.vhd",
+        "size": "30G",
+        "format": "vpc",
+        "subformat": "fixed",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/cachyos/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "alpine-ci": {
+      "name": "Alpine Linux Virt CI",
+      "iso": "isos/alpine-virt-3.23.4-x86_64.iso",
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.23.4-x86_64.iso",
+      "disk": {
+        "path": "artifacts/alpine-ci/disk.qcow2",
+        "size": "2G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 512,
+      "cpus": 1,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std"
+          ]
+        }
+      },
+      "ci": {
+        "accel": "tcg",
+        "headless": true,
+        "boot_from": "cdrom",
+        "expect": "login:",
+        "timeout_sec": 90
+      }
+    }
+  }
+}

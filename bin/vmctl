@@ -1,0 +1,478 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import selectors
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = ROOT / "vms.json"
+
+
+class VMError(Exception):
+    pass
+
+
+def load_config() -> dict:
+    with CONFIG_PATH.open("r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    if "vms" not in data or not isinstance(data["vms"], dict):
+        raise VMError(f"Invalid config file: {CONFIG_PATH}")
+    return data
+
+
+def get_vm(config: dict, name: str) -> dict:
+    try:
+        return config["vms"][name]
+    except KeyError as exc:
+        raise VMError(f"VM profile not found: {name}") from exc
+
+
+def resolve_path(path_str: str) -> Path:
+    path = Path(path_str)
+    return path if path.is_absolute() else ROOT / path
+
+
+def require_command(name: str) -> None:
+    if shutil.which(name) is None:
+        raise VMError(f"Missing command: {name}")
+
+
+def run(cmd: list[str], dry_run: bool = False) -> None:
+    print("$", " ".join(cmd))
+    if not dry_run:
+        subprocess.run(cmd, check=True)
+
+
+def ensure_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def download_file(url: str, destination: Path, dry_run: bool = False) -> None:
+    print(f"Downloading {url} -> {destination}")
+    ensure_parent(destination)
+    if dry_run:
+        return
+
+    try:
+        with urllib.request.urlopen(url) as response, destination.open("wb") as fh:
+            shutil.copyfileobj(response, fh)
+    except (OSError, urllib.error.URLError) as exc:
+        if destination.exists():
+            destination.unlink()
+        raise VMError(f"Failed to download '{url}': {exc}") from exc
+
+
+def ensure_iso(vm: dict, dry_run: bool = False) -> Path:
+    iso_path = resolve_path(vm["iso"])
+    if iso_path.is_file():
+        print(f"ISO already exists: {iso_path}")
+        return iso_path
+    if iso_path.exists():
+        raise VMError(f"ISO path exists but is not a regular file: {iso_path}")
+
+    iso_url = vm.get("iso_url")
+    if not iso_url:
+        raise VMError(f"ISO not found and no iso_url configured: {iso_path}")
+
+    download_file(iso_url, iso_path, dry_run=dry_run)
+    return iso_path
+
+
+def ensure_vm_dirs(name: str) -> Path:
+    base = ROOT / "artifacts" / name
+    (base / "logs").mkdir(parents=True, exist_ok=True)
+    (base / "runtime").mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def machine_arg(vm: dict, accel: str | None = None) -> str:
+    machine = vm["machine"]
+    if accel:
+        return f"{machine},accel={accel}"
+    return machine
+
+
+def firmware_args(vm: dict, dry_run: bool = False) -> list[str]:
+    fw = vm["firmware"]
+    fw_type = fw["type"]
+    if fw_type == "bios":
+        return []
+    if fw_type != "efi":
+        raise VMError(f"Unsupported firmware type: {fw_type}")
+
+    code = resolve_path(fw["code"])
+    vars_template = resolve_path(fw["vars_template"])
+    vars_path = resolve_path(fw["vars_path"])
+
+    if not code.is_file():
+        raise VMError(f"Missing OVMF code file: {code}")
+    if not vars_template.is_file():
+        raise VMError(f"Missing OVMF vars template: {vars_template}")
+    if not vars_path.exists():
+        ensure_parent(vars_path)
+        print(f"Creating EFI vars store: {vars_path}")
+        if not dry_run:
+            shutil.copyfile(vars_template, vars_path)
+
+    return [
+        "-drive",
+        f"if=pflash,format=raw,readonly=on,file={code}",
+        "-drive",
+        f"if=pflash,format=raw,file={vars_path}",
+    ]
+
+
+def disk_args(vm: dict) -> list[str]:
+    disk = vm["disk"]
+    disk_path = resolve_path(disk["path"])
+    if not disk_path.exists():
+        raise VMError(f"Disk image not found: {disk_path}")
+    interface = disk.get("interface", "virtio")
+    return [
+        "-drive",
+        f"file={disk_path},format={disk['format']},if={interface}",
+    ]
+
+
+def video_args(vm: dict, variant: str | None) -> list[str]:
+    video = vm.get("video", {})
+    variants = video.get("variants", {})
+    selected = variant or video.get("default")
+    if not selected:
+        return []
+    if selected not in variants:
+        choices = ", ".join(sorted(variants))
+        raise VMError(f"Unknown video profile '{selected}'. Choices: {choices}")
+    return list(variants[selected])
+
+
+def common_args(
+    vm: dict,
+    variant: str | None,
+    dry_run: bool = False,
+    accel: str | None = "kvm",
+    headless: bool = False,
+    serial_stdio: bool = False,
+    no_reboot: bool = False,
+) -> list[str]:
+    require_command("qemu-system-x86_64")
+    cpu_model = "host" if accel == "kvm" else vm.get("cpu_model", "max")
+    args = [
+        "qemu-system-x86_64",
+        "-m",
+        str(vm["memory_mb"]),
+        "-cpu",
+        cpu_model,
+        "-smp",
+        str(vm["cpus"]),
+        "-machine",
+        machine_arg(vm, accel=accel),
+        "-boot",
+        "menu=on",
+    ]
+    if accel == "kvm":
+        args.insert(1, "-enable-kvm")
+    args += firmware_args(vm, dry_run=dry_run)
+    args += disk_args(vm)
+
+    if headless:
+        args += ["-display", "none", "-monitor", "none"]
+    else:
+        args += video_args(vm, variant)
+
+    if serial_stdio:
+        args += ["-chardev", "stdio,id=char0,signal=off", "-serial", "chardev:char0"]
+
+    if vm.get("usb_tablet"):
+        args += ["-usb", "-device", "qemu-xhci", "-device", "usb-tablet"]
+
+    if vm.get("audio"):
+        args += ["-device", "ich9-intel-hda", "-device", "hda-duplex"]
+
+    network_mode = vm.get("network", "user")
+    if network_mode == "user":
+        args += ["-netdev", "user,id=n1", "-device", "virtio-net-pci,netdev=n1"]
+    else:
+        raise VMError(f"Unsupported network mode: {network_mode}")
+
+    if no_reboot:
+        args += ["-no-reboot"]
+
+    return args
+
+
+def run_and_expect(
+    cmd: list[str],
+    expected_text: str,
+    timeout_sec: int,
+    dry_run: bool = False,
+) -> None:
+    print("$", " ".join(cmd))
+    if dry_run:
+        return
+
+    deadline = time.monotonic() + timeout_sec
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    captured: list[str] = []
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ)
+
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise VMError(
+                    f"Timed out after {timeout_sec}s waiting for '{expected_text}'. "
+                    f"Captured output:\n{''.join(captured)[-4000:]}"
+                )
+
+            events = selector.select(timeout=min(0.2, remaining))
+            if events:
+                chunk = os.read(process.stdout.fileno(), 4096).decode(errors="replace")
+                if chunk:
+                    sys.stdout.write(chunk)
+                    sys.stdout.flush()
+                    captured.append(chunk)
+                    if expected_text in "".join(captured):
+                        process.terminate()
+                        try:
+                            process.wait(timeout=10)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait(timeout=10)
+                        return
+                continue
+
+            if process.poll() is not None:
+                remaining_output = process.stdout.read()
+                if remaining_output:
+                    chunk = remaining_output.decode(errors="replace")
+                    sys.stdout.write(chunk)
+                    sys.stdout.flush()
+                    captured.append(chunk)
+                    if expected_text in "".join(captured):
+                        return
+                raise VMError(
+                    f"QEMU exited before emitting '{expected_text}'. "
+                    f"Captured output:\n{''.join(captured)[-4000:]}"
+                )
+
+            time.sleep(min(0.2, remaining))
+    finally:
+        selector.close()
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+
+
+def cmd_list(args: argparse.Namespace) -> int:
+    config = load_config()
+    for name, vm in sorted(config["vms"].items()):
+        print(f"{name}: {vm.get('name', name)}")
+    return 0
+
+
+def cmd_show(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    print(json.dumps(vm, indent=2))
+    return 0
+
+
+def cmd_fetch_iso(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    ensure_iso(vm, dry_run=args.dry_run)
+    return 0
+
+
+def cmd_prep(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    ensure_vm_dirs(args.vm)
+
+    require_command("qemu-img")
+    disk = vm["disk"]
+    disk_path = resolve_path(disk["path"])
+    ensure_iso(vm, dry_run=args.dry_run)
+
+    if not disk_path.exists():
+        ensure_parent(disk_path)
+        cmd = ["qemu-img", "create", "-f", disk["format"]]
+        if disk.get("subformat"):
+            cmd += ["-o", f"subformat={disk['subformat']}"]
+        cmd += [str(disk_path), disk["size"]]
+        run(cmd, dry_run=args.dry_run)
+    else:
+        print(f"Disk already exists: {disk_path}")
+
+    firmware_args(vm, dry_run=args.dry_run)
+    print(f"Prepared VM '{args.vm}'")
+    return 0
+
+
+def cmd_install(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    ensure_vm_dirs(args.vm)
+    iso_path = ensure_iso(vm, dry_run=args.dry_run)
+    qemu_args = common_args(vm, args.video, dry_run=args.dry_run)
+    qemu_args += ["-cdrom", str(iso_path)]
+    run(qemu_args, dry_run=args.dry_run)
+    return 0
+
+
+def cmd_start(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    ensure_vm_dirs(args.vm)
+    qemu_args = common_args(vm, args.video, dry_run=args.dry_run)
+    run(qemu_args, dry_run=args.dry_run)
+    return 0
+
+
+def cmd_boot_check(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    ensure_vm_dirs(args.vm)
+
+    ci = vm.get("ci", {})
+    expected_text = args.expect or ci.get("expect")
+    if not expected_text:
+        raise VMError(f"Missing boot expectation for VM '{args.vm}'")
+
+    timeout_sec = args.timeout or ci.get("timeout_sec", 90)
+    accel = ci.get("accel", "tcg")
+    headless = ci.get("headless", True)
+    boot_from = ci.get("boot_from", "cdrom")
+
+    qemu_args = common_args(
+        vm,
+        variant=None,
+        dry_run=args.dry_run,
+        accel=accel,
+        headless=headless,
+        serial_stdio=True,
+        no_reboot=True,
+    )
+
+    if boot_from == "cdrom":
+        iso_path = ensure_iso(vm, dry_run=args.dry_run)
+        qemu_args += ["-boot", "once=d", "-cdrom", str(iso_path)]
+    elif boot_from != "disk":
+        raise VMError(f"Unsupported boot_from mode: {boot_from}")
+
+    run_and_expect(qemu_args, expected_text, int(timeout_sec), dry_run=args.dry_run)
+    print(f"Boot check passed for '{args.vm}'")
+    return 0
+
+
+def clean_vm(name: str, vm: dict, dry_run: bool = False) -> None:
+    disk_path = resolve_path(vm["disk"]["path"])
+    fw = vm["firmware"]
+    vars_path = resolve_path(fw["vars_path"]) if fw["type"] == "efi" else None
+    for path in [disk_path, vars_path]:
+        if path and path.exists():
+            print(f"Removing {path}")
+            if not dry_run:
+                path.unlink()
+    base = ROOT / "artifacts" / name
+    for subdir in [base / "runtime", base / "logs"]:
+        if subdir.exists() and not any(subdir.iterdir()):
+            print(f"Removing empty dir {subdir}")
+            if not dry_run:
+                subdir.rmdir()
+    if base.exists() and not any(base.iterdir()):
+        print(f"Removing empty dir {base}")
+        if not dry_run:
+            base.rmdir()
+
+
+def cmd_clean(args: argparse.Namespace) -> int:
+    config = load_config()
+    if args.all:
+        for name, vm in sorted(config["vms"].items()):
+            clean_vm(name, vm, dry_run=args.dry_run)
+        return 0
+    vm = get_vm(config, args.vm)
+    clean_vm(args.vm, vm, dry_run=args.dry_run)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="vmctl")
+    parser.add_argument("--dry-run", action="store_true", help="print commands without executing them")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    p = subparsers.add_parser("list")
+    p.set_defaults(func=cmd_list)
+
+    p = subparsers.add_parser("show")
+    p.add_argument("vm")
+    p.set_defaults(func=cmd_show)
+
+    p = subparsers.add_parser("fetch-iso")
+    p.add_argument("vm")
+    p.set_defaults(func=cmd_fetch_iso)
+
+    p = subparsers.add_parser("prep")
+    p.add_argument("vm")
+    p.set_defaults(func=cmd_prep)
+
+    p = subparsers.add_parser("install")
+    p.add_argument("vm")
+    p.add_argument("--video")
+    p.set_defaults(func=cmd_install)
+
+    p = subparsers.add_parser("start")
+    p.add_argument("vm")
+    p.add_argument("--video")
+    p.set_defaults(func=cmd_start)
+
+    p = subparsers.add_parser("boot-check")
+    p.add_argument("vm")
+    p.add_argument("--expect")
+    p.add_argument("--timeout", type=int)
+    p.set_defaults(func=cmd_boot_check)
+
+    p = subparsers.add_parser("clean")
+    p.add_argument("vm", nargs="?")
+    p.add_argument("--all", action="store_true")
+    p.set_defaults(func=cmd_clean)
+
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.command == "clean" and not args.all and not args.vm:
+        parser.error("clean requires a VM name or --all")
+
+    try:
+        return args.func(args)
+    except VMError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except subprocess.CalledProcessError as exc:
+        print(f"error: command failed with exit code {exc.returncode}", file=sys.stderr)
+        return exc.returncode
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
