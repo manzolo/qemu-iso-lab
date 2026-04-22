@@ -229,6 +229,85 @@ class VmctlTests(unittest.TestCase):
             [("boot:", "\n")],
         )
 
+    def test_firmware_args_uses_common_ovmf_fallback_when_configured_paths_are_missing(self):
+        self.create_disk()
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "/missing/OVMF_CODE_4M.fd",
+            "vars_template": "/missing/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.write_config()
+
+        fallback_code = self.root / "firmware" / "OVMF_CODE_4M.fd"
+        fallback_vars = self.root / "firmware" / "OVMF_VARS_4M.fd"
+        fallback_code.parent.mkdir(parents=True, exist_ok=True)
+        fallback_code.write_text("code", encoding="utf-8")
+        fallback_vars.write_text("vars", encoding="utf-8")
+
+        with mock.patch.object(
+            self.vmctl,
+            "COMMON_OVMF_PAIRS",
+            [(str(fallback_code), str(fallback_vars))],
+        ):
+            qemu_fw_args = self.vmctl.firmware_args(self.vm_config)
+
+        self.assertIn(f"if=pflash,format=raw,readonly=on,file={fallback_code}", qemu_fw_args)
+        self.assertIn(
+            f"if=pflash,format=raw,file={self.root / 'artifacts/testvm/OVMF_VARS.fd'}",
+            qemu_fw_args,
+        )
+        self.assertEqual((self.root / "artifacts/testvm/OVMF_VARS.fd").read_text(encoding="utf-8"), "vars")
+
+    def test_cmd_setup_reports_missing_dependencies_and_install_hints(self):
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "/missing/OVMF_CODE_4M.fd",
+            "vars_template": "/missing/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.write_config()
+        args = argparse.Namespace()
+
+        def fake_which(name):
+            if name in {"qemu-system-x86_64", "python3"}:
+                return f"/usr/bin/{name}"
+            return None
+
+        with mock.patch.object(self.vmctl.shutil, "which", side_effect=fake_which), \
+             mock.patch.object(self.vmctl, "COMMON_OVMF_PAIRS", []), \
+             mock.patch.object(self.vmctl, "read_os_release", return_value={"ID": "ubuntu", "ID_LIKE": "debian"}), \
+             mock.patch("sys.stdout", new_callable=mock.MagicMock()) as stdout:
+            exit_code = self.vmctl.cmd_setup(args)
+
+        output = "".join(call.args[0] for call in stdout.write.call_args_list)
+        self.assertEqual(exit_code, 1)
+        self.assertIn("[missing] qemu-img", output)
+        self.assertIn("[missing] testvm:", output)
+        self.assertIn("sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog", output)
+
+    def test_cmd_setup_passes_when_requirements_and_firmware_are_available(self):
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.write_config()
+        firmware_dir = self.root / "firmware"
+        firmware_dir.mkdir(parents=True, exist_ok=True)
+        (firmware_dir / "OVMF_CODE_4M.fd").write_text("code", encoding="utf-8")
+        (firmware_dir / "OVMF_VARS_4M.fd").write_text("vars", encoding="utf-8")
+        args = argparse.Namespace()
+
+        with mock.patch.object(self.vmctl.shutil, "which", return_value="/usr/bin/fake"), \
+             mock.patch("sys.stdout", new_callable=mock.MagicMock()) as stdout:
+            exit_code = self.vmctl.cmd_setup(args)
+
+        output = "".join(call.args[0] for call in stdout.write.call_args_list)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Setup check passed.", output)
+
 
 if __name__ == "__main__":
     unittest.main()

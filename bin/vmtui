@@ -33,8 +33,11 @@ menu_choose() {
     shift 2
     local output
     local status
+    local height="${MENU_HEIGHT:-22}"
+    local width="${MENU_WIDTH:-80}"
+    local list_height="${MENU_LIST_HEIGHT:-12}"
 
-    output=$(dialog --clear --stdout --title "$title" --menu "$prompt" 22 80 12 "$@") || status=$?
+    output=$(dialog --clear --stdout --title "$title" --menu "$prompt" "$height" "$width" "$list_height" "$@") || status=$?
     status=${status:-0}
     if [[ $status -ne 0 ]]; then
         return 1
@@ -60,15 +63,33 @@ import json
 import sys
 from pathlib import Path
 
+
+def ellipsize(text: str, width: int) -> str:
+    if len(text) <= width:
+        return text
+    if width <= 3:
+        return text[:width]
+    return text[: width - 3] + "..."
+
+
 config_path = Path(sys.argv[1])
 data = json.loads(config_path.read_text(encoding="utf-8"))
 for name, vm in sorted(data["vms"].items()):
     label = vm.get("name", name)
-    firmware = vm.get("firmware", {}).get("type", "?")
-    memory = vm.get("memory_mb", "?")
+    firmware = str(vm.get("firmware", {}).get("type", "?")).upper()
+    memory = f"{vm.get('memory_mb', '?')} MB"
     cpus = vm.get("cpus", "?")
+    cpu_label = f"{cpus} vCPU" if cpus == 1 else f"{cpus} vCPUs"
+    description = "  ".join(
+        [
+            f"{ellipsize(label, 28):<28}",
+            f"{firmware:>4}",
+            f"{memory:>7}",
+            f"{cpu_label:>7}",
+        ]
+    )
     print(name)
-    print(f"{label} | {firmware} | {memory}MB | {cpus} CPU")
+    print(description)
 PY
 }
 
@@ -114,7 +135,7 @@ run_vmctl() {
 choose_vm() {
     mapfile -t vm_items < <(list_vm_menu_items)
     local selected
-    selected=$(menu_choose "VM Selection" "Choose a VM profile" "${vm_items[@]}") || return 1
+    selected=$(MENU_WIDTH=96 MENU_LIST_HEIGHT=14 menu_choose "VM Selection" "Choose a VM profile" "${vm_items[@]}") || return 1
     current_vm="$selected"
     return 0
 }
@@ -173,8 +194,11 @@ run_action() {
                 run_vmctl clean --all
             fi
             ;;
-        change-vm)
-            choose_vm || true
+        back)
+            return 1
+            ;;
+        choose-vm)
+            choose_vm || return 1
             ;;
         quit)
             clear
@@ -183,11 +207,11 @@ run_action() {
     esac
 }
 
-main_menu_loop() {
+vm_menu_loop() {
     while true; do
         local selected
         selected=$(menu_choose \
-            "QEMU ISO Lab" \
+            "VM Actions" \
             "Current VM: $current_vm" \
             show "Show VM profile" \
             fetch-iso "Download ISO if missing" \
@@ -196,21 +220,35 @@ main_menu_loop() {
             start "Boot installed VM" \
             boot-check "Run headless boot smoke check" \
             clean "Clean current VM artifacts" \
-            clean-all "Clean all VM artifacts" \
-            change-vm "Choose another VM" \
-            quit "Exit TUI") || {
-                clear
-                exit 0
-            }
-        run_action "$selected"
+            back "Torna al menu") || return 0
+        run_action "$selected" || return 0
     done
 }
 
-if [[ -z "$current_vm" ]]; then
-    choose_vm || {
-        clear
-        exit 0
-    }
-fi
+main_menu_loop() {
+    while true; do
+        local selected
+        selected=$(menu_choose \
+            "QEMU ISO Lab" \
+            "Main menu" \
+            choose-vm "Seleziona una VM" \
+            clean-all "Pulisci gli artifact di tutte le VM" \
+            quit "Esci") || {
+                clear
+                exit 0
+            }
+
+        case "$selected" in
+            choose-vm)
+                if choose_vm; then
+                    vm_menu_loop
+                fi
+                ;;
+            clean-all|quit)
+                run_action "$selected"
+                ;;
+        esac
+    done
+}
 
 main_menu_loop

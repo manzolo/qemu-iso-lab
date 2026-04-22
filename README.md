@@ -15,7 +15,7 @@ The project currently provides:
 - a VM catalog in `vms.json`;
 - a Python CLI in `bin/vmctl`;
 - a minimal text UI in `bin/vmtui`;
-- a thin `Makefile` frontend;
+- a thin `Makefile` frontend, including a host `setup` check;
 - support for both `efi` and `bios` guests;
 - isolated per-VM artifacts under `artifacts/<vm>/`;
 - a lightweight CI smoke test based on `alpine-ci`.
@@ -69,6 +69,12 @@ git clone git@github.com:manzolo/qemu-iso-lab.git
 cd qemu-iso-lab
 ```
 
+Run the host check first:
+
+```bash
+make setup
+```
+
 Install dependencies on Arch-based systems:
 
 ```bash
@@ -89,6 +95,7 @@ sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog
 Use this path for a normal local guest such as `cachyos`:
 
 ```bash
+make setup
 make show VM=cachyos
 make prep VM=cachyos
 make install VM=cachyos
@@ -130,6 +137,7 @@ The TUI is a thin frontend over `vmctl`. It lets you:
 With `make`:
 
 ```bash
+make setup
 make list
 make show VM=cachyos
 make fetch-iso VM=cachyos
@@ -145,6 +153,7 @@ make clean-all
 With `vmctl` directly:
 
 ```bash
+./bin/vmctl setup
 ./bin/vmctl list
 ./bin/vmctl show cachyos
 ./bin/vmctl fetch-iso cachyos
@@ -215,9 +224,25 @@ Example:
 
 For `efi` profiles, `vmctl`:
 
+- prefers the `code` and `vars_template` paths from `vms.json`;
+- falls back to common OVMF locations if the configured paths are missing;
+- accepts `OVMF_CODE` and `OVMF_VARS_TEMPLATE` environment overrides;
 - uses `OVMF_CODE` as read-only firmware;
 - creates a local copy of `OVMF_VARS`;
 - starts QEMU with pflash drives.
+
+This means entries such as:
+
+```json
+"firmware": {
+  "type": "efi",
+  "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+  "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+  "vars_path": "artifacts/ubuntu-desktop/OVMF_VARS.fd"
+}
+```
+
+are safe as defaults, and `make setup` will tell you if your host needs a different OVMF package layout.
 
 ### BIOS
 

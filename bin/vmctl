@@ -17,10 +17,59 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "vms.json"
 HTTP_USER_AGENT = "Mozilla/5.0 (compatible; vmctl/1.0; +https://local.repo)"
+REQUIRED_COMMANDS = ["qemu-system-x86_64", "qemu-img", "python3"]
+OPTIONAL_COMMANDS = {"dialog": "required only for the TUI"}
+COMMON_OVMF_PAIRS = [
+    ("/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd"),
+    ("/usr/share/OVMF/OVMF_CODE.fd", "/usr/share/OVMF/OVMF_VARS.fd"),
+    ("/usr/share/edk2/x64/OVMF_CODE.4m.fd", "/usr/share/edk2/x64/OVMF_VARS.4m.fd"),
+    ("/usr/share/edk2/x64/OVMF_CODE.fd", "/usr/share/edk2/x64/OVMF_VARS.fd"),
+    ("/usr/share/edk2-ovmf/x64/OVMF_CODE.4m.fd", "/usr/share/edk2-ovmf/x64/OVMF_VARS.4m.fd"),
+    ("/usr/share/edk2-ovmf/x64/OVMF_CODE.fd", "/usr/share/edk2-ovmf/x64/OVMF_VARS.fd"),
+]
+USE_COLOR = (
+    os.environ.get("NO_COLOR") != "1"
+    and os.environ.get("TERM", "") not in ("", "dumb")
+    and getattr(sys.stdout, "isatty", lambda: False)() is True
+)
+RESET = "\033[0m" if USE_COLOR else ""
+BOLD = "\033[1m" if USE_COLOR else ""
+BLUE = "\033[34m" if USE_COLOR else ""
+CYAN = "\033[36m" if USE_COLOR else ""
+GREEN = "\033[32m" if USE_COLOR else ""
+YELLOW = "\033[33m" if USE_COLOR else ""
+RED = "\033[31m" if USE_COLOR else ""
 
 
 class VMError(Exception):
     pass
+
+
+def style(text: str, *codes: str) -> str:
+    if not USE_COLOR:
+        return text
+    return "".join(codes) + text + RESET
+
+
+def print_header(title: str) -> None:
+    print(f"{style('==>', BOLD, BLUE)} {style(title, BOLD)}")
+
+
+def print_kv(label: str, value: str) -> None:
+    print(f"  {style(f'{label:<10}', CYAN)} {value}")
+
+
+def print_status(marker: str, text: str, ok: bool = True) -> None:
+    color = GREEN if ok else YELLOW
+    print(f"  [{style(marker, color, BOLD)}] {text}")
+
+
+def print_command(cmd: list[str]) -> None:
+    print(f"{style('$', BOLD, BLUE)} {' '.join(cmd)}")
+
+
+def print_note(text: str) -> None:
+    print(f"{style('::', BOLD, CYAN)} {text}")
 
 
 def load_config() -> dict:
@@ -49,7 +98,7 @@ def require_command(name: str) -> None:
 
 
 def run(cmd: list[str], dry_run: bool = False) -> None:
-    print("$", " ".join(cmd))
+    print_command(cmd)
     if not dry_run:
         subprocess.run(cmd, check=True)
 
@@ -59,7 +108,7 @@ def ensure_parent(path: Path) -> None:
 
 
 def download_file(url: str, destination: Path, dry_run: bool = False) -> None:
-    print(f"Downloading {url} -> {destination}")
+    print_note(f"Downloading {url} -> {destination}")
     ensure_parent(destination)
     if dry_run:
         return
@@ -77,7 +126,7 @@ def download_file(url: str, destination: Path, dry_run: bool = False) -> None:
 def ensure_iso(vm: dict, dry_run: bool = False) -> Path:
     iso_path = resolve_path(vm["iso"])
     if iso_path.is_file():
-        print(f"ISO already exists: {iso_path}")
+        print_status("ok", f"ISO already exists: {iso_path}")
         return iso_path
     if iso_path.exists():
         raise VMError(f"ISO path exists but is not a regular file: {iso_path}")
@@ -97,6 +146,99 @@ def ensure_vm_dirs(name: str) -> Path:
     return base
 
 
+def read_os_release() -> dict[str, str]:
+    os_release = Path("/etc/os-release")
+    if not os_release.is_file():
+        return {}
+
+    data: dict[str, str] = {}
+    for line in os_release.read_text(encoding="utf-8").splitlines():
+        if "=" not in line or line.startswith("#"):
+            continue
+        key, value = line.split("=", 1)
+        data[key] = value.strip().strip('"')
+    return data
+
+
+def host_install_hints() -> list[str]:
+    os_release = read_os_release()
+    distro_tokens = {
+        token
+        for key in ("ID", "ID_LIKE")
+        for token in os_release.get(key, "").replace(",", " ").split()
+        if token
+    }
+
+    if {"arch", "cachyos", "manjaro"} & distro_tokens:
+        return ["sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog make"]
+    if {"debian", "ubuntu"} & distro_tokens:
+        return [
+            "sudo apt update",
+            "sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog",
+        ]
+    return [
+        "Install QEMU, Python 3, make, and OVMF/edk2 firmware with your distro package manager.",
+        "Optional: install dialog if you want to use make tui.",
+    ]
+
+
+def iter_ovmf_candidates(fw: dict) -> list[tuple[Path, Path]]:
+    candidates: list[tuple[Path, Path]] = []
+
+    env_code = os.environ.get("OVMF_CODE")
+    env_vars = os.environ.get("OVMF_VARS_TEMPLATE")
+    if env_code and env_vars:
+        candidates.append((Path(env_code), Path(env_vars)))
+
+    configured_code = fw.get("code")
+    configured_vars = fw.get("vars_template")
+    if configured_code and configured_vars:
+        candidates.append((resolve_path(configured_code), resolve_path(configured_vars)))
+
+    for code, vars_template in COMMON_OVMF_PAIRS:
+        candidates.append((Path(code), Path(vars_template)))
+
+    unique: list[tuple[Path, Path]] = []
+    seen: set[tuple[str, str]] = set()
+    for code, vars_template in candidates:
+        key = (str(code), str(vars_template))
+        if key not in seen:
+            unique.append((code, vars_template))
+            seen.add(key)
+    return unique
+
+
+def resolve_efi_firmware(fw: dict) -> tuple[Path, Path, Path]:
+    vars_path = resolve_path(fw["vars_path"])
+    for code, vars_template in iter_ovmf_candidates(fw):
+        if code.is_file() and vars_template.is_file():
+            return code, vars_template, vars_path
+
+    configured_code = resolve_path(fw["code"]) if fw.get("code") else None
+    configured_vars = resolve_path(fw["vars_template"]) if fw.get("vars_template") else None
+    lines = ["Unable to locate OVMF firmware files for EFI guest."]
+    if configured_code:
+        lines.append(f"Configured code path: {configured_code}")
+    if configured_vars:
+        lines.append(f"Configured vars template path: {configured_vars}")
+    if "OVMF_CODE" in os.environ or "OVMF_VARS_TEMPLATE" in os.environ:
+        lines.append("Environment overrides detected: OVMF_CODE / OVMF_VARS_TEMPLATE")
+    lines.append("Run 'make setup' to inspect host dependencies and suggested packages.")
+    raise VMError(" ".join(lines))
+
+
+def firmware_status(vm: dict) -> tuple[str, str]:
+    fw = vm["firmware"]
+    fw_type = fw["type"]
+    if fw_type == "bios":
+        return fw_type, "SeaBIOS / no OVMF required"
+    if fw_type != "efi":
+        raise VMError(f"Unsupported firmware type: {fw_type}")
+
+    code, vars_template, vars_path = resolve_efi_firmware(fw)
+    return fw_type, f"code={code} vars_template={vars_template} vars_path={vars_path}"
+
+
 def machine_arg(vm: dict, accel: str | None = None) -> str:
     machine = vm["machine"]
     if accel:
@@ -112,17 +254,10 @@ def firmware_args(vm: dict, dry_run: bool = False) -> list[str]:
     if fw_type != "efi":
         raise VMError(f"Unsupported firmware type: {fw_type}")
 
-    code = resolve_path(fw["code"])
-    vars_template = resolve_path(fw["vars_template"])
-    vars_path = resolve_path(fw["vars_path"])
-
-    if not code.is_file():
-        raise VMError(f"Missing OVMF code file: {code}")
-    if not vars_template.is_file():
-        raise VMError(f"Missing OVMF vars template: {vars_template}")
+    code, vars_template, vars_path = resolve_efi_firmware(fw)
     if not vars_path.exists():
         ensure_parent(vars_path)
-        print(f"Creating EFI vars store: {vars_path}")
+        print_note(f"Creating EFI vars store: {vars_path}")
         if not dry_run:
             shutil.copyfile(vars_template, vars_path)
 
@@ -220,7 +355,7 @@ def run_and_expect(
     auto_inputs: list[tuple[str, str]] | None = None,
     dry_run: bool = False,
 ) -> None:
-    print("$", " ".join(cmd))
+    print_command(cmd)
     if dry_run:
         return
 
@@ -296,14 +431,36 @@ def run_and_expect(
 
 def cmd_list(args: argparse.Namespace) -> int:
     config = load_config()
+    rows = []
     for name, vm in sorted(config["vms"].items()):
-        print(f"{name}: {vm.get('name', name)}")
+        firmware = vm.get("firmware", {}).get("type", "?").upper()
+        memory = vm.get("memory_mb", "?")
+        cpus = vm.get("cpus", "?")
+        rows.append((name, vm.get("name", name), firmware, str(memory), str(cpus)))
+
+    name_width = max(len("PROFILE"), max(len(row[0]) for row in rows))
+    label_width = max(len("NAME"), max(len(row[1]) for row in rows))
+    firmware_width = max(len("FW"), max(len(row[2]) for row in rows))
+    memory_width = max(len("RAM"), max(len(f"{row[3]}M") for row in rows))
+    cpu_width = max(len("CPU"), max(len(row[4]) for row in rows))
+    print(f"{style('PROFILE', BOLD, CYAN):<{name_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('NAME', BOLD, CYAN):<{label_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('FW', BOLD, CYAN):>{firmware_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('RAM', BOLD, CYAN):>{memory_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('CPU', BOLD, CYAN):>{cpu_width + len(BOLD) + len(CYAN) + len(RESET)}}")
+    for name, label, firmware, memory, cpus in rows:
+        print(f"{style(name, BOLD):<{name_width + len(BOLD) + len(RESET)}}  "
+              f"{label:<{label_width}}  "
+              f"{firmware:>{firmware_width}}  "
+              f"{f'{memory}M':>{memory_width}}  "
+              f"{cpus:>{cpu_width}}")
     return 0
 
 
 def cmd_show(args: argparse.Namespace) -> int:
     config = load_config()
     vm = get_vm(config, args.vm)
+    print_header(f"VM profile: {args.vm}")
     print(json.dumps(vm, indent=2))
     return 0
 
@@ -333,10 +490,10 @@ def cmd_prep(args: argparse.Namespace) -> int:
         cmd += [str(disk_path), disk["size"]]
         run(cmd, dry_run=args.dry_run)
     else:
-        print(f"Disk already exists: {disk_path}")
+        print_status("ok", f"Disk already exists: {disk_path}")
 
     firmware_args(vm, dry_run=args.dry_run)
-    print(f"Prepared VM '{args.vm}'")
+    print_status("ok", f"Prepared VM '{args.vm}'")
     return 0
 
 
@@ -399,8 +556,48 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
         auto_inputs=auto_inputs,
         dry_run=args.dry_run,
     )
-    print(f"Boot check passed for '{args.vm}'")
+    print_status("ok", f"Boot check passed for '{args.vm}'")
     return 0
+
+
+def cmd_setup(args: argparse.Namespace) -> int:
+    config = load_config()
+    status_ok = True
+
+    print_header("Host dependency check")
+    for name in REQUIRED_COMMANDS:
+        present = shutil.which(name) is not None
+        marker = "ok" if present else "missing"
+        print_status(marker, name, ok=present)
+        status_ok = status_ok and present
+
+    print_header("Optional tools")
+    for name, note in OPTIONAL_COMMANDS.items():
+        present = shutil.which(name) is not None
+        marker = "ok" if present else "missing"
+        print_status(marker, f"{name} ({note})", ok=present)
+
+    print_header("Firmware check")
+    efi_vms = [(name, vm) for name, vm in sorted(config["vms"].items()) if vm["firmware"]["type"] == "efi"]
+    if not efi_vms:
+        print_status("ok", "No EFI profiles configured")
+    else:
+        for name, vm in efi_vms:
+            try:
+                _, details = firmware_status(vm)
+                print_status("ok", f"{name}: {details}")
+            except VMError as exc:
+                print_status("missing", f"{name}: {exc}", ok=False)
+                status_ok = False
+
+    if status_ok:
+        print_status("ok", "Setup check passed.")
+        return 0
+
+    print_header("Suggested install commands")
+    for cmd in host_install_hints():
+        print_kv("cmd", cmd)
+    return 1
 
 
 def clean_vm(name: str, vm: dict, dry_run: bool = False) -> None:
@@ -409,17 +606,17 @@ def clean_vm(name: str, vm: dict, dry_run: bool = False) -> None:
     vars_path = resolve_path(fw["vars_path"]) if fw["type"] == "efi" else None
     for path in [disk_path, vars_path]:
         if path and path.exists():
-            print(f"Removing {path}")
+            print_note(f"Removing {path}")
             if not dry_run:
                 path.unlink()
     base = ROOT / "artifacts" / name
     for subdir in [base / "runtime", base / "logs"]:
         if subdir.exists() and not any(subdir.iterdir()):
-            print(f"Removing empty dir {subdir}")
+            print_note(f"Removing empty dir {subdir}")
             if not dry_run:
                 subdir.rmdir()
     if base.exists() and not any(base.iterdir()):
-        print(f"Removing empty dir {base}")
+        print_note(f"Removing empty dir {base}")
         if not dry_run:
             base.rmdir()
 
@@ -471,6 +668,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=int)
     p.set_defaults(func=cmd_boot_check)
 
+    p = subparsers.add_parser("setup")
+    p.set_defaults(func=cmd_setup)
+
     p = subparsers.add_parser("clean")
     p.add_argument("vm", nargs="?")
     p.add_argument("--all", action="store_true")
@@ -489,10 +689,10 @@ def main() -> int:
     try:
         return args.func(args)
     except VMError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(style(f"error: {exc}", RED, BOLD), file=sys.stderr)
         return 1
     except subprocess.CalledProcessError as exc:
-        print(f"error: command failed with exit code {exc.returncode}", file=sys.stderr)
+        print(style(f"error: command failed with exit code {exc.returncode}", RED, BOLD), file=sys.stderr)
         return exc.returncode
 
 

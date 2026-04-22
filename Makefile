@@ -1,51 +1,95 @@
 VM ?= cachyos
 VIDEO ?=
+ESC := \033
+ifneq ($(strip $(NO_COLOR)),1)
+ifneq ($(strip $(TERM)),)
+ifneq ($(strip $(TERM)),dumb)
+BOLD := $(ESC)[1m
+BLUE := $(ESC)[34m
+CYAN := $(ESC)[36m
+GREEN := $(ESC)[32m
+YELLOW := $(ESC)[33m
+RESET := $(ESC)[0m
+endif
+endif
+endif
 
-.PHONY: help list show fetch-iso prep install start boot-check tui clean clean-all
+.PHONY: help setup list show fetch-iso prep install start boot-check tui clean clean-all
+
+define print_header
+	@printf "$(BOLD)$(BLUE)==>$(RESET) $(BOLD)%s$(RESET)\n" "$(1)"
+endef
+
+define print_kv
+	@printf "  $(CYAN)%-8s$(RESET) %s\n" "$(1)" "$(2)"
+endef
 
 help:
-	@echo "Targets disponibili:"
-	@echo "  make list"
-	@echo "  make show VM=cachyos"
-	@echo "  make fetch-iso VM=cachyos"
-	@echo "  make prep VM=cachyos"
-	@echo "  make install VM=cachyos"
-	@echo "  make start VM=cachyos [VIDEO=safe|std|virtio-gl]"
-	@echo "  make boot-check VM=alpine-ci"
-	@echo "  make tui"
-	@echo "  make clean VM=cachyos"
-	@echo "  make clean-all"
-	@echo
-	@echo "Variabili:"
-	@echo "  VM=$(VM)"
-	@echo "  VIDEO=$(VIDEO)"
+	$(call print_header,Targets disponibili)
+	$(call print_kv,make,setup)
+	$(call print_kv,make,list)
+	$(call print_kv,make,show VM=cachyos)
+	$(call print_kv,make,fetch-iso VM=cachyos)
+	$(call print_kv,make,prep VM=cachyos)
+	$(call print_kv,make,install VM=cachyos)
+	$(call print_kv,make,start VM=cachyos [VIDEO=safe|std|virtio-gl])
+	$(call print_kv,make,boot-check VM=alpine-ci)
+	$(call print_kv,make,tui)
+	$(call print_kv,make,clean VM=cachyos)
+	$(call print_kv,make,clean-all)
+	@printf "\n"
+	$(call print_header,Variabili)
+	$(call print_kv,VM,$(VM))
+	$(call print_kv,VIDEO,$(if $(VIDEO),$(VIDEO),<default>))
+
+setup:
+	@./bin/vmctl setup
 
 list:
-	./bin/vmctl list
+	$(call print_header,Elenco VM configurate)
+	@./bin/vmctl list
 
 show:
-	./bin/vmctl show "$(VM)"
+	$(call print_header,Profilo VM)
+	$(call print_kv,VM,$(VM))
+	@./bin/vmctl show "$(VM)"
 
 fetch-iso:
-	./bin/vmctl fetch-iso "$(VM)"
+	$(call print_header,Download ISO)
+	$(call print_kv,VM,$(VM))
+	@./bin/vmctl fetch-iso "$(VM)"
 
 prep:
-	./bin/vmctl prep "$(VM)"
+	$(call print_header,Preparazione VM)
+	$(call print_kv,VM,$(VM))
+	@./bin/vmctl prep "$(VM)"
 
 install:
-	./bin/vmctl install "$(VM)" $(if $(VIDEO),--video $(VIDEO),)
+	$(call print_header,Avvio installer)
+	$(call print_kv,VM,$(VM))
+	$(call print_kv,VIDEO,$(if $(VIDEO),$(VIDEO),<default>))
+	@./bin/vmctl install "$(VM)" $(if $(VIDEO),--video $(VIDEO),)
 
 start:
-	./bin/vmctl start "$(VM)" $(if $(VIDEO),--video $(VIDEO),)
+	$(call print_header,Avvio VM)
+	$(call print_kv,VM,$(VM))
+	$(call print_kv,VIDEO,$(if $(VIDEO),$(VIDEO),<default>))
+	@./bin/vmctl start "$(VM)" $(if $(VIDEO),--video $(VIDEO),)
 
 boot-check:
-	./bin/vmctl boot-check "$(VM)"
+	$(call print_header,Boot smoke check)
+	$(call print_kv,VM,$(VM))
+	@./bin/vmctl boot-check "$(VM)"
 
 tui:
-	./bin/vmtui
+	$(call print_header,Apertura TUI)
+	@./bin/vmtui
 
 clean:
-	./bin/vmctl clean "$(VM)"
+	$(call print_header,Pulizia artifact VM)
+	$(call print_kv,VM,$(VM))
+	@./bin/vmctl clean "$(VM)"
 
 clean-all:
-	./bin/vmctl clean --all
+	$(call print_header,Pulizia artifact di tutte le VM)
+	@./bin/vmctl clean --all
