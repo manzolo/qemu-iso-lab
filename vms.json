@@ -80,6 +80,12 @@
         "accel": "tcg",
         "headless": true,
         "boot_from": "cdrom",
+        "auto_input": [
+          {
+            "match": "boot:",
+            "send": "\n"
+          }
+        ],
         "expect": "login:",
         "timeout_sec": 90
       }

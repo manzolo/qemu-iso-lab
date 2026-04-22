@@ -215,6 +215,7 @@ def run_and_expect(
     cmd: list[str],
     expected_text: str,
     timeout_sec: int,
+    auto_inputs: list[tuple[str, str]] | None = None,
     dry_run: bool = False,
 ) -> None:
     print("$", " ".join(cmd))
@@ -224,10 +225,12 @@ def run_and_expect(
     deadline = time.monotonic() + timeout_sec
     process = subprocess.Popen(
         cmd,
+        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
     captured: list[str] = []
+    sent_inputs: set[tuple[str, str]] = set()
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ)
 
@@ -247,7 +250,17 @@ def run_and_expect(
                     sys.stdout.write(chunk)
                     sys.stdout.flush()
                     captured.append(chunk)
-                    if expected_text in "".join(captured):
+                    full_output = "".join(captured)
+                    if auto_inputs:
+                        for match_text, send_text in auto_inputs:
+                            key = (match_text, send_text)
+                            if key in sent_inputs:
+                                continue
+                            if match_text in full_output:
+                                process.stdin.write(send_text.encode())
+                                process.stdin.flush()
+                                sent_inputs.add(key)
+                    if expected_text in full_output:
                         process.terminate()
                         try:
                             process.wait(timeout=10)
@@ -359,6 +372,7 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
     accel = ci.get("accel", "tcg")
     headless = ci.get("headless", True)
     boot_from = ci.get("boot_from", "cdrom")
+    auto_inputs = [(item["match"], item["send"]) for item in ci.get("auto_input", [])]
 
     qemu_args = common_args(
         vm,
@@ -376,7 +390,13 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
     elif boot_from != "disk":
         raise VMError(f"Unsupported boot_from mode: {boot_from}")
 
-    run_and_expect(qemu_args, expected_text, int(timeout_sec), dry_run=args.dry_run)
+    run_and_expect(
+        qemu_args,
+        expected_text,
+        int(timeout_sec),
+        auto_inputs=auto_inputs,
+        dry_run=args.dry_run,
+    )
     print(f"Boot check passed for '{args.vm}'")
     return 0
 

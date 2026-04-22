@@ -179,6 +179,7 @@ class VmctlTests(unittest.TestCase):
             "accel": "tcg",
             "headless": True,
             "boot_from": "cdrom",
+            "auto_input": [{"match": "boot:", "send": "\n"}],
             "expect": "login:",
             "timeout_sec": 42,
         }
@@ -199,6 +200,10 @@ class VmctlTests(unittest.TestCase):
         self.assertEqual(qemu_cmd[qemu_cmd.index("-cdrom") + 1], str(iso_path))
         self.assertEqual(expected_text, "login:")
         self.assertEqual(timeout_sec, 42)
+        self.assertEqual(
+            run_and_expect.call_args.kwargs["auto_inputs"],
+            [("boot:", "\n")],
+        )
 
 
 if __name__ == "__main__":
