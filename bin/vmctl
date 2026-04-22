@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "vms.json"
+HTTP_USER_AGENT = "Mozilla/5.0 (compatible; vmctl/1.0; +https://local.repo)"
 
 
 class VMError(Exception):
@@ -64,7 +65,8 @@ def download_file(url: str, destination: Path, dry_run: bool = False) -> None:
         return
 
     try:
-        with urllib.request.urlopen(url) as response, destination.open("wb") as fh:
+        request = urllib.request.Request(url, headers={"User-Agent": HTTP_USER_AGENT})
+        with urllib.request.urlopen(request) as response, destination.open("wb") as fh:
             shutil.copyfileobj(response, fh)
     except (OSError, urllib.error.URLError) as exc:
         if destination.exists():

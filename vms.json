@@ -1,9 +1,257 @@
 {
+  "catalog": {
+    "schema_version": 2,
+    "purpose": "Scratchpad metadata for distro hopping and ready-to-boot VM profiles.",
+    "distro_candidates": [
+      {
+        "slug": "cachyos",
+        "name": "CachyOS",
+        "family": "arch",
+        "release_model": "rolling",
+        "desktop": "KDE Plasma",
+        "installer": "Calamares",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "high",
+        "use_case": "Performance-tuned Arch derivative for daily desktop use.",
+        "tags": [
+          "gaming",
+          "desktop",
+          "arch-based"
+        ],
+        "vm_profile": "cachyos",
+        "notes": "Already present as a full install profile."
+      },
+      {
+        "slug": "fedora-workstation",
+        "name": "Fedora Workstation",
+        "family": "fedora",
+        "release_model": "stable",
+        "desktop": "GNOME",
+        "installer": "Anaconda",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "high",
+        "use_case": "Good baseline for modern GNOME, Wayland, and upstream defaults.",
+        "tags": [
+          "gnome",
+          "upstream-friendly",
+          "desktop"
+        ],
+        "vm_profile": "fedora-workstation",
+        "notes": "Also paired with Fedora Xfce, Cinnamon, and Server variants."
+      },
+      {
+        "slug": "debian",
+        "name": "Debian",
+        "family": "debian",
+        "release_model": "stable",
+        "desktop": "GNOME",
+        "installer": "Debian Installer or Calamares",
+        "firmware_hint": "bios-or-efi",
+        "profile_status": "ready",
+        "priority": "medium",
+        "use_case": "Conservative baseline to compare stability and package freshness tradeoffs.",
+        "tags": [
+          "stable",
+          "baseline",
+          "server-friendly"
+        ],
+        "vm_profile": "debian-gnome-live",
+        "notes": "Includes both live GNOME and lean netinst profiles."
+      },
+      {
+        "slug": "ubuntu",
+        "name": "Ubuntu",
+        "family": "debian",
+        "release_model": "lts-plus-interim",
+        "desktop": "GNOME",
+        "installer": "Subiquity",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "medium",
+        "use_case": "Mainstream desktop/server baseline with broad hardware support.",
+        "tags": [
+          "popular",
+          "desktop",
+          "broad-support"
+        ],
+        "vm_profile": "ubuntu-desktop",
+        "notes": "Includes both desktop and server profiles."
+      },
+      {
+        "slug": "linux-mint",
+        "name": "Linux Mint",
+        "family": "debian",
+        "release_model": "stable",
+        "desktop": "Cinnamon",
+        "installer": "Ubiquity",
+        "firmware_hint": "efi",
+        "profile_status": "idea",
+        "priority": "medium",
+        "use_case": "Traditional desktop workflow with lower setup friction.",
+        "tags": [
+          "cinnamon",
+          "friendly",
+          "desktop"
+        ],
+        "notes": "Left as catalog-only until you choose a preferred mirror."
+      },
+      {
+        "slug": "opensuse-tumbleweed",
+        "name": "openSUSE Tumbleweed",
+        "family": "opensuse",
+        "release_model": "rolling",
+        "desktop": "KDE Plasma",
+        "installer": "YaST",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "high",
+        "use_case": "Rolling distro with strong tooling and snapshots.",
+        "tags": [
+          "rolling",
+          "btrfs",
+          "snapper"
+        ],
+        "vm_profile": "opensuse-tumbleweed-kde",
+        "notes": "Includes both KDE live and net installer profiles."
+      },
+      {
+        "slug": "endeavouros",
+        "name": "EndeavourOS",
+        "family": "arch",
+        "release_model": "rolling",
+        "desktop": "Xfce",
+        "installer": "Calamares",
+        "firmware_hint": "efi",
+        "profile_status": "idea",
+        "priority": "medium",
+        "use_case": "Closer-to-Arch experience with a quicker install path.",
+        "tags": [
+          "arch-based",
+          "lighter",
+          "community"
+        ],
+        "notes": "Left as catalog-only because official downloads rotate across mirrors."
+      },
+      {
+        "slug": "nixos",
+        "name": "NixOS",
+        "family": "nix",
+        "release_model": "channel-based",
+        "desktop": "Graphical or minimal",
+        "installer": "Graphical or manual",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "high",
+        "use_case": "Declarative system management and reproducible configuration.",
+        "tags": [
+          "declarative",
+          "reproducible",
+          "advanced"
+        ],
+        "vm_profile": "nixos-graphical",
+        "notes": "Includes graphical and minimal installer profiles."
+      },
+      {
+        "slug": "archlinux",
+        "name": "Arch Linux",
+        "family": "arch",
+        "release_model": "rolling",
+        "desktop": "none",
+        "installer": "archinstall or manual",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "high",
+        "use_case": "Clean rolling baseline without derivative defaults.",
+        "tags": [
+          "rolling",
+          "manual",
+          "baseline"
+        ],
+        "vm_profile": "archlinux",
+        "notes": "Useful as a plain Arch control sample alongside CachyOS."
+      },
+      {
+        "slug": "alpine-linux",
+        "name": "Alpine Linux",
+        "family": "alpine",
+        "release_model": "stable",
+        "desktop": "none",
+        "installer": "setup-alpine",
+        "firmware_hint": "bios",
+        "profile_status": "ci-only",
+        "priority": "low",
+        "use_case": "Tiny guest for smoke tests, rescue tasks, and quick boot checks.",
+        "tags": [
+          "minimal",
+          "ci",
+          "musl"
+        ],
+        "vm_profile": "alpine-ci",
+        "notes": "Already present as the lightweight validation guest."
+      }
+    ]
+  },
   "vms": {
+    "archlinux": {
+      "name": "Arch Linux",
+      "meta": {
+        "catalog_slug": "archlinux",
+        "family": "arch",
+        "role": "baseline",
+        "release_model": "rolling"
+      },
+      "iso": "isos/archlinux-2026.04.01-x86_64.iso",
+      "iso_url": "https://mirrors.dotsrc.org/archlinux/iso/latest/archlinux-2026.04.01-x86_64.iso",
+      "disk": {
+        "path": "artifacts/archlinux/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/archlinux/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
     "cachyos": {
       "name": "CachyOS",
+      "meta": {
+        "catalog_slug": "cachyos",
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
       "iso": "isos/cachyos-desktop-linux-260308.iso",
-      "iso_url": "https://iso.cachyos.org/desktop/260308/cachyos-desktop-linux-260308.iso",
+      "iso_url": "https://mirror.cachyos.org/ISO/desktop/260308/cachyos-desktop-linux-260308.iso",
       "disk": {
         "path": "artifacts/cachyos/disk.vhd",
         "size": "30G",
@@ -49,8 +297,587 @@
       },
       "usb_tablet": true
     },
+    "debian-gnome-live": {
+      "name": "Debian 13 GNOME Live",
+      "meta": {
+        "catalog_slug": "debian",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/debian-live-13.4.0-amd64-gnome.iso",
+      "iso_url": "https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
+      "disk": {
+        "path": "artifacts/debian-gnome-live/disk.qcow2",
+        "size": "28G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/debian-gnome-live/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "debian-netinst": {
+      "name": "Debian 13 Netinst",
+      "meta": {
+        "catalog_slug": "debian",
+        "family": "debian",
+        "role": "installer",
+        "release_model": "stable"
+      },
+      "iso": "isos/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "disk": {
+        "path": "artifacts/debian-netinst/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "fedora-cinnamon": {
+      "name": "Fedora Cinnamon 42",
+      "meta": {
+        "catalog_slug": "fedora-workstation",
+        "family": "fedora",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
+      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
+      "disk": {
+        "path": "artifacts/fedora-cinnamon/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-cinnamon/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "fedora-server": {
+      "name": "Fedora Server 42 Netinst",
+      "meta": {
+        "catalog_slug": "fedora-workstation",
+        "family": "fedora",
+        "role": "server",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "disk": {
+        "path": "artifacts/fedora-server/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-server/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "fedora-workstation": {
+      "name": "Fedora Workstation 42",
+      "meta": {
+        "catalog_slug": "fedora-workstation",
+        "family": "fedora",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Workstation-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
+      "disk": {
+        "path": "artifacts/fedora-workstation/disk.qcow2",
+        "size": "36G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-workstation/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "fedora-xfce": {
+      "name": "Fedora Xfce 42",
+      "meta": {
+        "catalog_slug": "fedora-workstation",
+        "family": "fedora",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Xfce-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
+      "disk": {
+        "path": "artifacts/fedora-xfce/disk.qcow2",
+        "size": "28G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-xfce/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "nixos-graphical": {
+      "name": "NixOS 25.11 Graphical",
+      "meta": {
+        "catalog_slug": "nixos",
+        "family": "nix",
+        "role": "desktop",
+        "release_model": "channel-based"
+      },
+      "iso": "isos/latest-nixos-graphical-x86_64-linux.iso",
+      "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-graphical-x86_64-linux.iso",
+      "disk": {
+        "path": "artifacts/nixos-graphical/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/nixos-graphical/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "nixos-minimal": {
+      "name": "NixOS 25.11 Minimal",
+      "meta": {
+        "catalog_slug": "nixos",
+        "family": "nix",
+        "role": "minimal",
+        "release_model": "channel-based"
+      },
+      "iso": "isos/latest-nixos-minimal-x86_64-linux.iso",
+      "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-minimal-x86_64-linux.iso",
+      "disk": {
+        "path": "artifacts/nixos-minimal/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/nixos-minimal/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "opensuse-tumbleweed-kde": {
+      "name": "openSUSE Tumbleweed KDE Live",
+      "meta": {
+        "catalog_slug": "opensuse-tumbleweed",
+        "family": "opensuse",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
+      "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
+      "disk": {
+        "path": "artifacts/opensuse-tumbleweed-kde/disk.qcow2",
+        "size": "36G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/opensuse-tumbleweed-kde/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "opensuse-tumbleweed-net": {
+      "name": "openSUSE Tumbleweed NET",
+      "meta": {
+        "catalog_slug": "opensuse-tumbleweed",
+        "family": "opensuse",
+        "role": "installer",
+        "release_model": "rolling"
+      },
+      "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "disk": {
+        "path": "artifacts/opensuse-tumbleweed-net/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/opensuse-tumbleweed-net/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "ubuntu-desktop": {
+      "name": "Ubuntu 24.04.4 Desktop",
+      "meta": {
+        "catalog_slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-24.04.4-desktop-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-desktop/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-desktop/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "ubuntu-server": {
+      "name": "Ubuntu 24.04.4 Server",
+      "meta": {
+        "catalog_slug": "ubuntu",
+        "family": "debian",
+        "role": "server",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/noble/ubuntu-24.04.4-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-server/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-server/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
     "alpine-ci": {
       "name": "Alpine Linux Virt CI",
+      "meta": {
+        "catalog_slug": "alpine-linux",
+        "family": "alpine",
+        "role": "ci",
+        "release_model": "stable"
+      },
       "iso": "isos/alpine-virt-3.23.4-x86_64.iso",
       "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.23.4-x86_64.iso",
       "disk": {

@@ -101,6 +101,30 @@ class VmctlTests(unittest.TestCase):
         qemu_img_cmd = run_cmd.call_args.args[0]
         self.assertEqual(qemu_img_cmd[:3], ["qemu-img", "create", "-f"])
 
+    def test_download_file_sets_user_agent_header(self):
+        destination = self.root / "isos" / "download.iso"
+
+        class FakeResponse:
+            def __init__(self):
+                self._chunks = [b"payload", b""]
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self, size=-1):
+                return self._chunks.pop(0)
+
+        with mock.patch.object(self.vmctl.urllib.request, "urlopen", return_value=FakeResponse()) as urlopen_mock:
+            self.vmctl.download_file("https://example.invalid/test.iso", destination)
+
+        request = urlopen_mock.call_args.args[0]
+        self.assertEqual(request.full_url, "https://example.invalid/test.iso")
+        self.assertEqual(request.headers["User-agent"], self.vmctl.HTTP_USER_AGENT)
+        self.assertEqual(destination.read_bytes(), b"payload")
+
     def test_cmd_prep_fails_without_iso_url(self):
         self.vm_config.pop("iso_url")
         self.write_config()
