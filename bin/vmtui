@@ -53,6 +53,21 @@ confirm_box() {
     dialog --clear --title "$1" --yesno "$2" 10 72
 }
 
+input_box() {
+    local title="$1"
+    local prompt="$2"
+    local initial="${3:-}"
+    local output
+    local status
+
+    output=$(dialog --clear --stdout --title "$title" --inputbox "$prompt" 12 72 "$initial") || status=$?
+    status=${status:-0}
+    if [[ $status -ne 0 ]]; then
+        return 1
+    fi
+    printf '%s\n' "$output"
+}
+
 pause_box() {
     read -r -p "Press Enter to continue..." _
 }
@@ -117,6 +132,48 @@ print(f"Use vm default ({default or 'none'})")
 for name in sorted(variants):
     print(name)
     print(f"Video profile {name}")
+PY
+}
+
+list_empty_device_menu_items() {
+    python3 - "$VMCTL" <<'PY'
+import subprocess
+import sys
+
+vmctl = sys.argv[1]
+result = subprocess.run(
+    [vmctl, "list-empty-devices"],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+for line in result.stdout.splitlines():
+    if not line.strip():
+        continue
+    path, size, model = (line.split("\t", 2) + ["-", "-"])[:3]
+    print(path)
+    print(f"{size:>10}  {model}")
+PY
+}
+
+list_target_device_menu_items() {
+    python3 - "$VMCTL" <<'PY'
+import subprocess
+import sys
+
+vmctl = sys.argv[1]
+result = subprocess.run(
+    [vmctl, "list-target-devices"],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+for line in result.stdout.splitlines():
+    if not line.strip():
+        continue
+    path, size, model = (line.split("\t", 2) + ["-", "-"])[:3]
+    print(path)
+    print(f"{size:>10}  {model}")
 PY
 }
 
@@ -206,10 +263,51 @@ run_action() {
                 run_vmctl clean "$current_vm"
             fi
             ;;
+        flash)
+            local selected_device
+            local typed_device
+            mapfile -t device_items < <(list_empty_device_menu_items)
+            if [[ ${#device_items[@]} -eq 0 ]]; then
+                msg_box "No Empty Devices" "No empty whole-disk devices are currently eligible for flashing, or elevated privileges are required to inspect them."
+                return 0
+            fi
+            selected_device=$(MENU_WIDTH=96 MENU_LIST_HEIGHT=10 menu_choose "Flash Device" "Choose an empty target disk" "${device_items[@]}") || return 0
+            if ! confirm_box "Dangerous Operation" "Write VM '$current_vm' to physical device '$selected_device'?\n\nThis will overwrite the entire disk."; then
+                return 0
+            fi
+            typed_device=$(input_box "Type Device Path" "Type the device path again to confirm destructive flash:" "$selected_device") || return 0
+            if [[ "$typed_device" != "$selected_device" ]]; then
+                msg_box "Confirmation Failed" "Typed device path does not match. Flash cancelled."
+                return 0
+            fi
+            run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$typed_device"
+            ;;
+        flash-force)
+            local selected_device
+            local typed_device
+            mapfile -t device_items < <(list_target_device_menu_items)
+            if [[ ${#device_items[@]} -eq 0 ]]; then
+                msg_box "No Eligible Devices" "No non-root whole-disk devices are currently available for force flashing."
+                return 0
+            fi
+            selected_device=$(MENU_WIDTH=96 MENU_LIST_HEIGHT=10 menu_choose "Force Flash Device" "Choose a target disk to wipe and overwrite" "${device_items[@]}") || return 0
+            if ! confirm_box "Dangerous Force Flash" "Force-write VM '$current_vm' to '$selected_device'?\n\nThis will wipe existing partition tables and signatures before writing."; then
+                return 0
+            fi
+            typed_device=$(input_box "Type WIPE Device" "Type the device path again to confirm forced destructive flash:" "$selected_device") || return 0
+            if [[ "$typed_device" != "$selected_device" ]]; then
+                msg_box "Confirmation Failed" "Typed device path does not match. Force flash cancelled."
+                return 0
+            fi
+            run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$typed_device" --force-target
+            ;;
         clean-all)
             if confirm_box "Confirm Clean All" "Remove artifacts for all configured VMs?"; then
                 run_vmctl clean --all
             fi
+            ;;
+        advanced)
+            advanced_menu_loop
             ;;
         back)
             return 1
@@ -243,6 +341,19 @@ vm_menu_loop() {
     done
 }
 
+advanced_menu_loop() {
+    while true; do
+        local selected
+        selected=$(menu_choose \
+            "Advanced Actions" \
+            "Current VM: $current_vm" \
+            flash "Write VM disk to an empty physical device" \
+            flash-force "Force-write VM disk to a non-empty physical device" \
+            back "Back") || return 0
+        run_action "$selected" || return 0
+    done
+}
+
 main_menu_loop() {
     while true; do
         local selected
@@ -250,6 +361,7 @@ main_menu_loop() {
             "QEMU ISO Lab" \
             "Main menu" \
             choose-vm "Seleziona una VM" \
+            advanced "Azioni avanzate" \
             clean-all "Pulisci gli artifact di tutte le VM" \
             quit "Esci") || {
                 clear
@@ -260,6 +372,15 @@ main_menu_loop() {
             choose-vm)
                 if choose_vm; then
                     vm_menu_loop
+                fi
+                ;;
+            advanced)
+                if [[ -z "$current_vm" ]]; then
+                    if choose_vm; then
+                        advanced_menu_loop
+                    fi
+                else
+                    advanced_menu_loop
                 fi
                 ;;
             clean-all|quit)

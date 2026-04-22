@@ -227,6 +227,209 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("-vga", qemu_cmd)
         self.assertIn("std", qemu_cmd)
 
+    def test_cmd_flash_requires_matching_confirmation(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdy", dry_run=True)
+
+        with self.assertRaises(self.vmctl.VMError):
+            self.vmctl.cmd_flash(args)
+
+    def test_cmd_flash_rejects_non_empty_device(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "partition_layout", return_value="dos"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "inspect_block_device",
+                 return_value={
+                     "path": "/dev/sdz",
+                     "size": 16 * 1024**3,
+                     "model": "USB",
+                     "mountpoints": [],
+                     "children": [],
+                     "signatures": [{"type": "gpt"}],
+                     "is_root_disk": False,
+                     "is_empty": False,
+                 },
+             ):
+            with self.assertRaises(self.vmctl.VMError):
+                self.vmctl.cmd_flash(args)
+
+    def test_cmd_flash_rejects_efi_image_without_gpt(self):
+        self.create_disk()
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "partition_layout", return_value="dos"):
+            with self.assertRaises(self.vmctl.VMError):
+                self.vmctl.cmd_flash(args)
+
+    def test_cmd_flash_dry_run_builds_qemu_img_convert(self):
+        disk_path = self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "validate_flash_target",
+                 return_value=(
+                     {
+                         "path": "/dev/sdz",
+                         "size": 16 * 1024**3,
+                         "model": "USB",
+                         "mountpoints": [],
+                         "children": [],
+                         "signatures": [],
+                         "is_root_disk": False,
+                         "is_empty": True,
+                     },
+                     "dos",
+                     1 * 1024**3,
+                 ),
+             ), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_flash(args)
+
+        self.assertEqual(exit_code, 0)
+        run_cmd.assert_called_once()
+        helper_cmd = run_cmd.call_args.args[0]
+        self.assertEqual(
+            helper_cmd,
+            [
+                "sudo",
+                str(self.vmctl.Path(self.vmctl.__file__).resolve()),
+                "flash-helper",
+                "--vm",
+                self.vm_name,
+                "--device",
+                "/dev/sdz",
+                "--confirm-device",
+                "/dev/sdz",
+            ],
+        )
+
+    def test_cmd_flash_force_target_passes_flag_to_helper(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=True, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "validate_flash_target",
+                 return_value=(
+                     {
+                         "path": "/dev/sdz",
+                         "size": 16 * 1024**3,
+                         "model": "USB",
+                         "mountpoints": [],
+                         "children": [{"path": "/dev/sdz1"}],
+                         "signatures": [{"type": "gpt"}],
+                         "is_root_disk": False,
+                         "is_empty": False,
+                     },
+                     "dos",
+                     1 * 1024**3,
+                 ),
+             ), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_flash(args)
+
+        self.assertEqual(exit_code, 0)
+        helper_cmd = run_cmd.call_args.args[0]
+        self.assertIn("--force-target", helper_cmd)
+
+    def test_cmd_flash_helper_runs_convert_on_existing_device(self):
+        disk_path = self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False)
+
+        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "validate_flash_target",
+                 return_value=(
+                     {
+                         "path": "/dev/sdz",
+                         "size": 16 * 1024**3,
+                         "model": "USB",
+                         "mountpoints": [],
+                         "children": [],
+                         "signatures": [],
+                         "is_root_disk": False,
+                         "is_empty": True,
+                     },
+                     "dos",
+                     1 * 1024**3,
+                 ),
+             ), \
+             mock.patch.object(
+                 self.vmctl,
+                 "inspect_block_device",
+                 return_value={
+                     "path": "/dev/sdz",
+                     "size": 16 * 1024**3,
+                     "model": "USB",
+                     "mountpoints": [],
+                     "children": [],
+                     "signatures": [],
+                     "is_root_disk": False,
+                     "is_empty": True,
+                 },
+             ), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_flash_helper(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(run_cmd.call_count, 2)
+        convert_cmd = run_cmd.call_args_list[0].args[0]
+        self.assertEqual(
+            convert_cmd,
+            ["qemu-img", "convert", "-n", "-p", "-f", "qcow2", "-O", "raw", str(disk_path), "/dev/sdz"],
+        )
+
+    def test_cmd_flash_helper_force_target_wipes_signatures_first(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=True)
+
+        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "validate_flash_target",
+                 return_value=(
+                     {
+                         "path": "/dev/sdz",
+                         "size": 16 * 1024**3,
+                         "model": "USB",
+                         "mountpoints": [],
+                         "children": [{"path": "/dev/sdz1"}, {"path": "/dev/sdz2"}],
+                         "signatures": [{"type": "gpt"}],
+                         "is_root_disk": False,
+                         "is_empty": False,
+                     },
+                     "dos",
+                     1 * 1024**3,
+                 ),
+             ), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_flash_helper(args)
+
+        self.assertEqual(exit_code, 0)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(executed[0], ["wipefs", "-a", "-f", "/dev/sdz1"])
+        self.assertEqual(executed[1], ["wipefs", "-a", "-f", "/dev/sdz2"])
+        self.assertEqual(executed[2], ["wipefs", "-a", "-f", "/dev/sdz"])
+        self.assertEqual(executed[3], ["blockdev", "--rereadpt", "/dev/sdz"])
+
     def test_cmd_start_dry_run_builds_qemu_command_without_cdrom(self):
         disk_path = self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, video=None, dry_run=True)

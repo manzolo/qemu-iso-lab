@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import selectors
+import shlex
 import shutil
 import subprocess
 import sys
@@ -98,6 +99,18 @@ def load_json_file(path: Path) -> dict:
     return data
 
 
+def run_output(cmd: list[str]) -> str:
+    return subprocess.check_output(cmd, text=True)
+
+
+def image_info(path: Path) -> dict:
+    output = run_output(["qemu-img", "info", "--output=json", str(path)])
+    payload = json.loads(output)
+    if not isinstance(payload, dict):
+        raise VMError(f"Unexpected qemu-img info output for: {path}")
+    return payload
+
+
 def load_config() -> dict:
     catalog_path = CONFIG_DIR / "catalog.json"
     profiles_dir = CONFIG_DIR / "profiles"
@@ -160,8 +173,252 @@ def run(cmd: list[str], dry_run: bool = False, quiet: bool = False) -> None:
             subprocess.run(cmd, check=True)
 
 
+def run_pipeline(commands: list[list[str]], dry_run: bool = False) -> None:
+    print(f"{style('$', BOLD, BLUE)} {' | '.join(shell_join(cmd) for cmd in commands)}")
+    if dry_run:
+        return
+
+    processes = []
+    prev_stdout = None
+    try:
+        for index, cmd in enumerate(commands):
+            process = subprocess.Popen(
+                cmd,
+                stdin=prev_stdout,
+                stdout=subprocess.PIPE if index < len(commands) - 1 else None,
+            )
+            if prev_stdout is not None:
+                prev_stdout.close()
+            prev_stdout = process.stdout
+            processes.append(process)
+
+        for process in processes:
+            returncode = process.wait()
+            if returncode != 0:
+                raise subprocess.CalledProcessError(returncode, process.args)
+    finally:
+        if prev_stdout is not None:
+            prev_stdout.close()
+
+
 def ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def shell_join(cmd: list[str]) -> str:
+    return " ".join(shlex.quote(part) for part in cmd)
+
+
+def wipefs_signatures(path: Path) -> list[dict]:
+    result = subprocess.run(
+        ["wipefs", "-n", "--json", str(path)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        if "Permission denied" in stderr:
+            raise VMError(f"Need elevated privileges to inspect block device signatures: {path}")
+        return []
+
+    output = result.stdout
+
+    if not output.strip():
+        return []
+
+    payload = json.loads(output)
+    signatures = payload.get("signatures", [])
+    if not isinstance(signatures, list):
+        return []
+    return [item for item in signatures if isinstance(item, dict)]
+
+
+def partition_layout(path: Path) -> str | None:
+    for entry in wipefs_signatures(path):
+        sig_type = str(entry.get("type", "")).lower()
+        if sig_type in {"gpt", "dos"}:
+            return sig_type
+    return None
+
+
+def collect_mountpoints(node: dict) -> list[str]:
+    mountpoints = [mp for mp in node.get("mountpoints") or [] if mp]
+    for child in node.get("children") or []:
+        mountpoints.extend(collect_mountpoints(child))
+    return mountpoints
+
+
+def find_device_node(nodes: list[dict], device: str) -> dict | None:
+    for node in nodes:
+        if node.get("path") == device:
+            return node
+        child = find_device_node(node.get("children") or [], device)
+        if child is not None:
+            return child
+    return None
+
+
+def lsblk_devices() -> list[dict]:
+    output = run_output(
+        [
+            "lsblk",
+            "--json",
+            "-b",
+            "-o",
+            "PATH,NAME,TYPE,SIZE,MODEL,MOUNTPOINTS,PKNAME,PTTYPE,FSTYPE",
+        ]
+    )
+    payload = json.loads(output)
+    devices = payload.get("blockdevices", [])
+    if not isinstance(devices, list):
+        raise VMError("Unexpected lsblk output")
+    return devices
+
+
+def root_block_device() -> str | None:
+    try:
+        source = run_output(["findmnt", "-n", "-o", "SOURCE", "/"]).strip()
+    except subprocess.CalledProcessError:
+        return None
+    if not source.startswith("/dev/"):
+        return None
+
+    try:
+        parent = run_output(["lsblk", "-n", "-o", "PKNAME", source]).strip()
+    except subprocess.CalledProcessError:
+        parent = ""
+    if parent:
+        return f"/dev/{parent}"
+    return source
+
+
+def inspect_block_device(device: str) -> dict:
+    devices = lsblk_devices()
+    node = find_device_node(devices, device)
+    if node is None:
+        raise VMError(f"Device not found: {device}")
+    if node.get("type") != "disk":
+        raise VMError(f"Target is not a whole disk device: {device}")
+
+    mountpoints = collect_mountpoints(node)
+    signatures = wipefs_signatures(Path(device))
+    root_disk = root_block_device()
+    empty = not mountpoints and not signatures and not (node.get("children") or [])
+
+    return {
+        "path": device,
+        "name": node.get("name", ""),
+        "size": int(node.get("size", 0) or 0),
+        "model": str(node.get("model") or "").strip(),
+        "mountpoints": mountpoints,
+        "children": node.get("children") or [],
+        "signatures": signatures,
+        "pttype": node.get("pttype"),
+        "fstype": node.get("fstype"),
+        "is_root_disk": root_disk == device,
+        "is_empty": empty,
+    }
+
+
+def inspect_block_device_basic(device: str) -> dict:
+    devices = lsblk_devices()
+    node = find_device_node(devices, device)
+    if node is None:
+        raise VMError(f"Device not found: {device}")
+    if node.get("type") != "disk":
+        raise VMError(f"Target is not a whole disk device: {device}")
+
+    return {
+        "path": device,
+        "name": node.get("name", ""),
+        "size": int(node.get("size", 0) or 0),
+        "model": str(node.get("model") or "").strip(),
+        "mountpoints": collect_mountpoints(node),
+        "children": node.get("children") or [],
+        "is_root_disk": root_block_device() == device,
+    }
+
+
+def list_non_root_devices() -> list[dict]:
+    result = []
+    root_disk = root_block_device()
+    for node in lsblk_devices():
+        path = node.get("path")
+        if node.get("type") != "disk" or not path:
+            continue
+        if path == root_disk:
+            continue
+        result.append(
+            {
+                "path": path,
+                "size": int(node.get("size", 0) or 0),
+                "model": str(node.get("model") or "").strip(),
+                "mountpoints": collect_mountpoints(node),
+                "children": node.get("children") or [],
+                "is_root_disk": False,
+            }
+        )
+    return result
+
+
+def list_flashable_devices() -> list[dict]:
+    result = []
+    for node in lsblk_devices():
+        path = node.get("path")
+        if node.get("type") != "disk" or not path:
+            continue
+        try:
+            info = inspect_block_device(path)
+        except VMError:
+            continue
+        if info["is_empty"] and not info["is_root_disk"]:
+            result.append(info)
+    return result
+
+
+def format_bytes(size: int) -> str:
+    units = ["B", "KiB", "MiB", "GiB", "TiB"]
+    value = float(size)
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{size} B"
+
+
+def expected_partition_layout(vm: dict) -> str:
+    return "gpt" if vm["firmware"]["type"] == "efi" else "dos"
+
+
+def validate_flash_target(vm: dict, disk_path: Path, device: str, force_target: bool = False) -> tuple[dict, str | None, int]:
+    source_layout = partition_layout(disk_path)
+    source_info = image_info(disk_path)
+    virtual_size = int(source_info.get("virtual-size", 0) or 0)
+
+    if vm["firmware"]["type"] == "efi" and source_layout != "gpt":
+        raise VMError(f"EFI guest requires a GPT VM disk before flash; detected: {source_layout or 'unknown'}")
+    if vm["firmware"]["type"] == "bios" and source_layout not in {"dos", "gpt"}:
+        raise VMError(f"BIOS guest requires an MBR/GPT VM disk before flash; detected: {source_layout or 'unknown'}")
+
+    info = inspect_block_device(device)
+    if info["is_root_disk"]:
+        raise VMError(f"Refusing to overwrite the host root disk: {device}")
+    if info["mountpoints"]:
+        raise VMError(f"Refusing mounted target device: {device}")
+    if info["children"] and not force_target:
+        raise VMError(f"Refusing device with existing partitions: {device}")
+    if info["signatures"] and not force_target:
+        sig_list = ", ".join(sorted({str(item.get('type', '?')) for item in info["signatures"]}))
+        raise VMError(f"Refusing non-empty target device '{device}' with signatures: {sig_list}")
+    if not info["is_empty"] and not force_target:
+        raise VMError(f"Refusing target device that does not look empty: {device}")
+    if virtual_size and info["size"] < virtual_size:
+        raise VMError(
+            f"Target device '{device}' is smaller than the VM disk "
+            f"({format_bytes(info['size'])} < {format_bytes(virtual_size)})"
+        )
+
+    return info, source_layout, virtual_size
 
 
 def looks_like_html(path: Path) -> bool:
@@ -687,6 +944,140 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list_empty_devices(args: argparse.Namespace) -> int:
+    require_command("lsblk")
+    require_command("wipefs")
+    for info in list_flashable_devices():
+        print("\t".join([info["path"], format_bytes(info["size"]), info["model"] or "-"]))
+    return 0
+
+
+def cmd_list_target_devices(args: argparse.Namespace) -> int:
+    require_command("lsblk")
+    for info in list_non_root_devices():
+        print("\t".join([info["path"], format_bytes(info["size"]), info["model"] or "-"]))
+    return 0
+
+
+def cmd_flash(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    disk = vm["disk"]
+    disk_path = resolve_path(disk["path"])
+
+    if not disk_path.is_file():
+        raise VMError(f"VM disk image not found: {disk_path}")
+    if args.confirm_device != args.device:
+        raise VMError("flash requires --confirm-device to exactly match --device")
+
+    require_command("qemu-img")
+    require_command("lsblk")
+    require_command("wipefs")
+    require_command("findmnt")
+    require_command("sudo")
+
+    helper_will_recheck = False
+    try:
+        info, source_layout, virtual_size = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
+    except VMError as exc:
+        if "Need elevated privileges to inspect block device signatures" not in str(exc):
+            raise
+        helper_will_recheck = True
+        source_layout = partition_layout(disk_path)
+        virtual_size = int(image_info(disk_path).get("virtual-size", 0) or 0)
+        if vm["firmware"]["type"] == "efi" and source_layout != "gpt":
+            raise VMError(f"EFI guest requires a GPT VM disk before flash; detected: {source_layout or 'unknown'}")
+        if vm["firmware"]["type"] == "bios" and source_layout not in {"dos", "gpt"}:
+            raise VMError(f"BIOS guest requires an MBR/GPT VM disk before flash; detected: {source_layout or 'unknown'}")
+        info = inspect_block_device_basic(args.device)
+        if info["is_root_disk"]:
+            raise VMError(f"Refusing to overwrite the host root disk: {args.device}")
+        if info["mountpoints"]:
+            raise VMError(f"Refusing mounted target device: {args.device}")
+        if (info["children"] or not args.force_target) and info["children"]:
+            raise VMError(f"Refusing device with existing partitions before sudo validation: {args.device}")
+
+    print_header(f"Flash VM to physical disk: {args.vm}")
+    print_kv("source", pretty_path(disk_path))
+    print_kv("format", disk["format"])
+    print_kv("layout", source_layout or "unknown")
+    print_kv("image", format_bytes(virtual_size))
+    print_kv("target", args.device)
+    print_kv("size", format_bytes(info["size"]))
+    print_kv("model", info["model"] or "-")
+    if args.force_target:
+        print_status("warn", "Force mode enabled: existing partition table/signatures will be wiped", ok=False)
+    if helper_will_recheck:
+        print_status("warn", "Full target validation will run after sudo elevation", ok=False)
+    if vm["firmware"]["type"] == "bios" and source_layout == "gpt":
+        print_status("warn", "BIOS VM disk uses GPT; flashing as-is", ok=False)
+
+    helper_cmd = [
+        "sudo",
+        str(Path(__file__).resolve()),
+        "flash-helper",
+        "--vm",
+        args.vm,
+        "--device",
+        args.device,
+        "--confirm-device",
+        args.confirm_device,
+    ]
+    if args.force_target:
+        helper_cmd.append("--force-target")
+    run(helper_cmd, dry_run=args.dry_run)
+    if args.dry_run:
+        print_status("ok", f"Would flash {pretty_path(disk_path)} to {args.device} via sudo helper")
+    else:
+        print_status("ok", f"Flashed {pretty_path(disk_path)} to {args.device}")
+    return 0
+
+
+def cmd_flash_helper(args: argparse.Namespace) -> int:
+    if os.geteuid() != 0:
+        raise VMError("flash-helper must run as root")
+    if args.confirm_device != args.device:
+        raise VMError("flash-helper requires --confirm-device to exactly match --device")
+
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    disk = vm["disk"]
+    disk_path = resolve_path(disk["path"])
+    if not disk_path.is_file():
+        raise VMError(f"VM disk image not found: {disk_path}")
+
+    require_command("qemu-img")
+    require_command("lsblk")
+    require_command("wipefs")
+    require_command("findmnt")
+
+    info, _, _ = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
+    if args.force_target:
+        for child in info["children"]:
+            child_path = child.get("path")
+            if child_path:
+                run(["wipefs", "-a", "-f", child_path], dry_run=False, quiet=True)
+        run(["wipefs", "-a", "-f", args.device], dry_run=False, quiet=True)
+        run(["blockdev", "--rereadpt", args.device], dry_run=False, quiet=True)
+    run(
+        [
+            "qemu-img",
+            "convert",
+            "-n",
+            "-p",
+            "-f",
+            disk["format"],
+            "-O",
+            "raw",
+            str(disk_path),
+            args.device,
+        ],
+        dry_run=False,
+    )
+    run(["sync"], dry_run=False, quiet=True)
+    return 0
+
+
 def cmd_setup(args: argparse.Namespace) -> int:
     config = load_config()
     status_ok = True
@@ -800,6 +1191,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--expect")
     p.add_argument("--timeout", type=int)
     p.set_defaults(func=cmd_boot_check)
+
+    p = subparsers.add_parser("flash", help=argparse.SUPPRESS)
+    p.add_argument("vm")
+    p.add_argument("--device", required=True)
+    p.add_argument("--confirm-device", required=True)
+    p.add_argument("--force-target", action="store_true", help=argparse.SUPPRESS)
+    p.set_defaults(func=cmd_flash)
+
+    p = subparsers.add_parser("flash-helper", help=argparse.SUPPRESS)
+    p.add_argument("--vm", required=True)
+    p.add_argument("--device", required=True)
+    p.add_argument("--confirm-device", required=True)
+    p.add_argument("--force-target", action="store_true", help=argparse.SUPPRESS)
+    p.set_defaults(func=cmd_flash_helper)
+
+    p = subparsers.add_parser("list-empty-devices", help=argparse.SUPPRESS)
+    p.set_defaults(func=cmd_list_empty_devices)
+
+    p = subparsers.add_parser("list-target-devices", help=argparse.SUPPRESS)
+    p.set_defaults(func=cmd_list_target_devices)
 
     p = subparsers.add_parser("setup")
     p.set_defaults(func=cmd_setup)

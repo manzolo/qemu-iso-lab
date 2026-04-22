@@ -5,6 +5,7 @@ __pycache__/
 *.pyd
 
 # Virtual machine artifacts
+artifacts/
 artifacts/*/disk.*
 artifacts/*/OVMF_VARS.fd
 artifacts/*/logs/
@@ -16,3 +17,6 @@ isos/*.iso
 # Local overrides
 .env
 .env.*
+
+# Local Codex instructions
+AGENTS.md
