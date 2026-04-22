@@ -1,7 +1,7 @@
 VM ?= cachyos
 VIDEO ?=
 
-.PHONY: help list show fetch-iso prep install start boot-check clean clean-all
+.PHONY: help list show fetch-iso prep install start boot-check tui clean clean-all
 
 help:
 	@echo "Targets disponibili:"
@@ -12,6 +12,7 @@ help:
 	@echo "  make install VM=cachyos"
 	@echo "  make start VM=cachyos [VIDEO=safe|std|virtio-gl]"
 	@echo "  make boot-check VM=alpine-ci"
+	@echo "  make tui"
 	@echo "  make clean VM=cachyos"
 	@echo "  make clean-all"
 	@echo
@@ -39,6 +40,9 @@ start:
 
 boot-check:
 	./bin/vmctl boot-check "$(VM)"
+
+tui:
+	./bin/vmtui
 
 clean:
 	./bin/vmctl clean "$(VM)"

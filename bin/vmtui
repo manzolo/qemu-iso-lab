@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_PATH="$ROOT_DIR/vms.json"
+VMCTL="$ROOT_DIR/bin/vmctl"
+
+require_command() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        printf 'error: missing command: %s\n' "$1" >&2
+        exit 1
+    fi
+}
+
+require_command dialog
+require_command python3
+
+if [[ ! -x "$VMCTL" ]]; then
+    printf 'error: missing executable: %s\n' "$VMCTL" >&2
+    exit 1
+fi
+
+if [[ ! -f "$CONFIG_PATH" ]]; then
+    printf 'error: missing config: %s\n' "$CONFIG_PATH" >&2
+    exit 1
+fi
+
+current_vm=""
+
+menu_choose() {
+    local title="$1"
+    local prompt="$2"
+    shift 2
+    local output
+    local status
+
+    output=$(dialog --clear --stdout --title "$title" --menu "$prompt" 22 80 12 "$@") || status=$?
+    status=${status:-0}
+    if [[ $status -ne 0 ]]; then
+        return 1
+    fi
+    printf '%s\n' "$output"
+}
+
+msg_box() {
+    dialog --clear --title "$1" --msgbox "$2" 10 72
+}
+
+confirm_box() {
+    dialog --clear --title "$1" --yesno "$2" 10 72
+}
+
+pause_box() {
+    read -r -p "Press Enter to continue..." _
+}
+
+list_vm_menu_items() {
+    python3 - "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config_path = Path(sys.argv[1])
+data = json.loads(config_path.read_text(encoding="utf-8"))
+for name, vm in sorted(data["vms"].items()):
+    label = vm.get("name", name)
+    firmware = vm.get("firmware", {}).get("type", "?")
+    memory = vm.get("memory_mb", "?")
+    cpus = vm.get("cpus", "?")
+    print(name)
+    print(f"{label} | {firmware} | {memory}MB | {cpus} CPU")
+PY
+}
+
+list_video_menu_items() {
+    python3 - "$CONFIG_PATH" "$1" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config_path = Path(sys.argv[1])
+vm_name = sys.argv[2]
+data = json.loads(config_path.read_text(encoding="utf-8"))
+vm = data["vms"][vm_name]
+video = vm.get("video", {})
+default = video.get("default", "")
+variants = video.get("variants", {})
+print("__default__")
+print(f"Use vm default ({default or 'none'})")
+for name in sorted(variants):
+    print(name)
+    print(f"Video profile {name}")
+PY
+}
+
+run_vmctl() {
+    clear
+    printf 'Selected VM: %s\n' "$current_vm"
+    printf '$ %q' "$VMCTL"
+    for arg in "$@"; do
+        printf ' %q' "$arg"
+    done
+    printf '\n\n'
+
+    if "$VMCTL" "$@"; then
+        printf '\nCommand completed successfully.\n'
+    else
+        local status=$?
+        printf '\nCommand failed with exit code %s.\n' "$status"
+    fi
+    pause_box
+}
+
+choose_vm() {
+    mapfile -t vm_items < <(list_vm_menu_items)
+    local selected
+    selected=$(menu_choose "VM Selection" "Choose a VM profile" "${vm_items[@]}") || return 1
+    current_vm="$selected"
+    return 0
+}
+
+choose_video() {
+    mapfile -t video_items < <(list_video_menu_items "$current_vm")
+    local selected
+    selected=$(menu_choose "Video Profile" "Choose a video profile for $current_vm" "${video_items[@]}") || return 1
+    if [[ "$selected" == "__default__" ]]; then
+        printf '\n'
+    else
+        printf '%s\n' "$selected"
+    fi
+}
+
+run_action() {
+    local action="$1"
+    case "$action" in
+        show)
+            run_vmctl show "$current_vm"
+            ;;
+        fetch-iso)
+            run_vmctl fetch-iso "$current_vm"
+            ;;
+        prep)
+            run_vmctl prep "$current_vm"
+            ;;
+        install)
+            local video
+            video=$(choose_video) || return 0
+            if [[ -n "$video" ]]; then
+                run_vmctl install "$current_vm" --video "$video"
+            else
+                run_vmctl install "$current_vm"
+            fi
+            ;;
+        start)
+            local video
+            video=$(choose_video) || return 0
+            if [[ -n "$video" ]]; then
+                run_vmctl start "$current_vm" --video "$video"
+            else
+                run_vmctl start "$current_vm"
+            fi
+            ;;
+        boot-check)
+            run_vmctl boot-check "$current_vm"
+            ;;
+        clean)
+            if confirm_box "Confirm Clean" "Remove artifacts for VM '$current_vm'?"; then
+                run_vmctl clean "$current_vm"
+            fi
+            ;;
+        clean-all)
+            if confirm_box "Confirm Clean All" "Remove artifacts for all configured VMs?"; then
+                run_vmctl clean --all
+            fi
+            ;;
+        change-vm)
+            choose_vm || true
+            ;;
+        quit)
+            clear
+            exit 0
+            ;;
+    esac
+}
+
+main_menu_loop() {
+    while true; do
+        local selected
+        selected=$(menu_choose \
+            "QEMU ISO Lab" \
+            "Current VM: $current_vm" \
+            show "Show VM profile" \
+            fetch-iso "Download ISO if missing" \
+            prep "Prepare disk and firmware artifacts" \
+            install "Boot installer" \
+            start "Boot installed VM" \
+            boot-check "Run headless boot smoke check" \
+            clean "Clean current VM artifacts" \
+            clean-all "Clean all VM artifacts" \
+            change-vm "Choose another VM" \
+            quit "Exit TUI") || {
+                clear
+                exit 0
+            }
+        run_action "$selected"
+    done
+}
+
+if [[ -z "$current_vm" ]]; then
+    choose_vm || {
+        clear
+        exit 0
+    }
+fi
+
+main_menu_loop

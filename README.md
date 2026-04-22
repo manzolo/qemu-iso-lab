@@ -1,24 +1,26 @@
-# VM Test Manager
+# QEMU ISO Lab
 
-Small local manager for creating, booting, and cleaning QEMU virtual machines from JSON-defined profiles.
+`QEMU ISO Lab` is a small local toolkit for managing test virtual machines from JSON-defined profiles.
 
-The current implementation started as a CachyOS-specific setup, but the direction is broader: a reusable catalog of guests with configurable ISO, disk, firmware, video, and runtime settings.
+It started from a CachyOS-specific setup, but the project is evolving into a reusable catalog of guest definitions for ISO-based installs, boot checks, and QEMU experiments.
 
-Per la versione italiana, vedi [README.it.md](README.it.md).
+For the Italian version, see [README.it.md](README.it.md).
 
-Additional project notes live in [docs/](docs/), including [CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md).
+Additional notes live in [docs/](docs/), including [CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md).
 
-## Current Status
+## Overview
 
-The current V1 already provides:
+The project currently provides:
 
 - a VM catalog in `vms.json`;
-- a Python CLI engine in `bin/vmctl`;
+- a Python CLI in `bin/vmctl`;
+- a minimal text UI in `bin/vmtui`;
 - a thin `Makefile` frontend;
-- initial support for both `efi` and `bios` firmware flows;
-- isolated artifacts for each VM under `artifacts/<vm-name>/`.
+- support for both `efi` and `bios` guests;
+- isolated per-VM artifacts under `artifacts/<vm>/`;
+- a lightweight CI smoke test based on `alpine-ci`.
 
-The currently configured profile is:
+Current example profiles:
 
 - `cachyos`
 - `alpine-ci`
@@ -33,121 +35,58 @@ The currently configured profile is:
 ├── VM_MANAGER_PLAN.md
 ├── vms.json
 ├── bin/
-│   └── vmctl
+│   ├── vmctl
+│   └── vmtui
+├── docs/
+│   └── CI_BOOT_STRATEGY.md
 ├── isos/
-│   └── cachyos-desktop-linux-260308.iso
 ├── artifacts/
-│   └── cachyos/
-│       ├── disk.vhd
-│       ├── OVMF_VARS.fd
-│       ├── logs/
-│       └── runtime/
-└── ...
+└── tests/
 ```
-
-## Core Concepts
-
-### `vms.json`
-
-This file contains the VM profiles.
-
-Each profile defines at least:
-
-- a logical name;
-- an ISO path;
-- an optional ISO download URL;
-- disk settings;
-- firmware type;
-- memory and CPU allocation;
-- video profiles;
-- common runtime options.
-
-Example:
-
-```json
-{
-  "vms": {
-    "cachyos": {
-      "name": "CachyOS",
-      "iso": "isos/cachyos-desktop-linux-260308.iso",
-      "iso_url": "https://iso.cachyos.org/desktop/260308/cachyos-desktop-linux-260308.iso",
-      "disk": {
-        "path": "artifacts/cachyos/disk.vhd",
-        "size": "30G",
-        "format": "vpc",
-        "subformat": "fixed",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/cachyos/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 4
-    }
-  }
-}
-```
-
-### `bin/vmctl`
-
-This is the engine of the project.
-
-Its main responsibilities are:
-
-- loading `vms.json`;
-- resolving relative and absolute paths;
-- creating local disk and NVRAM artifacts;
-- building the QEMU command line;
-- executing `prep`, `install`, `start`, and `clean`.
-
-### `Makefile`
-
-The `Makefile` intentionally stays thin. It only provides convenient shortcuts around `bin/vmctl`.
 
 ## Requirements
 
-Minimum tools:
+Minimum host requirements:
 
 - `qemu-system-x86_64`
 - `qemu-img`
 - Python 3
+- `make`
 
-EFI profiles also require OVMF files, for example:
+Optional:
 
-- `/usr/share/OVMF/OVMF_CODE_4M.fd`
-- `/usr/share/OVMF/OVMF_VARS_4M.fd`
+- `dialog` for the TUI frontend;
+- OVMF files for EFI guests, for example:
+  - `/usr/share/OVMF/OVMF_CODE_4M.fd`
+  - `/usr/share/OVMF/OVMF_VARS_4M.fd`
 
-## Quick Start
+## Installation
 
-### Clone The Repository
+Clone the repository:
 
 ```bash
 git clone git@github.com:manzolo/qemu-iso-lab.git
 cd qemu-iso-lab
 ```
 
-### Install Host Requirements
-
-On Arch-based systems:
+Install dependencies on Arch-based systems:
 
 ```bash
-sudo pacman -S qemu-desktop qemu-base edk2-ovmf python
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog
 ```
 
-On Debian/Ubuntu:
+Install dependencies on Debian/Ubuntu:
 
 ```bash
 sudo apt update
-sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog
 ```
 
-### First Local Flow: Desktop Guest
+## Quick Start
 
-If you want to try the main desktop-oriented guest locally:
+### Local Desktop Flow
+
+Use this path for a normal local guest such as `cachyos`:
 
 ```bash
 make show VM=cachyos
@@ -155,104 +94,55 @@ make prep VM=cachyos
 make install VM=cachyos
 ```
 
-After the OS is installed on disk:
+After the guest has been installed to disk:
 
 ```bash
 make start VM=cachyos
 ```
 
-### First CI-Like Flow: Minimal Real Boot Check
+### Minimal Real Boot Check
 
-If you want the smallest real end-to-end smoke test already present in the repo:
+Use this path for the smallest real boot smoke test currently in the repo:
 
 ```bash
 make prep VM=alpine-ci
 make boot-check VM=alpine-ci
 ```
 
-This path downloads a small Alpine `virt` ISO, creates a small disk, boots QEMU headless, and waits for the serial `login:` prompt.
+This flow downloads a small Alpine `virt` ISO, prepares the disk, boots QEMU headless, and waits for the serial `login:` prompt.
 
-### List VMs
+### Optional TUI
+
+If you prefer a simple terminal UI:
+
+```bash
+make tui
+```
+
+The TUI is a thin frontend over `vmctl`. It lets you:
+
+- choose a VM profile;
+- run `show`, `fetch-iso`, `prep`, `install`, `start`, `boot-check`, `clean`, and `clean-all`;
+- choose the video profile for `install` and `start`.
+
+## Common Commands
+
+With `make`:
 
 ```bash
 make list
-```
-
-or:
-
-```bash
-./bin/vmctl list
-```
-
-### Show a profile
-
-```bash
 make show VM=cachyos
-```
-
-### Prepare disk and NVRAM
-
-```bash
-make prep VM=cachyos
-```
-
-This step:
-
-- downloads the ISO if it is missing and `iso_url` is configured;
-- creates the disk image if missing;
-- creates a local EFI vars copy when the firmware is `efi`;
-- prepares `logs/` and `runtime/` directories.
-
-### Download the ISO only
-
-```bash
 make fetch-iso VM=cachyos
-```
-
-If the ISO is already present, no download is performed.
-
-### Run a real headless boot check
-
-```bash
-make boot-check VM=alpine-ci
-```
-
-This flow is intended for CI. It uses a small Alpine `virt` ISO, boots QEMU without a GUI, watches the serial console, and succeeds only when the guest actually reaches the expected boot string.
-
-### Boot the installer
-
-```bash
+make prep VM=cachyos
 make install VM=cachyos
-```
-
-### Boot the installed VM
-
-```bash
 make start VM=cachyos
-```
-
-### Use a different video profile
-
-```bash
 make start VM=cachyos VIDEO=safe
-make start VM=cachyos VIDEO=virtio-gl
-```
-
-### Clean a VM's artifacts
-
-```bash
+make boot-check VM=alpine-ci
 make clean VM=cachyos
-```
-
-### Clean all VMs
-
-```bash
 make clean-all
 ```
 
-## Direct `vmctl` Usage
-
-Available commands:
+With `vmctl` directly:
 
 ```bash
 ./bin/vmctl list
@@ -261,13 +151,13 @@ Available commands:
 ./bin/vmctl prep cachyos
 ./bin/vmctl install cachyos
 ./bin/vmctl start cachyos
-./bin/vmctl boot-check alpine-ci
 ./bin/vmctl start cachyos --video safe
+./bin/vmctl boot-check alpine-ci
 ./bin/vmctl clean cachyos
 ./bin/vmctl clean --all
 ```
 
-To print commands without executing them:
+Dry-run examples:
 
 ```bash
 ./bin/vmctl --dry-run prep cachyos
@@ -275,7 +165,51 @@ To print commands without executing them:
 ./bin/vmctl --dry-run start cachyos --video safe
 ```
 
-## Supported Firmware
+## VM Profile Model
+
+Each VM entry in `vms.json` typically defines:
+
+- `name`
+- `iso`
+- `iso_url`
+- `disk`
+- `firmware`
+- `machine`
+- `memory_mb`
+- `cpus`
+- `network`
+- `audio`
+- `video`
+
+Example:
+
+```json
+{
+  "cachyos": {
+    "name": "CachyOS",
+    "iso": "isos/cachyos-desktop-linux-260308.iso",
+    "iso_url": "https://iso.cachyos.org/desktop/260308/cachyos-desktop-linux-260308.iso",
+    "disk": {
+      "path": "artifacts/cachyos/disk.vhd",
+      "size": "30G",
+      "format": "vpc",
+      "subformat": "fixed",
+      "interface": "virtio"
+    },
+    "firmware": {
+      "type": "efi",
+      "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+      "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+      "vars_path": "artifacts/cachyos/OVMF_VARS.fd"
+    },
+    "machine": "q35",
+    "memory_mb": 4096,
+    "cpus": 4
+  }
+}
+```
+
+## Firmware Modes
 
 ### EFI
 
@@ -291,19 +225,17 @@ For `bios` profiles, `vmctl`:
 
 - does not use OVMF;
 - does not create NVRAM files;
-- relies on the classic QEMU/SeaBIOS boot flow.
-
-La V1 ha gia il ramo logico per `bios`, ma manca ancora un profilo reale di esempio da testare.
+- uses the standard QEMU/SeaBIOS boot flow.
 
 ## Artifacts
 
-Ogni VM ha i suoi artifacts isolati sotto:
+Each VM stores its local state under:
 
 ```text
-artifacts/<nome-vm>/
+artifacts/<vm>/
 ```
 
-Esempio:
+Typical contents:
 
 ```text
 artifacts/cachyos/
@@ -313,93 +245,49 @@ artifacts/cachyos/
 └── runtime/
 ```
 
-Questa scelta evita collisioni tra guest diversi.
+This avoids collisions between different guest profiles.
 
 ## Video Profiles
 
-Nel profilo `cachyos` sono presenti:
+The `cachyos` profile currently includes:
 
 - `std`
 - `safe`
 - `virtio-gl`
 
-Uso previsto:
+Typical usage:
 
-- `std`: default semplice
-- `safe`: aggiunge seriale e resta piu utile per debug
-- `virtio-gl`: tentativo piu aggressivo per sessioni Wayland/compositor moderni
+- `std`: simple default mode;
+- `safe`: adds serial output and is more useful for debugging;
+- `virtio-gl`: more aggressive setup for modern Wayland/compositor sessions.
 
-Nota pratica: alcuni compositor Wayland, come `niri`, possono non essere affidabili dentro la VM anche se il boot del sistema e corretto.
+Practical note:
 
-## Come Aggiungere Una Nuova VM
+Some Wayland compositors, such as `niri`, may still behave poorly inside a VM even when the guest boots correctly.
 
-Passi minimi:
+## Adding A New VM
 
-1. copiare la ISO sotto `isos/`
-2. aggiungere un nuovo oggetto dentro `vms.json`
-3. scegliere formato disco e firmware
-4. eseguire:
+Minimal workflow:
+
+1. Copy the ISO under `isos/`, or define `iso_url`.
+2. Add a new VM object to `vms.json`.
+3. Choose disk format, firmware type, and runtime settings.
+4. Prepare and boot it:
 
 ```bash
-make prep VM=<nome>
-make install VM=<nome>
+make prep VM=<name>
+make install VM=<name>
 ```
 
-## Esempio Di Profilo BIOS
+## CI Smoke Test
 
-```json
-{
-  "debian-bios": {
-    "name": "Debian BIOS",
-    "iso": "isos/debian.iso",
-    "disk": {
-      "path": "artifacts/debian-bios/disk.qcow2",
-      "size": "20G",
-      "format": "qcow2",
-      "interface": "virtio"
-    },
-    "firmware": {
-      "type": "bios"
-    },
-    "machine": "pc",
-    "memory_mb": 2048,
-    "cpus": 2,
-    "network": "user",
-    "audio": true,
-    "video": {
-      "default": "std",
-      "variants": {
-        "std": ["-vga", "std", "-display", "gtk"]
-      }
-    }
-  }
-}
-```
+The repository includes a real boot smoke test based on `alpine-ci`.
 
-## Limiti Attuali
+That profile is intentionally small and CI-friendly:
 
-La V1 non copre ancora:
+- it uses Alpine `virt`;
+- it boots in headless mode;
+- it uses serial-console detection;
+- it is designed for GitHub Actions with `tcg` rather than assuming `kvm`.
 
-- validazione schema JSON;
-- override CLI per RAM/CPU/disco;
-- log seriali persistenti;
-- integrazione Ventoy nel nuovo flusso;
-- hook post-install;
-- snapshot e gestione runtime avanzata.
-
-## Roadmap Immediata
-
-Passi sensati dopo questa base:
-
-- aggiungere un secondo profilo reale `bios`;
-- spostare gli script legacy fuori dal flusso principale;
-- integrare `copy-to-ventoy` e `setup-vtoyboot` nel nuovo modello;
-- aggiungere validazione del catalogo;
-- migliorare il reporting dei comandi generati.
-
-## File Collegati
-
-- piano di refactor: [VM_MANAGER_PLAN.md](/home/manzolo/Scrivania/Temp/qemu/cachyos/VM_MANAGER_PLAN.md)
-- catalogo VM: [vms.json](/home/manzolo/Scrivania/Temp/qemu/cachyos/vms.json)
-- CLI: [bin/vmctl](/home/manzolo/Scrivania/Temp/qemu/cachyos/bin/vmctl)
-- frontend: [Makefile](/home/manzolo/Scrivania/Temp/qemu/cachyos/Makefile)
+More detail is documented in [docs/CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md).
