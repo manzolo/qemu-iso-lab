@@ -325,6 +325,9 @@ run_action() {
                 run_vmctl clean --all
             fi
             ;;
+        status)
+            run_vmctl status
+            ;;
         advanced)
             advanced_menu_loop
             ;;
@@ -381,6 +384,7 @@ main_menu_loop() {
             "QEMU ISO Lab" \
             "Main menu" \
             choose-vm "Choose a VM" \
+            status "Show VM local state" \
             advanced "Advanced actions" \
             clean-all "Clean artifacts for all VMs" \
             quit "Quit") || {
@@ -403,7 +407,7 @@ main_menu_loop() {
                     advanced_menu_loop
                 fi
                 ;;
-            clean-all|quit)
+            status|clean-all|quit)
                 run_action "$selected"
                 ;;
         esac
