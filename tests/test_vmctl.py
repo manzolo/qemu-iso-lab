@@ -239,20 +239,10 @@ class VmctlTests(unittest.TestCase):
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False, dry_run=True)
 
         with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "partition_layout", return_value="dos"), \
              mock.patch.object(
                  self.vmctl,
-                 "inspect_block_device",
-                 return_value={
-                     "path": "/dev/sdz",
-                     "size": 16 * 1024**3,
-                     "model": "USB",
-                     "mountpoints": [],
-                     "children": [],
-                     "signatures": [{"type": "gpt"}],
-                     "is_root_disk": False,
-                     "is_empty": False,
-                 },
+                 "validate_flash_target",
+                 side_effect=self.vmctl.VMError("Refusing non-empty target device '/dev/sdz' with signatures: gpt"),
              ):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.cmd_flash(args)
@@ -269,7 +259,11 @@ class VmctlTests(unittest.TestCase):
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False, dry_run=True)
 
         with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "partition_layout", return_value="dos"):
+             mock.patch.object(
+                 self.vmctl,
+                 "validate_flash_target",
+                 side_effect=self.vmctl.VMError("EFI guest requires a GPT VM disk before flash; detected: dos"),
+             ):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.cmd_flash(args)
 
