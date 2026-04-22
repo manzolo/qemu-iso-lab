@@ -390,14 +390,20 @@ def expected_partition_layout(vm: dict) -> str:
     return "gpt" if vm["firmware"]["type"] == "efi" else "dos"
 
 
+def is_container_disk_format(fmt: str) -> bool:
+    return fmt in {"qcow2", "qcow", "vmdk", "vhdx"}
+
+
 def validate_flash_target(vm: dict, disk_path: Path, device: str, force_target: bool = False) -> tuple[dict, str | None, int]:
     source_layout = partition_layout(disk_path)
     source_info = image_info(disk_path)
     virtual_size = int(source_info.get("virtual-size", 0) or 0)
+    disk_format = str(vm["disk"].get("format", "")).lower()
+    allow_unknown_layout = is_container_disk_format(disk_format)
 
-    if vm["firmware"]["type"] == "efi" and source_layout != "gpt":
+    if vm["firmware"]["type"] == "efi" and source_layout != "gpt" and not (allow_unknown_layout and source_layout is None):
         raise VMError(f"EFI guest requires a GPT VM disk before flash; detected: {source_layout or 'unknown'}")
-    if vm["firmware"]["type"] == "bios" and source_layout not in {"dos", "gpt"}:
+    if vm["firmware"]["type"] == "bios" and source_layout not in {"dos", "gpt"} and not (allow_unknown_layout and source_layout is None):
         raise VMError(f"BIOS guest requires an MBR/GPT VM disk before flash; detected: {source_layout or 'unknown'}")
 
     info = inspect_block_device(device)
@@ -985,9 +991,11 @@ def cmd_flash(args: argparse.Namespace) -> int:
         helper_will_recheck = True
         source_layout = partition_layout(disk_path)
         virtual_size = int(image_info(disk_path).get("virtual-size", 0) or 0)
-        if vm["firmware"]["type"] == "efi" and source_layout != "gpt":
+        disk_format = str(disk.get("format", "")).lower()
+        allow_unknown_layout = is_container_disk_format(disk_format)
+        if vm["firmware"]["type"] == "efi" and source_layout != "gpt" and not (allow_unknown_layout and source_layout is None):
             raise VMError(f"EFI guest requires a GPT VM disk before flash; detected: {source_layout or 'unknown'}")
-        if vm["firmware"]["type"] == "bios" and source_layout not in {"dos", "gpt"}:
+        if vm["firmware"]["type"] == "bios" and source_layout not in {"dos", "gpt"} and not (allow_unknown_layout and source_layout is None):
             raise VMError(f"BIOS guest requires an MBR/GPT VM disk before flash; detected: {source_layout or 'unknown'}")
         info = inspect_block_device_basic(args.device)
         if info["is_root_disk"]:
@@ -1005,6 +1013,8 @@ def cmd_flash(args: argparse.Namespace) -> int:
     print_kv("target", args.device)
     print_kv("size", format_bytes(info["size"]))
     print_kv("model", info["model"] or "-")
+    if source_layout is None and is_container_disk_format(str(disk.get("format", "")).lower()):
+        print_status("warn", "Guest partition layout is hidden inside the disk container; proceeding with caution", ok=False)
     if args.force_target:
         print_status("warn", "Force mode enabled: existing partition table/signatures will be wiped", ok=False)
     if helper_will_recheck:

@@ -267,6 +267,42 @@ class VmctlTests(unittest.TestCase):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.cmd_flash(args)
 
+    def test_cmd_flash_allows_unknown_layout_for_efi_qcow2(self):
+        self.create_disk()
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=True, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "validate_flash_target",
+                 return_value=(
+                     {
+                         "path": "/dev/sdz",
+                         "size": 16 * 1024**3,
+                         "model": "USB",
+                         "mountpoints": [],
+                         "children": [{"path": "/dev/sdz1"}],
+                         "signatures": [{"type": "gpt"}],
+                         "is_root_disk": False,
+                         "is_empty": False,
+                     },
+                     None,
+                     1 * 1024**3,
+                 ),
+             ), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_flash(args)
+
+        self.assertEqual(exit_code, 0)
+        run_cmd.assert_called_once()
+
     def test_cmd_flash_dry_run_builds_qemu_img_convert(self):
         disk_path = self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False, dry_run=True)
