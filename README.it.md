@@ -123,6 +123,55 @@ Per profili EFI servono anche i file OVMF, ad esempio:
 
 ## Uso Rapido
 
+### Clonare Il Repository
+
+```bash
+git clone git@github.com:manzolo/qemu-iso-lab.git
+cd qemu-iso-lab
+```
+
+### Installare I Requisiti Host
+
+Su sistemi Arch-based:
+
+```bash
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python
+```
+
+Su Debian/Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make
+```
+
+### Primo Flusso Locale: Guest Desktop
+
+Se vuoi provare localmente il guest principale orientato all'uso desktop:
+
+```bash
+make show VM=cachyos
+make prep VM=cachyos
+make install VM=cachyos
+```
+
+Dopo aver installato il sistema sul disco:
+
+```bash
+make start VM=cachyos
+```
+
+### Primo Flusso Tipo-CI: Boot Check Reale Minimo
+
+Se vuoi il test end-to-end reale piu piccolo gia presente nel repo:
+
+```bash
+make prep VM=alpine-ci
+make boot-check VM=alpine-ci
+```
+
+Questo percorso scarica una ISO Alpine `virt` piccola, crea un disco piccolo, avvia QEMU in headless mode e aspetta il prompt seriale `login:`.
+
 ### Elencare le VM
 
 ```bash
