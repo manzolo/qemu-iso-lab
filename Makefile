@@ -14,7 +14,7 @@ endif
 endif
 endif
 
-.PHONY: help setup list show fetch-iso prep install start boot-check tui clean clean-all
+.PHONY: help setup list status show fetch-iso prep install start boot-check tui clean clean-all
 
 define print_header
 	@printf "$(BOLD)$(BLUE)==>$(RESET) $(BOLD)%s$(RESET)\n" "$(1)"
@@ -28,6 +28,7 @@ help:
 	$(call print_header,Targets disponibili)
 	$(call print_kv,make,setup)
 	$(call print_kv,make,list)
+	$(call print_kv,make,status)
 	$(call print_kv,make,show VM=cachyos)
 	$(call print_kv,make,fetch-iso VM=cachyos)
 	$(call print_kv,make,prep VM=cachyos)
@@ -48,6 +49,10 @@ setup:
 list:
 	$(call print_header,Elenco VM configurate)
 	@./bin/vmctl list
+
+status:
+	$(call print_header,Stato VM configurate)
+	@./bin/vmctl status
 
 show:
 	$(call print_header,Profilo VM)

@@ -1,0 +1,148 @@
+{
+  "vms": {
+    "linuxmint-cinnamon": {
+      "name": "Linux Mint 22.3 Cinnamon",
+      "meta": {
+        "catalog_slug": "linux-mint",
+        "family": "mint",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/linuxmint-22.3-cinnamon-64bit.iso",
+      "iso_url": "https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
+      "disk": {
+        "path": "artifacts/linuxmint-cinnamon/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/linuxmint-cinnamon/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "almalinux-minimal": {
+      "name": "AlmaLinux 10.1 Minimal",
+      "meta": {
+        "catalog_slug": "almalinux",
+        "family": "rhel",
+        "role": "server",
+        "release_model": "stable"
+      },
+      "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
+      "iso_url": "https://repo.almalinux.org/almalinux/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
+      "disk": {
+        "path": "artifacts/almalinux-minimal/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/almalinux-minimal/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "kali-live": {
+      "name": "Kali Linux 2026.1 Live",
+      "meta": {
+        "catalog_slug": "kali-linux",
+        "family": "kali",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/kali-linux-2026.1-live-amd64.iso",
+      "iso_url": "https://cdimage.kali.org/kali-2026.1/kali-linux-2026.1-live-amd64.iso",
+      "disk": {
+        "path": "artifacts/kali-live/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/kali-live/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  }
+}

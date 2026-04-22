@@ -65,7 +65,7 @@ Opzionali:
 Clonare il repository:
 
 ```bash
-git clone git@github.com:manzolo/qemu-iso-lab.git
+git clone https://github.com/manzolo/qemu-iso-lab.git
 cd qemu-iso-lab
 ```
 

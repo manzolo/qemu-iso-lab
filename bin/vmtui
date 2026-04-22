@@ -355,7 +355,7 @@ vm_menu_loop() {
             start "Boot installed VM" \
             boot-check "Run headless boot smoke check" \
             clean "Clean current VM artifacts" \
-            back "Torna al menu") || return 0
+            back "Back to main menu") || return 0
         run_action "$selected" || return 0
     done
 }
@@ -380,10 +380,10 @@ main_menu_loop() {
         selected=$(menu_choose \
             "QEMU ISO Lab" \
             "Main menu" \
-            choose-vm "Seleziona una VM" \
-            advanced "Azioni avanzate" \
-            clean-all "Pulisci gli artifact di tutte le VM" \
-            quit "Esci") || {
+            choose-vm "Choose a VM" \
+            advanced "Advanced actions" \
+            clean-all "Clean artifacts for all VMs" \
+            quit "Quit") || {
                 clear
                 exit 0
             }

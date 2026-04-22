@@ -909,6 +909,64 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def disk_status(vm: dict) -> tuple[str, str, str]:
+    disk_path = resolve_path(vm["disk"]["path"])
+    if not disk_path.is_file():
+        return "missing", "-", "-"
+
+    actual_size = format_bytes(disk_path.stat().st_size)
+    virtual_size = "-"
+    if shutil.which("qemu-img") is not None:
+        try:
+            virtual_size = format_bytes(int(image_info(disk_path).get("virtual-size", 0) or 0))
+        except Exception:
+            virtual_size = "?"
+    return "ready", actual_size, virtual_size
+
+
+def iso_status(vm: dict) -> str:
+    iso_path = resolve_path(vm["iso"])
+    return "ready" if iso_path.is_file() else "missing"
+
+
+def nvram_status(vm: dict) -> str:
+    firmware = vm.get("firmware", {})
+    if firmware.get("type") != "efi":
+        return "-"
+    vars_path = resolve_path(firmware["vars_path"])
+    return "ready" if vars_path.is_file() else "missing"
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    config = load_config()
+    rows = []
+    for name, vm in sorted(config["vms"].items()):
+        disk, actual, virtual = disk_status(vm)
+        rows.append((name, disk, iso_status(vm), nvram_status(vm), actual, virtual))
+
+    name_width = max(len("PROFILE"), max(len(row[0]) for row in rows))
+    disk_width = max(len("DISK"), max(len(row[1]) for row in rows))
+    iso_width = max(len("ISO"), max(len(row[2]) for row in rows))
+    nvram_width = max(len("NVRAM"), max(len(row[3]) for row in rows))
+    actual_width = max(len("ACTUAL"), max(len(row[4]) for row in rows))
+    virtual_width = max(len("VIRTUAL"), max(len(row[5]) for row in rows))
+
+    print(f"{style('PROFILE', BOLD, CYAN):<{name_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('DISK', BOLD, CYAN):<{disk_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('ISO', BOLD, CYAN):<{iso_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('NVRAM', BOLD, CYAN):<{nvram_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('ACTUAL', BOLD, CYAN):>{actual_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('VIRTUAL', BOLD, CYAN):>{virtual_width + len(BOLD) + len(CYAN) + len(RESET)}}")
+    for name, disk, iso, nvram, actual, virtual in rows:
+        print(f"{style(name, BOLD):<{name_width + len(BOLD) + len(RESET)}}  "
+              f"{disk:<{disk_width}}  "
+              f"{iso:<{iso_width}}  "
+              f"{nvram:<{nvram_width}}  "
+              f"{actual:>{actual_width}}  "
+              f"{virtual:>{virtual_width}}")
+    return 0
+
+
 def cmd_show(args: argparse.Namespace) -> int:
     config = load_config()
     vm = get_vm(config, args.vm)
@@ -1427,6 +1485,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = subparsers.add_parser("list")
     p.set_defaults(func=cmd_list)
+
+    p = subparsers.add_parser("status")
+    p.set_defaults(func=cmd_status)
 
     p = subparsers.add_parser("show")
     p.add_argument("vm")

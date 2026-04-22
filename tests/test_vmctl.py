@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+import io
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -89,6 +90,35 @@ class VmctlTests(unittest.TestCase):
 
         self.assertIn(self.vm_name, config["vms"])
         self.assertEqual(config["catalog"]["schema_version"], 1)
+
+    def test_cmd_status_reports_disk_iso_and_nvram_state(self):
+        disk_path = self.create_disk()
+        iso_path = self.root / self.vm_config["iso"]
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_text("iso", encoding="utf-8")
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.write_config_dir()
+        vars_path = self.root / self.vm_config["firmware"]["vars_path"]
+        vars_path.parent.mkdir(parents=True, exist_ok=True)
+        vars_path.write_text("vars", encoding="utf-8")
+        args = argparse.Namespace()
+
+        with mock.patch.object(self.vmctl.shutil, "which", return_value="/usr/bin/qemu-img"), \
+             mock.patch.object(self.vmctl, "image_info", return_value={"virtual-size": 2 * 1024**3}), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_status(args)
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn(self.vm_name, output)
+        self.assertIn("ready", output)
+        self.assertIn(self.vmctl.format_bytes(disk_path.stat().st_size), output)
+        self.assertIn(self.vmctl.format_bytes(2 * 1024**3), output)
 
     def test_cmd_prep_downloads_iso_when_missing(self):
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
