@@ -1,0 +1,196 @@
+{
+  "vms": {
+    "fedora-cinnamon": {
+      "name": "Fedora Cinnamon 42",
+      "meta": {
+        "catalog_slug": "fedora-workstation",
+        "family": "fedora",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
+      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
+      "disk": {
+        "path": "artifacts/fedora-cinnamon/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-cinnamon/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "fedora-server": {
+      "name": "Fedora Server 42 Netinst",
+      "meta": {
+        "catalog_slug": "fedora-workstation",
+        "family": "fedora",
+        "role": "server",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "disk": {
+        "path": "artifacts/fedora-server/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-server/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "fedora-workstation": {
+      "name": "Fedora Workstation 42",
+      "meta": {
+        "catalog_slug": "fedora-workstation",
+        "family": "fedora",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Workstation-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
+      "disk": {
+        "path": "artifacts/fedora-workstation/disk.qcow2",
+        "size": "36G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-workstation/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "fedora-xfce": {
+      "name": "Fedora Xfce 42",
+      "meta": {
+        "catalog_slug": "fedora-workstation",
+        "family": "fedora",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Xfce-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
+      "disk": {
+        "path": "artifacts/fedora-xfce/disk.qcow2",
+        "size": "28G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-xfce/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  }
+}

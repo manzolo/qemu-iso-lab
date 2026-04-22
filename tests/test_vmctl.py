@@ -25,9 +25,9 @@ class VmctlTests(unittest.TestCase):
         self.vmctl = load_vmctl_module()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
-        self.config_path = self.root / "vms.json"
+        self.config_dir = self.root / "vms"
         self.original_root = self.vmctl.ROOT
-        self.original_config_path = self.vmctl.CONFIG_PATH
+        self.original_config_dir = self.vmctl.CONFIG_DIR
         self.vm_name = "testvm"
         self.vm_config = {
             "name": "Test VM",
@@ -48,33 +48,30 @@ class VmctlTests(unittest.TestCase):
             "video": {"default": "std", "variants": {"std": ["-vga", "std"]}},
         }
         self.vmctl.ROOT = self.root
-        self.vmctl.CONFIG_PATH = self.config_path
-        self.write_config()
+        self.vmctl.CONFIG_DIR = self.config_dir
+        self.write_config_dir()
 
     def tearDown(self):
         self.vmctl.ROOT = self.original_root
-        self.vmctl.CONFIG_PATH = self.original_config_path
+        self.vmctl.CONFIG_DIR = self.original_config_dir
         self.tempdir.cleanup()
-
-    def write_config(self):
-        self.config_path.write_text(
-            (
-                "{\n"
-                '  "vms": {\n'
-                f'    "{self.vm_name}": '
-                + json.dumps(self.vm_config, indent=6)
-                + "\n"
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
 
     def create_disk(self):
         disk_path = self.root / self.vm_config["disk"]["path"]
         disk_path.parent.mkdir(parents=True, exist_ok=True)
         disk_path.write_text("disk", encoding="utf-8")
         return disk_path
+
+    def write_config_dir(self):
+        (self.config_dir / "profiles").mkdir(parents=True, exist_ok=True)
+        (self.config_dir / "catalog.json").write_text(
+            json.dumps({"catalog": {"schema_version": 1}}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        (self.config_dir / "profiles" / "test.json").write_text(
+            json.dumps({"vms": {self.vm_name: self.vm_config}}, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
     def test_ensure_iso_skips_download_when_file_exists(self):
         iso_path = self.root / self.vm_config["iso"]
@@ -86,6 +83,12 @@ class VmctlTests(unittest.TestCase):
 
         self.assertEqual(resolved, iso_path)
         download_file.assert_not_called()
+
+    def test_load_config_reads_profiles_from_config_dir(self):
+        config = self.vmctl.load_config()
+
+        self.assertIn(self.vm_name, config["vms"])
+        self.assertEqual(config["catalog"]["schema_version"], 1)
 
     def test_cmd_prep_downloads_iso_when_missing(self):
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
@@ -161,12 +164,46 @@ class VmctlTests(unittest.TestCase):
 
     def test_cmd_prep_fails_without_iso_url(self):
         self.vm_config.pop("iso_url")
-        self.write_config()
+        self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
 
         with mock.patch.object(self.vmctl, "require_command"):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.cmd_prep(args)
+
+    def test_cmd_provision_dry_run_prepares_and_starts_installer(self):
+        iso_path = self.root / self.vm_config["iso"]
+        args = argparse.Namespace(vm=self.vm_name, video="std", no_start=False, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "download_file") as download_file, \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_provision(args)
+
+        self.assertEqual(exit_code, 0)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True)
+        self.assertEqual(run_cmd.call_count, 2)
+        qemu_img_cmd = run_cmd.call_args_list[0].args[0]
+        qemu_cmd = run_cmd.call_args_list[1].args[0]
+        self.assertEqual(qemu_img_cmd[:3], ["qemu-img", "create", "-f"])
+        self.assertEqual(qemu_cmd[0], "qemu-system-x86_64")
+        self.assertIn("-cdrom", qemu_cmd)
+        self.assertEqual(qemu_cmd[qemu_cmd.index("-cdrom") + 1], str(iso_path))
+        self.assertIn(f"file={self.root / self.vm_config['disk']['path']},format=qcow2,if=virtio", qemu_cmd)
+
+    def test_cmd_provision_no_start_only_prepares_artifacts(self):
+        iso_path = self.root / self.vm_config["iso"]
+        args = argparse.Namespace(vm=self.vm_name, video=None, no_start=True, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "download_file") as download_file, \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_provision(args)
+
+        self.assertEqual(exit_code, 0)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True)
+        run_cmd.assert_called_once()
+        self.assertEqual(run_cmd.call_args.args[0][:3], ["qemu-img", "create", "-f"])
 
     def test_cmd_install_dry_run_builds_qemu_command_with_cdrom(self):
         disk_path = self.create_disk()
@@ -241,7 +278,7 @@ class VmctlTests(unittest.TestCase):
             "expect": "login:",
             "timeout_sec": 42,
         }
-        self.write_config()
+        self.write_config_dir()
         iso_path = self.root / self.vm_config["iso"]
         args = argparse.Namespace(vm=self.vm_name, expect=None, timeout=None, dry_run=True)
 
@@ -271,7 +308,7 @@ class VmctlTests(unittest.TestCase):
             "vars_template": "/missing/OVMF_VARS_4M.fd",
             "vars_path": "artifacts/testvm/OVMF_VARS.fd",
         }
-        self.write_config()
+        self.write_config_dir()
 
         fallback_code = self.root / "firmware" / "OVMF_CODE_4M.fd"
         fallback_vars = self.root / "firmware" / "OVMF_VARS_4M.fd"
@@ -300,7 +337,7 @@ class VmctlTests(unittest.TestCase):
             "vars_template": "/missing/OVMF_VARS_4M.fd",
             "vars_path": "artifacts/testvm/OVMF_VARS.fd",
         }
-        self.write_config()
+        self.write_config_dir()
         args = argparse.Namespace()
 
         def fake_which(name):
@@ -327,7 +364,7 @@ class VmctlTests(unittest.TestCase):
             "vars_template": "firmware/OVMF_VARS_4M.fd",
             "vars_path": "artifacts/testvm/OVMF_VARS.fd",
         }
-        self.write_config()
+        self.write_config_dir()
         firmware_dir = self.root / "firmware"
         firmware_dir.mkdir(parents=True, exist_ok=True)
         (firmware_dir / "OVMF_CODE_4M.fd").write_text("code", encoding="utf-8")

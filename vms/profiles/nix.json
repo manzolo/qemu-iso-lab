@@ -1,0 +1,100 @@
+{
+  "vms": {
+    "nixos-graphical": {
+      "name": "NixOS 25.11 Graphical",
+      "meta": {
+        "catalog_slug": "nixos",
+        "family": "nix",
+        "role": "desktop",
+        "release_model": "channel-based"
+      },
+      "iso": "isos/latest-nixos-graphical-x86_64-linux.iso",
+      "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-graphical-x86_64-linux.iso",
+      "disk": {
+        "path": "artifacts/nixos-graphical/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/nixos-graphical/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "nixos-minimal": {
+      "name": "NixOS 25.11 Minimal",
+      "meta": {
+        "catalog_slug": "nixos",
+        "family": "nix",
+        "role": "minimal",
+        "release_model": "channel-based"
+      },
+      "iso": "isos/latest-nixos-minimal-x86_64-linux.iso",
+      "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-minimal-x86_64-linux.iso",
+      "disk": {
+        "path": "artifacts/nixos-minimal/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/nixos-minimal/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  }
+}

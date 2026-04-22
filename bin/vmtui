@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIG_PATH="$ROOT_DIR/vms.json"
+CONFIG_DIR="$ROOT_DIR/vms"
 VMCTL="$ROOT_DIR/bin/vmctl"
 
 require_command() {
@@ -20,8 +20,8 @@ if [[ ! -x "$VMCTL" ]]; then
     exit 1
 fi
 
-if [[ ! -f "$CONFIG_PATH" ]]; then
-    printf 'error: missing config: %s\n' "$CONFIG_PATH" >&2
+if [[ ! -d "$CONFIG_DIR" ]]; then
+    printf 'error: missing config directory: %s\n' "$CONFIG_DIR" >&2
     exit 1
 fi
 
@@ -58,7 +58,7 @@ pause_box() {
 }
 
 list_vm_menu_items() {
-    python3 - "$CONFIG_PATH" <<'PY'
+    python3 - "$CONFIG_DIR" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -72,8 +72,11 @@ def ellipsize(text: str, width: int) -> str:
     return text[: width - 3] + "..."
 
 
-config_path = Path(sys.argv[1])
-data = json.loads(config_path.read_text(encoding="utf-8"))
+config_dir = Path(sys.argv[1])
+data = {"catalog": {}, "vms": {}}
+for profile_path in sorted((config_dir / "profiles").glob("*.json")):
+    profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
+    data["vms"].update(profile_data["vms"])
 for name, vm in sorted(data["vms"].items()):
     label = vm.get("name", name)
     firmware = str(vm.get("firmware", {}).get("type", "?")).upper()
@@ -94,14 +97,17 @@ PY
 }
 
 list_video_menu_items() {
-    python3 - "$CONFIG_PATH" "$1" <<'PY'
+    python3 - "$CONFIG_DIR" "$1" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-config_path = Path(sys.argv[1])
+config_dir = Path(sys.argv[1])
 vm_name = sys.argv[2]
-data = json.loads(config_path.read_text(encoding="utf-8"))
+data = {"vms": {}}
+for profile_path in sorted((config_dir / "profiles").glob("*.json")):
+    profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
+    data["vms"].update(profile_data["vms"])
 vm = data["vms"][vm_name]
 video = vm.get("video", {})
 default = video.get("default", "")
@@ -156,6 +162,17 @@ run_action() {
     case "$action" in
         show)
             run_vmctl show "$current_vm"
+            ;;
+        provision)
+            local video
+            video=$(choose_video) || return 0
+            if confirm_box "Confirm Provision" "Guided install for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- start the installer"; then
+                if [[ -n "$video" ]]; then
+                    run_vmctl provision "$current_vm" --video "$video"
+                else
+                    run_vmctl provision "$current_vm"
+                fi
+            fi
             ;;
         fetch-iso)
             run_vmctl fetch-iso "$current_vm"
@@ -213,6 +230,7 @@ vm_menu_loop() {
         selected=$(menu_choose \
             "VM Actions" \
             "Current VM: $current_vm" \
+            provision "Guided install: fetch, prep, boot installer" \
             show "Show VM profile" \
             fetch-iso "Download ISO if missing" \
             prep "Prepare disk and firmware artifacts" \

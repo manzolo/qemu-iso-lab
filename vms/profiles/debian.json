@@ -1,0 +1,193 @@
+{
+  "vms": {
+    "debian-gnome-live": {
+      "name": "Debian 13 GNOME Live",
+      "meta": {
+        "catalog_slug": "debian",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/debian-live-13.4.0-amd64-gnome.iso",
+      "iso_url": "https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
+      "disk": {
+        "path": "artifacts/debian-gnome-live/disk.qcow2",
+        "size": "28G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/debian-gnome-live/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "debian-netinst": {
+      "name": "Debian 13 Netinst",
+      "meta": {
+        "catalog_slug": "debian",
+        "family": "debian",
+        "role": "installer",
+        "release_model": "stable"
+      },
+      "iso": "isos/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "disk": {
+        "path": "artifacts/debian-netinst/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "ubuntu-desktop": {
+      "name": "Ubuntu 24.04.4 Desktop",
+      "meta": {
+        "catalog_slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-24.04.4-desktop-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-desktop/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-desktop/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "ubuntu-server": {
+      "name": "Ubuntu 24.04.4 Server",
+      "meta": {
+        "catalog_slug": "ubuntu",
+        "family": "debian",
+        "role": "server",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/noble/ubuntu-24.04.4-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-server/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-server/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  }
+}

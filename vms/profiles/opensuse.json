@@ -1,0 +1,100 @@
+{
+  "vms": {
+    "opensuse-tumbleweed-kde": {
+      "name": "openSUSE Tumbleweed KDE Live",
+      "meta": {
+        "catalog_slug": "opensuse-tumbleweed",
+        "family": "opensuse",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
+      "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
+      "disk": {
+        "path": "artifacts/opensuse-tumbleweed-kde/disk.qcow2",
+        "size": "36G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/opensuse-tumbleweed-kde/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "opensuse-tumbleweed-net": {
+      "name": "openSUSE Tumbleweed NET",
+      "meta": {
+        "catalog_slug": "opensuse-tumbleweed",
+        "family": "opensuse",
+        "role": "installer",
+        "release_model": "rolling"
+      },
+      "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "disk": {
+        "path": "artifacts/opensuse-tumbleweed-net/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/opensuse-tumbleweed-net/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  }
+}

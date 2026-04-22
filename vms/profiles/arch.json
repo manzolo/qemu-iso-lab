@@ -1,0 +1,107 @@
+{
+  "vms": {
+    "archlinux": {
+      "name": "Arch Linux",
+      "meta": {
+        "catalog_slug": "archlinux",
+        "family": "arch",
+        "role": "baseline",
+        "release_model": "rolling"
+      },
+      "iso": "isos/archlinux-2026.04.01-x86_64.iso",
+      "iso_url": "https://mirrors.dotsrc.org/archlinux/iso/latest/archlinux-2026.04.01-x86_64.iso",
+      "disk": {
+        "path": "artifacts/archlinux/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/archlinux/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "cachyos": {
+      "name": "CachyOS",
+      "meta": {
+        "catalog_slug": "cachyos",
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/cachyos-desktop-linux-260308.iso",
+      "iso_url": "https://mirror.cachyos.org/ISO/desktop/260308/cachyos-desktop-linux-260308.iso",
+      "disk": {
+        "path": "artifacts/cachyos/disk.vhd",
+        "size": "30G",
+        "format": "vpc",
+        "subformat": "fixed",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/cachyos/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  }
+}

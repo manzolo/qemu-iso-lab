@@ -1,0 +1,51 @@
+{
+  "vms": {
+    "alpine-ci": {
+      "name": "Alpine Linux Virt CI",
+      "meta": {
+        "catalog_slug": "alpine-linux",
+        "family": "alpine",
+        "role": "ci",
+        "release_model": "stable"
+      },
+      "iso": "isos/alpine-virt-3.23.4-x86_64.iso",
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.23.4-x86_64.iso",
+      "disk": {
+        "path": "artifacts/alpine-ci/disk.qcow2",
+        "size": "2G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 512,
+      "cpus": 1,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std"
+          ]
+        }
+      },
+      "ci": {
+        "accel": "tcg",
+        "headless": true,
+        "boot_from": "cdrom",
+        "auto_input": [
+          {
+            "match": "boot:",
+            "send": "\n"
+          }
+        ],
+        "expect": "login:",
+        "timeout_sec": 90
+      }
+    }
+  }
+}

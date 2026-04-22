@@ -12,10 +12,11 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = ROOT / "vms.json"
+CONFIG_DIR = ROOT / "vms"
 HTTP_USER_AGENT = "Mozilla/5.0 (compatible; vmctl/1.0; +https://local.repo)"
 REQUIRED_COMMANDS = ["qemu-system-x86_64", "qemu-img", "python3"]
 OPTIONAL_COMMANDS = {"dialog": "required only for the TUI"}
@@ -72,11 +73,64 @@ def print_note(text: str) -> None:
     print(f"{style('::', BOLD, CYAN)} {text}")
 
 
-def load_config() -> dict:
-    with CONFIG_PATH.open("r", encoding="utf-8") as fh:
+def pretty_path(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def pretty_url(url: str) -> str:
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        return url
+    tail = parsed.path.rsplit("/", 1)[-1]
+    if tail:
+        return f"{parsed.netloc}/{tail}"
+    return parsed.netloc
+
+
+def load_json_file(path: Path) -> dict:
+    with path.open("r", encoding="utf-8") as fh:
         data = json.load(fh)
-    if "vms" not in data or not isinstance(data["vms"], dict):
-        raise VMError(f"Invalid config file: {CONFIG_PATH}")
+    if not isinstance(data, dict):
+        raise VMError(f"Invalid config file: {path}")
+    return data
+
+
+def load_config() -> dict:
+    catalog_path = CONFIG_DIR / "catalog.json"
+    profiles_dir = CONFIG_DIR / "profiles"
+    data: dict[str, object] = {"catalog": {}, "vms": {}}
+
+    if not CONFIG_DIR.is_dir():
+        raise VMError(f"Missing config directory: {CONFIG_DIR}")
+
+    if catalog_path.is_file():
+        catalog_data = load_json_file(catalog_path)
+        if "catalog" in catalog_data:
+            catalog_data = {"catalog": catalog_data["catalog"]}
+        if "catalog" not in catalog_data or not isinstance(catalog_data["catalog"], dict):
+            raise VMError(f"Invalid catalog file: {catalog_path}")
+        data["catalog"] = catalog_data["catalog"]
+
+    if not profiles_dir.is_dir():
+        raise VMError(f"Missing profiles directory: {profiles_dir}")
+
+    merged_vms: dict[str, dict] = {}
+    for path in sorted(profiles_dir.glob("*.json")):
+        profile_data = load_json_file(path)
+        if "vms" not in profile_data or not isinstance(profile_data["vms"], dict):
+            raise VMError(f"Invalid profile file: {path}")
+        for name, vm in profile_data["vms"].items():
+            if name in merged_vms:
+                raise VMError(f"Duplicate VM profile '{name}' in {path}")
+            merged_vms[name] = vm
+
+    if not merged_vms:
+        raise VMError(f"No VM profiles found in: {profiles_dir}")
+
+    data["vms"] = merged_vms
     return data
 
 
@@ -97,10 +151,13 @@ def require_command(name: str) -> None:
         raise VMError(f"Missing command: {name}")
 
 
-def run(cmd: list[str], dry_run: bool = False) -> None:
+def run(cmd: list[str], dry_run: bool = False, quiet: bool = False) -> None:
     print_command(cmd)
     if not dry_run:
-        subprocess.run(cmd, check=True)
+        if quiet:
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.run(cmd, check=True)
 
 
 def ensure_parent(path: Path) -> None:
@@ -117,7 +174,9 @@ def looks_like_html(path: Path) -> bool:
 
 
 def download_file(url: str, destination: Path, dry_run: bool = False) -> None:
-    print_note(f"Downloading {url} -> {destination}")
+    print_header("Download ISO")
+    print_kv("source", pretty_url(url))
+    print_kv("target", pretty_path(destination))
     ensure_parent(destination)
     if dry_run:
         return
@@ -147,13 +206,13 @@ def ensure_iso(vm: dict, dry_run: bool = False) -> Path:
     iso_path = resolve_path(vm["iso"])
     if iso_path.is_file():
         if looks_like_html(iso_path):
-            print_status("warn", f"Removing invalid cached ISO placeholder: {iso_path}", ok=False)
+            print_status("warn", f"Removing invalid cached ISO placeholder: {pretty_path(iso_path)}", ok=False)
             if not dry_run:
                 iso_path.unlink()
             else:
                 return iso_path
         else:
-            print_status("ok", f"ISO already exists: {iso_path}")
+            print_status("ok", f"ISO ready: {pretty_path(iso_path)}")
             return iso_path
     if iso_path.exists():
         raise VMError(f"ISO path exists but is not a regular file: {iso_path}")
@@ -284,7 +343,7 @@ def firmware_args(vm: dict, dry_run: bool = False) -> list[str]:
     code, vars_template, vars_path = resolve_efi_firmware(fw)
     if not vars_path.exists():
         ensure_parent(vars_path)
-        print_note(f"Creating EFI vars store: {vars_path}")
+        print_note(f"Creating EFI vars store: {pretty_path(vars_path)}")
         if not dry_run:
             shutil.copyfile(vars_template, vars_path)
 
@@ -296,10 +355,10 @@ def firmware_args(vm: dict, dry_run: bool = False) -> list[str]:
     ]
 
 
-def disk_args(vm: dict) -> list[str]:
+def disk_args(vm: dict, allow_missing: bool = False) -> list[str]:
     disk = vm["disk"]
     disk_path = resolve_path(disk["path"])
-    if not disk_path.exists():
+    if not disk_path.exists() and not allow_missing:
         raise VMError(f"Disk image not found: {disk_path}")
     interface = disk.get("interface", "virtio")
     return [
@@ -328,6 +387,7 @@ def common_args(
     headless: bool = False,
     serial_stdio: bool = False,
     no_reboot: bool = False,
+    allow_missing_disk: bool = False,
 ) -> list[str]:
     require_command("qemu-system-x86_64")
     cpu_model = "host" if accel == "kvm" else vm.get("cpu_model", "max")
@@ -347,7 +407,7 @@ def common_args(
     if accel == "kvm":
         args.insert(1, "-enable-kvm")
     args += firmware_args(vm, dry_run=dry_run)
-    args += disk_args(vm)
+    args += disk_args(vm, allow_missing=allow_missing_disk)
 
     if headless:
         args += ["-display", "none", "-monitor", "none"]
@@ -515,12 +575,52 @@ def cmd_prep(args: argparse.Namespace) -> int:
         if disk.get("subformat"):
             cmd += ["-o", f"subformat={disk['subformat']}"]
         cmd += [str(disk_path), disk["size"]]
-        run(cmd, dry_run=args.dry_run)
+        run(cmd, dry_run=args.dry_run, quiet=True)
+        print_status("ok", f"Created disk: {pretty_path(disk_path)}")
     else:
-        print_status("ok", f"Disk already exists: {disk_path}")
+        print_status("ok", f"Disk ready: {pretty_path(disk_path)}")
 
     firmware_args(vm, dry_run=args.dry_run)
     print_status("ok", f"Prepared VM '{args.vm}'")
+    return 0
+
+
+def cmd_provision(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    ensure_vm_dirs(args.vm)
+
+    print_header(f"Provision VM: {args.vm}")
+    iso_path = ensure_iso(vm, dry_run=args.dry_run)
+
+    require_command("qemu-img")
+    disk = vm["disk"]
+    disk_path = resolve_path(disk["path"])
+    disk_exists = disk_path.exists()
+    if not disk_exists:
+        ensure_parent(disk_path)
+        cmd = ["qemu-img", "create", "-f", disk["format"]]
+        if disk.get("subformat"):
+            cmd += ["-o", f"subformat={disk['subformat']}"]
+        cmd += [str(disk_path), disk["size"]]
+        run(cmd, dry_run=args.dry_run, quiet=True)
+        print_status("ok", f"Created disk: {pretty_path(disk_path)}")
+    else:
+        print_status("ok", f"Disk ready: {pretty_path(disk_path)}")
+
+    if args.no_start:
+        firmware_args(vm, dry_run=args.dry_run)
+        print_status("ok", f"Provisioned VM '{args.vm}' without starting the installer")
+        return 0
+
+    qemu_args = common_args(
+        vm,
+        args.video,
+        dry_run=args.dry_run,
+        allow_missing_disk=args.dry_run and not disk_exists,
+    )
+    qemu_args += ["-cdrom", str(iso_path)]
+    run(qemu_args, dry_run=args.dry_run)
     return 0
 
 
@@ -678,6 +778,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = subparsers.add_parser("prep")
     p.add_argument("vm")
     p.set_defaults(func=cmd_prep)
+
+    p = subparsers.add_parser("provision")
+    p.add_argument("vm")
+    p.add_argument("--video")
+    p.add_argument("--no-start", action="store_true", help="prepare ISO, disk, and firmware without starting the installer")
+    p.set_defaults(func=cmd_provision)
 
     p = subparsers.add_parser("install")
     p.add_argument("vm")
