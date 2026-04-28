@@ -34,7 +34,7 @@ class VmtuiTests(unittest.TestCase):
         )
 
     def test_list_vm_action_items_includes_cloud_init_entries_for_supported_vm(self):
-        result = self.run_bash("source bin/vmtui; list_vm_action_items ubuntu-niri-local")
+        result = self.run_bash("source bin/vmtui; list_vm_action_items ubuntu-niri")
         output = result.stdout.splitlines()
 
         self.assertIn("full-auto-install", output)
