@@ -1504,13 +1504,13 @@ def cmd_post_install(args: argparse.Namespace) -> int:
     require_command("scp")
     wait_for_ssh(vm, args.timeout, dry_run=args.dry_run)
 
+    for command in ci.get("post_install_run", []):
+        post_install_run(vm, str(command), dry_run=args.dry_run)
+
     for entry in ci.get("copy_from_host", []):
         if not isinstance(entry, dict):
             raise VMError("Invalid copy_from_host entry: expected object")
         post_install_copy(vm, entry, dry_run=args.dry_run)
-
-    for command in ci.get("post_install_run", []):
-        post_install_run(vm, str(command), dry_run=args.dry_run)
 
     print_status("ok", f"Post-install completed for VM '{args.vm}'")
     return 0

@@ -1024,7 +1024,15 @@ class VmctlTests(unittest.TestCase):
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(
-            executed[0],
+            executed[0][-1],
+            "sh -lc 'sudo apt update'",
+        )
+        self.assertEqual(
+            executed[1][-1],
+            "sh -lc 'sudo apt install -y niri'",
+        )
+        self.assertEqual(
+            executed[2],
             [
                 "ssh",
                 "-o",
@@ -1042,7 +1050,7 @@ class VmctlTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            executed[1],
+            executed[3],
             [
                 "scp",
                 "-o",
@@ -1056,8 +1064,6 @@ class VmctlTests(unittest.TestCase):
                 "tester@127.0.0.1:/home/tester/.config/niri",
             ],
         )
-        self.assertEqual(executed[2][-1], "sh -lc 'sudo apt update'")
-        self.assertEqual(executed[3][-1], "sh -lc 'sudo apt install -y niri'")
 
     def test_firmware_args_uses_common_ovmf_fallback_when_configured_paths_are_missing(self):
         self.create_disk()
