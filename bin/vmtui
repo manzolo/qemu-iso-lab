@@ -135,6 +135,46 @@ for name in sorted(variants):
 PY
 }
 
+vm_has_section() {
+    python3 - "$CONFIG_DIR" "$1" "$2" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config_dir = Path(sys.argv[1])
+vm_name = sys.argv[2]
+section = sys.argv[3]
+data = {"vms": {}}
+for profile_path in sorted((config_dir / "profiles").glob("*.json")):
+    profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
+    data["vms"].update(profile_data["vms"])
+vm = data["vms"][vm_name]
+raise SystemExit(0 if isinstance(vm.get(section), dict) else 1)
+PY
+}
+
+list_vm_action_items() {
+    local vm_name="$1"
+    printf '%s\n' provision "Guided install: fetch, prep, boot installer"
+    printf '%s\n' show "Show VM profile"
+    printf '%s\n' fetch-iso "Download ISO if missing"
+    printf '%s\n' prep "Prepare disk and firmware artifacts"
+    printf '%s\n' install "Boot installer"
+    if vm_has_section "$vm_name" "autoinstall"; then
+        printf '%s\n' full-auto-install "Fully automatic Ubuntu autoinstall"
+    fi
+    if vm_has_section "$vm_name" "cloud_init"; then
+        printf '%s\n' cloud-init-install "Cloud-init install flow for this VM"
+        printf '%s\n' install-cloud-init "Boot installer with generated cloud-init seed"
+        printf '%s\n' start-cloud-init "Boot installed VM with cloud-init first boot"
+        printf '%s\n' post-install "Run SSH post-install actions"
+    fi
+    printf '%s\n' start "Boot installed VM"
+    printf '%s\n' boot-check "Run headless boot smoke check"
+    printf '%s\n' clean "Clean current VM artifacts"
+    printf '%s\n' back "Back to main menu"
+}
+
 list_empty_device_menu_items() {
     python3 - "$VMCTL" <<'PY'
 import subprocess
@@ -231,6 +271,30 @@ run_action() {
                 fi
             fi
             ;;
+        cloud-init-install)
+            local video
+            video=$(choose_video) || return 0
+            if confirm_box "Manual Install With Cloud-Init" "Start the guided manual install flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- boot the installer now\n\nAfter the OS install finishes, come back and run:\n- Boot installed VM with cloud-init first boot\n- Run SSH post-install actions"; then
+                if [[ -n "$video" ]]; then
+                    run_vmctl provision "$current_vm" --video "$video"
+                else
+                    run_vmctl provision "$current_vm"
+                fi
+                msg_box "Next Steps" "After completing the OS installation inside the VM:\n\n1. Return to this menu\n2. Run 'Boot installed VM with cloud-init first boot'\n3. Then run 'Run SSH post-install actions'\n\nFor ubuntu-niri-local this is the intended flow."
+            fi
+            ;;
+        full-auto-install)
+            local video
+            video=$(choose_video) || return 0
+            if confirm_box "Fully Automatic Install" "Run the fully automatic Ubuntu autoinstall flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- boot the installer in autoinstall mode\n- exit when the installer reboots after finishing\n\nAfter that, start the installed VM normally and then run SSH post-install actions."; then
+                if [[ -n "$video" ]]; then
+                    run_vmctl install-unattended "$current_vm" --video "$video"
+                else
+                    run_vmctl install-unattended "$current_vm"
+                fi
+                msg_box "Next Steps" "When the unattended installer exits on reboot:\n\n1. Run 'Boot installed VM'\n2. Wait for the guest to finish its first boot\n3. Run 'Run SSH post-install actions'\n\nNo manual installer interaction is expected in this flow."
+            fi
+            ;;
         fetch-iso)
             run_vmctl fetch-iso "$current_vm"
             ;;
@@ -246,6 +310,15 @@ run_action() {
                 run_vmctl install "$current_vm"
             fi
             ;;
+        install-cloud-init)
+            local video
+            video=$(choose_video) || return 0
+            if [[ -n "$video" ]]; then
+                run_vmctl install "$current_vm" --video "$video" --cloud-init
+            else
+                run_vmctl install "$current_vm" --cloud-init
+            fi
+            ;;
         start)
             local video
             video=$(choose_video) || return 0
@@ -254,6 +327,18 @@ run_action() {
             else
                 run_vmctl start "$current_vm"
             fi
+            ;;
+        start-cloud-init)
+            local video
+            video=$(choose_video) || return 0
+            if [[ -n "$video" ]]; then
+                run_vmctl start "$current_vm" --video "$video" --cloud-init
+            else
+                run_vmctl start "$current_vm" --cloud-init
+            fi
+            ;;
+        post-install)
+            run_vmctl post-install "$current_vm"
             ;;
         boot-check)
             run_vmctl boot-check "$current_vm"
@@ -346,19 +431,13 @@ run_action() {
 
 vm_menu_loop() {
     while true; do
+        local -a menu_items=()
+        mapfile -t menu_items < <(list_vm_action_items "$current_vm")
         local selected
         selected=$(menu_choose \
             "VM Actions" \
             "Current VM: $current_vm" \
-            provision "Guided install: fetch, prep, boot installer" \
-            show "Show VM profile" \
-            fetch-iso "Download ISO if missing" \
-            prep "Prepare disk and firmware artifacts" \
-            install "Boot installer" \
-            start "Boot installed VM" \
-            boot-check "Run headless boot smoke check" \
-            clean "Clean current VM artifacts" \
-            back "Back to main menu") || return 0
+            "${menu_items[@]}") || return 0
         run_action "$selected" || return 0
     done
 }
@@ -414,4 +493,6 @@ main_menu_loop() {
     done
 }
 
-main_menu_loop
+if [[ "${VMTUI_TEST_MODE:-0}" != "1" ]]; then
+    main_menu_loop
+fi

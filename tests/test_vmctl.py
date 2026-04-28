@@ -74,6 +74,12 @@ class VmctlTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def write_extra_profile(self, filename: str, payload: dict) -> None:
+        (self.config_dir / "profiles" / filename).write_text(
+            json.dumps(payload, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
     def test_ensure_iso_skips_download_when_file_exists(self):
         iso_path = self.root / self.vm_config["iso"]
         iso_path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,6 +96,31 @@ class VmctlTests(unittest.TestCase):
 
         self.assertIn(self.vm_name, config["vms"])
         self.assertEqual(config["catalog"]["schema_version"], 1)
+
+    def test_load_config_reads_local_profile_override_file(self):
+        local_vm = json.loads(json.dumps(self.vm_config))
+        local_vm["name"] = "Local VM"
+        local_vm["disk"]["path"] = "artifacts/localvm/disk.qcow2"
+        self.write_extra_profile("local.json", {"vms": {"localvm": local_vm}})
+
+        config = self.vmctl.load_config()
+
+        self.assertIn("localvm", config["vms"])
+        self.assertEqual(config["vms"]["localvm"]["name"], "Local VM")
+
+    def test_cmd_list_includes_local_profile_override_file(self):
+        local_vm = json.loads(json.dumps(self.vm_config))
+        local_vm["name"] = "Local VM"
+        local_vm["disk"]["path"] = "artifacts/localvm/disk.qcow2"
+        self.write_extra_profile("local.json", {"vms": {"localvm": local_vm}})
+
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_list(argparse.Namespace())
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("localvm", output)
+        self.assertIn("Local VM", output)
 
     def test_cmd_status_reports_disk_iso_and_nvram_state(self):
         disk_path = self.create_disk()
@@ -255,7 +286,7 @@ class VmctlTests(unittest.TestCase):
     def test_cmd_install_dry_run_builds_qemu_command_with_cdrom(self):
         disk_path = self.create_disk()
         iso_path = self.root / self.vm_config["iso"]
-        args = argparse.Namespace(vm=self.vm_name, video="std", dry_run=True)
+        args = argparse.Namespace(vm=self.vm_name, video="std", cloud_init=False, dry_run=True)
 
         with mock.patch.object(self.vmctl, "download_file") as download_file, \
              mock.patch.object(self.vmctl, "require_command"), \
@@ -719,7 +750,7 @@ class VmctlTests(unittest.TestCase):
 
     def test_cmd_start_dry_run_builds_qemu_command_without_cdrom(self):
         disk_path = self.create_disk()
-        args = argparse.Namespace(vm=self.vm_name, video=None, dry_run=True)
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, dry_run=True)
 
         with mock.patch.object(self.vmctl, "require_command"), \
              mock.patch.object(self.vmctl, "run") as run_cmd:
@@ -767,6 +798,15 @@ class VmctlTests(unittest.TestCase):
 
         self.assertIn("e1000e,netdev=n1", qemu_cmd)
 
+    def test_common_args_adds_hostfwd_for_cloud_init_ssh(self):
+        self.create_disk()
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+
+        with mock.patch.object(self.vmctl, "require_command"):
+            qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
+
+        self.assertIn("user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", qemu_cmd)
+
     def test_common_args_supports_sata_disk_interface(self):
         disk_path = self.create_disk()
         self.vm_config["disk"]["interface"] = "sata"
@@ -809,6 +849,215 @@ class VmctlTests(unittest.TestCase):
             run_and_expect.call_args.kwargs["auto_inputs"],
             [("boot:", "\n")],
         )
+
+    def test_create_cloud_init_seed_writes_artifacts_and_runs_cloud_localds(self):
+        pubkey = self.root / ".ssh" / "id_ed25519.pub"
+        pubkey.parent.mkdir(parents=True, exist_ok=True)
+        pubkey.write_text("ssh-ed25519 AAAA from-file\n", encoding="utf-8")
+        self.vm_config["cloud_init"] = {
+            "hostname": "testvm",
+            "user": "tester",
+            "ssh_authorized_keys": ["ssh-ed25519 AAAA test"],
+            "ssh_authorized_keys_file": str(pubkey),
+            "packages": ["niri"],
+            "runcmd": ["echo ready"],
+        }
+
+        with mock.patch.object(self.vmctl.shutil, "which", side_effect=lambda name: "/usr/bin/cloud-localds" if name == "cloud-localds" else None), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            seed_path = self.vmctl.create_cloud_init_seed(self.vm_name, self.vm_config)
+
+        self.assertEqual(seed_path, self.root / "artifacts/testvm/cloud-init/seed.iso")
+        user_data = (self.root / "artifacts/testvm/cloud-init/user-data").read_text(encoding="utf-8")
+        self.assertIn("#cloud-config", user_data)
+        self.assertIn("ssh-ed25519 AAAA test", user_data)
+        self.assertIn("ssh-ed25519 AAAA from-file", user_data)
+        self.assertIn('"local-hostname": "testvm"', (self.root / "artifacts/testvm/cloud-init/meta-data").read_text(encoding="utf-8"))
+        self.assertEqual(
+            run_cmd.call_args.args[0],
+            [
+                "cloud-localds",
+                str(self.root / "artifacts/testvm/cloud-init/seed.iso"),
+                str(self.root / "artifacts/testvm/cloud-init/user-data"),
+                str(self.root / "artifacts/testvm/cloud-init/meta-data"),
+            ],
+        )
+
+    def test_collect_ssh_authorized_keys_requires_existing_file(self):
+        with self.assertRaises(self.vmctl.VMError):
+            self.vmctl.collect_ssh_authorized_keys({"ssh_authorized_keys_file": str(self.root / "missing.pub")})
+
+    def test_collect_ssh_authorized_keys_allows_missing_file_in_dry_run_mode(self):
+        keys = self.vmctl.collect_ssh_authorized_keys(
+            {"ssh_authorized_keys_file": str(self.root / "missing.pub")},
+            allow_missing_file=True,
+        )
+
+        self.assertEqual(keys, [])
+
+    def test_ssh_base_cmd_allows_missing_private_key_in_dry_run_mode(self):
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+            "ssh_key": str(self.root / "missing-key"),
+        }
+
+        cmd = self.vmctl.ssh_base_cmd(self.vm_config, dry_run=True)
+
+        self.assertEqual(cmd[0], "ssh")
+        self.assertNotIn("-i", cmd)
+
+    def test_ssh_base_cmd_requires_existing_private_key_when_not_dry_run(self):
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+            "ssh_key": str(self.root / "missing-key"),
+        }
+
+        with self.assertRaises(self.vmctl.VMError):
+            self.vmctl.ssh_base_cmd(self.vm_config, dry_run=False)
+
+    def test_cmd_start_cloud_init_attaches_seed_drive(self):
+        self.create_disk()
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=True, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "create_cloud_init_seed", return_value=self.root / "artifacts/testvm/cloud-init/seed.iso") as create_seed, \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_start(args)
+
+        self.assertEqual(exit_code, 0)
+        create_seed.assert_called_once_with(self.vm_name, self.vm_config, dry_run=True)
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertIn("-drive", qemu_cmd)
+        self.assertIn(
+            f"file={self.root / 'artifacts/testvm/cloud-init/seed.iso'},format=raw,if=virtio,media=cdrom,readonly=on",
+            qemu_cmd,
+        )
+
+    def test_render_autoinstall_user_data_embeds_identity_ssh_and_first_boot_cloud_init(self):
+        pubkey = self.root / ".ssh" / "id_ed25519.pub"
+        pubkey.parent.mkdir(parents=True, exist_ok=True)
+        pubkey.write_text("ssh-ed25519 AAAA from-file\n", encoding="utf-8")
+        self.vm_config["cloud_init"] = {
+            "hostname": "testvm",
+            "user": "tester",
+            "ssh_authorized_keys_file": str(pubkey),
+            "packages": ["niri"],
+            "runcmd": ["echo ready"],
+        }
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+            "timezone": "Europe/Rome",
+        }
+
+        rendered = self.vmctl.render_autoinstall_user_data(self.vm_name, self.vm_config)
+
+        self.assertIn('"username": "tester"', rendered)
+        self.assertIn('"password": "$6$hash"', rendered)
+        self.assertIn('"authorized-keys": [', rendered)
+        self.assertIn('"ssh-ed25519 AAAA from-file"', rendered)
+        self.assertIn('"user-data": {', rendered)
+        self.assertIn('"packages": [', rendered)
+        self.assertIn('"runcmd": [', rendered)
+
+    def test_cmd_install_unattended_builds_autoinstall_qemu_command(self):
+        iso_path = self.root / self.vm_config["iso"]
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video="std", dry_run=True)
+
+        with mock.patch.object(self.vmctl, "download_file") as download_file, \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso") as create_seed, \
+             mock.patch.object(self.vmctl, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")) as extract_boot, \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_install_unattended(args)
+
+        self.assertEqual(exit_code, 0)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True)
+        create_seed.assert_called_once_with(self.vm_name, self.vm_config, dry_run=True)
+        extract_boot.assert_called_once_with(self.vm_config, iso_path, dry_run=True)
+        self.assertEqual(run_cmd.call_args_list[0].args[0][:3], ["qemu-img", "create", "-f"])
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertIn("-cdrom", qemu_cmd)
+        self.assertIn("-kernel", qemu_cmd)
+        self.assertIn(str(self.root / "artifacts/testvm/installer/vmlinuz"), qemu_cmd)
+        self.assertIn("-initrd", qemu_cmd)
+        self.assertIn(str(self.root / "artifacts/testvm/installer/initrd"), qemu_cmd)
+        self.assertIn("-append", qemu_cmd)
+        self.assertIn("autoinstall", qemu_cmd)
+        self.assertIn("-no-reboot", qemu_cmd)
+        self.assertIn(
+            f"file={self.root / 'artifacts/testvm/autoinstall/seed.iso'},format=raw,if=virtio,media=cdrom,readonly=on",
+            qemu_cmd,
+        )
+
+    def test_cmd_post_install_waits_copies_and_runs_remote_commands(self):
+        source_dir = self.root / "host-niri"
+        source_dir.mkdir()
+        (source_dir / "config.kdl").write_text("layout {}", encoding="utf-8")
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+            "copy_from_host": [{"source": str(source_dir) + "/", "dest": "/home/tester/.config/niri"}],
+            "post_install_run": ["sudo apt update", "sudo apt install -y niri"],
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_post_install(args)
+
+        self.assertEqual(exit_code, 0)
+        wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(
+            executed[0],
+            [
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+                "-o",
+                "BatchMode=yes",
+                "-p",
+                "2222",
+                "tester@127.0.0.1",
+                "mkdir",
+                "-p",
+                "/home/tester/.config/niri",
+            ],
+        )
+        self.assertEqual(
+            executed[1],
+            [
+                "scp",
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+                "-P",
+                "2222",
+                "-r",
+                f"{source_dir}/.",
+                "tester@127.0.0.1:/home/tester/.config/niri",
+            ],
+        )
+        self.assertEqual(executed[2][-1], "sh -lc 'sudo apt update'")
+        self.assertEqual(executed[3][-1], "sh -lc 'sudo apt install -y niri'")
 
     def test_firmware_args_uses_common_ovmf_fallback_when_configured_paths_are_missing(self):
         self.create_disk()
@@ -866,7 +1115,7 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("[missing] qemu-img", output)
         self.assertIn("Unable to locate OVMF firmware files for EFI guest.", output)
         self.assertIn("Affected EFI profiles: testvm", output)
-        self.assertIn("sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog", output)
+        self.assertIn("sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog cloud-image-utils xorriso", output)
 
     def test_cmd_setup_can_install_missing_packages_after_confirmation(self):
         self.vm_config["firmware"] = {
@@ -903,7 +1152,7 @@ class VmctlTests(unittest.TestCase):
         self.assertEqual(executed[0], ["sudo", "apt", "update"])
         self.assertEqual(
             executed[1],
-            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "make", "dialog"],
+            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "make", "dialog", "cloud-image-utils", "xorriso"],
         )
 
     def test_cmd_setup_passes_when_requirements_and_firmware_are_available(self):

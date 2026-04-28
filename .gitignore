@@ -20,3 +20,6 @@ isos/*.iso
 
 # Local Codex instructions
 AGENTS.md
+
+# Local VM profile overrides
+vms/profiles/local.json

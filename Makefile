@@ -14,7 +14,7 @@ endif
 endif
 endif
 
-.PHONY: help setup list status show fetch-iso prep install start boot-check tui clean clean-all
+.PHONY: help setup list status show fetch-iso prep install install-unattended start boot-check tui clean clean-all init-local-profile
 
 define print_header
 	@printf "$(BOLD)$(BLUE)==>$(RESET) $(BOLD)%s$(RESET)\n" "$(1)"
@@ -33,8 +33,10 @@ help:
 	$(call print_kv,make,fetch-iso VM=cachyos)
 	$(call print_kv,make,prep VM=cachyos)
 	$(call print_kv,make,install VM=cachyos)
+	$(call print_kv,make,install-unattended VM=ubuntu-niri-local [VIDEO=safe|std|virtio-gl])
 	$(call print_kv,make,start VM=cachyos [VIDEO=safe|std|virtio-gl])
 	$(call print_kv,make,boot-check VM=alpine-ci)
+	$(call print_kv,make,init-local-profile)
 	$(call print_kv,make,tui)
 	$(call print_kv,make,clean VM=cachyos)
 	$(call print_kv,make,clean-all)
@@ -75,6 +77,12 @@ install:
 	$(call print_kv,VIDEO,$(if $(VIDEO),$(VIDEO),<default>))
 	@./bin/vmctl install "$(VM)" $(if $(VIDEO),--video $(VIDEO),)
 
+install-unattended:
+	$(call print_header,Avvio installer automatico)
+	$(call print_kv,VM,$(VM))
+	$(call print_kv,VIDEO,$(if $(VIDEO),$(VIDEO),<default>))
+	@./bin/vmctl install-unattended "$(VM)" $(if $(VIDEO),--video $(VIDEO),)
+
 start:
 	$(call print_header,Avvio VM)
 	$(call print_kv,VM,$(VM))
@@ -85,6 +93,16 @@ boot-check:
 	$(call print_header,Boot smoke check)
 	$(call print_kv,VM,$(VM))
 	@./bin/vmctl boot-check "$(VM)"
+
+init-local-profile:
+	$(call print_header,Inizializzazione profilo locale)
+	@if [ -e vms/profiles/local.json ]; then \
+		printf "  $(YELLOW)[warn]$(RESET) vms/profiles/local.json esiste gia\n"; \
+	else \
+		cp vms/profiles/local.json.example vms/profiles/local.json; \
+		printf "  $(GREEN)[ok]$(RESET) Creato vms/profiles/local.json dal template\n"; \
+		printf "  $(CYAN)nota$(RESET) Modifica YOUR_USER e i path SSH/dotfiles prima di usare ubuntu-niri-local\n"; \
+	fi
 
 tui:
 	$(call print_header,Apertura TUI)

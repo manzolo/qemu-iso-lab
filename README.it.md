@@ -324,6 +324,67 @@ make prep VM=<name>
 make install VM=<name>
 ```
 
+## Cloud-Init E Post-Install
+
+`vmctl` puo anche allegare un seed ISO `cloud-init` generato dal profilo VM e poi completare un post-install via SSH.
+
+Campi supportati dentro il profilo:
+
+- `cloud_init.hostname`
+- `cloud_init.user`
+- `cloud_init.ssh_authorized_keys`
+- `cloud_init.ssh_authorized_keys_file`
+- `cloud_init.ssh_key`
+- `cloud_init.ssh_host_port`
+- `cloud_init.packages`
+- `cloud_init.runcmd`
+- `cloud_init.copy_from_host`
+- `cloud_init.post_install_run`
+- `autoinstall.hostname`
+- `autoinstall.username`
+- `autoinstall.realname`
+- `autoinstall.password_hash`
+- `autoinstall.timezone`
+- `autoinstall.keyboard_layout`
+- `autoinstall.storage_layout`
+- `autoinstall.install_ssh`
+
+Uso tipico:
+
+```bash
+./bin/vmctl start ubuntu-niri --cloud-init
+./bin/vmctl post-install ubuntu-niri
+```
+
+`start --cloud-init` genera `artifacts/<vm>/cloud-init/{user-data,meta-data,seed.iso}` e allega `seed.iso` alla VM. `post-install` aspetta che SSH sia raggiungibile sulla porta inoltrata dal profilo, copia eventuali file host definiti in `copy_from_host` ed esegue i comandi remoti in `post_install_run`.
+
+Per automatizzare anche l'installer Ubuntu Server:
+
+```bash
+./bin/vmctl install-unattended ubuntu-niri-local
+./bin/vmctl start ubuntu-niri-local
+./bin/vmctl post-install ubuntu-niri-local
+```
+
+`install-unattended` genera un seed `autoinstall`, estrae `casper/vmlinuz` e `casper/initrd` dalla ISO e avvia l'installer con il parametro kernel `autoinstall`. Il processo QEMU termina al reboot finale dell'installer (`-no-reboot`), poi puoi avviare il sistema installato normalmente e completare il `post-install`.
+
+Esempio committabile:
+
+- `ubuntu-niri` mostra una configurazione `cloud_init` pulita, senza path o username personali hardcodati.
+- `ubuntu-niri` mostra anche una sezione `autoinstall` da completare con un vero hash SHA-512 della password.
+
+Override locale ignorato da git:
+
+- copia `vms/profiles/local.json.example` in `vms/profiles/local.json`;
+- sostituisci `YOUR_USER` e i path SSH/dotfiles con i tuoi;
+- usa il profilo `ubuntu-niri-local`, che resta solo sul tuo host.
+
+Shortcut:
+
+```bash
+make init-local-profile
+```
+
 ## Smoke Test CI
 
 Il repository include un vero boot smoke test basato su `alpine-ci`.

@@ -8,6 +8,7 @@ import pty
 import selectors
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -159,6 +160,10 @@ def get_vm(config: dict, name: str) -> dict:
 def resolve_path(path_str: str) -> Path:
     path = Path(path_str)
     return path if path.is_absolute() else ROOT / path
+
+
+def expand_host_path(path_str: str) -> Path:
+    return Path(path_str).expanduser()
 
 
 def require_command(name: str) -> None:
@@ -585,6 +590,360 @@ def ensure_vm_dirs(name: str) -> Path:
     return base
 
 
+def ensure_vm_disk(vm: dict, dry_run: bool = False) -> Path:
+    require_command("qemu-img")
+    disk = vm["disk"]
+    disk_path = resolve_path(disk["path"])
+    if not disk_path.exists():
+        ensure_parent(disk_path)
+        cmd = ["qemu-img", "create", "-f", disk["format"]]
+        if disk.get("subformat"):
+            cmd += ["-o", f"subformat={disk['subformat']}"]
+        cmd += [str(disk_path), disk["size"]]
+        run(cmd, dry_run=dry_run, quiet=True)
+        print_status("ok", f"Created disk: {pretty_path(disk_path)}")
+    else:
+        print_status("ok", f"Disk ready: {pretty_path(disk_path)}")
+    return disk_path
+
+
+def _get_vm_section(vm: dict, key: str) -> dict | None:
+    config = vm.get(key)
+    if config is None:
+        return None
+    if not isinstance(config, dict):
+        raise VMError(f"Invalid {key} config: expected object")
+    return config
+
+
+def cloud_init_config(vm: dict) -> dict | None:
+    return _get_vm_section(vm, "cloud_init")
+
+
+def autoinstall_config(vm: dict) -> dict | None:
+    return _get_vm_section(vm, "autoinstall")
+
+
+def _vm_artifact_subdir(vm: dict, subdir: str) -> Path:
+    return resolve_path(vm["disk"]["path"]).parent / subdir
+
+
+def cloud_init_artifact_dir(vm: dict) -> Path:
+    return _vm_artifact_subdir(vm, "cloud-init")
+
+
+def autoinstall_artifact_dir(vm: dict) -> Path:
+    return _vm_artifact_subdir(vm, "autoinstall")
+
+
+def collect_ssh_authorized_keys(config: dict, allow_missing_file: bool = False) -> list[str]:
+    keys: list[str] = []
+    inline_keys = config.get("ssh_authorized_keys") or []
+    for key in inline_keys:
+        value = str(key).strip()
+        if value:
+            keys.append(value)
+
+    keys_file = str(config.get("ssh_authorized_keys_file") or "").strip()
+    if keys_file:
+        path = expand_host_path(keys_file)
+        if not path.is_file():
+            if allow_missing_file:
+                return keys
+            raise VMError(f"SSH authorized keys file not found: {path}")
+        for line in path.read_text(encoding="utf-8").splitlines():
+            value = line.strip()
+            if value and not value.startswith("#"):
+                keys.append(value)
+    return keys
+
+
+def render_cloud_init_payload(config: dict, dry_run: bool = False, include_user: bool = True) -> dict[str, object]:
+    payload: dict[str, object] = {"package_update": True}
+    user = str(config.get("user") or "").strip()
+    if include_user and user:
+        user_entry: dict[str, object] = {"name": user}
+        ssh_keys = collect_ssh_authorized_keys(config, allow_missing_file=dry_run)
+        if ssh_keys:
+            user_entry["ssh_authorized_keys"] = ssh_keys
+        payload["users"] = [user_entry]
+    if config.get("packages"):
+        payload["packages"] = list(config["packages"])
+    if config.get("runcmd"):
+        payload["runcmd"] = list(config["runcmd"])
+    if config.get("write_files"):
+        payload["write_files"] = list(config["write_files"])
+    return payload
+
+
+def render_cloud_init_user_data(vm: dict, dry_run: bool = False) -> str:
+    config = cloud_init_config(vm)
+    if config is None:
+        raise VMError("VM profile does not define cloud_init")
+    payload = render_cloud_init_payload(config, dry_run=dry_run, include_user=True)
+    return "#cloud-config\n" + json.dumps(payload, indent=2) + "\n"
+
+
+def render_cloud_init_meta_data(vm_name: str, vm: dict) -> str:
+    config = cloud_init_config(vm)
+    if config is None:
+        raise VMError("VM profile does not define cloud_init")
+    return json.dumps(
+        {
+            "instance-id": config.get("instance_id", vm_name),
+            "local-hostname": config.get("hostname", vm_name),
+        },
+        indent=2,
+    ) + "\n"
+
+
+def create_seed_image(artifact_dir: Path, user_data: str, meta_data: str, dry_run: bool = False) -> Path:
+    user_data_path = artifact_dir / "user-data"
+    meta_data_path = artifact_dir / "meta-data"
+    seed_path = artifact_dir / "seed.iso"
+    ensure_parent(user_data_path)
+
+    if not dry_run:
+        user_data_path.write_text(user_data, encoding="utf-8")
+        meta_data_path.write_text(meta_data, encoding="utf-8")
+
+    if shutil.which("cloud-localds"):
+        cmd = ["cloud-localds", str(seed_path), str(user_data_path), str(meta_data_path)]
+    elif shutil.which("genisoimage"):
+        cmd = [
+            "genisoimage",
+            "-output",
+            str(seed_path),
+            "-volid",
+            "cidata",
+            "-joliet",
+            "-rock",
+            str(user_data_path),
+            str(meta_data_path),
+        ]
+    elif shutil.which("xorriso"):
+        cmd = [
+            "xorriso",
+            "-as",
+            "mkisofs",
+            "-output",
+            str(seed_path),
+            "-volid",
+            "cidata",
+            "-joliet",
+            "-rock",
+            str(user_data_path),
+            str(meta_data_path),
+        ]
+    else:
+        raise VMError("Missing cloud-init seed builder: install cloud-localds, genisoimage, or xorriso")
+
+    run(cmd, dry_run=dry_run)
+    return seed_path
+
+
+def create_cloud_init_seed(vm_name: str, vm: dict, dry_run: bool = False) -> Path:
+    if cloud_init_config(vm) is None:
+        raise VMError(f"VM '{vm_name}' does not define cloud_init")
+    return create_seed_image(
+        cloud_init_artifact_dir(vm),
+        render_cloud_init_user_data(vm, dry_run=dry_run),
+        render_cloud_init_meta_data(vm_name, vm),
+        dry_run=dry_run,
+    )
+
+
+def cloud_init_drive_args(seed_path: Path) -> list[str]:
+    return [
+        "-drive",
+        f"file={seed_path},format=raw,if=virtio,media=cdrom,readonly=on",
+    ]
+
+
+def render_autoinstall_user_data(vm_name: str, vm: dict, dry_run: bool = False) -> str:
+    config = autoinstall_config(vm)
+    if config is None:
+        raise VMError("VM profile does not define autoinstall")
+
+    ci = cloud_init_config(vm)
+    username = str(config.get("username") or (ci or {}).get("user") or "").strip()
+    hostname = str(config.get("hostname") or (ci or {}).get("hostname") or vm_name).strip()
+    password_hash = str(config.get("password_hash") or "").strip()
+    if not username:
+        raise VMError("autoinstall.username is required")
+    if not password_hash:
+        raise VMError("autoinstall.password_hash is required")
+
+    payload: dict[str, object] = {
+        "autoinstall": {
+            "version": 1,
+            "identity": {
+                "hostname": hostname,
+                "password": password_hash,
+                "realname": str(config.get("realname") or username),
+                "username": username,
+            },
+            "keyboard": {"layout": str(config.get("keyboard_layout") or "us")},
+            "locale": str(config.get("locale") or "en_US.UTF-8"),
+            "storage": {
+                "layout": {
+                    "name": str(config.get("storage_layout") or "direct"),
+                }
+            },
+        }
+    }
+
+    timezone = str(config.get("timezone") or "").strip()
+    if timezone:
+        payload["autoinstall"]["timezone"] = timezone
+
+    ssh_keys = collect_ssh_authorized_keys(ci or {}, allow_missing_file=dry_run)
+    payload["autoinstall"]["ssh"] = {
+        "install-server": bool(config.get("install_ssh", True)),
+        "authorized-keys": ssh_keys,
+        "allow-pw": bool(config.get("allow_password", not ssh_keys)),
+    }
+
+    if config.get("packages"):
+        payload["autoinstall"]["packages"] = list(config["packages"])
+
+    if ci is not None:
+        payload["autoinstall"]["user-data"] = render_cloud_init_payload(ci, dry_run=dry_run, include_user=False)
+
+    return "#cloud-config\n" + json.dumps(payload, indent=2) + "\n"
+
+
+def create_autoinstall_seed(vm_name: str, vm: dict, dry_run: bool = False) -> Path:
+    if autoinstall_config(vm) is None:
+        raise VMError(f"VM '{vm_name}' does not define autoinstall")
+    meta_data = json.dumps({"instance-id": f"{vm_name}-autoinstall", "local-hostname": vm_name}, indent=2) + "\n"
+    return create_seed_image(
+        autoinstall_artifact_dir(vm),
+        render_autoinstall_user_data(vm_name, vm, dry_run=dry_run),
+        meta_data,
+        dry_run=dry_run,
+    )
+
+
+def installer_artifact_dir(vm: dict) -> Path:
+    return _vm_artifact_subdir(vm, "installer")
+
+
+def extract_iso_member(iso_path: Path, member_path: str, dest_path: Path, dry_run: bool = False) -> None:
+    ensure_parent(dest_path)
+    if dest_path.exists() and not dry_run:
+        return
+
+    if shutil.which("xorriso"):
+        run(
+            ["xorriso", "-osirrox", "on", "-indev", str(iso_path), "-extract", f"/{member_path}", str(dest_path)],
+            dry_run=dry_run,
+        )
+        return
+
+    if shutil.which("bsdtar"):
+        cmd = ["bsdtar", "-xOf", str(iso_path), member_path]
+        print_command(cmd)
+        if dry_run:
+            return
+        result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE)
+        dest_path.write_bytes(result.stdout)
+        return
+
+    raise VMError("Missing ISO extraction tool: install xorriso or bsdtar")
+
+
+def extract_installer_boot_artifacts(vm: dict, iso_path: Path, dry_run: bool = False) -> tuple[Path, Path]:
+    artifact_dir = installer_artifact_dir(vm)
+    kernel_path = artifact_dir / "vmlinuz"
+    initrd_path = artifact_dir / "initrd"
+    extract_iso_member(iso_path, "casper/vmlinuz", kernel_path, dry_run=dry_run)
+    extract_iso_member(iso_path, "casper/initrd", initrd_path, dry_run=dry_run)
+    return kernel_path, initrd_path
+
+
+def ssh_target(vm: dict) -> tuple[str, int, str]:
+    config = cloud_init_config(vm)
+    if config is None:
+        raise VMError("VM profile does not define cloud_init")
+    user = str(config.get("user") or "").strip()
+    port = int(config.get("ssh_host_port") or 0)
+    if not user:
+        raise VMError("cloud_init.user is required for SSH provisioning")
+    if port <= 0:
+        raise VMError("cloud_init.ssh_host_port is required for SSH provisioning")
+    return ("127.0.0.1", port, user)
+
+
+def _ssh_common_opts(config: dict, dry_run: bool = False) -> list[str]:
+    opts = ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
+    key_path = str(config.get("ssh_key") or "").strip()
+    if key_path:
+        expanded = expand_host_path(key_path)
+        if not expanded.is_file():
+            if dry_run:
+                return opts
+            raise VMError(f"SSH private key not found: {expanded}")
+        opts += ["-i", str(expanded)]
+    return opts
+
+
+def ssh_base_cmd(vm: dict, dry_run: bool = False) -> list[str]:
+    host, port, user = ssh_target(vm)
+    config = cloud_init_config(vm)
+    assert config is not None
+    return ["ssh"] + _ssh_common_opts(config, dry_run=dry_run) + ["-o", "BatchMode=yes", "-p", str(port), f"{user}@{host}"]
+
+
+def scp_base_cmd(vm: dict, dry_run: bool = False) -> list[str]:
+    _, port, _ = ssh_target(vm)
+    config = cloud_init_config(vm)
+    assert config is not None
+    return ["scp"] + _ssh_common_opts(config, dry_run=dry_run) + ["-P", str(port)]
+
+
+def wait_for_ssh(vm: dict, timeout_sec: int, dry_run: bool = False) -> None:
+    host, port, _ = ssh_target(vm)
+    if dry_run:
+        print_note(f"Would wait for SSH on {host}:{port}")
+        return
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                return
+        except OSError:
+            time.sleep(2)
+    raise VMError(f"Timed out waiting for SSH on {host}:{port}")
+
+
+def post_install_copy(vm: dict, entry: dict, dry_run: bool = False) -> None:
+    host, _, user = ssh_target(vm)
+    source_raw = str(entry.get("source") or "").strip()
+    dest_raw = str(entry.get("dest") or "").strip()
+    if not source_raw or not dest_raw:
+        raise VMError("copy_from_host entries require source and dest")
+
+    source = expand_host_path(source_raw)
+    if not dry_run and not source.exists():
+        raise VMError(f"Host path not found: {source}")
+
+    recursive = source_raw.endswith("/") or source.is_dir()
+    if recursive:
+        run(ssh_base_cmd(vm, dry_run=dry_run) + ["mkdir", "-p", dest_raw], dry_run=dry_run)
+        remote_target = f"{user}@{host}:{dest_raw}"
+        run(scp_base_cmd(vm, dry_run=dry_run) + ["-r", f"{source}/.", remote_target], dry_run=dry_run)
+        return
+
+    run(ssh_base_cmd(vm, dry_run=dry_run) + ["mkdir", "-p", str(Path(dest_raw).parent)], dry_run=dry_run)
+    remote_target = f"{user}@{host}:{dest_raw}"
+    run(scp_base_cmd(vm, dry_run=dry_run) + [str(source), remote_target], dry_run=dry_run)
+
+
+def post_install_run(vm: dict, command: str, dry_run: bool = False) -> None:
+    run(ssh_base_cmd(vm, dry_run=dry_run) + [f"sh -lc {shlex.quote(command)}"], dry_run=dry_run)
+
+
 def read_os_release() -> dict[str, str]:
     os_release = Path("/etc/os-release")
     if not os_release.is_file():
@@ -619,11 +978,36 @@ def host_install_commands() -> list[list[str]] | None:
     }
 
     if {"arch", "cachyos", "manjaro"} & distro_tokens:
-        return [["sudo", "pacman", "-S", "qemu-desktop", "qemu-base", "edk2-ovmf", "python", "dialog", "make"]]
+        return [[
+            "sudo",
+            "pacman",
+            "-S",
+            "qemu-desktop",
+            "qemu-base",
+            "edk2-ovmf",
+            "python",
+            "dialog",
+            "make",
+            "cloud-image-utils",
+            "xorriso",
+        ]]
     if {"debian", "ubuntu"} & distro_tokens:
         return [
             ["sudo", "apt", "update"],
-            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "make", "dialog"],
+            [
+                "sudo",
+                "apt",
+                "install",
+                "-y",
+                "qemu-system-x86",
+                "qemu-utils",
+                "ovmf",
+                "python3",
+                "make",
+                "dialog",
+                "cloud-image-utils",
+                "xorriso",
+            ],
         ]
     return None
 
@@ -807,7 +1191,11 @@ def common_args(
     network_mode = vm.get("network", "user")
     if network_mode == "user":
         network_device = vm.get("network_device", "virtio-net-pci")
-        args += ["-netdev", "user,id=n1", "-device", f"{network_device},netdev=n1"]
+        netdev = "user,id=n1"
+        ci = cloud_init_config(vm)
+        if ci is not None and ci.get("ssh_host_port"):
+            netdev += f",hostfwd=tcp:127.0.0.1:{int(ci['ssh_host_port'])}-:22"
+        args += ["-netdev", netdev, "-device", f"{network_device},netdev=n1"]
     else:
         raise VMError(f"Unsupported network mode: {network_mode}")
 
@@ -1024,23 +1412,8 @@ def cmd_prep(args: argparse.Namespace) -> int:
     config = load_config()
     vm = get_vm(config, args.vm)
     ensure_vm_dirs(args.vm)
-
-    require_command("qemu-img")
-    disk = vm["disk"]
-    disk_path = resolve_path(disk["path"])
     ensure_iso(vm, dry_run=args.dry_run)
-
-    if not disk_path.exists():
-        ensure_parent(disk_path)
-        cmd = ["qemu-img", "create", "-f", disk["format"]]
-        if disk.get("subformat"):
-            cmd += ["-o", f"subformat={disk['subformat']}"]
-        cmd += [str(disk_path), disk["size"]]
-        run(cmd, dry_run=args.dry_run, quiet=True)
-        print_status("ok", f"Created disk: {pretty_path(disk_path)}")
-    else:
-        print_status("ok", f"Disk ready: {pretty_path(disk_path)}")
-
+    ensure_vm_disk(vm, dry_run=args.dry_run)
     firmware_args(vm, dry_run=args.dry_run)
     print_status("ok", f"Prepared VM '{args.vm}'")
     return 0
@@ -1053,21 +1426,9 @@ def cmd_provision(args: argparse.Namespace) -> int:
 
     print_header(f"Provision VM: {args.vm}")
     iso_path = ensure_iso(vm, dry_run=args.dry_run)
-
-    require_command("qemu-img")
-    disk = vm["disk"]
-    disk_path = resolve_path(disk["path"])
+    disk_path = resolve_path(vm["disk"]["path"])
     disk_exists = disk_path.exists()
-    if not disk_exists:
-        ensure_parent(disk_path)
-        cmd = ["qemu-img", "create", "-f", disk["format"]]
-        if disk.get("subformat"):
-            cmd += ["-o", f"subformat={disk['subformat']}"]
-        cmd += [str(disk_path), disk["size"]]
-        run(cmd, dry_run=args.dry_run, quiet=True)
-        print_status("ok", f"Created disk: {pretty_path(disk_path)}")
-    else:
-        print_status("ok", f"Disk ready: {pretty_path(disk_path)}")
+    ensure_vm_disk(vm, dry_run=args.dry_run)
 
     if args.no_start:
         firmware_args(vm, dry_run=args.dry_run)
@@ -1092,6 +1453,31 @@ def cmd_install(args: argparse.Namespace) -> int:
     iso_path = ensure_iso(vm, dry_run=args.dry_run)
     qemu_args = common_args(vm, args.video, dry_run=args.dry_run)
     qemu_args += ["-cdrom", str(iso_path)]
+    if args.cloud_init:
+        qemu_args += cloud_init_drive_args(create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run))
+    run(qemu_args, dry_run=args.dry_run)
+    return 0
+
+
+def cmd_install_unattended(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    ensure_vm_dirs(args.vm)
+    iso_path = ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    seed_path = create_autoinstall_seed(args.vm, vm, dry_run=args.dry_run)
+    kernel_path, initrd_path = extract_installer_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+    qemu_args = common_args(
+        vm,
+        args.video,
+        dry_run=args.dry_run,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+    )
+    qemu_args += ["-cdrom", str(iso_path)]
+    qemu_args += cloud_init_drive_args(seed_path)
+    qemu_args += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", "autoinstall"]
     run(qemu_args, dry_run=args.dry_run)
     return 0
 
@@ -1101,7 +1487,32 @@ def cmd_start(args: argparse.Namespace) -> int:
     vm = get_vm(config, args.vm)
     ensure_vm_dirs(args.vm)
     qemu_args = common_args(vm, args.video, dry_run=args.dry_run)
+    if args.cloud_init:
+        qemu_args += cloud_init_drive_args(create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run))
     run(qemu_args, dry_run=args.dry_run)
+    return 0
+
+
+def cmd_post_install(args: argparse.Namespace) -> int:
+    config = load_config()
+    vm = get_vm(config, args.vm)
+    ci = cloud_init_config(vm)
+    if ci is None:
+        raise VMError(f"VM '{args.vm}' does not define cloud_init")
+
+    require_command("ssh")
+    require_command("scp")
+    wait_for_ssh(vm, args.timeout, dry_run=args.dry_run)
+
+    for entry in ci.get("copy_from_host", []):
+        if not isinstance(entry, dict):
+            raise VMError("Invalid copy_from_host entry: expected object")
+        post_install_copy(vm, entry, dry_run=args.dry_run)
+
+    for command in ci.get("post_install_run", []):
+        post_install_run(vm, str(command), dry_run=args.dry_run)
+
+    print_status("ok", f"Post-install completed for VM '{args.vm}'")
     return 0
 
 
@@ -1561,12 +1972,24 @@ def build_parser() -> argparse.ArgumentParser:
     p = subparsers.add_parser("install")
     p.add_argument("vm")
     p.add_argument("--video")
+    p.add_argument("--cloud-init", action="store_true", help="attach a generated cloud-init seed ISO")
     p.set_defaults(func=cmd_install)
+
+    p = subparsers.add_parser("install-unattended")
+    p.add_argument("vm")
+    p.add_argument("--video")
+    p.set_defaults(func=cmd_install_unattended)
 
     p = subparsers.add_parser("start")
     p.add_argument("vm")
     p.add_argument("--video")
+    p.add_argument("--cloud-init", action="store_true", help="attach a generated cloud-init seed ISO")
     p.set_defaults(func=cmd_start)
+
+    p = subparsers.add_parser("post-install")
+    p.add_argument("vm")
+    p.add_argument("--timeout", type=int, default=300)
+    p.set_defaults(func=cmd_post_install)
 
     p = subparsers.add_parser("boot-check")
     p.add_argument("vm")

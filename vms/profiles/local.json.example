@@ -1,0 +1,105 @@
+{
+  "vms": {
+    "ubuntu-niri-local": {
+      "name": "Ubuntu 26.04 Niri (Local)",
+      "meta": {
+        "catalog_slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-niri-local/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-niri-local/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "autoinstall": {
+        "hostname": "ubuntu-niri-local",
+        "username": "YOUR_USER",
+        "realname": "YOUR_USER",
+        "password_hash": "REPLACE_WITH_SHA512_HASH",
+        "timezone": "Europe/Rome",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true
+      },
+      "cloud_init": {
+        "hostname": "ubuntu-niri-local",
+        "user": "YOUR_USER",
+        "ssh_authorized_keys_file": "~/.ssh/id_ed25519.pub",
+        "ssh_key": "~/.ssh/id_ed25519",
+        "ssh_host_port": 2222,
+        "packages": [
+          "software-properties-common",
+          "foot",
+          "waybar"
+        ],
+        "runcmd": [
+          "mkdir -p /home/YOUR_USER/.config/niri",
+          "chown -R YOUR_USER:YOUR_USER /home/YOUR_USER/.config"
+        ],
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-YOUR_USER-nopasswd",
+            "permissions": "0440",
+            "content": "YOUR_USER ALL=(ALL) NOPASSWD:ALL\n"
+          }
+        ],
+        "copy_from_host": [
+          {
+            "source": "~/.config/niri/",
+            "dest": "/home/YOUR_USER/.config/niri"
+          }
+        ],
+        "post_install_run": [
+          "sudo add-apt-repository -y ppa:avengemedia/danklinux",
+          "sudo add-apt-repository -y ppa:avengemedia/dms",
+          "sudo apt update",
+          "sudo apt install -y niri dms",
+          "mkdir -p ~/.config/niri",
+          "command -v niri >/dev/null && niri --version || true"
+        ]
+      }
+    }
+  }
+}

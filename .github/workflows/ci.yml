@@ -46,3 +46,27 @@ jobs:
 
       - name: Boot smoke test
         run: ./bin/vmctl boot-check alpine-ci
+
+  ubuntu-niri-dry-run:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dry-run host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils xorriso genisoimage
+
+      - name: Prepare ubuntu-niri unattended install dry-run
+        run: ./bin/vmctl --dry-run install-unattended ubuntu-niri
+
+      - name: Prepare ubuntu-niri post-install dry-run
+        run: ./bin/vmctl --dry-run post-install ubuntu-niri
