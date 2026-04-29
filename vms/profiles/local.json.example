@@ -1,5 +1,80 @@
 {
   "vms": {
+    "cachyos-local": {
+      "name": "CachyOS (Local)",
+      "meta": {
+        "catalog_slug": "cachyos",
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/cachyos-desktop-linux-260308.iso",
+      "iso_url": "https://mirror.cachyos.org/ISO/desktop/260308/cachyos-desktop-linux-260308.iso",
+      "disk": {
+        "path": "artifacts/cachyos-local/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/cachyos-local/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "virtio-gl",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "ssh_provision": {
+        "hostname": "cachyos-local",
+        "user": "YOUR_USER",
+        "ssh_key": "~/.ssh/id_ed25519",
+        "ssh_host_port": 2223,
+        "copy_from_host": [
+          {
+            "source": "~/.config/niri/",
+            "dest": "/home/YOUR_USER/.config/niri"
+          },
+          {
+            "source": "~/.config/DankMaterialShell/",
+            "dest": "/home/YOUR_USER/.config/DankMaterialShell"
+          }
+        ],
+        "post_install_run": [
+          "mkdir -p ~/.config/niri ~/.config/DankMaterialShell",
+          "sudo pacman -Sy --noconfirm --needed foot niri || true",
+          "command -v niri >/dev/null && niri --version || true"
+        ]
+      }
+    },
     "ubuntu-niri-local": {
       "name": "Ubuntu 26.04 Niri (Local)",
       "meta": {

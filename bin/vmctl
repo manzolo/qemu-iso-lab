@@ -698,6 +698,14 @@ def cloud_init_config(vm: dict) -> dict | None:
     return _get_vm_section(vm, "cloud_init")
 
 
+def ssh_provision_config(vm: dict) -> dict | None:
+    return _get_vm_section(vm, "ssh_provision")
+
+
+def ssh_access_config(vm: dict) -> dict | None:
+    return ssh_provision_config(vm) or cloud_init_config(vm)
+
+
 def autoinstall_config(vm: dict) -> dict | None:
     return _get_vm_section(vm, "autoinstall")
 
@@ -941,20 +949,20 @@ def extract_installer_boot_artifacts(vm: dict, iso_path: Path, dry_run: bool = F
 
 
 def ssh_target(vm: dict) -> tuple[str, int, str]:
-    config = cloud_init_config(vm)
+    config = ssh_access_config(vm)
     if config is None:
-        raise VMError("VM profile does not define cloud_init")
+        raise VMError("VM profile does not define SSH provisioning")
     user = str(config.get("user") or "").strip()
     port = int(config.get("ssh_host_port") or 0)
     if not user:
-        raise VMError("cloud_init.user is required for SSH provisioning")
+        raise VMError("SSH provisioning user is required")
     if port <= 0:
-        raise VMError("cloud_init.ssh_host_port is required for SSH provisioning")
+        raise VMError("SSH provisioning ssh_host_port is required")
     return ("127.0.0.1", port, user)
 
 
 def _ssh_common_opts(config: dict, dry_run: bool = False) -> list[str]:
-    opts = ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
+    opts = ["-F", "/dev/null", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
     key_path = str(config.get("ssh_key") or "").strip()
     if key_path:
         expanded = expand_host_path(key_path)
@@ -968,21 +976,21 @@ def _ssh_common_opts(config: dict, dry_run: bool = False) -> list[str]:
 
 def ssh_base_cmd(vm: dict, dry_run: bool = False) -> list[str]:
     host, port, user = ssh_target(vm)
-    config = cloud_init_config(vm)
+    config = ssh_access_config(vm)
     assert config is not None
     return ["ssh"] + _ssh_common_opts(config, dry_run=dry_run) + ["-o", "BatchMode=yes", "-p", str(port), f"{user}@{host}"]
 
 
 def ssh_shell_cmd(vm: dict, dry_run: bool = False) -> list[str]:
     host, port, user = ssh_target(vm)
-    config = cloud_init_config(vm)
+    config = ssh_access_config(vm)
     assert config is not None
     return ["ssh"] + _ssh_common_opts(config, dry_run=dry_run) + ["-p", str(port), f"{user}@{host}"]
 
 
 def scp_base_cmd(vm: dict, dry_run: bool = False) -> list[str]:
     _, port, _ = ssh_target(vm)
-    config = cloud_init_config(vm)
+    config = ssh_access_config(vm)
     assert config is not None
     return ["scp"] + _ssh_common_opts(config, dry_run=dry_run) + ["-P", str(port)]
 
@@ -1298,9 +1306,9 @@ def common_args(
     if network_mode == "user":
         network_device = vm.get("network_device", "virtio-net-pci")
         netdev = "user,id=n1"
-        ci = cloud_init_config(vm)
-        if ci is not None and ci.get("ssh_host_port"):
-            netdev += f",hostfwd=tcp:127.0.0.1:{int(ci['ssh_host_port'])}-:22"
+        ssh_cfg = ssh_access_config(vm)
+        if ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
+            netdev += f",hostfwd=tcp:127.0.0.1:{int(ssh_cfg['ssh_host_port'])}-:22"
         args += ["-netdev", netdev, "-device", f"{network_device},netdev=n1"]
     else:
         raise VMError(f"Unsupported network mode: {network_mode}")
@@ -1610,17 +1618,17 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 
 def run_post_install(vm_name: str, vm: dict, timeout_sec: int, dry_run: bool = False) -> None:
-    ci = cloud_init_config(vm)
-    if ci is None:
-        raise VMError(f"VM '{vm_name}' does not define cloud_init")
+    ssh_cfg = ssh_access_config(vm)
+    if ssh_cfg is None:
+        raise VMError(f"VM '{vm_name}' does not define SSH provisioning")
     require_command("ssh")
     require_command("scp")
     wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
 
-    for command in ci.get("post_install_run", []):
+    for command in ssh_cfg.get("post_install_run", []):
         post_install_run(vm, str(command), dry_run=dry_run)
 
-    for entry in ci.get("copy_from_host", []):
+    for entry in ssh_cfg.get("copy_from_host", []):
         if not isinstance(entry, dict):
             raise VMError("Invalid copy_from_host entry: expected object")
         post_install_copy(vm, entry, dry_run=dry_run)

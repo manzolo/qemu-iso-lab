@@ -153,6 +153,25 @@ raise SystemExit(0 if isinstance(vm.get(section), dict) else 1)
 PY
 }
 
+vm_has_ssh_provision() {
+    python3 - "$CONFIG_DIR" "$1" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config_dir = Path(sys.argv[1])
+vm_name = sys.argv[2]
+data = {"vms": {}}
+for profile_path in sorted((config_dir / "profiles").glob("*.json")):
+    profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
+    data["vms"].update(profile_data["vms"])
+vm = data["vms"][vm_name]
+ssh_cfg = vm.get("ssh_provision")
+cloud_cfg = vm.get("cloud_init")
+raise SystemExit(0 if isinstance(ssh_cfg, dict) or isinstance(cloud_cfg, dict) else 1)
+PY
+}
+
 list_vm_action_items() {
     local vm_name="$1"
     printf '%s\n' show "Show VM profile"
@@ -175,7 +194,7 @@ list_quick_action_items() {
     fi
     printf '%s\n' start "Boot installed VM"
     printf '%s\n' start-headless "Boot installed VM without display"
-    if vm_has_section "$vm_name" "cloud_init"; then
+    if vm_has_ssh_provision "$vm_name"; then
         printf '%s\n' shell "Open SSH shell"
     fi
     printf '%s\n' back "Back to VM actions"
@@ -202,10 +221,12 @@ list_run_action_items() {
     printf '%s\n' start "Boot installed VM"
     printf '%s\n' start-headless "Boot installed VM without display"
     printf '%s\n' stop "Stop tracked background VM"
-    if vm_has_section "$vm_name" "cloud_init"; then
+    if vm_has_ssh_provision "$vm_name"; then
         printf '%s\n' shell "Open SSH shell"
-        printf '%s\n' start-cloud-init "Boot installed VM with cloud-init first boot"
         printf '%s\n' post-install "Run SSH post-install actions"
+    fi
+    if vm_has_section "$vm_name" "cloud_init"; then
+        printf '%s\n' start-cloud-init "Boot installed VM with cloud-init first boot"
     fi
     printf '%s\n' back "Back to VM actions"
 }

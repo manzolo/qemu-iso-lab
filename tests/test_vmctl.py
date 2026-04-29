@@ -863,6 +863,15 @@ class VmctlTests(unittest.TestCase):
 
         self.assertIn("user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", qemu_cmd)
 
+    def test_common_args_adds_hostfwd_for_ssh_provision(self):
+        self.create_disk()
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2223}
+
+        with mock.patch.object(self.vmctl, "require_command"):
+            qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
+
+        self.assertIn("user,id=n1,hostfwd=tcp:127.0.0.1:2223-:22", qemu_cmd)
+
     def test_common_args_supports_sata_disk_interface(self):
         disk_path = self.create_disk()
         self.vm_config["disk"]["interface"] = "sata"
@@ -982,6 +991,7 @@ class VmctlTests(unittest.TestCase):
         cmd = self.vmctl.ssh_shell_cmd(self.vm_config, dry_run=True)
 
         self.assertEqual(cmd[0], "ssh")
+        self.assertEqual(cmd[1:3], ["-F", "/dev/null"])
         self.assertNotIn("BatchMode=yes", cmd)
         self.assertEqual(cmd[-1], "tester@127.0.0.1")
 
@@ -1201,6 +1211,22 @@ class VmctlTests(unittest.TestCase):
         self.assertNotIn("BatchMode=yes", ssh_cmd)
         self.assertEqual(ssh_cmd[-1], "tester@127.0.0.1")
 
+    def test_cmd_shell_runs_with_ssh_provision(self):
+        self.vm_config["ssh_provision"] = {
+            "user": "tester",
+            "ssh_host_port": 2223,
+        }
+        self.write_config_dir()
+
+        with mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_shell(argparse.Namespace(vm=self.vm_name, dry_run=True))
+
+        self.assertEqual(exit_code, 0)
+        ssh_cmd = run_cmd.call_args.args[0]
+        self.assertEqual(ssh_cmd[0], "ssh")
+        self.assertNotIn("BatchMode=yes", ssh_cmd)
+        self.assertEqual(ssh_cmd[-1], "tester@127.0.0.1")
+
     def test_cmd_stop_terminates_running_qemu_pid(self):
         pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
         pid_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1290,6 +1316,8 @@ class VmctlTests(unittest.TestCase):
             executed[2],
             [
                 "ssh",
+                "-F",
+                "/dev/null",
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-o",
@@ -1308,6 +1336,8 @@ class VmctlTests(unittest.TestCase):
             executed[3],
             [
                 "scp",
+                "-F",
+                "/dev/null",
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-o",
@@ -1319,6 +1349,34 @@ class VmctlTests(unittest.TestCase):
                 "tester@127.0.0.1:/home/tester/.config/niri",
             ],
         )
+
+    def test_cmd_post_install_supports_ssh_provision(self):
+        source_dir = self.root / "host-niri"
+        source_dir.mkdir()
+        (source_dir / "config.kdl").write_text("layout {}", encoding="utf-8")
+        self.vm_config["ssh_provision"] = {
+            "user": "tester",
+            "ssh_host_port": 2223,
+            "copy_from_host": [{"source": str(source_dir) + "/", "dest": "/home/tester/.config/niri"}],
+            "post_install_run": ["sudo pacman -Sy --noconfirm --needed foot niri || true"],
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_post_install(args)
+
+        self.assertEqual(exit_code, 0)
+        wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(
+            executed[0][-1],
+            "sh -lc 'sudo pacman -Sy --noconfirm --needed foot niri || true'",
+        )
+        self.assertEqual(executed[1][-1], "/home/tester/.config/niri")
+        self.assertEqual(executed[2][-1], "tester@127.0.0.1:/home/tester/.config/niri")
 
     def test_firmware_args_uses_common_ovmf_fallback_when_configured_paths_are_missing(self):
         self.create_disk()

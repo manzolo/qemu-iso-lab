@@ -65,6 +65,17 @@ class VmtuiTests(unittest.TestCase):
         self.assertIn("start-headless", output)
         self.assertNotIn("shell", output)
 
+    def test_list_quick_action_items_include_shell_for_ssh_provision_vm(self):
+        result = self.run_bash("source bin/vmtui; list_quick_action_items cachyos-local")
+        output = result.stdout.splitlines()
+
+        self.assertIn("provision", output)
+        self.assertIn("start", output)
+        self.assertIn("start-headless", output)
+        self.assertIn("shell", output)
+        self.assertNotIn("bootstrap-unattended", output)
+        self.assertNotIn("cloud-init-install", output)
+
     def test_list_install_action_items_include_cloud_init_entries_for_supported_vm(self):
         result = self.run_bash("source bin/vmtui; list_install_action_items ubuntu-niri")
         output = result.stdout.splitlines()
@@ -105,6 +116,17 @@ class VmtuiTests(unittest.TestCase):
         self.assertNotIn("shell", output)
         self.assertNotIn("start-cloud-init", output)
         self.assertNotIn("post-install", output)
+
+    def test_list_run_action_items_include_ssh_post_install_for_ssh_provision_vm(self):
+        result = self.run_bash("source bin/vmtui; list_run_action_items cachyos-local")
+        output = result.stdout.splitlines()
+
+        self.assertIn("start", output)
+        self.assertIn("start-headless", output)
+        self.assertIn("stop", output)
+        self.assertIn("shell", output)
+        self.assertIn("post-install", output)
+        self.assertNotIn("start-cloud-init", output)
 
     def test_list_maintenance_action_items_include_boot_check_and_clean(self):
         result = self.run_bash("source bin/vmtui; list_maintenance_action_items")
