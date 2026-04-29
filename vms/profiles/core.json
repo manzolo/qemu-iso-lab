@@ -40,7 +40,7 @@
         "auto_input": [
           {
             "match": "boot:",
-            "send": "\n"
+            "send": "\r"
           }
         ],
         "expect": "login:",

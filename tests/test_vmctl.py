@@ -733,17 +733,6 @@ class VmctlTests(unittest.TestCase):
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz")
         temp_root = self.root / "tmp-import"
 
-        class FakeTempDir:
-            def __init__(self, path):
-                self.path = path
-
-            def __enter__(self):
-                self.path.mkdir(parents=True, exist_ok=True)
-                return str(self.path)
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
         with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
              mock.patch.object(self.vmctl, "require_command"), \
              mock.patch.object(
@@ -763,7 +752,7 @@ class VmctlTests(unittest.TestCase):
              mock.patch.object(self.vmctl, "maybe_read_gpt_geometry", return_value={}), \
              mock.patch.object(self.vmctl, "run") as run_cmd, \
              mock.patch.object(self.vmctl, "run_progress") as run_progress, \
-             mock.patch.object(self.vmctl.tempfile, "TemporaryDirectory", return_value=FakeTempDir(temp_root)), \
+             mock.patch.object(self.vmctl.tempfile, "mkdtemp", return_value=str(temp_root)), \
              mock.patch.object(self.vmctl, "run_pipeline") as run_pipeline, \
              mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner, \
              mock.patch.object(self.vmctl, "maybe_restore_sudo_owner_tree") as restore_tree:
@@ -801,17 +790,6 @@ class VmctlTests(unittest.TestCase):
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz")
         temp_root = self.root / "tmp-import-geometry"
 
-        class FakeTempDir:
-            def __init__(self, path):
-                self.path = path
-
-            def __enter__(self):
-                self.path.mkdir(parents=True, exist_ok=True)
-                return str(self.path)
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
         with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
              mock.patch.object(self.vmctl, "require_command"), \
              mock.patch.object(
@@ -834,11 +812,12 @@ class VmctlTests(unittest.TestCase):
                  return_value={
                      "gpt_partition_entry_count": 1024,
                      "gpt_partition_entry_size": 128,
+                     "gpt_first_usable_lba": 34,
                  },
              ) as read_geometry, \
              mock.patch.object(self.vmctl, "run") as run_cmd, \
              mock.patch.object(self.vmctl, "run_progress") as run_progress, \
-             mock.patch.object(self.vmctl.tempfile, "TemporaryDirectory", return_value=FakeTempDir(temp_root)), \
+             mock.patch.object(self.vmctl.tempfile, "mkdtemp", return_value=str(temp_root)), \
              mock.patch.object(self.vmctl, "run_pipeline") as run_pipeline, \
              mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner, \
              mock.patch.object(self.vmctl, "maybe_restore_sudo_owner_tree") as restore_tree:
@@ -933,6 +912,7 @@ class VmctlTests(unittest.TestCase):
                 "logical_sector_size": 512,
                 "gpt_partition_entry_count": 1024,
                 "gpt_partition_entry_size": 128,
+                "gpt_first_usable_lba": 34,
                 "children": [{"type": "part", "start": 2048, "size": 5 * 1024**3}],
             }
         )
@@ -941,11 +921,33 @@ class VmctlTests(unittest.TestCase):
         self.assertEqual(import_bytes, self.vmctl.round_up((2048 * 512) + (5 * 1024**3) + backup_bytes, 1024**2))
         self.assertEqual(compacted, True)
 
+    def test_suggested_import_bytes_uses_first_usable_lba_for_gpt_tail_gap(self):
+        import_bytes, compacted = self.vmctl.suggested_import_bytes(
+            {
+                "size": 250 * 1024**3,
+                "pttype": "gpt",
+                "logical_sector_size": 512,
+                "gpt_partition_entry_count": 128,
+                "gpt_partition_entry_size": 128,
+                "gpt_first_usable_lba": 2048,
+                "children": [
+                    {"type": "part", "start": 4096, "size": 4 * 1024**3},
+                    {"type": "part", "start": 8392704, "size": 58716088 * 512},
+                ],
+            }
+        )
+
+        backup_bytes = (2048 - 1) * 512
+        last_partition_end = (8392704 * 512) + (58716088 * 512)
+        self.assertEqual(import_bytes, self.vmctl.round_up(last_partition_end + backup_bytes, 1024**2))
+        self.assertEqual(compacted, True)
+
     def test_maybe_read_gpt_geometry_reads_entry_array_metadata(self):
         sector_size = 512
         disk_path = self.root / "gpt-header.img"
         header = bytearray(sector_size * 2)
         header[sector_size:sector_size + 8] = b"EFI PART"
+        header[sector_size + 40:sector_size + 48] = (2048).to_bytes(8, "little")
         header[sector_size + 80:sector_size + 84] = (1024).to_bytes(4, "little")
         header[sector_size + 84:sector_size + 88] = (128).to_bytes(4, "little")
         disk_path.write_bytes(header)
@@ -955,6 +957,7 @@ class VmctlTests(unittest.TestCase):
         self.assertEqual(
             geometry,
             {
+                "gpt_first_usable_lba": 2048,
                 "gpt_partition_entry_count": 1024,
                 "gpt_partition_entry_size": 128,
             },
@@ -1082,7 +1085,7 @@ class VmctlTests(unittest.TestCase):
             "accel": "tcg",
             "headless": True,
             "boot_from": "cdrom",
-            "auto_input": [{"match": "boot:", "send": "\n"}],
+            "auto_input": [{"match": "boot:", "send": "\r"}],
             "expect": "login:",
             "timeout_sec": 42,
         }
@@ -1105,7 +1108,7 @@ class VmctlTests(unittest.TestCase):
         self.assertEqual(timeout_sec, 42)
         self.assertEqual(
             run_and_expect.call_args.kwargs["auto_inputs"],
-            [("boot:", "\n")],
+            [("boot:", "\r")],
         )
 
     def test_create_cloud_init_seed_writes_artifacts_and_runs_cloud_localds(self):
