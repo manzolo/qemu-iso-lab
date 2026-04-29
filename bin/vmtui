@@ -155,31 +155,40 @@ PY
 
 list_vm_action_items() {
     local vm_name="$1"
-    printf '%s\n' provision "Guided install: fetch, prep, boot installer"
     printf '%s\n' show "Show VM profile"
-    printf '%s\n' install-flows "Open install and provisioning actions"
+    printf '%s\n' quick-actions "Common flows for this VM"
+    printf '%s\n' install-flows "Install, reinstall, and provisioning"
+    printf '%s\n' run-flows "Boot, stop, and connect to the VM"
+    printf '%s\n' maintenance-flows "Boot checks and artifact cleanup"
+    printf '%s\n' back "Back to main menu"
+}
+
+list_quick_action_items() {
+    local vm_name="$1"
+    if vm_has_section "$vm_name" "autoinstall" && vm_has_section "$vm_name" "cloud_init"; then
+        printf '%s\n' bootstrap-unattended "Full unattended install, first boot, and post-install"
+    fi
+    if vm_has_section "$vm_name" "cloud_init"; then
+        printf '%s\n' cloud-init-install "Guided manual install flow for this VM"
+    else
+        printf '%s\n' provision "Guided install: fetch, prep, boot installer"
+    fi
     printf '%s\n' start "Boot installed VM"
     printf '%s\n' start-headless "Boot installed VM without display"
-    printf '%s\n' stop "Stop tracked background VM"
-    printf '%s\n' shell "Open SSH shell"
     if vm_has_section "$vm_name" "cloud_init"; then
-        printf '%s\n' post-install-flows "Open first-boot and post-install actions"
+        printf '%s\n' shell "Open SSH shell"
     fi
-    printf '%s\n' boot-check "Run headless boot smoke check"
-    printf '%s\n' clean "Clean current VM artifacts"
-    printf '%s\n' back "Back to main menu"
+    printf '%s\n' back "Back to VM actions"
 }
 
 list_install_action_items() {
     local vm_name="$1"
     printf '%s\n' fetch-iso "Download ISO if missing"
     printf '%s\n' prep "Prepare disk and firmware artifacts"
-    printf '%s\n' install "Boot installer"
+    printf '%s\n' provision "Guided install: fetch, prep, boot installer"
+    printf '%s\n' install "Boot installer only"
     if vm_has_section "$vm_name" "autoinstall"; then
         printf '%s\n' full-auto-install "Fully automatic Ubuntu autoinstall"
-        if vm_has_section "$vm_name" "cloud_init"; then
-            printf '%s\n' bootstrap-unattended "Autoinstall, first boot, and post-install"
-        fi
     fi
     if vm_has_section "$vm_name" "cloud_init"; then
         printf '%s\n' cloud-init-install "Guided manual install flow for this VM"
@@ -188,12 +197,22 @@ list_install_action_items() {
     printf '%s\n' back "Back to VM actions"
 }
 
-list_post_install_action_items() {
+list_run_action_items() {
     local vm_name="$1"
+    printf '%s\n' start "Boot installed VM"
+    printf '%s\n' start-headless "Boot installed VM without display"
+    printf '%s\n' stop "Stop tracked background VM"
     if vm_has_section "$vm_name" "cloud_init"; then
+        printf '%s\n' shell "Open SSH shell"
         printf '%s\n' start-cloud-init "Boot installed VM with cloud-init first boot"
         printf '%s\n' post-install "Run SSH post-install actions"
     fi
+    printf '%s\n' back "Back to VM actions"
+}
+
+list_maintenance_action_items() {
+    printf '%s\n' boot-check "Run headless boot smoke check"
+    printf '%s\n' clean "Clean current VM artifacts"
     printf '%s\n' back "Back to VM actions"
 }
 
@@ -454,11 +473,17 @@ run_action() {
                 run_vmctl clean --all
             fi
             ;;
+        quick-actions)
+            quick_menu_loop
+            ;;
         install-flows)
             install_menu_loop
             ;;
-        post-install-flows)
-            post_install_menu_loop
+        run-flows)
+            run_menu_loop
+            ;;
+        maintenance-flows)
+            maintenance_menu_loop
             ;;
         status)
             run_vmctl status
@@ -492,6 +517,19 @@ vm_menu_loop() {
     done
 }
 
+quick_menu_loop() {
+    while true; do
+        local -a menu_items=()
+        mapfile -t menu_items < <(list_quick_action_items "$current_vm")
+        local selected
+        selected=$(menu_choose \
+            "Quick Actions" \
+            "Current VM: $current_vm" \
+            "${menu_items[@]}") || return 0
+        run_action "$selected" || return 0
+    done
+}
+
 install_menu_loop() {
     while true; do
         local -a menu_items=()
@@ -505,13 +543,26 @@ install_menu_loop() {
     done
 }
 
-post_install_menu_loop() {
+run_menu_loop() {
     while true; do
         local -a menu_items=()
-        mapfile -t menu_items < <(list_post_install_action_items "$current_vm")
+        mapfile -t menu_items < <(list_run_action_items "$current_vm")
         local selected
         selected=$(menu_choose \
-            "Post-Install Actions" \
+            "Run And Access" \
+            "Current VM: $current_vm" \
+            "${menu_items[@]}") || return 0
+        run_action "$selected" || return 0
+    done
+}
+
+maintenance_menu_loop() {
+    while true; do
+        local -a menu_items=()
+        mapfile -t menu_items < <(list_maintenance_action_items)
+        local selected
+        selected=$(menu_choose \
+            "Maintenance" \
             "Current VM: $current_vm" \
             "${menu_items[@]}") || return 0
         run_action "$selected" || return 0
