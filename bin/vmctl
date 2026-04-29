@@ -1009,6 +1009,10 @@ def render_autoinstall_user_data(vm_name: str, vm: dict, dry_run: bool = False) 
     if timezone:
         payload["autoinstall"]["timezone"] = timezone
 
+    updates = str(config.get("updates") or "").strip()
+    if updates:
+        payload["autoinstall"]["updates"] = updates
+
     ssh_keys = collect_ssh_authorized_keys(ci or {}, allow_missing_file=dry_run)
     payload["autoinstall"]["ssh"] = {
         "install-server": bool(config.get("install_ssh", True)),
@@ -1156,9 +1160,11 @@ def remote_sudo_shell_cmd(vm: dict, command: str, dry_run: bool = False) -> list
 
 def wait_for_guest_post_install_ready(vm: dict, dry_run: bool = False) -> None:
     if dry_run:
-        print_note("Would wait for cloud-init and package manager activity to settle")
+        print_note("Would wait for cloud-init to finish")
+        print_note("Would wait for package manager activity to settle")
         return
 
+    print_note("Waiting for cloud-init to finish")
     cloud_init_wait = (
         "if command -v cloud-init >/dev/null 2>&1; then "
         "sudo cloud-init status --wait || true; "
@@ -1166,11 +1172,11 @@ def wait_for_guest_post_install_ready(vm: dict, dry_run: bool = False) -> None:
     )
     run(remote_shell_cmd(vm, cloud_init_wait, dry_run=dry_run), dry_run=dry_run)
 
+    print_note("Waiting for package manager activity to settle")
     package_wait = (
         "while pgrep -x apt >/dev/null || "
         "pgrep -x apt-get >/dev/null || "
-        "pgrep -x dpkg >/dev/null || "
-        "pgrep -x unattended-upgr >/dev/null; do "
+        "pgrep -x dpkg >/dev/null; do "
         "sleep 2; "
         "done"
     )
@@ -1832,7 +1838,9 @@ def run_post_install(vm_name: str, vm: dict, timeout_sec: int, dry_run: bool = F
     require_command("ssh")
     require_command("scp")
     wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
+    print_status("ok", f"SSH is ready for VM '{vm_name}'")
     wait_for_guest_post_install_ready(vm, dry_run=dry_run)
+    print_note("Running post-install provisioning")
 
     for command in ssh_cfg.get("post_install_run", []):
         post_install_run(vm, str(command), dry_run=dry_run)
@@ -2378,9 +2386,11 @@ def cmd_clean(args: argparse.Namespace) -> int:
     config = load_config()
     if args.all:
         for name, vm in sorted(config["vms"].items()):
+            cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
             clean_vm(name, vm, dry_run=args.dry_run)
         return 0
     vm = get_vm(config, args.vm)
+    cmd_stop(argparse.Namespace(vm=args.vm, dry_run=args.dry_run))
     clean_vm(args.vm, vm, dry_run=args.dry_run)
     return 0
 

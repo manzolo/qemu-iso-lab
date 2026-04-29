@@ -117,6 +117,28 @@ Dopo aver installato il guest sul disco:
 make start VM=<name>
 ```
 
+### Flusso Locale Unattended
+
+Usa questo percorso per i profili locali che definiscono `autoinstall` e provisioning SSH:
+
+```bash
+make prep VM=<name>
+make install-unattended VM=<name>
+make post-install VM=<name>
+```
+
+Oppure esegui tutto il flusso in un solo passo:
+
+```bash
+make bootstrap-unattended VM=<name>
+```
+
+Dopo il primo boot puoi aprire una shell con:
+
+```bash
+make shell VM=<name>
+```
+
 ### Boot Check Reale Minimo
 
 Usa questo percorso per il piu piccolo smoke test reale gia presente nel repository:
@@ -139,7 +161,7 @@ make tui
 La TUI e un frontend sottile sopra `vmctl`. Permette di:
 
 - scegliere il profilo VM;
-- eseguire `show`, `fetch-iso`, `prep`, `install`, `start`, `boot-check`, `clean` e `clean-all`;
+- eseguire `show`, `fetch-iso`, `prep`, `install`, `install-unattended`, `start`, `post-install`, `shell`, `boot-check`, `clean` e `clean-all`;
 - scegliere il profilo video per `install` e `start`.
 
 ## Comandi Comuni
@@ -154,8 +176,12 @@ make show VM=<name>
 make fetch-iso VM=<name>
 make prep VM=<name>
 make install VM=<name>
+make install-unattended VM=<name>
+make post-install VM=<name>
+make bootstrap-unattended VM=<name>
 make start VM=<name>
 make start VM=<name> VIDEO=safe
+make shell VM=<name>
 make boot-check VM=alpine-ci
 make clean VM=<name>
 make clean-all
@@ -171,8 +197,12 @@ Direttamente con `vmctl`:
 ./bin/vmctl fetch-iso <name>
 ./bin/vmctl prep <name>
 ./bin/vmctl install <name>
+./bin/vmctl install-unattended <name>
+./bin/vmctl post-install <name>
+./bin/vmctl bootstrap-unattended <name>
 ./bin/vmctl start <name>
 ./bin/vmctl start <name> --video safe
+./bin/vmctl shell <name>
 ./bin/vmctl boot-check alpine-ci
 ./bin/vmctl clean <name>
 ./bin/vmctl clean --all
@@ -203,6 +233,12 @@ Ogni voce in `vms/profiles/*.json` definisce tipicamente:
 - `video`
 
 I profili orientati all'import possono omettere `iso_url` intenzionalmente. Sono pensati per flussi come `import-device`, dove porti dentro la VM un'installazione fisica esistente invece di avviare un installer da ISO.
+
+I profili che definiscono `cloud_init`, `ssh_provision` o `autoinstall` possono anche supportare flussi di livello piu alto come installazione unattended, provisioning post-install via SSH e accesso shell interattivo.
+
+`status` mostra anche uno stato runtime essenziale oltre agli artifact, inclusi processi QEMU in background tracciati e porte SSH forward quando disponibili.
+
+`clean` e intenzionalmente conservativo: ora prova prima a fermare la VM, poi rimuove gli artifact generati.
 
 Il repository include ora `windows10-template` e `windows11-template` come target conservativi per l'import:
 

@@ -1262,6 +1262,7 @@ class VmctlTests(unittest.TestCase):
             "username": "tester",
             "password_hash": "$6$hash",
             "timezone": "Europe/Rome",
+            "updates": "none",
         }
 
         rendered = self.vmctl.render_autoinstall_user_data(self.vm_name, self.vm_config)
@@ -1271,6 +1272,7 @@ class VmctlTests(unittest.TestCase):
         self.assertIn('"authorized-keys": [', rendered)
         self.assertIn('"ssh-ed25519 AAAA from-file"', rendered)
         self.assertIn('"user-data": {', rendered)
+        self.assertIn('"updates": "none"', rendered)
         self.assertIn('"packages": [', rendered)
         self.assertIn('"runcmd": [', rendered)
 
@@ -1524,7 +1526,8 @@ class VmctlTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("artifact", encoding="utf-8")
 
-        exit_code = self.vmctl.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False))
+        with mock.patch.object(self.vmctl, "cmd_stop", return_value=0):
+            exit_code = self.vmctl.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False))
 
         self.assertEqual(exit_code, 0)
         self.assertFalse(disk_path.exists())
@@ -1534,6 +1537,26 @@ class VmctlTests(unittest.TestCase):
         self.assertFalse((self.root / "artifacts/testvm/cloud-init").exists())
         self.assertFalse((self.root / "artifacts/testvm/autoinstall").exists())
         self.assertFalse((self.root / "artifacts/testvm/installer").exists())
+
+    def test_cmd_clean_stops_vm_before_removing_artifacts(self):
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.write_config_dir()
+        self.create_disk()
+
+        with mock.patch.object(self.vmctl, "cmd_stop", return_value=0) as stop_cmd:
+            exit_code = self.vmctl.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False))
+
+        self.assertEqual(exit_code, 0)
+        stop_cmd.assert_called_once()
+        stop_args = stop_cmd.call_args.args[0]
+        self.assertEqual(stop_args.vm, self.vm_name)
+        self.assertFalse(stop_args.dry_run)
 
     def test_cmd_post_install_waits_copies_and_runs_remote_commands(self):
         source_dir = self.root / "host-niri"
