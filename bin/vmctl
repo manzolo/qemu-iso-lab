@@ -9,6 +9,7 @@ import selectors
 import shlex
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -691,6 +692,34 @@ def process_cmdline(pid: int) -> str | None:
     return raw.replace(b"\x00", b" ").decode(errors="replace").strip()
 
 
+def local_tcp_port_open(port: int, host: str = "127.0.0.1", timeout_sec: float = 0.3) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout_sec):
+            return True
+    except OSError:
+        return False
+
+
+def find_qemu_process_by_hostfwd_port(port: int) -> tuple[int | None, str | None]:
+    needles = (f":127.0.0.1:{port}-:22", f":{port}-:22")
+    proc_root = Path("/proc")
+    for proc_dir in proc_root.iterdir():
+        if not proc_dir.name.isdigit():
+            continue
+        try:
+            raw = (proc_dir / "cmdline").read_bytes()
+        except OSError:
+            continue
+        if not raw:
+            continue
+        cmdline = raw.replace(b"\x00", b" ").decode(errors="replace").strip()
+        if "qemu-system-x86_64" not in cmdline:
+            continue
+        if any(needle in cmdline for needle in needles):
+            return int(proc_dir.name), cmdline
+    return None, None
+
+
 def is_bootstrap_vm_running(name: str) -> tuple[bool, int | None, str | None]:
     pid = read_pid_file(bootstrap_pid_path(name))
     if pid is None:
@@ -699,6 +728,57 @@ def is_bootstrap_vm_running(name: str) -> tuple[bool, int | None, str | None]:
     if not cmdline or "qemu-system-x86_64" not in cmdline:
         return (False, pid, cmdline)
     return (True, pid, cmdline)
+
+
+def vm_runtime_status(name: str, vm: dict) -> tuple[str, str]:
+    running, pid, cmdline = is_bootstrap_vm_running(name)
+    if running and pid is not None:
+        return (f"tracked:{pid}", cmdline or "-")
+
+    ssh_cfg = ssh_access_config(vm)
+    if ssh_cfg is None or not ssh_cfg.get("ssh_host_port"):
+        return ("-", "-")
+
+    port = int(ssh_cfg["ssh_host_port"])
+    pid, cmdline = find_qemu_process_by_hostfwd_port(port)
+    if pid is not None:
+        return (f"hostfwd:{port}", f"pid={pid}")
+    if local_tcp_port_open(port):
+        return (f"open:{port}", "-")
+    return (f"closed:{port}", "-")
+
+
+def stop_qemu_process(
+    pid: int,
+    header: str,
+    description: str,
+    pid_path: Path | None = None,
+    dry_run: bool = False,
+) -> int:
+    print_header(header)
+    print_kv("pid", str(pid))
+    cmdline = process_cmdline(pid)
+    if cmdline:
+        print_kv("cmd", cmdline)
+    if dry_run:
+        print_status("ok", f"Would stop {description} (pid {pid})")
+        return 0
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError as exc:
+        raise VMError(f"Failed to stop process {pid}: {exc}") from exc
+
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        if process_cmdline(pid) is None:
+            if pid_path is not None and pid_path.exists():
+                pid_path.unlink()
+            print_status("ok", f"Stopped {description}")
+            return 0
+        time.sleep(1)
+
+    raise VMError(f"Timed out stopping {description} (pid {pid})")
 
 
 def prepare_background_vm_slot(name: str, dry_run: bool = False) -> tuple[Path, Path]:
@@ -1066,6 +1146,37 @@ def wait_for_ssh(vm: dict, timeout_sec: int, dry_run: bool = False) -> None:
     raise VMError(f"Timed out waiting for SSH on {host}:{port}")
 
 
+def remote_shell_cmd(vm: dict, command: str, dry_run: bool = False) -> list[str]:
+    return ssh_base_cmd(vm, dry_run=dry_run) + [f"sh -lc {shlex.quote(command)}"]
+
+
+def remote_sudo_shell_cmd(vm: dict, command: str, dry_run: bool = False) -> list[str]:
+    return ssh_base_cmd(vm, dry_run=dry_run) + [f"sudo sh -lc {shlex.quote(command)}"]
+
+
+def wait_for_guest_post_install_ready(vm: dict, dry_run: bool = False) -> None:
+    if dry_run:
+        print_note("Would wait for cloud-init and package manager activity to settle")
+        return
+
+    cloud_init_wait = (
+        "if command -v cloud-init >/dev/null 2>&1; then "
+        "sudo cloud-init status --wait || true; "
+        "fi"
+    )
+    run(remote_shell_cmd(vm, cloud_init_wait, dry_run=dry_run), dry_run=dry_run)
+
+    package_wait = (
+        "while pgrep -x apt >/dev/null || "
+        "pgrep -x apt-get >/dev/null || "
+        "pgrep -x dpkg >/dev/null || "
+        "pgrep -x unattended-upgr >/dev/null; do "
+        "sleep 2; "
+        "done"
+    )
+    run(remote_shell_cmd(vm, package_wait, dry_run=dry_run), dry_run=dry_run)
+
+
 def post_install_copy(vm: dict, entry: dict, dry_run: bool = False) -> None:
     host, _, user = ssh_target(vm)
     source_raw = str(entry.get("source") or "").strip()
@@ -1073,24 +1184,68 @@ def post_install_copy(vm: dict, entry: dict, dry_run: bool = False) -> None:
     if not source_raw or not dest_raw:
         raise VMError("copy_from_host entries require source and dest")
 
+    source_sudo = bool(entry.get("source_sudo", False))
+    dest_sudo = bool(entry.get("dest_sudo", False))
+    dest_mode = str(entry.get("dest_mode") or "").strip()
     source = expand_host_path(source_raw)
     if not dry_run and not source.exists():
         raise VMError(f"Host path not found: {source}")
 
     recursive = source_raw.endswith("/") or source.is_dir()
+    remote_mkdir = remote_sudo_shell_cmd if dest_sudo else remote_shell_cmd
+    remote_chmod = remote_sudo_shell_cmd if dest_sudo else remote_shell_cmd
+
+    if source_sudo and recursive:
+        raise VMError("copy_from_host does not support source_sudo for recursive directories")
+
+    if source_sudo:
+        temp_source = Path(tempfile.mkdtemp(prefix="vmctl-copy-src-", dir="/tmp")) / source.name
+        try:
+            run(["sudo", "cp", "--archive", str(source), str(temp_source)], dry_run=dry_run)
+            maybe_restore_sudo_owner(temp_source)
+            source = temp_source
+        except Exception:
+            if temp_source.exists():
+                temp_source.unlink(missing_ok=True)
+            raise
+
     if recursive:
-        run(ssh_base_cmd(vm, dry_run=dry_run) + ["mkdir", "-p", dest_raw], dry_run=dry_run)
+        run(remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
         remote_target = f"{user}@{host}:{dest_raw}"
         run(scp_base_cmd(vm, dry_run=dry_run) + ["-r", f"{source}/.", remote_target], dry_run=dry_run)
+        if dest_mode:
+            run(remote_chmod(vm, f"chmod -R {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
+        if source_sudo and source.exists():
+            source.unlink(missing_ok=True)
         return
 
-    run(ssh_base_cmd(vm, dry_run=dry_run) + ["mkdir", "-p", str(Path(dest_raw).parent)], dry_run=dry_run)
-    remote_target = f"{user}@{host}:{dest_raw}"
-    run(scp_base_cmd(vm, dry_run=dry_run) + [str(source), remote_target], dry_run=dry_run)
+    dest_parent = str(Path(dest_raw).parent)
+    temp_dest = dest_raw
+    if dest_sudo:
+        temp_dest = f"/tmp/{Path(dest_raw).name}"
+
+    try:
+        run(remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_parent if dest_sudo else dest_parent)}", dry_run=dry_run), dry_run=dry_run)
+        remote_target = f"{user}@{host}:{temp_dest}"
+        run(scp_base_cmd(vm, dry_run=dry_run) + [str(source), remote_target], dry_run=dry_run)
+        if dest_sudo:
+            run(
+                remote_sudo_shell_cmd(
+                    vm,
+                    f"install -D -m {shlex.quote(dest_mode or '600')} {shlex.quote(temp_dest)} {shlex.quote(dest_raw)} && rm -f {shlex.quote(temp_dest)}",
+                    dry_run=dry_run,
+                ),
+                dry_run=dry_run,
+            )
+        elif dest_mode:
+            run(remote_chmod(vm, f"chmod {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
+    finally:
+        if source_sudo and source.exists():
+            source.unlink(missing_ok=True)
 
 
 def post_install_run(vm: dict, command: str, dry_run: bool = False) -> None:
-    run(ssh_base_cmd(vm, dry_run=dry_run) + [f"sh -lc {shlex.quote(command)}"], dry_run=dry_run)
+    run(remote_shell_cmd(vm, command, dry_run=dry_run), dry_run=dry_run)
 
 
 def read_os_release() -> dict[str, str]:
@@ -1524,7 +1679,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         if not args.all and not vm_has_local_state(vm):
             continue
         disk, actual, virtual = disk_status(vm)
-        rows.append((name, disk, iso_status(vm), nvram_status(vm), actual, virtual))
+        runtime, runtime_note = vm_runtime_status(name, vm)
+        rows.append((name, disk, iso_status(vm), nvram_status(vm), runtime, actual, virtual, runtime_note))
 
     if not rows:
         print_status("ok", "No local VM state found. Use --all to show the full catalog.")
@@ -1534,22 +1690,28 @@ def cmd_status(args: argparse.Namespace) -> int:
     disk_width = max(len("DISK"), max(len(row[1]) for row in rows))
     iso_width = max(len("ISO"), max(len(row[2]) for row in rows))
     nvram_width = max(len("NVRAM"), max(len(row[3]) for row in rows))
-    actual_width = max(len("ACTUAL"), max(len(row[4]) for row in rows))
-    virtual_width = max(len("VIRTUAL"), max(len(row[5]) for row in rows))
+    runtime_width = max(len("RUNTIME"), max(len(row[4]) for row in rows))
+    actual_width = max(len("ACTUAL"), max(len(row[5]) for row in rows))
+    virtual_width = max(len("VIRTUAL"), max(len(row[6]) for row in rows))
 
     print(f"{style('PROFILE', BOLD, CYAN):<{name_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
           f"{style('DISK', BOLD, CYAN):<{disk_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
           f"{style('ISO', BOLD, CYAN):<{iso_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
           f"{style('NVRAM', BOLD, CYAN):<{nvram_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
+          f"{style('RUNTIME', BOLD, CYAN):<{runtime_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
           f"{style('ACTUAL', BOLD, CYAN):>{actual_width + len(BOLD) + len(CYAN) + len(RESET)}}  "
           f"{style('VIRTUAL', BOLD, CYAN):>{virtual_width + len(BOLD) + len(CYAN) + len(RESET)}}")
-    for name, disk, iso, nvram, actual, virtual in rows:
+    for name, disk, iso, nvram, runtime, actual, virtual, runtime_note in rows:
         print(f"{style(name, BOLD):<{name_width + len(BOLD) + len(RESET)}}  "
               f"{disk:<{disk_width}}  "
               f"{iso:<{iso_width}}  "
               f"{nvram:<{nvram_width}}  "
+              f"{runtime:<{runtime_width}}  "
               f"{actual:>{actual_width}}  "
               f"{virtual:>{virtual_width}}")
+        if runtime_note != "-":
+            print(f"{'':<{name_width}}  {'':<{disk_width}}  {'':<{iso_width}}  {'':<{nvram_width}}  "
+                  f"{style('note', CYAN):<{runtime_width}}  {runtime_note}")
     return 0
 
 
@@ -1670,6 +1832,7 @@ def run_post_install(vm_name: str, vm: dict, timeout_sec: int, dry_run: bool = F
     require_command("ssh")
     require_command("scp")
     wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
+    wait_for_guest_post_install_ready(vm, dry_run=dry_run)
 
     for command in ssh_cfg.get("post_install_run", []):
         post_install_run(vm, str(command), dry_run=dry_run)
@@ -1716,42 +1879,48 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
 
 def cmd_stop(args: argparse.Namespace) -> int:
     config = load_config()
-    get_vm(config, args.vm)
+    vm = get_vm(config, args.vm)
     pid_path = bootstrap_pid_path(args.vm)
     running, pid, cmdline = is_bootstrap_vm_running(args.vm)
     if pid is None:
+        ssh_cfg = ssh_access_config(vm)
+        if ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
+            port = int(ssh_cfg["ssh_host_port"])
+            fallback_pid, _ = find_qemu_process_by_hostfwd_port(port)
+            if fallback_pid is not None:
+                return stop_qemu_process(
+                    fallback_pid,
+                    f"Stop discovered background VM: {args.vm}",
+                    f"discovered background VM for '{args.vm}'",
+                    dry_run=args.dry_run,
+                )
         print_status("ok", f"No tracked background VM for '{args.vm}'")
         return 0
     if not running:
         print_status("warn", f"Removing stale bootstrap PID file for '{args.vm}'", ok=False)
         if not args.dry_run and pid_path.exists():
             pid_path.unlink()
+        ssh_cfg = ssh_access_config(vm)
+        if ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
+            port = int(ssh_cfg["ssh_host_port"])
+            fallback_pid, _ = find_qemu_process_by_hostfwd_port(port)
+            if fallback_pid is not None:
+                return stop_qemu_process(
+                    fallback_pid,
+                    f"Stop discovered background VM: {args.vm}",
+                    f"discovered background VM for '{args.vm}'",
+                    dry_run=args.dry_run,
+                )
         return 0
 
     assert pid is not None
-    print_header(f"Stop background VM: {args.vm}")
-    print_kv("pid", str(pid))
-    if cmdline:
-        print_kv("cmd", cmdline)
-    if args.dry_run:
-        print_status("ok", f"Would stop background VM for '{args.vm}'")
-        return 0
-
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except OSError as exc:
-        raise VMError(f"Failed to stop VM '{args.vm}' (pid {pid}): {exc}") from exc
-
-    deadline = time.monotonic() + 15
-    while time.monotonic() < deadline:
-        if process_cmdline(pid) is None:
-            if pid_path.exists():
-                pid_path.unlink()
-            print_status("ok", f"Stopped background VM for '{args.vm}'")
-            return 0
-        time.sleep(1)
-
-    raise VMError(f"Timed out stopping VM '{args.vm}' (pid {pid})")
+    return stop_qemu_process(
+        pid,
+        f"Stop background VM: {args.vm}",
+        f"background VM for '{args.vm}'",
+        pid_path=pid_path,
+        dry_run=args.dry_run,
+    )
 
 
 def cmd_shell(args: argparse.Namespace) -> int:

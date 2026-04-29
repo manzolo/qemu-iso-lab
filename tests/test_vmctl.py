@@ -141,6 +141,7 @@ class VmctlTests(unittest.TestCase):
 
         with mock.patch.object(self.vmctl.shutil, "which", return_value="/usr/bin/qemu-img"), \
              mock.patch.object(self.vmctl, "image_info", return_value={"virtual-size": 2 * 1024**3}), \
+             mock.patch.object(self.vmctl, "vm_runtime_status", return_value=("-", "-")), \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_status(args)
 
@@ -150,6 +151,7 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("ready", output)
         self.assertIn(self.vmctl.format_bytes(disk_path.stat().st_size), output)
         self.assertIn(self.vmctl.format_bytes(2 * 1024**3), output)
+        self.assertIn("RUNTIME", output)
 
     def test_cmd_status_hides_untouched_vms_by_default(self):
         other_vm = json.loads(json.dumps(self.vm_config))
@@ -167,6 +169,20 @@ class VmctlTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertIn(self.vm_name, output)
         self.assertNotIn("othervm", output)
+
+    def test_cmd_status_reports_runtime_port_and_note(self):
+        self.create_disk()
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.write_config_dir()
+
+        with mock.patch.object(self.vmctl, "vm_runtime_status", return_value=("hostfwd:2222", "pid=4242")), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_status(argparse.Namespace(all=False))
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("hostfwd:2222", output)
+        self.assertIn("pid=4242", output)
 
     def test_cmd_prep_downloads_iso_when_missing(self):
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
@@ -1085,9 +1101,9 @@ class VmctlTests(unittest.TestCase):
             "accel": "tcg",
             "headless": True,
             "boot_from": "cdrom",
-            "auto_input": [{"match": "boot:", "send": "\r"}],
+            "auto_input": [{"match": "boot:", "send": "\r"}, {"match": "boot:", "send": "\n"}],
             "expect": "login:",
-            "timeout_sec": 42,
+            "timeout_sec": 180,
         }
         self.write_config_dir()
         iso_path = self.root / self.vm_config["iso"]
@@ -1105,10 +1121,10 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("-cdrom", qemu_cmd)
         self.assertEqual(qemu_cmd[qemu_cmd.index("-cdrom") + 1], str(iso_path))
         self.assertEqual(expected_text, "login:")
-        self.assertEqual(timeout_sec, 42)
+        self.assertEqual(timeout_sec, 180)
         self.assertEqual(
             run_and_expect.call_args.kwargs["auto_inputs"],
-            [("boot:", "\r")],
+            [("boot:", "\r"), ("boot:", "\n")],
         )
 
     def test_create_cloud_init_seed_writes_artifacts_and_runs_cloud_localds(self):
@@ -1436,8 +1452,48 @@ class VmctlTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         kill_mock.assert_called_once_with(1234, self.vmctl.signal.SIGTERM)
-        sleep_mock.assert_called_once_with(1)
+        self.assertLessEqual(sleep_mock.call_count, 1)
         self.assertFalse(pid_path.exists())
+
+    def test_cmd_stop_terminates_discovered_qemu_when_pid_file_missing(self):
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, dry_run=False)
+
+        with mock.patch.object(self.vmctl, "find_qemu_process_by_hostfwd_port", return_value=(5678, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22")), \
+             mock.patch.object(self.vmctl, "process_cmdline", side_effect=["qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", None]), \
+             mock.patch.object(self.vmctl.os, "kill") as kill_mock, \
+             mock.patch.object(self.vmctl.time, "sleep") as sleep_mock:
+            exit_code = self.vmctl.cmd_stop(args)
+
+        self.assertEqual(exit_code, 0)
+        kill_mock.assert_called_once_with(5678, self.vmctl.signal.SIGTERM)
+        self.assertLessEqual(sleep_mock.call_count, 1)
+
+    def test_cmd_stop_falls_back_to_discovered_qemu_after_stale_pid_file(self):
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+        }
+        self.write_config_dir()
+        pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text("424242\n", encoding="utf-8")
+        args = argparse.Namespace(vm=self.vm_name, dry_run=False)
+
+        with mock.patch.object(self.vmctl, "find_qemu_process_by_hostfwd_port", return_value=(5678, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22")), \
+             mock.patch.object(self.vmctl, "process_cmdline", side_effect=[None, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", None]), \
+             mock.patch.object(self.vmctl.os, "kill") as kill_mock, \
+             mock.patch.object(self.vmctl.time, "sleep") as sleep_mock:
+            exit_code = self.vmctl.cmd_stop(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertFalse(pid_path.exists())
+        kill_mock.assert_called_once_with(5678, self.vmctl.signal.SIGTERM)
+        self.assertLessEqual(sleep_mock.call_count, 1)
 
     def test_cmd_clean_removes_generated_artifact_subdirs(self):
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
@@ -1494,11 +1550,13 @@ class VmctlTests(unittest.TestCase):
 
         with mock.patch.object(self.vmctl, "require_command"), \
              mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
              mock.patch.object(self.vmctl, "run") as run_cmd:
             exit_code = self.vmctl.cmd_post_install(args)
 
         self.assertEqual(exit_code, 0)
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
+        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(
             executed[0][-1],
@@ -1523,9 +1581,7 @@ class VmctlTests(unittest.TestCase):
                 "-p",
                 "2222",
                 "tester@127.0.0.1",
-                "mkdir",
-                "-p",
-                "/home/tester/.config/niri",
+                "sh -lc 'mkdir -p /home/tester/.config/niri'",
             ],
         )
         self.assertEqual(
@@ -1561,18 +1617,60 @@ class VmctlTests(unittest.TestCase):
 
         with mock.patch.object(self.vmctl, "require_command"), \
              mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
              mock.patch.object(self.vmctl, "run") as run_cmd:
             exit_code = self.vmctl.cmd_post_install(args)
 
         self.assertEqual(exit_code, 0)
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
+        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(
             executed[0][-1],
             "sh -lc 'sudo pacman -Sy --noconfirm --needed foot niri || true'",
         )
-        self.assertEqual(executed[1][-1], "/home/tester/.config/niri")
+        self.assertEqual(executed[1][-1], "sh -lc 'mkdir -p /home/tester/.config/niri'")
         self.assertEqual(executed[2][-1], "tester@127.0.0.1:/home/tester/.config/niri")
+
+    def test_cmd_post_install_supports_sudo_copy_for_system_connections(self):
+        source_file = self.root / "vpn.nmconnection"
+        source_file.write_text("[connection]\nid=test\n", encoding="utf-8")
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+            "copy_from_host": [
+                {
+                    "source": str(source_file),
+                    "source_sudo": True,
+                    "dest": "/etc/NetworkManager/system-connections/test.nmconnection",
+                    "dest_sudo": True,
+                    "dest_mode": "600",
+                }
+            ],
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_post_install(args)
+
+        self.assertEqual(exit_code, 0)
+        wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
+        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(executed[0], ["sudo", "cp", "--archive", str(source_file), mock.ANY])
+        self.assertEqual(
+            executed[1][-1],
+            "sudo sh -lc 'mkdir -p /etc/NetworkManager/system-connections'",
+        )
+        self.assertTrue(executed[2][-1].startswith("tester@127.0.0.1:/tmp/test.nmconnection"))
+        self.assertEqual(
+            executed[3][-1],
+            "sudo sh -lc 'install -D -m 600 /tmp/test.nmconnection /etc/NetworkManager/system-connections/test.nmconnection && rm -f /tmp/test.nmconnection'",
+        )
 
     def test_firmware_args_uses_common_ovmf_fallback_when_configured_paths_are_missing(self):
         self.create_disk()

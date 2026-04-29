@@ -41,10 +41,14 @@
           {
             "match": "boot:",
             "send": "\r"
+          },
+          {
+            "match": "boot:",
+            "send": "\n"
           }
         ],
         "expect": "login:",
-        "timeout_sec": 90
+        "timeout_sec": 180
       }
     }
   }
