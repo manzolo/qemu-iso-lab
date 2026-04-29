@@ -512,16 +512,82 @@ class VmctlTests(unittest.TestCase):
                      "is_empty": True,
                  },
              ), \
+             mock.patch.object(
+                 self.vmctl,
+                 "inspect_block_device_basic",
+                 return_value={
+                     "path": "/dev/sdz",
+                     "size": 16 * 1024**3,
+                     "model": "USB",
+                     "mountpoints": [],
+                     "children": [],
+                     "logical_sector_size": 512,
+                     "pttype": "dos",
+                     "is_root_disk": False,
+                 },
+             ), \
              mock.patch.object(self.vmctl, "run") as run_cmd:
             exit_code = self.vmctl.cmd_flash_helper(args)
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(run_cmd.call_count, 2)
+        self.assertEqual(run_cmd.call_count, 3)
         convert_cmd = run_cmd.call_args_list[0].args[0]
         self.assertEqual(
             convert_cmd,
             ["qemu-img", "convert", "-n", "-p", "-f", "qcow2", "-O", "raw", str(disk_path), "/dev/sdz"],
         )
+
+    def test_cmd_flash_helper_relocates_gpt_after_writing_to_larger_disk(self):
+        disk_path = self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False)
+
+        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "validate_flash_target",
+                 return_value=(
+                     {
+                         "path": "/dev/sdz",
+                         "size": 16 * 1024**3,
+                         "model": "USB",
+                         "mountpoints": [],
+                         "children": [],
+                         "signatures": [],
+                         "is_root_disk": False,
+                         "is_empty": True,
+                     },
+                     "gpt",
+                     1 * 1024**3,
+                 ),
+             ), \
+             mock.patch.object(
+                 self.vmctl,
+                 "inspect_block_device_basic",
+                 return_value={
+                     "path": "/dev/sdz",
+                     "size": 16 * 1024**3,
+                     "model": "USB",
+                     "mountpoints": [],
+                     "children": [],
+                     "logical_sector_size": 512,
+                     "pttype": "gpt",
+                     "is_root_disk": False,
+                 },
+             ), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_flash_helper(args)
+
+        self.assertEqual(exit_code, 0)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(
+            executed[0],
+            ["qemu-img", "convert", "-n", "-p", "-f", "qcow2", "-O", "raw", str(disk_path), "/dev/sdz"],
+        )
+        self.assertEqual(executed[1], ["blockdev", "--rereadpt", "/dev/sdz"])
+        self.assertEqual(executed[2], ["sgdisk", "-e", "/dev/sdz"])
+        self.assertEqual(executed[3], ["blockdev", "--rereadpt", "/dev/sdz"])
+        self.assertEqual(executed[4], ["sync"])
 
     def test_cmd_flash_helper_force_target_wipes_signatures_first(self):
         self.create_disk()
@@ -546,6 +612,20 @@ class VmctlTests(unittest.TestCase):
                      "dos",
                      1 * 1024**3,
                  ),
+             ), \
+             mock.patch.object(
+                 self.vmctl,
+                 "inspect_block_device_basic",
+                 return_value={
+                     "path": "/dev/sdz",
+                     "size": 16 * 1024**3,
+                     "model": "USB",
+                     "mountpoints": [],
+                     "children": [],
+                     "logical_sector_size": 512,
+                     "pttype": "dos",
+                     "is_root_disk": False,
+                 },
              ), \
              mock.patch.object(self.vmctl, "run") as run_cmd:
             exit_code = self.vmctl.cmd_flash_helper(args)
@@ -680,6 +760,7 @@ class VmctlTests(unittest.TestCase):
                      "is_root_disk": False,
                  },
              ), \
+             mock.patch.object(self.vmctl, "maybe_read_gpt_geometry", return_value={}), \
              mock.patch.object(self.vmctl, "run") as run_cmd, \
              mock.patch.object(self.vmctl, "run_progress") as run_progress, \
              mock.patch.object(self.vmctl.tempfile, "TemporaryDirectory", return_value=FakeTempDir(temp_root)), \
@@ -690,6 +771,83 @@ class VmctlTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         expected_count = self.vmctl.round_up((2048 * 512) + (32 * 1024**3) + (33 * 512), 1024**2)
+        temp_raw = temp_root / "source.raw"
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(
+            executed[0],
+            [
+                "dd",
+                "if=/dev/sdz",
+                f"of={temp_raw}",
+                "iflag=fullblock,count_bytes",
+                f"count={expected_count}",
+                "bs=4M",
+                "conv=sparse",
+                "status=progress",
+            ],
+        )
+        self.assertEqual(executed[1], ["sgdisk", "-e", str(temp_raw)])
+        self.assertEqual(executed[2], ["sgdisk", "-v", str(temp_raw)])
+        run_progress.assert_called_once_with(
+            ["qemu-img", "convert", "-p", "-f", "raw", "-O", "qcow2", str(temp_raw), str(disk_path)],
+            dry_run=False,
+        )
+        run_pipeline.assert_not_called()
+        restore_owner.assert_called_once_with(disk_path)
+        restore_tree.assert_called_once_with(disk_path.parent)
+
+    def test_cmd_import_helper_uses_real_gpt_geometry_for_compaction(self):
+        disk_path = self.root / self.vm_config["disk"]["path"]
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz")
+        temp_root = self.root / "tmp-import-geometry"
+
+        class FakeTempDir:
+            def __init__(self, path):
+                self.path = path
+
+            def __enter__(self):
+                self.path.mkdir(parents=True, exist_ok=True)
+                return str(self.path)
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "validate_import_source",
+                 return_value={
+                     "path": "/dev/sdz",
+                     "size": 250 * 1024**3,
+                     "model": "USB",
+                     "mountpoints": [],
+                     "children": [{"type": "part", "start": 2048, "size": 5 * 1024**3}],
+                     "logical_sector_size": 512,
+                     "pttype": "gpt",
+                     "is_root_disk": False,
+                 },
+             ), \
+             mock.patch.object(
+                 self.vmctl,
+                 "maybe_read_gpt_geometry",
+                 return_value={
+                     "gpt_partition_entry_count": 1024,
+                     "gpt_partition_entry_size": 128,
+                 },
+             ) as read_geometry, \
+             mock.patch.object(self.vmctl, "run") as run_cmd, \
+             mock.patch.object(self.vmctl, "run_progress") as run_progress, \
+             mock.patch.object(self.vmctl.tempfile, "TemporaryDirectory", return_value=FakeTempDir(temp_root)), \
+             mock.patch.object(self.vmctl, "run_pipeline") as run_pipeline, \
+             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner, \
+             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner_tree") as restore_tree:
+            exit_code = self.vmctl.cmd_import_helper(args)
+
+        self.assertEqual(exit_code, 0)
+        read_geometry.assert_called_once_with("/dev/sdz", 512)
+        backup_bytes = 512 * (1 + ((1024 * 128) // 512))
+        expected_count = self.vmctl.round_up((2048 * 512) + (5 * 1024**3) + backup_bytes, 1024**2)
         temp_raw = temp_root / "source.raw"
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(
@@ -766,6 +924,41 @@ class VmctlTests(unittest.TestCase):
 
         self.assertEqual(import_bytes, self.vmctl.round_up((2048 * 512) + (5 * 1024**3) + (33 * 512), 1024**2))
         self.assertEqual(compacted, True)
+
+    def test_suggested_import_bytes_uses_actual_gpt_entry_array_size(self):
+        import_bytes, compacted = self.vmctl.suggested_import_bytes(
+            {
+                "size": 250 * 1024**3,
+                "pttype": "gpt",
+                "logical_sector_size": 512,
+                "gpt_partition_entry_count": 1024,
+                "gpt_partition_entry_size": 128,
+                "children": [{"type": "part", "start": 2048, "size": 5 * 1024**3}],
+            }
+        )
+
+        backup_bytes = 512 * (1 + ((1024 * 128) // 512))
+        self.assertEqual(import_bytes, self.vmctl.round_up((2048 * 512) + (5 * 1024**3) + backup_bytes, 1024**2))
+        self.assertEqual(compacted, True)
+
+    def test_maybe_read_gpt_geometry_reads_entry_array_metadata(self):
+        sector_size = 512
+        disk_path = self.root / "gpt-header.img"
+        header = bytearray(sector_size * 2)
+        header[sector_size:sector_size + 8] = b"EFI PART"
+        header[sector_size + 80:sector_size + 84] = (1024).to_bytes(4, "little")
+        header[sector_size + 84:sector_size + 88] = (128).to_bytes(4, "little")
+        disk_path.write_bytes(header)
+
+        geometry = self.vmctl.maybe_read_gpt_geometry(str(disk_path), sector_size)
+
+        self.assertEqual(
+            geometry,
+            {
+                "gpt_partition_entry_count": 1024,
+                "gpt_partition_entry_size": 128,
+            },
+        )
 
     def test_cmd_start_dry_run_builds_qemu_command_without_cdrom(self):
         disk_path = self.create_disk()

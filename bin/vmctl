@@ -510,6 +510,46 @@ def round_up(value: int, alignment: int) -> int:
     return ((value + alignment - 1) // alignment) * alignment
 
 
+def round_up_div(value: int, divisor: int) -> int:
+    if value <= 0:
+        return 0
+    return (value + divisor - 1) // divisor
+
+
+def gpt_backup_overhead_bytes(info: dict) -> int:
+    logical_sector_size = int(info.get("logical_sector_size", 512) or 512)
+    partition_entry_count = int(info.get("gpt_partition_entry_count", 128) or 128)
+    partition_entry_size = int(info.get("gpt_partition_entry_size", 128) or 128)
+    entry_array_bytes = partition_entry_count * partition_entry_size
+    entry_array_sectors = round_up_div(entry_array_bytes, logical_sector_size)
+    # Secondary GPT needs one header sector plus the full partition entry array.
+    return logical_sector_size * (1 + entry_array_sectors)
+
+
+def maybe_read_gpt_geometry(device: str, logical_sector_size: int) -> dict[str, int]:
+    header_offset = logical_sector_size
+    header_size = 92
+    try:
+        with Path(device).open("rb") as fh:
+            fh.seek(header_offset)
+            header = fh.read(header_size)
+    except OSError:
+        return {}
+
+    if len(header) < header_size or header[:8] != b"EFI PART":
+        return {}
+
+    partition_entry_count = int.from_bytes(header[80:84], "little")
+    partition_entry_size = int.from_bytes(header[84:88], "little")
+    if partition_entry_count <= 0 or partition_entry_size <= 0:
+        return {}
+
+    return {
+        "gpt_partition_entry_count": partition_entry_count,
+        "gpt_partition_entry_size": partition_entry_size,
+    }
+
+
 def partition_extent_bytes(node: dict, logical_sector_size: int) -> int:
     start = int(node.get("start", 0) or 0)
     size = int(node.get("size", 0) or 0)
@@ -525,7 +565,7 @@ def suggested_import_bytes(info: dict) -> tuple[int, bool]:
     last_partition_end = max(partition_extent_bytes(child, logical_sector_size) for child in children)
     layout = str(info.get("pttype") or "").lower()
     if layout == "gpt":
-        backup_gpt_bytes = logical_sector_size * 33
+        backup_gpt_bytes = gpt_backup_overhead_bytes(info)
         bounded_size = min(int(info["size"]), round_up(last_partition_end + backup_gpt_bytes, 1024**2))
         if bounded_size <= 0:
             return int(info["size"]), False
@@ -1902,7 +1942,7 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
     require_command("wipefs")
     require_command("findmnt")
 
-    info, _, _ = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
+    info, _, virtual_size = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
     if args.force_target:
         for child in info["children"]:
             child_path = child.get("path")
@@ -1925,6 +1965,13 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
         ],
         dry_run=False,
     )
+    if virtual_size and info["size"] > virtual_size:
+        run(["blockdev", "--rereadpt", args.device], dry_run=False, quiet=True)
+        flashed_info = inspect_block_device_basic(args.device)
+        if str(flashed_info.get("pttype") or "").lower() == "gpt":
+            require_command("sgdisk")
+            run(["sgdisk", "-e", args.device], dry_run=False, quiet=True)
+            run(["blockdev", "--rereadpt", args.device], dry_run=False, quiet=True)
     run(["sync"], dry_run=False, quiet=True)
     return 0
 
@@ -2002,6 +2049,8 @@ def cmd_import_helper(args: argparse.Namespace) -> int:
     require_command("findmnt")
 
     info = validate_import_source(args.device)
+    if str(info.get("pttype") or "").lower() == "gpt":
+        info.update(maybe_read_gpt_geometry(args.device, int(info.get("logical_sector_size", 512) or 512)))
     import_bytes, is_compacted = suggested_import_bytes(info)
     layout = str(info.get("pttype") or "").lower()
     convert_cmd = ["qemu-img", "convert", "-p", "-f", "raw", "-O", disk["format"]]
