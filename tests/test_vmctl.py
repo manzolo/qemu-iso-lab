@@ -305,6 +305,25 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("-vga", qemu_cmd)
         self.assertIn("std", qemu_cmd)
 
+    def test_cmd_install_defaults_to_safe_video_for_installer(self):
+        self.create_disk()
+        self.vm_config["video"]["default"] = "virtio-gl"
+        self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "download_file"), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_install(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertIn("-vga", qemu_cmd)
+        self.assertIn("std", qemu_cmd)
+        self.assertIn("-serial", qemu_cmd)
+        self.assertNotIn("virtio-vga-gl", qemu_cmd)
+
     def test_cmd_flash_requires_matching_confirmation(self):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdy", dry_run=True)
@@ -750,7 +769,7 @@ class VmctlTests(unittest.TestCase):
 
     def test_cmd_start_dry_run_builds_qemu_command_without_cdrom(self):
         disk_path = self.create_disk()
-        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, dry_run=True)
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=False, background=False, dry_run=True)
 
         with mock.patch.object(self.vmctl, "require_command"), \
              mock.patch.object(self.vmctl, "run") as run_cmd:
@@ -765,6 +784,43 @@ class VmctlTests(unittest.TestCase):
         self.assertNotIn("-cdrom", qemu_cmd)
         self.assertIn("-netdev", qemu_cmd)
         self.assertIn("user,id=n1", qemu_cmd)
+
+    def test_cmd_start_headless_dry_run_uses_no_display(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, video="std", cloud_init=False, headless=True, background=False, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_start(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertIn("-display", qemu_cmd)
+        self.assertIn("none", qemu_cmd)
+        self.assertIn("-monitor", qemu_cmd)
+        self.assertNotIn("-vga", qemu_cmd)
+
+    def test_cmd_start_headless_background_tracks_pid_and_log(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=True, background=True, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "run_background", return_value=None) as run_background:
+            exit_code = self.vmctl.cmd_start(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_background.call_args.args[0]
+        log_path = run_background.call_args.args[1]
+        self.assertIn("-display", qemu_cmd)
+        self.assertIn("none", qemu_cmd)
+        self.assertEqual(log_path, self.root / "artifacts/testvm/logs/bootstrap-start.log")
+
+    def test_cmd_start_background_requires_headless(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=False, background=True, dry_run=True)
+
+        with self.assertRaises(self.vmctl.VMError):
+            self.vmctl.cmd_start(args)
 
     def test_common_args_tcg_headless_serial(self):
         disk_path = self.create_disk()
@@ -917,11 +973,42 @@ class VmctlTests(unittest.TestCase):
         with self.assertRaises(self.vmctl.VMError):
             self.vmctl.ssh_base_cmd(self.vm_config, dry_run=False)
 
+    def test_ssh_shell_cmd_omits_batch_mode(self):
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+        }
+
+        cmd = self.vmctl.ssh_shell_cmd(self.vm_config, dry_run=True)
+
+        self.assertEqual(cmd[0], "ssh")
+        self.assertNotIn("BatchMode=yes", cmd)
+        self.assertEqual(cmd[-1], "tester@127.0.0.1")
+
+    def test_wait_for_ssh_retries_until_probe_succeeds(self):
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+        }
+        self.write_config_dir()
+
+        results = [
+            self.vmctl.subprocess.CompletedProcess(args=["ssh"], returncode=255),
+            self.vmctl.subprocess.CompletedProcess(args=["ssh"], returncode=0),
+        ]
+        with mock.patch.object(self.vmctl.subprocess, "run", side_effect=results) as run_cmd, \
+             mock.patch.object(self.vmctl.time, "sleep") as sleep_mock:
+            self.vmctl.wait_for_ssh(self.vm_config, timeout_sec=10, dry_run=False)
+
+        self.assertEqual(run_cmd.call_count, 2)
+        self.assertEqual(run_cmd.call_args_list[0].args[0][-1], "true")
+        sleep_mock.assert_called_once_with(2)
+
     def test_cmd_start_cloud_init_attaches_seed_drive(self):
         self.create_disk()
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
         self.write_config_dir()
-        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=True, dry_run=True)
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=True, headless=False, background=False, dry_run=True)
 
         with mock.patch.object(self.vmctl, "require_command"), \
              mock.patch.object(self.vmctl, "create_cloud_init_seed", return_value=self.root / "artifacts/testvm/cloud-init/seed.iso") as create_seed, \
@@ -1001,6 +1088,174 @@ class VmctlTests(unittest.TestCase):
             f"file={self.root / 'artifacts/testvm/autoinstall/seed.iso'},format=raw,if=virtio,media=cdrom,readonly=on",
             qemu_cmd,
         )
+
+    def test_cmd_install_unattended_defaults_to_safe_video_for_installer(self):
+        iso_path = self.root / self.vm_config["iso"]
+        self.vm_config["video"]["default"] = "virtio-gl"
+        self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video=None, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "download_file"), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
+             mock.patch.object(self.vmctl, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_install_unattended(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertIn("-vga", qemu_cmd)
+        self.assertIn("std", qemu_cmd)
+        self.assertIn("-serial", qemu_cmd)
+        self.assertNotIn("virtio-vga-gl", qemu_cmd)
+
+    def test_cmd_bootstrap_unattended_runs_install_background_start_and_post_install(self):
+        self.create_disk()
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+            "post_install_run": ["echo ready"],
+        }
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video="std", timeout=45, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "cmd_install_unattended") as install_unattended, \
+             mock.patch.object(self.vmctl, "run_background", return_value=None) as run_background, \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_bootstrap_unattended(args)
+
+        self.assertEqual(exit_code, 0)
+        install_args = install_unattended.call_args.args[0]
+        self.assertEqual(install_args.vm, self.vm_name)
+        self.assertEqual(install_args.video, "std")
+        self.assertEqual(install_args.dry_run, True)
+        qemu_cmd = run_background.call_args.args[0]
+        log_path = run_background.call_args.args[1]
+        self.assertEqual(qemu_cmd[0], "qemu-system-x86_64")
+        self.assertIn("-display", qemu_cmd)
+        self.assertIn("none", qemu_cmd)
+        self.assertNotIn("-vga", qemu_cmd)
+        self.assertEqual(log_path, self.root / "artifacts/testvm/logs/bootstrap-start.log")
+        wait_for_ssh.assert_called_once_with(self.vm_config, 45, dry_run=True)
+        self.assertEqual(
+            run_cmd.call_args.args[0][-1],
+            "sh -lc 'echo ready'",
+        )
+
+    def test_cmd_bootstrap_unattended_requires_autoinstall(self):
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.write_config_dir()
+
+        with self.assertRaises(self.vmctl.VMError):
+            self.vmctl.cmd_bootstrap_unattended(argparse.Namespace(vm=self.vm_name, video=None, timeout=30, dry_run=True))
+
+    def test_cmd_bootstrap_unattended_requires_cloud_init(self):
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.write_config_dir()
+
+        with self.assertRaises(self.vmctl.VMError):
+            self.vmctl.cmd_bootstrap_unattended(argparse.Namespace(vm=self.vm_name, video=None, timeout=30, dry_run=True))
+
+    def test_cmd_stop_removes_stale_pid_file(self):
+        pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text("424242\n", encoding="utf-8")
+        args = argparse.Namespace(vm=self.vm_name, dry_run=False)
+
+        exit_code = self.vmctl.cmd_stop(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertFalse(pid_path.exists())
+
+    def test_cmd_shell_runs_interactive_ssh_command(self):
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+        }
+        self.write_config_dir()
+
+        with mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_shell(argparse.Namespace(vm=self.vm_name, dry_run=True))
+
+        self.assertEqual(exit_code, 0)
+        ssh_cmd = run_cmd.call_args.args[0]
+        self.assertEqual(ssh_cmd[0], "ssh")
+        self.assertNotIn("BatchMode=yes", ssh_cmd)
+        self.assertEqual(ssh_cmd[-1], "tester@127.0.0.1")
+
+    def test_cmd_stop_terminates_running_qemu_pid(self):
+        pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text("1234\n", encoding="utf-8")
+        args = argparse.Namespace(vm=self.vm_name, dry_run=False)
+
+        with mock.patch.object(self.vmctl, "process_cmdline", side_effect=["qemu-system-x86_64 -display none", "qemu-system-x86_64 -display none", None]), \
+             mock.patch.object(self.vmctl.os, "kill") as kill_mock, \
+             mock.patch.object(self.vmctl.time, "sleep") as sleep_mock:
+            exit_code = self.vmctl.cmd_stop(args)
+
+        self.assertEqual(exit_code, 0)
+        kill_mock.assert_called_once_with(1234, self.vmctl.signal.SIGTERM)
+        sleep_mock.assert_called_once_with(1)
+        self.assertFalse(pid_path.exists())
+
+    def test_cmd_clean_removes_generated_artifact_subdirs(self):
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.write_config_dir()
+        disk_path = self.create_disk()
+        vars_path = self.root / self.vm_config["firmware"]["vars_path"]
+        vars_path.parent.mkdir(parents=True, exist_ok=True)
+        vars_path.write_text("vars", encoding="utf-8")
+        for relative in [
+            "artifacts/testvm/runtime/bootstrap-start.pid",
+            "artifacts/testvm/logs/bootstrap-start.log",
+            "artifacts/testvm/cloud-init/seed.iso",
+            "artifacts/testvm/autoinstall/seed.iso",
+            "artifacts/testvm/installer/vmlinuz",
+        ]:
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("artifact", encoding="utf-8")
+
+        exit_code = self.vmctl.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False))
+
+        self.assertEqual(exit_code, 0)
+        self.assertFalse(disk_path.exists())
+        self.assertFalse(vars_path.exists())
+        self.assertFalse((self.root / "artifacts/testvm/runtime").exists())
+        self.assertFalse((self.root / "artifacts/testvm/logs").exists())
+        self.assertFalse((self.root / "artifacts/testvm/cloud-init").exists())
+        self.assertFalse((self.root / "artifacts/testvm/autoinstall").exists())
+        self.assertFalse((self.root / "artifacts/testvm/installer").exists())
 
     def test_cmd_post_install_waits_copies_and_runs_remote_commands(self):
         source_dir = self.root / "host-niri"

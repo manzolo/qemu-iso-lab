@@ -28,7 +28,7 @@
       "network": "user",
       "audio": true,
       "video": {
-        "default": "safe",
+        "default": "virtio-gl",
         "variants": {
           "std": [
             "-vga",
@@ -71,8 +71,7 @@
         "ssh_host_port": 2222,
         "packages": [
           "software-properties-common",
-          "foot",
-          "waybar"
+          "foot"
         ],
         "runcmd": [
           "mkdir -p /home/YOUR_USER/.config/niri",
@@ -89,6 +88,10 @@
           {
             "source": "~/.config/niri/",
             "dest": "/home/YOUR_USER/.config/niri"
+          },
+          {
+            "source": "~/.config/DankMaterialShell/",
+            "dest": "/home/YOUR_USER/.config/DankMaterialShell"
           }
         ],
         "post_install_run": [
@@ -96,6 +99,7 @@
           "sudo add-apt-repository -y ppa:avengemedia/dms",
           "sudo apt update",
           "sudo apt install -y niri dms",
+          "sudo systemctl --global disable waybar.service || true",
           "mkdir -p ~/.config/niri",
           "command -v niri >/dev/null && niri --version || true"
         ]

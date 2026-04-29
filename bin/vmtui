@@ -157,22 +157,44 @@ list_vm_action_items() {
     local vm_name="$1"
     printf '%s\n' provision "Guided install: fetch, prep, boot installer"
     printf '%s\n' show "Show VM profile"
+    printf '%s\n' install-flows "Open install and provisioning actions"
+    printf '%s\n' start "Boot installed VM"
+    printf '%s\n' start-headless "Boot installed VM without display"
+    printf '%s\n' stop "Stop tracked background VM"
+    printf '%s\n' shell "Open SSH shell"
+    if vm_has_section "$vm_name" "cloud_init"; then
+        printf '%s\n' post-install-flows "Open first-boot and post-install actions"
+    fi
+    printf '%s\n' boot-check "Run headless boot smoke check"
+    printf '%s\n' clean "Clean current VM artifacts"
+    printf '%s\n' back "Back to main menu"
+}
+
+list_install_action_items() {
+    local vm_name="$1"
     printf '%s\n' fetch-iso "Download ISO if missing"
     printf '%s\n' prep "Prepare disk and firmware artifacts"
     printf '%s\n' install "Boot installer"
     if vm_has_section "$vm_name" "autoinstall"; then
         printf '%s\n' full-auto-install "Fully automatic Ubuntu autoinstall"
+        if vm_has_section "$vm_name" "cloud_init"; then
+            printf '%s\n' bootstrap-unattended "Autoinstall, first boot, and post-install"
+        fi
     fi
     if vm_has_section "$vm_name" "cloud_init"; then
-        printf '%s\n' cloud-init-install "Cloud-init install flow for this VM"
+        printf '%s\n' cloud-init-install "Guided manual install flow for this VM"
         printf '%s\n' install-cloud-init "Boot installer with generated cloud-init seed"
+    fi
+    printf '%s\n' back "Back to VM actions"
+}
+
+list_post_install_action_items() {
+    local vm_name="$1"
+    if vm_has_section "$vm_name" "cloud_init"; then
         printf '%s\n' start-cloud-init "Boot installed VM with cloud-init first boot"
         printf '%s\n' post-install "Run SSH post-install actions"
     fi
-    printf '%s\n' start "Boot installed VM"
-    printf '%s\n' boot-check "Run headless boot smoke check"
-    printf '%s\n' clean "Clean current VM artifacts"
-    printf '%s\n' back "Back to main menu"
+    printf '%s\n' back "Back to VM actions"
 }
 
 list_empty_device_menu_items() {
@@ -295,6 +317,17 @@ run_action() {
                 msg_box "Next Steps" "When the unattended installer exits on reboot:\n\n1. Run 'Boot installed VM'\n2. Wait for the guest to finish its first boot\n3. Run 'Run SSH post-install actions'\n\nNo manual installer interaction is expected in this flow."
             fi
             ;;
+        bootstrap-unattended)
+            local video
+            video=$(choose_video) || return 0
+            if confirm_box "Bootstrap Unattended" "Run the fully unattended bootstrap flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- run Ubuntu autoinstall\n- start the installed VM headless in the background\n- wait for SSH and run post-install actions\n\nUse this only when autoinstall and cloud-init are both configured correctly."; then
+                if [[ -n "$video" ]]; then
+                    run_vmctl bootstrap-unattended "$current_vm" --video "$video"
+                else
+                    run_vmctl bootstrap-unattended "$current_vm"
+                fi
+            fi
+            ;;
         fetch-iso)
             run_vmctl fetch-iso "$current_vm"
             ;;
@@ -327,6 +360,17 @@ run_action() {
             else
                 run_vmctl start "$current_vm"
             fi
+            ;;
+        start-headless)
+            run_vmctl start "$current_vm" --headless --background
+            ;;
+        stop)
+            if confirm_box "Confirm Stop" "Stop the tracked background VM for '$current_vm' if it is running?"; then
+                run_vmctl stop "$current_vm"
+            fi
+            ;;
+        shell)
+            run_vmctl shell "$current_vm"
             ;;
         start-cloud-init)
             local video
@@ -410,6 +454,12 @@ run_action() {
                 run_vmctl clean --all
             fi
             ;;
+        install-flows)
+            install_menu_loop
+            ;;
+        post-install-flows)
+            post_install_menu_loop
+            ;;
         status)
             run_vmctl status
             ;;
@@ -436,6 +486,32 @@ vm_menu_loop() {
         local selected
         selected=$(menu_choose \
             "VM Actions" \
+            "Current VM: $current_vm" \
+            "${menu_items[@]}") || return 0
+        run_action "$selected" || return 0
+    done
+}
+
+install_menu_loop() {
+    while true; do
+        local -a menu_items=()
+        mapfile -t menu_items < <(list_install_action_items "$current_vm")
+        local selected
+        selected=$(menu_choose \
+            "Install Actions" \
+            "Current VM: $current_vm" \
+            "${menu_items[@]}") || return 0
+        run_action "$selected" || return 0
+    done
+}
+
+post_install_menu_loop() {
+    while true; do
+        local -a menu_items=()
+        mapfile -t menu_items < <(list_post_install_action_items "$current_vm")
+        local selected
+        selected=$(menu_choose \
+            "Post-Install Actions" \
             "Current VM: $current_vm" \
             "${menu_items[@]}") || return 0
         run_action "$selected" || return 0
