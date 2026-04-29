@@ -1,4 +1,5 @@
 import os
+import json
 import subprocess
 import tempfile
 import unittest
@@ -13,12 +14,39 @@ class VmtuiTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.bindir = Path(self.tempdir.name)
+        self.config_dir = self.bindir / "vms"
+        profiles_dir = self.config_dir / "profiles"
+        profiles_dir.mkdir(parents=True)
+        for profile_path in sorted((ROOT / "vms" / "profiles").glob("*.json")):
+            if profile_path.name == "local.json":
+                continue
+            (profiles_dir / profile_path.name).write_text(profile_path.read_text(encoding="utf-8"), encoding="utf-8")
+        ssh_vm = {
+            "vms": {
+                "test-ssh": {
+                    "name": "Test SSH VM",
+                    "iso": "isos/test.iso",
+                    "disk": {"path": "artifacts/test-ssh/disk.qcow2", "size": "16G"},
+                    "firmware": {"type": "efi"},
+                    "memory_mb": 2048,
+                    "cpus": 2,
+                    "ssh_provision": {
+                        "hostname": "test-ssh",
+                        "user": "tester",
+                        "ssh_key": "~/.ssh/id_ed25519",
+                        "ssh_host_port": 2223,
+                    },
+                }
+            }
+        }
+        (profiles_dir / "test-ssh.json").write_text(json.dumps(ssh_vm), encoding="utf-8")
         dialog = self.bindir / "dialog"
         dialog.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
         dialog.chmod(0o755)
         self.env = os.environ.copy()
         self.env["PATH"] = f"{self.bindir}:{self.env['PATH']}"
         self.env["VMTUI_TEST_MODE"] = "1"
+        self.env["VMTUI_CONFIG_DIR"] = str(self.config_dir)
 
     def tearDown(self):
         self.tempdir.cleanup()
@@ -66,7 +94,7 @@ class VmtuiTests(unittest.TestCase):
         self.assertNotIn("shell", output)
 
     def test_list_quick_action_items_include_shell_for_ssh_provision_vm(self):
-        result = self.run_bash("source bin/vmtui; list_quick_action_items cachyos-local")
+        result = self.run_bash("source bin/vmtui; list_quick_action_items test-ssh")
         output = result.stdout.splitlines()
 
         self.assertIn("provision", output)
@@ -118,7 +146,7 @@ class VmtuiTests(unittest.TestCase):
         self.assertNotIn("post-install", output)
 
     def test_list_run_action_items_include_ssh_post_install_for_ssh_provision_vm(self):
-        result = self.run_bash("source bin/vmtui; list_run_action_items cachyos-local")
+        result = self.run_bash("source bin/vmtui; list_run_action_items test-ssh")
         output = result.stdout.splitlines()
 
         self.assertIn("start", output)

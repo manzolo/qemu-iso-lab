@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIG_DIR="$ROOT_DIR/vms"
+ROOT_DIR="${VMTUI_ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+CONFIG_DIR="${VMTUI_CONFIG_DIR:-$ROOT_DIR/vms}"
 VMCTL="$ROOT_DIR/bin/vmctl"
 
 require_command() {
