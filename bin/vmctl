@@ -10,6 +10,7 @@ import shlex
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -107,8 +108,15 @@ def run_output(cmd: list[str]) -> str:
     return subprocess.check_output(cmd, text=True)
 
 
-def image_info(path: Path) -> dict:
-    output = run_output(["qemu-img", "info", "--output=json", str(path)])
+def image_info(path: Path, quiet: bool = False) -> dict:
+    cmd = ["qemu-img", "info", "--output=json", str(path)]
+    if quiet:
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise subprocess.CalledProcessError(result.returncode, cmd, output=result.stdout, stderr=result.stderr)
+        output = result.stdout
+    else:
+        output = run_output(cmd)
     payload = json.loads(output)
     if not isinstance(payload, dict):
         raise VMError(f"Unexpected qemu-img info output for: {path}")
@@ -733,7 +741,7 @@ def is_bootstrap_vm_running(name: str) -> tuple[bool, int | None, str | None]:
 def vm_runtime_status(name: str, vm: dict) -> tuple[str, str]:
     running, pid, cmdline = is_bootstrap_vm_running(name)
     if running and pid is not None:
-        return (f"tracked:{pid}", cmdline or "-")
+        return (f"tracked:{pid}", "-")
 
     ssh_cfg = ssh_access_config(vm)
     if ssh_cfg is None or not ssh_cfg.get("ssh_host_port"):
@@ -1011,6 +1019,8 @@ def render_autoinstall_user_data(vm_name: str, vm: dict, dry_run: bool = False) 
 
     updates = str(config.get("updates") or "").strip()
     if updates:
+        if updates not in {"security", "all"}:
+            raise VMError("autoinstall.updates must be one of: security, all")
         payload["autoinstall"]["updates"] = updates
 
     ssh_keys = collect_ssh_authorized_keys(ci or {}, allow_missing_file=dry_run)
@@ -1195,7 +1205,8 @@ def post_install_copy(vm: dict, entry: dict, dry_run: bool = False) -> None:
     dest_mode = str(entry.get("dest_mode") or "").strip()
     source = expand_host_path(source_raw)
     if not dry_run and not source.exists():
-        raise VMError(f"Host path not found: {source}")
+        print_status("warn", f"Skipping missing host path: {source}", ok=False)
+        return
 
     recursive = source_raw.endswith("/") or source.is_dir()
     remote_mkdir = remote_sudo_shell_cmd if dest_sudo else remote_shell_cmd
@@ -1217,12 +1228,31 @@ def post_install_copy(vm: dict, entry: dict, dry_run: bool = False) -> None:
 
     if recursive:
         run(remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
-        remote_target = f"{user}@{host}:{dest_raw}"
-        run(scp_base_cmd(vm, dry_run=dry_run) + ["-r", f"{source}/.", remote_target], dry_run=dry_run)
-        if dest_mode:
-            run(remote_chmod(vm, f"chmod -R {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
-        if source_sudo and source.exists():
-            source.unlink(missing_ok=True)
+        staging_dir = Path(tempfile.mkdtemp(prefix="vmctl-copy-dir-", dir="/tmp"))
+        staged_source = staging_dir / source.name
+        try:
+            shutil.copytree(source, staged_source, symlinks=True, ignore_dangling_symlinks=True)
+            for path in staged_source.rglob("*"):
+                try:
+                    mode = path.lstat().st_mode
+                except OSError:
+                    continue
+                if path.is_symlink() and not path.exists():
+                    path.unlink(missing_ok=True)
+                    continue
+                if stat.S_ISSOCK(mode) or stat.S_ISFIFO(mode) or stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+                    if path.is_dir():
+                        shutil.rmtree(path, ignore_errors=True)
+                    else:
+                        path.unlink(missing_ok=True)
+            remote_target = f"{user}@{host}:{dest_raw}"
+            run(scp_base_cmd(vm, dry_run=dry_run) + ["-r", f"{staged_source}/.", remote_target], dry_run=dry_run)
+            if dest_mode:
+                run(remote_chmod(vm, f"chmod -R {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
+        finally:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            if source_sudo and source.exists():
+                source.unlink(missing_ok=True)
         return
 
     dest_parent = str(Path(dest_raw).parent)
@@ -1474,6 +1504,7 @@ def common_args(
     serial_stdio: bool = False,
     no_reboot: bool = False,
     allow_missing_disk: bool = False,
+    enable_clipboard: bool = True,
 ) -> list[str]:
     require_command("qemu-system-x86_64")
     cpu_model = "host" if accel == "kvm" else vm.get("cpu_model", "max")
@@ -1508,6 +1539,16 @@ def common_args(
 
     if vm.get("audio"):
         args += ["-device", "ich9-intel-hda", "-device", "hda-duplex"]
+
+    if enable_clipboard and vm.get("clipboard") and not headless:
+        args += [
+            "-device",
+            "virtio-serial-pci",
+            "-chardev",
+            "qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on",
+            "-device",
+            "virtserialport,chardev=vdagent0,name=com.redhat.spice.0",
+        ]
 
     network_mode = vm.get("network", "user")
     if network_mode == "user":
@@ -1644,7 +1685,7 @@ def disk_status(vm: dict) -> tuple[str, str, str]:
     virtual_size = "-"
     if shutil.which("qemu-img") is not None:
         try:
-            virtual_size = format_bytes(int(image_info(disk_path).get("virtual-size", 0) or 0))
+            virtual_size = format_bytes(int(image_info(disk_path, quiet=True).get("virtual-size", 0) or 0))
         except Exception:
             virtual_size = "?"
     return "ready", actual_size, virtual_size
@@ -1768,6 +1809,7 @@ def cmd_provision(args: argparse.Namespace) -> int:
         installer_video_variant(vm, args.video),
         dry_run=args.dry_run,
         allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
     )
     qemu_args += ["-cdrom", str(iso_path)]
     run(qemu_args, dry_run=args.dry_run)
@@ -1779,7 +1821,12 @@ def cmd_install(args: argparse.Namespace) -> int:
     vm = get_vm(config, args.vm)
     ensure_vm_dirs(args.vm)
     iso_path = ensure_iso(vm, dry_run=args.dry_run)
-    qemu_args = common_args(vm, installer_video_variant(vm, args.video), dry_run=args.dry_run)
+    qemu_args = common_args(
+        vm,
+        installer_video_variant(vm, args.video),
+        dry_run=args.dry_run,
+        enable_clipboard=False,
+    )
     qemu_args += ["-cdrom", str(iso_path)]
     if args.cloud_init:
         qemu_args += cloud_init_drive_args(create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run))
@@ -1802,6 +1849,7 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         no_reboot=True,
         allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
     )
     qemu_args += ["-cdrom", str(iso_path)]
     qemu_args += cloud_init_drive_args(seed_path)
@@ -1842,13 +1890,13 @@ def run_post_install(vm_name: str, vm: dict, timeout_sec: int, dry_run: bool = F
     wait_for_guest_post_install_ready(vm, dry_run=dry_run)
     print_note("Running post-install provisioning")
 
-    for command in ssh_cfg.get("post_install_run", []):
-        post_install_run(vm, str(command), dry_run=dry_run)
-
     for entry in ssh_cfg.get("copy_from_host", []):
         if not isinstance(entry, dict):
             raise VMError("Invalid copy_from_host entry: expected object")
         post_install_copy(vm, entry, dry_run=dry_run)
+
+    for command in ssh_cfg.get("post_install_run", []):
+        post_install_run(vm, str(command), dry_run=dry_run)
 
 
 def cmd_post_install(args: argparse.Namespace) -> int:

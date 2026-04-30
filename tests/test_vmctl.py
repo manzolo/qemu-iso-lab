@@ -184,6 +184,30 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("hostfwd:2222", output)
         self.assertIn("pid=4242", output)
 
+    def test_cmd_status_handles_locked_disk_image_quietly(self):
+        self.create_disk()
+        self.write_config_dir()
+
+        with mock.patch.object(self.vmctl.shutil, "which", return_value="/usr/bin/qemu-img"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "image_info",
+                 side_effect=self.vmctl.subprocess.CalledProcessError(
+                     1,
+                     ["qemu-img", "info"],
+                     stderr='qemu-img: Failed to get shared "write" lock',
+                 ),
+             ), \
+             mock.patch.object(self.vmctl, "vm_runtime_status", return_value=("-", "-")), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_status(argparse.Namespace(all=False))
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn(self.vm_name, output)
+        self.assertIn("?", output)
+        self.assertNotIn("Failed to get shared", output)
+
     def test_cmd_prep_downloads_iso_when_missing(self):
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
 
@@ -1095,6 +1119,33 @@ class VmctlTests(unittest.TestCase):
         self.assertIn(f"id=disk0,file={disk_path},format=qcow2,if=none", qemu_cmd)
         self.assertIn("ide-hd,drive=disk0,bus=ahci0.0", qemu_cmd)
 
+    def test_common_args_enables_clipboard_agent_for_graphical_vm(self):
+        self.create_disk()
+        self.vm_config["clipboard"] = True
+
+        with mock.patch.object(self.vmctl, "require_command"):
+            qemu_cmd = self.vmctl.common_args(self.vm_config, variant="std", dry_run=True)
+
+        self.assertIn("virtio-serial-pci", qemu_cmd)
+        self.assertIn("qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on", qemu_cmd)
+        self.assertIn("virtserialport,chardev=vdagent0,name=com.redhat.spice.0", qemu_cmd)
+
+    def test_common_args_can_disable_clipboard_agent(self):
+        self.create_disk()
+        self.vm_config["clipboard"] = True
+
+        with mock.patch.object(self.vmctl, "require_command"):
+            qemu_cmd = self.vmctl.common_args(
+                self.vm_config,
+                variant="std",
+                dry_run=True,
+                enable_clipboard=False,
+            )
+
+        self.assertNotIn("virtio-serial-pci", qemu_cmd)
+        self.assertNotIn("qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on", qemu_cmd)
+        self.assertNotIn("virtserialport,chardev=vdagent0,name=com.redhat.spice.0", qemu_cmd)
+
     def test_cmd_boot_check_dry_run_uses_ci_settings(self):
         self.create_disk()
         self.vm_config["ci"] = {
@@ -1262,7 +1313,6 @@ class VmctlTests(unittest.TestCase):
             "username": "tester",
             "password_hash": "$6$hash",
             "timezone": "Europe/Rome",
-            "updates": "none",
         }
 
         rendered = self.vmctl.render_autoinstall_user_data(self.vm_name, self.vm_config)
@@ -1272,9 +1322,19 @@ class VmctlTests(unittest.TestCase):
         self.assertIn('"authorized-keys": [', rendered)
         self.assertIn('"ssh-ed25519 AAAA from-file"', rendered)
         self.assertIn('"user-data": {', rendered)
-        self.assertIn('"updates": "none"', rendered)
         self.assertIn('"packages": [', rendered)
         self.assertIn('"runcmd": [', rendered)
+
+    def test_render_autoinstall_user_data_rejects_invalid_updates_value(self):
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+            "updates": "none",
+        }
+
+        with self.assertRaises(self.vmctl.VMError):
+            self.vmctl.render_autoinstall_user_data(self.vm_name, self.vm_config)
 
     def test_cmd_install_unattended_builds_autoinstall_qemu_command(self):
         iso_path = self.root / self.vm_config["iso"]
@@ -1582,15 +1642,7 @@ class VmctlTests(unittest.TestCase):
         wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(
-            executed[0][-1],
-            "sh -lc 'sudo apt update'",
-        )
-        self.assertEqual(
-            executed[1][-1],
-            "sh -lc 'sudo apt install -y niri'",
-        )
-        self.assertEqual(
-            executed[2],
+            executed[0],
             [
                 "ssh",
                 "-F",
@@ -1608,21 +1660,19 @@ class VmctlTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            executed[3],
-            [
-                "scp",
-                "-F",
-                "/dev/null",
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-o",
-                "UserKnownHostsFile=/dev/null",
-                "-P",
-                "2222",
-                "-r",
-                f"{source_dir}/.",
-                "tester@127.0.0.1:/home/tester/.config/niri",
-            ],
+            executed[1],
+            mock.ANY,
+        )
+        self.assertEqual(executed[1][0], "scp")
+        self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/niri")
+        self.assertTrue(executed[1][-2].endswith("/host-niri/."))
+        self.assertEqual(
+            executed[2][-1],
+            "sh -lc 'sudo apt update'",
+        )
+        self.assertEqual(
+            executed[3][-1],
+            "sh -lc 'sudo apt install -y niri'",
         )
 
     def test_cmd_post_install_supports_ssh_provision(self):
@@ -1648,12 +1698,12 @@ class VmctlTests(unittest.TestCase):
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
         wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
         executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/niri'")
+        self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/niri")
         self.assertEqual(
-            executed[0][-1],
+            executed[2][-1],
             "sh -lc 'sudo pacman -Sy --noconfirm --needed foot niri || true'",
         )
-        self.assertEqual(executed[1][-1], "sh -lc 'mkdir -p /home/tester/.config/niri'")
-        self.assertEqual(executed[2][-1], "tester@127.0.0.1:/home/tester/.config/niri")
 
     def test_cmd_post_install_supports_sudo_copy_for_system_connections(self):
         source_file = self.root / "vpn.nmconnection"
@@ -1694,6 +1744,87 @@ class VmctlTests(unittest.TestCase):
             executed[3][-1],
             "sudo sh -lc 'install -D -m 600 /tmp/test.nmconnection /etc/NetworkManager/system-connections/test.nmconnection && rm -f /tmp/test.nmconnection'",
         )
+
+    def test_cmd_post_install_recursive_copy_stages_directory_before_scp(self):
+        source_dir = self.root / "host-geany"
+        source_dir.mkdir()
+        (source_dir / "geany.conf").write_text("config", encoding="utf-8")
+        (source_dir / "runtime-link").symlink_to(source_dir / "geany.conf")
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+            "copy_from_host": [{"source": str(source_dir) + "/", "dest": "/home/tester/.config/geany"}],
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_post_install(args)
+
+        self.assertEqual(exit_code, 0)
+        wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
+        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/geany'")
+        self.assertEqual(executed[1][0], "scp")
+        self.assertTrue(executed[1][-2].endswith("/."))
+        self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/geany")
+
+    def test_cmd_post_install_recursive_copy_skips_dangling_symlink(self):
+        source_dir = self.root / "host-geany-dangling"
+        source_dir.mkdir()
+        (source_dir / "geany.conf").write_text("config", encoding="utf-8")
+        (source_dir / "geany_socket_wayland-0").symlink_to(source_dir / "missing-socket")
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+            "copy_from_host": [{"source": str(source_dir) + "/", "dest": "/home/tester/.config/geany"}],
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_post_install(args)
+
+        self.assertEqual(exit_code, 0)
+        wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
+        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/geany'")
+        self.assertEqual(executed[1][0], "scp")
+        self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/geany")
+
+    def test_cmd_post_install_skips_missing_host_path(self):
+        missing_dir = self.root / "missing-config"
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+            "copy_from_host": [{"source": str(missing_dir) + "/", "dest": "/home/tester/.config/missing"}],
+            "post_install_run": ["echo done"],
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=False)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(self.vmctl, "run") as run_cmd, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_post_install(args)
+
+        self.assertEqual(exit_code, 0)
+        wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=False)
+        wait_ready.assert_called_once_with(self.vm_config, dry_run=False)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(len(executed), 1)
+        self.assertEqual(executed[0][-1], "sh -lc 'echo done'")
+        self.assertIn("Skipping missing host path", stdout.getvalue())
 
     def test_firmware_args_uses_common_ovmf_fallback_when_configured_paths_are_missing(self):
         self.create_disk()
