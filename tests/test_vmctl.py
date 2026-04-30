@@ -345,7 +345,7 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("-vga", qemu_cmd)
         self.assertIn("std", qemu_cmd)
 
-    def test_cmd_install_defaults_to_safe_video_for_installer(self):
+    def test_cmd_install_defaults_to_safe_video_for_non_ubuntu_installer(self):
         self.create_disk()
         self.vm_config["video"]["default"] = "virtio-gl"
         self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
@@ -362,6 +362,26 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("-vga", qemu_cmd)
         self.assertIn("std", qemu_cmd)
         self.assertIn("-serial", qemu_cmd)
+        self.assertNotIn("virtio-vga-gl", qemu_cmd)
+
+    def test_cmd_install_defaults_to_std_video_for_ubuntu_installer(self):
+        self.create_disk()
+        self.vm_config["meta"] = {"catalog_slug": "ubuntu"}
+        self.vm_config["video"]["default"] = "virtio-gl"
+        self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "download_file"), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_install(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertIn("-vga", qemu_cmd)
+        self.assertIn("std", qemu_cmd)
+        self.assertNotIn("-serial", qemu_cmd)
         self.assertNotIn("virtio-vga-gl", qemu_cmd)
 
     def test_cmd_flash_requires_matching_confirmation(self):
@@ -676,6 +696,58 @@ class VmctlTests(unittest.TestCase):
         self.assertEqual(executed[1], ["wipefs", "-a", "-f", "/dev/sdz2"])
         self.assertEqual(executed[2], ["wipefs", "-a", "-f", "/dev/sdz"])
         self.assertEqual(executed[3], ["blockdev", "--rereadpt", "/dev/sdz"])
+
+    def test_cmd_flash_helper_continues_when_rereadpt_fails(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=True)
+
+        def fake_run(cmd, dry_run=False, quiet=False):
+            if cmd == ["blockdev", "--rereadpt", "/dev/sdz"]:
+                raise self.vmctl.subprocess.CalledProcessError(1, cmd)
+
+        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(
+                 self.vmctl,
+                 "validate_flash_target",
+                 return_value=(
+                     {
+                         "path": "/dev/sdz",
+                         "size": 16 * 1024**3,
+                         "model": "USB",
+                         "mountpoints": [],
+                         "children": [{"path": "/dev/sdz1"}],
+                         "signatures": [{"type": "gpt"}],
+                         "is_root_disk": False,
+                         "is_empty": False,
+                     },
+                     "dos",
+                     1 * 1024**3,
+                 ),
+             ), \
+             mock.patch.object(
+                 self.vmctl,
+                 "inspect_block_device_basic",
+                 return_value={
+                     "path": "/dev/sdz",
+                     "size": 16 * 1024**3,
+                     "model": "USB",
+                     "mountpoints": [],
+                     "children": [],
+                     "logical_sector_size": 512,
+                     "pttype": "dos",
+                     "is_root_disk": False,
+                 },
+             ), \
+             mock.patch.object(self.vmctl, "run", side_effect=fake_run) as run_cmd, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_flash_helper(args)
+
+        self.assertEqual(exit_code, 0)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertIn(["blockdev", "--rereadpt", "/dev/sdz"], executed)
+        self.assertIn(["sync"], executed)
+        self.assertIn("Kernel did not reread the partition table", stdout.getvalue())
 
     def test_cmd_import_device_requires_matching_confirmation(self):
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdy", dry_run=True)
@@ -1373,7 +1445,7 @@ class VmctlTests(unittest.TestCase):
             qemu_cmd,
         )
 
-    def test_cmd_install_unattended_defaults_to_safe_video_for_installer(self):
+    def test_cmd_install_unattended_defaults_to_safe_video_for_non_ubuntu_installer(self):
         iso_path = self.root / self.vm_config["iso"]
         self.vm_config["video"]["default"] = "virtio-gl"
         self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
@@ -1398,6 +1470,34 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("-vga", qemu_cmd)
         self.assertIn("std", qemu_cmd)
         self.assertIn("-serial", qemu_cmd)
+        self.assertNotIn("virtio-vga-gl", qemu_cmd)
+
+    def test_cmd_install_unattended_defaults_to_std_video_for_ubuntu_installer(self):
+        iso_path = self.root / self.vm_config["iso"]
+        self.vm_config["meta"] = {"catalog_slug": "ubuntu"}
+        self.vm_config["video"]["default"] = "virtio-gl"
+        self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video=None, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "download_file"), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
+             mock.patch.object(self.vmctl, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_install_unattended(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertIn("-vga", qemu_cmd)
+        self.assertIn("std", qemu_cmd)
+        self.assertNotIn("-serial", qemu_cmd)
         self.assertNotIn("virtio-vga-gl", qemu_cmd)
 
     def test_cmd_bootstrap_unattended_runs_install_background_start_and_post_install(self):

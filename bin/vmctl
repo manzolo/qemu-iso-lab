@@ -189,6 +189,17 @@ def run(cmd: list[str], dry_run: bool = False, quiet: bool = False) -> None:
             subprocess.run(cmd, check=True)
 
 
+def reread_partition_table(device: str, dry_run: bool = False) -> None:
+    try:
+        run(["blockdev", "--rereadpt", device], dry_run=dry_run, quiet=True)
+    except subprocess.CalledProcessError:
+        print_status(
+            "warn",
+            f"Kernel did not reread the partition table for {device}; continuing anyway",
+            ok=False,
+        )
+
+
 def run_background(cmd: list[str], log_path: Path, dry_run: bool = False) -> int | None:
     print_command(cmd)
     print_kv("log", pretty_path(log_path))
@@ -1489,7 +1500,12 @@ def installer_video_variant(vm: dict, requested: str | None) -> str | None:
         return requested
     video = vm.get("video", {})
     variants = video.get("variants", {})
-    for candidate in ("safe", "std"):
+    meta = vm.get("meta", {})
+    iso_path = str(vm.get("iso", "")).lower()
+    iso_url = str(vm.get("iso_url", "")).lower()
+    is_ubuntu = meta.get("catalog_slug") == "ubuntu" or "ubuntu" in iso_path or "ubuntu" in iso_url
+    candidates = ("std", "safe") if is_ubuntu else ("safe", "std")
+    for candidate in candidates:
         if candidate in variants:
             return candidate
     return None
@@ -2180,7 +2196,7 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
             if child_path:
                 run(["wipefs", "-a", "-f", child_path], dry_run=False, quiet=True)
         run(["wipefs", "-a", "-f", args.device], dry_run=False, quiet=True)
-        run(["blockdev", "--rereadpt", args.device], dry_run=False, quiet=True)
+        reread_partition_table(args.device, dry_run=False)
     run(
         [
             "qemu-img",
@@ -2197,12 +2213,12 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
         dry_run=False,
     )
     if virtual_size and info["size"] > virtual_size:
-        run(["blockdev", "--rereadpt", args.device], dry_run=False, quiet=True)
+        reread_partition_table(args.device, dry_run=False)
         flashed_info = inspect_block_device_basic(args.device)
         if str(flashed_info.get("pttype") or "").lower() == "gpt":
             require_command("sgdisk")
             run(["sgdisk", "-e", args.device], dry_run=False, quiet=True)
-            run(["blockdev", "--rereadpt", args.device], dry_run=False, quiet=True)
+            reread_partition_table(args.device, dry_run=False)
     run(["sync"], dry_run=False, quiet=True)
     return 0
 
