@@ -190,6 +190,11 @@ class VmtuiTests(unittest.TestCase):
 
         self.assertEqual(result.stdout.strip(), "sudo apt-get install -y virt-viewer")
 
+    def test_resolve_action_maps_remote_hosts(self):
+        result = self.run_bash("source bin/vmtui; resolve_action 'Remote Hosts'")
+
+        self.assertEqual(result.stdout.strip(), "remote-hosts")
+
     def test_list_maintenance_action_items_include_boot_check_and_clean(self):
         result = self.run_bash("source bin/vmtui; list_maintenance_action_items")
         output = result.stdout.splitlines()

@@ -162,11 +162,21 @@ La TUI e un frontend sottile sopra `vmctl`. Raggruppa le azioni VM in:
 
 - `Start Here` per i flussi consigliati, inclusi install guidato, bootstrap completo, boot desktop, boot headless e console SSH quando disponibile;
 - `Installation` per download ISO, preparazione disco, install manuale, autoinstall e flussi installer con cloud-init;
-- `Run & Access` per boot desktop/headless, stop delle VM in background, accesso SSH, primo boot e post-install;
+- `Run & Access` per boot desktop/headless, accesso Remote SPICE, stop delle VM in background, accesso SSH, primo boot e post-install;
 - `Maintenance` per boot check, pulizia artifact della VM e rimozione della ISO in cache;
 - `Advanced` per flash/import da dischi fisici.
 
 Le azioni di install e boot possono scegliere un profilo video prima di avviare QEMU.
+
+Per l'accesso grafico remoto, crea una configurazione host locale:
+
+```bash
+cp vms/remotes.json.example vms/remotes.json
+```
+
+Modifica `vms/remotes.json` con target SSH, percorso remoto del progetto e porte SPICE. La TUI puo anche creare e modificare questo file da `Remote Hosts`.
+
+Poi usa `Choose VM` -> `Run & Access` -> `Remote SPICE`. La TUI avvia QEMU sull'host remoto con `--spice-port`, apre un tunnel SSH e lancia `remote-viewer` in locale. Se `remote-viewer` manca, la TUI propone di installare `virt-viewer` con il package manager rilevato.
 
 ## Comandi Comuni
 

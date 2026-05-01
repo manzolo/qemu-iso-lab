@@ -162,11 +162,21 @@ The TUI is a thin frontend over `vmctl`. It groups VM actions into:
 
 - `Start Here` for the recommended flows, including guided install, full bootstrap, desktop boot, headless boot, and SSH console when available;
 - `Installation` for ISO download, disk preparation, manual install, autoinstall, and cloud-init installer flows;
-- `Run & Access` for desktop/headless boot, stopping background VMs, SSH access, first boot, and post-install tasks;
+- `Run & Access` for desktop/headless boot, Remote SPICE access, stopping background VMs, SSH access, first boot, and post-install tasks;
 - `Maintenance` for boot checks, VM artifact cleanup, and cached ISO removal;
 - `Advanced` for physical disk flash/import workflows.
 
 Installer and boot actions can choose a video profile before starting QEMU.
+
+For remote graphical access, create a local remote host config:
+
+```bash
+cp vms/remotes.json.example vms/remotes.json
+```
+
+Edit `vms/remotes.json` with the SSH target, remote project path, and SPICE ports. The TUI can also create and edit this file from `Remote Hosts`.
+
+Then use `Choose VM` -> `Run & Access` -> `Remote SPICE`. The TUI starts QEMU on the remote host with `--spice-port`, opens an SSH tunnel, and launches `remote-viewer` locally. If `remote-viewer` is missing, the TUI offers to install `virt-viewer` with the detected package manager.
 
 ## Common Commands
 

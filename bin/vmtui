@@ -503,6 +503,7 @@ resolve_action() {
         "Choose VM") printf '%s\n' choose-vm ;;
         "Status") printf '%s\n' status ;;
         "Advanced") printf '%s\n' advanced ;;
+        "Remote Hosts") printf '%s\n' remote-hosts ;;
         "Clean All") printf '%s\n' clean-all ;;
         "Quit") printf '%s\n' quit ;;
         "Flash Empty Disk") printf '%s\n' flash ;;
@@ -717,6 +718,9 @@ run_action() {
         advanced)
             advanced_menu_loop
             ;;
+        remote-hosts)
+            remote_hosts_menu_loop
+            ;;
         back)
             return 1
             ;;
@@ -795,6 +799,44 @@ maintenance_menu_loop() {
     done
 }
 
+remote_hosts_menu_loop() {
+    while true; do
+        local selected
+        selected=$(menu_choose \
+            "Remote Hosts" \
+            "Config: $CONFIG_DIR/remotes.json" \
+            "Show Path" "Show local remotes config paths" \
+            "Create Example" "Create vms/remotes.json from the example template" \
+            "Edit Config" "Open vms/remotes.json with EDITOR" \
+            "Back" "Return to main menu") || return 0
+        case "$selected" in
+            "Show Path")
+                msg_box "Remote Hosts" "Config:\n$CONFIG_DIR/remotes.json\n\nTemplate:\n$CONFIG_DIR/remotes.json.example"
+                ;;
+            "Create Example")
+                if [[ -e "$CONFIG_DIR/remotes.json" ]]; then
+                    msg_box "Already Exists" "$CONFIG_DIR/remotes.json already exists."
+                elif [[ ! -f "$CONFIG_DIR/remotes.json.example" ]]; then
+                    msg_box "Missing Template" "$CONFIG_DIR/remotes.json.example is missing."
+                elif confirm_box "Create Remotes" "Create $CONFIG_DIR/remotes.json from the example template?"; then
+                    cp "$CONFIG_DIR/remotes.json.example" "$CONFIG_DIR/remotes.json"
+                    msg_box "Created" "Created $CONFIG_DIR/remotes.json.\n\nEdit it with your SSH target and project path."
+                fi
+                ;;
+            "Edit Config")
+                if [[ ! -e "$CONFIG_DIR/remotes.json" ]]; then
+                    msg_box "Missing Config" "Create $CONFIG_DIR/remotes.json first."
+                else
+                    "${EDITOR:-nano}" "$CONFIG_DIR/remotes.json"
+                fi
+                ;;
+            "Back")
+                return 0
+                ;;
+        esac
+    done
+}
+
 advanced_menu_loop() {
     while true; do
         local selected
@@ -817,6 +859,7 @@ main_menu_loop() {
             "Choose where to work" \
             "Choose VM" "Select a VM profile and open its workspace" \
             "Status" "Show local VM state" \
+            "Remote Hosts" "Configure saved SSH/SPICE remote hosts" \
             "Advanced" "Flash or import physical disks" \
             "Clean All" "Remove artifacts for all configured VMs" \
             "Quit" "Close the TUI") || {
@@ -839,7 +882,7 @@ main_menu_loop() {
                     advanced_menu_loop
                 fi
                 ;;
-            status|clean-all|quit)
+            remote-hosts|status|clean-all|quit)
                 run_action "$selected"
                 ;;
         esac
