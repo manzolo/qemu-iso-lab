@@ -1,15 +1,16 @@
 # legacy/
 
-Prototipi storici sostituiti da `bin/vmctl`. Conservati come riferimento, non
-vengono più usati dai workflow correnti.
+Historical prototypes superseded by `bin/vmctl`. Kept for reference, no
+longer used by the current workflows.
 
-- `setup-vhd.sh` — creava un disco VHD, copiava OVMF_VARS e generava run-*.sh
-  per CachyOS. Oggi: `vmctl prep` e `vmctl install`.
-- `run-install.sh` — installer hardcoded CachyOS (EFI + virtio + GTK).
-  Oggi: `vmctl install <vm>`.
-- `run-boot.sh` — boot del disco già installato. Oggi: `vmctl start <vm>`.
+- `setup-vhd.sh` — created a VHD disk, copied OVMF_VARS, and generated
+  `run-*.sh` scripts for CachyOS. Today: `vmctl prep` and `vmctl install`.
+- `run-install.sh` — hardcoded CachyOS installer (EFI + virtio + GTK).
+  Today: `vmctl install <vm>`.
+- `run-boot.sh` — boots the already-installed disk. Today: `vmctl start <vm>`.
 
-Questi script erano costruiti attorno a un singolo disco `cachyos-30g.vhd`
-nella radice del progetto, con percorsi e nomi cablati. Il modello attuale
-(profili JSON in `vms/profiles/`, artifact isolati per VM in `artifacts/<vm>/`)
-copre lo stesso scenario in modo dichiarativo e per più distro.
+These scripts were built around a single `cachyos-30g.vhd` disk in the
+project root, with hardcoded paths and names. The current model (JSON
+profiles under `vms/profiles/`, isolated per-VM artifacts under
+`artifacts/<vm>/`) covers the same scenario declaratively and for multiple
+distros.
