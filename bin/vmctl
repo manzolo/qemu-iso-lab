@@ -2777,37 +2777,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=int, help="override the boot-check timeout in seconds")
     p.set_defaults(func=cmd_boot_check)
 
-    p = subparsers.add_parser("flash", help=argparse.SUPPRESS)
-    p.add_argument("vm")
-    p.add_argument("--device", required=True)
-    p.add_argument("--confirm-device", required=True)
-    p.add_argument("--force-target", action="store_true", help=argparse.SUPPRESS)
+    p = subparsers.add_parser("flash", help="copy a VM disk to a physical block device (DESTRUCTIVE; requires sudo)")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--device", required=True, help="target block device, e.g. /dev/sdb")
+    p.add_argument("--confirm-device", required=True, help="repeat --device exactly to confirm")
+    p.add_argument("--force-target", action="store_true", help="wipe an existing partition table on the target before flashing")
     p.set_defaults(func=cmd_flash)
 
-    p = subparsers.add_parser("flash-helper", help=argparse.SUPPRESS)
-    p.add_argument("--vm", required=True)
-    p.add_argument("--device", required=True)
-    p.add_argument("--confirm-device", required=True)
-    p.add_argument("--force-target", action="store_true", help=argparse.SUPPRESS)
-    p.set_defaults(func=cmd_flash_helper)
-
-    p = subparsers.add_parser("import-device", help=argparse.SUPPRESS)
-    p.add_argument("vm")
-    p.add_argument("--device", required=True)
-    p.add_argument("--confirm-device", required=True)
+    p = subparsers.add_parser("import-device", help="import a physical block device as a VM disk (DESTRUCTIVE; requires sudo)")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--device", required=True, help="source block device, e.g. /dev/sdb")
+    p.add_argument("--confirm-device", required=True, help="repeat --device exactly to confirm")
     p.set_defaults(func=cmd_import_device)
-
-    p = subparsers.add_parser("import-helper", help=argparse.SUPPRESS)
-    p.add_argument("--vm", required=True)
-    p.add_argument("--device", required=True)
-    p.add_argument("--confirm-device", required=True)
-    p.set_defaults(func=cmd_import_helper)
-
-    p = subparsers.add_parser("list-empty-devices", help=argparse.SUPPRESS)
-    p.set_defaults(func=cmd_list_empty_devices)
-
-    p = subparsers.add_parser("list-target-devices", help=argparse.SUPPRESS)
-    p.set_defaults(func=cmd_list_target_devices)
 
     p = subparsers.add_parser("setup", help="verify host prerequisites")
     p.set_defaults(func=cmd_setup)
@@ -2820,7 +2801,43 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+INTERNAL_MODES = {
+    "flash-helper",
+    "import-helper",
+    "list-empty-devices",
+    "list-target-devices",
+}
+
+
+def dispatch_internal(mode: str, argv: list[str]) -> int:
+    if mode == "list-empty-devices":
+        return cmd_list_empty_devices(argparse.Namespace())
+    if mode == "list-target-devices":
+        return cmd_list_target_devices(argparse.Namespace())
+    if mode == "flash-helper":
+        p = argparse.ArgumentParser(prog="vmctl flash-helper")
+        p.add_argument("--vm", required=True)
+        p.add_argument("--device", required=True)
+        p.add_argument("--confirm-device", required=True)
+        p.add_argument("--force-target", action="store_true")
+        return cmd_flash_helper(p.parse_args(argv))
+    if mode == "import-helper":
+        p = argparse.ArgumentParser(prog="vmctl import-helper")
+        p.add_argument("--vm", required=True)
+        p.add_argument("--device", required=True)
+        p.add_argument("--confirm-device", required=True)
+        return cmd_import_helper(p.parse_args(argv))
+    raise VMError(f"unknown internal mode: {mode}")
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] in INTERNAL_MODES:
+        try:
+            return dispatch_internal(sys.argv[1], sys.argv[2:])
+        except VMError as exc:
+            print(style(f"error: {exc}", RED, BOLD), file=sys.stderr)
+            return 1
+
     parser = build_parser()
     args = parser.parse_args()
 
