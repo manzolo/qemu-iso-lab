@@ -3,7 +3,7 @@
     "popos-cosmic": {
       "name": "Pop!_OS 24.04 COSMIC",
       "meta": {
-        "catalog_slug": "popos",
+        "slug": "popos",
         "family": "debian",
         "role": "desktop",
         "release_model": "lts"
@@ -58,7 +58,7 @@
     "endeavouros": {
       "name": "EndeavourOS Titan",
       "meta": {
-        "catalog_slug": "endeavouros",
+        "slug": "endeavouros",
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling"
@@ -116,7 +116,7 @@
     "kde-neon-user": {
       "name": "KDE neon User Edition",
       "meta": {
-        "catalog_slug": "kde-neon",
+        "slug": "kde-neon",
         "family": "debian",
         "role": "desktop",
         "release_model": "rolling-desktop"
@@ -171,7 +171,7 @@
     "void-xfce": {
       "name": "Void Linux Xfce",
       "meta": {
-        "catalog_slug": "void-linux",
+        "slug": "void-linux",
         "family": "void",
         "role": "desktop",
         "release_model": "rolling"
@@ -220,7 +220,7 @@
     "opensuse-slowroll": {
       "name": "openSUSE Slowroll DVD",
       "meta": {
-        "catalog_slug": "opensuse-slowroll",
+        "slug": "opensuse-slowroll",
         "family": "opensuse",
         "role": "desktop",
         "release_model": "slow-rolling"

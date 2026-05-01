@@ -3,7 +3,7 @@
     "fedora-cinnamon": {
       "name": "Fedora Cinnamon 42",
       "meta": {
-        "catalog_slug": "fedora-workstation",
+        "slug": "fedora-workstation",
         "family": "fedora",
         "role": "desktop",
         "release_model": "stable"
@@ -51,7 +51,7 @@
     "fedora-server": {
       "name": "Fedora Server 42 Netinst",
       "meta": {
-        "catalog_slug": "fedora-workstation",
+        "slug": "fedora-workstation",
         "family": "fedora",
         "role": "server",
         "release_model": "stable"
@@ -99,7 +99,7 @@
     "fedora-workstation": {
       "name": "Fedora Workstation 42",
       "meta": {
-        "catalog_slug": "fedora-workstation",
+        "slug": "fedora-workstation",
         "family": "fedora",
         "role": "desktop",
         "release_model": "stable"
@@ -147,7 +147,7 @@
     "fedora-xfce": {
       "name": "Fedora Xfce 42",
       "meta": {
-        "catalog_slug": "fedora-workstation",
+        "slug": "fedora-workstation",
         "family": "fedora",
         "role": "desktop",
         "release_model": "stable"

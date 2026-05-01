@@ -3,7 +3,7 @@
     "cachyos-local": {
       "name": "CachyOS (Local)",
       "meta": {
-        "catalog_slug": "cachyos",
+        "slug": "cachyos",
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling"
@@ -78,7 +78,7 @@
     "ubuntu-niri-local": {
       "name": "Ubuntu 26.04 Niri (Local)",
       "meta": {
-        "catalog_slug": "ubuntu",
+        "slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
         "release_model": "lts"

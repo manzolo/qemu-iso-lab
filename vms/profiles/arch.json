@@ -3,7 +3,7 @@
     "archlinux": {
       "name": "Arch Linux",
       "meta": {
-        "catalog_slug": "archlinux",
+        "slug": "archlinux",
         "family": "arch",
         "role": "baseline",
         "release_model": "rolling"
@@ -51,7 +51,7 @@
     "cachyos": {
       "name": "CachyOS",
       "meta": {
-        "catalog_slug": "cachyos",
+        "slug": "cachyos",
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling"

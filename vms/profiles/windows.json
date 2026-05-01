@@ -3,7 +3,7 @@
     "windows10-template": {
       "name": "Windows 10 Template",
       "meta": {
-        "catalog_slug": "windows-10-template",
+        "slug": "windows-10-template",
         "family": "windows",
         "role": "import-template",
         "release_model": "custom"
@@ -51,7 +51,7 @@
     "windows11-template": {
       "name": "Windows 11 Template",
       "meta": {
-        "catalog_slug": "windows-11-template",
+        "slug": "windows-11-template",
         "family": "windows",
         "role": "import-template",
         "release_model": "custom"

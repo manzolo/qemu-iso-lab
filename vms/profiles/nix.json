@@ -3,7 +3,7 @@
     "nixos-graphical": {
       "name": "NixOS 25.11 Graphical",
       "meta": {
-        "catalog_slug": "nixos",
+        "slug": "nixos",
         "family": "nix",
         "role": "desktop",
         "release_model": "channel-based"
@@ -51,7 +51,7 @@
     "nixos-minimal": {
       "name": "NixOS 25.11 Minimal",
       "meta": {
-        "catalog_slug": "nixos",
+        "slug": "nixos",
         "family": "nix",
         "role": "minimal",
         "release_model": "channel-based"

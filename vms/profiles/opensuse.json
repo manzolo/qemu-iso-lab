@@ -3,7 +3,7 @@
     "opensuse-tumbleweed-kde": {
       "name": "openSUSE Tumbleweed KDE Live",
       "meta": {
-        "catalog_slug": "opensuse-tumbleweed",
+        "slug": "opensuse-tumbleweed",
         "family": "opensuse",
         "role": "desktop",
         "release_model": "rolling"
@@ -51,7 +51,7 @@
     "opensuse-tumbleweed-net": {
       "name": "openSUSE Tumbleweed NET",
       "meta": {
-        "catalog_slug": "opensuse-tumbleweed",
+        "slug": "opensuse-tumbleweed",
         "family": "opensuse",
         "role": "installer",
         "release_model": "rolling"

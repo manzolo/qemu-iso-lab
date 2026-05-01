@@ -3,7 +3,7 @@
     "alpine-ci": {
       "name": "Alpine Linux Virt CI",
       "meta": {
-        "catalog_slug": "alpine-linux",
+        "slug": "alpine-linux",
         "family": "alpine",
         "role": "ci",
         "release_model": "stable"

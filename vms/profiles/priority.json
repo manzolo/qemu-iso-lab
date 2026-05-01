@@ -3,7 +3,7 @@
     "linuxmint-cinnamon": {
       "name": "Linux Mint 22.3 Cinnamon",
       "meta": {
-        "catalog_slug": "linux-mint",
+        "slug": "linux-mint",
         "family": "mint",
         "role": "desktop",
         "release_model": "stable"
@@ -51,7 +51,7 @@
     "almalinux-minimal": {
       "name": "AlmaLinux 10.1 Minimal",
       "meta": {
-        "catalog_slug": "almalinux",
+        "slug": "almalinux",
         "family": "rhel",
         "role": "server",
         "release_model": "stable"
@@ -99,7 +99,7 @@
     "kali-live": {
       "name": "Kali Linux 2026.1 Live",
       "meta": {
-        "catalog_slug": "kali-linux",
+        "slug": "kali-linux",
         "family": "kali",
         "role": "desktop",
         "release_model": "rolling"

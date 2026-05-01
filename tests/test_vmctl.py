@@ -466,7 +466,7 @@ class VmctlTests(unittest.TestCase):
 
     def test_cmd_install_defaults_to_std_video_for_ubuntu_installer(self):
         self.create_disk()
-        self.vm_config["meta"] = {"catalog_slug": "ubuntu"}
+        self.vm_config["meta"] = {"slug": "ubuntu"}
         self.vm_config["video"]["default"] = "virtio-gl"
         self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
         self.write_config_dir()
@@ -1590,7 +1590,7 @@ class VmctlTests(unittest.TestCase):
 
     def test_cmd_install_unattended_defaults_to_std_video_for_ubuntu_installer(self):
         iso_path = self.root / self.vm_config["iso"]
-        self.vm_config["meta"] = {"catalog_slug": "ubuntu"}
+        self.vm_config["meta"] = {"slug": "ubuntu"}
         self.vm_config["video"]["default"] = "virtio-gl"
         self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}

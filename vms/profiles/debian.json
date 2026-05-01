@@ -3,7 +3,7 @@
     "debian-gnome-live": {
       "name": "Debian 13 GNOME Live",
       "meta": {
-        "catalog_slug": "debian",
+        "slug": "debian",
         "family": "debian",
         "role": "desktop",
         "release_model": "stable"
@@ -51,7 +51,7 @@
     "debian-netinst": {
       "name": "Debian 13 Netinst",
       "meta": {
-        "catalog_slug": "debian",
+        "slug": "debian",
         "family": "debian",
         "role": "installer",
         "release_model": "stable"
@@ -96,7 +96,7 @@
     "ubuntu-desktop": {
       "name": "Ubuntu 26.04 Desktop",
       "meta": {
-        "catalog_slug": "ubuntu",
+        "slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
         "release_model": "lts"
@@ -144,7 +144,7 @@
     "ubuntu-server": {
       "name": "Ubuntu 26.04 Server",
       "meta": {
-        "catalog_slug": "ubuntu",
+        "slug": "ubuntu",
         "family": "debian",
         "role": "server",
         "release_model": "lts"
@@ -192,7 +192,7 @@
     "ubuntu-niri": {
       "name": "Ubuntu 26.04 Niri",
       "meta": {
-        "catalog_slug": "ubuntu",
+        "slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
         "release_model": "lts"
