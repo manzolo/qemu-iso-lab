@@ -124,7 +124,7 @@
         "desktop": "Xfce",
         "installer": "Calamares",
         "firmware_hint": "efi",
-        "profile_status": "idea",
+        "profile_status": "ready",
         "priority": "medium",
         "use_case": "Closer-to-Arch experience with a quicker install path.",
         "tags": [
@@ -132,7 +132,84 @@
           "lighter",
           "community"
         ],
-        "notes": "Left as catalog-only because official downloads rotate across mirrors."
+        "vm_profile": "endeavouros",
+        "notes": "Titan ISO profile with two official mirror candidates."
+      },
+      {
+        "slug": "popos",
+        "name": "Pop!_OS",
+        "family": "debian",
+        "release_model": "lts",
+        "desktop": "COSMIC",
+        "installer": "Pop installer",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "high",
+        "use_case": "COSMIC desktop and Ubuntu-derived workstation baseline.",
+        "tags": [
+          "cosmic",
+          "desktop",
+          "ubuntu-based"
+        ],
+        "vm_profile": "popos-cosmic",
+        "notes": "Generic AMD/Intel ISO profile; NVIDIA ISO can be added separately if needed."
+      },
+      {
+        "slug": "kde-neon",
+        "name": "KDE neon",
+        "family": "debian",
+        "release_model": "rolling-desktop",
+        "desktop": "KDE Plasma",
+        "installer": "Calamares",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "medium",
+        "use_case": "Latest released KDE software on a stable Ubuntu base.",
+        "tags": [
+          "kde",
+          "plasma",
+          "desktop"
+        ],
+        "vm_profile": "kde-neon-user",
+        "notes": "Tracks the User Edition current ISO."
+      },
+      {
+        "slug": "void-linux",
+        "name": "Void Linux",
+        "family": "void",
+        "release_model": "rolling",
+        "desktop": "Xfce",
+        "installer": "void-installer",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "medium",
+        "use_case": "Independent distro with XBPS and runit for non-systemd comparison.",
+        "tags": [
+          "independent",
+          "runit",
+          "xbps"
+        ],
+        "vm_profile": "void-xfce",
+        "notes": "Uses the glibc Xfce live installer image."
+      },
+      {
+        "slug": "opensuse-slowroll",
+        "name": "openSUSE Slowroll",
+        "family": "opensuse",
+        "release_model": "slow-rolling",
+        "desktop": "Selectable from DVD installer",
+        "installer": "YaST",
+        "firmware_hint": "efi",
+        "profile_status": "ready",
+        "priority": "medium",
+        "use_case": "Slower rolling openSUSE baseline between Leap-style stability and Tumbleweed cadence.",
+        "tags": [
+          "rolling",
+          "opensuse",
+          "yast"
+        ],
+        "vm_profile": "opensuse-slowroll",
+        "notes": "Uses the current Slowroll DVD media alias."
       },
       {
         "slug": "nixos",

@@ -1,0 +1,270 @@
+{
+  "vms": {
+    "popos-cosmic": {
+      "name": "Pop!_OS 24.04 COSMIC",
+      "meta": {
+        "catalog_slug": "popos",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts"
+      },
+      "iso": "isos/pop-os_24.04_amd64_generic_22.iso",
+      "iso_url": "https://iso.pop-os.org/24.04/amd64/generic/22/pop-os_24.04_amd64_generic_22.iso",
+      "iso_size": 3077963776,
+      "disk": {
+        "path": "artifacts/popos-cosmic/disk.qcow2",
+        "size": "40G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/popos-cosmic/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "endeavouros": {
+      "name": "EndeavourOS Titan",
+      "meta": {
+        "catalog_slug": "endeavouros",
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/EndeavourOS_Titan-2026.03.06.iso",
+      "iso_urls": [
+        "https://mirror.rznet.fr/endeavouros/iso/EndeavourOS_Titan-2026.03.06.iso",
+        "https://mirrors.gigenet.com/endeavouros/iso/EndeavourOS_Titan-2026.03.06.iso"
+      ],
+      "iso_size": 3699195904,
+      "disk": {
+        "path": "artifacts/endeavouros/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/endeavouros/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "kde-neon-user": {
+      "name": "KDE neon User Edition",
+      "meta": {
+        "catalog_slug": "kde-neon",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "rolling-desktop"
+      },
+      "iso": "isos/neon-user-current.iso",
+      "iso_url": "https://files.kde.org/neon/images/user/current/neon-user-current.iso",
+      "iso_size": 3244294144,
+      "disk": {
+        "path": "artifacts/kde-neon-user/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/kde-neon-user/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "void-xfce": {
+      "name": "Void Linux Xfce",
+      "meta": {
+        "catalog_slug": "void-linux",
+        "family": "void",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/void-live-x86_64-20250202-xfce.iso",
+      "iso_url": "https://repo-default.voidlinux.org/live/current/void-live-x86_64-20250202-xfce.iso",
+      "iso_size": 1446789120,
+      "disk": {
+        "path": "artifacts/void-xfce/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/void-xfce/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "opensuse-slowroll": {
+      "name": "openSUSE Slowroll DVD",
+      "meta": {
+        "catalog_slug": "opensuse-slowroll",
+        "family": "opensuse",
+        "role": "desktop",
+        "release_model": "slow-rolling"
+      },
+      "iso": "isos/openSUSE-Slowroll-DVD-x86_64-Media.iso",
+      "iso_url": "https://download.opensuse.org/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",
+      "iso_size": 4655677440,
+      "disk": {
+        "path": "artifacts/opensuse-slowroll/disk.qcow2",
+        "size": "36G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/opensuse-slowroll/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  }
+}
