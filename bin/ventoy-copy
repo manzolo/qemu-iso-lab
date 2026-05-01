@@ -3,26 +3,26 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Uso:
+Usage:
   sudo bin/ventoy-copy <target> <file.vhd>
 
-  <target> puo' essere:
-    - una partizione blocco (es. /dev/sdb1): viene montata sotto /mnt/ventoy-copy-$$
-    - un mountpoint gia' montato (es. /run/media/user/Ventoy)
+  <target> can be:
+    - a block partition (e.g. /dev/sdb1): it gets mounted under /mnt/ventoy-copy-$$
+    - an already-mounted mountpoint (e.g. /run/media/user/Ventoy)
 
-Esempi:
+Examples:
   sudo bin/ventoy-copy /dev/sdb1 artifacts/cachyos/disk.vhd
   sudo bin/ventoy-copy /run/media/user/Ventoy artifacts/cachyos/disk.vhd
 
-Note:
-  - Il file viene copiato con suffisso .vtoy, richiesto da Ventoy
-  - Prima di copiare, prepara il disco con: sudo bin/ventoy-prep
+Notes:
+  - The file is copied with the .vtoy suffix required by Ventoy
+  - Before copying, prepare the disk with: sudo bin/ventoy-prep
 EOF
 }
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
-    echo "Comando mancante: $1" >&2
+    echo "Missing command: $1" >&2
     exit 1
   }
 }
@@ -48,7 +48,7 @@ if [[ -z "${TARGET}" || -z "${SRC_PATH}" ]]; then
 fi
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Esegui come root: sudo $0 ..." >&2
+  echo "Run as root: sudo $0 ..." >&2
   exit 1
 fi
 
@@ -58,7 +58,7 @@ require_cmd mountpoint
 require_cmd findmnt
 
 if [[ ! -f "${SRC_PATH}" ]]; then
-  echo "File sorgente non trovato: ${SRC_PATH}" >&2
+  echo "Source file not found: ${SRC_PATH}" >&2
   exit 1
 fi
 
@@ -78,22 +78,22 @@ if [[ -b "${TARGET}" ]]; then
 elif [[ -d "${TARGET}" ]]; then
   TARGET_DIR="${TARGET}"
   if ! mountpoint -q "${TARGET_DIR}"; then
-    echo "La directory esiste ma non risulta montata: ${TARGET_DIR}" >&2
+    echo "The directory exists but does not appear mounted: ${TARGET_DIR}" >&2
     exit 1
   fi
 else
-  echo "Target non valido: ${TARGET}" >&2
+  echo "Invalid target: ${TARGET}" >&2
   exit 1
 fi
 
 FSTYPE="$(findmnt -n -o FSTYPE --target "${TARGET_DIR}" || true)"
-echo "Destinazione: ${TARGET_DIR} (${FSTYPE:-fs sconosciuto})"
-echo "Copio: ${SRC_PATH}"
-echo "Verso: ${TARGET_DIR}/${DEST_NAME}"
+echo "Destination: ${TARGET_DIR} (${FSTYPE:-unknown fs})"
+echo "Copying: ${SRC_PATH}"
+echo "Into:    ${TARGET_DIR}/${DEST_NAME}"
 
 cp -f "${SRC_PATH}" "${TARGET_DIR}/${DEST_NAME}"
 sync
 
 echo
-echo "Copia completata:"
+echo "Copy complete:"
 echo "  ${TARGET_DIR}/${DEST_NAME}"
