@@ -204,6 +204,45 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("?", output)
         self.assertNotIn("Failed to get shared", output)
 
+    def test_cmd_list_emits_json_when_flag_set(self):
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_list(argparse.Namespace(json=True))
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(len(payload), 1)
+        entry = payload[0]
+        self.assertEqual(entry["profile"], self.vm_name)
+        self.assertEqual(entry["name"], self.vm_config["name"])
+        self.assertEqual(entry["memory_mb"], self.vm_config["memory_mb"])
+        self.assertEqual(entry["cpus"], self.vm_config["cpus"])
+
+    def test_cmd_status_emits_json_when_flag_set(self):
+        self.create_disk()
+        self.write_config_dir()
+
+        with mock.patch.object(self.vmctl, "vm_runtime_status", return_value=("-", "-")), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_status(argparse.Namespace(all=False, json=True))
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(len(payload), 1)
+        entry = payload[0]
+        self.assertEqual(entry["profile"], self.vm_name)
+        self.assertEqual(entry["disk"], "ready")
+        self.assertIsNone(entry["runtime_note"])
+
+    def test_cmd_show_skips_header_in_json_mode(self):
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_show(argparse.Namespace(vm=self.vm_name, json=True))
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertNotIn("==>", output)
+        payload = json.loads(output)
+        self.assertEqual(payload["name"], self.vm_config["name"])
+
     def test_cmd_prep_downloads_iso_when_missing(self):
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
 
