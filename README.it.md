@@ -158,11 +158,15 @@ Se preferisci una piccola interfaccia testuale:
 make tui
 ```
 
-La TUI e un frontend sottile sopra `vmctl`. Permette di:
+La TUI e un frontend sottile sopra `vmctl`. Raggruppa le azioni VM in:
 
-- scegliere il profilo VM;
-- eseguire `show`, `fetch-iso`, `prep`, `install`, `install-unattended`, `start`, `post-install`, `shell`, `boot-check`, `clean` e `clean-all`;
-- scegliere il profilo video per `install` e `start`.
+- `Start Here` per i flussi consigliati, inclusi install guidato, bootstrap completo, boot desktop, boot headless e console SSH quando disponibile;
+- `Installation` per download ISO, preparazione disco, install manuale, autoinstall e flussi installer con cloud-init;
+- `Run & Access` per boot desktop/headless, stop delle VM in background, accesso SSH, primo boot e post-install;
+- `Maintenance` per boot check, pulizia artifact della VM e rimozione della ISO in cache;
+- `Advanced` per flash/import da dischi fisici.
+
+Le azioni di install e boot possono scegliere un profilo video prima di avviare QEMU.
 
 ## Comandi Comuni
 
