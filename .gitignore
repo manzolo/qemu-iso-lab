@@ -11,8 +11,8 @@ artifacts/*/OVMF_VARS.fd
 artifacts/*/logs/
 artifacts/*/runtime/
 
-# Local ISO images
-isos/*.iso
+# Local ISO images and partial downloads
+isos/
 
 # Local overrides
 .env
