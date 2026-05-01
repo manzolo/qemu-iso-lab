@@ -4,7 +4,9 @@
 
 It provides a reusable catalog of guest definitions for ISO-based installs, imports from physical disks, boot checks, and QEMU experiments.
 
-Additional notes live in [docs/](docs/), including [CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md).
+Additional notes live in [docs/](docs/), including
+[ARCHITECTURE.md](docs/ARCHITECTURE.md) for a one-page mental map and
+[CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md) for the smoke-test rationale.
 
 ## Overview
 
