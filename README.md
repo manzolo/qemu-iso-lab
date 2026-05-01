@@ -29,7 +29,6 @@ Current profiles include desktop guests, installer/minimal guests, Windows impor
 ├── Makefile
 ├── README.md
 ├── README.it.md
-├── VM_MANAGER_PLAN.md
 ├── vms/
 │   └── profiles/
 ├── bin/

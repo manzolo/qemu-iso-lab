@@ -29,7 +29,6 @@ I profili attuali includono guest desktop, guest installer/minimal, template Win
 ├── Makefile
 ├── README.md
 ├── README.it.md
-├── VM_MANAGER_PLAN.md
 ├── vms/
 │   └── profiles/
 ├── bin/
