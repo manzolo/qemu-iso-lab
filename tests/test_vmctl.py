@@ -503,10 +503,10 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("-serial", qemu_cmd)
         self.assertNotIn("virtio-vga-gl", qemu_cmd)
 
-    def test_cmd_install_defaults_to_std_video_for_ubuntu_installer(self):
+    def test_cmd_install_honours_installer_order_when_set(self):
         self.create_disk()
-        self.vm_config["meta"] = {"slug": "ubuntu"}
         self.vm_config["video"]["default"] = "virtio-gl"
+        self.vm_config["video"]["installer_order"] = ["std", "safe"]
         self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, dry_run=True)
@@ -1627,10 +1627,10 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("-serial", qemu_cmd)
         self.assertNotIn("virtio-vga-gl", qemu_cmd)
 
-    def test_cmd_install_unattended_defaults_to_std_video_for_ubuntu_installer(self):
+    def test_cmd_install_unattended_honours_installer_order_when_set(self):
         iso_path = self.root / self.vm_config["iso"]
-        self.vm_config["meta"] = {"slug": "ubuntu"}
         self.vm_config["video"]["default"] = "virtio-gl"
+        self.vm_config["video"]["installer_order"] = ["std", "safe"]
         self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
         self.vm_config["autoinstall"] = {

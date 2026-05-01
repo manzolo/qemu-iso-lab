@@ -122,6 +122,7 @@
       "audio": true,
       "video": {
         "default": "std",
+        "installer_order": ["std", "safe"],
         "variants": {
           "std": [
             "-vga",
@@ -170,6 +171,7 @@
       "audio": false,
       "video": {
         "default": "safe",
+        "installer_order": ["std", "safe"],
         "variants": {
           "std": [
             "-vga",
@@ -218,6 +220,7 @@
       "audio": true,
       "video": {
         "default": "safe",
+        "installer_order": ["std", "safe"],
         "variants": {
           "std": [
             "-vga",

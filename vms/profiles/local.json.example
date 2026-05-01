@@ -104,6 +104,7 @@
       "audio": true,
       "video": {
         "default": "virtio-gl",
+        "installer_order": ["std", "safe"],
         "variants": {
           "std": [
             "-vga",

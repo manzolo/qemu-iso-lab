@@ -1653,12 +1653,8 @@ def installer_video_variant(vm: dict, requested: str | None) -> str | None:
         return requested
     video = vm.get("video", {})
     variants = video.get("variants", {})
-    meta = vm.get("meta", {})
-    iso_path = str(vm.get("iso", "")).lower()
-    iso_url = str(vm.get("iso_url", "")).lower()
-    is_ubuntu = meta.get("slug") == "ubuntu" or "ubuntu" in iso_path or "ubuntu" in iso_url
-    candidates = ("std", "safe") if is_ubuntu else ("safe", "std")
-    for candidate in candidates:
+    order = video.get("installer_order", ("safe", "std"))
+    for candidate in order:
         if candidate in variants:
             return candidate
     return None
