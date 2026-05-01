@@ -1,6 +1,11 @@
 import argparse
-import importlib.machinery
-import importlib.util
+import pathlib
+import urllib.request
+import os
+import shutil
+import subprocess
+import sys
+import time
 import json
 import tempfile
 import unittest
@@ -10,15 +15,60 @@ import io
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPT_PATH = ROOT / "bin" / "vmctl"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import vmctl  # noqa: E402
+import vmctl.cloud_init  # noqa: E402
+import vmctl.config  # noqa: E402
+import vmctl.disk_inspect  # noqa: E402
+import vmctl.errors  # noqa: E402
+import vmctl.flash  # noqa: E402
+import vmctl.import_dev  # noqa: E402
+import vmctl.iso  # noqa: E402
+import vmctl.lifecycle  # noqa: E402
+import vmctl.qemu  # noqa: E402
+import vmctl.runtime  # noqa: E402
+import vmctl.state  # noqa: E402
+import vmctl.ui  # noqa: E402
+
+
+class _VmctlFacade:
+    """Test compatibility shim that flattens the vmctl package surface.
+
+    Forwards attribute reads to the right submodule and ROOT/CONFIG_DIR
+    writes to vmctl.state. mock.patch.object should target submodules
+    directly (e.g. vmctl.iso, vmctl.runtime) - patching through this
+    facade does NOT affect callers in the real submodules.
+    """
+
+    _STATE_ATTRS = (
+        "ROOT", "CONFIG_DIR", "HTTP_USER_AGENT",
+        "REQUIRED_COMMANDS", "OPTIONAL_COMMANDS", "COMMON_OVMF_PAIRS",
+    )
+    _SEARCH_ORDER = (
+        vmctl.lifecycle, vmctl.flash, vmctl.import_dev, vmctl.disk_inspect,
+        vmctl.iso, vmctl.cloud_init, vmctl.qemu, vmctl.config,
+        vmctl.runtime, vmctl.ui, vmctl.state, vmctl.errors,
+    )
+
+    def __getattr__(self, name):
+        if name in self._STATE_ATTRS:
+            return getattr(vmctl.state, name)
+        for mod in self._SEARCH_ORDER:
+            if hasattr(mod, name):
+                return getattr(mod, name)
+        raise AttributeError(f"vmctl has no attribute {name!r}")
+
+    def __setattr__(self, name, value):
+        if name in self._STATE_ATTRS:
+            setattr(vmctl.state, name, value)
+            return
+        object.__setattr__(self, name, value)
 
 
 def load_vmctl_module():
-    loader = importlib.machinery.SourceFileLoader("vmctl_module", str(SCRIPT_PATH))
-    spec = importlib.util.spec_from_loader(loader.name, loader)
-    module = importlib.util.module_from_spec(spec)
-    loader.exec_module(module)
-    return module
+    return _VmctlFacade()
 
 
 class VmctlTests(unittest.TestCase):
@@ -27,8 +77,8 @@ class VmctlTests(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
         self.config_dir = self.root / "vms"
-        self.original_root = self.vmctl.ROOT
-        self.original_config_dir = self.vmctl.CONFIG_DIR
+        self.original_root = vmctl.state.ROOT
+        self.original_config_dir = vmctl.state.CONFIG_DIR
         self.vm_name = "testvm"
         self.vm_config = {
             "name": "Test VM",
@@ -48,13 +98,13 @@ class VmctlTests(unittest.TestCase):
             "audio": False,
             "video": {"default": "std", "variants": {"std": ["-vga", "std"]}},
         }
-        self.vmctl.ROOT = self.root
-        self.vmctl.CONFIG_DIR = self.config_dir
+        vmctl.state.ROOT = self.root
+        vmctl.state.CONFIG_DIR = self.config_dir
         self.write_config_dir()
 
     def tearDown(self):
-        self.vmctl.ROOT = self.original_root
-        self.vmctl.CONFIG_DIR = self.original_config_dir
+        vmctl.state.ROOT = self.original_root
+        vmctl.state.CONFIG_DIR = self.original_config_dir
         self.tempdir.cleanup()
 
     def create_disk(self):
@@ -81,7 +131,7 @@ class VmctlTests(unittest.TestCase):
         iso_path.parent.mkdir(parents=True, exist_ok=True)
         iso_path.write_text("already here", encoding="utf-8")
 
-        with mock.patch.object(self.vmctl, "download_file") as download_file:
+        with mock.patch.object(vmctl.iso, "download_file") as download_file:
             resolved = self.vmctl.ensure_iso(self.vm_config)
 
         self.assertEqual(resolved, iso_path)
@@ -195,9 +245,9 @@ class VmctlTests(unittest.TestCase):
         vars_path.write_text("vars", encoding="utf-8")
         args = argparse.Namespace(all=False)
 
-        with mock.patch.object(self.vmctl.shutil, "which", return_value="/usr/bin/qemu-img"), \
-             mock.patch.object(self.vmctl, "image_info", return_value={"virtual-size": 2 * 1024**3}), \
-             mock.patch.object(self.vmctl, "vm_runtime_status", return_value=("-", "-")), \
+        with mock.patch.object(shutil, "which", return_value="/usr/bin/qemu-img"), \
+             mock.patch.object(vmctl.runtime, "image_info", return_value={"virtual-size": 2 * 1024**3}), \
+             mock.patch.object(vmctl.lifecycle, "vm_runtime_status", return_value=("-", "-")), \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_status(args)
 
@@ -231,7 +281,7 @@ class VmctlTests(unittest.TestCase):
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
         self.write_config_dir()
 
-        with mock.patch.object(self.vmctl, "vm_runtime_status", return_value=("hostfwd:2222", "pid=4242")), \
+        with mock.patch.object(vmctl.lifecycle, "vm_runtime_status", return_value=("hostfwd:2222", "pid=4242")), \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_status(argparse.Namespace(all=False))
 
@@ -244,17 +294,15 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         self.write_config_dir()
 
-        with mock.patch.object(self.vmctl.shutil, "which", return_value="/usr/bin/qemu-img"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "image_info",
+        with mock.patch.object(shutil, "which", return_value="/usr/bin/qemu-img"), \
+             mock.patch.object(vmctl.runtime, "image_info",
                  side_effect=self.vmctl.subprocess.CalledProcessError(
                      1,
                      ["qemu-img", "info"],
                      stderr='qemu-img: Failed to get shared "write" lock',
                  ),
              ), \
-             mock.patch.object(self.vmctl, "vm_runtime_status", return_value=("-", "-")), \
+             mock.patch.object(vmctl.lifecycle, "vm_runtime_status", return_value=("-", "-")), \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_status(argparse.Namespace(all=False))
 
@@ -281,7 +329,7 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         self.write_config_dir()
 
-        with mock.patch.object(self.vmctl, "vm_runtime_status", return_value=("-", "-")), \
+        with mock.patch.object(vmctl.lifecycle, "vm_runtime_status", return_value=("-", "-")), \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_status(argparse.Namespace(all=False, json=True))
 
@@ -306,9 +354,9 @@ class VmctlTests(unittest.TestCase):
     def test_cmd_prep_downloads_iso_when_missing(self):
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
 
-        with mock.patch.object(self.vmctl, "download_file") as download_file, \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file") as download_file, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_prep(args)
 
         self.assertEqual(exit_code, 0)
@@ -334,7 +382,7 @@ class VmctlTests(unittest.TestCase):
             def read(self, size=-1):
                 return self._chunks.pop(0)
 
-        with mock.patch.object(self.vmctl.urllib.request, "urlopen", return_value=FakeResponse()) as urlopen_mock:
+        with mock.patch.object(urllib.request, "urlopen", return_value=FakeResponse()) as urlopen_mock:
             self.vmctl.download_file("https://example.invalid/test.iso", destination)
 
         request = urlopen_mock.call_args.args[0]
@@ -358,7 +406,7 @@ class VmctlTests(unittest.TestCase):
             def read(self, size=-1):
                 return b"<!doctype html><html></html>"
 
-        with mock.patch.object(self.vmctl.urllib.request, "urlopen", return_value=FakeResponse()):
+        with mock.patch.object(urllib.request, "urlopen", return_value=FakeResponse()):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.download_file("https://example.invalid/fedora.iso", destination)
 
@@ -386,7 +434,7 @@ class VmctlTests(unittest.TestCase):
             def read(self, size=-1):
                 return self._chunks.pop(0)
 
-        with mock.patch.object(self.vmctl.urllib.request, "urlopen", return_value=FakeResponse()):
+        with mock.patch.object(urllib.request, "urlopen", return_value=FakeResponse()):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.download_file("https://example.invalid/test.iso", destination)
 
@@ -398,7 +446,7 @@ class VmctlTests(unittest.TestCase):
         iso_path.parent.mkdir(parents=True, exist_ok=True)
         iso_path.write_text("<!doctype html><html></html>", encoding="utf-8")
 
-        with mock.patch.object(self.vmctl, "download_file") as download_file:
+        with mock.patch.object(vmctl.iso, "download_file") as download_file:
             resolved = self.vmctl.ensure_iso(self.vm_config)
 
         self.assertEqual(resolved, iso_path)
@@ -410,7 +458,7 @@ class VmctlTests(unittest.TestCase):
         iso_path.write_bytes(b"partial")
         self.vm_config["iso_size"] = 1024
 
-        with mock.patch.object(self.vmctl, "download_file") as download_file:
+        with mock.patch.object(vmctl.iso, "download_file") as download_file:
             resolved = self.vmctl.ensure_iso(self.vm_config)
 
         self.assertEqual(resolved, iso_path)
@@ -424,8 +472,8 @@ class VmctlTests(unittest.TestCase):
             "pattern": r'href="(?P<url>test-[0-9]+\.iso)"',
         }
 
-        with mock.patch.object(self.vmctl, "fetch_text", return_value='<a href="test-2.iso">test-2.iso</a>'), \
-             mock.patch.object(self.vmctl, "download_file") as download_file:
+        with mock.patch.object(vmctl.iso, "fetch_text", return_value='<a href="test-2.iso">test-2.iso</a>'), \
+             mock.patch.object(vmctl.iso, "download_file") as download_file:
             resolved = self.vmctl.ensure_iso(self.vm_config)
 
         self.assertEqual(resolved, iso_path)
@@ -438,8 +486,8 @@ class VmctlTests(unittest.TestCase):
             "pattern": r'href="(?P<url>test-[0-9]+\.iso)"',
         }
 
-        with mock.patch.object(self.vmctl, "fetch_text") as fetch_text, \
-             mock.patch.object(self.vmctl, "download_file") as download_file:
+        with mock.patch.object(vmctl.iso, "fetch_text") as fetch_text, \
+             mock.patch.object(vmctl.iso, "download_file") as download_file:
             resolved = self.vmctl.ensure_iso(self.vm_config, dry_run=True)
 
         self.assertEqual(resolved, iso_path)
@@ -457,8 +505,8 @@ class VmctlTests(unittest.TestCase):
             if url.endswith("test-2.iso"):
                 raise self.vmctl.VMError("mirror failed")
 
-        with mock.patch.object(self.vmctl, "fetch_text", return_value='<a href="test-2.iso">test-2.iso</a>'), \
-             mock.patch.object(self.vmctl, "download_file", side_effect=fail_first) as download_file:
+        with mock.patch.object(vmctl.iso, "fetch_text", return_value='<a href="test-2.iso">test-2.iso</a>'), \
+             mock.patch.object(vmctl.iso, "download_file", side_effect=fail_first) as download_file:
             resolved = self.vmctl.ensure_iso(self.vm_config)
 
         self.assertEqual(resolved, iso_path)
@@ -472,8 +520,8 @@ class VmctlTests(unittest.TestCase):
             "pattern": r'href="(?P<url>test-[0-9]+\.iso)"',
         }
 
-        with mock.patch.object(self.vmctl, "fetch_text", side_effect=self.vmctl.VMError("index failed")), \
-             mock.patch.object(self.vmctl, "download_file") as download_file:
+        with mock.patch.object(vmctl.iso, "fetch_text", side_effect=self.vmctl.VMError("index failed")), \
+             mock.patch.object(vmctl.iso, "download_file") as download_file:
             resolved = self.vmctl.ensure_iso(self.vm_config)
 
         self.assertEqual(resolved, iso_path)
@@ -484,7 +532,7 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
 
-        with mock.patch.object(self.vmctl, "require_command"):
+        with mock.patch.object(vmctl.runtime, "require_command"):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.cmd_prep(args)
 
@@ -492,9 +540,9 @@ class VmctlTests(unittest.TestCase):
         iso_path = self.root / self.vm_config["iso"]
         args = argparse.Namespace(vm=self.vm_name, video="std", no_start=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file") as download_file, \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file") as download_file, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_provision(args)
 
         self.assertEqual(exit_code, 0)
@@ -512,9 +560,9 @@ class VmctlTests(unittest.TestCase):
         iso_path = self.root / self.vm_config["iso"]
         args = argparse.Namespace(vm=self.vm_name, video=None, no_start=True, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file") as download_file, \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file") as download_file, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_provision(args)
 
         self.assertEqual(exit_code, 0)
@@ -527,9 +575,9 @@ class VmctlTests(unittest.TestCase):
         iso_path = self.root / self.vm_config["iso"]
         args = argparse.Namespace(vm=self.vm_name, video="std", cloud_init=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file") as download_file, \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file") as download_file, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_install(args)
 
         self.assertEqual(exit_code, 0)
@@ -552,9 +600,9 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file"), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file"), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_install(args)
 
         self.assertEqual(exit_code, 0)
@@ -573,9 +621,9 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file"), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file"), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_install(args)
 
         self.assertEqual(exit_code, 0)
@@ -596,10 +644,8 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_flash_target",
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
                  side_effect=self.vmctl.VMError("Refusing non-empty target device '/dev/sdz' with signatures: gpt"),
              ):
             with self.assertRaises(self.vmctl.VMError):
@@ -616,10 +662,8 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_flash_target",
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
                  side_effect=self.vmctl.VMError("EFI guest requires a GPT VM disk before flash; detected: dos"),
              ):
             with self.assertRaises(self.vmctl.VMError):
@@ -636,10 +680,8 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=True, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_flash_target",
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
                  return_value=(
                      {
                          "path": "/dev/sdz",
@@ -655,7 +697,7 @@ class VmctlTests(unittest.TestCase):
                      1 * 1024**3,
                  ),
              ), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_flash(args)
 
         self.assertEqual(exit_code, 0)
@@ -665,10 +707,8 @@ class VmctlTests(unittest.TestCase):
         disk_path = self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_flash_target",
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
                  return_value=(
                      {
                          "path": "/dev/sdz",
@@ -684,7 +724,7 @@ class VmctlTests(unittest.TestCase):
                      1 * 1024**3,
                  ),
              ), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_flash(args)
 
         self.assertEqual(exit_code, 0)
@@ -694,7 +734,7 @@ class VmctlTests(unittest.TestCase):
             helper_cmd,
             [
                 "sudo",
-                str(self.vmctl.Path(self.vmctl.__file__).resolve()),
+                str((vmctl.state.ROOT / "bin" / "vmctl").resolve()),
                 "flash-helper",
                 "--vm",
                 self.vm_name,
@@ -709,10 +749,8 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=True, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_flash_target",
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
                  return_value=(
                      {
                          "path": "/dev/sdz",
@@ -728,7 +766,7 @@ class VmctlTests(unittest.TestCase):
                      1 * 1024**3,
                  ),
              ), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_flash(args)
 
         self.assertEqual(exit_code, 0)
@@ -739,11 +777,9 @@ class VmctlTests(unittest.TestCase):
         disk_path = self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False)
 
-        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_flash_target",
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
                  return_value=(
                      {
                          "path": "/dev/sdz",
@@ -759,9 +795,7 @@ class VmctlTests(unittest.TestCase):
                      1 * 1024**3,
                  ),
              ), \
-             mock.patch.object(
-                 self.vmctl,
-                 "inspect_block_device",
+             mock.patch.object(vmctl.disk_inspect, "inspect_block_device",
                  return_value={
                      "path": "/dev/sdz",
                      "size": 16 * 1024**3,
@@ -773,9 +807,7 @@ class VmctlTests(unittest.TestCase):
                      "is_empty": True,
                  },
              ), \
-             mock.patch.object(
-                 self.vmctl,
-                 "inspect_block_device_basic",
+             mock.patch.object(vmctl.disk_inspect, "inspect_block_device_basic",
                  return_value={
                      "path": "/dev/sdz",
                      "size": 16 * 1024**3,
@@ -787,7 +819,7 @@ class VmctlTests(unittest.TestCase):
                      "is_root_disk": False,
                  },
              ), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_flash_helper(args)
 
         self.assertEqual(exit_code, 0)
@@ -802,11 +834,9 @@ class VmctlTests(unittest.TestCase):
         disk_path = self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=False)
 
-        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_flash_target",
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
                  return_value=(
                      {
                          "path": "/dev/sdz",
@@ -822,9 +852,7 @@ class VmctlTests(unittest.TestCase):
                      1 * 1024**3,
                  ),
              ), \
-             mock.patch.object(
-                 self.vmctl,
-                 "inspect_block_device_basic",
+             mock.patch.object(vmctl.disk_inspect, "inspect_block_device_basic",
                  return_value={
                      "path": "/dev/sdz",
                      "size": 16 * 1024**3,
@@ -836,7 +864,7 @@ class VmctlTests(unittest.TestCase):
                      "is_root_disk": False,
                  },
              ), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_flash_helper(args)
 
         self.assertEqual(exit_code, 0)
@@ -854,11 +882,9 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=True)
 
-        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_flash_target",
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
                  return_value=(
                      {
                          "path": "/dev/sdz",
@@ -874,9 +900,7 @@ class VmctlTests(unittest.TestCase):
                      1 * 1024**3,
                  ),
              ), \
-             mock.patch.object(
-                 self.vmctl,
-                 "inspect_block_device_basic",
+             mock.patch.object(vmctl.disk_inspect, "inspect_block_device_basic",
                  return_value={
                      "path": "/dev/sdz",
                      "size": 16 * 1024**3,
@@ -888,7 +912,7 @@ class VmctlTests(unittest.TestCase):
                      "is_root_disk": False,
                  },
              ), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_flash_helper(args)
 
         self.assertEqual(exit_code, 0)
@@ -906,11 +930,9 @@ class VmctlTests(unittest.TestCase):
             if cmd == ["blockdev", "--rereadpt", "/dev/sdz"]:
                 raise self.vmctl.subprocess.CalledProcessError(1, cmd)
 
-        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_flash_target",
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
                  return_value=(
                      {
                          "path": "/dev/sdz",
@@ -926,9 +948,7 @@ class VmctlTests(unittest.TestCase):
                      1 * 1024**3,
                  ),
              ), \
-             mock.patch.object(
-                 self.vmctl,
-                 "inspect_block_device_basic",
+             mock.patch.object(vmctl.disk_inspect, "inspect_block_device_basic",
                  return_value={
                      "path": "/dev/sdz",
                      "size": 16 * 1024**3,
@@ -940,7 +960,7 @@ class VmctlTests(unittest.TestCase):
                      "is_root_disk": False,
                  },
              ), \
-             mock.patch.object(self.vmctl, "run", side_effect=fake_run) as run_cmd, \
+             mock.patch.object(vmctl.runtime, "run", side_effect=fake_run) as run_cmd, \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_flash_helper(args)
 
@@ -959,10 +979,8 @@ class VmctlTests(unittest.TestCase):
     def test_cmd_import_device_dry_run_builds_helper_command(self):
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_import_source",
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.import_dev, "validate_import_source",
                  return_value={
                      "path": "/dev/sdz",
                      "size": 16 * 1024**3,
@@ -974,7 +992,7 @@ class VmctlTests(unittest.TestCase):
                      "is_root_disk": False,
                  },
              ), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_import_device(args)
 
         self.assertEqual(exit_code, 0)
@@ -983,7 +1001,7 @@ class VmctlTests(unittest.TestCase):
             helper_cmd,
             [
                 "sudo",
-                str(self.vmctl.Path(self.vmctl.__file__).resolve()),
+                str((vmctl.state.ROOT / "bin" / "vmctl").resolve()),
                 "import-helper",
                 "--vm",
                 self.vm_name,
@@ -998,11 +1016,9 @@ class VmctlTests(unittest.TestCase):
         disk_path = self.root / self.vm_config["disk"]["path"]
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz")
 
-        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_import_source",
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.import_dev, "validate_import_source",
                  return_value={
                      "path": "/dev/sdz",
                      "size": 16 * 1024**3,
@@ -1014,11 +1030,11 @@ class VmctlTests(unittest.TestCase):
                      "is_root_disk": False,
                  },
              ), \
-             mock.patch.object(self.vmctl, "run") as run_cmd, \
-             mock.patch.object(self.vmctl, "run_progress") as run_progress, \
-             mock.patch.object(self.vmctl, "run_pipeline") as run_pipeline, \
-             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner, \
-             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner_tree") as restore_tree:
+             mock.patch.object(vmctl.runtime, "run") as run_cmd, \
+             mock.patch.object(vmctl.runtime, "run_progress") as run_progress, \
+             mock.patch.object(vmctl.runtime, "run_pipeline") as run_pipeline, \
+             mock.patch.object(vmctl.flash, "maybe_restore_sudo_owner") as restore_owner, \
+             mock.patch.object(vmctl.flash, "maybe_restore_sudo_owner_tree") as restore_tree:
             exit_code = self.vmctl.cmd_import_helper(args)
 
         self.assertEqual(exit_code, 0)
@@ -1046,11 +1062,9 @@ class VmctlTests(unittest.TestCase):
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz")
         temp_root = self.root / "tmp-import"
 
-        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_import_source",
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.import_dev, "validate_import_source",
                  return_value={
                      "path": "/dev/sdz",
                      "size": 115 * 1024**3,
@@ -1062,13 +1076,13 @@ class VmctlTests(unittest.TestCase):
                      "is_root_disk": False,
                  },
              ), \
-             mock.patch.object(self.vmctl, "maybe_read_gpt_geometry", return_value={}), \
-             mock.patch.object(self.vmctl, "run") as run_cmd, \
-             mock.patch.object(self.vmctl, "run_progress") as run_progress, \
-             mock.patch.object(self.vmctl.tempfile, "mkdtemp", return_value=str(temp_root)), \
-             mock.patch.object(self.vmctl, "run_pipeline") as run_pipeline, \
-             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner, \
-             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner_tree") as restore_tree:
+             mock.patch.object(vmctl.disk_inspect, "maybe_read_gpt_geometry", return_value={}), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd, \
+             mock.patch.object(vmctl.runtime, "run_progress") as run_progress, \
+             mock.patch.object(tempfile, "mkdtemp", return_value=str(temp_root)), \
+             mock.patch.object(vmctl.runtime, "run_pipeline") as run_pipeline, \
+             mock.patch.object(vmctl.flash, "maybe_restore_sudo_owner") as restore_owner, \
+             mock.patch.object(vmctl.flash, "maybe_restore_sudo_owner_tree") as restore_tree:
             exit_code = self.vmctl.cmd_import_helper(args)
 
         self.assertEqual(exit_code, 0)
@@ -1103,11 +1117,9 @@ class VmctlTests(unittest.TestCase):
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz")
         temp_root = self.root / "tmp-import-geometry"
 
-        with mock.patch.object(self.vmctl.os, "geteuid", return_value=0), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(
-                 self.vmctl,
-                 "validate_import_source",
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.import_dev, "validate_import_source",
                  return_value={
                      "path": "/dev/sdz",
                      "size": 250 * 1024**3,
@@ -1119,21 +1131,19 @@ class VmctlTests(unittest.TestCase):
                      "is_root_disk": False,
                  },
              ), \
-             mock.patch.object(
-                 self.vmctl,
-                 "maybe_read_gpt_geometry",
+             mock.patch.object(vmctl.disk_inspect, "maybe_read_gpt_geometry",
                  return_value={
                      "gpt_partition_entry_count": 1024,
                      "gpt_partition_entry_size": 128,
                      "gpt_first_usable_lba": 34,
                  },
              ) as read_geometry, \
-             mock.patch.object(self.vmctl, "run") as run_cmd, \
-             mock.patch.object(self.vmctl, "run_progress") as run_progress, \
-             mock.patch.object(self.vmctl.tempfile, "mkdtemp", return_value=str(temp_root)), \
-             mock.patch.object(self.vmctl, "run_pipeline") as run_pipeline, \
-             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner") as restore_owner, \
-             mock.patch.object(self.vmctl, "maybe_restore_sudo_owner_tree") as restore_tree:
+             mock.patch.object(vmctl.runtime, "run") as run_cmd, \
+             mock.patch.object(vmctl.runtime, "run_progress") as run_progress, \
+             mock.patch.object(tempfile, "mkdtemp", return_value=str(temp_root)), \
+             mock.patch.object(vmctl.runtime, "run_pipeline") as run_pipeline, \
+             mock.patch.object(vmctl.flash, "maybe_restore_sudo_owner") as restore_owner, \
+             mock.patch.object(vmctl.flash, "maybe_restore_sudo_owner_tree") as restore_tree:
             exit_code = self.vmctl.cmd_import_helper(args)
 
         self.assertEqual(exit_code, 0)
@@ -1166,9 +1176,7 @@ class VmctlTests(unittest.TestCase):
         restore_tree.assert_called_once_with(disk_path.parent)
 
     def test_validate_import_source_rejects_mounted_disk(self):
-        with mock.patch.object(
-            self.vmctl,
-            "inspect_block_device_basic",
+        with mock.patch.object(vmctl.disk_inspect, "inspect_block_device_basic",
             return_value={
                 "path": "/dev/sdz",
                 "size": 16 * 1024**3,
@@ -1184,7 +1192,7 @@ class VmctlTests(unittest.TestCase):
                 self.vmctl.validate_import_source("/dev/sdz")
 
     def test_ensure_vm_dirs_wraps_permission_errors(self):
-        with mock.patch.object(self.vmctl.Path, "mkdir", side_effect=PermissionError("denied")):
+        with mock.patch.object(pathlib.Path, "mkdir", side_effect=PermissionError("denied")):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.ensure_vm_dirs(self.vm_name)
 
@@ -1280,8 +1288,8 @@ class VmctlTests(unittest.TestCase):
         disk_path = self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=False, background=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_start(args)
 
         self.assertEqual(exit_code, 0)
@@ -1298,8 +1306,8 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, video="std", cloud_init=False, headless=True, background=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_start(args)
 
         self.assertEqual(exit_code, 0)
@@ -1313,8 +1321,8 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=True, background=True, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run_background", return_value=None) as run_background:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=None) as run_background:
             exit_code = self.vmctl.cmd_start(args)
 
         self.assertEqual(exit_code, 0)
@@ -1328,8 +1336,8 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=False, background=True, spice_port=5930, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run_background", return_value=None) as run_background:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=None) as run_background:
             exit_code = self.vmctl.cmd_start(args)
 
         self.assertEqual(exit_code, 0)
@@ -1350,7 +1358,7 @@ class VmctlTests(unittest.TestCase):
     def test_common_args_tcg_headless_serial(self):
         disk_path = self.create_disk()
 
-        with mock.patch.object(self.vmctl, "require_command"):
+        with mock.patch.object(vmctl.runtime, "require_command"):
             qemu_cmd = self.vmctl.common_args(
                 self.vm_config,
                 variant=None,
@@ -1374,7 +1382,7 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         self.vm_config["network_device"] = "e1000e"
 
-        with mock.patch.object(self.vmctl, "require_command"):
+        with mock.patch.object(vmctl.runtime, "require_command"):
             qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
 
         self.assertIn("e1000e,netdev=n1", qemu_cmd)
@@ -1383,7 +1391,7 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
 
-        with mock.patch.object(self.vmctl, "require_command"):
+        with mock.patch.object(vmctl.runtime, "require_command"):
             qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
 
         self.assertIn("user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", qemu_cmd)
@@ -1392,7 +1400,7 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2223}
 
-        with mock.patch.object(self.vmctl, "require_command"):
+        with mock.patch.object(vmctl.runtime, "require_command"):
             qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
 
         self.assertIn("user,id=n1,hostfwd=tcp:127.0.0.1:2223-:22", qemu_cmd)
@@ -1401,7 +1409,7 @@ class VmctlTests(unittest.TestCase):
         disk_path = self.create_disk()
         self.vm_config["disk"]["interface"] = "sata"
 
-        with mock.patch.object(self.vmctl, "require_command"):
+        with mock.patch.object(vmctl.runtime, "require_command"):
             qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
 
         self.assertIn("ich9-ahci,id=ahci0", qemu_cmd)
@@ -1412,7 +1420,7 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         self.vm_config["clipboard"] = True
 
-        with mock.patch.object(self.vmctl, "require_command"):
+        with mock.patch.object(vmctl.runtime, "require_command"):
             qemu_cmd = self.vmctl.common_args(self.vm_config, variant="std", dry_run=True)
 
         self.assertIn("virtio-serial-pci", qemu_cmd)
@@ -1423,7 +1431,7 @@ class VmctlTests(unittest.TestCase):
         self.create_disk()
         self.vm_config["clipboard"] = True
 
-        with mock.patch.object(self.vmctl, "require_command"):
+        with mock.patch.object(vmctl.runtime, "require_command"):
             qemu_cmd = self.vmctl.common_args(
                 self.vm_config,
                 variant="std",
@@ -1449,9 +1457,9 @@ class VmctlTests(unittest.TestCase):
         iso_path = self.root / self.vm_config["iso"]
         args = argparse.Namespace(vm=self.vm_name, expect=None, timeout=None, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file") as download_file, \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "run_and_expect") as run_and_expect:
+        with mock.patch.object(vmctl.iso, "download_file") as download_file, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.qemu, "run_and_expect") as run_and_expect:
             exit_code = self.vmctl.cmd_boot_check(args)
 
         self.assertEqual(exit_code, 0)
@@ -1480,8 +1488,8 @@ class VmctlTests(unittest.TestCase):
             "runcmd": ["echo ready"],
         }
 
-        with mock.patch.object(self.vmctl.shutil, "which", side_effect=lambda name: "/usr/bin/cloud-localds" if name == "cloud-localds" else None), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(shutil, "which", side_effect=lambda name: "/usr/bin/cloud-localds" if name == "cloud-localds" else None), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             seed_path = self.vmctl.create_cloud_init_seed(self.vm_name, self.vm_config)
 
         self.assertEqual(seed_path, self.root / "artifacts/testvm/cloud-init/seed.iso")
@@ -1558,8 +1566,8 @@ class VmctlTests(unittest.TestCase):
             self.vmctl.subprocess.CompletedProcess(args=["ssh"], returncode=255),
             self.vmctl.subprocess.CompletedProcess(args=["ssh"], returncode=0),
         ]
-        with mock.patch.object(self.vmctl.subprocess, "run", side_effect=results) as run_cmd, \
-             mock.patch.object(self.vmctl.time, "sleep") as sleep_mock:
+        with mock.patch.object(subprocess, "run", side_effect=results) as run_cmd, \
+             mock.patch.object(time, "sleep") as sleep_mock:
             self.vmctl.wait_for_ssh(self.vm_config, timeout_sec=10, dry_run=False)
 
         self.assertEqual(run_cmd.call_count, 2)
@@ -1572,9 +1580,9 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=True, headless=False, background=False, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "create_cloud_init_seed", return_value=self.root / "artifacts/testvm/cloud-init/seed.iso") as create_seed, \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.cloud_init, "create_cloud_init_seed", return_value=self.root / "artifacts/testvm/cloud-init/seed.iso") as create_seed, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_start(args)
 
         self.assertEqual(exit_code, 0)
@@ -1636,11 +1644,11 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video="std", dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file") as download_file, \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso") as create_seed, \
-             mock.patch.object(self.vmctl, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")) as extract_boot, \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file") as download_file, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.cloud_init, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso") as create_seed, \
+             mock.patch.object(vmctl.iso, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")) as extract_boot, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_install_unattended(args)
 
         self.assertEqual(exit_code, 0)
@@ -1676,11 +1684,11 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video=None, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file"), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
-             mock.patch.object(self.vmctl, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file"), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.cloud_init, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
+             mock.patch.object(vmctl.iso, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_install_unattended(args)
 
         self.assertEqual(exit_code, 0)
@@ -1705,11 +1713,11 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video=None, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file"), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
-             mock.patch.object(self.vmctl, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file"), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.cloud_init, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
+             mock.patch.object(vmctl.iso, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_install_unattended(args)
 
         self.assertEqual(exit_code, 0)
@@ -1729,11 +1737,11 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video="std", headless=True, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "download_file"), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
-             mock.patch.object(self.vmctl, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.iso, "download_file"), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.cloud_init, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
+             mock.patch.object(vmctl.iso, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_install_unattended(args)
 
         self.assertEqual(exit_code, 0)
@@ -1759,11 +1767,11 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video="std", timeout=45, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "cmd_install_unattended") as install_unattended, \
-             mock.patch.object(self.vmctl, "run_background", return_value=None) as run_background, \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.lifecycle, "cmd_install_unattended") as install_unattended, \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=None) as run_background, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.lifecycle, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_bootstrap_unattended(args)
 
         self.assertEqual(exit_code, 0)
@@ -1796,11 +1804,11 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video=None, headless=True, timeout=45, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "cmd_install_unattended") as install_unattended, \
-             mock.patch.object(self.vmctl, "run_background", return_value=None), \
-             mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "wait_for_ssh"), \
-             mock.patch.object(self.vmctl, "run"):
+        with mock.patch.object(vmctl.lifecycle, "cmd_install_unattended") as install_unattended, \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=None), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.lifecycle, "wait_for_ssh"), \
+             mock.patch.object(vmctl.runtime, "run"):
             exit_code = self.vmctl.cmd_bootstrap_unattended(args)
 
         self.assertEqual(exit_code, 0)
@@ -1843,7 +1851,7 @@ class VmctlTests(unittest.TestCase):
         }
         self.write_config_dir()
 
-        with mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_shell(argparse.Namespace(vm=self.vm_name, dry_run=True))
 
         self.assertEqual(exit_code, 0)
@@ -1859,7 +1867,7 @@ class VmctlTests(unittest.TestCase):
         }
         self.write_config_dir()
 
-        with mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_shell(argparse.Namespace(vm=self.vm_name, dry_run=True))
 
         self.assertEqual(exit_code, 0)
@@ -1874,9 +1882,9 @@ class VmctlTests(unittest.TestCase):
         pid_path.write_text("1234\n", encoding="utf-8")
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
 
-        with mock.patch.object(self.vmctl, "process_cmdline", side_effect=["qemu-system-x86_64 -display none", "qemu-system-x86_64 -display none", None]), \
-             mock.patch.object(self.vmctl.os, "kill") as kill_mock, \
-             mock.patch.object(self.vmctl.time, "sleep") as sleep_mock:
+        with mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=["qemu-system-x86_64 -display none", "qemu-system-x86_64 -display none", None]), \
+             mock.patch.object(os, "kill") as kill_mock, \
+             mock.patch.object(time, "sleep") as sleep_mock:
             exit_code = self.vmctl.cmd_stop(args)
 
         self.assertEqual(exit_code, 0)
@@ -1892,10 +1900,10 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
 
-        with mock.patch.object(self.vmctl, "find_qemu_process_by_hostfwd_port", return_value=(5678, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22")), \
-             mock.patch.object(self.vmctl, "process_cmdline", side_effect=["qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", None]), \
-             mock.patch.object(self.vmctl.os, "kill") as kill_mock, \
-             mock.patch.object(self.vmctl.time, "sleep") as sleep_mock:
+        with mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_hostfwd_port", return_value=(5678, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22")), \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=["qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", None]), \
+             mock.patch.object(os, "kill") as kill_mock, \
+             mock.patch.object(time, "sleep") as sleep_mock:
             exit_code = self.vmctl.cmd_stop(args)
 
         self.assertEqual(exit_code, 0)
@@ -1913,10 +1921,10 @@ class VmctlTests(unittest.TestCase):
         pid_path.write_text("424242\n", encoding="utf-8")
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
 
-        with mock.patch.object(self.vmctl, "find_qemu_process_by_hostfwd_port", return_value=(5678, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22")), \
-             mock.patch.object(self.vmctl, "process_cmdline", side_effect=[None, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", None]), \
-             mock.patch.object(self.vmctl.os, "kill") as kill_mock, \
-             mock.patch.object(self.vmctl.time, "sleep") as sleep_mock:
+        with mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_hostfwd_port", return_value=(5678, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22")), \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=[None, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", None]), \
+             mock.patch.object(os, "kill") as kill_mock, \
+             mock.patch.object(time, "sleep") as sleep_mock:
             exit_code = self.vmctl.cmd_stop(args)
 
         self.assertEqual(exit_code, 0)
@@ -1953,7 +1961,7 @@ class VmctlTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("artifact", encoding="utf-8")
 
-        with mock.patch.object(self.vmctl, "cmd_stop", return_value=0):
+        with mock.patch.object(vmctl.lifecycle, "cmd_stop", return_value=0):
             exit_code = self.vmctl.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False))
 
         self.assertEqual(exit_code, 0)
@@ -1976,7 +1984,7 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         self.create_disk()
 
-        with mock.patch.object(self.vmctl, "cmd_stop", return_value=0) as stop_cmd:
+        with mock.patch.object(vmctl.lifecycle, "cmd_stop", return_value=0) as stop_cmd:
             exit_code = self.vmctl.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False))
 
         self.assertEqual(exit_code, 0)
@@ -2021,10 +2029,10 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
-             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.lifecycle, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(vmctl.lifecycle, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_post_install(args)
 
         self.assertEqual(exit_code, 0)
@@ -2078,10 +2086,10 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
-             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.lifecycle, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(vmctl.lifecycle, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_post_install(args)
 
         self.assertEqual(exit_code, 0)
@@ -2114,10 +2122,10 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
-             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.lifecycle, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(vmctl.lifecycle, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_post_install(args)
 
         self.assertEqual(exit_code, 0)
@@ -2148,10 +2156,10 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
-             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.lifecycle, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(vmctl.lifecycle, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_post_install(args)
 
         self.assertEqual(exit_code, 0)
@@ -2176,10 +2184,10 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=True)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
-             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
-             mock.patch.object(self.vmctl, "run") as run_cmd:
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.lifecycle, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(vmctl.lifecycle, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_post_install(args)
 
         self.assertEqual(exit_code, 0)
@@ -2201,10 +2209,10 @@ class VmctlTests(unittest.TestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, timeout=30, dry_run=False)
 
-        with mock.patch.object(self.vmctl, "require_command"), \
-             mock.patch.object(self.vmctl, "wait_for_ssh") as wait_for_ssh, \
-             mock.patch.object(self.vmctl, "wait_for_guest_post_install_ready") as wait_ready, \
-             mock.patch.object(self.vmctl, "run") as run_cmd, \
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.lifecycle, "wait_for_ssh") as wait_for_ssh, \
+             mock.patch.object(vmctl.lifecycle, "wait_for_guest_post_install_ready") as wait_ready, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd, \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_post_install(args)
 
@@ -2232,9 +2240,7 @@ class VmctlTests(unittest.TestCase):
         fallback_code.write_text("code", encoding="utf-8")
         fallback_vars.write_text("vars", encoding="utf-8")
 
-        with mock.patch.object(
-            self.vmctl,
-            "COMMON_OVMF_PAIRS",
+        with mock.patch.object(vmctl.state, "COMMON_OVMF_PAIRS",
             [(str(fallback_code), str(fallback_vars))],
         ):
             qemu_fw_args = self.vmctl.firmware_args(self.vm_config)
@@ -2261,9 +2267,9 @@ class VmctlTests(unittest.TestCase):
                 return f"/usr/bin/{name}"
             return None
 
-        with mock.patch.object(self.vmctl.shutil, "which", side_effect=fake_which), \
-             mock.patch.object(self.vmctl, "COMMON_OVMF_PAIRS", []), \
-             mock.patch.object(self.vmctl, "read_os_release", return_value={"ID": "ubuntu", "ID_LIKE": "debian"}), \
+        with mock.patch.object(shutil, "which", side_effect=fake_which), \
+             mock.patch.object(vmctl.state, "COMMON_OVMF_PAIRS", []), \
+             mock.patch.object(vmctl.lifecycle, "read_os_release", return_value={"ID": "ubuntu", "ID_LIKE": "debian"}), \
              mock.patch("sys.stdout", new_callable=mock.MagicMock()) as stdout:
             exit_code = self.vmctl.cmd_setup(args)
 
@@ -2298,9 +2304,9 @@ class VmctlTests(unittest.TestCase):
                 return None
             return "/usr/bin/fake"
 
-        with mock.patch.object(self.vmctl.shutil, "which", side_effect=fake_which), \
-             mock.patch.object(self.vmctl, "prompt_yes_no", return_value=True), \
-             mock.patch.object(self.vmctl, "run") as run_cmd, \
+        with mock.patch.object(shutil, "which", side_effect=fake_which), \
+             mock.patch.object(vmctl.lifecycle, "prompt_yes_no", return_value=True), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd, \
              mock.patch("sys.stdout", new_callable=mock.MagicMock()):
             exit_code = self.vmctl.cmd_setup(args)
 
@@ -2326,7 +2332,7 @@ class VmctlTests(unittest.TestCase):
         (firmware_dir / "OVMF_VARS_4M.fd").write_text("vars", encoding="utf-8")
         args = argparse.Namespace()
 
-        with mock.patch.object(self.vmctl.shutil, "which", return_value="/usr/bin/fake"), \
+        with mock.patch.object(shutil, "which", return_value="/usr/bin/fake"), \
              mock.patch("sys.stdout", new_callable=mock.MagicMock()) as stdout:
             exit_code = self.vmctl.cmd_setup(args)
 
