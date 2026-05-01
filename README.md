@@ -4,8 +4,6 @@
 
 It provides a reusable catalog of guest definitions for ISO-based installs, imports from physical disks, boot checks, and QEMU experiments.
 
-For the Italian version, see [README.it.md](README.it.md).
-
 Additional notes live in [docs/](docs/), including [CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md).
 
 ## Overview
@@ -28,7 +26,6 @@ Current profiles include desktop guests, installer/minimal guests, Windows impor
 .
 ├── Makefile
 ├── README.md
-├── README.it.md
 ├── vms/
 │   └── profiles/
 ├── bin/
