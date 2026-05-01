@@ -12,7 +12,7 @@ Additional notes live in [docs/](docs/), including [CI_BOOT_STRATEGY.md](docs/CI
 
 The project currently provides:
 
-- a VM catalog split across `vms/catalog.json` and `vms/profiles/*.json`;
+- a modular VM catalog under `vms/profiles/*.json`;
 - a Python CLI in `bin/vmctl`;
 - a minimal text UI in `bin/vmtui`;
 - a thin `Makefile` frontend, including a host `setup` check;
@@ -31,7 +31,6 @@ Current profiles include desktop guests, installer/minimal guests, Windows impor
 ├── README.it.md
 ├── VM_MANAGER_PLAN.md
 ├── vms/
-│   ├── catalog.json
 │   └── profiles/
 ├── bin/
 │   ├── vmctl

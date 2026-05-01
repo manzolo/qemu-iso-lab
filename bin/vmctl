@@ -126,20 +126,10 @@ def image_info(path: Path, quiet: bool = False) -> dict:
 
 
 def load_config() -> dict:
-    catalog_path = CONFIG_DIR / "catalog.json"
     profiles_dir = CONFIG_DIR / "profiles"
-    data: dict[str, object] = {"catalog": {}, "vms": {}}
 
     if not CONFIG_DIR.is_dir():
         raise VMError(f"Missing config directory: {CONFIG_DIR}")
-
-    if catalog_path.is_file():
-        catalog_data = load_json_file(catalog_path)
-        if "catalog" in catalog_data:
-            catalog_data = {"catalog": catalog_data["catalog"]}
-        if "catalog" not in catalog_data or not isinstance(catalog_data["catalog"], dict):
-            raise VMError(f"Invalid catalog file: {catalog_path}")
-        data["catalog"] = catalog_data["catalog"]
 
     if not profiles_dir.is_dir():
         raise VMError(f"Missing profiles directory: {profiles_dir}")
@@ -157,8 +147,7 @@ def load_config() -> dict:
     if not merged_vms:
         raise VMError(f"No VM profiles found in: {profiles_dir}")
 
-    data["vms"] = merged_vms
-    return data
+    return {"vms": merged_vms}
 
 
 def get_vm(config: dict, name: str) -> dict:

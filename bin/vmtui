@@ -138,7 +138,7 @@ def ellipsize(text: str, width: int) -> str:
 
 
 config_dir = Path(sys.argv[1])
-data = {"catalog": {}, "vms": {}}
+data = {"vms": {}}
 for profile_path in sorted((config_dir / "profiles").glob("*.json")):
     profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
     data["vms"].update(profile_data["vms"])

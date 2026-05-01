@@ -65,10 +65,6 @@ class VmctlTests(unittest.TestCase):
 
     def write_config_dir(self):
         (self.config_dir / "profiles").mkdir(parents=True, exist_ok=True)
-        (self.config_dir / "catalog.json").write_text(
-            json.dumps({"catalog": {"schema_version": 1}}, indent=2) + "\n",
-            encoding="utf-8",
-        )
         (self.config_dir / "profiles" / "test.json").write_text(
             json.dumps({"vms": {self.vm_name: self.vm_config}}, indent=2) + "\n",
             encoding="utf-8",
@@ -95,7 +91,7 @@ class VmctlTests(unittest.TestCase):
         config = self.vmctl.load_config()
 
         self.assertIn(self.vm_name, config["vms"])
-        self.assertEqual(config["catalog"]["schema_version"], 1)
+        self.assertNotIn("catalog", config)
 
     def test_load_config_reads_local_profile_override_file(self):
         local_vm = json.loads(json.dumps(self.vm_config))
