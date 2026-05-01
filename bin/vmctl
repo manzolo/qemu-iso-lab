@@ -1640,6 +1640,25 @@ def video_args(vm: dict, variant: str | None) -> list[str]:
     return list(variants[selected])
 
 
+def spice_display_args(port: int) -> list[str]:
+    if port < 1 or port > 65535:
+        raise VMError(f"Invalid SPICE port: {port}")
+    return [
+        "-vga",
+        "qxl",
+        "-display",
+        "none",
+        "-spice",
+        f"addr=127.0.0.1,port={port},disable-ticketing=on",
+        "-device",
+        "virtio-serial-pci",
+        "-chardev",
+        "spicevmc,id=vdagent0,name=vdagent",
+        "-device",
+        "virtserialport,chardev=vdagent0,name=com.redhat.spice.0",
+    ]
+
+
 def installer_video_variant(vm: dict, requested: str | None) -> str | None:
     if requested:
         return requested
@@ -1666,6 +1685,7 @@ def common_args(
     no_reboot: bool = False,
     allow_missing_disk: bool = False,
     enable_clipboard: bool = True,
+    spice_port: int | None = None,
 ) -> list[str]:
     require_command("qemu-system-x86_64")
     cpu_model = "host" if accel == "kvm" else vm.get("cpu_model", "max")
@@ -1687,7 +1707,9 @@ def common_args(
     args += firmware_args(vm, dry_run=dry_run)
     args += disk_args(vm, allow_missing=allow_missing_disk)
 
-    if headless:
+    if spice_port is not None:
+        args += spice_display_args(spice_port)
+    elif headless:
         args += ["-display", "none", "-monitor", "none"]
     else:
         args += video_args(vm, variant)
@@ -1701,7 +1723,7 @@ def common_args(
     if vm.get("audio"):
         args += ["-device", "ich9-intel-hda", "-device", "hda-duplex"]
 
-    if enable_clipboard and vm.get("clipboard") and not headless:
+    if enable_clipboard and vm.get("clipboard") and not headless and spice_port is None:
         args += [
             "-device",
             "virtio-serial-pci",
@@ -1994,6 +2016,7 @@ def cmd_provision(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
+        spice_port=getattr(args, "spice_port", None),
     )
     qemu_args += ["-cdrom", str(iso_path)]
     run(qemu_args, dry_run=args.dry_run)
@@ -2010,6 +2033,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         installer_video_variant(vm, args.video),
         dry_run=args.dry_run,
         enable_clipboard=False,
+        spice_port=getattr(args, "spice_port", None),
     )
     qemu_args += ["-cdrom", str(iso_path)]
     if args.cloud_init:
@@ -2027,13 +2051,16 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
     ensure_vm_disk(vm, dry_run=args.dry_run)
     seed_path = create_autoinstall_seed(args.vm, vm, dry_run=args.dry_run)
     kernel_path, initrd_path = extract_installer_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+    headless = getattr(args, "headless", False)
     qemu_args = common_args(
         vm,
-        installer_video_variant(vm, args.video),
+        None if headless else installer_video_variant(vm, args.video),
         dry_run=args.dry_run,
+        headless=headless,
         no_reboot=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
+        spice_port=getattr(args, "spice_port", None),
     )
     qemu_args += ["-cdrom", str(iso_path)]
     qemu_args += cloud_init_drive_args(seed_path)
@@ -2046,12 +2073,13 @@ def cmd_start(args: argparse.Namespace) -> int:
     config = load_config()
     vm = get_vm(config, args.vm)
     ensure_vm_dirs(args.vm)
-    qemu_args = common_args(vm, args.video, dry_run=args.dry_run, headless=args.headless)
+    spice_port = getattr(args, "spice_port", None)
+    qemu_args = common_args(vm, args.video, dry_run=args.dry_run, headless=args.headless, spice_port=spice_port)
     if args.cloud_init:
         qemu_args += cloud_init_drive_args(create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run))
     if args.background:
-        if not args.headless:
-            raise VMError("--background currently requires --headless")
+        if not args.headless and spice_port is None:
+            raise VMError("--background currently requires --headless or --spice-port")
         pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
         pid = run_background(qemu_args, log_path, dry_run=args.dry_run)
         if pid is not None:
@@ -2102,7 +2130,15 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
     artifact_dir = ensure_vm_dirs(args.vm)
 
     print_header(f"Bootstrap VM unattended: {args.vm}")
-    cmd_install_unattended(argparse.Namespace(vm=args.vm, video=args.video, dry_run=args.dry_run))
+    cmd_install_unattended(
+        argparse.Namespace(
+            vm=args.vm,
+            video=args.video,
+            headless=getattr(args, "headless", False),
+            spice_port=getattr(args, "spice_port", None),
+            dry_run=args.dry_run,
+        )
+    )
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
     qemu_args = common_args(vm, None, dry_run=args.dry_run, headless=True)
@@ -2658,23 +2694,29 @@ def build_parser() -> argparse.ArgumentParser:
     p = subparsers.add_parser("provision")
     p.add_argument("vm")
     p.add_argument("--video")
+    p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
     p.add_argument("--no-start", action="store_true", help="prepare ISO, disk, and firmware without starting the installer")
     p.set_defaults(func=cmd_provision)
 
     p = subparsers.add_parser("install")
     p.add_argument("vm")
     p.add_argument("--video")
+    p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
     p.add_argument("--cloud-init", action="store_true", help="attach a generated cloud-init seed ISO")
     p.set_defaults(func=cmd_install)
 
     p = subparsers.add_parser("install-unattended")
     p.add_argument("vm")
     p.add_argument("--video")
+    p.add_argument("--headless", action="store_true", help="run the unattended installer without a display")
+    p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
     p.set_defaults(func=cmd_install_unattended)
 
     p = subparsers.add_parser("bootstrap-unattended")
     p.add_argument("vm")
     p.add_argument("--video")
+    p.add_argument("--headless", action="store_true", help="run the installer stage without a display")
+    p.add_argument("--spice-port", type=int, help="expose the installer stage via SPICE on 127.0.0.1:PORT")
     p.add_argument("--timeout", type=int, default=300)
     p.set_defaults(func=cmd_bootstrap_unattended)
 
@@ -2684,6 +2726,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cloud-init", action="store_true", help="attach a generated cloud-init seed ISO")
     p.add_argument("--headless", action="store_true", help="start the installed guest without a display")
     p.add_argument("--background", action="store_true", help="detach the installed guest into the background")
+    p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
     p.set_defaults(func=cmd_start)
 
     p = subparsers.add_parser("stop")

@@ -72,6 +72,56 @@ pause_box() {
     read -r -p "Press Enter to continue..." _
 }
 
+install_command_for() {
+    case "$1" in
+        remote-viewer)
+            if command -v apt-get >/dev/null 2>&1; then
+                printf '%s\n' "sudo apt-get install -y virt-viewer"
+            elif command -v pacman >/dev/null 2>&1; then
+                printf '%s\n' "sudo pacman -S --needed virt-viewer"
+            elif command -v dnf >/dev/null 2>&1; then
+                printf '%s\n' "sudo dnf install -y virt-viewer"
+            else
+                return 1
+            fi
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+ensure_optional_command() {
+    local command_name="$1"
+    local install_cmd
+
+    if command -v "$command_name" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    install_cmd=$(install_command_for "$command_name") || {
+        msg_box "Missing Command" "Missing command: $command_name\n\nInstall it manually and retry."
+        return 1
+    }
+
+    if ! confirm_box "Install Dependency" "Missing command: $command_name\n\nInstall it now?\n\n$install_cmd"; then
+        return 1
+    fi
+
+    clear
+    printf '$ %s\n\n' "$install_cmd"
+    if bash -lc "$install_cmd"; then
+        printf '\nDependency installed.\n'
+    else
+        printf '\nDependency installation failed.\n'
+        pause_box
+        return 1
+    fi
+    pause_box
+
+    command -v "$command_name" >/dev/null 2>&1
+}
+
 list_vm_menu_items() {
     python3 - "$CONFIG_DIR" <<'PY'
 import json
@@ -172,6 +222,51 @@ raise SystemExit(0 if isinstance(ssh_cfg, dict) or isinstance(cloud_cfg, dict) e
 PY
 }
 
+list_remote_menu_items() {
+    python3 - "$CONFIG_DIR" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config_dir = Path(sys.argv[1])
+path = config_dir / "remotes.json"
+if not path.exists():
+    raise SystemExit(0)
+data = json.loads(path.read_text(encoding="utf-8"))
+remotes = data.get("remotes", {})
+if not isinstance(remotes, dict):
+    raise SystemExit(0)
+for name, remote in sorted(remotes.items()):
+    if not isinstance(remote, dict):
+        continue
+    label = remote.get("label", name)
+    target = remote.get("ssh_target", "")
+    project = remote.get("project_dir", "")
+    ports = f"{remote.get('local_spice_port', 5930)}->{remote.get('remote_spice_port', 5930)}"
+    print(name)
+    print(f"{label}  {target}  {ports}  {project}")
+PY
+}
+
+remote_field() {
+    python3 - "$CONFIG_DIR" "$1" "$2" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config_dir = Path(sys.argv[1])
+remote_name = sys.argv[2]
+field = sys.argv[3]
+path = config_dir / "remotes.json"
+data = json.loads(path.read_text(encoding="utf-8"))
+remote = data.get("remotes", {}).get(remote_name)
+if not isinstance(remote, dict):
+    raise SystemExit(f"unknown remote: {remote_name}")
+value = remote.get(field, "")
+print(value)
+PY
+}
+
 list_vm_action_items() {
     local vm_name="$1"
     printf '%s\n' "Start Here" "Recommended flows for this VM"
@@ -220,6 +315,7 @@ list_run_action_items() {
     local vm_name="$1"
     printf '%s\n' "Boot Desktop" "Start the installed VM with display"
     printf '%s\n' "Boot Headless" "Start the installed VM in the background"
+    printf '%s\n' "Remote SPICE" "Start this VM on a remote host and open a SPICE viewer"
     printf '%s\n' "Stop VM" "Stop the tracked background process"
     if vm_has_ssh_provision "$vm_name"; then
         printf '%s\n' "SSH Console" "Open a shell inside the VM"
@@ -298,6 +394,67 @@ run_vmctl() {
     pause_box
 }
 
+remote_spice_session() {
+    require_command ssh
+    ensure_optional_command remote-viewer || return 0
+
+    local remote_name
+    local remote_target
+    local remote_dir
+    local local_port
+    local remote_port
+    local quoted_dir
+    local quoted_vm
+    local remote_cmd
+    local tunnel_pid
+
+    mapfile -t remote_items < <(list_remote_menu_items)
+    if [[ ${#remote_items[@]} -eq 0 ]]; then
+        msg_box "No Remotes" "Create vms/remotes.json first.\n\nUse vms/remotes.json.example as a template."
+        return 0
+    fi
+
+    remote_name=$(MENU_WIDTH=110 MENU_LIST_HEIGHT=10 menu_choose "Remote SPICE" "Choose a remote host" "${remote_items[@]}") || return 0
+    remote_target=$(remote_field "$remote_name" "ssh_target")
+    remote_dir=$(remote_field "$remote_name" "project_dir")
+    local_port=$(remote_field "$remote_name" "local_spice_port")
+    remote_port=$(remote_field "$remote_name" "remote_spice_port")
+
+    if [[ ! "$local_port" =~ ^[0-9]+$ || ! "$remote_port" =~ ^[0-9]+$ ]]; then
+        msg_box "Invalid Port" "SPICE ports must be numeric."
+        return 0
+    fi
+
+    printf -v quoted_dir '%q' "$remote_dir"
+    printf -v quoted_vm '%q' "$current_vm"
+    remote_cmd="cd $quoted_dir && ./bin/vmctl start $quoted_vm --spice-port $remote_port --background"
+
+    clear
+    printf 'Remote VM: %s\n' "$current_vm"
+    printf 'Remote host: %s\n' "$remote_target"
+    printf 'Remote project: %s\n' "$remote_dir"
+    printf 'SPICE tunnel: 127.0.0.1:%s -> %s:127.0.0.1:%s\n\n' "$local_port" "$remote_target" "$remote_port"
+
+    printf '$ ssh -N -L %q %q &\n' "$local_port:127.0.0.1:$remote_port" "$remote_target"
+    ssh -N -L "$local_port:127.0.0.1:$remote_port" "$remote_target" &
+    tunnel_pid=$!
+    sleep 1
+
+    printf '$ ssh %q %q\n\n' "$remote_target" "$remote_cmd"
+    if ! ssh "$remote_target" "$remote_cmd"; then
+        kill "$tunnel_pid" >/dev/null 2>&1 || true
+        wait "$tunnel_pid" >/dev/null 2>&1 || true
+        pause_box
+        return 0
+    fi
+
+    printf '\n$ remote-viewer %q\n\n' "spice://127.0.0.1:$local_port"
+    remote-viewer "spice://127.0.0.1:$local_port" || true
+    kill "$tunnel_pid" >/dev/null 2>&1 || true
+    wait "$tunnel_pid" >/dev/null 2>&1 || true
+    pause_box
+}
+
 choose_vm() {
     mapfile -t vm_items < <(list_vm_menu_items)
     local selected
@@ -329,6 +486,7 @@ resolve_action() {
         "Guided Install"|"Guided Provision") printf '%s\n' provision ;;
         "Boot Desktop") printf '%s\n' start ;;
         "Boot Headless") printf '%s\n' start-headless ;;
+        "Remote SPICE") printf '%s\n' remote-spice ;;
         "SSH Console") printf '%s\n' shell ;;
         "Fetch ISO") printf '%s\n' fetch-iso ;;
         "Prepare VM") printf '%s\n' prep ;;
@@ -442,6 +600,9 @@ run_action() {
             ;;
         start-headless)
             run_vmctl start "$current_vm" --headless --background
+            ;;
+        remote-spice)
+            remote_spice_session
             ;;
         stop)
             if confirm_box "Confirm Stop" "Stop the tracked background VM for '$current_vm' if it is running?"; then

@@ -40,6 +40,18 @@ class VmtuiTests(unittest.TestCase):
             }
         }
         (profiles_dir / "test-ssh.json").write_text(json.dumps(ssh_vm), encoding="utf-8")
+        remotes = {
+            "remotes": {
+                "i9": {
+                    "label": "i9.lan",
+                    "ssh_target": "manzolo@i9.lan",
+                    "project_dir": "/home/manzolo/Workspaces/qemu/qemu-iso-lab",
+                    "local_spice_port": 5930,
+                    "remote_spice_port": 5930,
+                }
+            }
+        }
+        (self.config_dir / "remotes.json").write_text(json.dumps(remotes), encoding="utf-8")
         dialog = self.bindir / "dialog"
         dialog.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
         dialog.chmod(0o755)
@@ -131,6 +143,7 @@ class VmtuiTests(unittest.TestCase):
 
         self.assertIn("Boot Desktop", output)
         self.assertIn("Boot Headless", output)
+        self.assertIn("Remote SPICE", output)
         self.assertIn("Stop VM", output)
         self.assertIn("SSH Console", output)
         self.assertIn("First Boot", output)
@@ -142,6 +155,7 @@ class VmtuiTests(unittest.TestCase):
 
         self.assertIn("Boot Desktop", output)
         self.assertIn("Boot Headless", output)
+        self.assertIn("Remote SPICE", output)
         self.assertIn("Stop VM", output)
         self.assertNotIn("SSH Console", output)
         self.assertNotIn("First Boot", output)
@@ -153,10 +167,28 @@ class VmtuiTests(unittest.TestCase):
 
         self.assertIn("Boot Desktop", output)
         self.assertIn("Boot Headless", output)
+        self.assertIn("Remote SPICE", output)
         self.assertIn("Stop VM", output)
         self.assertIn("SSH Console", output)
         self.assertIn("Post-Install", output)
         self.assertNotIn("First Boot", output)
+
+    def test_list_remote_menu_items_reads_remotes_json(self):
+        result = self.run_bash("source bin/vmtui; list_remote_menu_items")
+        output = result.stdout.splitlines()
+
+        self.assertEqual(output[0], "i9")
+        self.assertIn("manzolo@i9.lan", output[1])
+        self.assertIn("5930->5930", output[1])
+
+    def test_install_command_for_remote_viewer_detects_apt(self):
+        apt_get = self.bindir / "apt-get"
+        apt_get.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+        apt_get.chmod(0o755)
+
+        result = self.run_bash("source bin/vmtui; install_command_for remote-viewer")
+
+        self.assertEqual(result.stdout.strip(), "sudo apt-get install -y virt-viewer")
 
     def test_list_maintenance_action_items_include_boot_check_and_clean(self):
         result = self.run_bash("source bin/vmtui; list_maintenance_action_items")

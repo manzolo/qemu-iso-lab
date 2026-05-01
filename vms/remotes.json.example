@@ -1,0 +1,11 @@
+{
+  "remotes": {
+    "i9": {
+      "label": "i9.lan",
+      "ssh_target": "manzolo@i9.lan",
+      "project_dir": "/home/manzolo/Workspaces/qemu/qemu-iso-lab",
+      "local_spice_port": 5930,
+      "remote_spice_port": 5930
+    }
+  }
+}

@@ -1227,6 +1227,22 @@ class VmctlTests(unittest.TestCase):
         self.assertIn("none", qemu_cmd)
         self.assertEqual(log_path, self.root / "artifacts/testvm/logs/bootstrap-start.log")
 
+    def test_cmd_start_spice_background_tracks_pid_and_log(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=False, background=True, spice_port=5930, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "run_background", return_value=None) as run_background:
+            exit_code = self.vmctl.cmd_start(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_background.call_args.args[0]
+        self.assertIn("-spice", qemu_cmd)
+        self.assertIn("addr=127.0.0.1,port=5930,disable-ticketing=on", qemu_cmd)
+        self.assertIn("virtserialport,chardev=vdagent0,name=com.redhat.spice.0", qemu_cmd)
+        self.assertIn("-display", qemu_cmd)
+        self.assertIn("none", qemu_cmd)
+
     def test_cmd_start_background_requires_headless(self):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=False, background=True, dry_run=True)
@@ -1604,6 +1620,31 @@ class VmctlTests(unittest.TestCase):
         self.assertNotIn("-serial", qemu_cmd)
         self.assertNotIn("virtio-vga-gl", qemu_cmd)
 
+    def test_cmd_install_unattended_headless_uses_no_display(self):
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video="std", headless=True, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "download_file"), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
+             mock.patch.object(self.vmctl, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(self.vmctl, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_install_unattended(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertIn("-display", qemu_cmd)
+        self.assertIn("none", qemu_cmd)
+        self.assertIn("-monitor", qemu_cmd)
+        self.assertNotIn("-vga", qemu_cmd)
+        self.assertNotIn("gtk", qemu_cmd)
+
     def test_cmd_bootstrap_unattended_runs_install_background_start_and_post_install(self):
         self.create_disk()
         self.vm_config["cloud_init"] = {
@@ -1630,6 +1671,7 @@ class VmctlTests(unittest.TestCase):
         install_args = install_unattended.call_args.args[0]
         self.assertEqual(install_args.vm, self.vm_name)
         self.assertEqual(install_args.video, "std")
+        self.assertEqual(install_args.headless, False)
         self.assertEqual(install_args.dry_run, True)
         qemu_cmd = run_background.call_args.args[0]
         log_path = run_background.call_args.args[1]
@@ -1643,6 +1685,28 @@ class VmctlTests(unittest.TestCase):
             run_cmd.call_args.args[0][-1],
             "sh -lc 'echo ready'",
         )
+
+    def test_cmd_bootstrap_unattended_forwards_headless_to_installer(self):
+        self.create_disk()
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video=None, headless=True, timeout=45, dry_run=True)
+
+        with mock.patch.object(self.vmctl, "cmd_install_unattended") as install_unattended, \
+             mock.patch.object(self.vmctl, "run_background", return_value=None), \
+             mock.patch.object(self.vmctl, "require_command"), \
+             mock.patch.object(self.vmctl, "wait_for_ssh"), \
+             mock.patch.object(self.vmctl, "run"):
+            exit_code = self.vmctl.cmd_bootstrap_unattended(args)
+
+        self.assertEqual(exit_code, 0)
+        install_args = install_unattended.call_args.args[0]
+        self.assertEqual(install_args.headless, True)
 
     def test_cmd_bootstrap_unattended_requires_autoinstall(self):
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
