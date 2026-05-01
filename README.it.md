@@ -227,6 +227,10 @@ Ogni voce in `vms/profiles/*.json` definisce tipicamente:
 - `name`
 - `iso`
 - `iso_url`
+- `iso_urls`
+- `iso_discovery`
+- `iso_size`
+- `iso_sha256`
 - `disk`
 - `firmware`
 - `machine`
@@ -236,7 +240,31 @@ Ogni voce in `vms/profiles/*.json` definisce tipicamente:
 - `audio`
 - `video`
 
-I profili orientati all'import possono omettere `iso_url` intenzionalmente. Sono pensati per flussi come `import-device`, dove porti dentro la VM un'installazione fisica esistente invece di avviare un installer da ISO.
+`fetch-iso` scarica prima in un file temporaneo `.part` e sostituisce la ISO finale in modo atomico solo dopo una validazione di base. Se il server espone `Content-Length`, i download troncati vengono rifiutati. Le ISO gia in cache possono essere validate anche con `iso_size` e `iso_sha256`; i file non validi vengono rimossi e scaricati di nuovo.
+
+I profili possono definire sorgenti ISO piu intelligenti senza perdere il fallback hardcoded:
+
+- `iso_discovery` legge un indice release ed estrae URL candidati con una regex;
+- `iso_urls` elenca mirror alternativi da provare in ordine;
+- `iso_url` resta il fallback finale e mantiene compatibili i profili esistenti.
+
+Esempio di discovery:
+
+```json
+"iso_discovery": {
+  "index_url": "https://example.invalid/releases/latest/",
+  "pattern": "href=\"(?P<url>example-[0-9.]+-x86_64\\.iso)\"",
+  "sort": "desc",
+  "limit": 1
+},
+"iso_urls": [
+  "https://mirror1.example.invalid/example.iso",
+  "https://mirror2.example.invalid/example.iso"
+],
+"iso_url": "https://example.invalid/hardcoded-fallback.iso"
+```
+
+I profili orientati all'import possono omettere intenzionalmente tutte le sorgenti di download ISO. Sono pensati per flussi come `import-device`, dove porti dentro la VM un'installazione fisica esistente invece di avviare un installer da ISO.
 
 I profili che definiscono `cloud_init`, `ssh_provision` o `autoinstall` possono anche supportare flussi di livello piu alto come installazione unattended, provisioning post-install via SSH e accesso shell interattivo.
 

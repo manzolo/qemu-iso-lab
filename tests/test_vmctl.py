@@ -269,6 +269,35 @@ class VmctlTests(unittest.TestCase):
 
         self.assertFalse(destination.exists())
 
+    def test_download_file_rejects_incomplete_response_and_keeps_existing_iso(self):
+        destination = self.root / "isos" / "download.iso"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(b"old iso")
+
+        class FakeResponse:
+            def __init__(self):
+                self._chunks = [b"partial", b""]
+                self.headers = {
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": "1024",
+                }
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self, size=-1):
+                return self._chunks.pop(0)
+
+        with mock.patch.object(self.vmctl.urllib.request, "urlopen", return_value=FakeResponse()):
+            with self.assertRaises(self.vmctl.VMError):
+                self.vmctl.download_file("https://example.invalid/test.iso", destination)
+
+        self.assertEqual(destination.read_bytes(), b"old iso")
+        self.assertFalse(destination.with_name(destination.name + ".part").exists())
+
     def test_ensure_iso_removes_invalid_cached_html_and_redownloads(self):
         iso_path = self.root / self.vm_config["iso"]
         iso_path.parent.mkdir(parents=True, exist_ok=True)
@@ -278,7 +307,82 @@ class VmctlTests(unittest.TestCase):
             resolved = self.vmctl.ensure_iso(self.vm_config)
 
         self.assertEqual(resolved, iso_path)
-        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=False)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=False, vm=self.vm_config)
+
+    def test_ensure_iso_removes_cached_file_with_bad_size_and_redownloads(self):
+        iso_path = self.root / self.vm_config["iso"]
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_bytes(b"partial")
+        self.vm_config["iso_size"] = 1024
+
+        with mock.patch.object(self.vmctl, "download_file") as download_file:
+            resolved = self.vmctl.ensure_iso(self.vm_config)
+
+        self.assertEqual(resolved, iso_path)
+        self.assertFalse(iso_path.exists())
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=False, vm=self.vm_config)
+
+    def test_ensure_iso_uses_discovered_url_before_hardcoded_fallback(self):
+        iso_path = self.root / self.vm_config["iso"]
+        self.vm_config["iso_discovery"] = {
+            "index_url": "https://example.invalid/releases/",
+            "pattern": r'href="(?P<url>test-[0-9]+\.iso)"',
+        }
+
+        with mock.patch.object(self.vmctl, "fetch_text", return_value='<a href="test-2.iso">test-2.iso</a>'), \
+             mock.patch.object(self.vmctl, "download_file") as download_file:
+            resolved = self.vmctl.ensure_iso(self.vm_config)
+
+        self.assertEqual(resolved, iso_path)
+        download_file.assert_called_once_with("https://example.invalid/releases/test-2.iso", iso_path, dry_run=False, vm=self.vm_config)
+
+    def test_ensure_iso_dry_run_skips_remote_discovery(self):
+        iso_path = self.root / self.vm_config["iso"]
+        self.vm_config["iso_discovery"] = {
+            "index_url": "https://example.invalid/releases/",
+            "pattern": r'href="(?P<url>test-[0-9]+\.iso)"',
+        }
+
+        with mock.patch.object(self.vmctl, "fetch_text") as fetch_text, \
+             mock.patch.object(self.vmctl, "download_file") as download_file:
+            resolved = self.vmctl.ensure_iso(self.vm_config, dry_run=True)
+
+        self.assertEqual(resolved, iso_path)
+        fetch_text.assert_not_called()
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True, vm=self.vm_config)
+
+    def test_ensure_iso_falls_back_to_hardcoded_url_when_discovered_url_fails(self):
+        iso_path = self.root / self.vm_config["iso"]
+        self.vm_config["iso_discovery"] = {
+            "index_url": "https://example.invalid/releases/",
+            "pattern": r'href="(?P<url>test-[0-9]+\.iso)"',
+        }
+
+        def fail_first(url, destination, dry_run=False, vm=None):
+            if url.endswith("test-2.iso"):
+                raise self.vmctl.VMError("mirror failed")
+
+        with mock.patch.object(self.vmctl, "fetch_text", return_value='<a href="test-2.iso">test-2.iso</a>'), \
+             mock.patch.object(self.vmctl, "download_file", side_effect=fail_first) as download_file:
+            resolved = self.vmctl.ensure_iso(self.vm_config)
+
+        self.assertEqual(resolved, iso_path)
+        self.assertEqual(download_file.call_args_list[0].args[:2], ("https://example.invalid/releases/test-2.iso", iso_path))
+        self.assertEqual(download_file.call_args_list[1].args[:2], (self.vm_config["iso_url"], iso_path))
+
+    def test_ensure_iso_falls_back_to_hardcoded_url_when_discovery_index_fails(self):
+        iso_path = self.root / self.vm_config["iso"]
+        self.vm_config["iso_discovery"] = {
+            "index_url": "https://example.invalid/releases/",
+            "pattern": r'href="(?P<url>test-[0-9]+\.iso)"',
+        }
+
+        with mock.patch.object(self.vmctl, "fetch_text", side_effect=self.vmctl.VMError("index failed")), \
+             mock.patch.object(self.vmctl, "download_file") as download_file:
+            resolved = self.vmctl.ensure_iso(self.vm_config)
+
+        self.assertEqual(resolved, iso_path)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=False, vm=self.vm_config)
 
     def test_cmd_prep_fails_without_iso_url(self):
         self.vm_config.pop("iso_url")
@@ -299,7 +403,7 @@ class VmctlTests(unittest.TestCase):
             exit_code = self.vmctl.cmd_provision(args)
 
         self.assertEqual(exit_code, 0)
-        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True, vm=self.vm_config)
         self.assertEqual(run_cmd.call_count, 2)
         qemu_img_cmd = run_cmd.call_args_list[0].args[0]
         qemu_cmd = run_cmd.call_args_list[1].args[0]
@@ -319,7 +423,7 @@ class VmctlTests(unittest.TestCase):
             exit_code = self.vmctl.cmd_provision(args)
 
         self.assertEqual(exit_code, 0)
-        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True, vm=self.vm_config)
         run_cmd.assert_called_once()
         self.assertEqual(run_cmd.call_args.args[0][:3], ["qemu-img", "create", "-f"])
 
@@ -334,7 +438,7 @@ class VmctlTests(unittest.TestCase):
             exit_code = self.vmctl.cmd_install(args)
 
         self.assertEqual(exit_code, 0)
-        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True, vm=self.vm_config)
         run_cmd.assert_called_once()
         qemu_cmd = run_cmd.call_args.args[0]
         self.assertEqual(run_cmd.call_args.kwargs["dry_run"], True)
@@ -1238,7 +1342,7 @@ class VmctlTests(unittest.TestCase):
             exit_code = self.vmctl.cmd_boot_check(args)
 
         self.assertEqual(exit_code, 0)
-        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True, vm=self.vm_config)
         run_and_expect.assert_called_once()
         qemu_cmd, expected_text, timeout_sec = run_and_expect.call_args.args
         self.assertIn("-cdrom", qemu_cmd)
@@ -1427,7 +1531,7 @@ class VmctlTests(unittest.TestCase):
             exit_code = self.vmctl.cmd_install_unattended(args)
 
         self.assertEqual(exit_code, 0)
-        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True, vm=self.vm_config)
         create_seed.assert_called_once_with(self.vm_name, self.vm_config, dry_run=True)
         extract_boot.assert_called_once_with(self.vm_config, iso_path, dry_run=True)
         self.assertEqual(run_cmd.call_args_list[0].args[0][:3], ["qemu-img", "create", "-f"])
@@ -1717,6 +1821,29 @@ class VmctlTests(unittest.TestCase):
         stop_args = stop_cmd.call_args.args[0]
         self.assertEqual(stop_args.vm, self.vm_name)
         self.assertFalse(stop_args.dry_run)
+
+    def test_cmd_delete_iso_removes_cached_iso_and_partial_download(self):
+        iso_path = self.root / self.vm_config["iso"]
+        partial_path = iso_path.with_name(iso_path.name + ".part")
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_text("iso", encoding="utf-8")
+        partial_path.write_text("partial", encoding="utf-8")
+
+        exit_code = self.vmctl.cmd_delete_iso(argparse.Namespace(vm=self.vm_name, dry_run=False))
+
+        self.assertEqual(exit_code, 0)
+        self.assertFalse(iso_path.exists())
+        self.assertFalse(partial_path.exists())
+
+    def test_cmd_delete_iso_dry_run_keeps_cached_iso(self):
+        iso_path = self.root / self.vm_config["iso"]
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_text("iso", encoding="utf-8")
+
+        exit_code = self.vmctl.cmd_delete_iso(argparse.Namespace(vm=self.vm_name, dry_run=True))
+
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(iso_path.exists())
 
     def test_cmd_post_install_waits_copies_and_runs_remote_commands(self):
         source_dir = self.root / "host-niri"

@@ -227,6 +227,10 @@ Each VM entry in `vms/profiles/*.json` typically defines:
 - `name`
 - `iso`
 - `iso_url`
+- `iso_urls`
+- `iso_discovery`
+- `iso_size`
+- `iso_sha256`
 - `disk`
 - `firmware`
 - `machine`
@@ -236,7 +240,31 @@ Each VM entry in `vms/profiles/*.json` typically defines:
 - `audio`
 - `video`
 
-Import-oriented profiles may omit `iso_url` on purpose. These are intended for flows such as `import-device`, where you bring an existing physical installation into a VM disk rather than booting a distro installer ISO.
+`fetch-iso` downloads to a temporary `.part` file and atomically replaces the final ISO only after the download passes basic validation. If `Content-Length` is available, truncated downloads are rejected. Existing cached ISOs can also be validated with `iso_size` and `iso_sha256`; invalid cached files are removed and downloaded again.
+
+Profiles can define smarter ISO sources without giving up a hardcoded fallback:
+
+- `iso_discovery` reads a release index and extracts candidate ISO URLs with a regular expression;
+- `iso_urls` lists additional mirrors to try in order;
+- `iso_url` remains the final fallback and keeps older profiles working.
+
+Example discovery:
+
+```json
+"iso_discovery": {
+  "index_url": "https://example.invalid/releases/latest/",
+  "pattern": "href=\"(?P<url>example-[0-9.]+-x86_64\\.iso)\"",
+  "sort": "desc",
+  "limit": 1
+},
+"iso_urls": [
+  "https://mirror1.example.invalid/example.iso",
+  "https://mirror2.example.invalid/example.iso"
+],
+"iso_url": "https://example.invalid/hardcoded-fallback.iso"
+```
+
+Import-oriented profiles may omit every ISO download source on purpose. These are intended for flows such as `import-device`, where you bring an existing physical installation into a VM disk rather than booting a distro installer ISO.
 
 Profiles that define `cloud_init`, `ssh_provision`, or `autoinstall` can also support higher-level flows such as unattended install, SSH post-install provisioning, and interactive shell access.
 
