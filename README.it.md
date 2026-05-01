@@ -35,13 +35,20 @@ I profili attuali includono guest desktop, guest installer/minimal, template Win
 │   └── profiles/
 ├── bin/
 │   ├── vmctl
-│   └── vmtui
+│   ├── vmtui
+│   ├── ventoy-prep
+│   └── ventoy-copy
 ├── docs/
 │   └── CI_BOOT_STRATEGY.md
 ├── isos/
 ├── artifacts/
+├── legacy/
 └── tests/
 ```
+
+`legacy/` contiene i prototipi bash originari per CachyOS (`setup-vhd.sh`,
+`run-install.sh`, `run-boot.sh`), conservati come riferimento. Le stesse
+funzioni sono oggi coperte da `vmctl prep`, `vmctl install` e `vmctl start`.
 
 ## Requisiti
 
@@ -475,3 +482,18 @@ Quel profilo e volutamente piccolo e adatto alla CI:
 - e pensato per GitHub Actions con `tcg`, senza assumere `kvm`.
 
 Maggiori dettagli sono in [docs/CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md).
+
+## Utility Ventoy
+
+Due helper in `bin/` permettono di riusare un disco guest su una chiavetta
+Ventoy, indipendentemente dal flusso principale delle VM:
+
+- `bin/ventoy-prep` — scarica la ISO `vtoyboot`, la estrae ed esegue
+  `vtoyboot.sh` dentro una VM avviata, in modo che il disco guest diventi
+  avviabile da Ventoy. Si esegue come root **nel guest**.
+- `bin/ventoy-copy <target> <file.vhd>` — copia un `.vhd` su una partizione
+  o mountpoint Ventoy, aggiungendo il suffisso `.vtoy` richiesto da Ventoy.
+  Si esegue come root **sull'host**.
+
+Questi strumenti sono fuori dal flusso principale di `vmctl` e servono solo
+nello scenario di multi-boot Ventoy.

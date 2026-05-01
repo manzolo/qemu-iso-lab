@@ -4,17 +4,19 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Uso:
-  sudo ./copy-to-ventoy.sh /dev/sdX1 [file.vhd]
-  sudo ./copy-to-ventoy.sh /percorso/di/mount [file.vhd]
+  sudo bin/ventoy-copy <target> <file.vhd>
+
+  <target> puo' essere:
+    - una partizione blocco (es. /dev/sdb1): viene montata sotto /mnt/ventoy-copy-$$
+    - un mountpoint gia' montato (es. /run/media/user/Ventoy)
 
 Esempi:
-  sudo ./copy-to-ventoy.sh /dev/sdb1 cachyos-30g.vhd
-  sudo ./copy-to-ventoy.sh /run/media/user/Ventoy cachyos-30g.vhd
+  sudo bin/ventoy-copy /dev/sdb1 artifacts/cachyos/disk.vhd
+  sudo bin/ventoy-copy /run/media/user/Ventoy artifacts/cachyos/disk.vhd
 
 Note:
-  - Se passi una partizione blocco, lo script la monta sotto /mnt/ventoy-copy-$$
-  - Se passi un mountpoint gia montato, copia direttamente li
   - Il file viene copiato con suffisso .vtoy, richiesto da Ventoy
+  - Prima di copiare, prepara il disco con: sudo bin/ventoy-prep
 EOF
 }
 
@@ -38,11 +40,9 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 TARGET="${1:-}"
-SRC_BASENAME="${2:-cachyos-30g.vhd}"
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRC_PATH="$DIR/$SRC_BASENAME"
+SRC_PATH="${2:-}"
 
-if [[ -z "${TARGET}" ]]; then
+if [[ -z "${TARGET}" || -z "${SRC_PATH}" ]]; then
   usage >&2
   exit 1
 fi
