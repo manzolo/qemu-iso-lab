@@ -95,10 +95,12 @@ produces isolated per-VM artifacts.
 | `disk_inspect.py`         | ~242  | `wipefs`, `lsblk`, GPT geometry, `cmd_list_*_devices`.          |
 | `flash.py`                | ~214  | `cmd_flash`, `cmd_flash_helper`, sudo re-exec target.           |
 | `import_dev.py`           | ~187  | `cmd_import_device`, `cmd_import_helper`, sudo re-exec target.  |
-| `lifecycle.py`            | ~999  | All other `cmd_*` handlers + SSH helpers + setup/clean.         |
-| `cli.py`                  | ~179  | `build_parser`, `dispatch_internal`, `main`. Wires it together. |
+| `ssh.py`                  | ~209  | SSH/SCP helpers: target, base cmds, wait, post-install copy/run.|
+| `host_setup.py`           | ~85   | OS detection, install hints, `prompt_yes_no`.                   |
+| `lifecycle.py`            | ~717  | All other `cmd_*` handlers + background-VM tracking.            |
+| `cli.py`                  | ~181  | `build_parser`, `dispatch_internal`, `main`. Wires it together. |
 
-**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`iso`/`cloud_init`/`qemu`/`disk_inspect` ← {`flash`, `import_dev`, `lifecycle`} ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
+**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`iso`/`cloud_init`/`qemu`/`disk_inspect` ← {`flash`, `import_dev`, `ssh`, `host_setup`} ← `lifecycle` ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
 
 ## Typical flows
 

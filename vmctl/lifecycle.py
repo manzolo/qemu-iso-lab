@@ -4,18 +4,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shlex
 import shutil
 import signal
 import socket
-import stat
 import subprocess
-import sys
-import tempfile
 import time
 from pathlib import Path
 
-from vmctl import cloud_init, config, flash, iso, qemu, runtime, state, ui
+from vmctl import cloud_init, config, host_setup, iso, qemu, runtime, ssh, state, ui
 from vmctl.errors import VMError
 
 
@@ -171,284 +167,6 @@ def ensure_vm_disk(vm: dict, dry_run: bool = False) -> Path:
     else:
         ui.print_status("ok", f"Disk ready: {ui.pretty_path(disk_path)}")
     return disk_path
-
-
-# --- SSH provisioning ----------------------------------------------------------
-
-def ssh_target(vm: dict) -> tuple[str, int, str]:
-    cfg = cloud_init.ssh_access_config(vm)
-    if cfg is None:
-        raise VMError("VM profile does not define SSH provisioning")
-    user = str(cfg.get("user") or "").strip()
-    port = int(cfg.get("ssh_host_port") or 0)
-    if not user:
-        raise VMError("SSH provisioning user is required")
-    if port <= 0:
-        raise VMError("SSH provisioning ssh_host_port is required")
-    return ("127.0.0.1", port, user)
-
-
-def _ssh_common_opts(cfg: dict, dry_run: bool = False) -> list[str]:
-    opts = ["-F", "/dev/null", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
-    key_path = str(cfg.get("ssh_key") or "").strip()
-    if key_path:
-        expanded = runtime.expand_host_path(key_path)
-        if not expanded.is_file():
-            if dry_run:
-                return opts
-            raise VMError(f"SSH private key not found: {expanded}")
-        opts += ["-i", str(expanded)]
-    return opts
-
-
-def ssh_base_cmd(vm: dict, dry_run: bool = False) -> list[str]:
-    host, port, user = ssh_target(vm)
-    cfg = cloud_init.ssh_access_config(vm)
-    assert cfg is not None
-    return ["ssh"] + _ssh_common_opts(cfg, dry_run=dry_run) + ["-o", "BatchMode=yes", "-p", str(port), f"{user}@{host}"]
-
-
-def ssh_shell_cmd(vm: dict, dry_run: bool = False) -> list[str]:
-    host, port, user = ssh_target(vm)
-    cfg = cloud_init.ssh_access_config(vm)
-    assert cfg is not None
-    return ["ssh"] + _ssh_common_opts(cfg, dry_run=dry_run) + ["-p", str(port), f"{user}@{host}"]
-
-
-def scp_base_cmd(vm: dict, dry_run: bool = False) -> list[str]:
-    _, port, _ = ssh_target(vm)
-    cfg = cloud_init.ssh_access_config(vm)
-    assert cfg is not None
-    return ["scp"] + _ssh_common_opts(cfg, dry_run=dry_run) + ["-P", str(port)]
-
-
-def wait_for_ssh(vm: dict, timeout_sec: int, dry_run: bool = False) -> None:
-    host, port, _ = ssh_target(vm)
-    if dry_run:
-        ui.print_note(f"Would wait for SSH on {host}:{port}")
-        return
-    deadline = time.monotonic() + timeout_sec
-    probe_cmd = ssh_base_cmd(vm, dry_run=dry_run) + ["true"]
-    while time.monotonic() < deadline:
-        try:
-            result = subprocess.run(
-                probe_cmd,
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                return
-        except (OSError, subprocess.TimeoutExpired):
-            time.sleep(2)
-            continue
-        time.sleep(2)
-    raise VMError(f"Timed out waiting for SSH on {host}:{port}")
-
-
-def remote_shell_cmd(vm: dict, command: str, dry_run: bool = False) -> list[str]:
-    return ssh_base_cmd(vm, dry_run=dry_run) + [f"sh -lc {shlex.quote(command)}"]
-
-
-def remote_sudo_shell_cmd(vm: dict, command: str, dry_run: bool = False) -> list[str]:
-    return ssh_base_cmd(vm, dry_run=dry_run) + [f"sudo sh -lc {shlex.quote(command)}"]
-
-
-def wait_for_guest_post_install_ready(vm: dict, dry_run: bool = False) -> None:
-    if dry_run:
-        ui.print_note("Would wait for cloud-init to finish")
-        ui.print_note("Would wait for package manager activity to settle")
-        return
-
-    ui.print_note("Waiting for cloud-init to finish")
-    cloud_init_wait = (
-        "if command -v cloud-init >/dev/null 2>&1; then "
-        "sudo cloud-init status --wait || true; "
-        "fi"
-    )
-    runtime.run(remote_shell_cmd(vm, cloud_init_wait, dry_run=dry_run), dry_run=dry_run)
-
-    ui.print_note("Waiting for package manager activity to settle")
-    package_wait = (
-        "while pgrep -x apt >/dev/null || "
-        "pgrep -x apt-get >/dev/null || "
-        "pgrep -x dpkg >/dev/null; do "
-        "sleep 2; "
-        "done"
-    )
-    runtime.run(remote_shell_cmd(vm, package_wait, dry_run=dry_run), dry_run=dry_run)
-
-
-def post_install_copy(vm: dict, entry: dict, dry_run: bool = False) -> None:
-    host, _, user = ssh_target(vm)
-    source_raw = str(entry.get("source") or "").strip()
-    dest_raw = str(entry.get("dest") or "").strip()
-    if not source_raw or not dest_raw:
-        raise VMError("copy_from_host entries require source and dest")
-
-    source_sudo = bool(entry.get("source_sudo", False))
-    dest_sudo = bool(entry.get("dest_sudo", False))
-    dest_mode = str(entry.get("dest_mode") or "").strip()
-    source = runtime.expand_host_path(source_raw)
-    if not dry_run and not source.exists():
-        ui.print_status("warn", f"Skipping missing host path: {source}", ok=False)
-        return
-
-    recursive = source_raw.endswith("/") or source.is_dir()
-    remote_mkdir = remote_sudo_shell_cmd if dest_sudo else remote_shell_cmd
-    remote_chmod = remote_sudo_shell_cmd if dest_sudo else remote_shell_cmd
-
-    if source_sudo and recursive:
-        raise VMError("copy_from_host does not support source_sudo for recursive directories")
-
-    if source_sudo:
-        temp_source = Path(tempfile.mkdtemp(prefix="vmctl-copy-src-", dir="/tmp")) / source.name
-        try:
-            runtime.run(["sudo", "cp", "--archive", str(source), str(temp_source)], dry_run=dry_run)
-            flash.maybe_restore_sudo_owner(temp_source)
-            source = temp_source
-        except Exception:
-            if temp_source.exists():
-                temp_source.unlink(missing_ok=True)
-            raise
-
-    if recursive:
-        runtime.run(remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
-        staging_dir = Path(tempfile.mkdtemp(prefix="vmctl-copy-dir-", dir="/tmp"))
-        staged_source = staging_dir / source.name
-        try:
-            shutil.copytree(source, staged_source, symlinks=True, ignore_dangling_symlinks=True)
-            for path in staged_source.rglob("*"):
-                try:
-                    mode = path.lstat().st_mode
-                except OSError:
-                    continue
-                if path.is_symlink() and not path.exists():
-                    path.unlink(missing_ok=True)
-                    continue
-                if stat.S_ISSOCK(mode) or stat.S_ISFIFO(mode) or stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
-                    if path.is_dir():
-                        shutil.rmtree(path, ignore_errors=True)
-                    else:
-                        path.unlink(missing_ok=True)
-            remote_target = f"{user}@{host}:{dest_raw}"
-            runtime.run(scp_base_cmd(vm, dry_run=dry_run) + ["-r", f"{staged_source}/.", remote_target], dry_run=dry_run)
-            if dest_mode:
-                runtime.run(remote_chmod(vm, f"chmod -R {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
-        finally:
-            shutil.rmtree(staging_dir, ignore_errors=True)
-            if source_sudo and source.exists():
-                source.unlink(missing_ok=True)
-        return
-
-    dest_parent = str(Path(dest_raw).parent)
-    temp_dest = dest_raw
-    if dest_sudo:
-        temp_dest = f"/tmp/{Path(dest_raw).name}"
-
-    try:
-        runtime.run(remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_parent if dest_sudo else dest_parent)}", dry_run=dry_run), dry_run=dry_run)
-        remote_target = f"{user}@{host}:{temp_dest}"
-        runtime.run(scp_base_cmd(vm, dry_run=dry_run) + [str(source), remote_target], dry_run=dry_run)
-        if dest_sudo:
-            runtime.run(
-                remote_sudo_shell_cmd(
-                    vm,
-                    f"install -D -m {shlex.quote(dest_mode or '600')} {shlex.quote(temp_dest)} {shlex.quote(dest_raw)} && rm -f {shlex.quote(temp_dest)}",
-                    dry_run=dry_run,
-                ),
-                dry_run=dry_run,
-            )
-        elif dest_mode:
-            runtime.run(remote_chmod(vm, f"chmod {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
-    finally:
-        if source_sudo and source.exists():
-            source.unlink(missing_ok=True)
-
-
-def post_install_run(vm: dict, command: str, dry_run: bool = False) -> None:
-    runtime.run(remote_shell_cmd(vm, command, dry_run=dry_run), dry_run=dry_run)
-
-
-# --- host setup helpers --------------------------------------------------------
-
-def read_os_release() -> dict[str, str]:
-    os_release = Path("/etc/os-release")
-    if not os_release.is_file():
-        return {}
-
-    data: dict[str, str] = {}
-    for line in os_release.read_text(encoding="utf-8").splitlines():
-        if "=" not in line or line.startswith("#"):
-            continue
-        key, value = line.split("=", 1)
-        data[key] = value.strip().strip('"')
-    return data
-
-
-def host_install_hints() -> list[str]:
-    commands = host_install_commands()
-    if commands is not None:
-        return [runtime.shell_join(cmd) for cmd in commands]
-    return [
-        "Install QEMU, Python 3, make, and OVMF/edk2 firmware with your distro package manager.",
-        "Optional: install dialog if you want to use make tui.",
-    ]
-
-
-def host_install_commands() -> list[list[str]] | None:
-    os_release = read_os_release()
-    distro_tokens = {
-        token
-        for key in ("ID", "ID_LIKE")
-        for token in os_release.get(key, "").replace(",", " ").split()
-        if token
-    }
-
-    if {"arch", "cachyos", "manjaro"} & distro_tokens:
-        return [[
-            "sudo",
-            "pacman",
-            "-S",
-            "qemu-desktop",
-            "qemu-base",
-            "edk2-ovmf",
-            "python",
-            "dialog",
-            "make",
-            "cloud-image-utils",
-            "xorriso",
-        ]]
-    if {"debian", "ubuntu"} & distro_tokens:
-        return [
-            ["sudo", "apt", "update"],
-            [
-                "sudo",
-                "apt",
-                "install",
-                "-y",
-                "qemu-system-x86",
-                "qemu-utils",
-                "ovmf",
-                "python3",
-                "make",
-                "dialog",
-                "cloud-image-utils",
-                "xorriso",
-            ],
-        ]
-    return None
-
-
-def prompt_yes_no(prompt: str) -> bool:
-    if not getattr(sys.stdin, "isatty", lambda: False)():
-        return False
-    try:
-        answer = input(f"{prompt} [y/N] ").strip().lower()
-    except EOFError:
-        return False
-    return answer in {"y", "yes"}
 
 
 # --- info commands -------------------------------------------------------------
@@ -753,18 +471,18 @@ def run_post_install(vm_name: str, vm: dict, timeout_sec: int, dry_run: bool = F
         raise VMError(f"VM '{vm_name}' does not define SSH provisioning")
     runtime.require_command("ssh")
     runtime.require_command("scp")
-    wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
+    ssh.wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
     ui.print_status("ok", f"SSH is ready for VM '{vm_name}'")
-    wait_for_guest_post_install_ready(vm, dry_run=dry_run)
+    ssh.wait_for_guest_post_install_ready(vm, dry_run=dry_run)
     ui.print_note("Running post-install provisioning")
 
     for entry in ssh_cfg.get("copy_from_host", []):
         if not isinstance(entry, dict):
             raise VMError("Invalid copy_from_host entry: expected object")
-        post_install_copy(vm, entry, dry_run=dry_run)
+        ssh.post_install_copy(vm, entry, dry_run=dry_run)
 
     for command in ssh_cfg.get("post_install_run", []):
-        post_install_run(vm, str(command), dry_run=dry_run)
+        ssh.post_install_run(vm, str(command), dry_run=dry_run)
 
 
 def cmd_post_install(args: argparse.Namespace) -> int:
@@ -858,7 +576,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
 def cmd_shell(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
-    runtime.run(ssh_shell_cmd(vm, dry_run=args.dry_run), dry_run=args.dry_run)
+    runtime.run(ssh.ssh_shell_cmd(vm, dry_run=args.dry_run), dry_run=args.dry_run)
     return 0
 
 
@@ -942,11 +660,11 @@ def cmd_setup(args: argparse.Namespace) -> int:
         return 0
 
     ui.print_header("Suggested install commands")
-    install_commands = host_install_commands()
-    for cmd in host_install_hints():
+    install_commands = host_setup.host_install_commands()
+    for cmd in host_setup.host_install_hints():
         ui.print_kv("cmd", cmd)
 
-    if install_commands and not getattr(args, "_skip_prompt", False) and prompt_yes_no("Install missing packages now?"):
+    if install_commands and not getattr(args, "_skip_prompt", False) and host_setup.prompt_yes_no("Install missing packages now?"):
         ui.print_header("Installing packages")
         try:
             for cmd in install_commands:
