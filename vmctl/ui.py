@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 from urllib.parse import urlparse
 
 from vmctl import state
@@ -48,7 +49,7 @@ def print_note(text: str) -> None:
     print(f"{style('::', BOLD, CYAN)} {text}")
 
 
-def pretty_path(path) -> str:
+def pretty_path(path: Path) -> str:
     try:
         return str(path.resolve().relative_to(state.ROOT))
     except ValueError:

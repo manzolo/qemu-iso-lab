@@ -6,11 +6,13 @@ import json
 import subprocess
 from pathlib import Path
 
+from typing import Any
+
 from vmctl import runtime
 from vmctl.errors import VMError
 
 
-def wipefs_signatures(path: Path) -> list[dict]:
+def wipefs_signatures(path: Path) -> list[dict[str, Any]]:
     result = subprocess.run(
         ["wipefs", "-n", "--json", str(path)],
         capture_output=True,
@@ -42,14 +44,14 @@ def partition_layout(path: Path) -> str | None:
     return None
 
 
-def collect_mountpoints(node: dict) -> list[str]:
+def collect_mountpoints(node: dict[str, Any]) -> list[str]:
     mountpoints = [mp for mp in node.get("mountpoints") or [] if mp]
     for child in node.get("children") or []:
         mountpoints.extend(collect_mountpoints(child))
     return mountpoints
 
 
-def find_device_node(nodes: list[dict], device: str) -> dict | None:
+def find_device_node(nodes: list[dict[str, Any]], device: str) -> dict[str, Any] | None:
     for node in nodes:
         if node.get("path") == device:
             return node
@@ -59,7 +61,7 @@ def find_device_node(nodes: list[dict], device: str) -> dict | None:
     return None
 
 
-def lsblk_devices() -> list[dict]:
+def lsblk_devices() -> list[dict[str, Any]]:
     output = runtime.run_output(
         [
             "lsblk",
@@ -93,7 +95,7 @@ def root_block_device() -> str | None:
     return source
 
 
-def inspect_block_device(device: str) -> dict:
+def inspect_block_device(device: str) -> dict[str, Any]:
     devices = lsblk_devices()
     node = find_device_node(devices, device)
     if node is None:
@@ -122,7 +124,7 @@ def inspect_block_device(device: str) -> dict:
     }
 
 
-def inspect_block_device_basic(device: str) -> dict:
+def inspect_block_device_basic(device: str) -> dict[str, Any]:
     devices = lsblk_devices()
     node = find_device_node(devices, device)
     if node is None:
@@ -144,7 +146,7 @@ def inspect_block_device_basic(device: str) -> dict:
     }
 
 
-def list_non_root_devices() -> list[dict]:
+def list_non_root_devices() -> list[dict[str, Any]]:
     result = []
     root_disk = root_block_device()
     for node in lsblk_devices():
@@ -166,7 +168,7 @@ def list_non_root_devices() -> list[dict]:
     return result
 
 
-def list_flashable_devices() -> list[dict]:
+def list_flashable_devices() -> list[dict[str, Any]]:
     result = []
     for node in lsblk_devices():
         path = node.get("path")
@@ -181,7 +183,7 @@ def list_flashable_devices() -> list[dict]:
     return result
 
 
-def gpt_backup_overhead_bytes(info: dict) -> int:
+def gpt_backup_overhead_bytes(info: dict[str, Any]) -> int:
     logical_sector_size = int(info.get("logical_sector_size", 512) or 512)
     partition_entry_count = int(info.get("gpt_partition_entry_count", 128) or 128)
     partition_entry_size = int(info.get("gpt_partition_entry_size", 128) or 128)
@@ -196,7 +198,7 @@ def gpt_backup_overhead_bytes(info: dict) -> int:
     return logical_sector_size * trailer_sectors
 
 
-def maybe_read_gpt_geometry(device: str, logical_sector_size: int) -> dict[str, int]:
+def maybe_read_gpt_geometry(device: str, logical_sector_size: int) -> dict[str, Any]:
     header_offset = logical_sector_size
     header_size = 92
     try:
@@ -221,7 +223,7 @@ def maybe_read_gpt_geometry(device: str, logical_sector_size: int) -> dict[str, 
     }
 
 
-def partition_extent_bytes(node: dict, logical_sector_size: int) -> int:
+def partition_extent_bytes(node: dict[str, Any], logical_sector_size: int) -> int:
     start = int(node.get("start", 0) or 0)
     size = int(node.get("size", 0) or 0)
     return (start * logical_sector_size) + size

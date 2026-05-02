@@ -5,12 +5,14 @@ import argparse
 import os
 from pathlib import Path
 
+from typing import Any
+
 from vmctl import config, disk_inspect, qemu, runtime, ui
 from vmctl import state
 from vmctl.errors import VMError
 
 
-def validate_flash_target(vm: dict, disk_path: Path, device: str, force_target: bool = False) -> tuple[dict, str | None, int]:
+def validate_flash_target(vm: dict[str, Any], disk_path: Path, device: str, force_target: bool = False) -> tuple[dict[str, Any], str | None, int]:
     source_layout = disk_inspect.partition_layout(disk_path)
     source_info = runtime.image_info(disk_path)
     virtual_size = int(source_info.get("virtual-size", 0) or 0)

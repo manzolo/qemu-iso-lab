@@ -10,6 +10,8 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urljoin
 
+from typing import Any
+
 from vmctl import state, ui, runtime
 from vmctl.errors import VMError
 
@@ -31,7 +33,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def validate_iso_file(path: Path, vm: dict | None = None) -> list[str]:
+def validate_iso_file(path: Path, vm: dict[str, Any] | None = None) -> list[str]:
     problems: list[str] = []
     if not path.is_file():
         return [f"not a regular file: {path}"]
@@ -70,10 +72,11 @@ def fetch_text(url: str) -> str:
         content_type = response.headers.get("Content-Type", "")
         if "text/html" not in content_type.lower() and "text/plain" not in content_type.lower():
             ui.print_status("warn", f"Unexpected discovery content type from {ui.pretty_url(url)}: {content_type}", ok=False)
-        return response.read().decode("utf-8", errors="replace")
+        result: str = response.read().decode("utf-8", errors="replace")
+        return result
 
 
-def discover_iso_urls(vm: dict) -> list[str]:
+def discover_iso_urls(vm: dict[str, Any]) -> list[str]:
     discovery = vm.get("iso_discovery")
     if not discovery:
         return []
@@ -112,7 +115,7 @@ def discover_iso_urls(vm: dict) -> list[str]:
     return urls
 
 
-def iso_url_candidates(vm: dict, allow_discovery: bool = True) -> list[str]:
+def iso_url_candidates(vm: dict[str, Any], allow_discovery: bool = True) -> list[str]:
     candidates: list[str] = []
     if allow_discovery:
         try:
@@ -138,7 +141,7 @@ def iso_url_candidates(vm: dict, allow_discovery: bool = True) -> list[str]:
     return deduped
 
 
-def download_file(url: str, destination: Path, dry_run: bool = False, vm: dict | None = None) -> None:
+def download_file(url: str, destination: Path, dry_run: bool = False, vm: dict[str, Any] | None = None) -> None:
     ui.print_header("Download ISO")
     ui.print_kv("source", ui.pretty_url(url))
     ui.print_kv("target", ui.pretty_path(destination))
@@ -183,7 +186,7 @@ def download_file(url: str, destination: Path, dry_run: bool = False, vm: dict |
     partial.replace(destination)
 
 
-def ensure_iso(vm: dict, dry_run: bool = False) -> Path:
+def ensure_iso(vm: dict[str, Any], dry_run: bool = False) -> Path:
     iso_path = runtime.resolve_path(vm["iso"])
     if iso_path.is_file():
         problems = validate_iso_file(iso_path, vm)
@@ -218,7 +221,7 @@ def ensure_iso(vm: dict, dry_run: bool = False) -> Path:
     return iso_path
 
 
-def installer_artifact_dir(vm: dict) -> Path:
+def installer_artifact_dir(vm: dict[str, Any]) -> Path:
     return runtime.resolve_path(vm["disk"]["path"]).parent / "installer"
 
 
@@ -246,7 +249,7 @@ def extract_iso_member(iso_path: Path, member_path: str, dest_path: Path, dry_ru
     raise VMError("Missing ISO extraction tool: install xorriso or bsdtar")
 
 
-def extract_installer_boot_artifacts(vm: dict, iso_path: Path, dry_run: bool = False) -> tuple[Path, Path]:
+def extract_installer_boot_artifacts(vm: dict[str, Any], iso_path: Path, dry_run: bool = False) -> tuple[Path, Path]:
     artifact_dir = installer_artifact_dir(vm)
     kernel_path = artifact_dir / "vmlinuz"
     initrd_path = artifact_dir / "initrd"

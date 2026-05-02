@@ -8,12 +8,14 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from typing import Any
+
 from vmctl import config, disk_inspect, flash, runtime, ui
 from vmctl import state
 from vmctl.errors import VMError
 
 
-def validate_import_source(device: str) -> dict:
+def validate_import_source(device: str) -> dict[str, Any]:
     info = disk_inspect.inspect_block_device_basic(device)
     if info["is_root_disk"]:
         raise VMError(f"Refusing to read from the host root disk: {device}")
@@ -22,7 +24,7 @@ def validate_import_source(device: str) -> dict:
     return info
 
 
-def suggested_import_bytes(info: dict) -> tuple[int, bool]:
+def suggested_import_bytes(info: dict[str, Any]) -> tuple[int, bool]:
     children = [child for child in info.get("children") or [] if child.get("type") == "part"]
     if not children:
         return int(info["size"]), False

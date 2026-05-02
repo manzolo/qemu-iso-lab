@@ -8,12 +8,13 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 from vmctl import cloud_init, flash, runtime, ui
 from vmctl.errors import VMError
 
 
-def ssh_target(vm: dict) -> tuple[str, int, str]:
+def ssh_target(vm: dict[str, Any]) -> tuple[str, int, str]:
     cfg = cloud_init.ssh_access_config(vm)
     if cfg is None:
         raise VMError("VM profile does not define SSH provisioning")
@@ -26,7 +27,7 @@ def ssh_target(vm: dict) -> tuple[str, int, str]:
     return ("127.0.0.1", port, user)
 
 
-def _ssh_common_opts(cfg: dict, dry_run: bool = False) -> list[str]:
+def _ssh_common_opts(cfg: dict[str, Any], dry_run: bool = False) -> list[str]:
     opts = ["-F", "/dev/null", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
     key_path = str(cfg.get("ssh_key") or "").strip()
     if key_path:
@@ -39,28 +40,28 @@ def _ssh_common_opts(cfg: dict, dry_run: bool = False) -> list[str]:
     return opts
 
 
-def ssh_base_cmd(vm: dict, dry_run: bool = False) -> list[str]:
+def ssh_base_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     host, port, user = ssh_target(vm)
     cfg = cloud_init.ssh_access_config(vm)
     assert cfg is not None
     return ["ssh"] + _ssh_common_opts(cfg, dry_run=dry_run) + ["-o", "BatchMode=yes", "-p", str(port), f"{user}@{host}"]
 
 
-def ssh_shell_cmd(vm: dict, dry_run: bool = False) -> list[str]:
+def ssh_shell_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     host, port, user = ssh_target(vm)
     cfg = cloud_init.ssh_access_config(vm)
     assert cfg is not None
     return ["ssh"] + _ssh_common_opts(cfg, dry_run=dry_run) + ["-p", str(port), f"{user}@{host}"]
 
 
-def scp_base_cmd(vm: dict, dry_run: bool = False) -> list[str]:
+def scp_base_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     _, port, _ = ssh_target(vm)
     cfg = cloud_init.ssh_access_config(vm)
     assert cfg is not None
     return ["scp"] + _ssh_common_opts(cfg, dry_run=dry_run) + ["-P", str(port)]
 
 
-def wait_for_ssh(vm: dict, timeout_sec: int, dry_run: bool = False) -> None:
+def wait_for_ssh(vm: dict[str, Any], timeout_sec: int, dry_run: bool = False) -> None:
     host, port, _ = ssh_target(vm)
     if dry_run:
         ui.print_note(f"Would wait for SSH on {host}:{port}")
@@ -85,15 +86,15 @@ def wait_for_ssh(vm: dict, timeout_sec: int, dry_run: bool = False) -> None:
     raise VMError(f"Timed out waiting for SSH on {host}:{port}")
 
 
-def remote_shell_cmd(vm: dict, command: str, dry_run: bool = False) -> list[str]:
+def remote_shell_cmd(vm: dict[str, Any], command: str, dry_run: bool = False) -> list[str]:
     return ssh_base_cmd(vm, dry_run=dry_run) + [f"sh -lc {shlex.quote(command)}"]
 
 
-def remote_sudo_shell_cmd(vm: dict, command: str, dry_run: bool = False) -> list[str]:
+def remote_sudo_shell_cmd(vm: dict[str, Any], command: str, dry_run: bool = False) -> list[str]:
     return ssh_base_cmd(vm, dry_run=dry_run) + [f"sudo sh -lc {shlex.quote(command)}"]
 
 
-def wait_for_guest_post_install_ready(vm: dict, dry_run: bool = False) -> None:
+def wait_for_guest_post_install_ready(vm: dict[str, Any], dry_run: bool = False) -> None:
     if dry_run:
         ui.print_note("Would wait for cloud-init to finish")
         ui.print_note("Would wait for package manager activity to settle")
@@ -118,7 +119,7 @@ def wait_for_guest_post_install_ready(vm: dict, dry_run: bool = False) -> None:
     runtime.run(remote_shell_cmd(vm, package_wait, dry_run=dry_run), dry_run=dry_run)
 
 
-def post_install_copy(vm: dict, entry: dict, dry_run: bool = False) -> None:
+def post_install_copy(vm: dict[str, Any], entry: dict[str, Any], dry_run: bool = False) -> None:
     host, _, user = ssh_target(vm)
     source_raw = str(entry.get("source") or "").strip()
     dest_raw = str(entry.get("dest") or "").strip()
@@ -205,5 +206,5 @@ def post_install_copy(vm: dict, entry: dict, dry_run: bool = False) -> None:
             source.unlink(missing_ok=True)
 
 
-def post_install_run(vm: dict, command: str, dry_run: bool = False) -> None:
+def post_install_run(vm: dict[str, Any], command: str, dry_run: bool = False) -> None:
     runtime.run(remote_shell_cmd(vm, command, dry_run=dry_run), dry_run=dry_run)

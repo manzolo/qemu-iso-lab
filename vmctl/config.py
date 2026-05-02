@@ -1,11 +1,13 @@
 """VM profile loading and validation."""
 from __future__ import annotations
 
+from typing import Any, cast
+
 from vmctl import state, runtime
 from vmctl.errors import VMError
 
 
-def validate_vm_profile(name: str, vm: dict) -> list[str]:
+def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
     errors: list[str] = []
 
     def err(msg: str) -> None:
@@ -70,7 +72,7 @@ def validate_vm_profile(name: str, vm: dict) -> list[str]:
     return errors
 
 
-def load_config() -> dict:
+def load_config() -> dict[str, Any]:
     profiles_dir = state.CONFIG_DIR / "profiles"
 
     if not state.CONFIG_DIR.is_dir():
@@ -79,7 +81,7 @@ def load_config() -> dict:
     if not profiles_dir.is_dir():
         raise VMError(f"Missing profiles directory: {profiles_dir}")
 
-    merged_vms: dict[str, dict] = {}
+    merged_vms: dict[str, dict[str, Any]] = {}
     for path in sorted(profiles_dir.glob("*.json")):
         profile_data = runtime.load_json_file(path)
         if "vms" not in profile_data or not isinstance(profile_data["vms"], dict):
@@ -101,8 +103,8 @@ def load_config() -> dict:
     return {"vms": merged_vms}
 
 
-def get_vm(config: dict, name: str) -> dict:
+def get_vm(config: dict[str, Any], name: str) -> dict[str, Any]:
     try:
-        return config["vms"][name]
+        return cast(dict[str, Any], config["vms"][name])
     except KeyError as exc:
         raise VMError(f"VM profile not found: {name}") from exc

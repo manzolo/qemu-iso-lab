@@ -5,11 +5,13 @@ import json
 import shutil
 from pathlib import Path
 
+from typing import Any
+
 from vmctl import ui, runtime
 from vmctl.errors import VMError
 
 
-def _get_vm_section(vm: dict, key: str) -> dict | None:
+def _get_vm_section(vm: dict[str, Any], key: str) -> dict[str, Any] | None:
     config = vm.get(key)
     if config is None:
         return None
@@ -18,35 +20,35 @@ def _get_vm_section(vm: dict, key: str) -> dict | None:
     return config
 
 
-def cloud_init_config(vm: dict) -> dict | None:
+def cloud_init_config(vm: dict[str, Any]) -> dict[str, Any] | None:
     return _get_vm_section(vm, "cloud_init")
 
 
-def ssh_provision_config(vm: dict) -> dict | None:
+def ssh_provision_config(vm: dict[str, Any]) -> dict[str, Any] | None:
     return _get_vm_section(vm, "ssh_provision")
 
 
-def ssh_access_config(vm: dict) -> dict | None:
+def ssh_access_config(vm: dict[str, Any]) -> dict[str, Any] | None:
     return ssh_provision_config(vm) or cloud_init_config(vm)
 
 
-def autoinstall_config(vm: dict) -> dict | None:
+def autoinstall_config(vm: dict[str, Any]) -> dict[str, Any] | None:
     return _get_vm_section(vm, "autoinstall")
 
 
-def _vm_artifact_subdir(vm: dict, subdir: str) -> Path:
+def _vm_artifact_subdir(vm: dict[str, Any], subdir: str) -> Path:
     return runtime.resolve_path(vm["disk"]["path"]).parent / subdir
 
 
-def cloud_init_artifact_dir(vm: dict) -> Path:
+def cloud_init_artifact_dir(vm: dict[str, Any]) -> Path:
     return _vm_artifact_subdir(vm, "cloud-init")
 
 
-def autoinstall_artifact_dir(vm: dict) -> Path:
+def autoinstall_artifact_dir(vm: dict[str, Any]) -> Path:
     return _vm_artifact_subdir(vm, "autoinstall")
 
 
-def collect_ssh_authorized_keys(config: dict, allow_missing_file: bool = False) -> list[str]:
+def collect_ssh_authorized_keys(config: dict[str, Any], allow_missing_file: bool = False) -> list[str]:
     keys: list[str] = []
     inline_keys = config.get("ssh_authorized_keys") or []
     for key in inline_keys:
@@ -67,11 +69,11 @@ def collect_ssh_authorized_keys(config: dict, allow_missing_file: bool = False) 
     return keys
 
 
-def render_cloud_init_payload(config: dict, dry_run: bool = False, include_user: bool = True) -> dict[str, object]:
-    payload: dict[str, object] = {"package_update": True}
+def render_cloud_init_payload(config: dict[str, Any], dry_run: bool = False, include_user: bool = True) -> dict[str, Any]:
+    payload: dict[str, Any] = {"package_update": True}
     user = str(config.get("user") or "").strip()
     if include_user and user:
-        user_entry: dict[str, object] = {"name": user}
+        user_entry: dict[str, Any] = {"name": user}
         ssh_keys = collect_ssh_authorized_keys(config, allow_missing_file=dry_run)
         if ssh_keys:
             user_entry["ssh_authorized_keys"] = ssh_keys
@@ -85,7 +87,7 @@ def render_cloud_init_payload(config: dict, dry_run: bool = False, include_user:
     return payload
 
 
-def render_cloud_init_user_data(vm: dict, dry_run: bool = False) -> str:
+def render_cloud_init_user_data(vm: dict[str, Any], dry_run: bool = False) -> str:
     config = cloud_init_config(vm)
     if config is None:
         raise VMError("VM profile does not define cloud_init")
@@ -93,7 +95,7 @@ def render_cloud_init_user_data(vm: dict, dry_run: bool = False) -> str:
     return "#cloud-config\n" + json.dumps(payload, indent=2) + "\n"
 
 
-def render_cloud_init_meta_data(vm_name: str, vm: dict) -> str:
+def render_cloud_init_meta_data(vm_name: str, vm: dict[str, Any]) -> str:
     config = cloud_init_config(vm)
     if config is None:
         raise VMError("VM profile does not define cloud_init")
@@ -123,7 +125,7 @@ def create_seed_image(artifact_dir: Path, user_data: str, meta_data: str, dry_ru
     return seed_path
 
 
-def create_cloud_init_seed(vm_name: str, vm: dict, dry_run: bool = False) -> Path:
+def create_cloud_init_seed(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
     if cloud_init_config(vm) is None:
         raise VMError(f"VM '{vm_name}' does not define cloud_init")
     return create_seed_image(
@@ -138,7 +140,7 @@ def cloud_init_drive_args(seed_path: Path) -> list[str]:
     return ["-drive", f"file={seed_path},format=raw,if=virtio,media=cdrom,readonly=on"]
 
 
-def render_autoinstall_user_data(vm_name: str, vm: dict, dry_run: bool = False) -> str:
+def render_autoinstall_user_data(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> str:
     config = autoinstall_config(vm)
     if config is None:
         raise VMError("VM profile does not define autoinstall")
@@ -150,37 +152,36 @@ def render_autoinstall_user_data(vm_name: str, vm: dict, dry_run: bool = False) 
         raise VMError("autoinstall.username is required")
     if not password_hash:
         raise VMError("autoinstall.password_hash is required")
-    payload: dict[str, object] = {
-        "autoinstall": {
-            "version": 1,
-            "identity": {"hostname": hostname, "password": password_hash, "realname": str(config.get("realname") or username), "username": username},
-            "keyboard": {"layout": str(config.get("keyboard_layout") or "us")},
-            "locale": str(config.get("locale") or "en_US.UTF-8"),
-            "storage": {"layout": {"name": str(config.get("storage_layout") or "direct")}},
-        }
+    autoinstall_section: dict[str, Any] = {
+        "version": 1,
+        "identity": {"hostname": hostname, "password": password_hash, "realname": str(config.get("realname") or username), "username": username},
+        "keyboard": {"layout": str(config.get("keyboard_layout") or "us")},
+        "locale": str(config.get("locale") or "en_US.UTF-8"),
+        "storage": {"layout": {"name": str(config.get("storage_layout") or "direct")}},
     }
+    payload: dict[str, Any] = {"autoinstall": autoinstall_section}
     timezone = str(config.get("timezone") or "").strip()
     if timezone:
-        payload["autoinstall"]["timezone"] = timezone
+        autoinstall_section["timezone"] = timezone
     updates = str(config.get("updates") or "").strip()
     if updates:
         if updates not in {"security", "all"}:
             raise VMError("autoinstall.updates must be one of: security, all")
-        payload["autoinstall"]["updates"] = updates
+        autoinstall_section["updates"] = updates
     ssh_keys = collect_ssh_authorized_keys(ci or {}, allow_missing_file=dry_run)
-    payload["autoinstall"]["ssh"] = {
+    autoinstall_section["ssh"] = {
         "install-server": bool(config.get("install_ssh", True)),
         "authorized-keys": ssh_keys,
         "allow-pw": bool(config.get("allow_password", not ssh_keys)),
     }
     if config.get("packages"):
-        payload["autoinstall"]["packages"] = list(config["packages"])
+        autoinstall_section["packages"] = list(config["packages"])
     if ci is not None:
-        payload["autoinstall"]["user-data"] = render_cloud_init_payload(ci, dry_run=dry_run, include_user=False)
+        autoinstall_section["user-data"] = render_cloud_init_payload(ci, dry_run=dry_run, include_user=False)
     return "#cloud-config\n" + json.dumps(payload, indent=2) + "\n"
 
 
-def create_autoinstall_seed(vm_name: str, vm: dict, dry_run: bool = False) -> Path:
+def create_autoinstall_seed(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
     if autoinstall_config(vm) is None:
         raise VMError(f"VM '{vm_name}' does not define autoinstall")
     meta_data = json.dumps({"instance-id": f"{vm_name}-autoinstall", "local-hostname": vm_name}, indent=2) + "\n"

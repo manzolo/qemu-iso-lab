@@ -9,12 +9,13 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from vmctl import state, ui
 from vmctl.errors import VMError
 
 
-def load_json_file(path: Path) -> dict:
+def load_json_file(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as fh:
         data = json.load(fh)
     if not isinstance(data, dict):
@@ -26,7 +27,7 @@ def run_output(cmd: list[str]) -> str:
     return subprocess.check_output(cmd, text=True)
 
 
-def image_info(path: Path, quiet: bool = False) -> dict:
+def image_info(path: Path, quiet: bool = False) -> dict[str, Any]:
     cmd = ["qemu-img", "info", "--output=json", str(path)]
     if quiet:
         result = subprocess.run(cmd, check=False, capture_output=True, text=True)

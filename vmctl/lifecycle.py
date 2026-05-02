@@ -10,6 +10,7 @@ import socket
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
 
 from vmctl import cloud_init, config, host_setup, iso, qemu, runtime, ssh, state, ui
 from vmctl.errors import VMError
@@ -88,7 +89,7 @@ def is_bootstrap_vm_running(name: str) -> tuple[bool, int | None, str | None]:
     return (True, pid, cmdline)
 
 
-def vm_runtime_status(name: str, vm: dict) -> tuple[str, str]:
+def vm_runtime_status(name: str, vm: dict[str, Any]) -> tuple[str, str]:
     running, pid, cmdline = is_bootstrap_vm_running(name)
     if running and pid is not None:
         return (f"tracked:{pid}", "-")
@@ -152,7 +153,7 @@ def prepare_background_vm_slot(name: str, dry_run: bool = False) -> tuple[Path, 
     return (pid_path, log_path)
 
 
-def ensure_vm_disk(vm: dict, dry_run: bool = False) -> Path:
+def ensure_vm_disk(vm: dict[str, Any], dry_run: bool = False) -> Path:
     runtime.require_command("qemu-img")
     disk = vm["disk"]
     disk_path = runtime.resolve_path(disk["path"])
@@ -213,7 +214,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
-def disk_status(vm: dict) -> tuple[str, str, str]:
+def disk_status(vm: dict[str, Any]) -> tuple[str, str, str]:
     disk_path = runtime.resolve_path(vm["disk"]["path"])
     if not disk_path.is_file():
         return "missing", "-", "-"
@@ -228,12 +229,12 @@ def disk_status(vm: dict) -> tuple[str, str, str]:
     return "ready", actual_size, virtual_size
 
 
-def iso_status(vm: dict) -> str:
+def iso_status(vm: dict[str, Any]) -> str:
     iso_path = runtime.resolve_path(vm["iso"])
     return "ready" if iso_path.is_file() else "missing"
 
 
-def nvram_status(vm: dict) -> str:
+def nvram_status(vm: dict[str, Any]) -> str:
     firmware = vm.get("firmware", {})
     if firmware.get("type") != "efi":
         return "-"
@@ -241,7 +242,7 @@ def nvram_status(vm: dict) -> str:
     return "ready" if vars_path.is_file() else "missing"
 
 
-def vm_has_local_state(vm: dict) -> bool:
+def vm_has_local_state(vm: dict[str, Any]) -> bool:
     disk_path = runtime.resolve_path(vm["disk"]["path"])
     if disk_path.exists():
         return True
@@ -465,7 +466,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     return 0
 
 
-def run_post_install(vm_name: str, vm: dict, timeout_sec: int, dry_run: bool = False) -> None:
+def run_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int, dry_run: bool = False) -> None:
     ssh_cfg = cloud_init.ssh_access_config(vm)
     if ssh_cfg is None:
         raise VMError(f"VM '{vm_name}' does not define SSH provisioning")
@@ -667,8 +668,8 @@ def cmd_setup(args: argparse.Namespace) -> int:
     if install_commands and not getattr(args, "_skip_prompt", False) and host_setup.prompt_yes_no("Install missing packages now?"):
         ui.print_header("Installing packages")
         try:
-            for cmd in install_commands:
-                runtime.run(cmd, dry_run=False)
+            for install_cmd in install_commands:
+                runtime.run(install_cmd, dry_run=False)
         except subprocess.CalledProcessError as exc:
             raise VMError(f"Package installation failed: {' '.join(exc.cmd)}") from exc
         ui.print_note("Re-running setup checks")
@@ -677,7 +678,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return 1
 
 
-def clean_vm(name: str, vm: dict, dry_run: bool = False) -> None:
+def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
     disk_path = runtime.resolve_path(vm["disk"]["path"])
     fw = vm["firmware"]
     vars_path = runtime.resolve_path(fw["vars_path"]) if fw["type"] == "efi" else None

@@ -172,7 +172,7 @@ def main() -> int:
         parser.error("clean requires a VM name or --all")
 
     try:
-        return args.func(args)
+        return int(args.func(args))
     except VMError as exc:
         print(ui.style(f"error: {exc}", ui.RED, ui.BOLD), file=sys.stderr)
         return 1

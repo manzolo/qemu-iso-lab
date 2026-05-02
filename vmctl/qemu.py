@@ -9,11 +9,13 @@ import sys
 import time
 from pathlib import Path
 
+from typing import Any
+
 from vmctl import state, ui, runtime, cloud_init
 from vmctl.errors import VMError
 
 
-def expected_partition_layout(vm: dict) -> str:
+def expected_partition_layout(vm: dict[str, Any]) -> str:
     return "gpt" if vm["firmware"]["type"] == "efi" else "dos"
 
 
@@ -21,7 +23,7 @@ def is_container_disk_format(fmt: str) -> bool:
     return fmt in {"qcow2", "qcow", "vmdk", "vhdx"}
 
 
-def iter_ovmf_candidates(fw: dict) -> list[tuple[Path, Path]]:
+def iter_ovmf_candidates(fw: dict[str, Any]) -> list[tuple[Path, Path]]:
     candidates: list[tuple[Path, Path]] = []
     env_code = os.environ.get("OVMF_CODE")
     env_vars = os.environ.get("OVMF_VARS_TEMPLATE")
@@ -35,15 +37,15 @@ def iter_ovmf_candidates(fw: dict) -> list[tuple[Path, Path]]:
         candidates.append((Path(code), Path(vars_template)))
     unique: list[tuple[Path, Path]] = []
     seen: set[tuple[str, str]] = set()
-    for code, vars_template in candidates:
-        key = (str(code), str(vars_template))
+    for pair in candidates:
+        key = (str(pair[0]), str(pair[1]))
         if key not in seen:
-            unique.append((code, vars_template))
+            unique.append(pair)
             seen.add(key)
     return unique
 
 
-def resolve_efi_firmware(fw: dict) -> tuple[Path, Path, Path]:
+def resolve_efi_firmware(fw: dict[str, Any]) -> tuple[Path, Path, Path]:
     vars_path = runtime.resolve_path(fw["vars_path"])
     for code, vars_template in iter_ovmf_candidates(fw):
         if code.is_file() and vars_template.is_file():
@@ -61,7 +63,7 @@ def resolve_efi_firmware(fw: dict) -> tuple[Path, Path, Path]:
     raise VMError(" ".join(lines))
 
 
-def firmware_status(vm: dict) -> tuple[str, str]:
+def firmware_status(vm: dict[str, Any]) -> tuple[str, str]:
     fw = vm["firmware"]
     fw_type = fw["type"]
     if fw_type == "bios":
@@ -72,14 +74,14 @@ def firmware_status(vm: dict) -> tuple[str, str]:
     return fw_type, f"code={code} vars_template={vars_template} vars_path={vars_path}"
 
 
-def machine_arg(vm: dict, accel: str | None = None) -> str:
-    machine = vm["machine"]
+def machine_arg(vm: dict[str, Any], accel: str | None = None) -> str:
+    machine = str(vm["machine"])
     if accel:
         return f"{machine},accel={accel}"
     return machine
 
 
-def firmware_args(vm: dict, dry_run: bool = False) -> list[str]:
+def firmware_args(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     fw = vm["firmware"]
     fw_type = fw["type"]
     if fw_type == "bios":
@@ -95,7 +97,7 @@ def firmware_args(vm: dict, dry_run: bool = False) -> list[str]:
     return ["-drive", f"if=pflash,format=raw,readonly=on,file={code}", "-drive", f"if=pflash,format=raw,file={vars_path}"]
 
 
-def disk_args(vm: dict, allow_missing: bool = False) -> list[str]:
+def disk_args(vm: dict[str, Any], allow_missing: bool = False) -> list[str]:
     disk = vm["disk"]
     disk_path = runtime.resolve_path(disk["path"])
     if not disk_path.exists() and not allow_missing:
@@ -108,7 +110,7 @@ def disk_args(vm: dict, allow_missing: bool = False) -> list[str]:
     raise VMError(f"Unsupported disk interface: {interface}")
 
 
-def video_args(vm: dict, variant: str | None) -> list[str]:
+def video_args(vm: dict[str, Any], variant: str | None) -> list[str]:
     video = vm.get("video", {})
     variants = video.get("variants", {})
     selected = variant or video.get("default")
@@ -127,7 +129,7 @@ def spice_display_args(port: int) -> list[str]:
             "-device", "virtio-serial-pci", "-chardev", "spicevmc,id=vdagent0,name=vdagent", "-device", "virtserialport,chardev=vdagent0,name=com.redhat.spice.0"]
 
 
-def installer_video_variant(vm: dict, requested: str | None) -> str | None:
+def installer_video_variant(vm: dict[str, Any], requested: str | None) -> str | None:
     if requested:
         return requested
     video = vm.get("video", {})
@@ -135,12 +137,12 @@ def installer_video_variant(vm: dict, requested: str | None) -> str | None:
     order = video.get("installer_order", ("safe", "std"))
     for candidate in order:
         if candidate in variants:
-            return candidate
+            return str(candidate)
     return None
 
 
 def common_args(
-    vm: dict, variant: str | None, dry_run: bool = False, accel: str | None = "kvm",
+    vm: dict[str, Any], variant: str | None, dry_run: bool = False, accel: str | None = "kvm",
     headless: bool = False, serial_stdio: bool = False, no_reboot: bool = False,
     allow_missing_disk: bool = False, enable_clipboard: bool = True, spice_port: int | None = None,
 ) -> list[str]:
@@ -191,6 +193,8 @@ def run_and_expect(
         return
     deadline = time.monotonic() + timeout_sec
     process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    assert process.stdout is not None
+    assert process.stdin is not None
     captured: list[str] = []
     sent_inputs: set[tuple[str, str]] = set()
     selector = selectors.DefaultSelector()
