@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qemu-iso-lab-vmctl"
+version = "1.0.0"
+description = "QEMU ISO Lab — declarative VM management toolkit"
+requires-python = ">=3.10"
+authors = [{ name = "Andrea Manzi" }]
+readme = "README.md"
+
+[project.scripts]
+vmctl = "vmctl.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vmctl*"]
