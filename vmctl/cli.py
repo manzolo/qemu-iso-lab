@@ -5,6 +5,7 @@ import argparse
 import subprocess
 import sys
 
+import vmctl
 from vmctl import disk_inspect, flash, import_dev, lifecycle, ui
 from vmctl.errors import VMError
 
@@ -16,6 +17,7 @@ VIDEO_HELP = "QEMU display variant (defaults to the profile setting)"
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vmctl")
+    parser.add_argument("--version", action="version", version=f"vmctl {vmctl.__version__}")
     parser.add_argument("--dry-run", action="store_true", help="print commands without executing them")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
