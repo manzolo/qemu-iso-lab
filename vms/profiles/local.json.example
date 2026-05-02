@@ -40,9 +40,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ],
           "virtio-gl": [
             "-device",
@@ -104,7 +102,10 @@
       "audio": true,
       "video": {
         "default": "virtio-gl",
-        "installer_order": ["std", "safe"],
+        "installer_order": [
+          "std",
+          "safe"
+        ],
         "variants": {
           "std": [
             "-vga",
@@ -116,9 +117,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ],
           "virtio-gl": [
             "-device",

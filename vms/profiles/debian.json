@@ -40,9 +40,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ]
         }
       },
@@ -85,9 +83,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ]
         }
       },
@@ -122,7 +118,10 @@
       "audio": true,
       "video": {
         "default": "std",
-        "installer_order": ["std", "safe"],
+        "installer_order": [
+          "std",
+          "safe"
+        ],
         "variants": {
           "std": [
             "-vga",
@@ -134,9 +133,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ]
         }
       },
@@ -171,7 +168,10 @@
       "audio": false,
       "video": {
         "default": "safe",
-        "installer_order": ["std", "safe"],
+        "installer_order": [
+          "std",
+          "safe"
+        ],
         "variants": {
           "std": [
             "-vga",
@@ -183,9 +183,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ]
         }
       },
@@ -220,7 +218,10 @@
       "audio": true,
       "video": {
         "default": "safe",
-        "installer_order": ["std", "safe"],
+        "installer_order": [
+          "std",
+          "safe"
+        ],
         "variants": {
           "std": [
             "-vga",
@@ -232,9 +233,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ],
           "virtio-gl": [
             "-device",

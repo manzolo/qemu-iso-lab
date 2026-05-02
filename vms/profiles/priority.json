@@ -40,9 +40,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ]
         }
       },
@@ -88,9 +86,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ]
         }
       },
@@ -136,9 +132,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ]
         }
       },

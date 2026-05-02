@@ -41,9 +41,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ],
           "virtio-gl": [
             "-device",
@@ -99,9 +97,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ],
           "virtio-gl": [
             "-device",
@@ -154,9 +150,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ],
           "virtio-gl": [
             "-device",
@@ -209,9 +203,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ]
         }
       },
@@ -258,9 +250,7 @@
             "-vga",
             "std",
             "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
+            "gtk"
           ]
         }
       },
