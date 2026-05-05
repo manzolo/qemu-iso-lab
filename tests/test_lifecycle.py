@@ -328,6 +328,10 @@ class VmctlTests(BaseVmctlTestCase):
         log_path = run_background.call_args.args[1]
         self.assertIn("-display", qemu_cmd)
         self.assertIn("none", qemu_cmd)
+        self.assertIn("-chardev", qemu_cmd)
+        self.assertIn("stdio,id=char0,signal=off", qemu_cmd)
+        self.assertIn("-serial", qemu_cmd)
+        self.assertIn("chardev:char0", qemu_cmd)
         self.assertEqual(log_path, self.root / "artifacts/testvm/logs/bootstrap-start.log")
 
     def test_cmd_start_spice_background_tracks_pid_and_log(self):
@@ -646,6 +650,10 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("-display", qemu_cmd)
         self.assertIn("none", qemu_cmd)
         self.assertNotIn("-vga", qemu_cmd)
+        self.assertIn("-chardev", qemu_cmd)
+        self.assertIn("stdio,id=char0,signal=off", qemu_cmd)
+        self.assertIn("-serial", qemu_cmd)
+        self.assertIn("chardev:char0", qemu_cmd)
         self.assertEqual(log_path, self.root / "artifacts/testvm/logs/bootstrap-start.log")
         wait_for_ssh.assert_called_once_with(self.vm_config, 45, dry_run=True)
         self.assertEqual(
@@ -692,6 +700,40 @@ class VmctlTests(BaseVmctlTestCase):
 
         with self.assertRaises(self.vmctl.VMError):
             self.vmctl.cmd_bootstrap_unattended(argparse.Namespace(vm=self.vm_name, video=None, timeout=30, dry_run=True))
+
+    def test_cmd_bootstrap_archinstall_resets_efi_vars_before_boot(self):
+        self.create_disk()
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.vm_config["archinstall_config"] = {
+            "hostname": "arch-test",
+            "username": "tester",
+            "password": "s3cret",
+        }
+        self.write_config_dir()
+        vars_path = self.root / self.vm_config["firmware"]["vars_path"]
+        vars_path.parent.mkdir(parents=True, exist_ok=True)
+        vars_path.write_text("vars", encoding="utf-8")
+        args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=False)
+
+        with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.lifecycle, "ensure_vm_disk"), \
+             mock.patch.object(vmctl.archinstall, "create_bootstrap_iso", return_value=self.root / "artifacts/testvm/archinstall/bootstrap.iso"), \
+             mock.patch.object(vmctl.iso, "extract_arch_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.archinstall, "arch_iso_label", return_value="ARCH_202604"), \
+             mock.patch.object(vmctl.qemu, "common_args", side_effect=[["qemu-system-x86_64"], ["qemu-system-x86_64"]]), \
+             mock.patch.object(vmctl.qemu, "run_and_expect"), \
+             mock.patch.object(vmctl.lifecycle, "prepare_background_vm_slot", return_value=(self.root / "artifacts/testvm/runtime/bootstrap-start.pid", self.root / "artifacts/testvm/logs/bootstrap-start.log")), \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=None), \
+             mock.patch.object(vmctl.lifecycle, "run_post_install"):
+            exit_code = self.vmctl.cmd_bootstrap_archinstall(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertFalse(vars_path.exists())
 
 
 if __name__ == "__main__":

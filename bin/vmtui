@@ -123,10 +123,13 @@ ensure_optional_command() {
 }
 
 list_vm_menu_items() {
-    python3 - "$CONFIG_DIR" <<'PY'
-import json
+    python3 - "$ROOT_DIR" "$CONFIG_DIR" <<'PY'
 import sys
 from pathlib import Path
+
+sys.path.insert(0, sys.argv[1])
+
+from vmctl import config, state
 
 
 def ellipsize(text: str, width: int) -> str:
@@ -137,12 +140,9 @@ def ellipsize(text: str, width: int) -> str:
     return text[: width - 3] + "..."
 
 
-config_dir = Path(sys.argv[1])
-data = {"vms": {}}
-for profile_path in sorted((config_dir / "profiles").glob("*.json")):
-    profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
-    data["vms"].update(profile_data["vms"])
-for name, vm in sorted(data["vms"].items()):
+state.ROOT = Path(sys.argv[1])
+state.CONFIG_DIR = Path(sys.argv[2])
+for name, vm in sorted(config.load_config()["vms"].items()):
     label = vm.get("name", name)
     firmware = str(vm.get("firmware", {}).get("type", "?")).upper()
     memory = f"{vm.get('memory_mb', '?')} MB"
@@ -162,18 +162,18 @@ PY
 }
 
 list_video_menu_items() {
-    python3 - "$CONFIG_DIR" "$1" <<'PY'
-import json
+    python3 - "$ROOT_DIR" "$CONFIG_DIR" "$1" <<'PY'
 import sys
 from pathlib import Path
 
-config_dir = Path(sys.argv[1])
-vm_name = sys.argv[2]
-data = {"vms": {}}
-for profile_path in sorted((config_dir / "profiles").glob("*.json")):
-    profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
-    data["vms"].update(profile_data["vms"])
-vm = data["vms"][vm_name]
+sys.path.insert(0, sys.argv[1])
+
+from vmctl import config, state
+
+state.ROOT = Path(sys.argv[1])
+state.CONFIG_DIR = Path(sys.argv[2])
+vm_name = sys.argv[3]
+vm = config.load_config()["vms"][vm_name]
 video = vm.get("video", {})
 default = video.get("default", "")
 variants = video.get("variants", {})
@@ -186,36 +186,36 @@ PY
 }
 
 vm_has_section() {
-    python3 - "$CONFIG_DIR" "$1" "$2" <<'PY'
-import json
+    python3 - "$ROOT_DIR" "$CONFIG_DIR" "$1" "$2" <<'PY'
 import sys
 from pathlib import Path
 
-config_dir = Path(sys.argv[1])
-vm_name = sys.argv[2]
-section = sys.argv[3]
-data = {"vms": {}}
-for profile_path in sorted((config_dir / "profiles").glob("*.json")):
-    profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
-    data["vms"].update(profile_data["vms"])
-vm = data["vms"][vm_name]
+sys.path.insert(0, sys.argv[1])
+
+from vmctl import config, state
+
+state.ROOT = Path(sys.argv[1])
+state.CONFIG_DIR = Path(sys.argv[2])
+vm_name = sys.argv[3]
+section = sys.argv[4]
+vm = config.load_config()["vms"][vm_name]
 raise SystemExit(0 if isinstance(vm.get(section), dict) else 1)
 PY
 }
 
 vm_has_ssh_provision() {
-    python3 - "$CONFIG_DIR" "$1" <<'PY'
-import json
+    python3 - "$ROOT_DIR" "$CONFIG_DIR" "$1" <<'PY'
 import sys
 from pathlib import Path
 
-config_dir = Path(sys.argv[1])
-vm_name = sys.argv[2]
-data = {"vms": {}}
-for profile_path in sorted((config_dir / "profiles").glob("*.json")):
-    profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
-    data["vms"].update(profile_data["vms"])
-vm = data["vms"][vm_name]
+sys.path.insert(0, sys.argv[1])
+
+from vmctl import config, state
+
+state.ROOT = Path(sys.argv[1])
+state.CONFIG_DIR = Path(sys.argv[2])
+vm_name = sys.argv[3]
+vm = config.load_config()["vms"][vm_name]
 ssh_cfg = vm.get("ssh_provision")
 cloud_cfg = vm.get("cloud_init")
 raise SystemExit(0 if isinstance(ssh_cfg, dict) or isinstance(cloud_cfg, dict) else 1)
@@ -279,12 +279,15 @@ list_vm_action_items() {
 
 list_quick_action_items() {
     local vm_name="$1"
+    if vm_has_section "$vm_name" "archinstall_config"; then
+        printf '%s\n' "Arch Bootstrap" "Fully automated Arch install + post-install (headless)"
+    fi
     if vm_has_section "$vm_name" "autoinstall" && vm_has_section "$vm_name" "cloud_init"; then
         printf '%s\n' "Full Bootstrap" "Unattended install, first boot, and post-install"
     fi
     if vm_has_section "$vm_name" "cloud_init"; then
         printf '%s\n' "Cloud-Init Flow" "Manual installer with first-boot handoff"
-    else
+    elif ! vm_has_section "$vm_name" "archinstall_config"; then
         printf '%s\n' "Guided Install" "Fetch ISO, prepare artifacts, boot installer"
     fi
     printf '%s\n' "Boot Desktop" "Start the installed VM with display"
@@ -299,8 +302,13 @@ list_install_action_items() {
     local vm_name="$1"
     printf '%s\n' "Fetch ISO" "Download or validate the configured ISO"
     printf '%s\n' "Prepare VM" "Create disk and firmware artifacts"
-    printf '%s\n' "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-    printf '%s\n' "Installer Only" "Boot the installer without preparation"
+    if vm_has_section "$vm_name" "archinstall_config"; then
+        printf '%s\n' "Arch Bootstrap" "Fully automated Arch install + post-install (headless)"
+        printf '%s\n' "Arch Install (Interactive)" "Boot live ISO with pre-built archinstall config on /dev/vdb"
+    else
+        printf '%s\n' "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+        printf '%s\n' "Installer Only" "Boot the installer without preparation"
+    fi
     if vm_has_section "$vm_name" "autoinstall"; then
         printf '%s\n' "Autoinstall" "Run the unattended Ubuntu installer"
     fi
@@ -482,6 +490,8 @@ resolve_action() {
         "Maintenance") printf '%s\n' maintenance-flows ;;
         "Profile Details") printf '%s\n' show ;;
         "Main Menu"|"Back") printf '%s\n' back ;;
+        "Arch Bootstrap") printf '%s\n' bootstrap-archinstall ;;
+        "Arch Install (Interactive)") printf '%s\n' install-archinstall ;;
         "Full Bootstrap") printf '%s\n' bootstrap-unattended ;;
         "Guided Install"|"Guided Provision") printf '%s\n' provision ;;
         "Boot Desktop") printf '%s\n' start ;;
@@ -553,6 +563,23 @@ run_action() {
                     run_vmctl install-unattended "$current_vm"
                 fi
                 msg_box "Next Steps" "When the unattended installer exits on reboot:\n\n1. Run 'Boot installed VM'\n2. Wait for the guest to finish its first boot\n3. Run 'Run SSH post-install actions'\n\nNo manual installer interaction is expected in this flow."
+            fi
+            ;;
+        bootstrap-archinstall)
+            if confirm_box "Arch Bootstrap" "Run the fully automated Arch Linux bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the Arch live ISO headless via serial console\n- automatically trigger pacstrap, locale, user, GRUB\n- start the installed VM and run SSH post-install (paru + noctalia-git)\n\nExpected time: ~15-30 min depending on download speed."; then
+                run_vmctl bootstrap-archinstall "$current_vm"
+            fi
+            ;;
+        install-archinstall)
+            local video
+            video=$(choose_video) || return 0
+            if confirm_box "Arch Install (Interactive)" "Boot the Arch live ISO with a pre-built archinstall config disk for VM '$current_vm'?\n\nThis will:\n- generate archinstall-config.json + archinstall-creds.json\n- boot the live ISO with the config on /dev/vdb\n\nIn the live environment run:\n  mkdir -p /tmp/archconf\n  mount /dev/vdb /tmp/archconf\n  bash /tmp/archconf/run.sh"; then
+                if [[ -n "$video" ]]; then
+                    run_vmctl install-archinstall "$current_vm" --video "$video"
+                else
+                    run_vmctl install-archinstall "$current_vm"
+                fi
+                msg_box "Next Steps" "In the Arch live environment:\n\n  mkdir -p /tmp/archconf\n  mount /dev/vdb /tmp/archconf\n  bash /tmp/archconf/run.sh\n\narchinstall will start with most options pre-filled.\nAfter reboot, use 'Post-Install' to run SSH provisioning."
             fi
             ;;
         bootstrap-unattended)

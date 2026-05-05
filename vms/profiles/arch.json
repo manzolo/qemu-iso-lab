@@ -98,6 +98,245 @@
         }
       },
       "usb_tablet": true
+    },
+    "cachyos-local": {
+      "name": "CachyOS",
+      "meta": {
+        "catalog_slug": "cachyos",
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/cachyos-desktop-linux-260308.iso",
+      "iso_url": "https://mirror.cachyos.org/ISO/desktop/260308/cachyos-desktop-linux-260308.iso",
+      "disk": {
+        "path": "artifacts/cachyos-local/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/cachyos-local/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "virtio-gl",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "ssh_provision": {
+        "hostname": "cachyos-local",
+        "user": "manzolo",
+        "ssh_host_port": 2223,
+        "post_install_run": [
+          "mkdir -p ~/.config/niri ~/.config/DankMaterialShell",
+          "sudo pacman -Sy --noconfirm --needed foot niri || true",
+          "command -v niri >/dev/null && niri --version || true"
+        ]
+      }
+    },
+    "cachyos-nvidia-local": {
+      "name": "CachyOS NVIDIA 580",
+      "meta": {
+        "catalog_slug": "cachyos",
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/cachyos-desktop-linux-260308.iso",
+      "iso_url": "https://mirror.cachyos.org/ISO/desktop/260308/cachyos-desktop-linux-260308.iso",
+      "disk": {
+        "path": "artifacts/cachyos-nvidia-local/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/cachyos-nvidia-local/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "virtio-gl",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk",
+            "-serial",
+            "mon:stdio"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "ssh_provision": {
+        "hostname": "cachyos-nvidia-local",
+        "user": "manzolo",
+        "ssh_host_port": 2224,
+        "post_install_run": [
+          "mkdir -p ~/.config/niri ~/.config/DankMaterialShell",
+          "sudo pacman -Sy --noconfirm --needed foot niri nvidia-580xx-dkms nvidia-580xx-utils nvidia-580xx-settings lib32-nvidia-580xx-utils opencl-nvidia-580xx lib32-opencl-nvidia-580xx || true",
+          "command -v niri >/dev/null && niri --version || true"
+        ]
+      }
+    },
+    "arch-noctalia-local": {
+      "name": "Arch Linux + Noctalia 5",
+      "meta": {
+        "slug": "archlinux",
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/archlinux-2026.04.01-x86_64.iso",
+      "iso_url": "https://mirrors.dotsrc.org/archlinux/iso/latest/archlinux-2026.04.01-x86_64.iso",
+      "disk": {
+        "path": "artifacts/arch-noctalia-local/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/arch-noctalia-local/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 8192,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "virtio-gl",
+        "variants": {
+          "std": ["-vga", "std", "-display", "gtk"],
+          "safe": ["-vga", "std", "-display", "gtk"],
+          "virtio-gl": ["-device", "virtio-vga-gl", "-display", "gtk,gl=on"]
+        }
+      },
+      "usb_tablet": true,
+      "archinstall_config": {
+        "hostname": "arch-noctalia-local",
+        "username": "manzolo",
+        "password": "manzolo",
+        "timezone": "Europe/Rome",
+        "keyboard_layout": "it",
+        "locale_lang": "it_IT",
+        "locale_enc": "UTF-8",
+        "bootloader": "Grub",
+        "kernels": ["linux"],
+        "audio": true,
+        "packages": [
+          "brightnessctl",
+          "ffmpeg",
+          "foot",
+          "greetd",
+          "imagemagick",
+          "jemalloc",
+          "cli11",
+          "cmake",
+          "niri",
+          "libxkbcommon",
+          "mesa",
+          "ninja",
+          "noto-fonts",
+          "noto-fonts-emoji",
+          "pipewire",
+          "pipewire-pulse",
+          "polkit",
+          "python",
+          "qt6-base",
+          "qt6-declarative",
+          "qt6-multimedia",
+          "qt6-shadertools",
+          "qt6-svg",
+          "qt6-wayland",
+          "seatd",
+          "ttf-dejavu",
+          "vulkan-headers",
+          "wayland-protocols",
+          "wireplumber",
+          "wlr-randr",
+          "xdg-desktop-portal-gtk",
+          "xorg-xwayland"
+        ],
+        "bootstrap_chroot_commands": [
+          "pacman -S --noconfirm --needed git base-devel",
+          "usermod -aG seat manzolo",
+          "systemctl enable seatd greetd",
+          "cat > /etc/greetd/config.toml <<\"EOF\"\n[terminal]\nvt = 1\n\n[initial_session]\ncommand = \"niri-session\"\nuser = \"manzolo\"\n\n[default_session]\ncommand = \"agreety\"\nuser = \"greeter\"\nEOF"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "arch-noctalia-local",
+        "user": "manzolo",
+        "ssh_host_port": 2226,
+        "post_install_run": [
+          "mkdir -p ~/.config/niri ~/.config/DankMaterialShell ~/bin ~/aurbuild",
+          "sudo pacman -S --noconfirm --needed niri",
+          "rm -rf ~/aurbuild/noctalia-qs && git clone https://aur.archlinux.org/noctalia-qs.git ~/aurbuild/noctalia-qs",
+          "bash -lc 'set -e; cd ~/aurbuild/noctalia-qs; makepkg -Ccf --noconfirm; pkg=$(find \"$HOME\"/aurbuild/noctalia-qs -maxdepth 1 -type f -name \"noctalia-qs-*.pkg.tar.*\" -printf \"%T@ %p\\n\" | sort -nr | head -n1 | cut -d\" \" -f2-); test -n \"$pkg\"; test -s \"$pkg\"; [ \"$(bsdtar -xOf \"$pkg\" usr/bin/quickshell | wc -c)\" -gt 0 ]'",
+          "sudo bash -lc 'set -e; pkg=$(find /home/manzolo/aurbuild/noctalia-qs -maxdepth 1 -type f -name \"noctalia-qs-*.pkg.tar.*\" -printf \"%T@ %p\\n\" | sort -nr | head -n1 | cut -d\" \" -f2-); test -n \"$pkg\"; pacman -U --overwrite \"*\" --noconfirm \"$pkg\"; if ! test -s /usr/bin/quickshell; then pacman -U --overwrite \"*\" --noconfirm \"$pkg\"; fi; test -s /usr/bin/quickshell'",
+          "rm -rf ~/aurbuild/noctalia-shell-git && git clone https://aur.archlinux.org/noctalia-shell-git.git ~/aurbuild/noctalia-shell-git",
+          "bash -lc 'set -e; cd ~/aurbuild/noctalia-shell-git; makepkg -Ccf --noconfirm; pkg=$(find \"$HOME\"/aurbuild/noctalia-shell-git -maxdepth 1 -type f -name \"noctalia-shell-git-*.pkg.tar.*\" -printf \"%T@ %p\\n\" | sort -nr | head -n1 | cut -d\" \" -f2-); test -n \"$pkg\"; test -s \"$pkg\"; [ \"$(bsdtar -xOf \"$pkg\" etc/xdg/quickshell/noctalia-shell/shell.qml | wc -c)\" -gt 0 ]'",
+          "sudo bash -lc 'set -e; pkg=$(find /home/manzolo/aurbuild/noctalia-shell-git -maxdepth 1 -type f -name \"noctalia-shell-git-*.pkg.tar.*\" -printf \"%T@ %p\\n\" | sort -nr | head -n1 | cut -d\" \" -f2-); test -n \"$pkg\"; pacman -U --overwrite \"*\" --noconfirm \"$pkg\"; if ! test -s /etc/xdg/quickshell/noctalia-shell/shell.qml; then pacman -U --overwrite \"*\" --noconfirm \"$pkg\"; fi; test -s /etc/xdg/quickshell/noctalia-shell/shell.qml'",
+          "cat > ~/bin/start-noctalia <<'EOF'\n#!/usr/bin/env sh\nexport XDG_CURRENT_DESKTOP=niri\nexport XDG_SESSION_TYPE=wayland\nexec qs -c noctalia-shell >>\"${XDG_RUNTIME_DIR:-/tmp}/noctalia.log\" 2>&1\nEOF\nchmod +x ~/bin/start-noctalia",
+          "python3 - <<'PY'\nfrom pathlib import Path\npath = Path.home() / '.config' / 'niri' / 'config.kdl'\ntext = path.read_text(encoding='utf-8')\nreplacements = {\n    'spawn-at-startup \"noctalia\"': 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n    'spawn-at-startup \"qs -c noctalia-shell\"': 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n    'spawn-at-startup \"~/bin/start-noctalia\"': 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n    'spawn-at-startup \"foot\"': '// spawn-at-startup \"foot\"',\n}\nfor old, new in replacements.items():\n    text = text.replace(old, new)\nneedle = '// spawn-at-startup \"waybar\"'\nentry = 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"'\nif entry not in text:\n    if needle in text:\n        text = text.replace(needle, needle + '\\n' + entry + '\\n', 1)\n    else:\n        text += '\\n' + entry + '\\n'\nif '// spawn-at-startup \"foot\"' not in text:\n    text += '\\n// spawn-at-startup \"foot\"\\n'\npath.write_text(text, encoding='utf-8')\nPY",
+          "sudo systemctl enable seatd greetd",
+          "sudo bash -c 'printf \"[terminal]\\nvt = 1\\n\\n[initial_session]\\ncommand = \\\"niri-session\\\"\\nuser = \\\"manzolo\\\"\\n\\n[default_session]\\ncommand = \\\"agreety\\\"\\nuser = \\\"greeter\\\"\\n\" > /etc/greetd/config.toml'",
+          "sudo systemctl restart greetd",
+          "command -v noctalia >/dev/null && noctalia --version || true",
+          "command -v niri >/dev/null && niri --version || true"
+        ]
+      }
     }
   }
 }

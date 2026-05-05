@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import cloud_init, config, host_setup, iso, qemu, runtime, ssh, state, ui
+from vmctl import archinstall, cloud_init, config, host_setup, iso, qemu, runtime, ssh, state, ui
 from vmctl.errors import VMError
 
 
@@ -168,6 +168,18 @@ def ensure_vm_disk(vm: dict[str, Any], dry_run: bool = False) -> Path:
     else:
         ui.print_status("ok", f"Disk ready: {ui.pretty_path(disk_path)}")
     return disk_path
+
+
+def reset_vm_nvram(vm: dict[str, Any], dry_run: bool = False) -> None:
+    fw = vm.get("firmware", {})
+    if fw.get("type") != "efi":
+        return
+    vars_path = runtime.resolve_path(fw["vars_path"])
+    if not vars_path.exists():
+        return
+    ui.print_status("warn", f"Resetting EFI vars store: {ui.pretty_path(vars_path)}", ok=False)
+    if not dry_run:
+        vars_path.unlink()
 
 
 # --- info commands -------------------------------------------------------------
@@ -417,6 +429,95 @@ def cmd_install(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = config.get_vm(cfg, args.vm)
+    if archinstall.archinstall_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define archinstall_config")
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Arch (automated): {args.vm}")
+
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+
+    bootstrap_iso = archinstall.create_bootstrap_iso(args.vm, vm, dry_run=args.dry_run)
+    kernel_path, initrd_path = iso.extract_arch_installer_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+    iso_label = archinstall.arch_iso_label(iso_path)
+
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        headless=True,
+        serial_stdio=True,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+    )
+    install_qemu_args += ["-cdrom", str(iso_path)]
+    install_qemu_args += archinstall.config_iso_drive_args(bootstrap_iso)
+    install_qemu_args += [
+        "-kernel", str(kernel_path),
+        "-initrd", str(initrd_path),
+        "-append", f"archisobasedir=arch archisolabel={iso_label} console=ttyS0,115200 quiet",
+    ]
+
+    trigger = "mkdir -p /tmp/archconf && mount /dev/vdb /tmp/archconf && bash /tmp/archconf/run.sh"
+    ui.print_note("Booting Arch live ISO — waiting for shell, then triggering automated install...")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    qemu.run_and_expect(
+        install_qemu_args,
+        expected_text=archinstall.BOOTSTRAP_COMPLETE_TOKEN,
+        timeout_sec=getattr(args, "timeout", 1800),
+        auto_inputs=[
+            (archinstall.ARCH_SERIAL_LOGIN_PROMPT, "root\n"),
+            (archinstall.ARCH_LIVE_PROMPT, f"\n{trigger}\n"),
+        ],
+        dry_run=args.dry_run,
+        log_path=serial_log,
+    )
+    ui.print_status("ok", "Installation complete — starting installed VM for post-install")
+
+    pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+    run_qemu_args = qemu.common_args(vm, None, dry_run=args.dry_run, headless=True)
+    pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run)
+    if pid is not None:
+        pid_path.write_text(f"{pid}\n", encoding="utf-8")
+        ui.print_kv("pid", str(pid))
+
+    run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
+    return 0
+
+
+def cmd_install_archinstall(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = config.get_vm(cfg, args.vm)
+    if archinstall.archinstall_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define archinstall_config")
+    runtime.ensure_vm_dirs(args.vm)
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+    config_iso = archinstall.create_config_iso(args.vm, vm, dry_run=args.dry_run)
+    qemu_args = qemu.common_args(
+        vm,
+        qemu.installer_video_variant(vm, args.video),
+        dry_run=args.dry_run,
+        enable_clipboard=False,
+        spice_port=getattr(args, "spice_port", None),
+    )
+    qemu_args += ["-cdrom", str(iso_path)]
+    qemu_args += archinstall.config_iso_drive_args(config_iso)
+    ui.print_note("In the live environment run:")
+    ui.print_note("  mkdir -p /tmp/archconf && mount /dev/vdb /tmp/archconf && bash /tmp/archconf/run.sh")
+    runtime.run(qemu_args, dry_run=args.dry_run)
+    return 0
+
+
 def cmd_install_unattended(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -449,12 +550,26 @@ def cmd_start(args: argparse.Namespace) -> int:
     vm = config.get_vm(cfg, args.vm)
     runtime.ensure_vm_dirs(args.vm)
     spice_port = getattr(args, "spice_port", None)
-    qemu_args = qemu.common_args(vm, args.video, dry_run=args.dry_run, headless=args.headless, spice_port=spice_port)
+    cloud_init_args: list[str] = []
     if args.cloud_init:
-        qemu_args += cloud_init.cloud_init_drive_args(cloud_init.create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run))
+        cloud_init_args = cloud_init.cloud_init_drive_args(
+            cloud_init.create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run)
+        )
+    qemu_args = qemu.common_args(vm, args.video, dry_run=args.dry_run, headless=args.headless, spice_port=spice_port)
+    qemu_args += cloud_init_args
     if args.background:
         if not args.headless and spice_port is None:
             raise VMError("--background currently requires --headless or --spice-port")
+        if args.headless:
+            qemu_args = qemu.common_args(
+                vm,
+                args.video,
+                dry_run=args.dry_run,
+                headless=True,
+                serial_stdio=True,
+                spice_port=spice_port,
+            )
+            qemu_args += cloud_init_args
         pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
         pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run)
         if pid is not None:
@@ -516,7 +631,7 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
     )
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
-    qemu_args = qemu.common_args(vm, None, dry_run=args.dry_run, headless=True)
+    qemu_args = qemu.common_args(vm, None, dry_run=args.dry_run, headless=True, serial_stdio=True)
     pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run)
     if pid is not None:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")

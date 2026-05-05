@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import selectors
 import shutil
 import subprocess
@@ -13,6 +14,18 @@ from typing import Any
 
 from vmctl import state, ui, runtime, cloud_init
 from vmctl.errors import VMError
+
+
+_ANSI_ESCAPE_RE = re.compile(
+    r"\x1B(?:[@-Z\\-_]"
+    r"|\([A-Z0-9]"
+    r"|\[[0-?]*[ -/]*[@-~]"
+    r"|\][^\x07\x1B]*(?:\x07|\x1B\\)?)"
+)
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_ESCAPE_RE.sub("", text)
 
 
 def expected_partition_layout(vm: dict[str, Any]) -> str:
@@ -187,11 +200,17 @@ def common_args(
 def run_and_expect(
     cmd: list[str], expected_text: str, timeout_sec: int,
     auto_inputs: list[tuple[str, str]] | None = None, dry_run: bool = False,
+    log_path: Path | None = None,
 ) -> None:
     ui.print_command(cmd)
     if dry_run:
         return
     deadline = time.monotonic() + timeout_sec
+    log_file = None
+    if log_path is not None:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_file = log_path.open("w", encoding="utf-8", errors="replace")
+        ui.print_kv("serial log", str(log_path))
     process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     assert process.stdout is not None
     assert process.stdin is not None
@@ -210,18 +229,24 @@ def run_and_expect(
                 if chunk:
                     sys.stdout.write(chunk)
                     sys.stdout.flush()
+                    if log_file is not None:
+                        log_file.write(chunk)
+                        log_file.flush()
                     captured.append(chunk)
-                    full_output = "".join(captured)
+                    full_output_clean = _strip_ansi("".join(captured))
                     if auto_inputs:
                         for match_text, send_text in auto_inputs:
                             key = (match_text, send_text)
                             if key in sent_inputs:
                                 continue
-                            if match_text in full_output:
+                            if match_text in full_output_clean:
                                 process.stdin.write(send_text.encode())
                                 process.stdin.flush()
                                 sent_inputs.add(key)
-                    if expected_text in full_output:
+                                if log_file is not None:
+                                    log_file.write(f"\n[run_and_expect] matched {match_text!r} -> sent {send_text!r}\n")
+                                    log_file.flush()
+                    if expected_text in full_output_clean:
                         process.terminate()
                         try:
                             process.wait(timeout=10)
@@ -236,8 +261,11 @@ def run_and_expect(
                     chunk = remaining_output.decode(errors="replace")
                     sys.stdout.write(chunk)
                     sys.stdout.flush()
+                    if log_file is not None:
+                        log_file.write(chunk)
+                        log_file.flush()
                     captured.append(chunk)
-                    if expected_text in "".join(captured):
+                    if expected_text in _strip_ansi("".join(captured)):
                         return
                 raise VMError(f"QEMU exited before emitting '{expected_text}'. Captured output:\n{''.join(captured)[-4000:]}")
             time.sleep(min(0.2, remaining))
@@ -246,3 +274,5 @@ def run_and_expect(
         if process.poll() is None:
             process.kill()
             process.wait(timeout=10)
+        if log_file is not None:
+            log_file.close()

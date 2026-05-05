@@ -256,3 +256,12 @@ def extract_installer_boot_artifacts(vm: dict[str, Any], iso_path: Path, dry_run
     extract_iso_member(iso_path, "casper/vmlinuz", kernel_path, dry_run=dry_run)
     extract_iso_member(iso_path, "casper/initrd", initrd_path, dry_run=dry_run)
     return kernel_path, initrd_path
+
+
+def extract_arch_installer_boot_artifacts(vm: dict[str, Any], iso_path: Path, dry_run: bool = False) -> tuple[Path, Path]:
+    artifact_dir = installer_artifact_dir(vm)
+    kernel_path = artifact_dir / "vmlinuz"
+    initrd_path = artifact_dir / "initrd"
+    extract_iso_member(iso_path, "arch/boot/x86_64/vmlinuz-linux", kernel_path, dry_run=dry_run)
+    extract_iso_member(iso_path, "arch/boot/x86_64/initramfs-linux.img", initrd_path, dry_run=dry_run)
+    return kernel_path, initrd_path

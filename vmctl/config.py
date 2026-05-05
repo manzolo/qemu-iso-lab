@@ -1,10 +1,21 @@
 """VM profile loading and validation."""
 from __future__ import annotations
 
+import copy
 from typing import Any, cast
 
 from vmctl import state, runtime
 from vmctl.errors import VMError
+
+
+def merge_vm_profile(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = copy.deepcopy(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = merge_vm_profile(cast(dict[str, Any], merged[key]), value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
 
 
 def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
@@ -82,14 +93,18 @@ def load_config() -> dict[str, Any]:
         raise VMError(f"Missing profiles directory: {profiles_dir}")
 
     merged_vms: dict[str, dict[str, Any]] = {}
-    for path in sorted(profiles_dir.glob("*.json")):
+    profile_paths = sorted(profiles_dir.glob("*.json"), key=lambda p: (p.name == "local.json", p.name))
+    for path in profile_paths:
         profile_data = runtime.load_json_file(path)
         if "vms" not in profile_data or not isinstance(profile_data["vms"], dict):
             raise VMError(f"Invalid profile file: {path}")
         for name, vm in profile_data["vms"].items():
             if name in merged_vms:
+                if path.name == "local.json":
+                    merged_vms[name] = merge_vm_profile(merged_vms[name], cast(dict[str, Any], vm))
+                    continue
                 raise VMError(f"Duplicate VM profile '{name}' in {path}")
-            merged_vms[name] = vm
+            merged_vms[name] = cast(dict[str, Any], vm)
 
     if not merged_vms:
         raise VMError(f"No VM profiles found in: {profiles_dir}")

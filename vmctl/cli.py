@@ -61,6 +61,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cloud-init", action="store_true", help="attach a generated cloud-init seed ISO")
     p.set_defaults(func=lifecycle.cmd_install)
 
+    p = subparsers.add_parser("bootstrap-archinstall", help="fully automated Arch install + post-install via serial console (like bootstrap-unattended)")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_archinstall)
+
+    p = subparsers.add_parser("install-archinstall", help="boot the Arch live ISO with a pre-built archinstall config disk")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--video", choices=VIDEO_CHOICES, help=VIDEO_HELP)
+    p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
+    p.set_defaults(func=lifecycle.cmd_install_archinstall)
+
     p = subparsers.add_parser("install-unattended", help="boot the unattended installer (cloud-init/autoinstall)")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--video", choices=VIDEO_CHOICES, help=VIDEO_HELP)

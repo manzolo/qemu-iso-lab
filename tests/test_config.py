@@ -89,6 +89,41 @@ class ConfigTests(BaseVmctlTestCase):
         self.assertIn("localvm", config["vms"])
         self.assertEqual(config["vms"]["localvm"]["name"], "Local VM")
 
+    def test_load_config_local_profile_can_override_shared_profile(self):
+        self.vm_config["ssh_provision"] = {
+            "hostname": "base-vm",
+            "user": "vmuser",
+            "ssh_host_port": 2222,
+            "post_install_run": ["echo base"],
+        }
+        self.write_config_dir()
+
+        local_vm = {
+            "name": "Local Override",
+            "ssh_provision": {
+                "ssh_key": "~/.ssh/id_rsa",
+                "copy_from_host": [{"source": "~/.config/app/", "dest": "/home/vmuser/.config/app"}],
+            },
+        }
+        self.write_extra_profile("local.json", {"vms": {self.vm_name: local_vm}})
+
+        config = self.vmctl.load_config()
+
+        vm = config["vms"][self.vm_name]
+        self.assertEqual(vm["name"], "Local Override")
+        self.assertEqual(vm["ssh_provision"]["hostname"], "base-vm")
+        self.assertEqual(vm["ssh_provision"]["ssh_key"], "~/.ssh/id_rsa")
+        self.assertEqual(vm["ssh_provision"]["post_install_run"], ["echo base"])
+
+    def test_load_config_rejects_duplicate_shared_profile(self):
+        duplicate_vm = json.loads(json.dumps(self.vm_config))
+        self.write_extra_profile("z-duplicate.json", {"vms": {self.vm_name: duplicate_vm}})
+
+        with self.assertRaises(self.vmctl.VMError) as ctx:
+            self.vmctl.load_config()
+
+        self.assertIn("Duplicate VM profile", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
