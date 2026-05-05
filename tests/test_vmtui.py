@@ -26,10 +26,25 @@ class VmtuiTests(unittest.TestCase):
                 "test-ssh": {
                     "name": "Test SSH VM",
                     "iso": "isos/test.iso",
-                    "disk": {"path": "artifacts/test-ssh/disk.qcow2", "size": "16G"},
-                    "firmware": {"type": "efi"},
+                    "disk": {
+                        "path": "artifacts/test-ssh/disk.qcow2",
+                        "size": "16G",
+                        "format": "qcow2",
+                        "interface": "virtio",
+                    },
+                    "firmware": {
+                        "type": "efi",
+                        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+                        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+                        "vars_path": "artifacts/test-ssh/OVMF_VARS.fd",
+                    },
                     "memory_mb": 2048,
                     "cpus": 2,
+                    "network": "user",
+                    "video": {
+                        "default": "std",
+                        "variants": {"std": ["-vga", "std", "-display", "gtk"]},
+                    },
                     "ssh_provision": {
                         "hostname": "test-ssh",
                         "user": "tester",
