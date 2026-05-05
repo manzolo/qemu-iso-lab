@@ -320,7 +320,7 @@
         "user": "manzolo",
         "ssh_host_port": 2226,
         "post_install_run": [
-          "mkdir -p ~/.config/niri ~/.config/DankMaterialShell ~/bin ~/aurbuild",
+          "mkdir -p ~/.config/niri ~/.config/DankMaterialShell ~/.config/noctalia/wallpapers/Virtual-1 ~/bin ~/aurbuild",
           "sudo pacman -S --noconfirm --needed niri",
           "rm -rf ~/aurbuild/noctalia-qs && git clone https://aur.archlinux.org/noctalia-qs.git ~/aurbuild/noctalia-qs",
           "bash -lc 'set -e; cd ~/aurbuild/noctalia-qs; makepkg -Ccf --noconfirm; pkg=$(find \"$HOME\"/aurbuild/noctalia-qs -maxdepth 1 -type f -name \"noctalia-qs-*.pkg.tar.*\" -printf \"%T@ %p\\n\" | sort -nr | head -n1 | cut -d\" \" -f2-); test -n \"$pkg\"; test -s \"$pkg\"; [ \"$(bsdtar -xOf \"$pkg\" usr/bin/quickshell | wc -c)\" -gt 0 ]'",
