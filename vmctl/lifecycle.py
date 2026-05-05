@@ -481,6 +481,7 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
     )
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
+    reset_vm_nvram(vm, dry_run=args.dry_run)
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
     run_qemu_args = qemu.common_args(vm, None, dry_run=args.dry_run, headless=True)
     pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run)
