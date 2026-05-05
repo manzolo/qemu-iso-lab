@@ -294,14 +294,27 @@ echo "==> Bootloader..."
 arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --removable
 arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
 mkdir -p /mnt/boot/efi/EFI/BOOT /mnt/boot/efi/EFI/GRUB
-cat > /mnt/boot/efi/EFI/BOOT/grub.cfg <<EOF
+# Replace --removable BOOTX64.EFI with a standalone GRUB image that embeds all
+# required modules (part_gpt, ext2, search, normal, linux...) plus a config
+# that chain-loads /boot/grub/grub.cfg from the root partition. Without this,
+# `insmod ext2` inside an external stub fails (modules aren't at the prefix
+# path on the ESP) and GRUB drops to the `grub>` prompt.
+cat > /mnt/grub-embedded.cfg <<'GRUBEOF'
 insmod part_gpt
 insmod ext2
 set root=(hd0,gpt2)
-set prefix=(\\$root)/boot/grub
-configfile \\$prefix/grub.cfg
-EOF
-cp /mnt/boot/efi/EFI/BOOT/grub.cfg /mnt/boot/efi/EFI/GRUB/grub.cfg
+set prefix=($root)/boot/grub
+configfile $prefix/grub.cfg
+GRUBEOF
+arch-chroot /mnt grub-mkstandalone \\
+    --format=x86_64-efi \\
+    --output=/boot/efi/EFI/BOOT/BOOTX64.EFI \\
+    --modules="part_gpt part_msdos ext2 fat normal configfile search search_fs_file search_fs_uuid search_label echo linux all_video font gfxterm" \\
+    "boot/grub/grub.cfg=/grub-embedded.cfg"
+rm -f /mnt/grub-embedded.cfg
+cp /mnt/boot/efi/EFI/BOOT/BOOTX64.EFI /mnt/boot/efi/EFI/GRUB/grubx64.efi
+echo "==> Registering EFI boot entry for Arch Linux..."
+arch-chroot /mnt efibootmgr --create --disk /dev/vda --part 1 --label "Arch Linux" --loader '\\EFI\\BOOT\\BOOTX64.EFI' --quiet || true
 arch-chroot /mnt efibootmgr
 {bootstrap_commands_block}
 
