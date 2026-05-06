@@ -397,6 +397,18 @@ def cmd_provision(args: argparse.Namespace) -> int:
         ui.print_status("ok", f"Provisioned VM '{args.vm}' without starting the installer")
         return 0
 
+    running, bg_pid, _ = is_bootstrap_vm_running(args.vm)
+    if not running:
+        ssh_cfg = cloud_init.ssh_access_config(vm)
+        if ssh_cfg and ssh_cfg.get("ssh_host_port"):
+            bg_pid, _ = find_qemu_process_by_hostfwd_port(int(ssh_cfg["ssh_host_port"]))
+            running = bg_pid is not None
+    if running and bg_pid is not None:
+        ui.print_status("warn", f"VM '{args.vm}' is already running headless (pid {bg_pid})", ok=False)
+        ui.print_note(f"  vmctl shell {args.vm}              — open an SSH session")
+        ui.print_note(f"  vmctl stop {args.vm} && vmctl start {args.vm}  — restart with display")
+        return 1
+
     qemu_args = qemu.common_args(
         vm,
         qemu.installer_video_variant(vm, args.video),
