@@ -7,4 +7,26 @@ export XDG_SESSION_TYPE=wayland
 log_dir="${XDG_STATE_HOME:-"$HOME/.local/state"}/noctalia"
 mkdir -p "$log_dir"
 
+patch_settings() {
+    python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path.home() / ".config/noctalia/settings.json"
+if not path.exists():
+    raise SystemExit(1)
+data = json.loads(path.read_text(encoding="utf-8"))
+data.setdefault("appLauncher", {})["terminalCommand"] = "footclient"
+path.write_text(json.dumps(data, indent=4) + "\n", encoding="utf-8")
+PY
+}
+
+patch_settings 2>/dev/null || (
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        sleep 1
+        patch_settings 2>/dev/null && exit 0
+    done
+    exit 0
+) &
+
 exec qs -c noctalia-shell >>"$log_dir/noctalia.log" 2>&1
