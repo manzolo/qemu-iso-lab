@@ -536,6 +536,7 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
         None if headless else qemu.installer_video_variant(vm, args.video),
         dry_run=args.dry_run,
         headless=headless,
+        serial_stdio=headless,
         no_reboot=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
@@ -627,7 +628,7 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
         argparse.Namespace(
             vm=args.vm,
             video=args.video,
-            headless=getattr(args, "headless", False),
+            headless=True,
             spice_port=getattr(args, "spice_port", None),
             dry_run=args.dry_run,
         )

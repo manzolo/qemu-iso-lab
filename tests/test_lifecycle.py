@@ -642,7 +642,7 @@ class VmctlTests(BaseVmctlTestCase):
         install_args = install_unattended.call_args.args[0]
         self.assertEqual(install_args.vm, self.vm_name)
         self.assertEqual(install_args.video, "std")
-        self.assertEqual(install_args.headless, False)
+        self.assertEqual(install_args.headless, True)
         self.assertEqual(install_args.dry_run, True)
         qemu_cmd = run_background.call_args.args[0]
         log_path = run_background.call_args.args[1]
@@ -661,7 +661,7 @@ class VmctlTests(BaseVmctlTestCase):
             "sh -lc 'echo ready'",
         )
 
-    def test_cmd_bootstrap_unattended_forwards_headless_to_installer(self):
+    def test_cmd_bootstrap_unattended_always_headless_installer(self):
         self.create_disk()
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
         self.vm_config["autoinstall"] = {
@@ -670,7 +670,7 @@ class VmctlTests(BaseVmctlTestCase):
             "password_hash": "$6$hash",
         }
         self.write_config_dir()
-        args = argparse.Namespace(vm=self.vm_name, video=None, headless=True, timeout=45, dry_run=True)
+        args = argparse.Namespace(vm=self.vm_name, video=None, headless=False, timeout=45, dry_run=True)
 
         with mock.patch.object(vmctl.lifecycle, "cmd_install_unattended") as install_unattended, \
              mock.patch.object(vmctl.runtime, "run_background", return_value=None), \
