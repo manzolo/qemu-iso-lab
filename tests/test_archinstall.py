@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
 
 import vmctl.archinstall  # noqa: E402
 import vmctl.runtime  # noqa: E402
+import vmctl.ssh  # noqa: E402
 
 from tests._common import BaseVmctlTestCase  # noqa: E402
 
@@ -192,6 +193,20 @@ class ArchinstallBootstrapTests(BaseVmctlTestCase):
         self.assertIn("Bootstrap guest customization", script)
         self.assertIn("arch-chroot /mnt bash -lc 'pacman -S --noconfirm --needed git'", script)
         self.assertIn("arch-chroot /mnt bash -lc 'systemctl enable greetd'", script)
+
+    def test_render_bootstrap_script_generates_ssh_key_for_ssh_provision(self):
+        self._arch_vm()
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2223}
+        key_path = self.root / "artifacts/testvm/ssh/id_ed25519"
+        pub_path = self.root / "artifacts/testvm/ssh/id_ed25519.pub"
+        pub_path.parent.mkdir(parents=True)
+        pub_path.write_text("ssh-ed25519 AAAATEST generated\n", encoding="utf-8")
+
+        with mock.patch.object(vmctl.ssh, "ensure_generated_ssh_keypair", return_value=key_path):
+            script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+
+        self.assertIn("Installing SSH public key for tester", script)
+        self.assertIn("ssh-ed25519 AAAATEST generated", script)
 
     def test_render_bootstrap_script_ends_with_complete_token_and_poweroff(self):
         self._arch_vm()

@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from vmctl import runtime, ui
+from vmctl import runtime, ssh, ui
 from vmctl.errors import VMError
 
 
@@ -16,13 +16,9 @@ def _resolve_ssh_pubkey(vm: dict[str, Any]) -> str | None:
     ssh_cfg = vm.get("ssh_provision")
     if not isinstance(ssh_cfg, dict):
         return None
-    raw = str(ssh_cfg.get("ssh_key") or "").strip()
-    if not raw:
+    pubkey = ssh.resolve_ssh_public_key(vm, ssh_cfg)
+    if pubkey is None:
         return None
-    private = Path(raw).expanduser()
-    pubkey = private.parent / (private.name + ".pub")
-    if not pubkey.exists():
-        raise VMError(f"SSH public key not found at {pubkey} (expected for ssh_provision)")
     return pubkey.read_text(encoding="utf-8").strip()
 
 

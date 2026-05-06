@@ -34,10 +34,7 @@
       }
     },
     "arch-noctalia-local": {
-      "name": "Arch Linux + Noctalia 5 (Local)",
-      "ssh_provision": {
-        "ssh_key": "~/.ssh/id_rsa"
-      }
+      "name": "Arch Linux + Noctalia 5 (Local)"
     }
   }
 }

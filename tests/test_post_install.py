@@ -51,6 +51,17 @@ class PostInstallTests(BaseVmctlTestCase):
         with self.assertRaises(self.vmctl.VMError):
             self.vmctl.ssh_base_cmd(self.vm_config, dry_run=False)
 
+    def test_ssh_provision_without_key_uses_generated_vm_key(self):
+        self.vm_config["ssh_provision"] = {
+            "user": "tester",
+            "ssh_host_port": 2223,
+        }
+
+        cmd = self.vmctl.ssh_base_cmd(self.vm_config, dry_run=True)
+
+        self.assertIn("-i", cmd)
+        self.assertIn(str(self.root / "artifacts/testvm/ssh/id_ed25519"), cmd)
+
     def test_ssh_shell_cmd_omits_batch_mode(self):
         self.vm_config["cloud_init"] = {
             "user": "tester",

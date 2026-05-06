@@ -14,6 +14,65 @@ from vmctl import cloud_init, flash, runtime, ui
 from vmctl.errors import VMError
 
 
+def generated_ssh_key_path(vm: dict[str, Any]) -> Path:
+    return runtime.resolve_path(vm["disk"]["path"]).parent / "ssh" / "id_ed25519"
+
+
+def _configured_ssh_key(cfg: dict[str, Any]) -> Path | None:
+    key_path = str(cfg.get("ssh_key") or "").strip()
+    if not key_path:
+        return None
+    return runtime.expand_host_path(key_path)
+
+
+def ensure_generated_ssh_keypair(vm: dict[str, Any], dry_run: bool = False) -> Path:
+    private = generated_ssh_key_path(vm)
+    public = private.parent / f"{private.name}.pub"
+    if dry_run:
+        return private
+    private.parent.mkdir(parents=True, exist_ok=True)
+    if private.exists() and public.exists():
+        return private
+    if private.exists() and not public.exists():
+        public.write_text(
+            subprocess.check_output(["ssh-keygen", "-y", "-f", str(private)], text=True).strip() + "\n",
+            encoding="utf-8",
+        )
+        return private
+    runtime.require_command("ssh-keygen")
+    comment = str(vm.get("name") or vm.get("archinstall_config", {}).get("hostname") or "vmctl")
+    runtime.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", f"vmctl {comment}", "-f", str(private)])
+    return private
+
+
+def resolve_ssh_private_key(vm: dict[str, Any], cfg: dict[str, Any], dry_run: bool = False) -> Path | None:
+    configured = _configured_ssh_key(cfg)
+    if configured is not None:
+        if not configured.is_file():
+            if dry_run:
+                return None
+            raise VMError(f"SSH private key not found: {configured}")
+        return configured
+    if cloud_init.ssh_provision_config(vm) is cfg:
+        return ensure_generated_ssh_keypair(vm, dry_run=dry_run)
+    return None
+
+
+def resolve_ssh_public_key(vm: dict[str, Any], cfg: dict[str, Any], dry_run: bool = False) -> Path | None:
+    configured = _configured_ssh_key(cfg)
+    if configured is not None:
+        public = configured.parent / f"{configured.name}.pub"
+        if not public.is_file():
+            if dry_run:
+                return None
+            raise VMError(f"SSH public key not found at {public} (expected for ssh_provision)")
+        return public
+    if cloud_init.ssh_provision_config(vm) is cfg:
+        private = ensure_generated_ssh_keypair(vm, dry_run=dry_run)
+        return private.parent / f"{private.name}.pub"
+    return None
+
+
 def ssh_target(vm: dict[str, Any]) -> tuple[str, int, str]:
     cfg = cloud_init.ssh_access_config(vm)
     if cfg is None:
@@ -29,14 +88,6 @@ def ssh_target(vm: dict[str, Any]) -> tuple[str, int, str]:
 
 def _ssh_common_opts(cfg: dict[str, Any], dry_run: bool = False) -> list[str]:
     opts = ["-F", "/dev/null", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
-    key_path = str(cfg.get("ssh_key") or "").strip()
-    if key_path:
-        expanded = runtime.expand_host_path(key_path)
-        if not expanded.is_file():
-            if dry_run:
-                return opts
-            raise VMError(f"SSH private key not found: {expanded}")
-        opts += ["-i", str(expanded)]
     return opts
 
 
@@ -44,21 +95,33 @@ def ssh_base_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     host, port, user = ssh_target(vm)
     cfg = cloud_init.ssh_access_config(vm)
     assert cfg is not None
-    return ["ssh"] + _ssh_common_opts(cfg, dry_run=dry_run) + ["-o", "BatchMode=yes", "-p", str(port), f"{user}@{host}"]
+    opts = _ssh_common_opts(cfg, dry_run=dry_run)
+    private = resolve_ssh_private_key(vm, cfg, dry_run=dry_run)
+    if private is not None:
+        opts += ["-i", str(private)]
+    return ["ssh"] + opts + ["-o", "BatchMode=yes", "-p", str(port), f"{user}@{host}"]
 
 
 def ssh_shell_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     host, port, user = ssh_target(vm)
     cfg = cloud_init.ssh_access_config(vm)
     assert cfg is not None
-    return ["ssh"] + _ssh_common_opts(cfg, dry_run=dry_run) + ["-p", str(port), f"{user}@{host}"]
+    opts = _ssh_common_opts(cfg, dry_run=dry_run)
+    private = resolve_ssh_private_key(vm, cfg, dry_run=dry_run)
+    if private is not None:
+        opts += ["-i", str(private)]
+    return ["ssh"] + opts + ["-p", str(port), f"{user}@{host}"]
 
 
 def scp_base_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     _, port, _ = ssh_target(vm)
     cfg = cloud_init.ssh_access_config(vm)
     assert cfg is not None
-    return ["scp"] + _ssh_common_opts(cfg, dry_run=dry_run) + ["-P", str(port)]
+    opts = _ssh_common_opts(cfg, dry_run=dry_run)
+    private = resolve_ssh_private_key(vm, cfg, dry_run=dry_run)
+    if private is not None:
+        opts += ["-i", str(private)]
+    return ["scp"] + opts + ["-P", str(port)]
 
 
 def wait_for_ssh(vm: dict[str, Any], timeout_sec: int, dry_run: bool = False) -> None:
