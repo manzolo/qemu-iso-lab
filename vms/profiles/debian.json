@@ -274,13 +274,15 @@
             "content": "vmuser ALL=(ALL) NOPASSWD:ALL\n"
           }
         ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/ubuntu-niri/bin/ubuntu-niri-post-install",
+            "dest": "/home/vmuser/bin/ubuntu-niri-post-install",
+            "dest_mode": "755"
+          }
+        ],
         "post_install_run": [
-          "sudo add-apt-repository -y ppa:avengemedia/danklinux",
-          "sudo add-apt-repository -y ppa:avengemedia/dms",
-          "sudo apt update",
-          "sudo apt install -y niri dms",
-          "mkdir -p ~/.config/niri",
-          "command -v niri >/dev/null && niri --version || true"
+          "~/bin/ubuntu-niri-post-install"
         ]
       }
     },
@@ -370,14 +372,15 @@
             "content": "manzolo ALL=(ALL) NOPASSWD:ALL\n"
           }
         ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/ubuntu-niri-local/bin/ubuntu-niri-local-post-install",
+            "dest": "/home/manzolo/bin/ubuntu-niri-local-post-install",
+            "dest_mode": "755"
+          }
+        ],
         "post_install_run": [
-          "sudo add-apt-repository -y ppa:avengemedia/danklinux || true",
-          "sudo add-apt-repository -y ppa:avengemedia/dms || true",
-          "sudo apt update || true",
-          "sudo apt install -y niri dms || true",
-          "sudo systemctl --global disable waybar.service || true",
-          "mkdir -p ~/.config/niri",
-          "command -v niri >/dev/null && niri --version || true"
+          "~/bin/ubuntu-niri-local-post-install"
         ]
       }
     }

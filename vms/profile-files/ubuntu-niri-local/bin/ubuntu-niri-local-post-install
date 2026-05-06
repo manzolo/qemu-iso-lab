@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+sudo add-apt-repository -y ppa:avengemedia/danklinux || true
+sudo add-apt-repository -y ppa:avengemedia/dms || true
+sudo apt update || true
+sudo apt install -y niri dms || true
+sudo systemctl --global disable waybar.service || true
+mkdir -p "$HOME/.config/niri"
+command -v niri >/dev/null
+niri --version
