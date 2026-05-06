@@ -147,7 +147,7 @@ def installer_video_variant(vm: dict[str, Any], requested: str | None) -> str | 
         return requested
     video = vm.get("video", {})
     variants = video.get("variants", {})
-    order = video.get("installer_order", ("safe", "std"))
+    order = video.get("installer_order", ("std", "safe"))
     for candidate in order:
         if candidate in variants:
             return str(candidate)

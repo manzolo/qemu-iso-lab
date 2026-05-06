@@ -236,7 +236,7 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("-vga", qemu_cmd)
         self.assertIn("std", qemu_cmd)
 
-    def test_cmd_install_defaults_to_safe_video_for_non_ubuntu_installer(self):
+    def test_cmd_install_defaults_to_std_video_for_non_ubuntu_installer(self):
         self.create_disk()
         self.vm_config["video"]["default"] = "virtio-gl"
         self.vm_config["video"]["variants"]["virtio-gl"] = ["-device", "virtio-vga-gl", "-display", "gtk,gl=on"]
@@ -253,8 +253,23 @@ class VmctlTests(BaseVmctlTestCase):
         qemu_cmd = run_cmd.call_args.args[0]
         self.assertIn("-vga", qemu_cmd)
         self.assertIn("std", qemu_cmd)
-        self.assertIn("-serial", qemu_cmd)
+        self.assertNotIn("-serial", qemu_cmd)
         self.assertNotIn("virtio-vga-gl", qemu_cmd)
+
+    def test_cmd_install_prefers_std_over_safe_by_default(self):
+        self.create_disk()
+        self.vm_config["video"]["variants"]["safe"] = ["-vga", "std", "-display", "gtk", "-serial", "mon:stdio"]
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, dry_run=True)
+
+        with mock.patch.object(vmctl.iso, "download_file"), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_install(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertNotIn("-serial", qemu_cmd)
 
     def test_cmd_install_honours_installer_order_when_set(self):
         self.create_disk()
@@ -545,7 +560,7 @@ class VmctlTests(BaseVmctlTestCase):
             qemu_cmd,
         )
 
-    def test_cmd_install_unattended_defaults_to_safe_video_for_non_ubuntu_installer(self):
+    def test_cmd_install_unattended_defaults_to_std_video_for_non_ubuntu_installer(self):
         iso_path = self.root / self.vm_config["iso"]
         self.vm_config["video"]["default"] = "virtio-gl"
         self.vm_config["video"]["variants"]["virtio-gl"] = ["-device", "virtio-vga-gl", "-display", "gtk,gl=on"]
@@ -570,7 +585,7 @@ class VmctlTests(BaseVmctlTestCase):
         qemu_cmd = run_cmd.call_args.args[0]
         self.assertIn("-vga", qemu_cmd)
         self.assertIn("std", qemu_cmd)
-        self.assertIn("-serial", qemu_cmd)
+        self.assertNotIn("-serial", qemu_cmd)
         self.assertNotIn("virtio-vga-gl", qemu_cmd)
 
     def test_cmd_install_unattended_honours_installer_order_when_set(self):
