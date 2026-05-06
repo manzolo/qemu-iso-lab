@@ -156,10 +156,15 @@
         "hostname": "cachyos-local",
         "user": "manzolo",
         "ssh_host_port": 2223,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/cachyos-local/bin/cachyos-post-install",
+            "dest": "/home/manzolo/bin/cachyos-post-install",
+            "dest_mode": "755"
+          }
+        ],
         "post_install_run": [
-          "mkdir -p ~/.config/niri ~/.config/DankMaterialShell",
-          "sudo pacman -Sy --noconfirm --needed foot niri || true",
-          "command -v niri >/dev/null && niri --version || true"
+          "~/bin/cachyos-post-install"
         ]
       }
     },
@@ -220,10 +225,15 @@
         "hostname": "cachyos-nvidia-local",
         "user": "manzolo",
         "ssh_host_port": 2224,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/cachyos-nvidia-local/bin/cachyos-nvidia-post-install",
+            "dest": "/home/manzolo/bin/cachyos-nvidia-post-install",
+            "dest_mode": "755"
+          }
+        ],
         "post_install_run": [
-          "mkdir -p ~/.config/niri ~/.config/DankMaterialShell",
-          "sudo pacman -Sy --noconfirm --needed foot niri nvidia-580xx-dkms nvidia-580xx-utils nvidia-580xx-settings lib32-nvidia-580xx-utils opencl-nvidia-580xx lib32-opencl-nvidia-580xx || true",
-          "command -v niri >/dev/null && niri --version || true"
+          "~/bin/cachyos-nvidia-post-install"
         ]
       }
     },

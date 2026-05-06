@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p "$HOME/.config/niri" "$HOME/.config/DankMaterialShell"
+
+sudo pacman -Sy --noconfirm --needed foot niri
+
+command -v niri >/dev/null
+niri --version

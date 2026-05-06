@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p "$HOME/.config/niri" "$HOME/.config/DankMaterialShell"
+
+sudo pacman -Sy --noconfirm --needed \
+  foot niri \
+  nvidia-580xx-dkms nvidia-580xx-utils nvidia-580xx-settings \
+  lib32-nvidia-580xx-utils opencl-nvidia-580xx lib32-opencl-nvidia-580xx
+
+command -v niri >/dev/null
+niri --version
