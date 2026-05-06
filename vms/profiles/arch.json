@@ -278,6 +278,7 @@
           "brightnessctl",
           "ffmpeg",
           "foot",
+          "fuzzel",
           "greetd",
           "imagemagick",
           "jemalloc",
@@ -306,6 +307,7 @@
           "wireplumber",
           "wlr-randr",
           "xdg-desktop-portal-gtk",
+          "xwayland-satellite",
           "xorg-xwayland"
         ],
         "bootstrap_chroot_commands": [
@@ -321,7 +323,7 @@
         "ssh_host_port": 2226,
         "post_install_run": [
           "mkdir -p ~/.config/niri ~/.config/DankMaterialShell ~/.config/noctalia/wallpapers/Virtual-1 ~/bin ~/aurbuild",
-          "sudo pacman -S --noconfirm --needed niri",
+          "sudo pacman -S --noconfirm --needed niri foot fuzzel xwayland-satellite",
           "rm -rf ~/aurbuild/noctalia-qs && git clone https://aur.archlinux.org/noctalia-qs.git ~/aurbuild/noctalia-qs",
           "bash -lc 'set -e; cd ~/aurbuild/noctalia-qs; makepkg -Ccf --noconfirm; pkg=$(find \"$HOME\"/aurbuild/noctalia-qs -maxdepth 1 -type f -name \"noctalia-qs-*.pkg.tar.*\" -printf \"%T@ %p\\n\" | sort -nr | head -n1 | cut -d\" \" -f2-); test -n \"$pkg\"; test -s \"$pkg\"; [ \"$(bsdtar -xOf \"$pkg\" usr/bin/quickshell | wc -c)\" -gt 0 ]'",
           "sudo bash -lc 'set -e; pkg=$(find /home/manzolo/aurbuild/noctalia-qs -maxdepth 1 -type f -name \"noctalia-qs-*.pkg.tar.*\" -printf \"%T@ %p\\n\" | sort -nr | head -n1 | cut -d\" \" -f2-); test -n \"$pkg\"; pacman -U --overwrite \"*\" --noconfirm \"$pkg\"; if ! test -s /usr/bin/quickshell; then pacman -U --overwrite \"*\" --noconfirm \"$pkg\"; fi; test -s /usr/bin/quickshell'",
@@ -329,7 +331,7 @@
           "bash -lc 'set -e; cd ~/aurbuild/noctalia-shell-git; makepkg -Ccf --noconfirm; pkg=$(find \"$HOME\"/aurbuild/noctalia-shell-git -maxdepth 1 -type f -name \"noctalia-shell-git-*.pkg.tar.*\" -printf \"%T@ %p\\n\" | sort -nr | head -n1 | cut -d\" \" -f2-); test -n \"$pkg\"; test -s \"$pkg\"; [ \"$(bsdtar -xOf \"$pkg\" etc/xdg/quickshell/noctalia-shell/shell.qml | wc -c)\" -gt 0 ]'",
           "sudo bash -lc 'set -e; pkg=$(find /home/manzolo/aurbuild/noctalia-shell-git -maxdepth 1 -type f -name \"noctalia-shell-git-*.pkg.tar.*\" -printf \"%T@ %p\\n\" | sort -nr | head -n1 | cut -d\" \" -f2-); test -n \"$pkg\"; pacman -U --overwrite \"*\" --noconfirm \"$pkg\"; if ! test -s /etc/xdg/quickshell/noctalia-shell/shell.qml; then pacman -U --overwrite \"*\" --noconfirm \"$pkg\"; fi; test -s /etc/xdg/quickshell/noctalia-shell/shell.qml'",
           "cat > ~/bin/start-noctalia <<'EOF'\n#!/usr/bin/env sh\nexport XDG_CURRENT_DESKTOP=niri\nexport XDG_SESSION_TYPE=wayland\nexec qs -c noctalia-shell >>\"${XDG_RUNTIME_DIR:-/tmp}/noctalia.log\" 2>&1\nEOF\nchmod +x ~/bin/start-noctalia",
-          "python3 - <<'PY'\nfrom pathlib import Path\npath = Path.home() / '.config' / 'niri' / 'config.kdl'\ntext = path.read_text(encoding='utf-8')\nreplacements = {\n    'spawn-at-startup \"noctalia\"': 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n    'spawn-at-startup \"qs -c noctalia-shell\"': 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n    'spawn-at-startup \"~/bin/start-noctalia\"': 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n    'spawn-at-startup \"foot\"': '// spawn-at-startup \"foot\"',\n}\nfor old, new in replacements.items():\n    text = text.replace(old, new)\nneedle = '// spawn-at-startup \"waybar\"'\nentry = 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"'\nif entry not in text:\n    if needle in text:\n        text = text.replace(needle, needle + '\\n' + entry + '\\n', 1)\n    else:\n        text += '\\n' + entry + '\\n'\nif '// spawn-at-startup \"foot\"' not in text:\n    text += '\\n// spawn-at-startup \"foot\"\\n'\npath.write_text(text, encoding='utf-8')\nPY",
+          "python3 - <<'PY'\nfrom pathlib import Path\npath = Path.home() / '.config' / 'niri' / 'config.kdl'\ntext = path.read_text(encoding='utf-8')\nreplacements = {\n    'spawn-at-startup \"noctalia\"': 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n    'spawn-at-startup \"qs -c noctalia-shell\"': 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n    'spawn-at-startup \"~/bin/start-noctalia\"': 'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n    'spawn-at-startup \"foot\"': 'spawn-at-startup \"foot --server\"',\n    'Mod+T hotkey-overlay-title=\"Open a Terminal: alacritty\" { spawn \"alacritty\"; }': 'Mod+T hotkey-overlay-title=\"Open a Terminal: foot\" { spawn \"footclient\"; }',\n    'Mod+T hotkey-overlay-title=\"Open a Terminal: foot\" { spawn \"foot\"; }': 'Mod+T hotkey-overlay-title=\"Open a Terminal: foot\" { spawn \"footclient\"; }',\n}\nfor old, new in replacements.items():\n    text = text.replace(old, new)\nfor stale in ['// spawn-at-startup \"foot\"\\n', '// spawn-at-startup \"foot --server\"\\n', 'spawn-at-startup \"foot\"\\n']:\n    text = text.replace(stale, '')\nstartup_entries = [\n    'spawn-at-startup \"foot --server\"',\n    'spawn-at-startup \"xwayland-satellite\"',\n    'spawn-at-startup \"/home/manzolo/bin/start-noctalia\"',\n]\ninsert_at = text.find('// spawn-at-startup \"waybar\"')\nmissing = [entry for entry in startup_entries if entry not in text]\nif missing and insert_at >= 0:\n    text = text[:insert_at] + ''.join(entry + '\\n' for entry in missing) + text[insert_at:]\nelif missing:\n    text = text.rstrip() + '\\n' + ''.join(entry + '\\n' for entry in missing)\nif 'Mod+T hotkey-overlay-title=\"Open a Terminal: foot\" { spawn \"footclient\"; }' not in text:\n    raise SystemExit('niri config does not contain the expected terminal bind')\nif 'Mod+D hotkey-overlay-title=\"Run an Application: fuzzel\" { spawn \"fuzzel\"; }' not in text:\n    raise SystemExit('niri config does not contain the expected fuzzel launcher bind')\npath.write_text(text, encoding='utf-8')\nPY",
           "sudo systemctl enable seatd greetd",
           "sudo bash -c 'printf \"[terminal]\\nvt = 1\\n\\n[initial_session]\\ncommand = \\\"niri-session\\\"\\nuser = \\\"manzolo\\\"\\n\\n[default_session]\\ncommand = \\\"agreety\\\"\\nuser = \\\"greeter\\\"\\n\" > /etc/greetd/config.toml'",
           "sudo systemctl restart greetd",
