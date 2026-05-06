@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+set -eu
+
+export XDG_CURRENT_DESKTOP=niri
+export XDG_SESSION_TYPE=wayland
+
+log_dir="${XDG_STATE_HOME:-"$HOME/.local/state"}/noctalia"
+mkdir -p "$log_dir"
+
+exec qs -c noctalia-shell >>"$log_dir/noctalia.log" 2>&1
