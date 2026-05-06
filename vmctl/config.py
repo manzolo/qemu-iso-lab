@@ -13,6 +13,8 @@ def merge_vm_profile(base: dict[str, Any], override: dict[str, Any]) -> dict[str
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
             merged[key] = merge_vm_profile(cast(dict[str, Any], merged[key]), value)
+        elif isinstance(value, list) and isinstance(merged.get(key), list):
+            merged[key] = copy.deepcopy(merged[key]) + copy.deepcopy(value)
         else:
             merged[key] = copy.deepcopy(value)
     return merged

@@ -115,6 +115,32 @@ class ConfigTests(BaseVmctlTestCase):
         self.assertEqual(vm["ssh_provision"]["ssh_key"], "~/.ssh/id_rsa")
         self.assertEqual(vm["ssh_provision"]["post_install_run"], ["echo base"])
 
+    def test_load_config_local_profile_concatenates_arrays(self):
+        self.vm_config["ssh_provision"] = {
+            "hostname": "base-vm",
+            "user": "vmuser",
+            "ssh_host_port": 2222,
+            "copy_from_host": [{"source": "vms/profile-files/script", "dest": "/home/vmuser/bin/script", "dest_mode": "755"}],
+            "post_install_run": ["~/bin/script"],
+        }
+        self.write_config_dir()
+
+        local_vm = {
+            "ssh_provision": {
+                "copy_from_host": [{"source": "~/.config/app/", "dest": "/home/vmuser/.config/app"}],
+            },
+        }
+        self.write_extra_profile("local.json", {"vms": {self.vm_name: local_vm}})
+
+        config = self.vmctl.load_config()
+
+        vm = config["vms"][self.vm_name]
+        copies = vm["ssh_provision"]["copy_from_host"]
+        self.assertEqual(len(copies), 2)
+        self.assertEqual(copies[0]["source"], "vms/profile-files/script")
+        self.assertEqual(copies[1]["source"], "~/.config/app/")
+        self.assertEqual(vm["ssh_provision"]["post_install_run"], ["~/bin/script"])
+
     def test_load_config_rejects_duplicate_shared_profile(self):
         duplicate_vm = json.loads(json.dumps(self.vm_config))
         self.write_extra_profile("z-duplicate.json", {"vms": {self.vm_name: duplicate_vm}})
