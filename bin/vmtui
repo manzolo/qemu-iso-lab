@@ -639,7 +639,10 @@ run_action() {
                         ;;
                     "Restart with Display")
                         if confirm_box "Restart with Display" "Stop '$current_vm' and restart it with display?"; then
-                            run_vmctl stop "$current_vm"
+                            clear
+                            printf 'Selected VM: %s\n\n' "$current_vm"
+                            "$VMCTL" stop "$current_vm" || true
+                            printf '\n'
                             local video
                             video=$(choose_video) || return 0
                             if [[ -n "$video" ]]; then
