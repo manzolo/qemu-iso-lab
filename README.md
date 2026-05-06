@@ -29,7 +29,8 @@ Current profiles include desktop guests, installer/minimal guests, Windows impor
 ├── Makefile
 ├── README.md
 ├── vms/
-│   └── profiles/
+│   ├── profiles/
+│   └── profile-files/
 ├── bin/
 │   ├── vmctl
 │   ├── vmtui
@@ -420,8 +421,15 @@ Supported profile fields:
 - `cloud_init.ssh_host_port`
 - `cloud_init.packages`
 - `cloud_init.runcmd`
+- `cloud_init.write_files`
 - `cloud_init.copy_from_host`
 - `cloud_init.post_install_run`
+- `ssh_provision.hostname`
+- `ssh_provision.user`
+- `ssh_provision.ssh_key`
+- `ssh_provision.ssh_host_port`
+- `ssh_provision.copy_from_host`
+- `ssh_provision.post_install_run`
 - `autoinstall.hostname`
 - `autoinstall.username`
 - `autoinstall.realname`
@@ -430,6 +438,21 @@ Supported profile fields:
 - `autoinstall.keyboard_layout`
 - `autoinstall.storage_layout`
 - `autoinstall.install_ssh`
+
+`ssh_provision` is used for guests whose installer runs interactively (CachyOS, Arch) rather than via cloud-init. Both `cloud_init` and `ssh_provision` support `copy_from_host` and `post_install_run`.
+
+Provisioning scripts can be versioned under `vms/profile-files/<vm>/` and deployed via `copy_from_host` with `dest_mode: "755"`. This keeps JSON profiles readable and puts the actual logic in plain shell scripts tracked by git.
+
+```json
+"copy_from_host": [
+  {
+    "source": "vms/profile-files/my-vm/bin/my-post-install",
+    "dest": "/home/user/bin/my-post-install",
+    "dest_mode": "755"
+  }
+],
+"post_install_run": ["~/bin/my-post-install"]
+```
 
 Typical usage:
 
@@ -460,6 +483,8 @@ Git-ignored local override:
 - copy `vms/profiles/local.json.example` to `vms/profiles/local.json`;
 - replace `YOUR_USER` and the SSH/dotfile paths with your own values;
 - use the `ubuntu-niri-local` profile, which stays only on your host.
+
+When `local.json` adds entries to the same list key as a base profile (for example `copy_from_host`), the lists are **concatenated** — base entries first, local entries appended. This means you can add personal file copies in `local.json` without losing the versioned script entries defined in the base profile.
 
 Shortcut:
 
