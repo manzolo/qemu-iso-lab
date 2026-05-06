@@ -553,6 +553,20 @@ def cmd_start(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
     runtime.ensure_vm_dirs(args.vm)
+
+    if not getattr(args, "background", False):
+        running, bg_pid, _ = is_bootstrap_vm_running(args.vm)
+        if not running:
+            ssh_cfg = cloud_init.ssh_access_config(vm)
+            if ssh_cfg and ssh_cfg.get("ssh_host_port"):
+                bg_pid, _ = find_qemu_process_by_hostfwd_port(int(ssh_cfg["ssh_host_port"]))
+                running = bg_pid is not None
+        if running and bg_pid is not None:
+            ui.print_status("warn", f"VM '{args.vm}' is already running headless (pid {bg_pid})", ok=False)
+            ui.print_note(f"  vmctl shell {args.vm}              — open an SSH session")
+            ui.print_note(f"  vmctl stop {args.vm} && vmctl start {args.vm}  — restart with display")
+            return 1
+
     spice_port = getattr(args, "spice_port", None)
     cloud_init_args: list[str] = []
     if args.cloud_init:

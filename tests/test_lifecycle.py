@@ -357,6 +357,17 @@ class VmctlTests(BaseVmctlTestCase):
         with self.assertRaises(self.vmctl.VMError):
             self.vmctl.cmd_start(args)
 
+    def test_cmd_start_aborts_if_background_vm_already_running(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=False, background=False, dry_run=True)
+
+        with mock.patch.object(vmctl.lifecycle, "is_bootstrap_vm_running", return_value=(True, 1234, "qemu-system-x86_64")), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_start(args)
+
+        self.assertEqual(exit_code, 1)
+        run_cmd.assert_not_called()
+
     def test_common_args_tcg_headless_serial(self):
         disk_path = self.create_disk()
 
