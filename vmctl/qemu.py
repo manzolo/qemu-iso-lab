@@ -247,12 +247,15 @@ def run_and_expect(
                                     log_file.write(f"\n[run_and_expect] matched {match_text!r} -> sent {send_text!r}\n")
                                     log_file.flush()
                     if expected_text in full_output_clean:
-                        process.terminate()
                         try:
-                            process.wait(timeout=10)
+                            process.wait(timeout=30)
                         except subprocess.TimeoutExpired:
-                            process.kill()
-                            process.wait(timeout=10)
+                            process.terminate()
+                            try:
+                                process.wait(timeout=10)
+                            except subprocess.TimeoutExpired:
+                                process.kill()
+                                process.wait(timeout=10)
                         return
                 continue
             if process.poll() is not None:

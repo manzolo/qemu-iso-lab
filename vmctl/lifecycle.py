@@ -483,6 +483,9 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
     run_qemu_args = qemu.common_args(vm, None, dry_run=args.dry_run, headless=True)
+    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
+    runtime.ensure_parent(post_serial_log)
+    run_qemu_args += ["-serial", f"file:{post_serial_log}"]
     pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run)
     if pid is not None:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")

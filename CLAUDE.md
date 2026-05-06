@@ -80,6 +80,23 @@ SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` �
 
 The interactive variant (`install-archinstall`) generates archinstall JSON configs and attaches them as a second virtio CD-ROM (`/dev/vdb`) for the user to run manually.
 
+#### CRITICAL — completion token / ESP flush invariant (do not break)
+
+The Arch unattended bootstrap has a sequencing rule that cost 5+ hours of debugging when violated. **Treat this as gospel:**
+
+1. In `vmctl/archinstall.py` the install script MUST end with this exact ordering:
+   ```bash
+   sync
+   blockdev --flushbufs /dev/vda /dev/vda1 /dev/vda2 || true
+   echo "==> Arch Linux installation complete!"   # BOOTSTRAP_COMPLETE_TOKEN
+   poweroff -f
+   ```
+   The completion token must appear **after** the sync+flush, never before. If the token is printed first, the host kills QEMU before the guest finishes flushing the ESP, so `EFI/BOOT/BOOTX64.EFI`, the embedded GRUB binary, and the stub `grub.cfg` files end up partially or entirely missing. Symptom: guest drops to `grub rescue>` on first real boot, and an ESP inspection shows only `EFI/GRUB/grubx64.efi` from `grub-install`.
+
+2. In `vmctl/qemu.py::run_and_expect`, when `expected_text` matches, the function MUST call `process.wait(timeout=30)` and let the guest power itself off naturally. Only fall back to `terminate()` → `kill()` if that wait times out. Do NOT replace this with an immediate `terminate()` on token match — that re-introduces the same race.
+
+If a future change appears to need either of these relaxed (e.g. "speed up the bootstrap by killing QEMU sooner", "drop the redundant sync"), the answer is no — investigate the actual problem elsewhere. Any new unattended flow that signals completion via a serial token must follow the same flush → token → natural-poweroff pattern.
+
 ### Testing conventions
 
 `tests/_common.py` exports `BaseVmctlTestCase` with a temp-dir root and a `_VmctlFacade` that flattens all vmctl submodules into a single attribute namespace. When adding a new module, add its import to both the `import` block and the `_SEARCH_ORDER` tuple in `_common.py`.

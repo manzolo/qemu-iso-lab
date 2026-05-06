@@ -291,33 +291,73 @@ arch-chroot /mnt bash -c "echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d
 arch-chroot /mnt chmod 0440 /etc/sudoers.d/nopasswd-wheel
 {ssh_key_block}
 echo "==> Bootloader..."
-arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --removable
+# Standard Arch UEFI install: grub-install (without --removable) generates a
+# grubx64.efi whose prefix points to /boot/grub on the root partition, with
+# all modules required to read that path baked in by grub-install itself.
+# It also registers an EFI boot entry via efibootmgr automatically.
+arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
+
+# Make kernel boot visible on the serial console for post-install diagnostics
+# (kept on tty0 too so it shows on the QEMU display).
+sed -i 's|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 console=tty0 console=ttyS0,115200"|' /mnt/etc/default/grub
+
+# Clear out stale temporary configs from previous failed attempts, then ask
+# GRUB to generate the real config at the canonical path.
+rm -f /mnt/boot/grub/grub.cfg /mnt/boot/grub/grub.cfg.new /mnt/boot/grub/grub.cfg.new.new /mnt/boot/grub/grub.cfg.new.new.new
 arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
-mkdir -p /mnt/boot/efi/EFI/BOOT /mnt/boot/efi/EFI/GRUB
-# Replace --removable BOOTX64.EFI with a standalone GRUB image that embeds all
-# required modules (part_gpt, ext2, search, normal, linux...) plus a config
-# that chain-loads /boot/grub/grub.cfg from the root partition. Without this,
-# `insmod ext2` inside an external stub fails (modules aren't at the prefix
-# path on the ESP) and GRUB drops to the `grub>` prompt.
-cat > /mnt/grub-embedded.cfg <<'GRUBEOF'
-insmod part_gpt
-insmod ext2
-set root=(hd0,gpt2)
-set prefix=($root)/boot/grub
-configfile $prefix/grub.cfg
-GRUBEOF
+
+# Some current Arch/GRUB combinations leave a *.new file behind instead of
+# promoting it into place. If that happens, salvage the newest temporary file.
+if [ ! -s /mnt/boot/grub/grub.cfg ]; then
+    for candidate in \
+        /mnt/boot/grub/grub.cfg.new \
+        /mnt/boot/grub/grub.cfg.new.new \
+        /mnt/boot/grub/grub.cfg.new.new.new
+    do
+        if [ -s "$candidate" ]; then
+            install -D -m 600 "$candidate" /mnt/boot/grub/grub.cfg
+            break
+        fi
+    done
+fi
+
+test -s /mnt/boot/grub/grub.cfg
+arch-chroot /mnt grub-script-check /boot/grub/grub.cfg
+
+# Replace the plain EFI loader with a standalone GRUB image that embeds the
+# first-stage config and the modules needed to find the root filesystem. This
+# avoids OVMF/GRUB prefix drift that otherwise drops the VM into `grub>`.
+ROOT_UUID="$(blkid -s UUID -o value /dev/vda2)"
+cat > /mnt/grub-embedded.cfg <<EOF
+search --no-floppy --fs-uuid --set=root $ROOT_UUID
+set prefix=(\\$root)/boot/grub
+configfile \\$prefix/grub.cfg
+EOF
 arch-chroot /mnt grub-mkstandalone \\
     --format=x86_64-efi \\
-    --output=/boot/efi/EFI/BOOT/BOOTX64.EFI \\
-    --modules="part_gpt part_msdos ext2 fat normal configfile search search_fs_file search_fs_uuid search_label echo linux all_video font gfxterm" \\
+    --output=/boot/efi/EFI/GRUB/grubx64.efi \\
+    --modules="part_gpt part_msdos fat ext2 normal configfile search search_fs_uuid search_fs_file search_label regexp linux all_video font gfxterm gzio echo boot chain test true" \\
     "boot/grub/grub.cfg=/grub-embedded.cfg"
 rm -f /mnt/grub-embedded.cfg
-cp /mnt/boot/efi/EFI/BOOT/BOOTX64.EFI /mnt/boot/efi/EFI/GRUB/grubx64.efi
-echo "==> Registering EFI boot entry for Arch Linux..."
-arch-chroot /mnt efibootmgr --create --disk /dev/vda --part 1 --label "Arch Linux" --loader '\\EFI\\BOOT\\BOOTX64.EFI' --quiet || true
+
+# Keep the removable fallback path bootable if NVRAM is reset or ignored.
+mkdir -p /mnt/boot/efi/EFI/BOOT
+cp /mnt/boot/efi/EFI/GRUB/grubx64.efi /mnt/boot/efi/EFI/BOOT/BOOTX64.EFI
+
+# Leave the same first-stage config on the ESP for diagnostics and for any
+# non-standalone GRUB binary that a user may install later.
+cat > /mnt/boot/efi/EFI/GRUB/grub.cfg <<EOF
+search --no-floppy --fs-uuid --set=root $ROOT_UUID
+set prefix=(\\$root)/boot/grub
+configfile \\$prefix/grub.cfg
+EOF
+cp /mnt/boot/efi/EFI/GRUB/grub.cfg /mnt/boot/efi/EFI/BOOT/grub.cfg
+
 arch-chroot /mnt efibootmgr
 {bootstrap_commands_block}
 
+sync
+blockdev --flushbufs /dev/vda /dev/vda1 /dev/vda2 || true
 echo "{BOOTSTRAP_COMPLETE_TOKEN}"
 poweroff -f
 """
