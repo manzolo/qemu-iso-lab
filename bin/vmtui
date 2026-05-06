@@ -630,8 +630,8 @@ run_action() {
                 local choice
                 choice=$(menu_choose "VM Already Running" \
                     "VM '$current_vm' is already running headless.\nWhat do you want to do?" \
-                    "SSH Console"          "Open an SSH session inside the running VM" \
                     "Restart with Display" "Stop the headless VM and start it with display" \
+                    "SSH Console"          "Open an SSH session inside the running VM" \
                     "Cancel"               "Return to the menu") || return 0
                 case "$choice" in
                     "SSH Console")
