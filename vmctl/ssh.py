@@ -157,7 +157,12 @@ def remote_sudo_shell_cmd(vm: dict[str, Any], command: str, dry_run: bool = Fals
     return ssh_base_cmd(vm, dry_run=dry_run) + [f"sudo sh -lc {shlex.quote(command)}"]
 
 
-def wait_for_guest_post_install_ready(vm: dict[str, Any], dry_run: bool = False) -> None:
+def wait_for_guest_post_install_ready(
+    vm: dict[str, Any],
+    dry_run: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+) -> None:
     if dry_run:
         ui.print_note("Would wait for cloud-init to finish")
         ui.print_note("Would wait for package manager activity to settle")
@@ -169,7 +174,13 @@ def wait_for_guest_post_install_ready(vm: dict[str, Any], dry_run: bool = False)
         "sudo cloud-init status --wait || true; "
         "fi"
     )
-    runtime.run(remote_shell_cmd(vm, cloud_init_wait, dry_run=dry_run), dry_run=dry_run)
+    runtime.run(
+        remote_shell_cmd(vm, cloud_init_wait, dry_run=dry_run),
+        dry_run=dry_run,
+        stdout_log=stdout_log,
+        stderr_log=stderr_log,
+        append=True,
+    )
 
     ui.print_note("Waiting for package manager activity to settle")
     package_wait = (
@@ -179,10 +190,22 @@ def wait_for_guest_post_install_ready(vm: dict[str, Any], dry_run: bool = False)
         "sleep 2; "
         "done"
     )
-    runtime.run(remote_shell_cmd(vm, package_wait, dry_run=dry_run), dry_run=dry_run)
+    runtime.run(
+        remote_shell_cmd(vm, package_wait, dry_run=dry_run),
+        dry_run=dry_run,
+        stdout_log=stdout_log,
+        stderr_log=stderr_log,
+        append=True,
+    )
 
 
-def post_install_copy(vm: dict[str, Any], entry: dict[str, Any], dry_run: bool = False) -> None:
+def post_install_copy(
+    vm: dict[str, Any],
+    entry: dict[str, Any],
+    dry_run: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+) -> None:
     host, _, user = ssh_target(vm)
     source_raw = str(entry.get("source") or "").strip()
     dest_raw = str(entry.get("dest") or "").strip()
@@ -207,7 +230,13 @@ def post_install_copy(vm: dict[str, Any], entry: dict[str, Any], dry_run: bool =
     if source_sudo:
         temp_source = Path(tempfile.mkdtemp(prefix="vmctl-copy-src-", dir="/tmp")) / source.name
         try:
-            runtime.run(["sudo", "cp", "--archive", str(source), str(temp_source)], dry_run=dry_run)
+            runtime.run(
+                ["sudo", "cp", "--archive", str(source), str(temp_source)],
+                dry_run=dry_run,
+                stdout_log=stdout_log,
+                stderr_log=stderr_log,
+                append=True,
+            )
             flash.maybe_restore_sudo_owner(temp_source)
             source = temp_source
         except Exception:
@@ -216,7 +245,13 @@ def post_install_copy(vm: dict[str, Any], entry: dict[str, Any], dry_run: bool =
             raise
 
     if recursive:
-        runtime.run(remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
+        runtime.run(
+            remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_raw)}", dry_run=dry_run),
+            dry_run=dry_run,
+            stdout_log=stdout_log,
+            stderr_log=stderr_log,
+            append=True,
+        )
         staging_dir = Path(tempfile.mkdtemp(prefix="vmctl-copy-dir-", dir="/tmp"))
         staged_source = staging_dir / source.name
         try:
@@ -235,9 +270,21 @@ def post_install_copy(vm: dict[str, Any], entry: dict[str, Any], dry_run: bool =
                     else:
                         path.unlink(missing_ok=True)
             remote_target = f"{user}@{host}:{dest_raw}"
-            runtime.run(scp_base_cmd(vm, dry_run=dry_run) + ["-r", f"{staged_source}/.", remote_target], dry_run=dry_run)
+            runtime.run(
+                scp_base_cmd(vm, dry_run=dry_run) + ["-r", f"{staged_source}/.", remote_target],
+                dry_run=dry_run,
+                stdout_log=stdout_log,
+                stderr_log=stderr_log,
+                append=True,
+            )
             if dest_mode:
-                runtime.run(remote_chmod(vm, f"chmod -R {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
+                runtime.run(
+                    remote_chmod(vm, f"chmod -R {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run),
+                    dry_run=dry_run,
+                    stdout_log=stdout_log,
+                    stderr_log=stderr_log,
+                    append=True,
+                )
         finally:
             shutil.rmtree(staging_dir, ignore_errors=True)
             if source_sudo and source.exists():
@@ -250,9 +297,21 @@ def post_install_copy(vm: dict[str, Any], entry: dict[str, Any], dry_run: bool =
         temp_dest = f"/tmp/{Path(dest_raw).name}"
 
     try:
-        runtime.run(remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_parent if dest_sudo else dest_parent)}", dry_run=dry_run), dry_run=dry_run)
+        runtime.run(
+            remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_parent if dest_sudo else dest_parent)}", dry_run=dry_run),
+            dry_run=dry_run,
+            stdout_log=stdout_log,
+            stderr_log=stderr_log,
+            append=True,
+        )
         remote_target = f"{user}@{host}:{temp_dest}"
-        runtime.run(scp_base_cmd(vm, dry_run=dry_run) + [str(source), remote_target], dry_run=dry_run)
+        runtime.run(
+            scp_base_cmd(vm, dry_run=dry_run) + [str(source), remote_target],
+            dry_run=dry_run,
+            stdout_log=stdout_log,
+            stderr_log=stderr_log,
+            append=True,
+        )
         if dest_sudo:
             runtime.run(
                 remote_sudo_shell_cmd(
@@ -261,13 +320,34 @@ def post_install_copy(vm: dict[str, Any], entry: dict[str, Any], dry_run: bool =
                     dry_run=dry_run,
                 ),
                 dry_run=dry_run,
+                stdout_log=stdout_log,
+                stderr_log=stderr_log,
+                append=True,
             )
         elif dest_mode:
-            runtime.run(remote_chmod(vm, f"chmod {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run), dry_run=dry_run)
+            runtime.run(
+                remote_chmod(vm, f"chmod {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run),
+                dry_run=dry_run,
+                stdout_log=stdout_log,
+                stderr_log=stderr_log,
+                append=True,
+            )
     finally:
         if source_sudo and source.exists():
             source.unlink(missing_ok=True)
 
 
-def post_install_run(vm: dict[str, Any], command: str, dry_run: bool = False) -> None:
-    runtime.run(remote_shell_cmd(vm, command, dry_run=dry_run), dry_run=dry_run)
+def post_install_run(
+    vm: dict[str, Any],
+    command: str,
+    dry_run: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+) -> None:
+    runtime.run(
+        remote_shell_cmd(vm, command, dry_run=dry_run),
+        dry_run=dry_run,
+        stdout_log=stdout_log,
+        stderr_log=stderr_log,
+        append=True,
+    )

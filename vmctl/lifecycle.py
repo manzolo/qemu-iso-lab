@@ -37,6 +37,29 @@ def check_vm_stderr_log_path(name: str) -> Path:
     return runtime.vm_artifact_base(name) / "logs" / "check-vms.stderr.log"
 
 
+def phase_stdout_log_path(name: str, phase: str) -> Path:
+    return runtime.vm_artifact_base(name) / "logs" / f"{phase}.stdout.log"
+
+
+def phase_stderr_log_path(name: str, phase: str) -> Path:
+    return runtime.vm_artifact_base(name) / "logs" / f"{phase}.stderr.log"
+
+
+def companion_stderr_log_path(log_path: Path) -> Path:
+    if log_path.suffix:
+        return log_path.with_name(f"{log_path.stem}.stderr{log_path.suffix}")
+    return log_path.with_name(f"{log_path.name}.stderr.log")
+
+
+def announce_phase_logs(name: str, phase: str) -> tuple[Path, Path]:
+    stdout_log = phase_stdout_log_path(name, phase)
+    stderr_log = phase_stderr_log_path(name, phase)
+    ui.print_kv("stdout", ui.pretty_path(stdout_log))
+    ui.print_kv("stderr", ui.pretty_path(stderr_log))
+    ui.print_note(f"tail -f {ui.pretty_path(stdout_log)}")
+    return stdout_log, stderr_log
+
+
 def read_pid_file(path: Path) -> int | None:
     if not path.is_file():
         return None
@@ -318,6 +341,37 @@ def local_test_prereq_skip(vm_name: str, vm: dict[str, Any]) -> str | None:
     if actual_size < 1024 * 1024:
         return f"disk boot-check skipped: disk image for '{vm_name}' looks uninitialized"
     return None
+
+
+def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) -> list[str]:
+    candidates: list[str] = []
+    for vm_name in selected_names:
+        vm = config.get_vm(cfg, vm_name)
+        mode, _ = local_test_mode(vm)
+        if mode in {"bootstrap-unattended", "bootstrap-archinstall"}:
+            candidates.append(vm_name)
+    return candidates
+
+
+def maybe_clean_local_test_candidates(selected_names: list[str], cfg: dict[str, Any], args: argparse.Namespace) -> None:
+    candidates = local_test_clean_candidates(selected_names, cfg)
+    if not candidates:
+        return
+    names = ", ".join(candidates)
+    if getattr(args, "no_clean_first", False):
+        ui.print_note("Running check-vms without cleaning unattended/bootstrap VMs")
+        return
+    if not getattr(args, "clean_first", False):
+        if not host_setup.prompt_yes_no_default_yes(f"Clean unattended/bootstrap VMs before check-vms? {names}"):
+            ui.print_note("Running check-vms without cleaning unattended/bootstrap VMs")
+            return
+
+    ui.print_header("Clean local test VMs")
+    ui.print_kv("profiles", names)
+    for vm_name in candidates:
+        vm = config.get_vm(cfg, vm_name)
+        cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        clean_vm(vm_name, vm, dry_run=args.dry_run)
 
 
 def run_local_test_vm(
@@ -744,7 +798,8 @@ def cmd_install(args: argparse.Namespace) -> int:
     qemu_args += ["-cdrom", str(iso_path)]
     if args.cloud_init:
         qemu_args += cloud_init.cloud_init_drive_args(cloud_init.create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run))
-    runtime.run(qemu_args, dry_run=args.dry_run)
+    stdout_log, stderr_log = announce_phase_logs(args.vm, "install")
+    runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     return 0
 
 
@@ -805,7 +860,8 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
     post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     runtime.ensure_parent(post_serial_log)
     run_qemu_args += ["-serial", f"file:{post_serial_log}"]
-    pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run)
+    stderr_log = companion_stderr_log_path(log_path)
+    pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
     if pid is not None:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")
         ui.print_kv("pid", str(pid))
@@ -836,7 +892,8 @@ def cmd_install_archinstall(args: argparse.Namespace) -> int:
     qemu_args += archinstall.config_iso_drive_args(config_iso)
     ui.print_note("In the live environment run:")
     ui.print_note("  mkdir -p /tmp/archconf && mount /dev/vdb /tmp/archconf && bash /tmp/archconf/run.sh")
-    runtime.run(qemu_args, dry_run=args.dry_run)
+    stdout_log, stderr_log = announce_phase_logs(args.vm, "install-archinstall")
+    runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     return 0
 
 
@@ -867,7 +924,8 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
     qemu_args += ["-cdrom", str(iso_path)]
     qemu_args += cloud_init.cloud_init_drive_args(seed_path)
     qemu_args += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", append_args]
-    runtime.run(qemu_args, dry_run=args.dry_run)
+    stdout_log, stderr_log = announce_phase_logs(args.vm, "install-unattended")
+    runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     return 0
 
 
@@ -911,7 +969,8 @@ def cmd_start(args: argparse.Namespace) -> int:
             )
             qemu_args += cloud_init_args
         pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
-        pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run)
+        stderr_log = companion_stderr_log_path(log_path)
+        pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
         if pid is not None:
             pid_path.write_text(f"{pid}\n", encoding="utf-8")
             ui.print_kv("pid", str(pid))
@@ -927,18 +986,19 @@ def run_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int, dry_run
         raise VMError(f"VM '{vm_name}' does not define SSH provisioning")
     runtime.require_command("ssh")
     runtime.require_command("scp")
+    stdout_log, stderr_log = announce_phase_logs(vm_name, "post-install")
     ssh.wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
     ui.print_status("ok", f"SSH is ready for VM '{vm_name}'")
-    ssh.wait_for_guest_post_install_ready(vm, dry_run=dry_run)
+    ssh.wait_for_guest_post_install_ready(vm, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     ui.print_note("Running post-install provisioning")
 
     for entry in ssh_cfg.get("copy_from_host", []):
         if not isinstance(entry, dict):
             raise VMError("Invalid copy_from_host entry: expected object")
-        ssh.post_install_copy(vm, entry, dry_run=dry_run)
+        ssh.post_install_copy(vm, entry, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
 
     for command in ssh_cfg.get("post_install_run", []):
-        ssh.post_install_run(vm, str(command), dry_run=dry_run)
+        ssh.post_install_run(vm, str(command), dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
 
 
 def cmd_post_install(args: argparse.Namespace) -> int:
@@ -973,7 +1033,8 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
     qemu_args = qemu.common_args(vm, None, dry_run=args.dry_run, headless=True, serial_stdio=True)
-    pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run)
+    stderr_log = companion_stderr_log_path(log_path)
+    pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
     if pid is not None:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")
         ui.print_kv("pid", str(pid))
@@ -1112,6 +1173,7 @@ def cmd_test_local(args: argparse.Namespace) -> int:
     ui.print_header("Local VM test matrix")
     ui.print_kv("timeout", f"{args.timeout}s")
     ui.print_kv("parallel", str(parallel))
+    maybe_clean_local_test_candidates(selected_names, cfg, args)
 
     if parallel == 1:
         for vm_name in selected_names:

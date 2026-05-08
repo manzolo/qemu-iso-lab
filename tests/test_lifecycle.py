@@ -643,6 +643,48 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("looks uninitialized", detail)
         boot_check.assert_not_called()
 
+    def test_local_test_clean_candidates_selects_bootstrap_profiles_only(self):
+        ubuntu_vm = json.loads(json.dumps(self.vm_config))
+        ubuntu_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
+        ubuntu_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+
+        arch_vm = json.loads(json.dumps(self.vm_config))
+        arch_vm["archinstall_config"] = {"username": "vmuser", "password": "pw"}
+        arch_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2223}
+
+        boot_vm = json.loads(json.dumps(self.vm_config))
+        boot_vm["ci"] = {"expect": "login:"}
+
+        self.write_extra_profile(
+            "clean-candidates.json",
+            {"vms": {"ubuntu": ubuntu_vm, "arch": arch_vm, "boot": boot_vm}},
+        )
+        cfg = self.vmctl.config.load_config()
+
+        candidates = vmctl.lifecycle.local_test_clean_candidates(["ubuntu", "arch", "boot"], cfg)
+
+        self.assertEqual(candidates, ["ubuntu", "arch"])
+
+    def test_cmd_test_local_cleans_bootstrap_profiles_before_running(self):
+        ubuntu_vm = json.loads(json.dumps(self.vm_config))
+        ubuntu_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
+        ubuntu_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+        self.write_extra_profile("clean-before-run.json", {"vms": {"ubuntu": ubuntu_vm}})
+        args = argparse.Namespace(vms=["ubuntu"], timeout=300, parallel=1, dry_run=True, clean_first=False, no_clean_first=False)
+
+        with mock.patch.object(vmctl.host_setup, "prompt_yes_no_default_yes", return_value=True), \
+             mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended") as bootstrap_unattended, \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop") as cmd_stop, \
+             mock.patch.object(vmctl.lifecycle, "clean_vm") as clean_vm:
+            exit_code = self.vmctl.cmd_test_local(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(cmd_stop.call_count, 2)
+        self.assertTrue(all(call.args[0].vm == "ubuntu" for call in cmd_stop.call_args_list))
+        clean_vm.assert_called_once()
+        self.assertEqual(clean_vm.call_args.args[0], "ubuntu")
+        bootstrap_unattended.assert_called_once()
+
     def test_cmd_test_local_runs_matrix_and_summarizes_results(self):
         ubuntu_vm = json.loads(json.dumps(self.vm_config))
         ubuntu_vm["disk"]["path"] = "artifacts/ubuntu/disk.qcow2"
@@ -672,9 +714,10 @@ class VmctlTests(BaseVmctlTestCase):
             },
         )
 
-        args = argparse.Namespace(vms=[], timeout=300, dry_run=True)
+        args = argparse.Namespace(vms=[], timeout=300, dry_run=True, clean_first=False, no_clean_first=False)
 
-        with mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended") as bootstrap_unattended, \
+        with mock.patch.object(vmctl.host_setup, "prompt_yes_no_default_yes", return_value=False), \
+             mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended") as bootstrap_unattended, \
              mock.patch.object(vmctl.lifecycle, "cmd_boot_check") as boot_check, \
              mock.patch.object(vmctl.lifecycle, "cmd_stop") as cmd_stop, \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
@@ -738,7 +781,7 @@ class VmctlTests(BaseVmctlTestCase):
                 }
             },
         )
-        args = argparse.Namespace(vms=["alpha", "beta"], timeout=300, parallel=2, dry_run=True)
+        args = argparse.Namespace(vms=["alpha", "beta"], timeout=300, parallel=2, dry_run=True, clean_first=False, no_clean_first=False)
 
         completed = [
             subprocess.CompletedProcess(
@@ -753,7 +796,8 @@ class VmctlTests(BaseVmctlTestCase):
             ),
         ]
 
-        with mock.patch.object(vmctl.lifecycle.subprocess, "run", side_effect=completed) as run_cmd, \
+        with mock.patch.object(vmctl.host_setup, "prompt_yes_no_default_yes", return_value=False), \
+             mock.patch.object(vmctl.lifecycle.subprocess, "run", side_effect=completed) as run_cmd, \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_test_local(args)
 
@@ -772,9 +816,10 @@ class VmctlTests(BaseVmctlTestCase):
         failing_vm = json.loads(json.dumps(self.vm_config))
         failing_vm["ci"] = {"expect": "login:"}
         self.write_extra_profile("failure.json", {"vms": {"failing": failing_vm}})
-        args = argparse.Namespace(vms=["failing"], timeout=300, dry_run=True)
+        args = argparse.Namespace(vms=["failing"], timeout=300, dry_run=True, clean_first=False, no_clean_first=False)
 
-        with mock.patch.object(vmctl.lifecycle, "cmd_boot_check", side_effect=self.vmctl.VMError("boom")):
+        with mock.patch.object(vmctl.host_setup, "prompt_yes_no_default_yes", return_value=False), \
+             mock.patch.object(vmctl.lifecycle, "cmd_boot_check", side_effect=self.vmctl.VMError("boom")):
             exit_code = self.vmctl.cmd_test_local(args)
 
         self.assertEqual(exit_code, 1)
@@ -784,15 +829,35 @@ class VmctlTests(BaseVmctlTestCase):
         ubuntu_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
         ubuntu_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
         self.write_extra_profile("bootstrap-failure.json", {"vms": {"ubuntu": ubuntu_vm}})
-        args = argparse.Namespace(vms=["ubuntu"], timeout=300, dry_run=True)
+        args = argparse.Namespace(vms=["ubuntu"], timeout=300, dry_run=True, clean_first=False, no_clean_first=False)
 
-        with mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended", side_effect=self.vmctl.VMError("boom")), \
+        with mock.patch.object(vmctl.host_setup, "prompt_yes_no_default_yes", return_value=False), \
+             mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended", side_effect=self.vmctl.VMError("boom")), \
              mock.patch.object(vmctl.lifecycle, "cmd_stop") as cmd_stop:
             exit_code = self.vmctl.cmd_test_local(args)
 
         self.assertEqual(exit_code, 1)
         cmd_stop.assert_called_once()
         self.assertEqual(cmd_stop.call_args.args[0].vm, "ubuntu")
+
+    def test_cmd_test_local_clean_first_skips_prompt(self):
+        ubuntu_vm = json.loads(json.dumps(self.vm_config))
+        ubuntu_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
+        ubuntu_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+        self.write_extra_profile("clean-first.json", {"vms": {"ubuntu": ubuntu_vm}})
+        args = argparse.Namespace(vms=["ubuntu"], timeout=300, parallel=1, dry_run=True, clean_first=True, no_clean_first=False)
+
+        with mock.patch.object(vmctl.host_setup, "prompt_yes_no_default_yes") as prompt, \
+             mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended") as bootstrap_unattended, \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop") as cmd_stop, \
+             mock.patch.object(vmctl.lifecycle, "clean_vm") as clean_vm:
+            exit_code = self.vmctl.cmd_test_local(args)
+
+        self.assertEqual(exit_code, 0)
+        prompt.assert_not_called()
+        self.assertEqual(cmd_stop.call_count, 2)
+        clean_vm.assert_called_once()
+        bootstrap_unattended.assert_called_once()
 
     def test_cmd_start_cloud_init_attaches_seed_drive(self):
         self.create_disk()

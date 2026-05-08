@@ -83,3 +83,15 @@ def prompt_yes_no(prompt: str) -> bool:
     except EOFError:
         return False
     return answer in {"y", "yes"}
+
+
+def prompt_yes_no_default_yes(prompt: str) -> bool:
+    if not getattr(sys.stdin, "isatty", lambda: False)():
+        return True
+    try:
+        answer = input(f"{prompt} [Y/n] ").strip().lower()
+    except EOFError:
+        return True
+    if not answer:
+        return True
+    return answer in {"y", "yes"}

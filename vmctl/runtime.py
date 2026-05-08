@@ -8,6 +8,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -56,13 +57,83 @@ def require_command(name: str) -> None:
         raise VMError(f"Missing command: {name}")
 
 
-def run(cmd: list[str], dry_run: bool = False, quiet: bool = False) -> None:
+def _stream_pipe(pipe: Any, stream: Any, log_fh: Any) -> None:
+    try:
+        for chunk in iter(pipe.readline, ""):
+            if not chunk:
+                break
+            if stream is not None:
+                stream.write(chunk)
+                stream.flush()
+            if log_fh is not None:
+                log_fh.write(chunk)
+                log_fh.flush()
+    finally:
+        pipe.close()
+
+
+def run(
+    cmd: list[str],
+    dry_run: bool = False,
+    quiet: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+    append: bool = False,
+) -> None:
     ui.print_command(cmd)
     if not dry_run:
-        if quiet:
+        if quiet and stdout_log is None and stderr_log is None:
             subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        else:
+            return
+        if stdout_log is None and stderr_log is None:
             subprocess.run(cmd, check=True)
+            return
+
+        stdout_fh = None
+        stderr_fh = None
+        mode = "a" if append else "w"
+        try:
+            if stdout_log is not None:
+                ensure_parent(stdout_log)
+                stdout_fh = stdout_log.open(mode, encoding="utf-8")
+            if stderr_log is not None:
+                ensure_parent(stderr_log)
+                stderr_fh = stderr_log.open(mode, encoding="utf-8")
+
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
+            assert process.stdout is not None
+            assert process.stderr is not None
+
+            stdout_stream = None if quiet else sys.stdout
+            stderr_stream = None if quiet else sys.stderr
+            stdout_thread = threading.Thread(
+                target=_stream_pipe,
+                args=(process.stdout, stdout_stream, stdout_fh),
+                daemon=True,
+            )
+            stderr_thread = threading.Thread(
+                target=_stream_pipe,
+                args=(process.stderr, stderr_stream, stderr_fh),
+                daemon=True,
+            )
+            stdout_thread.start()
+            stderr_thread.start()
+            returncode = process.wait()
+            stdout_thread.join()
+            stderr_thread.join()
+            if returncode != 0:
+                raise subprocess.CalledProcessError(returncode, cmd)
+        finally:
+            if stdout_fh is not None:
+                stdout_fh.close()
+            if stderr_fh is not None:
+                stderr_fh.close()
 
 
 def reread_partition_table(device: str, dry_run: bool = False) -> None:
@@ -76,19 +147,33 @@ def reread_partition_table(device: str, dry_run: bool = False) -> None:
         )
 
 
-def run_background(cmd: list[str], log_path: Path, dry_run: bool = False) -> int | None:
+def run_background(cmd: list[str], log_path: Path, dry_run: bool = False, stderr_path: Path | None = None) -> int | None:
     ui.print_command(cmd)
     ui.print_kv("log", ui.pretty_path(log_path))
+    if stderr_path is not None:
+        ui.print_kv("stderr", ui.pretty_path(stderr_path))
     if dry_run:
         return None
 
     ensure_parent(log_path)
-    with log_path.open("ab") as fh:
+    if stderr_path is None:
+        with log_path.open("ab") as fh:
+            process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=fh,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        return process.pid
+
+    ensure_parent(stderr_path)
+    with log_path.open("ab") as stdout_fh, stderr_path.open("ab") as stderr_fh:
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.DEVNULL,
-            stdout=fh,
-            stderr=subprocess.STDOUT,
+            stdout=stdout_fh,
+            stderr=stderr_fh,
             start_new_session=True,
         )
     return process.pid

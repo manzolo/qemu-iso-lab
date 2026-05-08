@@ -164,9 +164,11 @@ Use this path to run the local validation matrix across multiple profiles:
 make check-vms
 make check-vms VMS="ubuntu-niri arch-noctalia-local" TIMEOUT=600
 make check-vms PARALLEL=4
+make check-vms PARALLEL=4 CLEAN_FIRST=1
 ```
 
 `PARALLEL` controls how many VM checks run concurrently. This is mainly useful for heavier local bootstrap flows such as unattended Ubuntu installs and Arch post-install provisioning.
+Use `CLEAN_FIRST=1` to skip the prompt and always clean unattended/bootstrap profiles before the run.
 
 ### Optional TUI
 
@@ -217,6 +219,7 @@ make shell VM=<name>
 make boot-check VM=alpine-ci
 make check-vms
 make check-vms PARALLEL=4
+make check-vms PARALLEL=4 CLEAN_FIRST=1
 make clean VM=<name>
 make clean-all
 ```
@@ -240,6 +243,7 @@ With `vmctl` directly:
 ./bin/vmctl boot-check alpine-ci
 ./bin/vmctl check-vms
 ./bin/vmctl check-vms --parallel 4
+./bin/vmctl check-vms --parallel 4 --clean-first
 ./bin/vmctl clean <name>
 ./bin/vmctl clean --all
 ```

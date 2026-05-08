@@ -116,7 +116,8 @@ check-vms:
 	$(call print_kv,VMS,$(if $(VMS),$(VMS),<all>))
 	$(call print_kv,TIMEOUT,$(TIMEOUT))
 	$(call print_kv,PARALLEL,$(PARALLEL))
-	@./bin/vmctl check-vms --timeout $(TIMEOUT) --parallel $(if $(PARALLEL),$(PARALLEL),1) $(VMS)
+	$(call print_kv,CLEAN_FIRST,$(CLEAN_FIRST))
+	@./bin/vmctl check-vms --timeout $(TIMEOUT) --parallel $(if $(PARALLEL),$(PARALLEL),1) $(if $(CLEAN_FIRST),--clean-first,) $(VMS)
 
 clean-stale:
 	$(call print_header,Clean stale runtime state)

@@ -86,7 +86,8 @@ class PostInstallTests(BaseVmctlTestCase):
             self.vmctl.subprocess.CompletedProcess(args=["ssh"], returncode=255),
             self.vmctl.subprocess.CompletedProcess(args=["ssh"], returncode=0),
         ]
-        with mock.patch.object(subprocess, "run", side_effect=results) as run_cmd, \
+        with mock.patch.object(vmctl.ssh, "ensure_generated_ssh_keypair", return_value=self.root / "artifacts/testvm/ssh/id_ed25519"), \
+             mock.patch.object(subprocess, "run", side_effect=results) as run_cmd, \
              mock.patch.object(time, "sleep") as sleep_mock:
             self.vmctl.wait_for_ssh(self.vm_config, timeout_sec=10, dry_run=False)
 
@@ -115,26 +116,21 @@ class PostInstallTests(BaseVmctlTestCase):
 
         self.assertEqual(exit_code, 0)
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
-        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
-        executed = [call.args[0] for call in run_cmd.call_args_list]
+        wait_ready.assert_called_once()
+        self.assertEqual(wait_ready.call_args.args[0], self.vm_config)
+        self.assertTrue(wait_ready.call_args.kwargs["dry_run"])
         self.assertEqual(
-            executed[0],
-            [
-                "ssh",
-                "-F",
-                "/dev/null",
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-o",
-                "UserKnownHostsFile=/dev/null",
-                "-o",
-                "BatchMode=yes",
-                "-p",
-                "2222",
-                "tester@127.0.0.1",
-                "sh -lc 'mkdir -p /home/tester/.config/niri'",
-            ],
+            wait_ready.call_args.kwargs["stdout_log"],
+            self.root / "artifacts/testvm/logs/post-install.stdout.log",
         )
+        self.assertEqual(
+            wait_ready.call_args.kwargs["stderr_log"],
+            self.root / "artifacts/testvm/logs/post-install.stderr.log",
+        )
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(executed[0][0], "ssh")
+        self.assertIn("tester@127.0.0.1", executed[0])
+        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/niri'")
         self.assertEqual(
             executed[1],
             mock.ANY,
@@ -172,7 +168,9 @@ class PostInstallTests(BaseVmctlTestCase):
 
         self.assertEqual(exit_code, 0)
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
-        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
+        wait_ready.assert_called_once()
+        self.assertEqual(wait_ready.call_args.args[0], self.vm_config)
+        self.assertTrue(wait_ready.call_args.kwargs["dry_run"])
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/niri'")
         self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/niri")
@@ -208,7 +206,9 @@ class PostInstallTests(BaseVmctlTestCase):
 
         self.assertEqual(exit_code, 0)
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
-        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
+        wait_ready.assert_called_once()
+        self.assertEqual(wait_ready.call_args.args[0], self.vm_config)
+        self.assertTrue(wait_ready.call_args.kwargs["dry_run"])
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(executed[0], ["sudo", "cp", "--archive", str(source_file), mock.ANY])
         self.assertEqual(
@@ -242,7 +242,9 @@ class PostInstallTests(BaseVmctlTestCase):
 
         self.assertEqual(exit_code, 0)
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
-        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
+        wait_ready.assert_called_once()
+        self.assertEqual(wait_ready.call_args.args[0], self.vm_config)
+        self.assertTrue(wait_ready.call_args.kwargs["dry_run"])
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/geany'")
         self.assertEqual(executed[1][0], "scp")
@@ -270,7 +272,9 @@ class PostInstallTests(BaseVmctlTestCase):
 
         self.assertEqual(exit_code, 0)
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=True)
-        wait_ready.assert_called_once_with(self.vm_config, dry_run=True)
+        wait_ready.assert_called_once()
+        self.assertEqual(wait_ready.call_args.args[0], self.vm_config)
+        self.assertTrue(wait_ready.call_args.kwargs["dry_run"])
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/geany'")
         self.assertEqual(executed[1][0], "scp")
@@ -296,10 +300,11 @@ class PostInstallTests(BaseVmctlTestCase):
 
         self.assertEqual(exit_code, 0)
         wait_for_ssh.assert_called_once_with(self.vm_config, 30, dry_run=False)
-        wait_ready.assert_called_once_with(self.vm_config, dry_run=False)
+        wait_ready.assert_called_once()
+        self.assertEqual(wait_ready.call_args.args[0], self.vm_config)
+        self.assertFalse(wait_ready.call_args.kwargs["dry_run"])
         executed = [call.args[0] for call in run_cmd.call_args_list]
-        self.assertEqual(len(executed), 1)
-        self.assertEqual(executed[0][-1], "sh -lc 'echo done'")
+        self.assertEqual(executed[-1][-1], "sh -lc 'echo done'")
         self.assertIn("Skipping missing host path", stdout.getvalue())
 
 
