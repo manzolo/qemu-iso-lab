@@ -115,10 +115,6 @@
       "memory_mb": 2048,
       "cpus": 2,
       "network": "user",
-      "installer_boot": {
-        "kernel": "install.amd/vmlinuz",
-        "initrd": "install.amd/initrd.gz"
-      },
       "audio": false,
       "video": {
         "default": "safe",
@@ -166,10 +162,6 @@
       "memory_mb": 2048,
       "cpus": 2,
       "network": "user",
-      "installer_boot": {
-        "kernel": "install.amd/vmlinuz",
-        "initrd": "install.amd/initrd.gz"
-      },
       "audio": false,
       "video": {
         "default": "safe",

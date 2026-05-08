@@ -118,10 +118,6 @@
       "memory_mb": 2048,
       "cpus": 2,
       "network": "user",
-      "installer_boot": {
-        "kernel": "images/pxeboot/vmlinuz",
-        "initrd": "images/pxeboot/initrd.img"
-      },
       "audio": false,
       "video": {
         "default": "safe",

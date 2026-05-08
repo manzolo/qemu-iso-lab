@@ -123,9 +123,9 @@ After the guest has been installed to disk:
 make start VM=<name>
 ```
 
-### Unattended Local Guest Flow
+### Ubuntu Autoinstall Flow
 
-Use this path for local profiles that define `autoinstall` and SSH provisioning:
+Use this path for Ubuntu-style local profiles that define `autoinstall` and SSH provisioning:
 
 ```bash
 make prep VM=<name>
@@ -167,7 +167,7 @@ make tui
 The TUI is a thin frontend over `vmctl`. It groups VM actions into:
 
 - `Start Here` for the recommended flows, including guided install, full bootstrap, desktop boot, headless boot, and SSH console when available;
-- `Installation` for ISO download, disk preparation, manual install, autoinstall, and cloud-init installer flows;
+- `Installation` for ISO download, disk preparation, manual install, Ubuntu autoinstall, and cloud-init installer flows;
 - `Run & Access` for desktop/headless boot, Remote SPICE access, stopping background VMs, SSH access, first boot, and post-install tasks;
 - `Maintenance` for boot checks, VM artifact cleanup, and cached ISO removal;
 - `Advanced` for physical disk flash/import workflows.
@@ -282,7 +282,7 @@ Example discovery:
 
 Import-oriented profiles may omit every ISO download source on purpose. These are intended for flows such as `import-device`, where you bring an existing physical installation into a VM disk rather than booting a distro installer ISO.
 
-Profiles that define `cloud_init`, `ssh_provision`, or `autoinstall` can also support higher-level flows such as unattended install, SSH post-install provisioning, and interactive shell access.
+Profiles that define `cloud_init`, `ssh_provision`, or `autoinstall` can also support higher-level flows such as Ubuntu autoinstall, SSH post-install provisioning, and interactive shell access.
 
 `status` reports basic runtime state in addition to artifact state, including tracked background QEMU processes and SSH forward ports when available.
 
@@ -472,7 +472,7 @@ To automate the Ubuntu Server installer as well:
 ./bin/vmctl post-install ubuntu-niri-local
 ```
 
-`install-unattended` generates an `autoinstall` seed, extracts `casper/vmlinuz` and `casper/initrd` from the ISO, and boots the installer with the `autoinstall` kernel argument. The QEMU process exits on the installer's final reboot (`-no-reboot`), after which you can boot the installed system normally and finish with `post-install`.
+`install-unattended` is currently an Ubuntu autoinstall flow. It generates an `autoinstall` seed, extracts `casper/vmlinuz` and `casper/initrd` from the ISO, and boots the installer with the `autoinstall` kernel argument. The QEMU process exits on the installer's final reboot (`-no-reboot`), after which you can boot the installed system normally and finish with `post-install`.
 
 Commit-safe example:
 

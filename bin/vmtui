@@ -224,10 +224,7 @@ PY
 
 vm_has_unattended_install() {
     local vm_name="$1"
-    if vm_has_section "$vm_name" "autoinstall"; then
-        return 0
-    fi
-    vm_has_section "$vm_name" "unattended"
+    vm_has_section "$vm_name" "autoinstall"
 }
 
 list_remote_menu_items() {
@@ -326,7 +323,7 @@ list_install_action_items() {
         printf '%s\n' "Installer Only" "Boot the installer without preparation"
     fi
     if vm_has_unattended_install "$vm_name"; then
-        printf '%s\n' "Unattended Install" "Run the configured unattended installer"
+        printf '%s\n' "Unattended Install" "Run the configured Ubuntu autoinstall flow"
     fi
     if vm_has_section "$vm_name" "cloud_init"; then
         printf '%s\n' "Cloud-Init Flow" "Manual install with generated first-boot data"
@@ -572,7 +569,7 @@ run_action() {
         full-auto-install)
             local video
             video=$(choose_video) || return 0
-            if confirm_box "Unattended Install" "Run the configured unattended installer flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- boot the installer in unattended mode\n- exit when the installer reboots after finishing\n\nAfter that, start the installed VM normally and then run SSH post-install actions."; then
+            if confirm_box "Unattended Install" "Run the configured Ubuntu autoinstall flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- boot the installer in unattended mode\n- exit when the installer reboots after finishing\n\nAfter that, start the installed VM normally and then run SSH post-install actions."; then
                 if [[ -n "$video" ]]; then
                     run_vmctl install-unattended "$current_vm" --video "$video"
                 else
@@ -601,7 +598,7 @@ run_action() {
         bootstrap-unattended)
             local video
             video=$(choose_video) || return 0
-            if confirm_box "Bootstrap Unattended" "Run the fully unattended bootstrap flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- run the configured unattended installer\n- start the installed VM headless in the background\n- wait for SSH and run post-install actions\n\nUse this only when unattended install and SSH provisioning are configured correctly."; then
+            if confirm_box "Bootstrap Unattended" "Run the fully unattended Ubuntu bootstrap flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- run the configured Ubuntu autoinstall flow\n- start the installed VM headless in the background\n- wait for SSH and run post-install actions\n\nUse this only when autoinstall and SSH provisioning are configured correctly."; then
                 if [[ -n "$video" ]]; then
                     run_vmctl bootstrap-unattended "$current_vm" --video "$video"
                 else

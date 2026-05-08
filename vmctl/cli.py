@@ -72,14 +72,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
     p.set_defaults(func=lifecycle.cmd_install_archinstall)
 
-    p = subparsers.add_parser("install-unattended", help="boot the unattended installer (cloud-init/autoinstall)")
+    p = subparsers.add_parser("install-unattended", help="boot the Ubuntu autoinstall flow")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--video", choices=VIDEO_CHOICES, help=VIDEO_HELP)
-    p.add_argument("--headless", action="store_true", help="run the unattended installer without a display")
+    p.add_argument("--headless", action="store_true", help="run the Ubuntu autoinstall flow without a display")
     p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
     p.set_defaults(func=lifecycle.cmd_install_unattended)
 
-    p = subparsers.add_parser("bootstrap-unattended", help="run the unattended installer headless and exit when it reboots")
+    p = subparsers.add_parser("bootstrap-unattended", help="run the Ubuntu autoinstall flow headless and exit when it reboots")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--video", choices=VIDEO_CHOICES, help=VIDEO_HELP)
     p.add_argument("--headless", action="store_true", help="run the installer stage without a display")

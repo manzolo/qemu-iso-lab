@@ -93,15 +93,6 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
                 elif not isinstance(installer_boot[key], str):
                     err(f"installer_boot.{key} must be a string")
 
-    unattended = vm.get("unattended")
-    if unattended is not None:
-        if not isinstance(unattended, dict):
-            err("unattended must be an object")
-        else:
-            kind = unattended.get("type")
-            if not isinstance(kind, str) or kind not in {"debian-preseed", "fedora-kickstart"}:
-                err(f"unattended.type must be one of: 'debian-preseed', 'fedora-kickstart'; got {kind!r}")
-
     return errors
 
 

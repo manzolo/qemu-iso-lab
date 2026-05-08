@@ -111,9 +111,9 @@ produces isolated per-VM artifacts.
 3. `make install VM=foo` — `vmctl` boots QEMU with the ISO and the disk attached.
 4. `make start VM=foo` (after install completes) — boots the installed disk only.
 
-**Unattended install:** `make install-unattended VM=foo` builds a cloud-init or
-autoinstall seed under `artifacts/<vm>/cloud-init/` and boots the installer
-with it attached.
+**Unattended install:** `make install-unattended VM=foo` is currently the
+Ubuntu autoinstall path. It builds an autoinstall seed under
+`artifacts/<vm>/autoinstall/` and boots the installer with it attached.
 
 **Smoke test under CI:** GitHub Actions runs `vmctl boot-check alpine-ci` under
 TCG. See [CI_BOOT_STRATEGY.md](CI_BOOT_STRATEGY.md).
