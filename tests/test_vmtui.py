@@ -49,7 +49,7 @@ class VmtuiTests(unittest.TestCase):
                         "hostname": "test-ssh",
                         "user": "tester",
                         "ssh_key": "~/.ssh/id_ed25519",
-                        "ssh_host_port": 2223,
+                        "ssh_host_port": 2293,
                     },
                 }
             }
