@@ -150,6 +150,32 @@ class ConfigTests(BaseVmctlTestCase):
 
         self.assertIn("Duplicate VM profile", str(ctx.exception))
 
+    def test_load_config_rejects_duplicate_ssh_host_port_across_vms(self):
+        other_vm = json.loads(json.dumps(self.vm_config))
+        other_vm["disk"]["path"] = "artifacts/othervm/disk.qcow2"
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        other_vm["cloud_init"] = {"user": "tester2", "ssh_host_port": 2222}
+        self.write_config_dir()
+        self.write_extra_profile("other.json", {"vms": {"othervm": other_vm}})
+
+        with self.assertRaises(self.vmctl.VMError) as ctx:
+            self.vmctl.load_config()
+
+        self.assertIn("Duplicate ssh_host_port 2222", str(ctx.exception))
+
+    def test_load_config_rejects_autoinstall_placeholder_password_hash(self):
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "vmuser",
+            "password_hash": "REPLACE_WITH_SHA512_HASH",
+        }
+        self.write_config_dir()
+
+        with self.assertRaises(self.vmctl.VMError) as ctx:
+            self.vmctl.load_config()
+
+        self.assertIn("autoinstall.password_hash still uses the placeholder value", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

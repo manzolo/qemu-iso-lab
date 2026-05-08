@@ -93,6 +93,36 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
                 elif not isinstance(installer_boot[key], str):
                     err(f"installer_boot.{key} must be a string")
 
+    autoinstall = vm.get("autoinstall")
+    if isinstance(autoinstall, dict):
+        password_hash = str(autoinstall.get("password_hash") or "").strip()
+        if password_hash == "REPLACE_WITH_SHA512_HASH":
+            err("autoinstall.password_hash still uses the placeholder value")
+
+    return errors
+
+
+def _ssh_port_conflicts(vms: dict[str, dict[str, Any]]) -> list[str]:
+    seen: dict[int, str] = {}
+    errors: list[str] = []
+    for name, vm in vms.items():
+        cfg = vm.get("ssh_provision")
+        if not isinstance(cfg, dict):
+            cfg = vm.get("cloud_init")
+        if not isinstance(cfg, dict):
+            continue
+        port = cfg.get("ssh_host_port")
+        if port is None:
+            continue
+        try:
+            port_int = int(port)
+        except (TypeError, ValueError):
+            continue
+        other = seen.get(port_int)
+        if other is None:
+            seen[port_int] = name
+            continue
+        errors.append(f"Duplicate ssh_host_port {port_int} in VM profiles '{other}' and '{name}'")
     return errors
 
 
@@ -125,6 +155,7 @@ def load_config() -> dict[str, Any]:
     all_errors: list[str] = []
     for name, vm in merged_vms.items():
         all_errors.extend(validate_vm_profile(name, vm))
+    all_errors.extend(_ssh_port_conflicts(merged_vms))
     if all_errors:
         raise VMError("Invalid VM profile(s):\n  " + "\n  ".join(all_errors))
 

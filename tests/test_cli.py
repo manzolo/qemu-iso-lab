@@ -19,6 +19,7 @@ class CliSmokeTests(unittest.TestCase):
         )
         self.assertIn("list", result.stdout)
         self.assertIn("install", result.stdout)
+        self.assertIn("check-vms", result.stdout)
 
     def test_version_flag_prints_version(self):
         result = subprocess.run(

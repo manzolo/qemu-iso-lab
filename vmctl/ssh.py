@@ -53,7 +53,7 @@ def resolve_ssh_private_key(vm: dict[str, Any], cfg: dict[str, Any], dry_run: bo
                 return None
             raise VMError(f"SSH private key not found: {configured}")
         return configured
-    if cloud_init.ssh_provision_config(vm) is cfg:
+    if cloud_init.ssh_access_config(vm) is cfg:
         return ensure_generated_ssh_keypair(vm, dry_run=dry_run)
     return None
 
@@ -67,7 +67,7 @@ def resolve_ssh_public_key(vm: dict[str, Any], cfg: dict[str, Any], dry_run: boo
                 return None
             raise VMError(f"SSH public key not found at {public} (expected for ssh_provision)")
         return public
-    if cloud_init.ssh_provision_config(vm) is cfg:
+    if cloud_init.ssh_access_config(vm) is cfg:
         private = ensure_generated_ssh_keypair(vm, dry_run=dry_run)
         return private.parent / f"{private.name}.pub"
     return None

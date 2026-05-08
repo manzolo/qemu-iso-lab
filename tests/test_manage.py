@@ -40,6 +40,16 @@ class ManageTests(BaseVmctlTestCase):
         self.assertEqual(exit_code, 0)
         self.assertFalse(pid_path.exists())
 
+    def test_cmd_clean_stale_removes_dead_bootstrap_pid_file(self):
+        pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text("424242\n", encoding="utf-8")
+
+        exit_code = self.vmctl.cmd_clean_stale(argparse.Namespace(vm=self.vm_name, dry_run=False))
+
+        self.assertEqual(exit_code, 0)
+        self.assertFalse(pid_path.exists())
+
     def test_cmd_shell_runs_interactive_ssh_command(self):
         self.vm_config["cloud_init"] = {
             "user": "tester",
@@ -72,6 +82,20 @@ class ManageTests(BaseVmctlTestCase):
         self.assertNotIn("BatchMode=yes", ssh_cmd)
         self.assertEqual(ssh_cmd[-1], "tester@127.0.0.1")
 
+    def test_ssh_base_cmd_uses_generated_key_for_cloud_init_access(self):
+        generated_private = self.root / "artifacts/testvm/ssh/id_ed25519"
+        self.vm_config["cloud_init"] = {
+            "user": "tester",
+            "ssh_host_port": 2222,
+        }
+
+        with mock.patch.object(vmctl.ssh, "ensure_generated_ssh_keypair", return_value=generated_private):
+            ssh_cmd = vmctl.ssh.ssh_base_cmd(self.vm_config)
+
+        self.assertIn("-i", ssh_cmd)
+        self.assertIn(str(generated_private), ssh_cmd)
+        self.assertIn("BatchMode=yes", ssh_cmd)
+
     def test_cmd_stop_terminates_running_qemu_pid(self):
         pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
         pid_path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,6 +111,33 @@ class ManageTests(BaseVmctlTestCase):
         kill_mock.assert_called_once_with(1234, self.vmctl.signal.SIGTERM)
         self.assertLessEqual(sleep_mock.call_count, 1)
         self.assertFalse(pid_path.exists())
+
+    def test_cmd_stop_force_kills_qemu_after_sigterm_timeout(self):
+        pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text("1234\n", encoding="utf-8")
+        args = argparse.Namespace(vm=self.vm_name, dry_run=False)
+
+        side_effects = ["qemu-system-x86_64 -display none"] * 4 + [None]
+        with mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=side_effects), \
+             mock.patch.object(time, "monotonic", side_effect=[0, 0, 16, 16, 16, 16, 16]), \
+             mock.patch.object(os, "kill") as kill_mock, \
+             mock.patch.object(time, "sleep") as sleep_mock:
+            exit_code = self.vmctl.cmd_stop(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            kill_mock.call_args_list,
+            [
+                mock.call(1234, self.vmctl.signal.SIGTERM),
+                mock.call(1234, self.vmctl.signal.SIGKILL),
+            ],
+        )
+        self.assertFalse(pid_path.exists())
+
+    def test_process_cmdline_returns_none_for_empty_proc_cmdline(self):
+        with mock.patch.object(Path, "read_bytes", return_value=b""):
+            self.assertIsNone(vmctl.lifecycle.process_cmdline(1234))
 
     def test_cmd_stop_terminates_discovered_qemu_when_pid_file_missing(self):
         self.vm_config["cloud_init"] = {
@@ -118,7 +169,7 @@ class ManageTests(BaseVmctlTestCase):
         args = argparse.Namespace(vm=self.vm_name, dry_run=False)
 
         with mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_hostfwd_port", return_value=(5678, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22")), \
-             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=[None, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", None]), \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=[None, None, "qemu-system-x86_64 -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22", None]), \
              mock.patch.object(os, "kill") as kill_mock, \
              mock.patch.object(time, "sleep") as sleep_mock:
             exit_code = self.vmctl.cmd_stop(args)

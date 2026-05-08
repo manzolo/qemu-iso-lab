@@ -102,8 +102,56 @@ class VmctlTests(BaseVmctlTestCase):
 
         self.assertEqual(exit_code, 0)
         output = stdout.getvalue()
-        self.assertIn("hostfwd:2222", output)
-        self.assertIn("pid=4242", output)
+        self.assertIn("hostfwd:2222 (pid=4242)", output)
+        self.assertNotIn("\nnote", output)
+
+    def test_cmd_status_cleans_stale_bootstrap_pid_file(self):
+        pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text("424242\n", encoding="utf-8")
+        self.create_disk()
+        self.write_config_dir()
+
+        with mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_disk_path", return_value=(None, None)), \
+             mock.patch.object(vmctl.lifecycle, "local_tcp_port_open", return_value=False), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            exit_code = self.vmctl.cmd_status(argparse.Namespace(all=False))
+
+        self.assertEqual(exit_code, 0)
+        self.assertFalse(pid_path.exists())
+
+    def test_status_cell_style_colors_ready_missing_and_runtime_states(self):
+        self.assertEqual(vmctl.lifecycle.status_cell_style("ready"), (vmctl.ui.GREEN, vmctl.ui.BOLD))
+        self.assertEqual(vmctl.lifecycle.status_cell_style("missing"), (vmctl.ui.YELLOW, vmctl.ui.BOLD))
+        self.assertEqual(vmctl.lifecycle.status_cell_style("hostfwd:2222"), (vmctl.ui.GREEN, vmctl.ui.BOLD))
+        self.assertEqual(vmctl.lifecycle.status_cell_style("closed:2222"), (vmctl.ui.YELLOW, vmctl.ui.BOLD))
+
+    def test_vm_runtime_status_prefers_disk_identity_over_shared_port(self):
+        vm = json.loads(json.dumps(self.vm_config))
+        vm["disk"]["path"] = "artifacts/testvm/disk.qcow2"
+        vm["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+
+        with mock.patch.object(vmctl.lifecycle, "is_bootstrap_vm_running", return_value=(False, None, None)), \
+             mock.patch.object(
+                 vmctl.lifecycle,
+                 "find_qemu_process_by_disk_path",
+                 return_value=(4242, f"qemu-system-x86_64 -drive file={self.root / vm['disk']['path']},format=qcow2,if=virtio -netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22"),
+             ):
+            runtime_str, runtime_note = vmctl.lifecycle.vm_runtime_status("testvm", vm)
+
+        self.assertEqual(runtime_str, "hostfwd:2222")
+        self.assertEqual(runtime_note, "pid=4242")
+
+    def test_vm_runtime_status_does_not_claim_shared_port_without_matching_disk(self):
+        vm = json.loads(json.dumps(self.vm_config))
+        vm["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+
+        with mock.patch.object(vmctl.lifecycle, "is_bootstrap_vm_running", return_value=(False, None, None)), \
+             mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_disk_path", return_value=(None, None)):
+            runtime_str, runtime_note = vmctl.lifecycle.vm_runtime_status("testvm", vm)
+
+        self.assertEqual(runtime_str, "closed:2222")
+        self.assertEqual(runtime_note, "-")
 
     def test_cmd_status_handles_locked_disk_image_quietly(self):
         self.create_disk()
@@ -526,6 +574,150 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertNotIn("-cdrom", qemu_cmd)
         self.assertEqual(expected_text, "login:")
         self.assertEqual(timeout_sec, 120)
+
+    def test_local_test_mode_prefers_bootstrap_bootcheck_and_skip(self):
+        unattended_vm = json.loads(json.dumps(self.vm_config))
+        unattended_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
+        unattended_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+
+        boot_vm = json.loads(json.dumps(self.vm_config))
+        boot_vm["ci"] = {"expect": "login:"}
+
+        skipped_vm = json.loads(json.dumps(self.vm_config))
+
+        template_vm = json.loads(json.dumps(self.vm_config))
+        template_vm["meta"] = {"role": "import-template"}
+
+        self.assertEqual(
+            vmctl.lifecycle.local_test_mode(unattended_vm),
+            ("bootstrap-unattended", "autoinstall + post-install"),
+        )
+        self.assertEqual(
+            vmctl.lifecycle.local_test_mode(boot_vm),
+            ("boot-check", "serial boot expectation"),
+        )
+        self.assertEqual(
+            vmctl.lifecycle.local_test_mode(skipped_vm),
+            ("skip", "missing ci.expect for boot-check"),
+        )
+        self.assertEqual(
+            vmctl.lifecycle.local_test_mode(template_vm),
+            ("skip", "import-template profile"),
+        )
+
+    def test_prepare_vm_for_local_test_reassigns_busy_ssh_port(self):
+        vm = json.loads(json.dumps(self.vm_config))
+        vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+
+        with mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_disk_path", return_value=(None, None)), \
+             mock.patch.object(vmctl.lifecycle, "local_tcp_port_open", return_value=True), \
+             mock.patch.object(vmctl.lifecycle, "pick_free_local_port", return_value=2299):
+            prepared, note = vmctl.lifecycle.prepare_vm_for_local_test("testvm", vm)
+
+        self.assertEqual(vm["cloud_init"]["ssh_host_port"], 2222)
+        self.assertEqual(prepared["cloud_init"]["ssh_host_port"], 2299)
+        self.assertIn("2222", note)
+        self.assertIn("2299", note)
+
+    def test_prepare_vm_for_local_test_skips_when_disk_is_in_use(self):
+        vm = json.loads(json.dumps(self.vm_config))
+
+        with mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_disk_path", return_value=(4242, "qemu-system-x86_64 ...")):
+            prepared, note = vmctl.lifecycle.prepare_vm_for_local_test("testvm", vm)
+
+        self.assertEqual(prepared["disk"]["path"], vm["disk"]["path"])
+        self.assertEqual(note, "disk already in use by qemu pid 4242")
+
+    def test_run_local_test_vm_skips_uninitialized_disk_boot_check(self):
+        vm = json.loads(json.dumps(self.vm_config))
+        vm["ci"] = {"boot_from": "disk", "expect": "login:"}
+        self.write_config_dir()
+        self.create_disk()
+        args = argparse.Namespace(timeout=300, dry_run=True)
+
+        with mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_disk_path", return_value=(None, None)), \
+             mock.patch.object(vmctl.lifecycle, "cmd_boot_check") as boot_check:
+            status, detail = vmctl.lifecycle.run_local_test_vm("testvm", vm, args)
+
+        self.assertEqual(status, "skipped")
+        self.assertIn("looks uninitialized", detail)
+        boot_check.assert_not_called()
+
+    def test_cmd_test_local_runs_matrix_and_summarizes_results(self):
+        ubuntu_vm = json.loads(json.dumps(self.vm_config))
+        ubuntu_vm["disk"]["path"] = "artifacts/ubuntu/disk.qcow2"
+        ubuntu_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
+        ubuntu_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+
+        boot_vm = json.loads(json.dumps(self.vm_config))
+        boot_vm["disk"]["path"] = "artifacts/alpine/disk.qcow2"
+        boot_vm["ci"] = {"expect": "login:"}
+
+        skipped_vm = json.loads(json.dumps(self.vm_config))
+        skipped_vm["disk"]["path"] = "artifacts/manual/disk.qcow2"
+
+        template_vm = json.loads(json.dumps(self.vm_config))
+        template_vm["disk"]["path"] = "artifacts/template/disk.qcow2"
+        template_vm["meta"] = {"role": "import-template"}
+
+        self.write_extra_profile(
+            "matrix.json",
+            {
+                "vms": {
+                    "ubuntu": ubuntu_vm,
+                    "alpine": boot_vm,
+                    "manual": skipped_vm,
+                    "template": template_vm,
+                }
+            },
+        )
+
+        args = argparse.Namespace(vms=[], timeout=300, dry_run=True)
+
+        with mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended") as bootstrap_unattended, \
+             mock.patch.object(vmctl.lifecycle, "cmd_boot_check") as boot_check, \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop") as cmd_stop, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_test_local(args)
+
+        self.assertEqual(exit_code, 0)
+        bootstrap_unattended.assert_called_once()
+        self.assertEqual(bootstrap_unattended.call_args.args[0].vm, "ubuntu")
+        cmd_stop.assert_called_once()
+        self.assertEqual(cmd_stop.call_args.args[0].vm, "ubuntu")
+        booted = sorted(call.args[0].vm for call in boot_check.call_args_list)
+        self.assertEqual(booted, ["alpine"])
+        output = stdout.getvalue()
+        self.assertIn("passed", output)
+        self.assertIn("skipped", output)
+        self.assertIn("ubuntu", output)
+        self.assertIn("manual", output)
+
+    def test_cmd_test_local_returns_nonzero_on_failure(self):
+        failing_vm = json.loads(json.dumps(self.vm_config))
+        failing_vm["ci"] = {"expect": "login:"}
+        self.write_extra_profile("failure.json", {"vms": {"failing": failing_vm}})
+        args = argparse.Namespace(vms=["failing"], timeout=300, dry_run=True)
+
+        with mock.patch.object(vmctl.lifecycle, "cmd_boot_check", side_effect=self.vmctl.VMError("boom")):
+            exit_code = self.vmctl.cmd_test_local(args)
+
+        self.assertEqual(exit_code, 1)
+
+    def test_cmd_test_local_stops_bootstrap_vm_even_on_failure(self):
+        ubuntu_vm = json.loads(json.dumps(self.vm_config))
+        ubuntu_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
+        ubuntu_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+        self.write_extra_profile("bootstrap-failure.json", {"vms": {"ubuntu": ubuntu_vm}})
+        args = argparse.Namespace(vms=["ubuntu"], timeout=300, dry_run=True)
+
+        with mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended", side_effect=self.vmctl.VMError("boom")), \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop") as cmd_stop:
+            exit_code = self.vmctl.cmd_test_local(args)
+
+        self.assertEqual(exit_code, 1)
+        cmd_stop.assert_called_once()
+        self.assertEqual(cmd_stop.call_args.args[0].vm, "ubuntu")
 
     def test_cmd_start_cloud_init_attaches_seed_drive(self):
         self.create_disk()

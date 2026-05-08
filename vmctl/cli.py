@@ -115,6 +115,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=int, help="override the boot-check timeout in seconds")
     p.set_defaults(func=lifecycle.cmd_boot_check)
 
+    p = subparsers.add_parser("check-vms", aliases=["test-local"], help="run the local VM validation matrix")
+    p.add_argument("vms", nargs="*", help="optional subset of VM profiles to test")
+    p.add_argument("--timeout", type=int, default=300, help="seconds for unattended/bootstrap and boot-check flows (default: 300)")
+    p.set_defaults(func=lifecycle.cmd_test_local)
+
     p = subparsers.add_parser("flash", help="copy a VM disk to a physical block device (DESTRUCTIVE; requires sudo)")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--device", required=True, help="target block device, e.g. /dev/sdb")
@@ -135,6 +140,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", nargs="?", help=VM_HELP)
     p.add_argument("--all", action="store_true", help="clean artifacts for every configured VM")
     p.set_defaults(func=lifecycle.cmd_clean)
+
+    p = subparsers.add_parser("clean-stale", help="remove stale runtime state such as dead bootstrap PID files")
+    p.add_argument("vm", nargs="?", help=VM_HELP)
+    p.set_defaults(func=lifecycle.cmd_clean_stale)
 
     return parser
 

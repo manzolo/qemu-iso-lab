@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 import shutil
@@ -48,6 +49,8 @@ def process_cmdline(pid: int) -> str | None:
         raw = path.read_bytes()
     except OSError:
         return None
+    if not raw:
+        return None
     return raw.replace(b"\x00", b" ").decode(errors="replace").strip()
 
 
@@ -79,6 +82,26 @@ def find_qemu_process_by_hostfwd_port(port: int) -> tuple[int | None, str | None
     return None, None
 
 
+def find_qemu_process_by_disk_path(disk_path: Path) -> tuple[int | None, str | None]:
+    needle = str(disk_path)
+    proc_root = Path("/proc")
+    for proc_dir in proc_root.iterdir():
+        if not proc_dir.name.isdigit():
+            continue
+        try:
+            raw = (proc_dir / "cmdline").read_bytes()
+        except OSError:
+            continue
+        if not raw:
+            continue
+        cmdline = raw.replace(b"\x00", b" ").decode(errors="replace").strip()
+        if "qemu-system-x86_64" not in cmdline:
+            continue
+        if needle in cmdline:
+            return int(proc_dir.name), cmdline
+    return None, None
+
+
 def is_bootstrap_vm_running(name: str) -> tuple[bool, int | None, str | None]:
     pid = read_pid_file(bootstrap_pid_path(name))
     if pid is None:
@@ -89,21 +112,40 @@ def is_bootstrap_vm_running(name: str) -> tuple[bool, int | None, str | None]:
     return (True, pid, cmdline)
 
 
+def cleanup_stale_bootstrap_pid(name: str, dry_run: bool = False, emit: bool = False) -> bool:
+    pid_path = bootstrap_pid_path(name)
+    running, pid, _ = is_bootstrap_vm_running(name)
+    if running or pid is None or not pid_path.exists():
+        return False
+    if emit:
+        ui.print_status("warn", f"Removing stale bootstrap PID file for '{name}'", ok=False)
+    if not dry_run:
+        pid_path.unlink()
+    return True
+
+
 def vm_runtime_status(name: str, vm: dict[str, Any]) -> tuple[str, str]:
+    cleanup_stale_bootstrap_pid(name, emit=False)
     running, pid, cmdline = is_bootstrap_vm_running(name)
     if running and pid is not None:
         return (f"tracked:{pid}", "-")
+
+    disk_path = runtime.resolve_path(vm["disk"]["path"])
+    pid, cmdline = find_qemu_process_by_disk_path(disk_path)
+    if pid is not None:
+        ssh_cfg = cloud_init.ssh_access_config(vm)
+        if ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
+            port = int(ssh_cfg["ssh_host_port"])
+            needles = (f":127.0.0.1:{port}-:22", f":{port}-:22")
+            if cmdline and any(needle in cmdline for needle in needles):
+                return (f"hostfwd:{port}", f"pid={pid}")
+        return (f"running:{pid}", "-")
 
     ssh_cfg = cloud_init.ssh_access_config(vm)
     if ssh_cfg is None or not ssh_cfg.get("ssh_host_port"):
         return ("-", "-")
 
     port = int(ssh_cfg["ssh_host_port"])
-    pid, cmdline = find_qemu_process_by_hostfwd_port(port)
-    if pid is not None:
-        return (f"hostfwd:{port}", f"pid={pid}")
-    if local_tcp_port_open(port):
-        return (f"open:{port}", "-")
     return (f"closed:{port}", "-")
 
 
@@ -114,6 +156,12 @@ def stop_qemu_process(
     pid_path: Path | None = None,
     dry_run: bool = False,
 ) -> int:
+    def finalize_stop(message: str) -> int:
+        if pid_path is not None and pid_path.exists():
+            pid_path.unlink()
+        ui.print_status("ok", message)
+        return 0
+
     ui.print_header(header)
     ui.print_kv("pid", str(pid))
     cmdline = process_cmdline(pid)
@@ -131,13 +179,22 @@ def stop_qemu_process(
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         if process_cmdline(pid) is None:
-            if pid_path is not None and pid_path.exists():
-                pid_path.unlink()
-            ui.print_status("ok", f"Stopped {description}")
-            return 0
+            return finalize_stop(f"Stopped {description}")
         time.sleep(1)
 
-    raise VMError(f"Timed out stopping {description} (pid {pid})")
+    ui.print_status("warn", f"{description} did not exit after SIGTERM; sending SIGKILL", ok=False)
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError as exc:
+        raise VMError(f"Failed to force-stop process {pid}: {exc}") from exc
+
+    kill_deadline = time.monotonic() + 5
+    while time.monotonic() < kill_deadline:
+        if process_cmdline(pid) is None:
+            return finalize_stop(f"Force-stopped {description}")
+        time.sleep(0.5)
+
+    raise VMError(f"Timed out force-stopping {description} (pid {pid})")
 
 
 def prepare_background_vm_slot(name: str, dry_run: bool = False) -> tuple[Path, Path]:
@@ -146,10 +203,7 @@ def prepare_background_vm_slot(name: str, dry_run: bool = False) -> tuple[Path, 
     running, pid, _ = is_bootstrap_vm_running(name)
     if running:
         raise VMError(f"Background VM for '{name}' is already running (pid {pid})")
-    if pid is not None and pid_path.exists():
-        ui.print_status("warn", f"Removing stale background VM PID file for '{name}'", ok=False)
-        if not dry_run:
-            pid_path.unlink()
+    cleanup_stale_bootstrap_pid(name, dry_run=dry_run, emit=True)
     return (pid_path, log_path)
 
 
@@ -180,6 +234,145 @@ def reset_vm_nvram(vm: dict[str, Any], dry_run: bool = False) -> None:
     ui.print_status("warn", f"Resetting EFI vars store: {ui.pretty_path(vars_path)}", ok=False)
     if not dry_run:
         vars_path.unlink()
+
+
+def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
+    meta = vm.get("meta", {})
+    role = str(meta.get("role") or "").strip()
+    if role == "import-template":
+        return ("skip", "import-template profile")
+    if cloud_init.autoinstall_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-unattended", "autoinstall + post-install")
+        return ("skip", "autoinstall without SSH post-install")
+    if archinstall.archinstall_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-archinstall", "archinstall + post-install")
+        return ("skip", "archinstall without SSH post-install")
+    ci = vm.get("ci", {})
+    if isinstance(ci, dict) and ci.get("expect"):
+        return ("boot-check", "serial boot expectation")
+    return ("skip", "missing ci.expect for boot-check")
+
+
+def pick_free_local_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        sock.listen(1)
+        return int(sock.getsockname()[1])
+
+
+def prepare_vm_for_local_test(vm_name: str, vm: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    prepared = copy.deepcopy(vm)
+    disk_path = runtime.resolve_path(prepared["disk"]["path"])
+    disk_pid, _ = find_qemu_process_by_disk_path(disk_path)
+    if disk_pid is not None:
+        return prepared, f"disk already in use by qemu pid {disk_pid}"
+
+    ssh_cfg = cloud_init.ssh_access_config(prepared)
+    if ssh_cfg is None or not ssh_cfg.get("ssh_host_port"):
+        return prepared, None
+
+    port = int(ssh_cfg["ssh_host_port"])
+    if not local_tcp_port_open(port):
+        return prepared, None
+
+    new_port = pick_free_local_port()
+    ssh_cfg["ssh_host_port"] = new_port
+    return prepared, f"SSH host port {port} busy, using {new_port} for check-vms"
+
+
+def resolved_vm(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, Any]:
+    override = getattr(args, "_vm_override", None)
+    if override is not None:
+        return copy.deepcopy(override)
+    return config.get_vm(cfg, args.vm)
+
+
+def local_test_prereq_skip(vm_name: str, vm: dict[str, Any]) -> str | None:
+    ci = vm.get("ci", {})
+    if not isinstance(ci, dict):
+        return None
+    if ci.get("boot_from") != "disk":
+        return None
+
+    disk_path = runtime.resolve_path(vm["disk"]["path"])
+    if not disk_path.exists():
+        return f"disk boot-check skipped: missing disk image for '{vm_name}'"
+
+    try:
+        actual_size = disk_path.stat().st_size
+    except OSError:
+        return None
+
+    if actual_size < 1024 * 1024:
+        return f"disk boot-check skipped: disk image for '{vm_name}' looks uninitialized"
+    return None
+
+
+def run_local_test_vm(
+    vm_name: str,
+    vm: dict[str, Any],
+    args: argparse.Namespace,
+) -> tuple[str, str]:
+    prepared_vm, prep_note = prepare_vm_for_local_test(vm_name, vm)
+    if prep_note is not None and prep_note.startswith("disk already in use"):
+        return ("skipped", prep_note)
+    prereq_skip = local_test_prereq_skip(vm_name, prepared_vm)
+    if prereq_skip is not None:
+        return ("skipped", prereq_skip)
+    mode, note = local_test_mode(prepared_vm)
+    if mode == "skip":
+        detail = note if prep_note is None else f"{note}; {prep_note}"
+        return ("skipped", detail)
+    if mode == "bootstrap-unattended":
+        try:
+            cmd_bootstrap_unattended(
+                argparse.Namespace(
+                    vm=vm_name,
+                    video=None,
+                    timeout=args.timeout,
+                    spice_port=None,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                )
+            )
+        finally:
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-archinstall":
+        try:
+            cmd_bootstrap_archinstall(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                )
+            )
+        finally:
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "boot-check":
+        cmd_boot_check(
+            argparse.Namespace(
+                vm=vm_name,
+                expect=None,
+                timeout=args.timeout,
+                dry_run=args.dry_run,
+                _vm_override=prepared_vm,
+            )
+        )
+        detail = note if prep_note is None else f"{note}; {prep_note}"
+        return ("passed", detail)
+    detail = note if prep_note is None else f"{note}; {prep_note}"
+    return ("skipped", detail)
 
 
 # --- info commands -------------------------------------------------------------
@@ -269,6 +462,34 @@ def vm_has_local_state(vm: dict[str, Any]) -> bool:
     return False
 
 
+def format_runtime_cell(runtime_str: str, runtime_note: str) -> str:
+    if runtime_note == "-" or not runtime_note:
+        return runtime_str
+    return f"{runtime_str} ({runtime_note})"
+
+
+def status_cell_style(value: str) -> tuple[str, ...]:
+    if value in {"ready"}:
+        return (ui.GREEN, ui.BOLD)
+    if value in {"missing"}:
+        return (ui.YELLOW, ui.BOLD)
+    if value.startswith(("tracked:", "hostfwd:", "open:")):
+        return (ui.GREEN, ui.BOLD)
+    if value.startswith(("closed:",)):
+        return (ui.YELLOW, ui.BOLD)
+    if value == "?":
+        return (ui.YELLOW, ui.BOLD)
+    return ()
+
+
+def style_status_cell(value: str, width: int, align: str = "<") -> str:
+    padded = f"{value:{align}{width}}"
+    codes = status_cell_style(value)
+    if not codes:
+        return padded
+    return ui.style(padded, *codes)
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     rows = []
@@ -277,7 +498,8 @@ def cmd_status(args: argparse.Namespace) -> int:
             continue
         disk, actual, virtual = disk_status(vm)
         runtime_str, runtime_note = vm_runtime_status(name, vm)
-        rows.append((name, disk, iso_status(vm), nvram_status(vm), runtime_str, actual, virtual, runtime_note))
+        runtime_cell = format_runtime_cell(runtime_str, runtime_note)
+        rows.append((name, disk, iso_status(vm), nvram_status(vm), runtime_cell, actual, virtual, runtime_note))
 
     if getattr(args, "json", False):
         out = [
@@ -317,15 +539,12 @@ def cmd_status(args: argparse.Namespace) -> int:
           f"{ui.style('VIRTUAL', ui.BOLD, ui.CYAN):>{virtual_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}")
     for name, disk, iso_str, nvram, runtime_str, actual, virtual, runtime_note in rows:
         print(f"{ui.style(name, ui.BOLD):<{name_width + len(ui.BOLD) + len(ui.RESET)}}  "
-              f"{disk:<{disk_width}}  "
-              f"{iso_str:<{iso_width}}  "
-              f"{nvram:<{nvram_width}}  "
-              f"{runtime_str:<{runtime_width}}  "
+              f"{style_status_cell(disk, disk_width)}  "
+              f"{style_status_cell(iso_str, iso_width)}  "
+              f"{style_status_cell(nvram, nvram_width)}  "
+              f"{style_status_cell(runtime_str, runtime_width)}  "
               f"{actual:>{actual_width}}  "
               f"{virtual:>{virtual_width}}")
-        if runtime_note != "-":
-            print(f"{'':<{name_width}}  {'':<{disk_width}}  {'':<{iso_width}}  {'':<{nvram_width}}  "
-                  f"{ui.style('note', ui.CYAN):<{runtime_width}}  {runtime_note}")
     return 0
 
 
@@ -443,7 +662,7 @@ def cmd_install(args: argparse.Namespace) -> int:
 
 def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
     cfg = config.load_config()
-    vm = config.get_vm(cfg, args.vm)
+    vm = resolved_vm(args, cfg)
     if archinstall.archinstall_config(vm) is None:
         raise VMError(f"VM '{args.vm}' does not define archinstall_config")
 
@@ -535,7 +754,7 @@ def cmd_install_archinstall(args: argparse.Namespace) -> int:
 
 def cmd_install_unattended(args: argparse.Namespace) -> int:
     cfg = config.load_config()
-    vm = config.get_vm(cfg, args.vm)
+    vm = resolved_vm(args, cfg)
     if cloud_init.autoinstall_config(vm) is None:
         raise VMError(f"VM '{args.vm}' does not define autoinstall")
     runtime.ensure_vm_dirs(args.vm)
@@ -644,7 +863,7 @@ def cmd_post_install(args: argparse.Namespace) -> int:
 
 def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
     cfg = config.load_config()
-    vm = config.get_vm(cfg, args.vm)
+    vm = resolved_vm(args, cfg)
     if cloud_init.autoinstall_config(vm) is None:
         raise VMError(f"VM '{args.vm}' does not define autoinstall")
     if cloud_init.ssh_access_config(vm) is None:
@@ -660,6 +879,7 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
             headless=True,
             spice_port=getattr(args, "spice_port", None),
             dry_run=args.dry_run,
+            _vm_override=vm,
         )
     )
 
@@ -696,9 +916,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
         ui.print_status("ok", f"No tracked background VM for '{args.vm}'")
         return 0
     if not running:
-        ui.print_status("warn", f"Removing stale bootstrap PID file for '{args.vm}'", ok=False)
-        if not args.dry_run and pid_path.exists():
-            pid_path.unlink()
+        cleanup_stale_bootstrap_pid(args.vm, dry_run=args.dry_run, emit=True)
         ssh_cfg = cloud_init.ssh_access_config(vm)
         if ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
             port = int(ssh_cfg["ssh_host_port"])
@@ -722,6 +940,23 @@ def cmd_stop(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_clean_stale(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    selected_names = [args.vm] if getattr(args, "vm", None) else sorted(cfg["vms"])
+    removed = 0
+
+    ui.print_header("Clean stale runtime state")
+    for name in selected_names:
+        if cleanup_stale_bootstrap_pid(name, dry_run=args.dry_run, emit=True):
+            removed += 1
+
+    if removed:
+        ui.print_status("ok", f"Removed {removed} stale bootstrap PID file(s)")
+    else:
+        ui.print_status("ok", "No stale bootstrap PID files found")
+    return 0
+
+
 def cmd_shell(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -731,7 +966,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
 
 def cmd_boot_check(args: argparse.Namespace) -> int:
     cfg = config.load_config()
-    vm = config.get_vm(cfg, args.vm)
+    vm = resolved_vm(args, cfg)
     runtime.ensure_vm_dirs(args.vm)
 
     ci = vm.get("ci", {})
@@ -770,6 +1005,44 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
     )
     ui.print_status("ok", f"Boot check passed for '{args.vm}'")
     return 0
+
+
+def cmd_test_local(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    selected_names = list(args.vms) if getattr(args, "vms", None) else sorted(cfg["vms"])
+    results: list[tuple[str, str, str]] = []
+
+    ui.print_header("Local VM test matrix")
+    ui.print_kv("timeout", f"{args.timeout}s")
+
+    for vm_name in selected_names:
+        vm = config.get_vm(cfg, vm_name)
+        mode, note = local_test_mode(vm)
+        ui.print_header(f"Test VM: {vm_name}")
+        ui.print_kv("mode", mode)
+        ui.print_kv("check", note)
+        try:
+            status, detail = run_local_test_vm(vm_name, vm, args)
+        except VMError as exc:
+            results.append((vm_name, "failed", str(exc)))
+            ui.print_status("fail", f"{vm_name}: {exc}", ok=False)
+            continue
+        results.append((vm_name, status, detail))
+        if status == "passed":
+            ui.print_status("ok", f"{vm_name}: {detail}")
+        else:
+            ui.print_status("warn", f"{vm_name}: {detail}", ok=False)
+
+    passed = sum(1 for _, status, _ in results if status == "passed")
+    failed = sum(1 for _, status, _ in results if status == "failed")
+    skipped = sum(1 for _, status, _ in results if status == "skipped")
+
+    ui.print_header("Local VM test summary")
+    ui.print_kv("passed", str(passed))
+    ui.print_kv("failed", str(failed))
+    ui.print_kv("skipped", str(skipped))
+
+    return 1 if failed else 0
 
 
 # --- setup / clean -------------------------------------------------------------

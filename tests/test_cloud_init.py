@@ -87,6 +87,29 @@ class CloudInitTests(BaseVmctlTestCase):
         self.assertIn('"packages": [', rendered)
         self.assertIn('"runcmd": [', rendered)
 
+    def test_render_autoinstall_user_data_generates_authorized_key_from_cloud_init_access(self):
+        generated_private = self.root / "artifacts/testvm/ssh/id_ed25519"
+        generated_public = generated_private.parent / "id_ed25519.pub"
+        generated_public.parent.mkdir(parents=True, exist_ok=True)
+        generated_private.write_text("private", encoding="utf-8")
+        generated_public.write_text("ssh-ed25519 AAAA generated\n", encoding="utf-8")
+        self.vm_config["cloud_init"] = {
+            "hostname": "testvm",
+            "user": "tester",
+            "ssh_host_port": 2222,
+        }
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+
+        with mock.patch.object(self.vmctl.ssh, "ensure_generated_ssh_keypair", return_value=generated_private):
+            rendered = self.vmctl.render_autoinstall_user_data(self.vm_name, self.vm_config)
+
+        self.assertIn('"authorized-keys": [', rendered)
+        self.assertIn('"ssh-ed25519 AAAA generated"', rendered)
+
     def test_render_autoinstall_user_data_rejects_invalid_updates_value(self):
         self.vm_config["autoinstall"] = {
             "hostname": "testvm",

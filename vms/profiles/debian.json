@@ -345,7 +345,7 @@
         "hostname": "ubuntu-niri",
         "username": "vmuser",
         "realname": "VM User",
-        "password_hash": "REPLACE_WITH_SHA512_HASH",
+        "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
         "timezone": "UTC",
         "keyboard_layout": "us",
         "storage_layout": "direct",
@@ -453,7 +453,7 @@
       "cloud_init": {
         "hostname": "ubuntu-niri-local",
         "user": "manzolo",
-        "ssh_host_port": 2222,
+        "ssh_host_port": 2227,
         "packages": [
           "software-properties-common",
           "foot"
