@@ -6,7 +6,8 @@ It provides a reusable catalog of guest definitions for ISO-based installs, impo
 
 Additional notes live in [docs/](docs/), including
 [ARCHITECTURE.md](docs/ARCHITECTURE.md) for a one-page mental map and
-[CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md) for the smoke-test rationale.
+[CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md) for the smoke-test rationale and
+[PROFILE_TODO.md](docs/PROFILE_TODO.md) for planned profile coverage.
 
 ## Overview
 

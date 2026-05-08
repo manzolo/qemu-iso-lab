@@ -151,6 +151,7 @@ class ManageTests(BaseVmctlTestCase):
             "artifacts/testvm/logs/bootstrap-start.log",
             "artifacts/testvm/cloud-init/seed.iso",
             "artifacts/testvm/autoinstall/seed.iso",
+            "artifacts/testvm/unattended/seed.iso",
             "artifacts/testvm/installer/vmlinuz",
         ]:
             path = self.root / relative
@@ -167,6 +168,7 @@ class ManageTests(BaseVmctlTestCase):
         self.assertFalse((self.root / "artifacts/testvm/logs").exists())
         self.assertFalse((self.root / "artifacts/testvm/cloud-init").exists())
         self.assertFalse((self.root / "artifacts/testvm/autoinstall").exists())
+        self.assertFalse((self.root / "artifacts/testvm/unattended").exists())
         self.assertFalse((self.root / "artifacts/testvm/installer").exists())
 
     def test_cmd_clean_stops_vm_before_removing_artifacts(self):

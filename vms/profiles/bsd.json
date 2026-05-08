@@ -1,0 +1,48 @@
+{
+  "vms": {
+    "freebsd": {
+      "name": "FreeBSD 14.3 Disc1",
+      "meta": {
+        "slug": "freebsd",
+        "family": "bsd",
+        "role": "server",
+        "release_model": "stable"
+      },
+      "iso": "isos/FreeBSD-14.3-RELEASE-amd64-disc1.iso",
+      "iso_url": "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/FreeBSD-14.3-RELEASE-amd64-disc1.iso",
+      "disk": {
+        "path": "artifacts/freebsd/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "e1000",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  }
+}

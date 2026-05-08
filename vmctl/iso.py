@@ -12,7 +12,7 @@ from urllib.parse import urljoin
 
 from typing import Any
 
-from vmctl import state, ui, runtime
+from vmctl import state, ui, runtime, cloud_init
 from vmctl.errors import VMError
 
 
@@ -253,9 +253,44 @@ def extract_installer_boot_artifacts(vm: dict[str, Any], iso_path: Path, dry_run
     artifact_dir = installer_artifact_dir(vm)
     kernel_path = artifact_dir / "vmlinuz"
     initrd_path = artifact_dir / "initrd"
-    extract_iso_member(iso_path, "casper/vmlinuz", kernel_path, dry_run=dry_run)
-    extract_iso_member(iso_path, "casper/initrd", initrd_path, dry_run=dry_run)
+    boot = vm.get("installer_boot", {})
+    kernel_member = str(boot.get("kernel") or "casper/vmlinuz")
+    initrd_member = str(boot.get("initrd") or "casper/initrd")
+    extract_iso_member(iso_path, kernel_member, kernel_path, dry_run=dry_run)
+    extract_iso_member(iso_path, initrd_member, initrd_path, dry_run=dry_run)
     return kernel_path, initrd_path
+
+
+def build_debian_preseed_initrd(vm_name: str, vm: dict[str, Any], initrd_path: Path, dry_run: bool = False) -> Path:
+    artifact_dir = installer_artifact_dir(vm)
+    preseed_path = cloud_init.unattended_artifact_dir(vm) / "preseed.cfg"
+    patched_initrd = artifact_dir / "initrd-preseed.gz"
+    if dry_run:
+        ui.print_note(f"Would embed {ui.pretty_path(preseed_path)} into {ui.pretty_path(patched_initrd)}")
+        return patched_initrd
+    if not preseed_path.is_file():
+        raise VMError(f"Missing Debian preseed file: {preseed_path}")
+    runtime.require_command("cpio")
+    runtime.require_command("gzip")
+    runtime.ensure_parent(patched_initrd)
+    temp_dir = artifact_dir / "initrd-preseed-build"
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        embedded_preseed = temp_dir / "preseed.cfg"
+        embedded_preseed.write_text(preseed_path.read_text(encoding="utf-8"), encoding="utf-8")
+        result = subprocess.run(
+            ["bash", "-lc", "printf 'preseed.cfg\\n' | cpio -o -H newc | gzip -9"],
+            cwd=temp_dir,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        patched_initrd.write_bytes(initrd_path.read_bytes() + result.stdout)
+        return patched_initrd
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def extract_arch_installer_boot_artifacts(vm: dict[str, Any], iso_path: Path, dry_run: bool = False) -> tuple[Path, Path]:

@@ -112,6 +112,17 @@ class VmtuiTests(unittest.TestCase):
         self.assertIn("Boot Headless", output)
         self.assertIn("SSH Console", output)
 
+    def test_list_quick_action_items_for_plain_debian_efi_vm(self):
+        result = self.run_bash("source bin/vmtui; list_quick_action_items debian-efi")
+        output = result.stdout.splitlines()
+
+        self.assertIn("Guided Install", output)
+        self.assertIn("Boot Desktop", output)
+        self.assertIn("Boot Headless", output)
+        self.assertNotIn("Full Bootstrap", output)
+        self.assertNotIn("SSH Console", output)
+        self.assertNotIn("Cloud-Init Flow", output)
+
     def test_list_quick_action_items_fallback_for_plain_vm(self):
         result = self.run_bash("source bin/vmtui; list_quick_action_items alpine-ci")
         output = result.stdout.splitlines()
@@ -138,17 +149,26 @@ class VmtuiTests(unittest.TestCase):
         output = result.stdout.splitlines()
 
         self.assertIn("Guided Provision", output)
-        self.assertIn("Autoinstall", output)
+        self.assertIn("Unattended Install", output)
         self.assertIn("Cloud-Init Flow", output)
         self.assertIn("Seeded Installer", output)
         self.assertNotIn("Full Bootstrap", output)
+
+    def test_list_install_action_items_for_plain_fedora_efi_vm(self):
+        result = self.run_bash("source bin/vmtui; list_install_action_items fedora-server-efi")
+        output = result.stdout.splitlines()
+
+        self.assertIn("Guided Provision", output)
+        self.assertNotIn("Unattended Install", output)
+        self.assertNotIn("Cloud-Init Flow", output)
+        self.assertNotIn("Seeded Installer", output)
 
     def test_list_install_action_items_omits_cloud_init_entries_for_plain_vm(self):
         result = self.run_bash("source bin/vmtui; list_install_action_items alpine-ci")
         output = result.stdout.splitlines()
 
         self.assertIn("Guided Provision", output)
-        self.assertNotIn("Autoinstall", output)
+        self.assertNotIn("Unattended Install", output)
         self.assertNotIn("Cloud-Init Flow", output)
         self.assertNotIn("Seeded Installer", output)
 

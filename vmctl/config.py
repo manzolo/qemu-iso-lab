@@ -82,6 +82,26 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
     elif "video" in vm:
         err("video must be an object")
 
+    installer_boot = vm.get("installer_boot")
+    if installer_boot is not None:
+        if not isinstance(installer_boot, dict):
+            err("installer_boot must be an object")
+        else:
+            for key in ("kernel", "initrd"):
+                if key not in installer_boot:
+                    err(f"installer_boot.{key} is required")
+                elif not isinstance(installer_boot[key], str):
+                    err(f"installer_boot.{key} must be a string")
+
+    unattended = vm.get("unattended")
+    if unattended is not None:
+        if not isinstance(unattended, dict):
+            err("unattended must be an object")
+        else:
+            kind = unattended.get("type")
+            if not isinstance(kind, str) or kind not in {"debian-preseed", "fedora-kickstart"}:
+                err(f"unattended.type must be one of: 'debian-preseed', 'fedora-kickstart'; got {kind!r}")
+
     return errors
 
 

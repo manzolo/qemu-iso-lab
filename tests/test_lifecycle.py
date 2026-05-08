@@ -503,6 +503,30 @@ class VmctlTests(BaseVmctlTestCase):
             [("boot:", "\r"), ("boot:", "\n")],
         )
 
+    def test_cmd_boot_check_disk_mode_skips_cdrom_and_uses_existing_disk(self):
+        self.create_disk()
+        self.vm_config["ci"] = {
+            "accel": "tcg",
+            "headless": True,
+            "boot_from": "disk",
+            "expect": "login:",
+            "timeout_sec": 120,
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, expect=None, timeout=None, dry_run=True)
+
+        with mock.patch.object(vmctl.iso, "download_file") as download_file, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.qemu, "run_and_expect") as run_and_expect:
+            exit_code = self.vmctl.cmd_boot_check(args)
+
+        self.assertEqual(exit_code, 0)
+        download_file.assert_not_called()
+        qemu_cmd, expected_text, timeout_sec = run_and_expect.call_args.args
+        self.assertNotIn("-cdrom", qemu_cmd)
+        self.assertEqual(expected_text, "login:")
+        self.assertEqual(timeout_sec, 120)
+
     def test_cmd_start_cloud_init_attaches_seed_drive(self):
         self.create_disk()
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
@@ -642,6 +666,56 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertNotIn("-vga", qemu_cmd)
         self.assertNotIn("gtk", qemu_cmd)
 
+    def test_cmd_install_unattended_builds_preseed_qemu_command(self):
+        iso_path = self.root / self.vm_config["iso"]
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["unattended"] = {
+            "type": "debian-preseed",
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.vm_config["installer_boot"] = {
+            "kernel": "install.amd/vmlinuz",
+            "initrd": "install.amd/initrd.gz",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video="std", dry_run=True)
+
+        with mock.patch.object(vmctl.iso, "download_file") as download_file, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.cloud_init, "create_unattended_seed", return_value=self.root / "artifacts/testvm/unattended/seed.iso") as create_seed, \
+             mock.patch.object(vmctl.cloud_init, "unattended_kernel_append", return_value="auto-install/enable=true priority=critical locale=it_IT.UTF-8") as kernel_append, \
+             mock.patch.object(vmctl.iso, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")) as extract_boot, \
+             mock.patch.object(vmctl.iso, "build_debian_preseed_initrd", return_value=self.root / "artifacts/testvm/installer/initrd-preseed.gz") as build_initrd, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_install_unattended(args)
+
+        self.assertEqual(exit_code, 0)
+        download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=True, vm=self.vm_config)
+        create_seed.assert_called_once_with(self.vm_name, self.vm_config, dry_run=True)
+        kernel_append.assert_called_once_with(
+            self.vm_name,
+            self.vm_config,
+            headless=False,
+            http_url=mock.ANY,
+        )
+        # HTTP URL is provided (not None) for debian-preseed — installer fetches preseed via network
+        http_url_arg = kernel_append.call_args.kwargs.get("http_url")
+        self.assertIsNotNone(http_url_arg)
+        self.assertIn("preseed.cfg", http_url_arg)
+        extract_boot.assert_called_once_with(self.vm_config, iso_path, dry_run=True)
+        # initrd embedding is skipped when HTTP URL is available
+        build_initrd.assert_not_called()
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertNotIn(
+            f"file={self.root / 'artifacts/testvm/unattended/seed.iso'},format=raw,if=virtio,media=cdrom,readonly=on",
+            qemu_cmd,
+        )
+        self.assertIn(str(self.root / "artifacts/testvm/installer/initrd"), qemu_cmd)
+        self.assertNotIn("initrd-preseed.gz", " ".join(str(x) for x in qemu_cmd))
+        self.assertIn("auto-install/enable=true priority=critical locale=it_IT.UTF-8", qemu_cmd)
+
     def test_cmd_bootstrap_unattended_runs_install_background_start_and_post_install(self):
         self.create_disk()
         self.vm_config["cloud_init"] = {
@@ -710,14 +784,15 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual(install_args.headless, True)
 
     def test_cmd_bootstrap_unattended_requires_autoinstall(self):
-        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2222}
         self.write_config_dir()
 
         with self.assertRaises(self.vmctl.VMError):
             self.vmctl.cmd_bootstrap_unattended(argparse.Namespace(vm=self.vm_name, video=None, timeout=30, dry_run=True))
 
-    def test_cmd_bootstrap_unattended_requires_cloud_init(self):
-        self.vm_config["autoinstall"] = {
+    def test_cmd_bootstrap_unattended_requires_ssh_access(self):
+        self.vm_config["unattended"] = {
+            "type": "debian-preseed",
             "hostname": "testvm",
             "username": "tester",
             "password_hash": "$6$hash",

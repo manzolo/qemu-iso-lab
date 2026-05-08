@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shutil
@@ -151,6 +152,50 @@ def prepare_background_vm_slot(name: str, dry_run: bool = False) -> tuple[Path, 
         if not dry_run:
             pid_path.unlink()
     return (pid_path, log_path)
+
+
+def _free_local_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        sock.listen(1)
+        return int(sock.getsockname()[1])
+
+
+@contextlib.contextmanager
+def unattended_http_source(vm_name: str, vm: dict[str, Any], dry_run: bool = False):
+    filename = cloud_init.unattended_http_filename(vm_name, vm)
+    if filename is None:
+        yield None
+        return
+    artifact_dir = cloud_init.unattended_artifact_dir(vm)
+    port = 18080 if dry_run else _free_local_port()
+    url = f"http://10.0.2.2:{port}/{filename}"
+    cmd = ["python3", "-m", "http.server", str(port), "--bind", "127.0.0.1", "--directory", str(artifact_dir)]
+    ui.print_note(f"Serving unattended file via {url}")
+    ui.print_command(cmd)
+    if dry_run:
+        yield url
+        return
+    process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if local_tcp_port_open(port):
+                break
+            if process.poll() is not None:
+                raise VMError(f"Failed to start unattended HTTP source for VM '{vm_name}'")
+            time.sleep(0.1)
+        else:
+            raise VMError(f"Timed out starting unattended HTTP source for VM '{vm_name}'")
+        yield url
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
 
 
 def ensure_vm_disk(vm: dict[str, Any], dry_run: bool = False) -> Path:
@@ -536,28 +581,44 @@ def cmd_install_archinstall(args: argparse.Namespace) -> int:
 def cmd_install_unattended(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
+    if not cloud_init.installer_requires_unattended(vm):
+        raise VMError(f"VM '{args.vm}' does not define an unattended installer")
     runtime.ensure_vm_dirs(args.vm)
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
-    seed_path = cloud_init.create_autoinstall_seed(args.vm, vm, dry_run=args.dry_run)
-    kernel_path, initrd_path = iso.extract_installer_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
     headless = getattr(args, "headless", False)
-    qemu_args = qemu.common_args(
-        vm,
-        None if headless else qemu.installer_video_variant(vm, args.video),
-        dry_run=args.dry_run,
-        headless=headless,
-        serial_stdio=headless,
-        no_reboot=True,
-        allow_missing_disk=args.dry_run and not disk_exists,
-        enable_clipboard=False,
-        spice_port=getattr(args, "spice_port", None),
-    )
-    qemu_args += ["-cdrom", str(iso_path)]
-    qemu_args += cloud_init.cloud_init_drive_args(seed_path)
-    qemu_args += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", "autoinstall"]
-    runtime.run(qemu_args, dry_run=args.dry_run)
+    with unattended_http_source(args.vm, vm, dry_run=args.dry_run) as unattended_url:
+        if cloud_init.autoinstall_config(vm) is not None:
+            seed_path = cloud_init.create_autoinstall_seed(args.vm, vm, dry_run=args.dry_run)
+            append_args = "autoinstall"
+        else:
+            seed_path = cloud_init.create_unattended_seed(args.vm, vm, dry_run=args.dry_run)
+            append_args = cloud_init.unattended_kernel_append(
+                args.vm,
+                vm,
+                headless=headless,
+                http_url=unattended_url,
+            )
+        kernel_path, initrd_path = iso.extract_installer_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+        if cloud_init.unattended_type(vm) == "debian-preseed" and unattended_url is None:
+            initrd_path = iso.build_debian_preseed_initrd(args.vm, vm, initrd_path, dry_run=args.dry_run)
+        qemu_args = qemu.common_args(
+            vm,
+            None if headless else qemu.installer_video_variant(vm, args.video),
+            dry_run=args.dry_run,
+            headless=headless,
+            serial_stdio=headless,
+            no_reboot=True,
+            allow_missing_disk=args.dry_run and not disk_exists,
+            enable_clipboard=False,
+            spice_port=getattr(args, "spice_port", None),
+        )
+        qemu_args += ["-cdrom", str(iso_path)]
+        if cloud_init.unattended_type(vm) != "debian-preseed":
+            qemu_args += cloud_init.cloud_init_drive_args(seed_path)
+        qemu_args += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", append_args]
+        runtime.run(qemu_args, dry_run=args.dry_run)
     return 0
 
 
@@ -642,10 +703,10 @@ def cmd_post_install(args: argparse.Namespace) -> int:
 def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
-    if cloud_init.autoinstall_config(vm) is None:
-        raise VMError(f"VM '{args.vm}' does not define autoinstall")
-    if cloud_init.cloud_init_config(vm) is None:
-        raise VMError(f"VM '{args.vm}' does not define cloud_init")
+    if not cloud_init.installer_requires_unattended(vm):
+        raise VMError(f"VM '{args.vm}' does not define an unattended installer")
+    if cloud_init.ssh_access_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define SSH access for post-install provisioning")
 
     runtime.ensure_vm_dirs(args.vm)
 
@@ -838,6 +899,7 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
         base / "logs",
         cloud_init.cloud_init_artifact_dir(vm),
         cloud_init.autoinstall_artifact_dir(vm),
+        cloud_init.unattended_artifact_dir(vm),
         iso.installer_artifact_dir(vm),
     ]:
         if subdir.exists():

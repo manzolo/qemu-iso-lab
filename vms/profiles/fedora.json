@@ -92,6 +92,60 @@
       },
       "usb_tablet": true
     },
+    "fedora-server-efi": {
+      "name": "Fedora Server 42 EFI Baseline",
+      "meta": {
+        "slug": "fedora-server",
+        "family": "fedora",
+        "role": "server",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "disk": {
+        "path": "artifacts/fedora-server-efi/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-server-efi/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "installer_boot": {
+        "kernel": "images/pxeboot/vmlinuz",
+        "initrd": "images/pxeboot/initrd.img"
+      },
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
     "fedora-workstation": {
       "name": "Fedora Workstation 42",
       "meta": {

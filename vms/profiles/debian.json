@@ -89,6 +89,111 @@
       },
       "usb_tablet": true
     },
+    "debian-efi": {
+      "name": "Debian 13 EFI Baseline",
+      "meta": {
+        "slug": "debian",
+        "family": "debian",
+        "role": "server",
+        "release_model": "stable"
+      },
+      "iso": "isos/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "disk": {
+        "path": "artifacts/debian-efi/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/debian-efi/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "installer_boot": {
+        "kernel": "install.amd/vmlinuz",
+        "initrd": "install.amd/initrd.gz"
+      },
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
+    "debian-bios": {
+      "name": "Debian 13 BIOS Baseline",
+      "meta": {
+        "slug": "debian",
+        "family": "debian",
+        "role": "server",
+        "release_model": "stable"
+      },
+      "iso": "isos/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "disk": {
+        "path": "artifacts/debian-bios/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "installer_boot": {
+        "kernel": "install.amd/vmlinuz",
+        "initrd": "install.amd/initrd.gz"
+      },
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true
+    },
     "ubuntu-desktop": {
       "name": "Ubuntu 26.04 Desktop",
       "meta": {
