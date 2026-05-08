@@ -693,6 +693,59 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("ubuntu", output)
         self.assertIn("manual", output)
 
+    def test_cmd_check_vm_prints_result_marker(self):
+        boot_vm = json.loads(json.dumps(self.vm_config))
+        boot_vm["ci"] = {"expect": "login:"}
+        self.write_extra_profile("single.json", {"vms": {"alpine": boot_vm}})
+        args = argparse.Namespace(vm="alpine", timeout=300, dry_run=True)
+
+        with mock.patch.object(vmctl.lifecycle, "cmd_boot_check"), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_check_vm(args)
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("__VMCTL_CHECK_VM_RESULT__", output)
+        self.assertIn('"status": "passed"', output)
+
+    def test_cmd_test_local_parallel_runs_workers_and_summarizes_results(self):
+        self.write_extra_profile(
+            "parallel.json",
+            {
+                "vms": {
+                    "alpha": json.loads(json.dumps(self.vm_config)),
+                    "beta": json.loads(json.dumps(self.vm_config)),
+                }
+            },
+        )
+        args = argparse.Namespace(vms=["alpha", "beta"], timeout=300, parallel=2, dry_run=True)
+
+        completed = [
+            subprocess.CompletedProcess(
+                args=["vmctl", "_check-vm", "alpha"],
+                returncode=0,
+                stdout="==> Test VM: alpha\n__VMCTL_CHECK_VM_RESULT__{\"vm\": \"alpha\", \"status\": \"passed\", \"detail\": \"serial boot expectation\"}\n",
+            ),
+            subprocess.CompletedProcess(
+                args=["vmctl", "_check-vm", "beta"],
+                returncode=0,
+                stdout="==> Test VM: beta\n__VMCTL_CHECK_VM_RESULT__{\"vm\": \"beta\", \"status\": \"skipped\", \"detail\": \"missing ci.expect for boot-check\"}\n",
+            ),
+        ]
+
+        with mock.patch.object(vmctl.lifecycle.subprocess, "run", side_effect=completed) as run_cmd, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_test_local(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(run_cmd.call_count, 2)
+        output = stdout.getvalue()
+        self.assertIn("parallel", output)
+        self.assertIn("passed", output)
+        self.assertIn("skipped", output)
+        self.assertIn("alpha", output)
+        self.assertIn("beta", output)
+
     def test_cmd_test_local_returns_nonzero_on_failure(self):
         failing_vm = json.loads(json.dumps(self.vm_config))
         failing_vm["ci"] = {"expect": "login:"}

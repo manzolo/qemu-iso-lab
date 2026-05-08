@@ -59,6 +59,7 @@ help:
 	$(call print_kv,check-vms,make check-vms)
 	$(call print_kv,clean-stale,make clean-stale)
 	$(call print_kv,subset,make check-vms VMS=ubuntu-niri TIMEOUT=600)
+	$(call print_kv,parallel,make check-vms PARALLEL=3)
 	$(call print_kv,note,VMS accepts space-separated profile names)
 
 setup:
@@ -114,7 +115,8 @@ check-vms:
 	$(call print_header,Local VM test matrix)
 	$(call print_kv,VMS,$(if $(VMS),$(VMS),<all>))
 	$(call print_kv,TIMEOUT,$(TIMEOUT))
-	@./bin/vmctl check-vms --timeout $(TIMEOUT) $(VMS)
+	$(call print_kv,PARALLEL,$(PARALLEL))
+	@./bin/vmctl check-vms --timeout $(TIMEOUT) --parallel $(if $(PARALLEL),$(PARALLEL),1) $(VMS)
 
 clean-stale:
 	$(call print_header,Clean stale runtime state)

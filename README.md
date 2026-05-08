@@ -156,6 +156,18 @@ make boot-check VM=alpine-ci
 
 This flow downloads a small Alpine `virt` ISO, prepares the disk, boots QEMU headless, and waits for the serial `login:` prompt.
 
+### Local VM Matrix
+
+Use this path to run the local validation matrix across multiple profiles:
+
+```bash
+make check-vms
+make check-vms VMS="ubuntu-niri arch-noctalia-local" TIMEOUT=600
+make check-vms PARALLEL=4
+```
+
+`PARALLEL` controls how many VM checks run concurrently. This is mainly useful for heavier local bootstrap flows such as unattended Ubuntu installs and Arch post-install provisioning.
+
 ### Optional TUI
 
 If you prefer a simple terminal UI:
@@ -203,6 +215,8 @@ make start VM=<name>
 make start VM=<name> VIDEO=safe
 make shell VM=<name>
 make boot-check VM=alpine-ci
+make check-vms
+make check-vms PARALLEL=4
 make clean VM=<name>
 make clean-all
 ```
@@ -224,6 +238,8 @@ With `vmctl` directly:
 ./bin/vmctl start <name> --video safe
 ./bin/vmctl shell <name>
 ./bin/vmctl boot-check alpine-ci
+./bin/vmctl check-vms
+./bin/vmctl check-vms --parallel 4
 ./bin/vmctl clean <name>
 ./bin/vmctl clean --all
 ```

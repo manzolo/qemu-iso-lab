@@ -118,7 +118,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = subparsers.add_parser("check-vms", aliases=["test-local"], help="run the local VM validation matrix")
     p.add_argument("vms", nargs="*", help="optional subset of VM profiles to test")
     p.add_argument("--timeout", type=int, default=300, help="seconds for unattended/bootstrap and boot-check flows (default: 300)")
+    p.add_argument("--parallel", type=int, default=1, help="number of VMs to test concurrently (default: 1)")
     p.set_defaults(func=lifecycle.cmd_test_local)
+
+    p = subparsers.add_parser("_check-vm", help=argparse.SUPPRESS)
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=300, help=argparse.SUPPRESS)
+    p.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
+    p.set_defaults(func=lifecycle.cmd_check_vm)
 
     p = subparsers.add_parser("flash", help="copy a VM disk to a physical block device (DESTRUCTIVE; requires sudo)")
     p.add_argument("vm", help=VM_HELP)

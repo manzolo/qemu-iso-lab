@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import copy
 import json
 import os
@@ -9,6 +10,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -373,6 +375,69 @@ def run_local_test_vm(
         return ("passed", detail)
     detail = note if prep_note is None else f"{note}; {prep_note}"
     return ("skipped", detail)
+
+
+def run_local_test_once(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> tuple[str, str]:
+    mode, note = local_test_mode(vm)
+    ui.print_header(f"Test VM: {vm_name}")
+    ui.print_kv("mode", mode)
+    ui.print_kv("check", note)
+    try:
+        status, detail = run_local_test_vm(vm_name, vm, args)
+    except VMError as exc:
+        status = "failed"
+        detail = str(exc)
+        ui.print_status("fail", f"{vm_name}: {exc}", ok=False)
+        return (status, detail)
+
+    if status == "passed":
+        ui.print_status("ok", f"{vm_name}: {detail}")
+    else:
+        ui.print_status("warn", f"{vm_name}: {detail}", ok=False)
+    return (status, detail)
+
+
+def parse_check_vm_result(output: str) -> tuple[str, str]:
+    marker = "__VMCTL_CHECK_VM_RESULT__"
+    for line in reversed(output.splitlines()):
+        if not line.startswith(marker):
+            continue
+        payload = json.loads(line[len(marker):])
+        status = str(payload["status"])
+        detail = str(payload["detail"])
+        return status, detail
+    raise VMError("worker result marker missing from check-vm output")
+
+
+def strip_check_vm_result(output: str) -> str:
+    marker = "__VMCTL_CHECK_VM_RESULT__"
+    lines = [line for line in output.splitlines() if not line.startswith(marker)]
+    if not lines:
+        return ""
+    return "\n".join(lines) + "\n"
+
+
+def run_local_test_vm_subprocess(vm_name: str, args: argparse.Namespace) -> tuple[str, str, str]:
+    cmd = [
+        sys.executable,
+        str(state.ROOT / "bin" / "vmctl"),
+        "_check-vm",
+        vm_name,
+        "--timeout",
+        str(args.timeout),
+    ]
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    result = subprocess.run(
+        cmd,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    output = result.stdout or ""
+    status, detail = parse_check_vm_result(output)
+    return status, detail, strip_check_vm_result(output)
 
 
 # --- info commands -------------------------------------------------------------
@@ -1007,31 +1072,47 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_check_vm(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = config.get_vm(cfg, args.vm)
+    status, detail = run_local_test_once(args.vm, vm, args)
+    print(f"__VMCTL_CHECK_VM_RESULT__{json.dumps({'vm': args.vm, 'status': status, 'detail': detail})}")
+    return 1 if status == "failed" else 0
+
+
 def cmd_test_local(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     selected_names = list(args.vms) if getattr(args, "vms", None) else sorted(cfg["vms"])
     results: list[tuple[str, str, str]] = []
+    parallel = max(1, int(getattr(args, "parallel", 1)))
 
     ui.print_header("Local VM test matrix")
     ui.print_kv("timeout", f"{args.timeout}s")
+    ui.print_kv("parallel", str(parallel))
 
-    for vm_name in selected_names:
-        vm = config.get_vm(cfg, vm_name)
-        mode, note = local_test_mode(vm)
-        ui.print_header(f"Test VM: {vm_name}")
-        ui.print_kv("mode", mode)
-        ui.print_kv("check", note)
-        try:
-            status, detail = run_local_test_vm(vm_name, vm, args)
-        except VMError as exc:
-            results.append((vm_name, "failed", str(exc)))
-            ui.print_status("fail", f"{vm_name}: {exc}", ok=False)
-            continue
-        results.append((vm_name, status, detail))
-        if status == "passed":
-            ui.print_status("ok", f"{vm_name}: {detail}")
-        else:
-            ui.print_status("warn", f"{vm_name}: {detail}", ok=False)
+    if parallel == 1:
+        for vm_name in selected_names:
+            vm = config.get_vm(cfg, vm_name)
+            status, detail = run_local_test_once(vm_name, vm, args)
+            results.append((vm_name, status, detail))
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+            future_map = {
+                executor.submit(run_local_test_vm_subprocess, vm_name, args): vm_name
+                for vm_name in selected_names
+            }
+            for future in concurrent.futures.as_completed(future_map):
+                vm_name = future_map[future]
+                try:
+                    status, detail, output = future.result()
+                except Exception as exc:
+                    results.append((vm_name, "failed", str(exc)))
+                    ui.print_header(f"Test VM: {vm_name}")
+                    ui.print_status("fail", f"{vm_name}: {exc}", ok=False)
+                    continue
+                if output:
+                    print(output, end="" if output.endswith("\n") else "\n")
+                results.append((vm_name, status, detail))
 
     passed = sum(1 for _, status, _ in results if status == "passed")
     failed = sum(1 for _, status, _ in results if status == "failed")
