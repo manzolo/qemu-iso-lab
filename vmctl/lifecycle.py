@@ -29,6 +29,14 @@ def bootstrap_log_path(name: str) -> Path:
     return runtime.vm_artifact_base(name) / "logs" / "bootstrap-start.log"
 
 
+def check_vm_stdout_log_path(name: str) -> Path:
+    return runtime.vm_artifact_base(name) / "logs" / "check-vms.stdout.log"
+
+
+def check_vm_stderr_log_path(name: str) -> Path:
+    return runtime.vm_artifact_base(name) / "logs" / "check-vms.stderr.log"
+
+
 def read_pid_file(path: Path) -> int | None:
     if not path.is_file():
         return None
@@ -417,7 +425,14 @@ def strip_check_vm_result(output: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def write_check_vm_log(path: Path, content: str) -> None:
+    runtime.ensure_parent(path)
+    path.write_text(content, encoding="utf-8")
+
+
 def run_local_test_vm_subprocess(vm_name: str, args: argparse.Namespace) -> tuple[str, str, str]:
+    stdout_log = check_vm_stdout_log_path(vm_name)
+    stderr_log = check_vm_stderr_log_path(vm_name)
     cmd = [
         sys.executable,
         str(state.ROOT / "bin" / "vmctl"),
@@ -432,12 +447,20 @@ def run_local_test_vm_subprocess(vm_name: str, args: argparse.Namespace) -> tupl
         cmd,
         check=False,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=subprocess.PIPE,
         text=True,
     )
-    output = result.stdout or ""
-    status, detail = parse_check_vm_result(output)
-    return status, detail, strip_check_vm_result(output)
+    stdout_output = result.stdout or ""
+    stderr_output = result.stderr or ""
+    write_check_vm_log(stdout_log, stdout_output)
+    write_check_vm_log(stderr_log, stderr_output)
+    try:
+        status, detail = parse_check_vm_result(stdout_output)
+    except VMError:
+        detail_source = stderr_output.strip() or stdout_output.strip() or f"worker exited with code {result.returncode}"
+        detail = detail_source.splitlines()[-1]
+        status = "failed"
+    return status, detail, strip_check_vm_result(stdout_output)
 
 
 # --- info commands -------------------------------------------------------------
@@ -1101,6 +1124,15 @@ def cmd_test_local(args: argparse.Namespace) -> int:
                 executor.submit(run_local_test_vm_subprocess, vm_name, args): vm_name
                 for vm_name in selected_names
             }
+            for vm_name in selected_names:
+                stdout_log = check_vm_stdout_log_path(vm_name)
+                stderr_log = check_vm_stderr_log_path(vm_name)
+                ui.print_note(
+                    f"{vm_name} logs: {ui.pretty_path(stdout_log)} | {ui.pretty_path(stderr_log)}"
+                )
+                ui.print_note(
+                    f"tail -f {ui.pretty_path(stdout_log)}"
+                )
             for future in concurrent.futures.as_completed(future_map):
                 vm_name = future_map[future]
                 try:

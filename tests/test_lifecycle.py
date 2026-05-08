@@ -708,6 +708,26 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("__VMCTL_CHECK_VM_RESULT__", output)
         self.assertIn('"status": "passed"', output)
 
+    def test_run_local_test_vm_subprocess_writes_stdout_and_stderr_logs(self):
+        args = argparse.Namespace(timeout=300, dry_run=False)
+        completed = subprocess.CompletedProcess(
+            args=["vmctl", "_check-vm", "alpha"],
+            returncode=0,
+            stdout="==> Test VM: alpha\n__VMCTL_CHECK_VM_RESULT__{\"vm\": \"alpha\", \"status\": \"passed\", \"detail\": \"serial boot expectation\"}\n",
+            stderr="warning on stderr\n",
+        )
+
+        with mock.patch.object(vmctl.lifecycle.subprocess, "run", return_value=completed):
+            status, detail, output = vmctl.lifecycle.run_local_test_vm_subprocess("alpha", args)
+
+        self.assertEqual(status, "passed")
+        self.assertEqual(detail, "serial boot expectation")
+        self.assertIn("Test VM: alpha", output)
+        stdout_log = self.root / "artifacts/alpha/logs/check-vms.stdout.log"
+        stderr_log = self.root / "artifacts/alpha/logs/check-vms.stderr.log"
+        self.assertEqual(stdout_log.read_text(encoding="utf-8"), completed.stdout)
+        self.assertEqual(stderr_log.read_text(encoding="utf-8"), completed.stderr)
+
     def test_cmd_test_local_parallel_runs_workers_and_summarizes_results(self):
         self.write_extra_profile(
             "parallel.json",
@@ -745,6 +765,8 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("skipped", output)
         self.assertIn("alpha", output)
         self.assertIn("beta", output)
+        self.assertIn("tail -f artifacts/alpha/logs/check-vms.stdout.log", output)
+        self.assertIn("tail -f artifacts/beta/logs/check-vms.stdout.log", output)
 
     def test_cmd_test_local_returns_nonzero_on_failure(self):
         failing_vm = json.loads(json.dumps(self.vm_config))
