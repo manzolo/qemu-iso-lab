@@ -200,6 +200,9 @@ class ManageTests(BaseVmctlTestCase):
         for relative in [
             "artifacts/testvm/runtime/bootstrap-start.pid",
             "artifacts/testvm/logs/bootstrap-start.log",
+            "artifacts/testvm/ssh/id_ed25519",
+            "artifacts/testvm/ssh/id_ed25519.pub",
+            "artifacts/testvm/archinstall/bootstrap.iso",
             "artifacts/testvm/cloud-init/seed.iso",
             "artifacts/testvm/autoinstall/seed.iso",
             "artifacts/testvm/unattended/seed.iso",
@@ -217,6 +220,8 @@ class ManageTests(BaseVmctlTestCase):
         self.assertFalse(vars_path.exists())
         self.assertFalse((self.root / "artifacts/testvm/runtime").exists())
         self.assertFalse((self.root / "artifacts/testvm/logs").exists())
+        self.assertFalse((self.root / "artifacts/testvm/ssh").exists())
+        self.assertFalse((self.root / "artifacts/testvm/archinstall").exists())
         self.assertFalse((self.root / "artifacts/testvm/cloud-init").exists())
         self.assertFalse((self.root / "artifacts/testvm/autoinstall").exists())
         self.assertFalse((self.root / "artifacts/testvm/unattended").exists())

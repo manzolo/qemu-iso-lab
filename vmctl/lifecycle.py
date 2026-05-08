@@ -1287,6 +1287,8 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
     for subdir in [
         base / "runtime",
         base / "logs",
+        base / "ssh",
+        archinstall.archinstall_artifact_dir(vm),
         cloud_init.cloud_init_artifact_dir(vm),
         cloud_init.autoinstall_artifact_dir(vm),
         cloud_init.unattended_artifact_dir(vm),
