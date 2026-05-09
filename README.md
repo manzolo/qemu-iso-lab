@@ -542,6 +542,10 @@ That profile is intentionally small and CI-friendly:
 - it uses serial-console detection;
 - it is designed for GitHub Actions with `tcg` rather than assuming `kvm`.
 
+`ci.accel` in VM profiles is treated as a GitHub Actions override. Local runs
+default to `kvm` when available, even if a profile declares `ci.accel: tcg` for
+CI portability.
+
 More detail is documented in [docs/CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md).
 
 ## Ventoy Utilities

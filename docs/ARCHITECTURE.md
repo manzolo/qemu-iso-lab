@@ -126,7 +126,9 @@ produces isolated per-VM artifacts.
   installed disk for SSH post-install work.
 
 **Smoke test under CI:** GitHub Actions runs `vmctl boot-check alpine-ci` under
-TCG. See [CI_BOOT_STRATEGY.md](CI_BOOT_STRATEGY.md).
+TCG. `ci.accel` is treated as a CI-only override; local unattended/bootstrap
+and boot-check runs default to KVM when available. See
+[CI_BOOT_STRATEGY.md](CI_BOOT_STRATEGY.md).
 
 ## Where things are NOT
 
