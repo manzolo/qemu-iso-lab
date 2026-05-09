@@ -18,8 +18,9 @@ isos/
 .env
 .env.*
 
-# Local Codex instructions
+# Local Codex/agent instructions
 AGENTS.md
+.codex
 
 # Local VM profile overrides
 vms/profiles/local.json
