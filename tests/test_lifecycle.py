@@ -1019,7 +1019,8 @@ class VmctlTests(BaseVmctlTestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video="std", headless=True, dry_run=True)
 
-        with mock.patch.object(vmctl.iso, "download_file"), \
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": ""}, clear=False), \
+             mock.patch.object(vmctl.iso, "download_file"), \
              mock.patch.object(vmctl.runtime, "require_command"), \
              mock.patch.object(vmctl.cloud_init, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
              mock.patch.object(vmctl.iso, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
@@ -1132,7 +1133,8 @@ class VmctlTests(BaseVmctlTestCase):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, video=None, headless=False, timeout=45, dry_run=True)
 
-        with mock.patch.object(vmctl.lifecycle, "cmd_install_unattended") as install_unattended, \
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": ""}, clear=False), \
+             mock.patch.object(vmctl.lifecycle, "cmd_install_unattended") as install_unattended, \
              mock.patch.object(vmctl.qemu, "common_args", return_value=["qemu-system-x86_64"]) as common_args, \
              mock.patch.object(vmctl.runtime, "run_background", return_value=None), \
              mock.patch.object(vmctl.runtime, "require_command"), \
