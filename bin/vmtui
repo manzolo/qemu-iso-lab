@@ -295,12 +295,20 @@ list_quick_action_items() {
     if vm_has_section "$vm_name" "archinstall_config"; then
         printf '%s\n' "Arch Bootstrap" "Fully automated Arch install + post-install (headless)"
     fi
+    if vm_has_section "$vm_name" "preseed_config"; then
+        printf '%s\n' "Debian Preseed Bootstrap" "Fully automated Debian install + post-install (headless)"
+    fi
+    if vm_has_section "$vm_name" "kickstart_config"; then
+        printf '%s\n' "Kickstart Bootstrap" "Fully automated AlmaLinux/RHEL install + post-install (headless)"
+    fi
     if vm_has_unattended_install "$vm_name" && vm_has_ssh_provision "$vm_name"; then
         printf '%s\n' "Full Bootstrap" "Unattended install, first boot, and post-install"
     fi
     if vm_has_section "$vm_name" "cloud_init"; then
         printf '%s\n' "Cloud-Init Flow" "Manual installer with first-boot handoff"
-    elif ! vm_has_section "$vm_name" "archinstall_config"; then
+    elif ! vm_has_section "$vm_name" "archinstall_config" \
+         && ! vm_has_section "$vm_name" "preseed_config" \
+         && ! vm_has_section "$vm_name" "kickstart_config"; then
         printf '%s\n' "Guided Install" "Fetch ISO, prepare artifacts, boot installer"
     fi
     printf '%s\n' "Boot Desktop" "Start the installed VM with display"
@@ -318,6 +326,14 @@ list_install_action_items() {
     if vm_has_section "$vm_name" "archinstall_config"; then
         printf '%s\n' "Arch Bootstrap" "Fully automated Arch install + post-install (headless)"
         printf '%s\n' "Arch Install (Interactive)" "Boot live ISO with pre-built archinstall config on /dev/vdb"
+    elif vm_has_section "$vm_name" "preseed_config"; then
+        printf '%s\n' "Debian Preseed Bootstrap" "Fully automated Debian install + post-install (headless)"
+        printf '%s\n' "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+        printf '%s\n' "Installer Only" "Boot the installer without preparation"
+    elif vm_has_section "$vm_name" "kickstart_config"; then
+        printf '%s\n' "Kickstart Bootstrap" "Fully automated AlmaLinux/RHEL install + post-install (headless)"
+        printf '%s\n' "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+        printf '%s\n' "Installer Only" "Boot the installer without preparation"
     else
         printf '%s\n' "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
         printf '%s\n' "Installer Only" "Boot the installer without preparation"
@@ -505,6 +521,8 @@ resolve_action() {
         "Main Menu"|"Back") printf '%s\n' back ;;
         "Arch Bootstrap") printf '%s\n' bootstrap-archinstall ;;
         "Arch Install (Interactive)") printf '%s\n' install-archinstall ;;
+        "Debian Preseed Bootstrap") printf '%s\n' bootstrap-preseed ;;
+        "Kickstart Bootstrap") printf '%s\n' bootstrap-kickstart ;;
         "Full Bootstrap") printf '%s\n' bootstrap-unattended ;;
         "Guided Install"|"Guided Provision") printf '%s\n' provision ;;
         "Boot Desktop") printf '%s\n' start ;;
@@ -604,6 +622,16 @@ run_action() {
                 else
                     run_vmctl bootstrap-unattended "$current_vm"
                 fi
+            fi
+            ;;
+        bootstrap-preseed)
+            if confirm_box "Debian Preseed Bootstrap" "Run the fully automated Debian preseed bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the Debian netinst headless via serial console\n- automatically run preseed install + late_command (SSH keys, sudoers)\n- start the installed VM and run SSH post-install\n\nExpected time: ~10-15 min depending on download speed."; then
+                run_vmctl bootstrap-preseed "$current_vm"
+            fi
+            ;;
+        bootstrap-kickstart)
+            if confirm_box "Kickstart Bootstrap" "Run the fully automated AlmaLinux/RHEL kickstart bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the AlmaLinux minimal ISO headless via serial console\n- automatically run kickstart install + %post (SSH keys, sudoers, SELinux)\n- start the installed VM and run SSH post-install\n\nExpected time: ~10 min depending on download speed."; then
+                run_vmctl bootstrap-kickstart "$current_vm"
             fi
             ;;
         fetch-iso)

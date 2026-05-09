@@ -16,7 +16,7 @@ endif
 endif
 endif
 
-.PHONY: help setup list status show fetch-iso prep install install-unattended start boot-check check-vms clean-stale tui clean clean-all init-local-profile
+.PHONY: help setup list status show fetch-iso prep install install-unattended bootstrap-preseed bootstrap-kickstart start boot-check check-vms clean-stale tui clean clean-all init-local-profile
 
 define print_header
 	@printf "$(BOLD)$(BLUE)==>$(RESET) $(BOLD)%s$(RESET)\n" "$(1)"
@@ -36,6 +36,8 @@ help:
 	$(call print_kv,prep,Prepare one VM disk/NVRAM)
 	$(call print_kv,install,Boot one installer)
 	$(call print_kv,install-unattended,Run Ubuntu autoinstall for one VM)
+	$(call print_kv,bootstrap-preseed,Run Debian preseed install for one VM)
+	$(call print_kv,bootstrap-kickstart,Run AlmaLinux kickstart install for one VM)
 	$(call print_kv,start,Start an installed VM)
 	$(call print_kv,boot-check,Run serial boot smoke check for one VM)
 	$(call print_kv,check-vms,Run the local VM validation matrix)
@@ -99,6 +101,16 @@ install-unattended:
 	$(call print_kv,VM,$(VM))
 	$(call print_kv,VIDEO,$(if $(VIDEO),$(VIDEO),<default>))
 	@./bin/vmctl install-unattended "$(VM)" $(if $(VIDEO),--video $(VIDEO),)
+
+bootstrap-preseed:
+	$(call print_header,Boot Debian preseed unattended installer)
+	$(call print_kv,VM,$(VM))
+	@./bin/vmctl bootstrap-preseed "$(VM)"
+
+bootstrap-kickstart:
+	$(call print_header,Boot AlmaLinux kickstart unattended installer)
+	$(call print_kv,VM,$(VM))
+	@./bin/vmctl bootstrap-kickstart "$(VM)"
 
 start:
 	$(call print_header,Start VM)

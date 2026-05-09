@@ -29,6 +29,8 @@ make bootstrap-unattended VM=<name>  # full unattended install + post-install
 # Or directly via bin/vmctl (supports --dry-run on every subcommand)
 ./bin/vmctl --dry-run install <name>
 ./bin/vmctl bootstrap-archinstall arch-noctalia-local
+./bin/vmctl bootstrap-preseed debian-server
+./bin/vmctl bootstrap-kickstart almalinux-server
 ```
 
 ## Architecture
@@ -78,13 +80,25 @@ SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` �
 4. Uses `run_and_expect` + `auto_inputs` to wait for `root@archiso` on the serial console, then sends the mount + run trigger automatically.
 5. Waits for `"==> Arch Linux installation complete!"`, then repeats step 3–4 of the Ubuntu flow.
 
+**Debian** (`bootstrap-preseed`):
+1. Generates preseed seed ISO (`PRESEED_CFG`).
+2. Extracts `vmlinuz` + `initrd.gz` from the ISO.
+3. Boots headless with serial stdio and appropriate preseed kernel appends.
+4. Uses `run_and_expect` to wait for `"==> Debian preseed install complete!"`, then starts installed VM headless.
+
+**AlmaLinux/RHEL** (`bootstrap-kickstart`):
+1. Generates kickstart seed ISO (`KS_CFG`).
+2. Extracts `vmlinuz` + `initrd.img` from the ISO.
+3. Boots headless with serial stdio and appropriate kickstart kernel appends.
+4. Uses `run_and_expect` to wait for `"==> Kickstart install complete!"`, then starts installed VM headless.
+
 The interactive variant (`install-archinstall`) generates archinstall JSON configs and attaches them as a second virtio CD-ROM (`/dev/vdb`) for the user to run manually.
 
 #### CRITICAL — completion token / ESP flush invariant (do not break)
 
-The Arch unattended bootstrap has a sequencing rule that cost 5+ hours of debugging when violated. **Treat this as gospel:**
+The Arch unattended bootstrap has a sequencing rule that cost 5+ hours of debugging when violated. This applies to **all** automated unattended flows (Arch, Debian, RHEL) that signal completion via serial. **Treat this as gospel:**
 
-1. In `vmctl/archinstall.py` the install script MUST end with this exact ordering:
+1. In the install script (or `%post`/`late_command`) it MUST end with this exact ordering:
    ```bash
    sync
    blockdev --flushbufs /dev/vda /dev/vda1 /dev/vda2 || true

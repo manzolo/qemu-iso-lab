@@ -186,6 +186,83 @@
       },
       "usb_tablet": true
     },
+    "debian-server": {
+      "name": "Debian 13 Server (Preseed)",
+      "meta": {
+        "slug": "debian",
+        "family": "debian",
+        "role": "server",
+        "release_model": "stable"
+      },
+      "iso": "isos/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "disk": {
+        "path": "artifacts/debian-server/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/debian-server/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "preseed_config": {
+        "hostname": "debian-server",
+        "domain": "local",
+        "username": "manzolo",
+        "fullname": "Andrea Manzi",
+        "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
+        "timezone": "Europe/Rome",
+        "keyboard_layout": "it",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "mirror_hostname": "deb.debian.org",
+        "mirror_directory": "/debian",
+        "tasks": ["standard"],
+        "packages": ["openssh-server", "sudo", "curl", "ca-certificates", "locales"],
+        "late_commands": [
+          "sed -i 's/^# *it_IT.UTF-8 UTF-8/it_IT.UTF-8 UTF-8/' /etc/locale.gen",
+          "locale-gen",
+          "update-locale LANG=it_IT.UTF-8"
+        ],
+        "disk_device": "/dev/vda"
+      },
+      "ssh_provision": {
+        "user": "manzolo",
+        "ssh_host_port": 2228,
+        "ssh_key": null
+      }
+    },
     "ubuntu-desktop": {
       "name": "Ubuntu 26.04 Desktop",
       "meta": {

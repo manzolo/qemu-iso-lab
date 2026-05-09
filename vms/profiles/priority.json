@@ -92,6 +92,71 @@
       },
       "usb_tablet": true
     },
+    "almalinux-server": {
+      "name": "AlmaLinux 10.1 Server (Kickstart)",
+      "meta": {
+        "slug": "almalinux",
+        "family": "rhel",
+        "role": "server",
+        "release_model": "stable"
+      },
+      "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
+      "iso_url": "https://repo.almalinux.org/almalinux/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
+      "disk": {
+        "path": "artifacts/almalinux-server/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/almalinux-server/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "kickstart_config": {
+        "hostname": "almalinux-server",
+        "username": "manzolo",
+        "fullname": "Andrea Manzi",
+        "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
+        "timezone": "Europe/Rome",
+        "keyboard_layout": "it",
+        "locale": "it_IT.UTF-8",
+        "packages": ["@^minimal-environment", "openssh-server", "sudo", "vim-minimal"],
+        "post_commands": [],
+        "disk_device": "vda",
+        "selinux": "enforcing",
+        "firewall": "enabled"
+      },
+      "ssh_provision": {
+        "user": "manzolo",
+        "ssh_host_port": 2229,
+        "ssh_key": null
+      }
+    },
     "kali-live": {
       "name": "Kali Linux 2026.1 Live",
       "meta": {

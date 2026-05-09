@@ -20,6 +20,8 @@ if str(ROOT) not in sys.path:
 
 import vmctl  # noqa: E402
 import vmctl.archinstall  # noqa: E402
+import vmctl.preseed  # noqa: E402
+import vmctl.kickstart  # noqa: E402
 import vmctl.cloud_init  # noqa: E402
 import vmctl.config  # noqa: E402
 import vmctl.disk_inspect  # noqa: E402
@@ -51,7 +53,7 @@ class _VmctlFacade:
     )
     _SEARCH_ORDER = (
         vmctl.lifecycle, vmctl.ssh, vmctl.host_setup, vmctl.flash, vmctl.import_dev, vmctl.disk_inspect,
-        vmctl.iso, vmctl.archinstall, vmctl.cloud_init, vmctl.qemu, vmctl.config,
+        vmctl.iso, vmctl.archinstall, vmctl.preseed, vmctl.kickstart, vmctl.cloud_init, vmctl.qemu, vmctl.config,
         vmctl.runtime, vmctl.ui, vmctl.state, vmctl.errors,
     )
 

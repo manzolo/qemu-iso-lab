@@ -66,6 +66,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_archinstall)
 
+    p = subparsers.add_parser("bootstrap-preseed", help="fully automated Debian preseed install + post-install via serial console")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_preseed)
+
+    p = subparsers.add_parser("bootstrap-kickstart", help="fully automated AlmaLinux kickstart install + post-install via serial console")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_kickstart)
+
     p = subparsers.add_parser("install-archinstall", help="boot the Arch live ISO with a pre-built archinstall config disk")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--video", choices=VIDEO_CHOICES, help=VIDEO_HELP)

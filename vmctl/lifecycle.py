@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import archinstall, cloud_init, config, host_setup, iso, qemu, runtime, ssh, state, ui
+from vmctl import archinstall, cloud_init, config, host_setup, iso, preseed, kickstart, qemu, runtime, ssh, state, ui
 from vmctl.errors import VMError
 
 
@@ -282,6 +282,14 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-archinstall", "archinstall + post-install")
         return ("skip", "archinstall without SSH post-install")
+    if preseed.preseed_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-preseed", "preseed + post-install")
+        return ("skip", "preseed without SSH post-install")
+    if kickstart.kickstart_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-kickstart", "kickstart + post-install")
+        return ("skip", "kickstart without SSH post-install")
     ci = vm.get("ci", {})
     if isinstance(ci, dict) and ci.get("expect"):
         return ("boot-check", "serial boot expectation")
@@ -348,7 +356,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-archinstall"}:
+        if mode in {"bootstrap-unattended", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart"}:
             candidates.append(vm_name)
     return candidates
 
@@ -410,6 +418,38 @@ def run_local_test_vm(
     if mode == "bootstrap-archinstall":
         try:
             cmd_bootstrap_archinstall(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                )
+            )
+        finally:
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-preseed":
+        try:
+            cmd_bootstrap_preseed(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                )
+            )
+        finally:
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-kickstart":
+        try:
+            cmd_bootstrap_kickstart(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -871,6 +911,140 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    cfg_obj = preseed.preseed_config(vm)
+    if cfg_obj is None:
+        raise VMError(f"VM '{args.vm}' does not define preseed_config")
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Debian (preseed): {args.vm}")
+
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+
+    kernel_path, initrd_path = preseed.extract_preseed_boot_artifacts(
+        args.vm, vm, iso_path, dry_run=args.dry_run,
+    )
+
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        headless=True,
+        serial_stdio=True,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+    )
+    install_qemu_args += ["-cdrom", str(iso_path)]
+
+    locale = cfg_obj.get("locale", "en_US.UTF-8")
+    keymap = cfg_obj.get("keyboard_layout", "us")
+    language = cfg_obj.get("language", "en")
+    country = cfg_obj.get("country", "US")
+    append_str = preseed.PRESEED_KERNEL_APPEND.format(
+        locale=locale, language=language, country=country, keymap=keymap,
+    )
+    
+    install_qemu_args += [
+        "-kernel", str(kernel_path),
+        "-initrd", str(initrd_path),
+        "-append", append_str,
+    ]
+
+    ui.print_note("Booting Debian installer — waiting for completion token...")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    qemu.run_and_expect(
+        install_qemu_args,
+        expected_text=preseed.BOOTSTRAP_COMPLETE_TOKEN,
+        timeout_sec=getattr(args, "timeout", 1800),
+        dry_run=args.dry_run,
+        log_path=serial_log,
+    )
+    ui.print_status("ok", "Installation complete — starting installed VM for post-install")
+
+    pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+    run_qemu_args = qemu.common_args(vm, None, dry_run=args.dry_run, headless=True)
+    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
+    runtime.ensure_parent(post_serial_log)
+    run_qemu_args += ["-serial", f"file:{post_serial_log}"]
+    stderr_log = companion_stderr_log_path(log_path)
+    pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
+    if pid is not None:
+        pid_path.write_text(f"{pid}\n", encoding="utf-8")
+        ui.print_kv("pid", str(pid))
+
+    run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
+    return 0
+
+
+def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if kickstart.kickstart_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define kickstart_config")
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap AlmaLinux/RHEL (kickstart): {args.vm}")
+
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+
+    seed_iso = kickstart.create_kickstart_iso(args.vm, vm, dry_run=args.dry_run)
+    kernel_path, initrd_path = kickstart.extract_kickstart_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        headless=True,
+        serial_stdio=True,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+    )
+    install_qemu_args += ["-cdrom", str(iso_path)]
+    install_qemu_args += kickstart.kickstart_iso_drive_args(seed_iso)
+    install_qemu_args += [
+        "-kernel", str(kernel_path),
+        "-initrd", str(initrd_path),
+        "-append", "inst.ks=hd:LABEL=KS_CFG:/ks.cfg inst.text inst.cmdline inst.repo=cdrom console=ttyS0,115200",
+    ]
+
+    ui.print_note("Booting Kickstart installer — waiting for completion token...")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    qemu.run_and_expect(
+        install_qemu_args,
+        expected_text=kickstart.BOOTSTRAP_COMPLETE_TOKEN,
+        timeout_sec=getattr(args, "timeout", 1800),
+        dry_run=args.dry_run,
+        log_path=serial_log,
+    )
+    ui.print_status("ok", "Installation complete — starting installed VM for post-install")
+
+    pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+    run_qemu_args = qemu.common_args(vm, None, dry_run=args.dry_run, headless=True)
+    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
+    runtime.ensure_parent(post_serial_log)
+    run_qemu_args += ["-serial", f"file:{post_serial_log}"]
+    stderr_log = companion_stderr_log_path(log_path)
+    pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
+    if pid is not None:
+        pid_path.write_text(f"{pid}\n", encoding="utf-8")
+        ui.print_kv("pid", str(pid))
+
+    run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
+    return 0
+
+
 def cmd_install_archinstall(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -1289,6 +1463,8 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
         base / "logs",
         base / "ssh",
         archinstall.archinstall_artifact_dir(vm),
+        preseed.preseed_artifact_dir(vm),
+        kickstart.kickstart_artifact_dir(vm),
         cloud_init.cloud_init_artifact_dir(vm),
         cloud_init.autoinstall_artifact_dir(vm),
         cloud_init.unattended_artifact_dir(vm),
