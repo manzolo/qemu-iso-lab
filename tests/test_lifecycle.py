@@ -1134,6 +1134,7 @@ class VmctlTests(BaseVmctlTestCase):
         args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=True)
 
         with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
              mock.patch.object(vmctl.lifecycle, "run_post_install") as run_post_install, \
              mock.patch.object(vmctl.runtime, "run_background", return_value=None):
             exit_code = self.vmctl.cmd_bootstrap_preseed(args)
@@ -1212,6 +1213,7 @@ class VmctlTests(BaseVmctlTestCase):
         args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=True)
 
         with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
              mock.patch.object(vmctl.kickstart, "create_kickstart_iso", return_value=self.root / "artifacts/testvm/kickstart/seed.iso"), \
              mock.patch.object(vmctl.kickstart, "extract_kickstart_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
              mock.patch.object(vmctl.lifecycle, "run_post_install") as run_post_install, \
