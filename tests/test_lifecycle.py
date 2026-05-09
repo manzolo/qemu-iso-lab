@@ -875,7 +875,7 @@ class VmctlTests(BaseVmctlTestCase):
         qemu_cmd = run_cmd.call_args.args[0]
         self.assertIn("-drive", qemu_cmd)
         self.assertIn(
-            f"file={self.root / 'artifacts/testvm/cloud-init/seed.iso'},format=raw,if=virtio,media=cdrom,readonly=on",
+            f"file={self.root / 'artifacts/testvm/cloud-init/seed.iso'},format=raw,if=virtio,readonly=on",
             qemu_cmd,
         )
 
@@ -909,10 +909,12 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("-initrd", qemu_cmd)
         self.assertIn(str(self.root / "artifacts/testvm/installer/initrd"), qemu_cmd)
         self.assertIn("-append", qemu_cmd)
-        self.assertIn("autoinstall", qemu_cmd)
+        append_value = qemu_cmd[qemu_cmd.index("-append") + 1]
+        self.assertIn("autoinstall", append_value)
+        self.assertIn("ds=nocloud", append_value)
         self.assertIn("-no-reboot", qemu_cmd)
         self.assertIn(
-            f"file={self.root / 'artifacts/testvm/autoinstall/seed.iso'},format=raw,if=virtio,media=cdrom,readonly=on",
+            f"file={self.root / 'artifacts/testvm/autoinstall/seed.iso'},format=raw,if=virtio,readonly=on",
             qemu_cmd,
         )
 
@@ -997,6 +999,36 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("-monitor", qemu_cmd)
         self.assertNotIn("-vga", qemu_cmd)
         self.assertNotIn("gtk", qemu_cmd)
+        append_value = qemu_cmd[qemu_cmd.index("-append") + 1]
+        self.assertIn("autoinstall", append_value)
+        self.assertIn("ds=nocloud", append_value)
+        self.assertIn("console=ttyS0,115200n8", append_value)
+        self.assertIn(
+            f"file={self.root / 'artifacts/testvm/autoinstall/seed.iso'},format=raw,if=virtio,readonly=on",
+            qemu_cmd,
+        )
+
+    def test_cmd_install_unattended_uses_ci_accel_when_present(self):
+        self.create_disk()
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.vm_config["ci"] = {"accel": "tcg"}
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video="std", headless=True, dry_run=True)
+
+        with mock.patch.object(vmctl.iso, "download_file"), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.cloud_init, "create_autoinstall_seed", return_value=self.root / "artifacts/testvm/autoinstall/seed.iso"), \
+             mock.patch.object(vmctl.iso, "extract_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.qemu, "common_args", return_value=["qemu-system-x86_64"]) as common_args, \
+             mock.patch.object(vmctl.runtime, "run"):
+            exit_code = self.vmctl.cmd_install_unattended(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(common_args.call_args.kwargs["accel"], "tcg")
 
     def test_cmd_bootstrap_unattended_runs_install_background_start_and_post_install(self):
         self.create_disk()
@@ -1064,6 +1096,30 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual(exit_code, 0)
         install_args = install_unattended.call_args.args[0]
         self.assertEqual(install_args.headless, True)
+
+    def test_cmd_bootstrap_unattended_uses_ci_accel_for_installed_boot(self):
+        self.create_disk()
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+        }
+        self.vm_config["ci"] = {"accel": "tcg"}
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, video=None, headless=False, timeout=45, dry_run=True)
+
+        with mock.patch.object(vmctl.lifecycle, "cmd_install_unattended") as install_unattended, \
+             mock.patch.object(vmctl.qemu, "common_args", return_value=["qemu-system-x86_64"]) as common_args, \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=None), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.ssh, "wait_for_ssh"), \
+             mock.patch.object(vmctl.runtime, "run"):
+            exit_code = self.vmctl.cmd_bootstrap_unattended(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(install_unattended.call_args.args[0].headless, True)
+        self.assertEqual(common_args.call_args.kwargs["accel"], "tcg")
 
     def test_cmd_bootstrap_unattended_requires_autoinstall(self):
         self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2222}

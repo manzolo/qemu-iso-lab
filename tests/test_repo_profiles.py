@@ -26,6 +26,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "alpine-installed-ci",
             "debian-efi",
             "debian-bios",
+            "ubuntu-server-headless",
             "fedora-server-efi",
             "freebsd",
         ):

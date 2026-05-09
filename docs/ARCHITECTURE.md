@@ -111,9 +111,19 @@ produces isolated per-VM artifacts.
 3. `make install VM=foo` — `vmctl` boots QEMU with the ISO and the disk attached.
 4. `make start VM=foo` (after install completes) — boots the installed disk only.
 
-**Unattended install:** `make install-unattended VM=foo` is currently the
-Ubuntu autoinstall path. It builds an autoinstall seed under
-`artifacts/<vm>/autoinstall/` and boots the installer with it attached.
+**Unattended install paths:**
+
+- `make install-unattended VM=foo` is the Ubuntu autoinstall path. It builds
+  an autoinstall seed under `artifacts/<vm>/autoinstall/` and boots the
+  installer with it attached.
+- `./bin/vmctl bootstrap-preseed <name>` is the Debian preseed path. It builds
+  preseed artifacts under `artifacts/<vm>/preseed/`, boots headless via serial,
+  waits for the completion token, then starts the installed disk for SSH
+  post-install work.
+- `./bin/vmctl bootstrap-kickstart <name>` is the AlmaLinux/RHEL kickstart
+  path. It builds kickstart artifacts under `artifacts/<vm>/kickstart/`, boots
+  headless via serial, waits for the completion token, then starts the
+  installed disk for SSH post-install work.
 
 **Smoke test under CI:** GitHub Actions runs `vmctl boot-check alpine-ci` under
 TCG. See [CI_BOOT_STRATEGY.md](CI_BOOT_STRATEGY.md).

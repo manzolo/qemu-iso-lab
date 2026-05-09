@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import copy
+
 import json
 import os
 import shutil
@@ -58,6 +59,8 @@ def announce_phase_logs(name: str, phase: str) -> tuple[Path, Path]:
     ui.print_kv("stderr", ui.pretty_path(stderr_log))
     ui.print_note(f"tail -f {ui.pretty_path(stdout_log)}")
     return stdout_log, stderr_log
+
+
 
 
 def read_pid_file(path: Path) -> int | None:
@@ -328,6 +331,15 @@ def resolved_vm(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, Any]
     if override is not None:
         return copy.deepcopy(override)
     return config.get_vm(cfg, args.vm)
+
+
+def automation_accel(vm: dict[str, Any]) -> str:
+    ci = vm.get("ci", {})
+    if isinstance(ci, dict):
+        accel = str(ci.get("accel") or "").strip()
+        if accel in {"kvm", "tcg"}:
+            return accel
+    return "kvm"
 
 
 def local_test_prereq_skip(vm_name: str, vm: dict[str, Any]) -> str | None:
@@ -865,6 +877,7 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
         vm,
         None,
         dry_run=args.dry_run,
+        accel=automation_accel(vm),
         headless=True,
         serial_stdio=True,
         no_reboot=True,
@@ -900,6 +913,7 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
         vm,
         None,
         dry_run=args.dry_run,
+        accel=automation_accel(vm),
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
     )
@@ -940,6 +954,7 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
         vm,
         None,
         dry_run=args.dry_run,
+        accel=automation_accel(vm),
         headless=True,
         serial_stdio=True,
         no_reboot=True,
@@ -978,6 +993,7 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
         vm,
         None,
         dry_run=args.dry_run,
+        accel=automation_accel(vm),
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
     )
@@ -1016,6 +1032,7 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         vm,
         None,
         dry_run=args.dry_run,
+        accel=automation_accel(vm),
         headless=True,
         serial_stdio=True,
         no_reboot=True,
@@ -1046,6 +1063,7 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         vm,
         None,
         dry_run=args.dry_run,
+        accel=automation_accel(vm),
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
     )
@@ -1100,12 +1118,15 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
     ensure_vm_disk(vm, dry_run=args.dry_run)
     headless = getattr(args, "headless", False)
     seed_path = cloud_init.create_autoinstall_seed(args.vm, vm, dry_run=args.dry_run)
-    append_args = "autoinstall"
+    append_args = "autoinstall ds=nocloud"
+    if headless:
+        append_args += " console=ttyS0,115200n8"
     kernel_path, initrd_path = iso.extract_installer_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
     qemu_args = qemu.common_args(
         vm,
         None if headless else qemu.installer_video_variant(vm, args.video),
         dry_run=args.dry_run,
+        accel=automation_accel(vm),
         headless=headless,
         serial_stdio=headless,
         no_reboot=True,
@@ -1229,6 +1250,7 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
         vm,
         None,
         dry_run=args.dry_run,
+        accel=automation_accel(vm),
         headless=True,
         serial_stdio=True,
         allow_missing_disk=args.dry_run and not disk_exists,

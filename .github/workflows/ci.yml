@@ -71,6 +71,33 @@ jobs:
       - name: Prepare ubuntu-niri post-install dry-run
         run: ./bin/vmctl --dry-run post-install ubuntu-niri
 
+  ubuntu-server-headless-install-boot:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install CI host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils xorriso genisoimage ovmf
+
+      - name: Bootstrap ubuntu-server-headless
+        run: ./bin/vmctl bootstrap-unattended ubuntu-server-headless --timeout 2400
+
+      - name: Stop installed ubuntu-server-headless background VM
+        run: ./bin/vmctl stop ubuntu-server-headless
+
+      - name: Boot ubuntu-server-headless from disk
+        run: ./bin/vmctl boot-check ubuntu-server-headless
+
   debian-server-dry-run:
     needs: test
     runs-on: ubuntu-latest

@@ -6,6 +6,7 @@ import os
 import pty
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -26,6 +27,13 @@ def load_json_file(path: Path) -> dict[str, Any]:
 
 def run_output(cmd: list[str]) -> str:
     return subprocess.check_output(cmd, text=True)
+
+
+def find_free_tcp_port(host: str = "127.0.0.1") -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((host, 0))
+        sock.listen(1)
+        return int(sock.getsockname()[1])
 
 
 def image_info(path: Path, quiet: bool = False) -> dict[str, Any]:

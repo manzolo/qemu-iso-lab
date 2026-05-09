@@ -363,6 +363,101 @@
       },
       "usb_tablet": true
     },
+    "ubuntu-server-headless": {
+      "name": "Ubuntu 26.04 Server Headless CI",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "ci-installed",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-server-headless/disk.qcow2",
+        "size": "16G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-server-headless/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "autoinstall": {
+        "hostname": "ubuntu-server-headless",
+        "username": "vmuser",
+        "realname": "VM User",
+        "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true
+      },
+      "cloud_init": {
+        "hostname": "ubuntu-server-headless",
+        "user": "vmuser",
+        "ssh_host_port": 2290,
+        "write_files": [
+          {
+            "path": "/etc/default/grub.d/90-vmctl-serial.cfg",
+            "permissions": "0644",
+            "content": "GRUB_CMDLINE_LINUX_DEFAULT=\"$GRUB_CMDLINE_LINUX_DEFAULT console=ttyS0,115200n8\"\nGRUB_CMDLINE_LINUX=\"$GRUB_CMDLINE_LINUX console=ttyS0,115200n8\"\n"
+          },
+          {
+            "path": "/etc/systemd/system/vmctl-ci-boot-marker.service",
+            "permissions": "0644",
+            "content": "[Unit]\nDescription=Emit vmctl CI boot marker on serial console\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/bin/sh -lc 'echo __VMCTL_UBUNTU_SERVER_HEADLESS_BOOTED__ > /dev/ttyS0'\n\n[Install]\nWantedBy=multi-user.target\n"
+          },
+          {
+            "path": "/etc/sudoers.d/90-vmuser-nopasswd",
+            "permissions": "0440",
+            "content": "vmuser ALL=(ALL) NOPASSWD:ALL\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl daemon-reload",
+          "systemctl enable serial-getty@ttyS0.service",
+          "systemctl enable vmctl-ci-boot-marker.service",
+          "update-grub"
+        ]
+      },
+      "ci": {
+        "accel": "tcg",
+        "headless": true,
+        "boot_from": "disk",
+        "expect": "__VMCTL_UBUNTU_SERVER_HEADLESS_BOOTED__",
+        "timeout_sec": 240
+      }
+    },
     "ubuntu-niri": {
       "name": "Ubuntu 26.04 Niri",
       "meta": {

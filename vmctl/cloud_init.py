@@ -189,7 +189,7 @@ def create_cloud_init_seed(vm_name: str, vm: dict[str, Any], dry_run: bool = Fal
 
 
 def cloud_init_drive_args(seed_path: Path) -> list[str]:
-    return ["-drive", f"file={seed_path},format=raw,if=virtio,media=cdrom,readonly=on"]
+    return ["-drive", f"file={seed_path},format=raw,if=virtio,readonly=on"]
 
 
 def render_autoinstall_user_data(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> str:
@@ -230,6 +230,7 @@ def render_autoinstall_user_data(vm_name: str, vm: dict[str, Any], dry_run: bool
         autoinstall_section["packages"] = list(config["packages"])
     if ci is not None:
         autoinstall_section["user-data"] = render_cloud_init_payload(ci, dry_run=dry_run, include_user=False)
+        autoinstall_section["user-data"]["power_state"] = {"mode": "poweroff"}
     return "#cloud-config\n" + json.dumps(payload, indent=2) + "\n"
 
 

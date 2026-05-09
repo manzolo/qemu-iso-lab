@@ -45,6 +45,14 @@ These are the first five profiles to implement.
 
 These are useful after the first wave.
 
+- `debian-server` - implemented
+  Automated Debian preseed server profile with SSH post-install.
+  Coverage added: non-Ubuntu unattended install path, EFI server bootstrap, serial token completion flow.
+
+- `almalinux-server` - implemented
+  Automated AlmaLinux kickstart server profile with SSH post-install.
+  Coverage added: enterprise-style unattended install path, RHEL-family provisioning, serial token completion flow.
+
 - `ubuntu-server-headless`
   Headless, SSH-oriented server baseline for shell and post-install workflows.
 
@@ -73,7 +81,8 @@ These are useful after the first wave.
 ### Automation
 
 - Avoid making Ubuntu autoinstall the only documented unattended path.
-- Revisit non-Ubuntu unattended automation only with a source model proven to work reliably.
+- Keep Debian preseed and Alma/RHEL kickstart unattended flows healthy as first-class bootstrap paths, not one-off experiments.
+- Add focused local dry-run and CI validation whenever a new unattended/bootstrap path is introduced.
 
 ### Compatibility
 
