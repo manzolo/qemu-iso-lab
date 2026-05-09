@@ -256,6 +256,24 @@ Dry-run examples:
 ./bin/vmctl --dry-run start <name> --video safe
 ```
 
+## Local Validation Before Push
+
+Do not treat GitHub Actions as the first place to discover regressions. If you touch CI, unattended/bootstrap flows, or related tests, make the relevant local checks pass before pushing.
+
+Minimum baseline:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+When changing unattended/bootstrap wiring, also run the focused dry-run command(s) you changed, for example:
+
+```bash
+./bin/vmctl --dry-run bootstrap-preseed debian-server
+./bin/vmctl --dry-run bootstrap-kickstart almalinux-server
+./bin/vmctl --dry-run install-unattended ubuntu-niri
+```
+
 ## VM Profile Model
 
 Each VM entry in `vms/profiles/*.json` typically defines:

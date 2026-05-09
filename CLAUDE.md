@@ -33,6 +33,8 @@ make bootstrap-unattended VM=<name>  # full unattended install + post-install
 ./bin/vmctl bootstrap-kickstart almalinux-server
 ```
 
+Before pushing, run the relevant local tests first. Do not use GitHub Actions as the first place to discover breakage in unit tests, dry-run bootstrap flows, or CI wiring. At minimum, if you touch CI or unattended/bootstrap code, run `python -m unittest discover -s tests -v` and any focused bootstrap/dry-run commands affected by the change.
+
 ## Architecture
 
 `bin/vmctl` is a 12-line shim that calls `vmctl.cli:main`. The `Makefile` is a thin convenience layer over `vmctl`. `bin/vmtui` is an independent `dialog`-based menu wrapper that shells out to `vmctl`.
@@ -134,3 +136,5 @@ artifacts/<vm>/
 ### CI
 
 GitHub Actions runs three jobs: `test` (unittest), `boot-smoke` (`boot-check alpine-ci` under TCG/QEMU, no KVM), and `ubuntu-niri-dry-run` (`--dry-run` of the full bootstrap). The `alpine-ci` profile is the stable CI guest — keep it small and TCG-capable.
+
+CI is a confirmation step, not the first feedback loop. If you modify workflow files, bootstrap handlers, or unattended install helpers, make the corresponding local `unittest` and dry-run checks pass before pushing.
