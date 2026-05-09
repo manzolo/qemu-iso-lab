@@ -1117,6 +1117,30 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual(exit_code, 0)
         self.assertFalse(vars_path.exists())
 
+    def test_cmd_bootstrap_preseed_dry_run_allows_missing_disk_for_post_install_boot(self):
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.vm_config["preseed_config"] = {
+            "hostname": "debian-test",
+            "username": "tester",
+            "password": "s3cret",
+        }
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2228}
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=True)
+
+        with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.lifecycle, "run_post_install") as run_post_install, \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=None):
+            exit_code = self.vmctl.cmd_bootstrap_preseed(args)
+
+        self.assertEqual(exit_code, 0)
+        run_post_install.assert_called_once_with(self.vm_name, self.vm_config, 45, dry_run=True)
+
     def test_cmd_bootstrap_kickstart_runs_install_wait_and_post_install(self):
         self.create_disk()
         self.vm_config["kickstart_config"] = {
@@ -1170,6 +1194,32 @@ class VmctlTests(BaseVmctlTestCase):
         pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
         self.assertEqual(pid_path.read_text(encoding="utf-8"), "4321\n")
         run_post_install.assert_called_once_with(self.vm_name, self.vm_config, 45, dry_run=False)
+
+    def test_cmd_bootstrap_kickstart_dry_run_allows_missing_disk_for_post_install_boot(self):
+        self.vm_config["firmware"] = {
+            "type": "efi",
+            "code": "firmware/OVMF_CODE_4M.fd",
+            "vars_template": "firmware/OVMF_VARS_4M.fd",
+            "vars_path": "artifacts/testvm/OVMF_VARS.fd",
+        }
+        self.vm_config["kickstart_config"] = {
+            "hostname": "alma-test",
+            "username": "tester",
+            "password": "s3cret",
+        }
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2229}
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=True)
+
+        with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.kickstart, "create_kickstart_iso", return_value=self.root / "artifacts/testvm/kickstart/seed.iso"), \
+             mock.patch.object(vmctl.kickstart, "extract_kickstart_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.lifecycle, "run_post_install") as run_post_install, \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=None):
+            exit_code = self.vmctl.cmd_bootstrap_kickstart(args)
+
+        self.assertEqual(exit_code, 0)
+        run_post_install.assert_called_once_with(self.vm_name, self.vm_config, 45, dry_run=True)
 
 
 if __name__ == "__main__":
