@@ -334,12 +334,22 @@ def resolved_vm(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, Any]
 
 
 def automation_accel(vm: dict[str, Any]) -> str:
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        ci = vm.get("ci", {})
+        if isinstance(ci, dict):
+            accel = str(ci.get("accel") or "").strip()
+            if accel in {"kvm", "tcg"}:
+                return accel
+    return "kvm"
+
+
+def ci_boot_accel(vm: dict[str, Any], default: str = "kvm") -> str:
     ci = vm.get("ci", {})
-    if isinstance(ci, dict):
+    if os.environ.get("GITHUB_ACTIONS") == "true" and isinstance(ci, dict):
         accel = str(ci.get("accel") or "").strip()
         if accel in {"kvm", "tcg"}:
             return accel
-    return "kvm"
+    return default
 
 
 def local_test_prereq_skip(vm_name: str, vm: dict[str, Any]) -> str | None:
@@ -1346,7 +1356,7 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
         raise VMError(f"Missing boot expectation for VM '{args.vm}'")
 
     timeout_sec = args.timeout or ci.get("timeout_sec", 90)
-    accel = ci.get("accel", "tcg")
+    accel = ci_boot_accel(vm)
     headless = ci.get("headless", True)
     boot_from = ci.get("boot_from", "cdrom")
     auto_inputs = [(item["match"], item["send"]) for item in ci.get("auto_input", [])]

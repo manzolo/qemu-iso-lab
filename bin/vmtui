@@ -273,11 +273,26 @@ PY
 }
 
 vm_is_running_headless() {
-    local pid_file="$ROOT_DIR/artifacts/$1/runtime/bootstrap-start.pid"
-    local pid
-    [[ -f "$pid_file" ]] || return 1
-    pid=$(cat "$pid_file" 2>/dev/null) || return 1
-    [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+    python3 - "$VMCTL" "$1" <<'PY'
+import json
+import subprocess
+import sys
+
+vmctl = sys.argv[1]
+vm_name = sys.argv[2]
+result = subprocess.run(
+    [vmctl, "status", "--json"],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+for row in json.loads(result.stdout):
+    if row.get("profile") != vm_name:
+        continue
+    runtime = str(row.get("runtime") or "")
+    raise SystemExit(0 if runtime.startswith(("tracked:", "hostfwd:", "running:")) else 1)
+raise SystemExit(1)
+PY
 }
 
 list_vm_action_items() {

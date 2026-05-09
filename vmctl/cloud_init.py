@@ -220,6 +220,7 @@ def render_autoinstall_user_data(vm_name: str, vm: dict[str, Any], dry_run: bool
         if updates not in {"security", "all"}:
             raise VMError("autoinstall.updates must be one of: security, all")
         autoinstall_section["updates"] = updates
+    autoinstall_section["shutdown"] = "poweroff"
     ssh_keys = _authorized_keys_for_vm(vm, dry_run=dry_run)
     autoinstall_section["ssh"] = {
         "install-server": bool(config.get("install_ssh", True)),
@@ -230,7 +231,6 @@ def render_autoinstall_user_data(vm_name: str, vm: dict[str, Any], dry_run: bool
         autoinstall_section["packages"] = list(config["packages"])
     if ci is not None:
         autoinstall_section["user-data"] = render_cloud_init_payload(ci, dry_run=dry_run, include_user=False)
-        autoinstall_section["user-data"]["power_state"] = {"mode": "poweroff"}
     return "#cloud-config\n" + json.dumps(payload, indent=2) + "\n"
 
 

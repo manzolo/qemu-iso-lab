@@ -414,8 +414,8 @@
       "usb_tablet": true,
       "autoinstall": {
         "hostname": "ubuntu-server-headless",
-        "username": "vmuser",
-        "realname": "VM User",
+        "username": "manzolo",
+        "realname": "Andrea Manzi",
         "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
         "timezone": "UTC",
         "keyboard_layout": "us",
@@ -424,7 +424,7 @@
       },
       "cloud_init": {
         "hostname": "ubuntu-server-headless",
-        "user": "vmuser",
+        "user": "manzolo",
         "ssh_host_port": 2290,
         "write_files": [
           {
@@ -438,9 +438,9 @@
             "content": "[Unit]\nDescription=Emit vmctl CI boot marker on serial console\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/bin/sh -lc 'echo __VMCTL_UBUNTU_SERVER_HEADLESS_BOOTED__ > /dev/ttyS0'\n\n[Install]\nWantedBy=multi-user.target\n"
           },
           {
-            "path": "/etc/sudoers.d/90-vmuser-nopasswd",
+            "path": "/etc/sudoers.d/90-manzolo-nopasswd",
             "permissions": "0440",
-            "content": "vmuser ALL=(ALL) NOPASSWD:ALL\n"
+            "content": "manzolo ALL=(ALL) NOPASSWD:ALL\n"
           }
         ],
         "runcmd": [
