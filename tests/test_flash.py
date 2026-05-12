@@ -305,8 +305,51 @@ class FlashTests(BaseVmctlTestCase):
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(executed[0], ["wipefs", "-a", "-f", "/dev/sdz1"])
         self.assertEqual(executed[1], ["wipefs", "-a", "-f", "/dev/sdz2"])
-        self.assertEqual(executed[2], ["wipefs", "-a", "-f", "/dev/sdz"])
-        self.assertEqual(executed[3], ["blockdev", "--rereadpt", "/dev/sdz"])
+        self.assertEqual(executed[2], ["sgdisk", "--zap-all", "/dev/sdz"])
+        self.assertEqual(executed[3], ["wipefs", "-a", "-f", "/dev/sdz"])
+        self.assertEqual(executed[4], ["blockdev", "--rereadpt", "/dev/sdz"])
+
+    def test_cmd_flash_helper_force_target_skips_zap_when_target_is_not_gpt(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=True)
+
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target",
+                 return_value=(
+                     {
+                         "path": "/dev/sdz",
+                         "size": 16 * 1024**3,
+                         "model": "USB",
+                         "mountpoints": [],
+                         "children": [{"path": "/dev/sdz1"}],
+                         "signatures": [{"type": "ext4"}],
+                         "pttype": "dos",
+                         "is_root_disk": False,
+                         "is_empty": False,
+                     },
+                     "dos",
+                     1 * 1024**3,
+                 ),
+             ), \
+             mock.patch.object(vmctl.disk_inspect, "inspect_block_device_basic",
+                 return_value={
+                     "path": "/dev/sdz",
+                     "size": 16 * 1024**3,
+                     "model": "USB",
+                     "mountpoints": [],
+                     "children": [],
+                     "logical_sector_size": 512,
+                     "pttype": "dos",
+                     "is_root_disk": False,
+                 },
+             ), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
+            exit_code = self.vmctl.cmd_flash_helper(args)
+
+        self.assertEqual(exit_code, 0)
+        executed = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertNotIn(["sgdisk", "--zap-all", "/dev/sdz"], executed)
 
     def test_cmd_flash_helper_continues_when_rereadpt_fails(self):
         self.create_disk()

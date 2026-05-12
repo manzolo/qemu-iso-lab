@@ -12,6 +12,15 @@ from vmctl import state
 from vmctl.errors import VMError
 
 
+def _device_has_gpt_metadata(info: dict[str, Any]) -> bool:
+    if str(info.get("pttype") or "").lower() == "gpt":
+        return True
+    for item in info.get("signatures") or []:
+        if str(item.get("type") or "").lower() == "gpt":
+            return True
+    return False
+
+
 def validate_flash_target(vm: dict[str, Any], disk_path: Path, device: str, force_target: bool = False) -> tuple[dict[str, Any], str | None, int]:
     source_layout = disk_inspect.partition_layout(disk_path)
     source_info = runtime.image_info(disk_path)
@@ -176,10 +185,14 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
 
     info, _, virtual_size = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
     if args.force_target:
+        if _device_has_gpt_metadata(info):
+            runtime.require_command("sgdisk")
         for child in info["children"]:
             child_path = child.get("path")
             if child_path:
                 runtime.run(["wipefs", "-a", "-f", child_path], dry_run=False, quiet=True)
+        if _device_has_gpt_metadata(info):
+            runtime.run(["sgdisk", "--zap-all", args.device], dry_run=False, quiet=True)
         runtime.run(["wipefs", "-a", "-f", args.device], dry_run=False, quiet=True)
         runtime.reread_partition_table(args.device, dry_run=False)
     runtime.run(
