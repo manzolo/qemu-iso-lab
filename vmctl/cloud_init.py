@@ -209,7 +209,11 @@ def render_autoinstall_user_data(vm_name: str, vm: dict[str, Any], dry_run: bool
         "identity": {"hostname": hostname, "password": password_hash, "realname": str(config.get("realname") or username), "username": username},
         "keyboard": {"layout": str(config.get("keyboard_layout") or "us")},
         "locale": str(config.get("locale") or "en_US.UTF-8"),
+        "source": {"search_drivers": bool(config.get("search_drivers", False))},
         "storage": {"layout": {"name": str(config.get("storage_layout") or "direct")}},
+        "drivers": {"install": bool(config.get("install_drivers", False))},
+        "oem": {"install": bool(config.get("install_oem", False))},
+        "codecs": {"install": bool(config.get("install_codecs", False))},
     }
     payload: dict[str, Any] = {"autoinstall": autoinstall_section}
     timezone = str(config.get("timezone") or "").strip()

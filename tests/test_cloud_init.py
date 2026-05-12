@@ -1,6 +1,7 @@
 import shutil
 import sys
 import unittest
+import json
 from pathlib import Path
 from unittest import mock
 
@@ -78,14 +79,40 @@ class CloudInitTests(BaseVmctlTestCase):
         }
 
         rendered = self.vmctl.render_autoinstall_user_data(self.vm_name, self.vm_config)
+        payload = json.loads(rendered.removeprefix("#cloud-config\n"))
+        autoinstall = payload["autoinstall"]
 
         self.assertIn('"username": "tester"', rendered)
         self.assertIn('"password": "$6$hash"', rendered)
+        self.assertEqual(autoinstall["source"]["search_drivers"], False)
+        self.assertEqual(autoinstall["drivers"]["install"], False)
+        self.assertEqual(autoinstall["oem"]["install"], False)
+        self.assertEqual(autoinstall["codecs"]["install"], False)
         self.assertIn('"authorized-keys": [', rendered)
         self.assertIn('"ssh-ed25519 AAAA from-file"', rendered)
         self.assertIn('"user-data": {', rendered)
         self.assertIn('"packages": [', rendered)
         self.assertIn('"runcmd": [', rendered)
+
+    def test_render_autoinstall_user_data_allows_overriding_driver_and_oem_flags(self):
+        self.vm_config["autoinstall"] = {
+            "hostname": "testvm",
+            "username": "tester",
+            "password_hash": "$6$hash",
+            "search_drivers": True,
+            "install_drivers": True,
+            "install_oem": True,
+            "install_codecs": True,
+        }
+
+        rendered = self.vmctl.render_autoinstall_user_data(self.vm_name, self.vm_config)
+        payload = json.loads(rendered.removeprefix("#cloud-config\n"))
+        autoinstall = payload["autoinstall"]
+
+        self.assertEqual(autoinstall["source"]["search_drivers"], True)
+        self.assertEqual(autoinstall["drivers"]["install"], True)
+        self.assertEqual(autoinstall["oem"]["install"], True)
+        self.assertEqual(autoinstall["codecs"]["install"], True)
 
     def test_render_autoinstall_user_data_generates_authorized_key_from_cloud_init_access(self):
         generated_private = self.root / "artifacts/testvm/ssh/id_ed25519"
