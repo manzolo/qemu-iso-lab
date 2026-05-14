@@ -178,13 +178,17 @@ If you prefer a simple terminal UI:
 make tui
 ```
 
-The TUI is a thin frontend over `vmctl`. It groups VM actions into:
+The TUI is a thin frontend over `vmctl`. The main menu offers `Choose VM`, `Status`, `Remote Hosts`, `Clean All`, and `Quit`. Picking a VM opens a single contextual menu with sections:
 
-- `Start Here` for the recommended flows, including guided install, full bootstrap, desktop boot, headless boot, and SSH console when available;
-- `Installation` for ISO download, disk preparation, manual install, Ubuntu autoinstall, and cloud-init installer flows;
-- `Run & Access` for desktop/headless boot, Remote SPICE access, stopping background VMs, SSH access, first boot, and post-install tasks;
-- `Maintenance` for boot checks, VM artifact cleanup, and cached ISO removal;
-- `Advanced` for physical disk flash/import workflows.
+- `INSTALL` — bootstrap or guided install actions that match the VM profile (`Full Bootstrap`, `Arch Bootstrap`, `Debian Preseed Bootstrap`, `Kickstart Bootstrap`, `Unattended Install`, `Cloud-Init Flow`, `Guided Provision`, `Installer Only`, `Seeded Installer`);
+- `RUN` — `Boot Desktop`, `Boot Headless`, `Stop VM`, `SSH Console`, `First Boot` (cloud-init);
+- `MAINTENANCE` — `Post-Install`, `Boot Check`, `Fetch ISO`, `Prepare VM`, `Clean VM`, `Delete ISO`, `Profile Details`;
+- `ADVANCED` — `Flash Empty Disk`, `Force Flash`, `Import Disk` (physical disk workflows scoped to the current VM);
+- `OTHER` — `Remote SPICE`, `Back`.
+
+Entries that don't apply to the current VM or state stay visible with a reason in their description (e.g. `SSH Console  (no ssh_provision in profile)`, `Stop VM  (VM not running)`). Selecting one opens an info dialog instead of failing.
+
+After an installer that doesn't auto-boot the VM (`Unattended Install`, `Guided Provision`, `Cloud-Init Flow`, `Arch Install (Interactive)`, `Installer Only`, `Seeded Installer`) the TUI offers `Start headless + SSH post-install` / `Start with display` / `Done`, so the install→boot→post-install chain finishes without navigating back through menus. The full-flow `Bootstrap` actions already do this end-to-end and skip the prompt.
 
 Installer and boot actions can choose a video profile before starting QEMU.
 
@@ -194,9 +198,9 @@ For remote graphical access, create a local remote host config:
 cp vms/remotes.json.example vms/remotes.json
 ```
 
-Edit `vms/remotes.json` with the SSH target, remote project path, and SPICE ports. The TUI can also create and edit this file from `Remote Hosts`.
+Edit `vms/remotes.json` with the SSH target, remote project path, and SPICE ports. The TUI can also create and edit this file from `Remote Hosts` on the main menu.
 
-Then use `Choose VM` -> `Run & Access` -> `Remote SPICE`. The TUI starts QEMU on the remote host with `--spice-port`, opens an SSH tunnel, and launches `remote-viewer` locally. If `remote-viewer` is missing, the TUI offers to install `virt-viewer` with the detected package manager.
+Then use `Choose VM` -> `Remote SPICE`. The TUI starts QEMU on the remote host with `--spice-port`, opens an SSH tunnel, and launches `remote-viewer` locally. If `remote-viewer` is missing, the TUI offers to install `virt-viewer` with the detected package manager.
 
 ## Common Commands
 
