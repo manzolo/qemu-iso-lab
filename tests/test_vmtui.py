@@ -88,130 +88,168 @@ class VmtuiTests(unittest.TestCase):
             check=True,
         )
 
-    def test_list_vm_action_items_uses_compact_grouped_menu(self):
-        result = self.run_bash("source bin/vmtui; list_vm_action_items ubuntu-niri")
-        output = result.stdout.splitlines()
+    def _unified_menu(self, vm_name: str) -> list[str]:
+        result = self.run_bash(f"source bin/vmtui; list_vm_menu_items_unified {vm_name}")
+        return result.stdout.splitlines()
 
-        self.assertEqual(output[:2], ["Start Here", "Recommended flows for this VM"])
-        self.assertEqual(output[-4:], ["Profile Details", "Review this VM configuration", "Main Menu", "Return to the main menu"])
-        self.assertIn("Start Here", output)
-        self.assertIn("Installation", output)
-        self.assertIn("Run & Access", output)
-        self.assertIn("Maintenance", output)
-        self.assertNotIn("start", output)
-        self.assertNotIn("shell", output)
-        self.assertNotIn("clean", output)
+    def _description_of(self, output: list[str], tag: str) -> str:
+        for i, line in enumerate(output):
+            if line == tag and i + 1 < len(output):
+                return output[i + 1]
+        return ""
 
-    def test_list_quick_action_items_include_bootstrap_for_supported_vm(self):
-        result = self.run_bash("source bin/vmtui; list_quick_action_items ubuntu-niri")
-        output = result.stdout.splitlines()
+    def test_unified_menu_has_all_sections(self):
+        output = self._unified_menu("ubuntu-niri")
+        self.assertIn("__sep_INSTALL", output)
+        self.assertIn("__sep_RUN", output)
+        self.assertIn("__sep_MAINTENANCE", output)
+        self.assertIn("__sep_ADVANCED", output)
+        self.assertIn("__sep_OTHER", output)
+        self.assertIn("Back", output)
 
+    def test_unified_menu_for_autoinstall_plus_cloud_init_vm(self):
+        output = self._unified_menu("ubuntu-niri")
         self.assertIn("Full Bootstrap", output)
-        self.assertIn("Cloud-Init Flow", output)
-        self.assertIn("Boot Desktop", output)
-        self.assertIn("Boot Headless", output)
-        self.assertIn("SSH Console", output)
-
-    def test_list_quick_action_items_for_plain_debian_efi_vm(self):
-        result = self.run_bash("source bin/vmtui; list_quick_action_items debian-efi")
-        output = result.stdout.splitlines()
-
-        self.assertIn("Guided Install", output)
-        self.assertIn("Boot Desktop", output)
-        self.assertIn("Boot Headless", output)
-        self.assertNotIn("Full Bootstrap", output)
-        self.assertNotIn("SSH Console", output)
-        self.assertNotIn("Cloud-Init Flow", output)
-
-    def test_list_quick_action_items_fallback_for_plain_vm(self):
-        result = self.run_bash("source bin/vmtui; list_quick_action_items alpine-ci")
-        output = result.stdout.splitlines()
-
-        self.assertNotIn("Full Bootstrap", output)
-        self.assertIn("Guided Install", output)
-        self.assertIn("Boot Desktop", output)
-        self.assertIn("Boot Headless", output)
-        self.assertNotIn("SSH Console", output)
-
-    def test_list_quick_action_items_include_shell_for_ssh_provision_vm(self):
-        result = self.run_bash("source bin/vmtui; list_quick_action_items test-ssh")
-        output = result.stdout.splitlines()
-
-        self.assertIn("Guided Install", output)
-        self.assertIn("Boot Desktop", output)
-        self.assertIn("Boot Headless", output)
-        self.assertIn("SSH Console", output)
-        self.assertNotIn("Full Bootstrap", output)
-        self.assertNotIn("Cloud-Init Flow", output)
-
-    def test_list_install_action_items_include_cloud_init_entries_for_supported_vm(self):
-        result = self.run_bash("source bin/vmtui; list_install_action_items ubuntu-niri")
-        output = result.stdout.splitlines()
-
-        self.assertIn("Guided Provision", output)
         self.assertIn("Unattended Install", output)
         self.assertIn("Cloud-Init Flow", output)
-        self.assertIn("Seeded Installer", output)
-        self.assertNotIn("Full Bootstrap", output)
-
-    def test_list_install_action_items_for_plain_fedora_efi_vm(self):
-        result = self.run_bash("source bin/vmtui; list_install_action_items fedora-server-efi")
-        output = result.stdout.splitlines()
-
-        self.assertIn("Guided Provision", output)
-        self.assertNotIn("Unattended Install", output)
-        self.assertNotIn("Cloud-Init Flow", output)
-        self.assertNotIn("Seeded Installer", output)
-
-    def test_list_install_action_items_omits_cloud_init_entries_for_plain_vm(self):
-        result = self.run_bash("source bin/vmtui; list_install_action_items alpine-ci")
-        output = result.stdout.splitlines()
-
-        self.assertIn("Guided Provision", output)
-        self.assertNotIn("Unattended Install", output)
-        self.assertNotIn("Cloud-Init Flow", output)
-        self.assertNotIn("Seeded Installer", output)
-
-    def test_list_run_action_items_include_cloud_init_entries_for_supported_vm(self):
-        result = self.run_bash("source bin/vmtui; list_run_action_items ubuntu-niri")
-        output = result.stdout.splitlines()
-
         self.assertIn("Boot Desktop", output)
         self.assertIn("Boot Headless", output)
-        self.assertIn("Remote SPICE", output)
-        self.assertIn("Stop VM", output)
         self.assertIn("SSH Console", output)
+        self.assertIn("Post-Install", output)
         self.assertIn("First Boot", output)
-        self.assertIn("Post-Install", output)
 
-    def test_list_run_action_items_omit_cloud_init_entries_for_plain_vm(self):
-        result = self.run_bash("source bin/vmtui; list_run_action_items alpine-ci")
-        output = result.stdout.splitlines()
-
-        self.assertIn("Boot Desktop", output)
-        self.assertIn("Boot Headless", output)
-        self.assertIn("Remote SPICE", output)
-        self.assertIn("Stop VM", output)
-        self.assertNotIn("SSH Console", output)
-        self.assertNotIn("First Boot", output)
-        self.assertNotIn("Post-Install", output)
-
-    def test_list_run_action_items_include_ssh_post_install_for_ssh_provision_vm(self):
-        result = self.run_bash("source bin/vmtui; list_run_action_items test-ssh")
-        output = result.stdout.splitlines()
-
-        self.assertIn("Boot Desktop", output)
-        self.assertIn("Boot Headless", output)
-        self.assertIn("Remote SPICE", output)
-        self.assertIn("Stop VM", output)
+    def test_unified_menu_for_arch_bootstrap_vm(self):
+        output = self._unified_menu("arch-noctalia-local")
+        self.assertIn("Arch Bootstrap", output)
+        self.assertIn("Arch Install (Interactive)", output)
         self.assertIn("SSH Console", output)
+        self.assertNotIn("Full Bootstrap", output)
+        self.assertNotIn("Debian Preseed Bootstrap", output)
+
+    def test_unified_menu_for_preseed_vm(self):
+        output = self._unified_menu("debian-server")
+        self.assertIn("Debian Preseed Bootstrap", output)
+        self.assertIn("Guided Provision", output)
+        self.assertIn("SSH Console", output)
+        self.assertNotIn("Arch Bootstrap", output)
+
+    def test_unified_menu_for_kickstart_vm(self):
+        output = self._unified_menu("almalinux-server")
+        self.assertIn("Kickstart Bootstrap", output)
+        self.assertIn("Guided Provision", output)
+        self.assertIn("SSH Console", output)
+
+    def test_unified_menu_for_plain_vm_uses_na_badges(self):
+        output = self._unified_menu("alpine-ci")
+        self.assertNotIn("Full Bootstrap", output)
+        self.assertNotIn("Arch Bootstrap", output)
+        self.assertIn("Guided Provision", output)
+        self.assertIn("Installer Only", output)
+        self.assertIn("SSH Console", output)
+        self.assertIn(
+            "(no ssh_provision in profile)",
+            self._description_of(output, "SSH Console"),
+        )
+        self.assertIn("Stop VM", output)
+        self.assertIn(
+            "(VM not running)",
+            self._description_of(output, "Stop VM"),
+        )
+
+    def test_unified_menu_for_ssh_only_vm_shows_active_ssh(self):
+        output = self._unified_menu("test-ssh")
+        self.assertIn("SSH Console", output)
+        self.assertIn(
+            "Open a shell inside the VM",
+            self._description_of(output, "SSH Console"),
+        )
         self.assertIn("Post-Install", output)
-        self.assertNotIn("First Boot", output)
+        self.assertIn(
+            "Run configured SSH provisioning tasks",
+            self._description_of(output, "Post-Install"),
+        )
+
+    def test_unified_menu_includes_advanced_entries(self):
+        output = self._unified_menu("alpine-ci")
+        self.assertIn("Flash Empty Disk", output)
+        self.assertIn("Force Flash", output)
+        self.assertIn("Import Disk", output)
+
+    def test_unified_menu_includes_maintenance_entries(self):
+        output = self._unified_menu("alpine-ci")
+        self.assertIn("Boot Check", output)
+        self.assertIn("Clean VM", output)
+        self.assertIn("Delete ISO", output)
+        self.assertIn("Profile Details", output)
+        self.assertIn("Fetch ISO", output)
+        self.assertIn("Prepare VM", output)
+
+    def test_is_na_action_ssh_when_no_ssh_provision(self):
+        result = subprocess.run(
+            ["bash", "-lc", "source bin/vmtui; is_na_action 'SSH Console' alpine-ci"],
+            cwd=ROOT,
+            env=self.env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0)
+
+    def test_is_na_action_ssh_when_ssh_provision_present(self):
+        result = subprocess.run(
+            ["bash", "-lc", "source bin/vmtui; is_na_action 'SSH Console' test-ssh"],
+            cwd=ROOT,
+            env=self.env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_is_na_action_boot_desktop_when_disk_missing(self):
+        # freebsd has no disk.qcow2 in artifacts/ (plain VM, never installed)
+        result = subprocess.run(
+            ["bash", "-lc", "source bin/vmtui; is_na_action 'Boot Desktop' freebsd"],
+            cwd=ROOT,
+            env=self.env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0)
+
+    def test_vm_status_summary_not_installed_when_no_disk(self):
+        result = self.run_bash("source bin/vmtui; vm_status_summary freebsd")
+        self.assertEqual(result.stdout.strip(), "not installed")
+
+    def test_resolve_action_separator_returns_noop(self):
+        result = self.run_bash("source bin/vmtui; resolve_action __sep_INSTALL")
+        self.assertEqual(result.stdout.strip(), "noop")
+
+    def test_resolve_action_other_separators_also_noop(self):
+        for sep in ("__sep_RUN", "__sep_MAINTENANCE", "__sep_ADVANCED", "__sep_OTHER"):
+            result = self.run_bash(f"source bin/vmtui; resolve_action {sep}")
+            self.assertEqual(result.stdout.strip(), "noop", f"separator {sep} not mapped to noop")
+
+    def test_resolve_action_maps_remote_hosts(self):
+        result = self.run_bash("source bin/vmtui; resolve_action 'Remote Hosts'")
+        self.assertEqual(result.stdout.strip(), "remote-hosts")
+
+    def test_resolve_action_maps_bootstrap_entries(self):
+        for entry, expected in (
+            ("Full Bootstrap", "bootstrap-unattended"),
+            ("Arch Bootstrap", "bootstrap-archinstall"),
+            ("Debian Preseed Bootstrap", "bootstrap-preseed"),
+            ("Kickstart Bootstrap", "bootstrap-kickstart"),
+            ("Unattended Install", "full-auto-install"),
+            ("Cloud-Init Flow", "cloud-init-install"),
+            ("Flash Empty Disk", "flash"),
+            ("Force Flash", "flash-force"),
+            ("Import Disk", "import-device"),
+        ):
+            result = self.run_bash(f"source bin/vmtui; resolve_action {entry!r}")
+            self.assertEqual(result.stdout.strip(), expected, f"{entry!r} did not resolve to {expected}")
 
     def test_list_remote_menu_items_reads_remotes_json(self):
         result = self.run_bash("source bin/vmtui; list_remote_menu_items")
         output = result.stdout.splitlines()
-
         self.assertEqual(output[0], "i9")
         self.assertIn("manzolo@i9.lan", output[1])
         self.assertIn("5930->5930", output[1])
@@ -220,23 +258,17 @@ class VmtuiTests(unittest.TestCase):
         apt_get = self.bindir / "apt-get"
         apt_get.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
         apt_get.chmod(0o755)
-
         result = self.run_bash("source bin/vmtui; install_command_for remote-viewer")
-
         self.assertEqual(result.stdout.strip(), "sudo apt-get install -y virt-viewer")
 
-    def test_resolve_action_maps_remote_hosts(self):
-        result = self.run_bash("source bin/vmtui; resolve_action 'Remote Hosts'")
-
-        self.assertEqual(result.stdout.strip(), "remote-hosts")
-
-    def test_list_maintenance_action_items_include_boot_check_and_clean(self):
-        result = self.run_bash("source bin/vmtui; list_maintenance_action_items")
+    def test_list_vm_menu_items_main_lists_profiles(self):
+        result = self.run_bash("source bin/vmtui; list_vm_menu_items")
         output = result.stdout.splitlines()
-
-        self.assertIn("Boot Check", output)
-        self.assertIn("Clean VM", output)
-        self.assertIn("Delete ISO", output)
+        # tags are even-indexed lines (0, 2, 4, ...)
+        tags = output[::2]
+        self.assertIn("alpine-ci", tags)
+        self.assertIn("ubuntu-niri", tags)
+        self.assertIn("arch-noctalia-local", tags)
 
 
 if __name__ == "__main__":

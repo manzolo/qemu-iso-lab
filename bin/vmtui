@@ -37,7 +37,12 @@ menu_choose() {
     local width="${MENU_WIDTH:-80}"
     local list_height="${MENU_LIST_HEIGHT:-12}"
 
-    output=$(dialog --clear --stdout --title "$title" --menu "$prompt" "$height" "$width" "$list_height" "$@") || status=$?
+    local -a dialog_args=(--clear --stdout --title "$title")
+    if [[ "${MENU_NO_TAGS:-0}" == "1" ]]; then
+        dialog_args+=(--no-tags)
+    fi
+    dialog_args+=(--menu "$prompt" "$height" "$width" "$list_height" "$@")
+    output=$(dialog "${dialog_args[@]}") || status=$?
     status=${status:-0}
     if [[ $status -ne 0 ]]; then
         return 1
@@ -46,7 +51,7 @@ menu_choose() {
 }
 
 msg_box() {
-    dialog --clear --title "$1" --msgbox "$2" 10 72
+    dialog --clear --title "$1" --msgbox "$2" 12 76
 }
 
 confirm_box() {
@@ -227,6 +232,46 @@ vm_has_unattended_install() {
     vm_has_section "$vm_name" "autoinstall"
 }
 
+vm_disk_path() {
+    python3 - "$ROOT_DIR" "$CONFIG_DIR" "$1" <<'PY'
+import sys
+from pathlib import Path
+
+sys.path.insert(0, sys.argv[1])
+
+from vmctl import config, state
+
+state.ROOT = Path(sys.argv[1])
+state.CONFIG_DIR = Path(sys.argv[2])
+vm_name = sys.argv[3]
+vm = config.load_config()["vms"][vm_name]
+disk = vm.get("disk", {})
+path = disk.get("path", "") if isinstance(disk, dict) else ""
+print(path or "")
+PY
+}
+
+vm_status_summary() {
+    local vm_name="$1"
+    if vm_is_running_headless "$vm_name"; then
+        printf '%s\n' "running (headless)"
+        return
+    fi
+    local disk
+    disk=$(vm_disk_path "$vm_name")
+    if [[ -n "$disk" ]]; then
+        local abs="$disk"
+        if [[ "$abs" != /* ]]; then
+            abs="$ROOT_DIR/$abs"
+        fi
+        if [[ -f "$abs" ]]; then
+            printf '%s\n' "installed, stopped"
+            return
+        fi
+    fi
+    printf '%s\n' "not installed"
+}
+
 list_remote_menu_items() {
     python3 - "$CONFIG_DIR" <<'PY'
 import json
@@ -295,95 +340,157 @@ raise SystemExit(1)
 PY
 }
 
-list_vm_action_items() {
-    local vm_name="$1"
-    printf '%s\n' "Start Here" "Recommended flows for this VM"
-    printf '%s\n' "Installation" "ISO, disk preparation, and installers"
-    printf '%s\n' "Run & Access" "Boot, stop, shell, and first boot tasks"
-    printf '%s\n' "Maintenance" "Boot checks and artifact cleanup"
-    printf '%s\n' "Profile Details" "Review this VM configuration"
-    printf '%s\n' "Main Menu" "Return to the main menu"
+emit_section() {
+    local name="$1"
+    printf '__sep_%s\n━━━ %s %s\n' "$name" "$name" "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
-list_quick_action_items() {
-    local vm_name="$1"
-    if vm_has_section "$vm_name" "archinstall_config"; then
-        printf '%s\n' "Arch Bootstrap" "Fully automated Arch install + post-install (headless)"
-    fi
-    if vm_has_section "$vm_name" "preseed_config"; then
-        printf '%s\n' "Debian Preseed Bootstrap" "Fully automated Debian install + post-install (headless)"
-    fi
-    if vm_has_section "$vm_name" "kickstart_config"; then
-        printf '%s\n' "Kickstart Bootstrap" "Fully automated AlmaLinux/RHEL install + post-install (headless)"
-    fi
-    if vm_has_unattended_install "$vm_name" && vm_has_ssh_provision "$vm_name"; then
-        printf '%s\n' "Full Bootstrap" "Unattended install, first boot, and post-install"
-    fi
-    if vm_has_section "$vm_name" "cloud_init"; then
-        printf '%s\n' "Cloud-Init Flow" "Manual installer with first-boot handoff"
-    elif ! vm_has_section "$vm_name" "archinstall_config" \
-         && ! vm_has_section "$vm_name" "preseed_config" \
-         && ! vm_has_section "$vm_name" "kickstart_config"; then
-        printf '%s\n' "Guided Install" "Fetch ISO, prepare artifacts, boot installer"
-    fi
-    printf '%s\n' "Boot Desktop" "Start the installed VM with display"
-    printf '%s\n' "Boot Headless" "Start the installed VM in the background"
-    if vm_has_ssh_provision "$vm_name"; then
-        printf '%s\n' "SSH Console" "Open a shell inside the VM"
-    fi
-    printf '%s\n' "Back" "Return to VM actions"
+emit_action() {
+    local tag="$1"
+    local desc="$2"
+    printf '%s\n  %-27s %s\n' "$tag" "$tag" "$desc"
 }
 
-list_install_action_items() {
+list_vm_menu_items_unified() {
     local vm_name="$1"
-    printf '%s\n' "Fetch ISO" "Download or validate the configured ISO"
-    printf '%s\n' "Prepare VM" "Create disk and firmware artifacts"
-    if vm_has_section "$vm_name" "archinstall_config"; then
-        printf '%s\n' "Arch Bootstrap" "Fully automated Arch install + post-install (headless)"
-        printf '%s\n' "Arch Install (Interactive)" "Boot live ISO with pre-built archinstall config on /dev/vdb"
-    elif vm_has_section "$vm_name" "preseed_config"; then
-        printf '%s\n' "Debian Preseed Bootstrap" "Fully automated Debian install + post-install (headless)"
-        printf '%s\n' "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-        printf '%s\n' "Installer Only" "Boot the installer without preparation"
-    elif vm_has_section "$vm_name" "kickstart_config"; then
-        printf '%s\n' "Kickstart Bootstrap" "Fully automated AlmaLinux/RHEL install + post-install (headless)"
-        printf '%s\n' "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-        printf '%s\n' "Installer Only" "Boot the installer without preparation"
+    local running=0
+    local installed=0
+    local has_ssh=0
+    local has_autoinstall=0
+    local has_archinstall=0
+    local has_preseed=0
+    local has_kickstart=0
+    local has_cloud_init=0
+
+    vm_is_running_headless "$vm_name" && running=1
+    local disk
+    disk=$(vm_disk_path "$vm_name")
+    if [[ -n "$disk" ]]; then
+        local abs="$disk"
+        [[ "$abs" != /* ]] && abs="$ROOT_DIR/$abs"
+        [[ -f "$abs" ]] && installed=1
+    fi
+    vm_has_ssh_provision "$vm_name" && has_ssh=1
+    vm_has_unattended_install "$vm_name" && has_autoinstall=1
+    vm_has_section "$vm_name" "archinstall_config" && has_archinstall=1
+    vm_has_section "$vm_name" "preseed_config" && has_preseed=1
+    vm_has_section "$vm_name" "kickstart_config" && has_kickstart=1
+    vm_has_section "$vm_name" "cloud_init" && has_cloud_init=1
+
+    emit_section "INSTALL"
+    if [[ $has_archinstall -eq 1 ]]; then
+        emit_action "Arch Bootstrap" "Fully automated Arch install + post-install"
+        emit_action "Arch Install (Interactive)" "Boot live ISO with pre-built archinstall config"
+    elif [[ $has_preseed -eq 1 ]]; then
+        emit_action "Debian Preseed Bootstrap" "Fully automated Debian install + post-install"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ $has_kickstart -eq 1 ]]; then
+        emit_action "Kickstart Bootstrap" "Fully automated AlmaLinux/RHEL install + post-install"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ $has_autoinstall -eq 1 && $has_ssh -eq 1 ]]; then
+        emit_action "Full Bootstrap" "Unattended install, first boot, and post-install"
+        emit_action "Unattended Install" "Run the configured Ubuntu autoinstall flow"
+        emit_action "Cloud-Init Flow" "Manual installer with first-boot handoff"
+    elif [[ $has_autoinstall -eq 1 ]]; then
+        emit_action "Unattended Install" "Run the configured Ubuntu autoinstall flow"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ $has_cloud_init -eq 1 ]]; then
+        emit_action "Cloud-Init Flow" "Manual installer with first-boot handoff"
+        emit_action "Seeded Installer" "Boot installer with a generated cloud-init seed"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
     else
-        printf '%s\n' "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-        printf '%s\n' "Installer Only" "Boot the installer without preparation"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+        emit_action "Installer Only" "Boot the installer without preparation"
     fi
-    if vm_has_unattended_install "$vm_name"; then
-        printf '%s\n' "Unattended Install" "Run the configured Ubuntu autoinstall flow"
+
+    emit_section "RUN"
+    if [[ $installed -eq 1 ]]; then
+        emit_action "Boot Desktop" "Start the installed VM with display"
+        emit_action "Boot Headless" "Start the installed VM in the background"
+    else
+        emit_action "Boot Desktop" "(no disk yet: run an install action first)"
+        emit_action "Boot Headless" "(no disk yet: run an install action first)"
     fi
-    if vm_has_section "$vm_name" "cloud_init"; then
-        printf '%s\n' "Cloud-Init Flow" "Manual install with generated first-boot data"
-        printf '%s\n' "Seeded Installer" "Boot installer with a generated cloud-init seed"
+    if [[ $running -eq 1 ]]; then
+        emit_action "Stop VM" "Stop the tracked background process"
+    else
+        emit_action "Stop VM" "(VM not running)"
     fi
-    printf '%s\n' "Back" "Return to VM actions"
+    if [[ $has_ssh -eq 1 ]]; then
+        emit_action "SSH Console" "Open a shell inside the VM"
+    else
+        emit_action "SSH Console" "(no ssh_provision in profile)"
+    fi
+    if [[ $has_cloud_init -eq 1 ]]; then
+        emit_action "First Boot" "Start the VM with cloud-init enabled"
+    fi
+
+    emit_section "MAINTENANCE"
+    if [[ $has_ssh -eq 1 ]]; then
+        emit_action "Post-Install" "Run configured SSH provisioning tasks"
+    else
+        emit_action "Post-Install" "(no ssh_provision in profile)"
+    fi
+    emit_action "Boot Check" "Run a headless smoke test"
+    emit_action "Fetch ISO" "Download or validate the configured ISO"
+    emit_action "Prepare VM" "Create disk and firmware artifacts"
+    emit_action "Clean VM" "Remove artifacts for this VM"
+    emit_action "Delete ISO" "Remove this VM's cached ISO"
+    emit_action "Profile Details" "Review this VM configuration"
+
+    emit_section "ADVANCED"
+    emit_action "Flash Empty Disk" "Write the VM disk to an empty physical device"
+    emit_action "Force Flash" "Wipe and write a non-empty physical device"
+    emit_action "Import Disk" "Read a physical device into the VM image"
+
+    emit_section "OTHER"
+    emit_action "Remote SPICE" "Start this VM on a remote host and open SPICE viewer"
+    emit_action "Back" "Return to main menu"
 }
 
-list_run_action_items() {
-    local vm_name="$1"
-    printf '%s\n' "Boot Desktop" "Start the installed VM with display"
-    printf '%s\n' "Boot Headless" "Start the installed VM in the background"
-    printf '%s\n' "Remote SPICE" "Start this VM on a remote host and open a SPICE viewer"
-    printf '%s\n' "Stop VM" "Stop the tracked background process"
-    if vm_has_ssh_provision "$vm_name"; then
-        printf '%s\n' "SSH Console" "Open a shell inside the VM"
-        printf '%s\n' "Post-Install" "Run configured SSH provisioning tasks"
-    fi
-    if vm_has_section "$vm_name" "cloud_init"; then
-        printf '%s\n' "First Boot" "Start the VM with cloud-init enabled"
-    fi
-    printf '%s\n' "Back" "Return to VM actions"
+is_na_action() {
+    local tag="$1"
+    local vm_name="$2"
+    case "$tag" in
+        "Boot Desktop"|"Boot Headless")
+            local disk
+            disk=$(vm_disk_path "$vm_name")
+            if [[ -z "$disk" ]]; then
+                return 0
+            fi
+            local abs="$disk"
+            [[ "$abs" != /* ]] && abs="$ROOT_DIR/$abs"
+            [[ ! -f "$abs" ]]
+            ;;
+        "Stop VM")
+            ! vm_is_running_headless "$vm_name"
+            ;;
+        "SSH Console"|"Post-Install")
+            ! vm_has_ssh_provision "$vm_name"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
-list_maintenance_action_items() {
-    printf '%s\n' "Boot Check" "Run a headless smoke test"
-    printf '%s\n' "Clean VM" "Remove artifacts for this VM"
-    printf '%s\n' "Delete ISO" "Remove this VM's cached ISO"
-    printf '%s\n' "Back" "Return to VM actions"
+msg_na_action() {
+    local tag="$1"
+    local vm_name="$2"
+    case "$tag" in
+        "Boot Desktop"|"Boot Headless")
+            msg_box "VM Not Installed" "VM '$vm_name' has no installed disk yet.\n\nRun an INSTALL action first (Bootstrap, Guided Provision, or Unattended Install)."
+            ;;
+        "Stop VM")
+            msg_box "VM Not Running" "VM '$vm_name' is not currently tracked as running headless.\n\nStart it first with 'Boot Desktop' or 'Boot Headless'."
+            ;;
+        "SSH Console"|"Post-Install")
+            msg_box "SSH Not Configured" "VM '$vm_name' has no 'ssh_provision' section in its profile.\n\nAdd one to vms/profiles/*.json to enable SSH actions."
+            ;;
+        *)
+            msg_box "Not Available" "Action '$tag' is not available for VM '$vm_name'."
+            ;;
+    esac
 }
 
 list_empty_device_menu_items() {
@@ -437,13 +544,15 @@ run_vmctl() {
     done
     printf '\n\n'
 
+    local status=0
     if "$VMCTL" "$@"; then
         printf '\nCommand completed successfully.\n'
     else
-        local status=$?
+        status=$?
         printf '\nCommand failed with exit code %s.\n' "$status"
     fi
     pause_box
+    return $status
 }
 
 remote_spice_session() {
@@ -507,14 +616,6 @@ remote_spice_session() {
     pause_box
 }
 
-choose_vm() {
-    mapfile -t vm_items < <(list_vm_menu_items)
-    local selected
-    selected=$(MENU_WIDTH=96 MENU_LIST_HEIGHT=14 menu_choose "VM Selection" "Choose a VM profile" "${vm_items[@]}") || return 1
-    current_vm="$selected"
-    return 0
-}
-
 choose_video() {
     mapfile -t video_items < <(list_video_menu_items "$current_vm")
     local selected
@@ -526,14 +627,49 @@ choose_video() {
     fi
 }
 
+prompt_post_install() {
+    local vm_name="$1"
+    local installer_label="$2"
+    local has_ssh=0
+    vm_has_ssh_provision "$vm_name" && has_ssh=1
+
+    local -a opts=()
+    if [[ $has_ssh -eq 1 ]]; then
+        opts+=("Start headless + SSH post-install" "Boot headless and run SSH provisioning")
+    fi
+    opts+=("Start with display" "Boot the installed VM with display")
+    opts+=("Done" "Return to the VM menu")
+
+    local choice
+    choice=$(menu_choose "Install complete" \
+        "${installer_label} finished for '$vm_name'. What next?" \
+        "${opts[@]}") || return 0
+
+    case "$choice" in
+        "Start headless + SSH post-install")
+            run_vmctl start "$vm_name" --headless --background || return 0
+            if [[ $has_ssh -eq 1 ]]; then
+                run_vmctl post-install "$vm_name" || true
+            fi
+            ;;
+        "Start with display")
+            local video
+            video=$(choose_video) || return 0
+            if [[ -n "$video" ]]; then
+                run_vmctl start "$vm_name" --video "$video" || true
+            else
+                run_vmctl start "$vm_name" || true
+            fi
+            ;;
+        "Done")
+            ;;
+    esac
+}
+
 resolve_action() {
     case "$1" in
-        "Start Here") printf '%s\n' quick-actions ;;
-        "Installation") printf '%s\n' install-flows ;;
-        "Run & Access") printf '%s\n' run-flows ;;
-        "Maintenance") printf '%s\n' maintenance-flows ;;
         "Profile Details") printf '%s\n' show ;;
-        "Main Menu"|"Back") printf '%s\n' back ;;
+        "Back") printf '%s\n' back ;;
         "Arch Bootstrap") printf '%s\n' bootstrap-archinstall ;;
         "Arch Install (Interactive)") printf '%s\n' install-archinstall ;;
         "Debian Preseed Bootstrap") printf '%s\n' bootstrap-preseed ;;
@@ -556,15 +692,14 @@ resolve_action() {
         "Boot Check") printf '%s\n' boot-check ;;
         "Clean VM") printf '%s\n' clean ;;
         "Delete ISO") printf '%s\n' delete-iso ;;
-        "Choose VM") printf '%s\n' choose-vm ;;
         "Status") printf '%s\n' status ;;
-        "Advanced") printf '%s\n' advanced ;;
         "Remote Hosts") printf '%s\n' remote-hosts ;;
         "Clean All") printf '%s\n' clean-all ;;
         "Quit") printf '%s\n' quit ;;
         "Flash Empty Disk") printf '%s\n' flash ;;
         "Force Flash") printf '%s\n' flash-force ;;
         "Import Disk") printf '%s\n' import-device ;;
+        __sep_*) printf '%s\n' noop ;;
         *) printf '%s\n' "$1" ;;
     esac
 }
@@ -573,104 +708,128 @@ run_action() {
     local action
     action=$(resolve_action "$1")
     case "$action" in
+        noop)
+            return 0
+            ;;
         show)
-            run_vmctl show "$current_vm"
+            run_vmctl show "$current_vm" || true
             ;;
         provision)
             local video
             video=$(choose_video) || return 0
             if confirm_box "Confirm Provision" "Guided install for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- start the installer"; then
+                local ok=0
                 if [[ -n "$video" ]]; then
-                    run_vmctl provision "$current_vm" --video "$video"
+                    run_vmctl provision "$current_vm" --video "$video" && ok=1
                 else
-                    run_vmctl provision "$current_vm"
+                    run_vmctl provision "$current_vm" && ok=1
+                fi
+                if [[ $ok -eq 1 ]]; then
+                    prompt_post_install "$current_vm" "Guided Provision"
                 fi
             fi
             ;;
         cloud-init-install)
             local video
             video=$(choose_video) || return 0
-            if confirm_box "Manual Install With Cloud-Init" "Start the guided manual install flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- boot the installer now\n\nAfter the OS install finishes, come back and run:\n- Boot installed VM with cloud-init first boot\n- Run SSH post-install actions"; then
+            if confirm_box "Cloud-Init Flow" "Start the guided manual install flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- boot the installer now\n\nWhen the OS install finishes you'll be offered the next step (boot + post-install)."; then
+                local ok=0
                 if [[ -n "$video" ]]; then
-                    run_vmctl provision "$current_vm" --video "$video"
+                    run_vmctl provision "$current_vm" --video "$video" && ok=1
                 else
-                    run_vmctl provision "$current_vm"
+                    run_vmctl provision "$current_vm" && ok=1
                 fi
-                msg_box "Next Steps" "After completing the OS installation inside the VM:\n\n1. Return to this menu\n2. Run 'Boot installed VM with cloud-init first boot'\n3. Then run 'Run SSH post-install actions'\n\nFor ubuntu-niri-local this is the intended flow."
+                if [[ $ok -eq 1 ]]; then
+                    prompt_post_install "$current_vm" "Cloud-Init Flow"
+                fi
             fi
             ;;
         full-auto-install)
             local video
             video=$(choose_video) || return 0
-            if confirm_box "Unattended Install" "Run the configured Ubuntu autoinstall flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- boot the installer in unattended mode\n- exit when the installer reboots after finishing\n\nAfter that, start the installed VM normally and then run SSH post-install actions."; then
+            if confirm_box "Unattended Install" "Run the configured Ubuntu autoinstall flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- boot the installer in unattended mode\n- exit when the installer reboots after finishing"; then
+                local ok=0
                 if [[ -n "$video" ]]; then
-                    run_vmctl install-unattended "$current_vm" --video "$video"
+                    run_vmctl install-unattended "$current_vm" --video "$video" && ok=1
                 else
-                    run_vmctl install-unattended "$current_vm"
+                    run_vmctl install-unattended "$current_vm" && ok=1
                 fi
-                msg_box "Next Steps" "When the unattended installer exits on reboot:\n\n1. Run 'Boot installed VM'\n2. Wait for the guest to finish its first boot\n3. Run 'Run SSH post-install actions'\n\nNo manual installer interaction is expected in this flow."
+                if [[ $ok -eq 1 ]]; then
+                    prompt_post_install "$current_vm" "Unattended Install"
+                fi
             fi
             ;;
         bootstrap-archinstall)
             if confirm_box "Arch Bootstrap" "Run the fully automated Arch Linux bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the Arch live ISO headless via serial console\n- automatically trigger pacstrap, locale, user, GRUB\n- start the installed VM and run SSH post-install (paru + noctalia-git)\n\nExpected time: ~15-30 min depending on download speed."; then
-                run_vmctl bootstrap-archinstall "$current_vm"
+                run_vmctl bootstrap-archinstall "$current_vm" || true
             fi
             ;;
         install-archinstall)
             local video
             video=$(choose_video) || return 0
             if confirm_box "Arch Install (Interactive)" "Boot the Arch live ISO with a pre-built archinstall config disk for VM '$current_vm'?\n\nThis will:\n- generate archinstall-config.json + archinstall-creds.json\n- boot the live ISO with the config on /dev/vdb\n\nIn the live environment run:\n  mkdir -p /tmp/archconf\n  mount /dev/vdb /tmp/archconf\n  bash /tmp/archconf/run.sh"; then
+                local ok=0
                 if [[ -n "$video" ]]; then
-                    run_vmctl install-archinstall "$current_vm" --video "$video"
+                    run_vmctl install-archinstall "$current_vm" --video "$video" && ok=1
                 else
-                    run_vmctl install-archinstall "$current_vm"
+                    run_vmctl install-archinstall "$current_vm" && ok=1
                 fi
-                msg_box "Next Steps" "In the Arch live environment:\n\n  mkdir -p /tmp/archconf\n  mount /dev/vdb /tmp/archconf\n  bash /tmp/archconf/run.sh\n\narchinstall will start with most options pre-filled.\nAfter reboot, use 'Post-Install' to run SSH provisioning."
+                if [[ $ok -eq 1 ]]; then
+                    prompt_post_install "$current_vm" "Arch Install (Interactive)"
+                fi
             fi
             ;;
         bootstrap-unattended)
             local video
             video=$(choose_video) || return 0
-            if confirm_box "Bootstrap Unattended" "Run the fully unattended Ubuntu bootstrap flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- run the configured Ubuntu autoinstall flow\n- start the installed VM headless in the background\n- wait for SSH and run post-install actions\n\nUse this only when autoinstall and SSH provisioning are configured correctly."; then
+            if confirm_box "Full Bootstrap" "Run the fully unattended Ubuntu bootstrap flow for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts if missing\n- run the configured Ubuntu autoinstall flow\n- start the installed VM headless in the background\n- wait for SSH and run post-install actions\n\nUse this only when autoinstall and SSH provisioning are configured correctly."; then
                 if [[ -n "$video" ]]; then
-                    run_vmctl bootstrap-unattended "$current_vm" --video "$video"
+                    run_vmctl bootstrap-unattended "$current_vm" --video "$video" || true
                 else
-                    run_vmctl bootstrap-unattended "$current_vm"
+                    run_vmctl bootstrap-unattended "$current_vm" || true
                 fi
             fi
             ;;
         bootstrap-preseed)
             if confirm_box "Debian Preseed Bootstrap" "Run the fully automated Debian preseed bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the Debian netinst headless via serial console\n- automatically run preseed install + late_command (SSH keys, sudoers)\n- start the installed VM and run SSH post-install\n\nExpected time: ~10-15 min depending on download speed."; then
-                run_vmctl bootstrap-preseed "$current_vm"
+                run_vmctl bootstrap-preseed "$current_vm" || true
             fi
             ;;
         bootstrap-kickstart)
             if confirm_box "Kickstart Bootstrap" "Run the fully automated AlmaLinux/RHEL kickstart bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the AlmaLinux minimal ISO headless via serial console\n- automatically run kickstart install + %post (SSH keys, sudoers, SELinux)\n- start the installed VM and run SSH post-install\n\nExpected time: ~10 min depending on download speed."; then
-                run_vmctl bootstrap-kickstart "$current_vm"
+                run_vmctl bootstrap-kickstart "$current_vm" || true
             fi
             ;;
         fetch-iso)
-            run_vmctl fetch-iso "$current_vm"
+            run_vmctl fetch-iso "$current_vm" || true
             ;;
         prep)
-            run_vmctl prep "$current_vm"
+            run_vmctl prep "$current_vm" || true
             ;;
         install)
             local video
             video=$(choose_video) || return 0
+            local ok=0
             if [[ -n "$video" ]]; then
-                run_vmctl install "$current_vm" --video "$video"
+                run_vmctl install "$current_vm" --video "$video" && ok=1
             else
-                run_vmctl install "$current_vm"
+                run_vmctl install "$current_vm" && ok=1
+            fi
+            if [[ $ok -eq 1 ]]; then
+                prompt_post_install "$current_vm" "Installer Only"
             fi
             ;;
         install-cloud-init)
             local video
             video=$(choose_video) || return 0
+            local ok=0
             if [[ -n "$video" ]]; then
-                run_vmctl install "$current_vm" --video "$video" --cloud-init
+                run_vmctl install "$current_vm" --video "$video" --cloud-init && ok=1
             else
-                run_vmctl install "$current_vm" --cloud-init
+                run_vmctl install "$current_vm" --cloud-init && ok=1
+            fi
+            if [[ $ok -eq 1 ]]; then
+                prompt_post_install "$current_vm" "Seeded Installer"
             fi
             ;;
         start)
@@ -683,7 +842,7 @@ run_action() {
                     "Cancel"               "Return to the menu") || return 0
                 case "$choice" in
                     "SSH Console")
-                        run_vmctl shell "$current_vm"
+                        run_vmctl shell "$current_vm" || true
                         ;;
                     "Restart with Display")
                         if confirm_box "Restart with Display" "Stop '$current_vm' and restart it with display?"; then
@@ -694,9 +853,9 @@ run_action() {
                             local video
                             video=$(choose_video) || return 0
                             if [[ -n "$video" ]]; then
-                                run_vmctl start "$current_vm" --video "$video"
+                                run_vmctl start "$current_vm" --video "$video" || true
                             else
-                                run_vmctl start "$current_vm"
+                                run_vmctl start "$current_vm" || true
                             fi
                         fi
                         ;;
@@ -706,43 +865,43 @@ run_action() {
             local video
             video=$(choose_video) || return 0
             if [[ -n "$video" ]]; then
-                run_vmctl start "$current_vm" --video "$video"
+                run_vmctl start "$current_vm" --video "$video" || true
             else
-                run_vmctl start "$current_vm"
+                run_vmctl start "$current_vm" || true
             fi
             ;;
         start-headless)
-            run_vmctl start "$current_vm" --headless --background
+            run_vmctl start "$current_vm" --headless --background || true
             ;;
         remote-spice)
             remote_spice_session
             ;;
         stop)
             if confirm_box "Confirm Stop" "Stop the tracked background VM for '$current_vm' if it is running?"; then
-                run_vmctl stop "$current_vm"
+                run_vmctl stop "$current_vm" || true
             fi
             ;;
         shell)
-            run_vmctl shell "$current_vm"
+            run_vmctl shell "$current_vm" || true
             ;;
         start-cloud-init)
             local video
             video=$(choose_video) || return 0
             if [[ -n "$video" ]]; then
-                run_vmctl start "$current_vm" --video "$video" --cloud-init
+                run_vmctl start "$current_vm" --video "$video" --cloud-init || true
             else
-                run_vmctl start "$current_vm" --cloud-init
+                run_vmctl start "$current_vm" --cloud-init || true
             fi
             ;;
         post-install)
-            run_vmctl post-install "$current_vm"
+            run_vmctl post-install "$current_vm" || true
             ;;
         boot-check)
-            run_vmctl boot-check "$current_vm"
+            run_vmctl boot-check "$current_vm" || true
             ;;
         clean)
             if confirm_box "Confirm Clean" "Remove artifacts for VM '$current_vm'?"; then
-                run_vmctl clean "$current_vm"
+                run_vmctl clean "$current_vm" || true
             fi
             ;;
         flash)
@@ -762,7 +921,7 @@ run_action() {
                 msg_box "Confirmation Failed" "Typed device path does not match. Flash cancelled."
                 return 0
             fi
-            run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$typed_device"
+            run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$typed_device" || true
             ;;
         flash-force)
             local selected_device
@@ -781,7 +940,7 @@ run_action() {
                 msg_box "Confirmation Failed" "Typed device path does not match. Force flash cancelled."
                 return 0
             fi
-            run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$typed_device" --force-target
+            run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$typed_device" --force-target || true
             ;;
         import-device)
             local selected_device
@@ -800,44 +959,26 @@ run_action() {
                 msg_box "Confirmation Failed" "Typed device path does not match. Import cancelled."
                 return 0
             fi
-            run_vmctl import-device "$current_vm" --device "$selected_device" --confirm-device "$typed_device"
+            run_vmctl import-device "$current_vm" --device "$selected_device" --confirm-device "$typed_device" || true
             ;;
         clean-all)
             if confirm_box "Confirm Clean All" "Remove artifacts for all configured VMs?"; then
-                run_vmctl clean --all
+                run_vmctl clean --all || true
             fi
             ;;
         delete-iso)
             if confirm_box "Confirm Delete ISO" "Delete the cached ISO for VM '$current_vm'?\n\nThis only removes the ISO file configured in the VM profile. It does not remove VM disks or generated artifacts."; then
-                run_vmctl delete-iso "$current_vm"
+                run_vmctl delete-iso "$current_vm" || true
             fi
             ;;
-        quick-actions)
-            quick_menu_loop
-            ;;
-        install-flows)
-            install_menu_loop
-            ;;
-        run-flows)
-            run_menu_loop
-            ;;
-        maintenance-flows)
-            maintenance_menu_loop
-            ;;
         status)
-            run_vmctl status
-            ;;
-        advanced)
-            advanced_menu_loop
+            run_vmctl status || true
             ;;
         remote-hosts)
             remote_hosts_menu_loop
             ;;
         back)
             return 1
-            ;;
-        choose-vm)
-            choose_vm || return 1
             ;;
         quit)
             clear
@@ -848,65 +989,27 @@ run_action() {
 
 vm_menu_loop() {
     while true; do
+        local status_summary
+        status_summary=$(vm_status_summary "$current_vm")
         local -a menu_items=()
-        mapfile -t menu_items < <(list_vm_action_items "$current_vm")
+        mapfile -t menu_items < <(list_vm_menu_items_unified "$current_vm")
         local selected
-        selected=$(menu_choose \
-            "VM Actions" \
-            "Current VM: $current_vm" \
+        selected=$(MENU_NO_TAGS=1 MENU_HEIGHT=28 MENU_WIDTH=86 MENU_LIST_HEIGHT=22 menu_choose \
+            "$current_vm" \
+            "Status: $status_summary" \
             "${menu_items[@]}") || return 0
-        run_action "$selected" || return 0
-    done
-}
-
-quick_menu_loop() {
-    while true; do
-        local -a menu_items=()
-        mapfile -t menu_items < <(list_quick_action_items "$current_vm")
-        local selected
-        selected=$(menu_choose \
-            "Quick Actions" \
-            "Current VM: $current_vm" \
-            "${menu_items[@]}") || return 0
-        run_action "$selected" || return 0
-    done
-}
-
-install_menu_loop() {
-    while true; do
-        local -a menu_items=()
-        mapfile -t menu_items < <(list_install_action_items "$current_vm")
-        local selected
-        selected=$(menu_choose \
-            "Install Actions" \
-            "Current VM: $current_vm" \
-            "${menu_items[@]}") || return 0
-        run_action "$selected" || return 0
-    done
-}
-
-run_menu_loop() {
-    while true; do
-        local -a menu_items=()
-        mapfile -t menu_items < <(list_run_action_items "$current_vm")
-        local selected
-        selected=$(menu_choose \
-            "Run And Access" \
-            "Current VM: $current_vm" \
-            "${menu_items[@]}") || return 0
-        run_action "$selected" || return 0
-    done
-}
-
-maintenance_menu_loop() {
-    while true; do
-        local -a menu_items=()
-        mapfile -t menu_items < <(list_maintenance_action_items)
-        local selected
-        selected=$(menu_choose \
-            "Maintenance" \
-            "Current VM: $current_vm" \
-            "${menu_items[@]}") || return 0
+        case "$selected" in
+            __sep_*)
+                continue
+                ;;
+            "Back")
+                return 0
+                ;;
+        esac
+        if is_na_action "$selected" "$current_vm"; then
+            msg_na_action "$selected" "$current_vm"
+            continue
+        fi
         run_action "$selected" || return 0
     done
 }
@@ -949,18 +1052,12 @@ remote_hosts_menu_loop() {
     done
 }
 
-advanced_menu_loop() {
-    while true; do
-        local selected
-        selected=$(menu_choose \
-            "Advanced" \
-            "Current VM: $current_vm" \
-            "Flash Empty Disk" "Write the VM disk to an empty physical device" \
-            "Force Flash" "Wipe and write a non-empty physical device" \
-            "Import Disk" "Read a physical device into the VM image" \
-            "Back" "Return to previous menu") || return 0
-        run_action "$selected" || return 0
-    done
+choose_vm() {
+    mapfile -t vm_items < <(list_vm_menu_items)
+    local selected
+    selected=$(MENU_WIDTH=96 MENU_LIST_HEIGHT=18 menu_choose "VM Selection" "Choose a VM profile (type the first letter to jump)" "${vm_items[@]}") || return 1
+    current_vm="$selected"
+    return 0
 }
 
 main_menu_loop() {
@@ -969,33 +1066,33 @@ main_menu_loop() {
         selected=$(menu_choose \
             "QEMU ISO Lab" \
             "Choose where to work" \
-            "Choose VM" "Select a VM profile and open its workspace" \
-            "Status" "Show local VM state" \
+            "Choose VM"    "Select a VM profile and open its workspace" \
+            "Status"       "Show local VM state" \
             "Remote Hosts" "Configure saved SSH/SPICE remote hosts" \
-            "Advanced" "Flash or import physical disks" \
-            "Clean All" "Remove artifacts for all configured VMs" \
-            "Quit" "Close the TUI") || {
+            "Clean All"    "Remove artifacts for all configured VMs" \
+            "Quit"         "Close the TUI") || {
                 clear
                 exit 0
             }
 
-        case "$(resolve_action "$selected")" in
-            choose-vm)
+        case "$selected" in
+            "Choose VM")
                 if choose_vm; then
                     vm_menu_loop
                 fi
                 ;;
-            advanced)
-                if [[ -z "$current_vm" ]]; then
-                    if choose_vm; then
-                        advanced_menu_loop
-                    fi
-                else
-                    advanced_menu_loop
-                fi
+            "Status")
+                run_action "Status"
                 ;;
-            remote-hosts|status|clean-all|quit)
-                run_action "$selected"
+            "Remote Hosts")
+                remote_hosts_menu_loop
+                ;;
+            "Clean All")
+                run_action "Clean All"
+                ;;
+            "Quit")
+                clear
+                exit 0
                 ;;
         esac
     done
