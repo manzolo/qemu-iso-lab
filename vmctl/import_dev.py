@@ -100,6 +100,21 @@ def cmd_import_device(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cleanup_stale_import_dirs(disk_path: Path) -> None:
+    """Remove leftover temp dirs from previous failed import runs.
+
+    On failure, ``cmd_import_helper`` intentionally keeps the temp dir so the
+    operator can inspect it.  When the next import run starts successfully we
+    no longer need those remnants, so clean them all up with a note.
+    """
+    prefix = f"{disk_path.stem}.import-"
+    parent = disk_path.parent
+    stale = sorted(d for d in parent.iterdir() if d.is_dir() and d.name.startswith(prefix))
+    for d in stale:
+        ui.print_note(f"Removing stale import temp dir from a previous failed run: {d.name}")
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def cmd_import_helper(args: argparse.Namespace) -> int:
     if os.geteuid() != 0:
         raise VMError("import-helper must run as root")
@@ -116,6 +131,8 @@ def cmd_import_helper(args: argparse.Namespace) -> int:
     runtime.require_command("dd")
     runtime.require_command("lsblk")
     runtime.require_command("findmnt")
+
+    _cleanup_stale_import_dirs(disk_path)
 
     info = validate_import_source(args.device)
     if str(info.get("pttype") or "").lower() == "gpt":
