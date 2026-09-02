@@ -70,6 +70,36 @@
           }
         ]
       }
+    },
+    "arch-dms-nvidia-local": {
+      "name": "Arch Linux + niri + DMS + NVIDIA (Local)",
+      "archinstall_config": {
+        "username": "YOUR_USER",
+        "password": "YOUR_PASSWORD"
+      },
+      "ssh_provision": {
+        "user": "YOUR_USER",
+        "copy_from_host": [
+          {
+            "source": "~/.config/niri/",
+            "dest": "/home/{{user}}/.config/niri"
+          },
+          {
+            "source": "~/.config/DankMaterialShell/",
+            "dest": "/home/{{user}}/.config/DankMaterialShell"
+          },
+          {
+            "source": "~/.zshrc",
+            "dest": "/home/{{user}}/.zshrc",
+            "dest_mode": "644"
+          },
+          {
+            "source": "~/.gitconfig",
+            "dest": "/home/{{user}}/.gitconfig",
+            "dest_mode": "644"
+          }
+        ]
+      }
     }
   }
 }

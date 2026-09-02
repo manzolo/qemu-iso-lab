@@ -274,6 +274,10 @@ arch-chroot /mnt bash -c "echo '{locale_lang}.{locale_enc} {locale_enc}' >> /etc
 arch-chroot /mnt locale-gen
 arch-chroot /mnt bash -c "echo 'LANG={locale_lang}.{locale_enc}' > /etc/locale.conf"
 arch-chroot /mnt bash -c "echo 'KEYMAP={kb_layout}' > /etc/vconsole.conf"
+# Same layout for the graphical session: Wayland compositors (niri, sway...) ask systemd-localed,
+# which reads this file. Without it the desktop falls back to US even with KEYMAP set.
+arch-chroot /mnt install -d -m 755 /etc/X11/xorg.conf.d
+arch-chroot /mnt bash -c "printf 'Section \\"InputClass\\"\\n    Identifier \\"system-keyboard\\"\\n    MatchIsKeyboard \\"on\\"\\n    Option \\"XkbLayout\\" \\"{kb_layout}\\"\\nEndSection\\n' > /etc/X11/xorg.conf.d/00-keyboard.conf"
 
 echo "==> Hostname..."
 arch-chroot /mnt bash -c "echo '{hostname}' > /etc/hostname"

@@ -23,7 +23,7 @@ mkdir -p \
   "$HOME/bin" \
   "$HOME/aurbuild"
 
-chmod 0755 "$HOME/bin/arch-dms-post-install"
+chmod 0755 "$HOME/bin/arch-dms-nvidia-post-install"
 
 build_and_install_aur() {
   local repo="$1"
@@ -71,13 +71,22 @@ command -v dms >/dev/null
 command -v dgop >/dev/null
 niri validate
 
-# --- terminal and personal touches ------------------------------------------------------
-# dms launches the first available terminal: prefer Ptyxis (as on the Ubuntu desktop), then Alacritty.
+# --- personal environment (dotfiles arrive from local.json copy_from_host) ------------
+if command -v zsh >/dev/null && [ "$(getent passwd "$USER" | cut -d: -f7)" != "/usr/bin/zsh" ]; then
+  sudo chsh -s /usr/bin/zsh "$USER"
+fi
 printf 'org.gnome.Ptyxis.desktop\nAlacritty.desktop\nfoot.desktop\n' > "$HOME/.config/xdg-terminals.list"
 if [ -f "$HOME/.config/ptyxis.dconf" ] && command -v dconf >/dev/null; then
   dbus-run-session -- dconf load /org/gnome/Ptyxis/ < "$HOME/.config/ptyxis.dconf" || true
 fi
 fc-cache -f >/dev/null 2>&1 || true
+
+# --- NVIDIA: built for bare metal, verified as far as a VM allows -----------------------
+test -f /etc/modprobe.d/nvidia.conf
+dkms status | grep -q nvidia
+grep -q '^MODULES=(nvidia' /etc/mkinitcpio.conf
+grep -q 'nvidia-drm.modeset=1' /boot/grub/grub.cfg
+systemctl is-enabled nvidia-hibernate nvidia-resume nvidia-suspend >/dev/null
 
 sudo systemctl enable seatd greetd
 sudo systemctl enable upower || true
