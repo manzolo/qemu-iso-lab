@@ -9,14 +9,38 @@ Additional notes live in [docs/](docs/), including
 [CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md) for the smoke-test rationale and
 [PROFILE_TODO.md](docs/PROFILE_TODO.md) for planned profile coverage.
 
+## What do you want to do?
+
+Everything goes through one command, `vmctl` (`vmctl --help` shows the same
+map, grouped by task; `vmtui` is the same as a dialog menu).
+
+| I want to...                                          | Run                                                      |
+|-------------------------------------------------------|----------------------------------------------------------|
+| check that this host can run the lab                  | `vmctl setup`                                            |
+| see which VMs exist and which are installed/running   | `vmctl list`, `vmctl status`                             |
+| read one profile as `vmctl` sees it                   | `vmctl show <vm>` (`--json` for scripts)                 |
+| install a distro by hand (ISO, disk, installer)       | `vmctl provision <vm>` then click through the installer  |
+| install Ubuntu with zero clicks, ready with SSH       | `vmctl bootstrap-unattended <vm>`                        |
+| same for Debian / AlmaLinux / Arch                    | `vmctl bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-archinstall <vm>` |
+| boot a VM I already installed                         | `vmctl start <vm>` (`--headless --background` to detach) |
+| get a shell inside it / stop it                       | `vmctl shell <vm>`, `vmctl stop <vm>`                    |
+| re-run the SSH provisioning steps of a profile        | `vmctl post-install <vm>`                                |
+| prove a VM still boots (CI-style)                     | `vmctl boot-check <vm>`, `vmctl check-vms`               |
+| write a VM to a real USB disk, or import one          | `vmctl flash`, `vmctl import-device` (destructive, sudo) |
+| free disk space                                       | `vmctl clean <vm>`, `vmctl clean --all`, `vmctl delete-iso <vm>` |
+| see what a command would do without doing it          | `vmctl --dry-run <command> <vm>`                         |
+| add my own user, key and dotfiles to the VMs          | edit `vms/profiles/local.json` (see *Guest identity* below) |
+| add a new VM                                          | add a profile to `vms/profiles/*.json` (see *Adding A New VM*) |
+| hack on `vmctl` itself                                | `make check` (mypy + tests), `make help` for the rest    |
+
 ## Overview
 
 The project currently provides:
 
 - a modular VM catalog under `vms/profiles/*.json`;
-- a Python CLI in `bin/vmctl`;
-- a minimal text UI in `bin/vmtui`;
-- a thin `Makefile` frontend, including a host `setup` check;
+- one Python CLI, `vmctl` (`bin/vmctl`, installable on your `PATH` with `make install-cli`);
+- a dialog-based text UI, `vmtui`, over the same commands;
+- a `Makefile` with developer targets only (tests, type checks, install of the CLI);
 - support for both `efi` and `bios` guests;
 - isolated per-VM artifacts under `artifacts/<vm>/`;
 - a lightweight CI smoke test based on `alpine-ci`.
@@ -38,7 +62,9 @@ Current profiles include desktop guests, installer/minimal guests, Windows impor
 │   ├── ventoy-prep
 │   └── ventoy-copy
 ├── docs/
-│   └── CI_BOOT_STRATEGY.md
+│   ├── ARCHITECTURE.md
+│   ├── CI_BOOT_STRATEGY.md
+│   └── PROFILE_TODO.md
 ├── isos/
 ├── artifacts/
 ├── legacy/
@@ -87,6 +113,12 @@ make install-cli
 
 The rest of this README assumes that. Without it, run `./bin/vmctl` and `./bin/vmtui` from the repository root.
 
+Optional tab completion of commands and VM names (zsh shown; `bash` works the same):
+
+```bash
+echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc
+```
+
 Install dependencies on Arch-based systems:
 
 ```bash
@@ -118,8 +150,7 @@ Use this path for a normal local guest:
 vmctl setup
 vmctl list
 vmctl show <name>
-vmctl prep <name>
-vmctl install <name>
+vmctl provision <name>     # = fetch-iso + prep + install, in one step
 ```
 
 After the guest has been installed to disk:
@@ -209,60 +240,41 @@ Then use `Choose VM` -> `Remote SPICE`. The TUI starts QEMU on the remote host w
 
 ## Common Commands
 
-With `make`:
+`vmctl --help` lists every command grouped by task; `vmctl <command> --help`
+shows the options of one command. The ones used daily:
 
 ```bash
-vmctl setup
-vmctl list
-vmctl status
-vmctl show <name>
-vmctl fetch-iso <name>
-vmctl prep <name>
-vmctl install <name>
-vmctl install-unattended <name>
-vmctl post-install <name>
-vmctl bootstrap-unattended <name>
-vmctl start <name>
-vmctl start <name> --video safe
-vmctl shell <name>
-vmctl boot-check alpine-ci
-vmctl check-vms
-vmctl check-vms --parallel 4
-vmctl check-vms --parallel 4 --clean-first
+vmctl setup                         # host prerequisites
+vmctl list                          # profiles (add --names for scripts)
+vmctl status                        # what is installed / running
+vmctl show <name>                   # resolved profile
+
+vmctl provision <name>              # ISO + disk + interactive installer
+vmctl bootstrap-unattended <name>   # Ubuntu autoinstall, headless, + post-install
+vmctl bootstrap-preseed <name>      # Debian
+vmctl bootstrap-kickstart <name>    # AlmaLinux / RHEL family
+vmctl bootstrap-archinstall <name>  # Arch
+
+vmctl start <name>                  # boot the installed disk
+vmctl start <name> --video safe     # ... with a conservative display
+vmctl start <name> --headless --background
+vmctl shell <name>                  # SSH in
+vmctl stop <name>
+vmctl post-install <name>           # (re)run the SSH provisioning steps
+
+vmctl boot-check alpine-ci          # serial-console smoke test
+vmctl check-vms --parallel 4        # local validation matrix
+
 vmctl clean <name>
 vmctl clean --all
 ```
 
-With `vmctl` directly:
+Every command accepts `--dry-run` before the command name and prints what it
+would execute:
 
 ```bash
-./bin/vmctl setup
-./bin/vmctl list
-./bin/vmctl status
-./bin/vmctl show <name>
-./bin/vmctl fetch-iso <name>
-./bin/vmctl prep <name>
-./bin/vmctl install <name>
-./bin/vmctl install-unattended <name>
-./bin/vmctl post-install <name>
-./bin/vmctl bootstrap-unattended <name>
-./bin/vmctl start <name>
-./bin/vmctl start <name> --video safe
-./bin/vmctl shell <name>
-./bin/vmctl boot-check alpine-ci
-./bin/vmctl check-vms
-./bin/vmctl check-vms --parallel 4
-./bin/vmctl check-vms --parallel 4 --clean-first
-./bin/vmctl clean <name>
-./bin/vmctl clean --all
-```
-
-Dry-run examples:
-
-```bash
-./bin/vmctl --dry-run prep <name>
-./bin/vmctl --dry-run install <name>
-./bin/vmctl --dry-run start <name> --video safe
+vmctl --dry-run prep <name>
+vmctl --dry-run bootstrap-preseed debian-server
 ```
 
 ## Local Validation Before Push
@@ -272,15 +284,16 @@ Do not treat GitHub Actions as the first place to discover regressions. If you t
 Minimum baseline:
 
 ```bash
-python3 -m unittest discover -s tests -v
+make check          # mypy --strict + pytest
+make ci             # the unittest invocation GitHub Actions uses
 ```
 
 When changing unattended/bootstrap wiring, also run the focused dry-run command(s) you changed, for example:
 
 ```bash
-./bin/vmctl --dry-run bootstrap-preseed debian-server
-./bin/vmctl --dry-run bootstrap-kickstart almalinux-server
-./bin/vmctl --dry-run install-unattended ubuntu-niri
+vmctl --dry-run bootstrap-preseed debian-server
+vmctl --dry-run bootstrap-kickstart almalinux-server
+vmctl --dry-run install-unattended ubuntu-niri
 ```
 
 ## VM Profile Model
@@ -505,8 +518,8 @@ Provisioning scripts can be versioned under `vms/profile-files/<vm>/` and deploy
 Typical usage:
 
 ```bash
-./bin/vmctl start ubuntu-niri --cloud-init
-./bin/vmctl post-install ubuntu-niri
+vmctl start ubuntu-niri --cloud-init
+vmctl post-install ubuntu-niri
 ```
 
 `start --cloud-init` generates `artifacts/<vm>/cloud-init/{user-data,meta-data,seed.iso}` and attaches `seed.iso` to the VM. `post-install` waits for SSH on the forwarded host port defined in the profile, copies any host files listed in `copy_from_host`, and runs the remote commands listed in `post_install_run`.
@@ -514,9 +527,9 @@ Typical usage:
 To automate the Ubuntu Server installer as well:
 
 ```bash
-./bin/vmctl install-unattended ubuntu-niri-local
-./bin/vmctl start ubuntu-niri-local
-./bin/vmctl post-install ubuntu-niri-local
+vmctl install-unattended ubuntu-niri-local
+vmctl start ubuntu-niri-local
+vmctl post-install ubuntu-niri-local
 ```
 
 `install-unattended` is currently an Ubuntu autoinstall flow. It generates an `autoinstall` seed, extracts `casper/vmlinuz` and `casper/initrd` from the ISO, and boots the installer with the `autoinstall` kernel argument. The QEMU process exits on the installer's final reboot (`-no-reboot`), after which you can boot the installed system normally and finish with `post-install`.

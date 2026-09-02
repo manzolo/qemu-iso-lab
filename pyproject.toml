@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qemu-iso-lab-vmctl"
-version = "1.0.0"
+version = "1.1.0"
 description = "QEMU ISO Lab — declarative VM management toolkit"
 requires-python = ">=3.10"
 authors = [{ name = "Andrea Manzi" }]

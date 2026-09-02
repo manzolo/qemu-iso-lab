@@ -67,7 +67,7 @@ produces isolated per-VM artifacts.
 
 | Component                         | Responsibility                                                        |
 |-----------------------------------|-----------------------------------------------------------------------|
-| `Makefile`                        | One-line targets that forward to `vmctl` (e.g. `vmctl install ...`) |
+| `Makefile`                        | Developer targets only: `install-cli`, `test`, `lint`, `check`, `ci`, `tui`. VM work is `vmctl` |
 | `bin/vmctl`                       | 12-line entry-point shim that imports `vmctl.cli.main` from the package |
 | `bin/vmtui`                       | Dialog-based menu wrapper over `vmctl`; also handles remote SPICE hosts via `vms/remotes.json` |
 | `bin/ventoy-prep`, `ventoy-copy`  | Off-flow helpers for Ventoy USB scenarios                              |

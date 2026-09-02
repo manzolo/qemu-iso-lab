@@ -5,39 +5,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Tests
-python -m pytest tests/                        # full suite (139 tests)
+# Developer loop (the Makefile has ONLY these kinds of targets: `make help`)
+make check                                     # mypy --strict + full pytest suite; run before every push
+make test                                      # pytest only
 python -m pytest tests/test_archinstall.py -v  # single test file
 python -m pytest tests/ -k "test_render"       # filter by name
+make ci                                        # python -m unittest discover -s tests -v (what GitHub Actions runs)
+make lint                                      # python -m mypy vmctl/ --strict (enforced)
+make install-cli                               # symlink vmctl + vmtui into ~/.local/bin
 
-# CI equivalent (what GitHub Actions runs)
-python -m unittest discover -s tests -v
-
-# Type checking (enforced: mypy --strict)
-python -m mypy vmctl/ --strict
-
-# VM lifecycle via make shortcuts
-vmctl setup                         # check host prerequisites
-vmctl list                          # list all configured VMs
-vmctl show <name>                # print resolved profile
-vmctl prep <name>                # create disk + EFI vars
-vmctl install <name>             # boot installer ISO
-vmctl start <name> --video safe    # boot installed disk
-vmctl boot-check alpine-ci       # headless serial smoke test
-vmctl bootstrap-unattended <name>  # full unattended install + post-install
-
-# Or directly via bin/vmctl (supports --dry-run on every subcommand)
-./bin/vmctl --dry-run install <name>
-./bin/vmctl bootstrap-archinstall arch-noctalia-local
-./bin/vmctl bootstrap-preseed debian-server
-./bin/vmctl bootstrap-kickstart almalinux-server
+# VM lifecycle: ONE front door, the vmctl CLI (./bin/vmctl if not installed).
+vmctl --help                       # commands grouped by task + typical flows: read this first
+vmctl <command> --help             # options of one command
+vmctl list --names                 # profile names, one per line
+vmctl show <name> --json           # resolved profile ({{user}} already expanded)
+vmctl --dry-run <command> <name>   # every command supports --dry-run
+vmctl bootstrap-archinstall arch-noctalia-local
+vmctl bootstrap-preseed debian-server
+vmctl bootstrap-kickstart almalinux-server
 ```
 
 Before pushing, run the relevant local tests first. Do not use GitHub Actions as the first place to discover breakage in unit tests, dry-run bootstrap flows, or CI wiring. At minimum, if you touch CI or unattended/bootstrap code, run `python -m unittest discover -s tests -v` and any focused bootstrap/dry-run commands affected by the change.
 
 ## Architecture
 
-`bin/vmctl` is a 12-line shim that calls `vmctl.cli:main`. The `Makefile` is a thin convenience layer over `vmctl`. `bin/vmtui` is an independent `dialog`-based menu wrapper that shells out to `vmctl`.
+`bin/vmctl` is a 12-line shim that calls `vmctl.cli:main`; `make install-cli` symlinks it (and `vmtui`) into `~/.local/bin`, and both resolve the repository root through the symlink. The `Makefile` carries developer targets only and must not grow VM-lifecycle targets again: new user-facing behaviour goes into a `vmctl` subcommand, registered in `cli.py` inside one of the `COMMAND_GROUPS` (a test fails otherwise). `bin/vmtui` is an independent `dialog`-based menu wrapper that shells out to `vmctl`.
 
 ### Module import order (no cycles allowed)
 
@@ -63,7 +55,9 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 
 ### Profile model
 
-All VM definitions live in `vms/profiles/*.json`. `load_config()` reads and merges every file in that directory. `vms/profiles/local.json` is gitignored and is the intended home for personal/host-specific profiles — copy from `local.json.example`.
+All VM definitions live in `vms/profiles/*.json`. `load_config()` reads and merges every file in that directory; `vms/profiles/local.json` is gitignored, loaded last, and deep-merged over the tracked profiles (dicts merge, lists concatenate). It is the only place for personal data — copy from `local.json.example`.
+
+Tracked profiles are generic on purpose: the guest user is `lab` (password `lab`, hash included) and every place where the user name appears inside a path, a command or a file body writes `{{user}}`. `config.expand_user_placeholder()` replaces it at load time with the identity declared by the profile (`ssh_provision.user`, `cloud_init.user`, `autoinstall.username`, `archinstall_config.username`, `preseed_config.username`, `kickstart_config.username`; they must agree). Overriding the identity in `local.json` therefore propagates everywhere. Never commit a real user name, password or hash into a tracked profile again; the repo is public.
 
 SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226.
 
