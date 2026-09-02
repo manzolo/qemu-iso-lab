@@ -38,7 +38,7 @@ build_and_install_aur() {
     makepkg -Ccf --noconfirm
   )
   pkg="$(
-    find "$dir" -maxdepth 1 -type f -name "${repo}-*.pkg.tar.*" -printf "%T@ %p\n" |
+    find "$dir" -maxdepth 1 -type f -name "${repo}-[0-9]*.pkg.tar.*" -printf "%T@ %p\n" |
       sort -nr |
       head -n1 |
       cut -d" " -f2-
