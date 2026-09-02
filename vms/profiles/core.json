@@ -8,8 +8,14 @@
         "role": "ci",
         "release_model": "stable"
       },
-      "iso": "isos/alpine-virt-3.23.4-x86_64.iso",
-      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.23.4-x86_64.iso",
+      "iso": "isos/alpine-virt-latest-stable-x86_64.iso",
+      "iso_discovery": {
+        "index_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/",
+        "pattern": "href=\"(alpine-virt-\\d+\\.\\d+\\.\\d+-x86_64\\.iso)\"",
+        "sort": "desc",
+        "limit": 1
+      },
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
       "disk": {
         "path": "artifacts/alpine-ci/disk.qcow2",
         "size": "2G",
@@ -59,8 +65,14 @@
         "role": "ci-installed",
         "release_model": "stable"
       },
-      "iso": "isos/alpine-virt-3.23.4-x86_64.iso",
-      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.23.4-x86_64.iso",
+      "iso": "isos/alpine-virt-latest-stable-x86_64.iso",
+      "iso_discovery": {
+        "index_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/",
+        "pattern": "href=\"(alpine-virt-\\d+\\.\\d+\\.\\d+-x86_64\\.iso)\"",
+        "sort": "desc",
+        "limit": 1
+      },
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
       "disk": {
         "path": "artifacts/alpine-installed-ci/disk.qcow2",
         "size": "2G",
