@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+packages=(
+  niri foot fuzzel xwayland-satellite
+  xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk xdg-user-dirs xdg-utils
+  wl-clipboard cliphist grim slurp swappy
+  nautilus gvfs gvfs-mtp gvfs-smb udisks2 udiskie
+  pavucontrol playerctl upower power-profiles-daemon
+  curl wget rsync unzip zip p7zip unrar less man-db man-pages bash-completion inetutils
+  fastfetch btop tree jq ripgrep fd eza bat nano vim
+  ttf-jetbrains-mono-nerd noto-fonts-cjk papirus-icon-theme adwaita-icon-theme
+  gnome-keyring seahorse
+  quickshell accountsservice go cava matugen
+)
+
+sudo pacman -S --noconfirm --needed "${packages[@]}"
+xdg-user-dirs-update || true
+
+mkdir -p \
+  "$HOME/.config/niri" \
+  "$HOME/.config/DankMaterialShell" \
+  "$HOME/bin" \
+  "$HOME/aurbuild"
+
+chmod 0755 "$HOME/bin/arch-dms-post-install"
+
+build_and_install_aur() {
+  local repo="$1"
+  local expected="$2"
+  local dir="$HOME/aurbuild/$repo"
+  local pkg
+
+  rm -rf "$dir"
+  git clone "https://aur.archlinux.org/${repo}.git" "$dir"
+  (
+    cd "$dir"
+    makepkg -Ccf --noconfirm
+  )
+  pkg="$(
+    find "$dir" -maxdepth 1 -type f -name "${repo}-*.pkg.tar.*" -printf "%T@ %p\n" |
+      sort -nr |
+      head -n1 |
+      cut -d" " -f2-
+  )"
+  test -n "$pkg"
+  test -s "$pkg"
+  bsdtar -tf "$pkg" | grep -qx "$expected"
+  sudo pacman -U --overwrite "*" --noconfirm "$pkg"
+}
+
+# dgop (monitor di sistema di Dank) e la shell dms: entrambi dall'AUR, compilati in Go.
+build_and_install_aur dgop usr/bin/dgop
+build_and_install_aur dms-shell-git usr/bin/dms
+
+# dms parte come unit utente agganciata a graphical-session.target (che niri-session
+# attiva): abilitata per tutti gli utenti, così non serve un bus di sessione via SSH.
+sudo systemctl --global enable dms.service
+
+command -v qs >/dev/null
+command -v quickshell >/dev/null
+command -v footclient >/dev/null
+command -v fuzzel >/dev/null
+command -v xwayland-satellite >/dev/null
+command -v dms >/dev/null
+command -v dgop >/dev/null
+niri validate
+
+sudo systemctl enable seatd greetd
+sudo systemctl enable upower || true
+sudo systemctl enable power-profiles-daemon || true
+sudo install -D -m 0644 /dev/stdin /etc/greetd/config.toml <<EOF
+[terminal]
+vt = 1
+
+[initial_session]
+command = "niri-session"
+user = "$USER"
+
+[default_session]
+command = "agreety"
+user = "greeter"
+EOF
+
+sudo systemctl restart greetd
