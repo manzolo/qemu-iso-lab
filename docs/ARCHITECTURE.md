@@ -67,7 +67,7 @@ produces isolated per-VM artifacts.
 
 | Component                         | Responsibility                                                        |
 |-----------------------------------|-----------------------------------------------------------------------|
-| `Makefile`                        | One-line targets that forward to `vmctl` (e.g. `make install VM=...`) |
+| `Makefile`                        | One-line targets that forward to `vmctl` (e.g. `vmctl install ...`) |
 | `bin/vmctl`                       | 12-line entry-point shim that imports `vmctl.cli.main` from the package |
 | `bin/vmtui`                       | Dialog-based menu wrapper over `vmctl`; also handles remote SPICE hosts via `vms/remotes.json` |
 | `bin/ventoy-prep`, `ventoy-copy`  | Off-flow helpers for Ventoy USB scenarios                              |
@@ -106,14 +106,14 @@ produces isolated per-VM artifacts.
 
 **Install a new VM from scratch:**
 
-1. `make fetch-iso VM=foo` — `vmctl` validates and caches the ISO under `isos/`.
-2. `make prep VM=foo` — `vmctl` creates `artifacts/foo/disk.qcow2` and a per-VM EFI vars copy.
-3. `make install VM=foo` — `vmctl` boots QEMU with the ISO and the disk attached.
-4. `make start VM=foo` (after install completes) — boots the installed disk only.
+1. `vmctl fetch-iso foo` — `vmctl` validates and caches the ISO under `isos/`.
+2. `vmctl prep foo` — `vmctl` creates `artifacts/foo/disk.qcow2` and a per-VM EFI vars copy.
+3. `vmctl install foo` — `vmctl` boots QEMU with the ISO and the disk attached.
+4. `vmctl start foo` (after install completes) — boots the installed disk only.
 
 **Unattended install paths:**
 
-- `make install-unattended VM=foo` is the Ubuntu autoinstall path. It builds
+- `vmctl install-unattended foo` is the Ubuntu autoinstall path. It builds
   an autoinstall seed under `artifacts/<vm>/autoinstall/` and boots the
   installer with it attached.
 - `./bin/vmctl bootstrap-preseed <name>` is the Debian preseed path. It builds

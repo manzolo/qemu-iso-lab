@@ -76,11 +76,16 @@ cd qemu-iso-lab
 Run the host check first:
 
 ```bash
-make setup
+vmctl setup
 ```
 
-`make` is only required if you want to use the `make ...` shortcuts shown in this README.
-If you prefer, you can use `./bin/vmctl ...` directly and skip that dependency.
+Put the CLI on your `PATH` (symlinks `vmctl` and `vmtui` into `~/.local/bin`):
+
+```bash
+make install-cli
+```
+
+The rest of this README assumes that. Without it, run `./bin/vmctl` and `./bin/vmtui` from the repository root.
 
 Install dependencies on Arch-based systems:
 
@@ -95,7 +100,7 @@ sudo apt update
 sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog
 ```
 
-If you do not want `make`, the minimum practical direct-CLI path is:
+The minimum practical path is:
 
 ```bash
 sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog
@@ -110,17 +115,17 @@ sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 dialog
 Use this path for a normal local guest:
 
 ```bash
-make setup
-make list
-make show VM=<name>
-make prep VM=<name>
-make install VM=<name>
+vmctl setup
+vmctl list
+vmctl show <name>
+vmctl prep <name>
+vmctl install <name>
 ```
 
 After the guest has been installed to disk:
 
 ```bash
-make start VM=<name>
+vmctl start <name>
 ```
 
 ### Ubuntu Autoinstall Flow
@@ -128,21 +133,21 @@ make start VM=<name>
 Use this path for Ubuntu-style local profiles that define `autoinstall` and SSH provisioning:
 
 ```bash
-make prep VM=<name>
-make install-unattended VM=<name>
-make post-install VM=<name>
+vmctl prep <name>
+vmctl install-unattended <name>
+vmctl post-install <name>
 ```
 
 Or run the full flow in one step:
 
 ```bash
-make bootstrap-unattended VM=<name>
+vmctl bootstrap-unattended <name>
 ```
 
 After the first boot, you can open a shell with:
 
 ```bash
-make shell VM=<name>
+vmctl shell <name>
 ```
 
 ### Minimal Real Boot Check
@@ -150,8 +155,8 @@ make shell VM=<name>
 Use this path for the smallest real boot smoke test currently in the repo:
 
 ```bash
-make prep VM=alpine-ci
-make boot-check VM=alpine-ci
+vmctl prep alpine-ci
+vmctl boot-check alpine-ci
 ```
 
 This flow downloads a small Alpine `virt` ISO, prepares the disk, boots QEMU headless, and waits for the serial `login:` prompt.
@@ -161,10 +166,10 @@ This flow downloads a small Alpine `virt` ISO, prepares the disk, boots QEMU hea
 Use this path to run the local validation matrix across multiple profiles:
 
 ```bash
-make check-vms
-make check-vms VMS="ubuntu-niri arch-noctalia-local" TIMEOUT=600
-make check-vms PARALLEL=4
-make check-vms PARALLEL=4 CLEAN_FIRST=1
+vmctl check-vms
+vmctl check-vms ubuntu-niri arch-noctalia-local --timeout 600
+vmctl check-vms --parallel 4
+vmctl check-vms --parallel 4 --clean-first
 ```
 
 `PARALLEL` controls how many VM checks run concurrently. This is mainly useful for heavier local bootstrap flows such as unattended Ubuntu installs and Arch post-install provisioning.
@@ -175,7 +180,7 @@ Use `CLEAN_FIRST=1` to skip the prompt and always clean unattended/bootstrap pro
 If you prefer a simple terminal UI:
 
 ```bash
-make tui
+vmtui
 ```
 
 The TUI is a thin frontend over `vmctl`. The main menu offers `Choose VM`, `Status`, `Remote Hosts`, `Clean All`, and `Quit`. Picking a VM opens a single contextual menu with sections:
@@ -207,25 +212,25 @@ Then use `Choose VM` -> `Remote SPICE`. The TUI starts QEMU on the remote host w
 With `make`:
 
 ```bash
-make setup
-make list
-make status
-make show VM=<name>
-make fetch-iso VM=<name>
-make prep VM=<name>
-make install VM=<name>
-make install-unattended VM=<name>
-make post-install VM=<name>
-make bootstrap-unattended VM=<name>
-make start VM=<name>
-make start VM=<name> VIDEO=safe
-make shell VM=<name>
-make boot-check VM=alpine-ci
-make check-vms
-make check-vms PARALLEL=4
-make check-vms PARALLEL=4 CLEAN_FIRST=1
-make clean VM=<name>
-make clean-all
+vmctl setup
+vmctl list
+vmctl status
+vmctl show <name>
+vmctl fetch-iso <name>
+vmctl prep <name>
+vmctl install <name>
+vmctl install-unattended <name>
+vmctl post-install <name>
+vmctl bootstrap-unattended <name>
+vmctl start <name>
+vmctl start <name> --video safe
+vmctl shell <name>
+vmctl boot-check alpine-ci
+vmctl check-vms
+vmctl check-vms --parallel 4
+vmctl check-vms --parallel 4 --clean-first
+vmctl clean <name>
+vmctl clean --all
 ```
 
 With `vmctl` directly:
@@ -388,7 +393,7 @@ This means entries such as:
 }
 ```
 
-are safe as defaults, and `make setup` will tell you if your host needs a different OVMF package layout.
+are safe as defaults, and `vmctl setup` will tell you if your host needs a different OVMF package layout.
 
 ### BIOS
 
@@ -446,8 +451,8 @@ Minimal workflow:
 4. Prepare and boot it:
 
 ```bash
-make prep VM=<name>
-make install VM=<name>
+vmctl prep <name>
+vmctl install <name>
 ```
 
 ## Cloud-Init And Post-Install

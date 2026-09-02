@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="${VMTUI_ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+ROOT_DIR="${VMTUI_ROOT_DIR:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)}"
 CONFIG_DIR="${VMTUI_CONFIG_DIR:-$ROOT_DIR/vms}"
 VMCTL="$ROOT_DIR/bin/vmctl"
 

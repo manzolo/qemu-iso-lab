@@ -17,14 +17,14 @@ python -m unittest discover -s tests -v
 python -m mypy vmctl/ --strict
 
 # VM lifecycle via make shortcuts
-make setup                         # check host prerequisites
-make list                          # list all configured VMs
-make show VM=<name>                # print resolved profile
-make prep VM=<name>                # create disk + EFI vars
-make install VM=<name>             # boot installer ISO
-make start VM=<name> VIDEO=safe    # boot installed disk
-make boot-check VM=alpine-ci       # headless serial smoke test
-make bootstrap-unattended VM=<name>  # full unattended install + post-install
+vmctl setup                         # check host prerequisites
+vmctl list                          # list all configured VMs
+vmctl show <name>                # print resolved profile
+vmctl prep <name>                # create disk + EFI vars
+vmctl install <name>             # boot installer ISO
+vmctl start <name> --video safe    # boot installed disk
+vmctl boot-check alpine-ci       # headless serial smoke test
+vmctl bootstrap-unattended <name>  # full unattended install + post-install
 
 # Or directly via bin/vmctl (supports --dry-run on every subcommand)
 ./bin/vmctl --dry-run install <name>
