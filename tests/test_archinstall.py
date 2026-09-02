@@ -237,6 +237,22 @@ class ArchinstallBootstrapTests(BaseVmctlTestCase):
         label = vmctl.archinstall.arch_iso_label(Path("unknown.iso"))
         self.assertEqual(label, "ARCH_LIVE")
 
+    def test_arch_iso_label_reads_volume_label_from_existing_iso(self):
+        iso = self.root / "archlinux-latest-x86_64.iso"
+        iso.write_bytes(b"not really an iso")
+        fake = mock.Mock(returncode=0, stdout="ARCH_202609\n")
+        with mock.patch.object(vmctl.archinstall.subprocess, "run", return_value=fake) as run:
+            label = vmctl.archinstall.arch_iso_label(iso)
+        self.assertEqual(label, "ARCH_202609")
+        self.assertEqual(run.call_args[0][0][:2], ["blkid", "-p"])
+
+    def test_arch_iso_label_falls_back_to_filename_when_probe_fails(self):
+        iso = self.root / "archlinux-2026.09.01-x86_64.iso"
+        iso.write_bytes(b"x")
+        fake = mock.Mock(returncode=2, stdout="")
+        with mock.patch.object(vmctl.archinstall.subprocess, "run", return_value=fake):
+            self.assertEqual(vmctl.archinstall.arch_iso_label(iso), "ARCH_202609")
+
     def test_create_bootstrap_iso_writes_install_sh_and_calls_builder(self):
         self._arch_vm()
         with mock.patch.object(shutil, "which", side_effect=lambda name: "/usr/bin/xorriso" if name == "xorriso" else None), \

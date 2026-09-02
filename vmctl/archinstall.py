@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import shlex
 import shutil
 from pathlib import Path
@@ -360,7 +361,23 @@ poweroff -f
 
 
 def arch_iso_label(iso_path: Path) -> str:
-    """Derive the Arch live ISO volume label from the filename (e.g. ARCH_202604)."""
+    """Return the Arch live ISO volume label (e.g. ARCH_202609).
+
+    Read from the ISO itself when the file exists (so a version-agnostic cached
+    name still boots with the right ``archisolabel=``); fall back to the
+    ``archlinux-YYYY.MM.DD-`` filename convention, then to ``ARCH_LIVE``.
+    """
+    if iso_path.is_file():
+        try:
+            probe = subprocess.run(
+                ["blkid", "-p", "-o", "value", "-s", "LABEL", str(iso_path)],
+                capture_output=True, text=True, check=False,
+            )
+            label = probe.stdout.strip()
+            if probe.returncode == 0 and label:
+                return label
+        except OSError:
+            pass
     match = re.search(r"archlinux-(\d{4})\.(\d{2})\.\d{2}-", iso_path.name)
     if match:
         return f"ARCH_{match.group(1)}{match.group(2)}"
