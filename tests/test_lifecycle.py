@@ -1396,6 +1396,26 @@ class GracefulStopTests(BaseVmctlTestCase):
         self.assertEqual(rc, 0)
         kill.assert_called_once_with(4242, signal.SIGTERM)
 
+    def test_stop_tries_ssh_poweroff_when_acpi_is_ignored(self):
+        sock_path = self.root / "qmp.sock"; sock_path.write_text("")
+        # the guest stays alive through the (1 s) ACPI grace period and dies only after the SSH request
+        state = {"alive": True}
+        def ssh_run(*args, **kwargs):
+            state["alive"] = False
+            return mock.Mock(returncode=0)
+        with mock.patch.object(vmctl.qemu, "qmp_command", return_value=True), \
+             mock.patch.object(vmctl.lifecycle, "ACPI_POWEROFF_GRACE_SEC", 1), \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=lambda pid: "qemu" if state["alive"] else None), \
+             mock.patch.object(vmctl.lifecycle.subprocess, "run", side_effect=ssh_run) as run, \
+             mock.patch.object(vmctl.lifecycle.time, "sleep"), \
+             mock.patch.object(vmctl.lifecycle.os, "kill") as kill:
+            rc = vmctl.lifecycle.stop_qemu_process(4242, "Stop", "background VM", qmp_socket=sock_path,
+                                                  ssh_poweroff_cmd=["ssh", "guest", "sudo", "systemctl", "poweroff"])
+        self.assertEqual(rc, 0)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0][-3:], ["sudo", "systemctl", "poweroff"])
+        kill.assert_not_called()
+
     def test_stop_without_socket_behaves_as_before(self):
         import signal
         with mock.patch.object(vmctl.qemu, "qmp_command") as qmp, \

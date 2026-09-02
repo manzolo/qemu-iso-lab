@@ -130,7 +130,7 @@ class PostInstallTests(BaseVmctlTestCase):
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(executed[0][0], "ssh")
         self.assertIn("tester@127.0.0.1", executed[0])
-        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/niri'")
+        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/niri && chmod -R u+w /home/tester/.config/niri'")
         self.assertEqual(
             executed[1],
             mock.ANY,
@@ -172,7 +172,7 @@ class PostInstallTests(BaseVmctlTestCase):
         self.assertEqual(wait_ready.call_args.args[0], self.vm_config)
         self.assertTrue(wait_ready.call_args.kwargs["dry_run"])
         executed = [call.args[0] for call in run_cmd.call_args_list]
-        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/niri'")
+        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/niri && chmod -R u+w /home/tester/.config/niri'")
         self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/niri")
         self.assertEqual(
             executed[2][-1],
@@ -246,7 +246,7 @@ class PostInstallTests(BaseVmctlTestCase):
         self.assertEqual(wait_ready.call_args.args[0], self.vm_config)
         self.assertTrue(wait_ready.call_args.kwargs["dry_run"])
         executed = [call.args[0] for call in run_cmd.call_args_list]
-        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/geany'")
+        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/geany && chmod -R u+w /home/tester/.config/geany'")
         self.assertEqual(executed[1][0], "scp")
         self.assertTrue(executed[1][-2].endswith("/."))
         self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/geany")
@@ -276,7 +276,7 @@ class PostInstallTests(BaseVmctlTestCase):
         self.assertEqual(wait_ready.call_args.args[0], self.vm_config)
         self.assertTrue(wait_ready.call_args.kwargs["dry_run"])
         executed = [call.args[0] for call in run_cmd.call_args_list]
-        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/geany'")
+        self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/geany && chmod -R u+w /home/tester/.config/geany'")
         self.assertEqual(executed[1][0], "scp")
         self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/geany")
 

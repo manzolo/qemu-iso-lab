@@ -195,6 +195,7 @@ def stop_qemu_process(
     pid_path: Path | None = None,
     dry_run: bool = False,
     qmp_socket: Path | None = None,
+    ssh_poweroff_cmd: list[str] | None = None,
 ) -> int:
     def finalize_stop(message: str) -> int:
         if pid_path is not None and pid_path.exists():
@@ -221,9 +222,26 @@ def stop_qemu_process(
                 if process_cmdline(pid) is None:
                     return finalize_stop(f"Stopped {description} (guest powered off cleanly)")
                 time.sleep(1)
-            ui.print_status("warn", f"{description} ignored the ACPI power-off for {ACPI_POWEROFF_GRACE_SEC}s; sending SIGTERM", ok=False)
+            ui.print_status("warn", f"{description} ignored the ACPI power-off for {ACPI_POWEROFF_GRACE_SEC}s", ok=False)
         else:
-            ui.print_status("warn", "QMP power-off request failed; sending SIGTERM (files written in the last seconds may be lost)", ok=False)
+            ui.print_status("warn", "QMP power-off request failed", ok=False)
+
+        if ssh_poweroff_cmd:
+            # Second chance for provisioned guests: a plain `systemctl poweroff` over SSH.
+            ui.print_note("Asking the guest to power off over SSH...")
+            try:
+                subprocess.run(ssh_poweroff_cmd, check=False, timeout=20,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+            deadline = time.monotonic() + ACPI_POWEROFF_GRACE_SEC
+            while time.monotonic() < deadline:
+                if process_cmdline(pid) is None:
+                    return finalize_stop(f"Stopped {description} (guest powered off over SSH)")
+                time.sleep(1)
+            ui.print_status("warn", f"{description} still running after the SSH power-off request", ok=False)
+
+        ui.print_status("warn", "Sending SIGTERM (files written in the last seconds may be lost)", ok=False)
 
     try:
         os.kill(pid, signal.SIGTERM)
@@ -1300,6 +1318,17 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
     return 0
 
 
+def ssh_poweroff_command(vm: dict[str, Any]) -> list[str] | None:
+    """`systemctl poweroff` over the VM's SSH access, or None when the profile has no SSH."""
+    ssh_cfg = cloud_init.ssh_access_config(vm)
+    if ssh_cfg is None or not ssh_cfg.get("ssh_host_port"):
+        return None
+    try:
+        return ssh.ssh_base_cmd(vm) + ["-o", "ConnectTimeout=5", "sudo", "systemctl", "poweroff"]
+    except VMError:
+        return None
+
+
 def cmd_stop(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -1317,6 +1346,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     f"discovered background VM for '{args.vm}'",
                     dry_run=args.dry_run,
                     qmp_socket=qemu.qmp_socket_path(vm),
+                    ssh_poweroff_cmd=ssh_poweroff_command(vm),
                 )
         ui.print_status("ok", f"No tracked background VM for '{args.vm}'")
         return 0
@@ -1333,6 +1363,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     f"discovered background VM for '{args.vm}'",
                     dry_run=args.dry_run,
                     qmp_socket=qemu.qmp_socket_path(vm),
+                    ssh_poweroff_cmd=ssh_poweroff_command(vm),
                 )
         return 0
 
@@ -1344,6 +1375,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
         pid_path=pid_path,
         dry_run=args.dry_run,
         qmp_socket=qemu.qmp_socket_path(vm),
+        ssh_poweroff_cmd=ssh_poweroff_command(vm),
     )
 
 

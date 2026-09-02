@@ -245,8 +245,11 @@ def post_install_copy(
             raise
 
     if recursive:
+        # A re-run must be able to refresh a directory that is already there: git pack files and
+        # other read-only content would make scp fail with "Permission denied" on the second copy.
+        dest_q = shlex.quote(dest_raw)
         runtime.run(
-            remote_mkdir(vm, f"mkdir -p {shlex.quote(dest_raw)}", dry_run=dry_run),
+            remote_mkdir(vm, f"mkdir -p {dest_q} && chmod -R u+w {dest_q}", dry_run=dry_run),
             dry_run=dry_run,
             stdout_log=stdout_log,
             stderr_log=stderr_log,
