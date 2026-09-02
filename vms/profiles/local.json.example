@@ -1,40 +1,55 @@
 {
+  "_comment": "Git-ignored personal overrides. Tracked profiles use the guest user 'lab' (password 'lab'); override the identity fields below and every {{user}} in paths/commands follows.",
   "vms": {
     "cachyos-local": {
       "name": "CachyOS (Local)",
       "ssh_provision": {
+        "user": "YOUR_USER",
         "ssh_key": "~/.ssh/id_ed25519",
         "copy_from_host": [
           {
             "source": "~/.config/niri/",
-            "dest": "/home/YOUR_USER/.config/niri"
+            "dest": "/home/{{user}}/.config/niri"
           },
           {
             "source": "~/.config/DankMaterialShell/",
-            "dest": "/home/YOUR_USER/.config/DankMaterialShell"
+            "dest": "/home/{{user}}/.config/DankMaterialShell"
           }
         ]
       }
     },
     "ubuntu-niri-local": {
       "name": "Ubuntu 26.04 Niri (Local)",
+      "autoinstall": {
+        "username": "YOUR_USER",
+        "realname": "YOUR_USER",
+        "password_hash": "REPLACE_WITH_SHA512_HASH"
+      },
       "cloud_init": {
+        "user": "YOUR_USER",
         "ssh_authorized_keys_file": "~/.ssh/id_ed25519.pub",
         "ssh_key": "~/.ssh/id_ed25519",
         "copy_from_host": [
           {
             "source": "~/.config/niri/",
-            "dest": "/home/YOUR_USER/.config/niri"
+            "dest": "/home/{{user}}/.config/niri"
           },
           {
             "source": "~/.config/DankMaterialShell/",
-            "dest": "/home/YOUR_USER/.config/DankMaterialShell"
+            "dest": "/home/{{user}}/.config/DankMaterialShell"
           }
         ]
       }
     },
     "arch-noctalia-local": {
-      "name": "Arch Linux + Noctalia 5 (Local)"
+      "name": "Arch Linux + Noctalia 5 (Local)",
+      "archinstall_config": {
+        "username": "YOUR_USER",
+        "password": "YOUR_PASSWORD"
+      },
+      "ssh_provision": {
+        "user": "YOUR_USER"
+      }
     }
   }
 }

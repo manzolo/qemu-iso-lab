@@ -24,7 +24,7 @@ input {
 spawn-at-startup "foot" "--server"
 spawn-at-startup "xwayland-satellite"
 spawn-at-startup "udiskie" "--tray"
-spawn-at-startup "/home/manzolo/bin/start-noctalia"
+spawn-at-startup "sh" "-c" "exec \"$HOME/bin/start-noctalia\""
 
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 prefer-no-csd

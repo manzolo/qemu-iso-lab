@@ -65,7 +65,7 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 
 All VM definitions live in `vms/profiles/*.json`. `load_config()` reads and merges every file in that directory. `vms/profiles/local.json` is gitignored and is the intended home for personal/host-specific profiles — copy from `local.json.example`.
 
-SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `ubuntu-manzolo-local` → 2225, `arch-noctalia-local` → 2226.
+SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226.
 
 ### Unattended install flows
 

@@ -59,8 +59,8 @@ class VmtuiTests(unittest.TestCase):
             "remotes": {
                 "i9": {
                     "label": "i9.lan",
-                    "ssh_target": "manzolo@i9.lan",
-                    "project_dir": "/home/manzolo/Workspaces/qemu/qemu-iso-lab",
+                    "ssh_target": "lab@host.lan",
+                    "project_dir": "/home/lab/qemu-iso-lab",
                     "local_spice_port": 5930,
                     "remote_spice_port": 5930,
                 }
@@ -251,7 +251,7 @@ class VmtuiTests(unittest.TestCase):
         result = self.run_bash("source bin/vmtui; list_remote_menu_items")
         output = result.stdout.splitlines()
         self.assertEqual(output[0], "i9")
-        self.assertIn("manzolo@i9.lan", output[1])
+        self.assertIn("lab@host.lan", output[1])
         self.assertIn("5930->5930", output[1])
 
     def test_install_command_for_remote_viewer_detects_apt(self):

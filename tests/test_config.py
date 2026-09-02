@@ -179,3 +179,56 @@ class ConfigTests(BaseVmctlTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UserPlaceholderTests(BaseVmctlTestCase):
+    def test_user_placeholder_is_expanded_from_ssh_provision_user(self):
+        self.vm_config["ssh_provision"] = {
+            "user": "alice",
+            "copy_from_host": [{"source": "x", "dest": "/home/{{user}}/bin/x"}],
+            "post_install_run": ["chown {{user}}:{{user}} /home/{{user}}"],
+        }
+        self.write_config_dir()
+
+        vm = self.vmctl.load_config()["vms"][self.vm_name]
+
+        self.assertEqual(vm["ssh_provision"]["copy_from_host"][0]["dest"], "/home/alice/bin/x")
+        self.assertEqual(vm["ssh_provision"]["post_install_run"], ["chown alice:alice /home/alice"])
+
+    def test_local_override_of_user_propagates_to_placeholders(self):
+        self.vm_config["ssh_provision"] = {"user": "lab", "post_install_run": ["id {{user}}"]}
+        self.write_config_dir()
+        self.write_extra_profile("local.json", {"vms": {self.vm_name: {"ssh_provision": {"user": "bob"}}}})
+
+        vm = self.vmctl.load_config()["vms"][self.vm_name]
+
+        self.assertEqual(vm["ssh_provision"]["user"], "bob")
+        self.assertEqual(vm["ssh_provision"]["post_install_run"], ["id bob"])
+
+    def test_placeholder_without_declared_user_is_rejected(self):
+        self.vm_config["autoinstall"] = {"password_hash": "$6$hash", "late_commands": ["touch /home/{{user}}/ok"]}
+        self.write_config_dir()
+
+        with self.assertRaises(self.vmctl.VMError) as ctx:
+            self.vmctl.load_config()
+
+        self.assertIn("declares no guest user", str(ctx.exception))
+
+    def test_disagreeing_user_fields_are_rejected(self):
+        self.vm_config["ssh_provision"] = {"user": "alice"}
+        self.vm_config["autoinstall"] = {"username": "bob", "password_hash": "$6$hash"}
+        self.write_config_dir()
+
+        with self.assertRaises(self.vmctl.VMError) as ctx:
+            self.vmctl.load_config()
+
+        self.assertIn("guest user fields disagree", str(ctx.exception))
+
+    def test_placeholder_inside_identity_field_is_rejected(self):
+        self.vm_config["ssh_provision"] = {"user": "{{user}}"}
+        self.write_config_dir()
+
+        with self.assertRaises(self.vmctl.VMError) as ctx:
+            self.vmctl.load_config()
+
+        self.assertIn("cannot itself contain", str(ctx.exception))

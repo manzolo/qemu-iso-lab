@@ -238,9 +238,9 @@
       "preseed_config": {
         "hostname": "debian-server",
         "domain": "local",
-        "username": "manzolo",
+        "username": "lab",
         "fullname": "Andrea Manzi",
-        "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "timezone": "Europe/Rome",
         "keyboard_layout": "it",
         "locale": "en_US.UTF-8",
@@ -258,7 +258,7 @@
         "disk_device": "/dev/vda"
       },
       "ssh_provision": {
-        "user": "manzolo",
+        "user": "lab",
         "ssh_host_port": 2228,
         "ssh_key": null
       }
@@ -414,9 +414,9 @@
       "usb_tablet": true,
       "autoinstall": {
         "hostname": "ubuntu-server-headless",
-        "username": "manzolo",
+        "username": "lab",
         "realname": "Andrea Manzi",
-        "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "timezone": "UTC",
         "keyboard_layout": "us",
         "storage_layout": "direct",
@@ -424,7 +424,7 @@
       },
       "cloud_init": {
         "hostname": "ubuntu-server-headless",
-        "user": "manzolo",
+        "user": "lab",
         "ssh_host_port": 2290,
         "write_files": [
           {
@@ -438,9 +438,9 @@
             "content": "[Unit]\nDescription=Emit vmctl CI boot marker on serial console\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/bin/sh -lc 'echo __VMCTL_UBUNTU_SERVER_HEADLESS_BOOTED__ > /dev/ttyS0'\n\n[Install]\nWantedBy=multi-user.target\n"
           },
           {
-            "path": "/etc/sudoers.d/90-manzolo-nopasswd",
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
             "permissions": "0440",
-            "content": "manzolo ALL=(ALL) NOPASSWD:ALL\n"
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
           }
         ],
         "runcmd": [
@@ -517,7 +517,7 @@
         "hostname": "ubuntu-niri",
         "username": "vmuser",
         "realname": "VM User",
-        "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "timezone": "UTC",
         "keyboard_layout": "us",
         "storage_layout": "direct",
@@ -614,9 +614,9 @@
       "usb_tablet": true,
       "autoinstall": {
         "hostname": "ubuntu-niri-local",
-        "username": "manzolo",
-        "realname": "manzolo",
-        "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
+        "username": "lab",
+        "realname": "{{user}}",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "timezone": "Europe/Rome",
         "keyboard_layout": "it",
         "storage_layout": "direct",
@@ -624,27 +624,27 @@
       },
       "cloud_init": {
         "hostname": "ubuntu-niri-local",
-        "user": "manzolo",
+        "user": "lab",
         "ssh_host_port": 2227,
         "packages": [
           "software-properties-common",
           "foot"
         ],
         "runcmd": [
-          "mkdir -p /home/manzolo/.config/niri",
-          "chown -R manzolo:manzolo /home/manzolo/.config"
+          "mkdir -p /home/{{user}}/.config/niri",
+          "chown -R {{user}}:{{user}} /home/{{user}}/.config"
         ],
         "write_files": [
           {
-            "path": "/etc/sudoers.d/90-manzolo-nopasswd",
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
             "permissions": "0440",
-            "content": "manzolo ALL=(ALL) NOPASSWD:ALL\n"
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
           }
         ],
         "copy_from_host": [
           {
             "source": "vms/profile-files/ubuntu-niri-local/bin/ubuntu-niri-local-post-install",
-            "dest": "/home/manzolo/bin/ubuntu-niri-local-post-install",
+            "dest": "/home/{{user}}/bin/ubuntu-niri-local-post-install",
             "dest_mode": "755"
           }
         ],

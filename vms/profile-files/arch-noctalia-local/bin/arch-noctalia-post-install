@@ -64,13 +64,13 @@ niri validate
 sudo systemctl enable seatd greetd
 sudo systemctl enable upower || true
 sudo systemctl enable power-profiles-daemon || true
-sudo install -D -m 0644 /dev/stdin /etc/greetd/config.toml <<'EOF'
+sudo install -D -m 0644 /dev/stdin /etc/greetd/config.toml <<EOF
 [terminal]
 vt = 1
 
 [initial_session]
 command = "niri-session"
-user = "manzolo"
+user = "$USER"
 
 [default_session]
 command = "agreety"

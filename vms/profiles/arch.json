@@ -154,12 +154,12 @@
       "usb_tablet": true,
       "ssh_provision": {
         "hostname": "cachyos-local",
-        "user": "manzolo",
+        "user": "lab",
         "ssh_host_port": 2223,
         "copy_from_host": [
           {
             "source": "vms/profile-files/cachyos-local/bin/cachyos-post-install",
-            "dest": "/home/manzolo/bin/cachyos-post-install",
+            "dest": "/home/{{user}}/bin/cachyos-post-install",
             "dest_mode": "755"
           }
         ],
@@ -223,12 +223,12 @@
       "usb_tablet": true,
       "ssh_provision": {
         "hostname": "cachyos-nvidia-local",
-        "user": "manzolo",
+        "user": "lab",
         "ssh_host_port": 2224,
         "copy_from_host": [
           {
             "source": "vms/profile-files/cachyos-nvidia-local/bin/cachyos-nvidia-post-install",
-            "dest": "/home/manzolo/bin/cachyos-nvidia-post-install",
+            "dest": "/home/{{user}}/bin/cachyos-nvidia-post-install",
             "dest_mode": "755"
           }
         ],
@@ -275,8 +275,8 @@
       "usb_tablet": true,
       "archinstall_config": {
         "hostname": "arch-noctalia-local",
-        "username": "manzolo",
-        "password": "manzolo",
+        "username": "lab",
+        "password": "lab",
         "timezone": "Europe/Rome",
         "keyboard_layout": "it",
         "locale_lang": "it_IT",
@@ -369,29 +369,29 @@
         ],
         "bootstrap_chroot_commands": [
           "pacman -S --noconfirm --needed git base-devel",
-          "usermod -aG seat manzolo",
+          "usermod -aG seat {{user}}",
           "systemctl enable seatd greetd",
-          "cat > /etc/greetd/config.toml <<\"EOF\"\n[terminal]\nvt = 1\n\n[initial_session]\ncommand = \"niri-session\"\nuser = \"manzolo\"\n\n[default_session]\ncommand = \"agreety\"\nuser = \"greeter\"\nEOF"
+          "cat > /etc/greetd/config.toml <<\"EOF\"\n[terminal]\nvt = 1\n\n[initial_session]\ncommand = \"niri-session\"\nuser = \"{{user}}\"\n\n[default_session]\ncommand = \"agreety\"\nuser = \"greeter\"\nEOF"
         ]
       },
       "ssh_provision": {
         "hostname": "arch-noctalia-local",
-        "user": "manzolo",
+        "user": "lab",
         "ssh_host_port": 2226,
         "copy_from_host": [
           {
             "source": "vms/profile-files/arch-noctalia-local/bin/start-noctalia",
-            "dest": "/home/manzolo/bin/start-noctalia",
+            "dest": "/home/{{user}}/bin/start-noctalia",
             "dest_mode": "755"
           },
           {
             "source": "vms/profile-files/arch-noctalia-local/bin/arch-noctalia-post-install",
-            "dest": "/home/manzolo/bin/arch-noctalia-post-install",
+            "dest": "/home/{{user}}/bin/arch-noctalia-post-install",
             "dest_mode": "755"
           },
           {
             "source": "vms/profile-files/arch-noctalia-local/niri/config.kdl",
-            "dest": "/home/manzolo/.config/niri/config.kdl",
+            "dest": "/home/{{user}}/.config/niri/config.kdl",
             "dest_mode": "644"
           }
         ],

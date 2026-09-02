@@ -139,9 +139,9 @@
       "usb_tablet": true,
       "kickstart_config": {
         "hostname": "almalinux-server",
-        "username": "manzolo",
+        "username": "lab",
         "fullname": "Andrea Manzi",
-        "password_hash": "$6$uojLs28Qc8VFPQo8$1H1mmUCPv2pW2laEHJNrZgoL2ResIAXW4SSlQVfcv8uoj3yq43JQl6Co5WOBVyzCsOj7Aab.ZVhSIBKxylsSp.",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "timezone": "Europe/Rome",
         "keyboard_layout": "it",
         "locale": "it_IT.UTF-8",
@@ -152,7 +152,7 @@
         "firewall": "enabled"
       },
       "ssh_provision": {
-        "user": "manzolo",
+        "user": "lab",
         "ssh_host_port": 2229,
         "ssh_key": null
       }

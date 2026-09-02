@@ -7,6 +7,19 @@ from typing import Any, cast
 from vmctl import state, runtime
 from vmctl.errors import VMError
 
+USER_PLACEHOLDER = "{{user}}"
+# (section, field) pairs that declare the guest user of a VM profile.  They
+# must agree with each other; their value replaces ``{{user}}`` everywhere
+# else in the profile (paths, commands, sudoers content...).
+USER_IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
+    ("ssh_provision", "user"),
+    ("cloud_init", "user"),
+    ("autoinstall", "username"),
+    ("archinstall_config", "username"),
+    ("preseed_config", "username"),
+    ("kickstart_config", "username"),
+)
+
 
 def merge_vm_profile(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     merged = copy.deepcopy(base)
@@ -18,6 +31,58 @@ def merge_vm_profile(base: dict[str, Any], override: dict[str, Any]) -> dict[str
         else:
             merged[key] = copy.deepcopy(value)
     return merged
+
+
+def resolve_vm_user(vm: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Return ``(user, error)`` from the identity fields of a VM profile."""
+    found: dict[str, str] = {}
+    for section, field in USER_IDENTITY_FIELDS:
+        sec = vm.get(section)
+        if not isinstance(sec, dict):
+            continue
+        value = str(sec.get(field) or "").strip()
+        if not value:
+            continue
+        if USER_PLACEHOLDER in value:
+            return None, f"{section}.{field} cannot itself contain {USER_PLACEHOLDER}"
+        found[f"{section}.{field}"] = value
+    distinct = sorted(set(found.values()))
+    if len(distinct) > 1:
+        detail = ", ".join(f"{k}={v!r}" for k, v in found.items())
+        return None, f"guest user fields disagree ({detail})"
+    return (distinct[0] if distinct else None), None
+
+
+def _contains_placeholder(value: Any) -> bool:
+    if isinstance(value, str):
+        return USER_PLACEHOLDER in value
+    if isinstance(value, dict):
+        return any(_contains_placeholder(v) for v in value.values())
+    if isinstance(value, list):
+        return any(_contains_placeholder(v) for v in value)
+    return False
+
+
+def _substitute(value: Any, user: str) -> Any:
+    if isinstance(value, str):
+        return value.replace(USER_PLACEHOLDER, user)
+    if isinstance(value, dict):
+        return {k: _substitute(v, user) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_substitute(v, user) for v in value]
+    return value
+
+
+def expand_user_placeholder(name: str, vm: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Replace ``{{user}}`` in every string of *vm* with the declared guest user."""
+    user, error = resolve_vm_user(vm)
+    if error:
+        return vm, [f"{name}: {error}"]
+    if not _contains_placeholder(vm):
+        return vm, []
+    if user is None:
+        return vm, [f"{name}: profile uses {USER_PLACEHOLDER} but declares no guest user (e.g. ssh_provision.user)"]
+    return cast(dict[str, Any], _substitute(vm, user)), []
 
 
 def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
@@ -153,8 +218,11 @@ def load_config() -> dict[str, Any]:
         raise VMError(f"No VM profiles found in: {profiles_dir}")
 
     all_errors: list[str] = []
-    for name, vm in merged_vms.items():
-        all_errors.extend(validate_vm_profile(name, vm))
+    for name, vm in list(merged_vms.items()):
+        expanded, errors = expand_user_placeholder(name, vm)
+        merged_vms[name] = expanded
+        all_errors.extend(errors)
+        all_errors.extend(validate_vm_profile(name, expanded))
     all_errors.extend(_ssh_port_conflicts(merged_vms))
     if all_errors:
         raise VMError("Invalid VM profile(s):\n  " + "\n  ".join(all_errors))

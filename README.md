@@ -516,18 +516,21 @@ To automate the Ubuntu Server installer as well:
 
 `install-unattended` is currently an Ubuntu autoinstall flow. It generates an `autoinstall` seed, extracts `casper/vmlinuz` and `casper/initrd` from the ISO, and boots the installer with the `autoinstall` kernel argument. The QEMU process exits on the installer's final reboot (`-no-reboot`), after which you can boot the installed system normally and finish with `post-install`.
 
-Commit-safe example:
+Guest identity and personal overrides:
 
-- `ubuntu-niri` shows a clean `cloud_init` configuration without hardcoded personal usernames or host paths.
-- `ubuntu-niri` also shows an `autoinstall` section that should be completed with a real SHA-512 password hash.
-
-Git-ignored local override:
-
-- copy `vms/profiles/local.json.example` to `vms/profiles/local.json`;
-- replace `YOUR_USER` and the SSH/dotfile paths with your own values;
-- use the `ubuntu-niri-local` profile, which stays only on your host.
-
-When `local.json` adds entries to the same list key as a base profile (for example `copy_from_host`), the lists are **concatenated** — base entries first, local entries appended. This means you can add personal file copies in `local.json` without losing the versioned script entries defined in the base profile.
+- Tracked profiles use a generic guest user **`lab`** with password **`lab`**
+  (SHA-512 hash included). They work out of the box for a throwaway lab VM.
+- Wherever a profile needs the user name inside a path or a command
+  (`/home/{{user}}/bin`, `chown {{user}}:{{user}}`, sudoers content...) it
+  writes the placeholder **`{{user}}`**. At load time `vmctl` replaces it with
+  the guest user declared by the profile (`ssh_provision.user`,
+  `cloud_init.user`, `autoinstall.username`, `archinstall_config.username`,
+  `preseed_config.username` or `kickstart_config.username`; they must agree).
+- To use your own name, key and password, override only the identity fields in
+  the git-ignored `vms/profiles/local.json`; every `{{user}}` follows:
+  - copy `vms/profiles/local.json.example` to `vms/profiles/local.json`;
+  - replace `YOUR_USER`, `YOUR_PASSWORD`/`REPLACE_WITH_SHA512_HASH`
+    (`openssl passwd -6`) and the SSH/dotfile paths with your own values.
 
 Shortcut:
 
