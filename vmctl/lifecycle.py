@@ -22,6 +22,9 @@ from vmctl.errors import VMError
 
 # --- background-VM tracking ----------------------------------------------------
 
+ACPI_POWEROFF_GRACE_SEC = 60
+
+
 def bootstrap_pid_path(name: str) -> Path:
     return runtime.vm_artifact_base(name) / "runtime" / "bootstrap-start.pid"
 
@@ -191,10 +194,13 @@ def stop_qemu_process(
     description: str,
     pid_path: Path | None = None,
     dry_run: bool = False,
+    qmp_socket: Path | None = None,
 ) -> int:
     def finalize_stop(message: str) -> int:
         if pid_path is not None and pid_path.exists():
             pid_path.unlink()
+        if qmp_socket is not None and qmp_socket.exists():
+            qmp_socket.unlink()
         ui.print_status("ok", message)
         return 0
 
@@ -206,6 +212,18 @@ def stop_qemu_process(
     if dry_run:
         ui.print_status("ok", f"Would stop {description} (pid {pid})")
         return 0
+
+    if qmp_socket is not None and qmp_socket.exists():
+        ui.print_note("Asking the guest to power off (ACPI, via QMP)...")
+        if qemu.qmp_command(qmp_socket, "system_powerdown"):
+            deadline = time.monotonic() + ACPI_POWEROFF_GRACE_SEC
+            while time.monotonic() < deadline:
+                if process_cmdline(pid) is None:
+                    return finalize_stop(f"Stopped {description} (guest powered off cleanly)")
+                time.sleep(1)
+            ui.print_status("warn", f"{description} ignored the ACPI power-off for {ACPI_POWEROFF_GRACE_SEC}s; sending SIGTERM", ok=False)
+        else:
+            ui.print_status("warn", "QMP power-off request failed; sending SIGTERM (files written in the last seconds may be lost)", ok=False)
 
     try:
         os.kill(pid, signal.SIGTERM)
@@ -1298,6 +1316,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     f"Stop discovered background VM: {args.vm}",
                     f"discovered background VM for '{args.vm}'",
                     dry_run=args.dry_run,
+                    qmp_socket=qemu.qmp_socket_path(vm),
                 )
         ui.print_status("ok", f"No tracked background VM for '{args.vm}'")
         return 0
@@ -1313,6 +1332,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     f"Stop discovered background VM: {args.vm}",
                     f"discovered background VM for '{args.vm}'",
                     dry_run=args.dry_run,
+                    qmp_socket=qemu.qmp_socket_path(vm),
                 )
         return 0
 
@@ -1323,6 +1343,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
         f"background VM for '{args.vm}'",
         pid_path=pid_path,
         dry_run=args.dry_run,
+        qmp_socket=qemu.qmp_socket_path(vm),
     )
 
 

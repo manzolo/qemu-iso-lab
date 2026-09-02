@@ -1,9 +1,11 @@
 """QEMU command-line argument builders and firmware helpers."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import selectors
+import socket
 import shutil
 import subprocess
 import sys
@@ -154,6 +156,37 @@ def installer_video_variant(vm: dict[str, Any], requested: str | None) -> str | 
     return None
 
 
+def qmp_socket_path(vm: dict[str, Any]) -> Path:
+    """QMP control socket of a headless VM, next to its runtime PID file."""
+    return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "qmp.sock"
+
+
+def qmp_command(sock_path: Path, command: str, timeout: float = 5.0) -> bool:
+    """Send one QMP command (after the capabilities handshake); True if QEMU acknowledged it."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
+            sock.connect(str(sock_path))
+            stream = sock.makefile("rwb", buffering=0)
+            greeting = json.loads(stream.readline() or b"{}")
+            if "QMP" not in greeting:
+                return False
+            for execute in ("qmp_capabilities", command):
+                stream.write((json.dumps({"execute": execute}) + "\n").encode())
+                while True:  # skip asynchronous events until the reply arrives
+                    line = stream.readline()
+                    if not line:
+                        return False
+                    reply = json.loads(line)
+                    if "error" in reply:
+                        return False
+                    if "return" in reply:
+                        break
+            return True
+    except (OSError, ValueError):
+        return False
+
+
 def common_args(
     vm: dict[str, Any], variant: str | None, dry_run: bool = False, accel: str | None = "kvm",
     headless: bool = False, serial_stdio: bool = False, no_reboot: bool = False,
@@ -171,6 +204,11 @@ def common_args(
         args += spice_display_args(spice_port)
     elif headless:
         args += ["-display", "none", "-monitor", "none"]
+        # A QMP socket lets `vmctl stop` ask the guest for an ACPI power-off instead of
+        # killing QEMU: a SIGTERM is a power cut and left half-written files behind.
+        qmp = qmp_socket_path(vm)
+        qmp.parent.mkdir(parents=True, exist_ok=True)
+        args += ["-qmp", f"unix:{qmp},server,nowait"]
     else:
         args += video_args(vm, variant)
     if serial_stdio:

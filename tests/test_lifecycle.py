@@ -1335,3 +1335,74 @@ class VmctlTests(BaseVmctlTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GracefulStopTests(BaseVmctlTestCase):
+    def test_headless_args_expose_a_qmp_socket(self):
+        with mock.patch.object(vmctl.runtime, "require_command"):
+            args = vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True, allow_missing_disk=True)
+        self.assertIn("-qmp", args)
+        sock = str(self.root / "artifacts" / "testvm" / "runtime" / "qmp.sock")
+        self.assertIn(f"unix:{sock},server,nowait", args)
+        self.assertTrue((self.root / "artifacts" / "testvm" / "runtime").is_dir())
+
+    def test_qmp_command_completes_the_handshake_with_a_fake_qemu(self):
+        import json, socket, threading
+        sock_path = self.root / "qmp.sock"
+        received = []
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(str(sock_path)); server.listen(1)
+
+        def serve():
+            conn, _ = server.accept()
+            with conn, conn.makefile("rwb", buffering=0) as stream:
+                stream.write(b'{"QMP": {"version": {}, "capabilities": []}}\n')
+                for _ in range(2):
+                    received.append(json.loads(stream.readline())["execute"])
+                    stream.write(b'{"event": "SOMETHING"}\n{"return": {}}\n')
+        thread = threading.Thread(target=serve, daemon=True); thread.start()
+        try:
+            self.assertTrue(vmctl.qemu.qmp_command(sock_path, "system_powerdown", timeout=5))
+        finally:
+            thread.join(timeout=5); server.close()
+        self.assertEqual(received, ["qmp_capabilities", "system_powerdown"])
+
+    def test_qmp_command_returns_false_without_a_socket(self):
+        self.assertFalse(vmctl.qemu.qmp_command(self.root / "missing.sock", "system_powerdown", timeout=1))
+
+    def test_stop_prefers_acpi_powerdown_and_skips_sigterm(self):
+        sock_path = self.root / "qmp.sock"; sock_path.write_text("")
+        pid_path = self.root / "bootstrap-start.pid"; pid_path.write_text("4242")
+        with mock.patch.object(vmctl.qemu, "qmp_command", return_value=True) as qmp, \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=["qemu-system-x86_64", None]), \
+             mock.patch.object(vmctl.lifecycle.os, "kill") as kill, \
+             mock.patch.object(vmctl.lifecycle.time, "sleep"):
+            rc = vmctl.lifecycle.stop_qemu_process(4242, "Stop", "background VM", pid_path=pid_path, qmp_socket=sock_path)
+        self.assertEqual(rc, 0)
+        qmp.assert_called_once_with(sock_path, "system_powerdown")
+        kill.assert_not_called()
+        self.assertFalse(pid_path.exists()); self.assertFalse(sock_path.exists())
+
+    def test_stop_falls_back_to_sigterm_when_the_guest_ignores_acpi(self):
+        import signal
+        sock_path = self.root / "qmp.sock"; sock_path.write_text("")
+        # grace period of 0 s: the ACPI wait loop ends at once, the guest is still alive -> SIGTERM path
+        with mock.patch.object(vmctl.qemu, "qmp_command", return_value=True), \
+             mock.patch.object(vmctl.lifecycle, "ACPI_POWEROFF_GRACE_SEC", 0), \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=["qemu-system-x86_64", None]), \
+             mock.patch.object(vmctl.lifecycle.time, "sleep"), \
+             mock.patch.object(vmctl.lifecycle.os, "kill") as kill:
+            rc = vmctl.lifecycle.stop_qemu_process(4242, "Stop", "background VM", qmp_socket=sock_path)
+        self.assertEqual(rc, 0)
+        kill.assert_called_once_with(4242, signal.SIGTERM)
+
+    def test_stop_without_socket_behaves_as_before(self):
+        import signal
+        with mock.patch.object(vmctl.qemu, "qmp_command") as qmp, \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=["qemu", None]), \
+             mock.patch.object(vmctl.lifecycle.time, "sleep"), \
+             mock.patch.object(vmctl.lifecycle.os, "kill") as kill:
+            rc = vmctl.lifecycle.stop_qemu_process(4242, "Stop", "background VM", qmp_socket=self.root / "none.sock")
+        self.assertEqual(rc, 0)
+        qmp.assert_not_called()
+        kill.assert_called_once_with(4242, signal.SIGTERM)
