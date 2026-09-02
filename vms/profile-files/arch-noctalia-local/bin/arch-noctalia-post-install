@@ -64,7 +64,10 @@ niri validate
 sudo systemctl enable seatd greetd
 sudo systemctl enable upower || true
 sudo systemctl enable power-profiles-daemon || true
-sudo install -D -m 0644 /dev/stdin /etc/greetd/config.toml <<EOF
+# Il contenuto passa da un file temporaneo: con `sudo ... /dev/stdin <<EOF` sudo (use_pty)
+# può consegnare uno stdin vuoto e lasciare config.toml a zero byte (visto il 2026-09-02).
+greetd_cfg="$(mktemp)"
+cat > "$greetd_cfg" <<EOF
 [terminal]
 vt = 1
 
@@ -76,5 +79,8 @@ user = "$USER"
 command = "agreety"
 user = "greeter"
 EOF
+sudo install -D -m 0644 "$greetd_cfg" /etc/greetd/config.toml
+rm -f "$greetd_cfg"
+test -s /etc/greetd/config.toml
 
 sudo systemctl restart greetd
