@@ -29,7 +29,7 @@ For that reason the project also defines `alpine-ci`, a small guest profile mean
 
 The selected ISO is:
 
-- `alpine-virt-3.23.4-x86_64.iso`
+- the newest `alpine-virt-<x.y.z>-x86_64.iso` from the Alpine latest-stable index (discovered at fetch time, release candidates excluded; 3.24.1 when this was written)
 
 Reasoning:
 
@@ -111,7 +111,7 @@ These choices were based on the following current references checked on April 22
   https://wiki.alpinelinux.org/wiki/Enable_Serial_Console_on_Boot
 - Alpine QEMU usage documentation:
   https://wiki.alpinelinux.org/wiki/Qemu
-- Alpine latest stable release index with `alpine-virt-3.23.4-x86_64.iso`:
+- Alpine latest stable release index, from which the newest `alpine-virt-<x.y.z>-x86_64.iso` is discovered (Alpine drops old point releases from that index, so pinning a version broke CI on 2026-09-02):
   https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/
 - GitHub-hosted runner reference:
   https://docs.github.com/actions/reference/runners/github-hosted-runners
