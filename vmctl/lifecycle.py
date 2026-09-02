@@ -584,6 +584,11 @@ def run_local_test_vm_subprocess(vm_name: str, args: argparse.Namespace) -> tupl
 def cmd_list(args: argparse.Namespace) -> int:
     cfg = config.load_config()
 
+    if getattr(args, "names", False):
+        for name in sorted(cfg["vms"]):
+            print(name)
+        return 0
+
     if getattr(args, "json", False):
         out = []
         for name, vm in sorted(cfg["vms"].items()):
