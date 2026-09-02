@@ -85,7 +85,7 @@ fc-cache -f >/dev/null 2>&1 || true
 test -f /etc/modprobe.d/nvidia.conf
 dkms status | grep -q nvidia
 grep -q '^MODULES=(nvidia' /etc/mkinitcpio.conf
-grep -q 'nvidia-drm.modeset=1' /boot/grub/grub.cfg
+sudo grep -q 'nvidia-drm.modeset=1' /boot/grub/grub.cfg
 systemctl is-enabled nvidia-hibernate nvidia-resume nvidia-suspend >/dev/null
 
 sudo systemctl enable seatd greetd
