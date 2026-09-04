@@ -87,14 +87,22 @@ def run(
     stdout_log: Path | None = None,
     stderr_log: Path | None = None,
     append: bool = False,
+    stdin_text: str | None = None,
 ) -> None:
     ui.print_command(cmd)
     if not dry_run:
         if quiet and stdout_log is None and stderr_log is None:
-            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                cmd,
+                check=True,
+                input=stdin_text,
+                text=stdin_text is not None,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             return
         if stdout_log is None and stderr_log is None:
-            subprocess.run(cmd, check=True)
+            subprocess.run(cmd, check=True, input=stdin_text, text=stdin_text is not None)
             return
 
         stdout_fh = None
@@ -110,6 +118,7 @@ def run(
 
             process = subprocess.Popen(
                 cmd,
+                stdin=subprocess.PIPE if stdin_text is not None else None,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -132,6 +141,10 @@ def run(
             )
             stdout_thread.start()
             stderr_thread.start()
+            if stdin_text is not None:
+                assert process.stdin is not None
+                process.stdin.write(stdin_text)
+                process.stdin.close()
             returncode = process.wait()
             stdout_thread.join()
             stderr_thread.join()

@@ -16,6 +16,7 @@ USER_IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
     ("cloud_init", "user"),
     ("autoinstall", "username"),
     ("archinstall_config", "username"),
+    ("omarchy_config", "username"),
     ("preseed_config", "username"),
     ("kickstart_config", "username"),
 )
@@ -163,6 +164,12 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
         password_hash = str(autoinstall.get("password_hash") or "").strip()
         if password_hash == "REPLACE_WITH_SHA512_HASH":
             err("autoinstall.password_hash still uses the placeholder value")
+
+    omarchy = vm.get("omarchy_config")
+    if isinstance(omarchy, dict):
+        password_hash = str(omarchy.get("password_hash") or "").strip()
+        if password_hash == "REPLACE_WITH_SHA512_HASH":
+            err("omarchy_config.password_hash still uses the placeholder value")
 
     return errors
 

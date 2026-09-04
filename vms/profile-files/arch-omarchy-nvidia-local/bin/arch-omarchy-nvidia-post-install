@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Omarchy configures NVIDIA automatically when the hardware is visible during
+# installation. The QEMU lab does not expose a physical GPU, so keep this
+# profile useful as a bare-metal image recipe by installing the current GSP-era
+# open kernel modules explicitly.
+packages=(
+  linux-headers
+  nvidia-open-dkms
+  nvidia-utils
+  lib32-nvidia-utils
+  libva-nvidia-driver
+  egl-wayland
+)
+
+sudo env OMARCHY_ALLOW_DIRECT_PACMAN=1 pacman -Syu --noconfirm --needed "${packages[@]}"
+
+modprobe_cfg="$(mktemp)"
+cat > "$modprobe_cfg" <<'EOF'
+options nvidia_drm modeset=1
+EOF
+sudo install -D -m 0644 "$modprobe_cfg" /etc/modprobe.d/nvidia.conf
+rm -f "$modprobe_cfg"
+
+mkinitcpio_cfg="$(mktemp)"
+cat > "$mkinitcpio_cfg" <<'EOF'
+MODULES+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+EOF
+sudo install -D -m 0644 "$mkinitcpio_cfg" /etc/mkinitcpio.conf.d/nvidia.conf
+rm -f "$mkinitcpio_cfg"
+
+if command -v limine-mkinitcpio >/dev/null 2>&1; then
+  sudo limine-mkinitcpio
+else
+  sudo mkinitcpio -P
+fi
+sudo systemctl enable nvidia-suspend nvidia-hibernate nvidia-resume
+
+test -s /etc/modprobe.d/nvidia.conf
+test -s /etc/mkinitcpio.conf.d/nvidia.conf
+dkms status | grep -q nvidia

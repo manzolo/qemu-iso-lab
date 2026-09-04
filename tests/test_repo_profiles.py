@@ -29,6 +29,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "ubuntu-server-headless",
             "fedora-server-efi",
             "freebsd",
+            "arch-omarchy-nvidia-local",
         ):
             self.assertIn(profile, cfg["vms"])
 

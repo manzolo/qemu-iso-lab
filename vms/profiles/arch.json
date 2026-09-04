@@ -815,6 +815,77 @@
           "nvidia-smi 2>/dev/null || echo 'nvidia-smi: no NVIDIA GPU in this VM (expected; the driver is here for bare metal)'"
         ]
       }
+    },
+    "arch-omarchy-nvidia-local": {
+      "name": "Omarchy 4 + Hyprland + NVIDIA open (recipe for bare metal)",
+      "meta": {
+        "slug": "omarchy",
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/omarchy-4.0.2.iso",
+      "iso_url": "https://iso.omarchy.org/omarchy-4.0.2.iso",
+      "iso_sha256": "2ef8e624aa1bec7e277e28056b8535a6c9373ba48d7ede3f1a01cb6d2373cfb8",
+      "disk": {
+        "path": "artifacts/arch-omarchy-nvidia-local/disk.qcow2",
+        "size": "64G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/arch-omarchy-nvidia-local/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 8192,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "virtio-gl",
+        "installer_order": ["std", "safe"],
+        "variants": {
+          "std": ["-vga", "std", "-display", "gtk"],
+          "safe": ["-vga", "std", "-display", "gtk"],
+          "virtio-gl": ["-device", "virtio-vga-gl", "-display", "gtk,gl=on"]
+        }
+      },
+      "usb_tablet": true,
+      "omarchy_config": {
+        "hostname": "arch-omarchy-nvidia-local",
+        "username": "lab",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "full_name": "Andrea Manzi",
+        "email": "",
+        "timezone": "Europe/Rome",
+        "keyboard_layout": "it",
+        "locale": "en_US.UTF-8",
+        "disk_device": "/dev/vda",
+        "encrypt": false
+      },
+      "ssh_provision": {
+        "hostname": "arch-omarchy-nvidia-local",
+        "user": "lab",
+        "sudo_password": "lab",
+        "ssh_host_port": 2232,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/arch-omarchy-nvidia-local/bin/arch-omarchy-nvidia-post-install",
+            "dest": "/home/{{user}}/bin/arch-omarchy-nvidia-post-install",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/arch-omarchy-nvidia-post-install",
+          "omarchy version || true",
+          "Hyprland --version || true",
+          "pacman -Q nvidia-open-dkms nvidia-utils && dkms status",
+          "nvidia-smi 2>/dev/null || echo 'nvidia-smi: no NVIDIA GPU in this VM (expected; the driver is here for bare metal)'"
+        ]
+      }
     }
   }
 }

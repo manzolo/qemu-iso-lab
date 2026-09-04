@@ -126,6 +126,13 @@ class VmtuiTests(unittest.TestCase):
         self.assertNotIn("Full Bootstrap", output)
         self.assertNotIn("Debian Preseed Bootstrap", output)
 
+    def test_unified_menu_for_omarchy_bootstrap_vm(self):
+        output = self._unified_menu("arch-omarchy-nvidia-local")
+        self.assertIn("Omarchy Bootstrap", output)
+        self.assertIn("Omarchy Unattended Install", output)
+        self.assertIn("SSH Console", output)
+        self.assertNotIn("Arch Bootstrap", output)
+
     def test_unified_menu_for_preseed_vm(self):
         output = self._unified_menu("debian-server")
         self.assertIn("Debian Preseed Bootstrap", output)
@@ -236,6 +243,8 @@ class VmtuiTests(unittest.TestCase):
         for entry, expected in (
             ("Full Bootstrap", "bootstrap-unattended"),
             ("Arch Bootstrap", "bootstrap-archinstall"),
+            ("Omarchy Bootstrap", "bootstrap-omarchy"),
+            ("Omarchy Unattended Install", "install-omarchy"),
             ("Debian Preseed Bootstrap", "bootstrap-preseed"),
             ("Kickstart Bootstrap", "bootstrap-kickstart"),
             ("Unattended Install", "full-auto-install"),

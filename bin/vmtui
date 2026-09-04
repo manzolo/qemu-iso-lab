@@ -358,6 +358,7 @@ list_vm_menu_items_unified() {
     local has_ssh=0
     local has_autoinstall=0
     local has_archinstall=0
+    local has_omarchy=0
     local has_preseed=0
     local has_kickstart=0
     local has_cloud_init=0
@@ -373,12 +374,16 @@ list_vm_menu_items_unified() {
     vm_has_ssh_provision "$vm_name" && has_ssh=1
     vm_has_unattended_install "$vm_name" && has_autoinstall=1
     vm_has_section "$vm_name" "archinstall_config" && has_archinstall=1
+    vm_has_section "$vm_name" "omarchy_config" && has_omarchy=1
     vm_has_section "$vm_name" "preseed_config" && has_preseed=1
     vm_has_section "$vm_name" "kickstart_config" && has_kickstart=1
     vm_has_section "$vm_name" "cloud_init" && has_cloud_init=1
 
     emit_section "INSTALL"
-    if [[ $has_archinstall -eq 1 ]]; then
+    if [[ $has_omarchy -eq 1 ]]; then
+        emit_action "Omarchy Bootstrap" "Official cidata install + NVIDIA post-install"
+        emit_action "Omarchy Unattended Install" "Install from the official ISO and stop after reboot"
+    elif [[ $has_archinstall -eq 1 ]]; then
         emit_action "Arch Bootstrap" "Fully automated Arch install + post-install"
         emit_action "Arch Install (Interactive)" "Boot live ISO with pre-built archinstall config"
     elif [[ $has_preseed -eq 1 ]]; then
@@ -671,6 +676,8 @@ resolve_action() {
         "Profile Details") printf '%s\n' show ;;
         "Back") printf '%s\n' back ;;
         "Arch Bootstrap") printf '%s\n' bootstrap-archinstall ;;
+        "Omarchy Bootstrap") printf '%s\n' bootstrap-omarchy ;;
+        "Omarchy Unattended Install") printf '%s\n' install-omarchy ;;
         "Arch Install (Interactive)") printf '%s\n' install-archinstall ;;
         "Debian Preseed Bootstrap") printf '%s\n' bootstrap-preseed ;;
         "Kickstart Bootstrap") printf '%s\n' bootstrap-kickstart ;;
@@ -762,6 +769,22 @@ run_action() {
         bootstrap-archinstall)
             if confirm_box "Arch Bootstrap" "Run the fully automated Arch Linux bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the Arch live ISO headless via serial console\n- automatically trigger pacstrap, locale, user, GRUB\n- start the installed VM and run SSH post-install (paru + noctalia-git)\n\nExpected time: ~15-30 min depending on download speed."; then
                 run_vmctl bootstrap-archinstall "$current_vm" || true
+            fi
+            ;;
+        bootstrap-omarchy)
+            if confirm_box "Omarchy Bootstrap" "Run the official unattended Omarchy install for VM '$current_vm'?\n\nThis will:\n- download the Omarchy ISO if missing\n- install Omarchy from a cidata configuration\n- start the installed VM headless\n- run the NVIDIA post-install over SSH"; then
+                run_vmctl bootstrap-omarchy "$current_vm" || true
+            fi
+            ;;
+        install-omarchy)
+            local video
+            video=$(choose_video) || return 0
+            if confirm_box "Omarchy Unattended Install" "Install Omarchy from the official ISO using the profile's cidata configuration?\n\nThe VM stops when the installer reboots; start it afterwards to use the desktop."; then
+                if [[ -n "$video" ]]; then
+                    run_vmctl install-omarchy "$current_vm" --video "$video" || true
+                else
+                    run_vmctl install-omarchy "$current_vm" || true
+                fi
             fi
             ;;
         install-archinstall)

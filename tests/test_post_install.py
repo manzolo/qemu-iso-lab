@@ -95,6 +95,26 @@ class PostInstallTests(BaseVmctlTestCase):
         self.assertEqual(run_cmd.call_args_list[0].args[0][-1], "true")
         sleep_mock.assert_called_once_with(2)
 
+    def test_ensure_passwordless_sudo_passes_password_on_stdin_only(self):
+        self.vm_config["ssh_provision"] = {
+            "user": "tester",
+            "ssh_host_port": 2223,
+            "sudo_password": "guest-secret",
+        }
+
+        with mock.patch.object(
+            vmctl.ssh,
+            "ensure_generated_ssh_keypair",
+            return_value=self.root / "artifacts/testvm/ssh/id_ed25519",
+        ), mock.patch.object(vmctl.runtime, "run") as run_cmd:
+            vmctl.ssh.ensure_passwordless_sudo(self.vm_config)
+
+        command = run_cmd.call_args.args[0]
+        self.assertNotIn("guest-secret", " ".join(command))
+        self.assertIn("sudo -S -p ''", command[-1])
+        self.assertIn("/etc/sudoers.d/vmctl-tester", command[-1])
+        self.assertEqual(run_cmd.call_args.kwargs["stdin_text"], "guest-secret\n")
+
     def test_cmd_post_install_waits_copies_and_runs_remote_commands(self):
         source_dir = self.root / "host-niri"
         source_dir.mkdir()

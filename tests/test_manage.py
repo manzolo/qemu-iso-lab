@@ -203,6 +203,7 @@ class ManageTests(BaseVmctlTestCase):
             "artifacts/testvm/ssh/id_ed25519",
             "artifacts/testvm/ssh/id_ed25519.pub",
             "artifacts/testvm/archinstall/bootstrap.iso",
+            "artifacts/testvm/omarchy/seed.iso",
             "artifacts/testvm/cloud-init/seed.iso",
             "artifacts/testvm/autoinstall/seed.iso",
             "artifacts/testvm/unattended/seed.iso",
@@ -222,6 +223,7 @@ class ManageTests(BaseVmctlTestCase):
         self.assertFalse((self.root / "artifacts/testvm/logs").exists())
         self.assertFalse((self.root / "artifacts/testvm/ssh").exists())
         self.assertFalse((self.root / "artifacts/testvm/archinstall").exists())
+        self.assertFalse((self.root / "artifacts/testvm/omarchy").exists())
         self.assertFalse((self.root / "artifacts/testvm/cloud-init").exists())
         self.assertFalse((self.root / "artifacts/testvm/autoinstall").exists())
         self.assertFalse((self.root / "artifacts/testvm/unattended").exists())

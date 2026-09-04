@@ -29,6 +29,7 @@ import vmctl.errors  # noqa: E402
 import vmctl.flash  # noqa: E402
 import vmctl.import_dev  # noqa: E402
 import vmctl.iso  # noqa: E402
+import vmctl.omarchy  # noqa: E402
 import vmctl.host_setup  # noqa: E402
 import vmctl.lifecycle  # noqa: E402
 import vmctl.qemu  # noqa: E402
@@ -53,7 +54,7 @@ class _VmctlFacade:
     )
     _SEARCH_ORDER = (
         vmctl.lifecycle, vmctl.ssh, vmctl.host_setup, vmctl.flash, vmctl.import_dev, vmctl.disk_inspect,
-        vmctl.iso, vmctl.archinstall, vmctl.preseed, vmctl.kickstart, vmctl.cloud_init, vmctl.qemu, vmctl.config,
+        vmctl.iso, vmctl.archinstall, vmctl.omarchy, vmctl.preseed, vmctl.kickstart, vmctl.cloud_init, vmctl.qemu, vmctl.config,
         vmctl.runtime, vmctl.ui, vmctl.state, vmctl.errors,
     )
 

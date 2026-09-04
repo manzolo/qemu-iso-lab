@@ -21,6 +21,7 @@ map, grouped by task; `vmtui` is the same as a dialog menu).
 | read one profile as `vmctl` sees it                   | `vmctl show <vm>` (`--json` for scripts)                 |
 | install a distro by hand (ISO, disk, installer)       | `vmctl provision <vm>` then click through the installer  |
 | install Ubuntu with zero clicks, ready with SSH       | `vmctl bootstrap-unattended <vm>`                        |
+| install Omarchy with zero clicks, ready with NVIDIA   | `vmctl bootstrap-omarchy arch-omarchy-nvidia-local`      |
 | same for Debian / AlmaLinux / Arch                    | `vmctl bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-archinstall <vm>` |
 | boot a VM I already installed                         | `vmctl start <vm>` (`--headless --background` to detach) |
 | get a shell inside it / stop it                       | `vmctl shell <vm>`, `vmctl stop <vm>`                    |
@@ -181,6 +182,22 @@ After the first boot, you can open a shell with:
 vmctl shell <name>
 ```
 
+### Omarchy + NVIDIA Flow
+
+The `arch-omarchy-nvidia-local` profile uses the official Omarchy ISO and its
+supported unattended `cidata` mechanism. It installs the native Omarchy
+Hyprland desktop with Btrfs + Limine, then adds the NVIDIA open DKMS stack:
+
+```bash
+vmctl bootstrap-omarchy arch-omarchy-nvidia-local
+vmctl stop arch-omarchy-nvidia-local
+vmctl start arch-omarchy-nvidia-local
+```
+
+Omarchy is Hyprland-based, not Niri-based. The NVIDIA packages are installed as
+a bare-metal image recipe; `nvidia-smi` is expected to report no device in a VM
+unless an NVIDIA GPU is passed through.
+
 ### Minimal Real Boot Check
 
 Use this path for the smallest real boot smoke test currently in the repo:
@@ -216,7 +233,7 @@ vmtui
 
 The TUI is a thin frontend over `vmctl`. The main menu offers `Choose VM`, `Status`, `Remote Hosts`, `Clean All`, and `Quit`. Picking a VM opens a single contextual menu with sections:
 
-- `INSTALL` — bootstrap or guided install actions that match the VM profile (`Full Bootstrap`, `Arch Bootstrap`, `Debian Preseed Bootstrap`, `Kickstart Bootstrap`, `Unattended Install`, `Cloud-Init Flow`, `Guided Provision`, `Installer Only`, `Seeded Installer`);
+- `INSTALL` — bootstrap or guided install actions that match the VM profile (`Full Bootstrap`, `Omarchy Bootstrap`, `Arch Bootstrap`, `Debian Preseed Bootstrap`, `Kickstart Bootstrap`, `Unattended Install`, `Cloud-Init Flow`, `Guided Provision`, `Installer Only`, `Seeded Installer`);
 - `RUN` — `Boot Desktop`, `Boot Headless`, `Stop VM`, `SSH Console`, `First Boot` (cloud-init);
 - `MAINTENANCE` — `Post-Install`, `Boot Check`, `Fetch ISO`, `Prepare VM`, `Clean VM`, `Delete ISO`, `Profile Details`;
 - `ADVANCED` — `Flash Empty Disk`, `Force Flash`, `Import Disk` (physical disk workflows scoped to the current VM);
@@ -251,6 +268,7 @@ vmctl show <name>                   # resolved profile
 
 vmctl provision <name>              # ISO + disk + interactive installer
 vmctl bootstrap-unattended <name>   # Ubuntu autoinstall, headless, + post-install
+vmctl bootstrap-omarchy <name>      # Omarchy cidata install + post-install
 vmctl bootstrap-preseed <name>      # Debian
 vmctl bootstrap-kickstart <name>    # AlmaLinux / RHEL family
 vmctl bootstrap-archinstall <name>  # Arch
@@ -342,7 +360,7 @@ Example discovery:
 
 Import-oriented profiles may omit every ISO download source on purpose. These are intended for flows such as `import-device`, where you bring an existing physical installation into a VM disk rather than booting a distro installer ISO.
 
-Profiles that define `cloud_init`, `ssh_provision`, or `autoinstall` can also support higher-level flows such as Ubuntu autoinstall, SSH post-install provisioning, and interactive shell access.
+Profiles that define `cloud_init`, `ssh_provision`, `autoinstall`, or `omarchy_config` can also support higher-level flows such as Ubuntu/Omarchy unattended installs, SSH post-install provisioning, and interactive shell access.
 
 `status` reports basic runtime state in addition to artifact state, including tracked background QEMU processes and SSH forward ports when available.
 
@@ -499,6 +517,14 @@ Supported profile fields:
 - `autoinstall.keyboard_layout`
 - `autoinstall.storage_layout`
 - `autoinstall.install_ssh`
+- `omarchy_config.hostname`
+- `omarchy_config.username`
+- `omarchy_config.password_hash`
+- `omarchy_config.timezone`
+- `omarchy_config.keyboard_layout`
+- `omarchy_config.locale`
+- `omarchy_config.disk_device`
+- `omarchy_config.encrypt`
 
 `ssh_provision` is used for guests whose installer runs interactively (CachyOS, Arch) rather than via cloud-init. Both `cloud_init` and `ssh_provision` support `copy_from_host` and `post_install_run`.
 
@@ -543,7 +569,8 @@ Guest identity and personal overrides:
   writes the placeholder **`{{user}}`**. At load time `vmctl` replaces it with
   the guest user declared by the profile (`ssh_provision.user`,
   `cloud_init.user`, `autoinstall.username`, `archinstall_config.username`,
-  `preseed_config.username` or `kickstart_config.username`; they must agree).
+  `omarchy_config.username`, `preseed_config.username` or
+  `kickstart_config.username`; they must agree).
 - To use your own name, key and password, override only the identity fields in
   the git-ignored `vms/profiles/local.json`; every `{{user}}` follows:
   - copy `vms/profiles/local.json.example` to `vms/profiles/local.json`;

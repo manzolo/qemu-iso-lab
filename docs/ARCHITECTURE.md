@@ -91,6 +91,7 @@ produces isolated per-VM artifacts.
 | `config.py`               | ~108  | `load_config`, `validate_vm_profile`, `get_vm`.                 |
 | `iso.py`                  | ~255  | ISO download, validation, discovery, installer extraction.     |
 | `cloud_init.py`           | ~192  | cloud-init / autoinstall seed builders.                         |
+| `omarchy.py`              | ~210  | Omarchy config rendering and unattended `cidata` builder.       |
 | `qemu.py`                 | ~244  | QEMU command builders: machine, firmware, disk, video, audio.   |
 | `disk_inspect.py`         | ~242  | `wipefs`, `lsblk`, GPT geometry, `cmd_list_*_devices`.          |
 | `flash.py`                | ~214  | `cmd_flash`, `cmd_flash_helper`, sudo re-exec target.           |
@@ -100,7 +101,7 @@ produces isolated per-VM artifacts.
 | `lifecycle.py`            | ~717  | All other `cmd_*` handlers + background-VM tracking.            |
 | `cli.py`                  | ~181  | `build_parser`, `dispatch_internal`, `main`. Wires it together. |
 
-**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`iso`/`cloud_init`/`qemu`/`disk_inspect` ← {`flash`, `import_dev`, `ssh`, `host_setup`} ← `lifecycle` ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
+**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`iso`/`cloud_init`/`omarchy`/`qemu`/`disk_inspect` ← {`flash`, `import_dev`, `ssh`, `host_setup`} ← `lifecycle` ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
 
 ## Typical flows
 
@@ -116,6 +117,8 @@ produces isolated per-VM artifacts.
 - `vmctl install-unattended foo` is the Ubuntu autoinstall path. It builds
   an autoinstall seed under `artifacts/<vm>/autoinstall/` and boots the
   installer with it attached.
+- `vmctl bootstrap-omarchy foo` uses the official ISO's `cidata` format,
+  waits for its unattended install to reboot, then starts SSH post-install.
 - `./bin/vmctl bootstrap-preseed <name>` is the Debian preseed path. It builds
   preseed artifacts under `artifacts/<vm>/preseed/`, boots headless via serial,
   waits for the completion token, then starts the installed disk for SSH

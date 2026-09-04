@@ -157,6 +157,40 @@ def remote_sudo_shell_cmd(vm: dict[str, Any], command: str, dry_run: bool = Fals
     return ssh_base_cmd(vm, dry_run=dry_run) + [f"sudo sh -lc {shlex.quote(command)}"]
 
 
+def ensure_passwordless_sudo(
+    vm: dict[str, Any],
+    dry_run: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+) -> None:
+    cfg = cloud_init.ssh_access_config(vm)
+    if cfg is None:
+        return
+    password = str(cfg.get("sudo_password") or "")
+    if not password:
+        return
+    if "\n" in password or "\r" in password:
+        raise VMError("ssh_provision.sudo_password cannot contain newlines")
+
+    _, _, user = ssh_target(vm)
+    sudoers_path = f"/etc/sudoers.d/vmctl-{user}"
+    sudoers_rule = f"{user} ALL=(ALL) NOPASSWD: ALL"
+    install_rule = (
+        f"printf '%s\\n' {shlex.quote(sudoers_rule)} > {shlex.quote(sudoers_path)} "
+        f"&& chmod 0440 {shlex.quote(sudoers_path)}"
+    )
+    ui.print_note("Configuring passwordless sudo for SSH provisioning")
+    runtime.run(
+        ssh_base_cmd(vm, dry_run=dry_run)
+        + [f"sudo -S -p '' sh -lc {shlex.quote(install_rule)}"],
+        dry_run=dry_run,
+        stdout_log=stdout_log,
+        stderr_log=stderr_log,
+        append=True,
+        stdin_text=None if dry_run else password + "\n",
+    )
+
+
 def wait_for_guest_post_install_ready(
     vm: dict[str, Any],
     dry_run: bool = False,

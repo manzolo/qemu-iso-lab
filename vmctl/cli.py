@@ -24,9 +24,9 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Discover", "what is configured, what exists on disk, what the host can run",
      ["list", "status", "show", "setup"]),
     ("Install by hand", "boot an installer and drive it yourself",
-     ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended"]),
+     ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "post-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "post-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell"]),
     ("Verify", "smoke tests and the local validation matrix",
@@ -44,6 +44,7 @@ typical flows:
   vmctl start <vm> [--headless]         boot the installed disk (add --background to detach)
   vmctl shell <vm>                      SSH into it (profiles with ssh_provision/cloud_init)
   vmctl bootstrap-unattended <vm>       Ubuntu: unattended install + post-install, no clicks
+  vmctl bootstrap-omarchy <vm>          Omarchy: cidata install + NVIDIA post-install
   vmctl bootstrap-preseed <vm>          same for Debian  (kickstart: AlmaLinux, archinstall: Arch)
   vmctl clean <vm>                      remove its disk and generated artifacts
   vmctl <command> --help                all options of one command
@@ -124,6 +125,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_archinstall)
 
+    p = _add(subparsers, "bootstrap-omarchy", help="fully automated Omarchy cidata install + SSH post-install")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--spice-port", type=int, help="expose the installer stage via SPICE on 127.0.0.1:PORT")
+    p.add_argument("--timeout", type=int, default=600, help="seconds to wait for SSH after installation (default: 600)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_omarchy)
+
     p = _add(subparsers, "bootstrap-preseed", help="fully automated Debian preseed install + post-install via serial console")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
@@ -146,6 +153,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--headless", action="store_true", help="run the Ubuntu autoinstall flow without a display")
     p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
     p.set_defaults(func=lifecycle.cmd_install_unattended)
+
+    p = _add(subparsers, "install-omarchy", help="boot the official Omarchy ISO with an unattended cidata drive")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--video", choices=VIDEO_CHOICES, help=VIDEO_HELP)
+    p.add_argument("--headless", action="store_true", help="run the Omarchy installer without a display")
+    p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
+    p.set_defaults(func=lifecycle.cmd_install_omarchy)
 
     p = _add(subparsers, "bootstrap-unattended", help="run the Ubuntu autoinstall flow headless and exit when it reboots")
     p.add_argument("vm", help=VM_HELP)

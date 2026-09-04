@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import archinstall, cloud_init, config, host_setup, iso, preseed, kickstart, qemu, runtime, ssh, state, ui
+from vmctl import archinstall, cloud_init, config, host_setup, iso, omarchy, preseed, kickstart, qemu, runtime, ssh, state, ui
 from vmctl.errors import VMError
 
 
@@ -313,6 +313,10 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
     role = str(meta.get("role") or "").strip()
     if role == "import-template":
         return ("skip", "import-template profile")
+    if omarchy.omarchy_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-omarchy", "Omarchy cidata install + post-install")
+        return ("skip", "Omarchy cidata install without SSH post-install")
     if cloud_init.autoinstall_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-unattended", "autoinstall + post-install")
@@ -414,7 +418,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart"}:
             candidates.append(vm_name)
     return candidates
 
@@ -461,6 +465,23 @@ def run_local_test_vm(
                 argparse.Namespace(
                     vm=vm_name,
                     video=None,
+                    timeout=args.timeout,
+                    spice_port=None,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                )
+            )
+        finally:
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-omarchy":
+        try:
+            cmd_bootstrap_omarchy(
+                argparse.Namespace(
+                    vm=vm_name,
                     timeout=args.timeout,
                     spice_port=None,
                     dry_run=args.dry_run,
@@ -1193,6 +1214,35 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_install_omarchy(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if omarchy.omarchy_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define omarchy_config")
+    runtime.ensure_vm_dirs(args.vm)
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    seed_path = omarchy.create_cidata_iso(args.vm, vm, dry_run=args.dry_run)
+    headless = getattr(args, "headless", False)
+    qemu_args = qemu.common_args(
+        vm,
+        None if headless else qemu.installer_video_variant(vm, args.video),
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=headless,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+        spice_port=getattr(args, "spice_port", None),
+    )
+    qemu_args += ["-cdrom", str(iso_path)]
+    qemu_args += omarchy.cidata_drive_args(seed_path)
+    stdout_log, stderr_log = announce_phase_logs(args.vm, "install-omarchy")
+    runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    return 0
+
+
 def cmd_start(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -1253,6 +1303,12 @@ def run_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int, dry_run
     stdout_log, stderr_log = announce_phase_logs(vm_name, "post-install")
     ssh.wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
     ui.print_status("ok", f"SSH is ready for VM '{vm_name}'")
+    ssh.ensure_passwordless_sudo(
+        vm,
+        dry_run=dry_run,
+        stdout_log=stdout_log,
+        stderr_log=stderr_log,
+    )
     ssh.wait_for_guest_post_install_ready(vm, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     ui.print_note("Running post-install provisioning")
 
@@ -1315,6 +1371,52 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
     run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
 
     ui.print_status("ok", f"Post-install completed for VM '{args.vm}'")
+    return 0
+
+
+def cmd_bootstrap_omarchy(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if omarchy.omarchy_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define omarchy_config")
+    if cloud_init.ssh_access_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define SSH access for post-install provisioning")
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Omarchy (cidata): {args.vm}")
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+    cmd_install_omarchy(
+        argparse.Namespace(
+            vm=args.vm,
+            video=None,
+            headless=True,
+            spice_port=getattr(args, "spice_port", None),
+            dry_run=args.dry_run,
+            _vm_override=vm,
+        )
+    )
+
+    pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+    )
+    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
+    runtime.ensure_parent(post_serial_log)
+    qemu_args += ["-serial", f"file:{post_serial_log}"]
+    stderr_log = companion_stderr_log_path(log_path)
+    pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
+    if pid is not None:
+        pid_path.write_text(f"{pid}\n", encoding="utf-8")
+        ui.print_kv("pid", str(pid))
+
+    run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0
 
 
@@ -1581,6 +1683,7 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
         archinstall.archinstall_artifact_dir(vm),
         preseed.preseed_artifact_dir(vm),
         kickstart.kickstart_artifact_dir(vm),
+        omarchy.omarchy_artifact_dir(vm),
         cloud_init.cloud_init_artifact_dir(vm),
         cloud_init.autoinstall_artifact_dir(vm),
         cloud_init.unattended_artifact_dir(vm),
