@@ -40,7 +40,7 @@ The project currently provides:
 
 - a modular VM catalog under `vms/profiles/*.json`;
 - one Python CLI, `vmctl` (`bin/vmctl`, installable on your `PATH` with `make install-cli`);
-- a dialog-based text UI, `vmtui`, over the same commands;
+- a text UI, `vmtui` (fzf with dialog fallback), over the same commands;
 - a `Makefile` with developer targets only (tests, type checks, install of the CLI);
 - support for both `efi` and `bios` guests;
 - isolated per-VM artifacts under `artifacts/<vm>/`;
@@ -225,21 +225,25 @@ Use `CLEAN_FIRST=1` to skip the prompt and always clean unattended/bootstrap pro
 
 ### Optional TUI
 
-If you prefer a simple terminal UI:
+If you prefer a terminal UI:
 
 ```bash
 vmtui
 ```
 
-The TUI is a thin frontend over `vmctl`. The main menu offers `Choose VM`, `Status`, `Remote Hosts`, `Clean All`, and `Quit`. Picking a VM opens a single contextual menu with sections:
+The TUI is a thin frontend over `vmctl`: every action echoes the `vmctl` command it runs, so it doubles as a discovery tool for the CLI. It uses **fzf** when installed (fuzzy type-to-filter, cursor on the suggested entry) and falls back to **dialog** otherwise; force one with `VMTUI_UI=fzf` or `VMTUI_UI=dialog`.
 
-- `INSTALL` — bootstrap or guided install actions that match the VM profile (`Full Bootstrap`, `Omarchy Bootstrap`, `Arch Bootstrap`, `Debian Preseed Bootstrap`, `Kickstart Bootstrap`, `Unattended Install`, `Cloud-Init Flow`, `Guided Provision`, `Installer Only`, `Seeded Installer`);
-- `RUN` — `Boot Desktop`, `Boot Headless`, `Stop VM`, `SSH Console`, `First Boot` (cloud-init);
-- `MAINTENANCE` — `Post-Install`, `Boot Check`, `Fetch ISO`, `Prepare VM`, `Clean VM`, `Delete ISO`, `Profile Details`;
-- `ADVANCED` — `Flash Empty Disk`, `Force Flash`, `Import Disk` (physical disk workflows scoped to the current VM);
-- `OTHER` — `Remote SPICE`, `Back`.
+The main screen is a **dashboard** of all profiles with live state (`●` running, `■` disk has data, `□` disk prepared but still empty, `○` no disk), RAM/CPU, SSH port and disk size; installed VMs are listed first and the cursor starts on the VM you opened last. The rows above and below the list give `Filter` (all / installed / running / by distro family), `Find` (substring on name or title), `Tools` (`vmctl status`, remote hosts, clean all) and `Quit`.
 
-Entries that don't apply to the current VM or state stay visible with a reason in their description (e.g. `SSH Console  (no ssh_provision in profile)`, `Stop VM  (VM not running)`). Selecting one opens an info dialog instead of failing.
+Opening a VM shows a one-line state summary (`■ stopped, disk has data · disk 8.8 GiB / 32.0 GiB · ISO ready · SSH port 2230`) and a single contextual menu. Only actions that make sense for the VM *right now* are listed, and the suggested next step is marked `▶` and preselected, so Enter does the obvious thing (install when there is no disk, boot when it is stopped, SSH when it is running):
+
+- `INSTALL` — the install flow matching the profile (`Full Bootstrap`, `Omarchy Bootstrap`, `Arch Bootstrap`, `Debian Preseed Bootstrap`, `Kickstart Bootstrap`, `Unattended Install`, `Cloud-Init Flow`, `Guided Provision`, `Installer Only`, `Seeded Installer`);
+- `RUN` — `Boot Desktop`, `Boot Headless`, `Stop VM` (only while running), `SSH Console` (only with `ssh_provision`), `First Boot` (cloud-init), `Remote SPICE`;
+- `MAINTENANCE` — `Video Profile`, `Post-Install`, `Boot Check`, `Fetch ISO`, `Prepare VM`, `Profile Details`;
+- `ADVANCED` — `Clean VM`, `Delete ISO`, `Flash Empty Disk`, `Force Flash`, `Import Disk`;
+- `Back` (or Esc) returns to the dashboard.
+
+`Video Profile` picks the `video.variants` entry used by every start/install action of that VM and remembers it (under `~/.local/state/vmtui/`), so the TUI never asks for a video profile again until you change it. Destructive actions (`Stop VM`, `Clean VM`, `Delete ISO`, flash/import) ask for confirmation; flash/import also require typing the device path.
 
 After an installer that doesn't auto-boot the VM (`Unattended Install`, `Guided Provision`, `Cloud-Init Flow`, `Arch Install (Interactive)`, `Installer Only`, `Seeded Installer`) the TUI offers `Start headless + SSH post-install` / `Start with display` / `Done`, so the install→boot→post-install chain finishes without navigating back through menus. The full-flow `Bootstrap` actions already do this end-to-end and skip the prompt.
 

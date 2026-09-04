@@ -2,7 +2,7 @@
 #
 # Day-to-day VM work goes through the CLI, not through make:
 #     vmctl --help            (./bin/vmctl --help before `make install-cli`)
-#     vmtui                   dialog-based menu over the same commands
+#     vmtui                   text UI (fzf, or dialog) over the same commands
 
 .DEFAULT_GOAL := help
 PREFIX ?= $(HOME)/.local

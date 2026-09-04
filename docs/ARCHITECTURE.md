@@ -69,7 +69,7 @@ produces isolated per-VM artifacts.
 |-----------------------------------|-----------------------------------------------------------------------|
 | `Makefile`                        | Developer targets only: `install-cli`, `test`, `lint`, `check`, `ci`, `tui`. VM work is `vmctl` |
 | `bin/vmctl`                       | 12-line entry-point shim that imports `vmctl.cli.main` from the package |
-| `bin/vmtui`                       | Dialog-based menu wrapper over `vmctl`; also handles remote SPICE hosts via `vms/remotes.json` |
+| `bin/vmtui`                       | Menu wrapper over `vmctl` (fzf when available, dialog fallback); also handles remote SPICE hosts via `vms/remotes.json` |
 | `bin/ventoy-prep`, `ventoy-copy`  | Off-flow helpers for Ventoy USB scenarios                              |
 | `vmctl/`                          | The Python package — see module table below                            |
 | `vms/profiles/*.json`             | Source of truth for VM definitions (`local.json` is git-ignored override) |
@@ -150,5 +150,6 @@ and boot-check runs default to KVM when available. See
   Use `vms/profiles/local.json` for personal-only profiles (git-ignored).
 - **A new `vmctl` subcommand:** add a parser in `main()` and a handler function.
   Tests go in `tests/test_vmctl.py`.
-- **A new TUI screen:** edit `bin/vmtui`, which composes `dialog` menus and
-  shells out to `vmctl`.
+- **A new TUI screen:** edit `bin/vmtui`. Use the backend-neutral widgets
+  (`menu_choose`, `confirm_box`, `msg_box`, `input_box`) so both the fzf and
+  the dialog backend keep working, and shell out to `vmctl` via `run_vmctl`.

@@ -29,7 +29,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ## Architecture
 
-`bin/vmctl` is a 12-line shim that calls `vmctl.cli:main`; `make install-cli` symlinks it (and `vmtui`) into `~/.local/bin`, and both resolve the repository root through the symlink. The `Makefile` carries developer targets only and must not grow VM-lifecycle targets again: new user-facing behaviour goes into a `vmctl` subcommand, registered in `cli.py` inside one of the `COMMAND_GROUPS` (a test fails otherwise). `bin/vmtui` is an independent `dialog`-based menu wrapper that shells out to `vmctl`.
+`bin/vmctl` is a 12-line shim that calls `vmctl.cli:main`; `make install-cli` symlinks it (and `vmtui`) into `~/.local/bin`, and both resolve the repository root through the symlink. The `Makefile` carries developer targets only and must not grow VM-lifecycle targets again: new user-facing behaviour goes into a `vmctl` subcommand, registered in `cli.py` inside one of the `COMMAND_GROUPS` (a test fails otherwise). `bin/vmtui` is an independent menu wrapper (fzf backend, `dialog` fallback, `VMTUI_UI` to force one) that shells out to `vmctl`.
 
 ### Module import order (no cycles allowed)
 
