@@ -528,6 +528,14 @@ Supported profile fields:
 
 `ssh_provision` is used for guests whose installer runs interactively (CachyOS, Arch) rather than via cloud-init. Both `cloud_init` and `ssh_provision` support `copy_from_host` and `post_install_run`.
 
+`ssh_provision.sudo_password` is optional and exists for guests whose installer cannot set up
+passwordless sudo itself (Omarchy ignores archinstall's `custom_commands`). When it is present,
+post-install first writes `/etc/sudoers.d/vmctl-<user>` in the guest, feeding the password to
+`sudo -S` **on stdin** so it never appears in a command line or a log. Note that this step lives
+in the shared post-install path, so it applies to **every** profile that defines the field, not
+just the Omarchy one; profiles without it are untouched. Keep real passwords out of the tracked
+profiles — put the field in the git-ignored `vms/profiles/local.json`.
+
 Provisioning scripts can be versioned under `vms/profile-files/<vm>/` and deployed via `copy_from_host` with `dest_mode: "755"`. This keeps JSON profiles readable and puts the actual logic in plain shell scripts tracked by git.
 
 ```json
