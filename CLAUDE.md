@@ -113,6 +113,16 @@ If a future change appears to need either of these relaxed (e.g. "speed up the b
 
 Tests mock `vmctl.runtime.run` (for subprocess calls) and `shutil.which` (for tool detection). Patch the submodule directly (`mock.patch.object(vmctl.runtime, "run")`), not through the facade.
 
+#### Host isolation (a test must pass identically on the developer's host and in the bare CI runner)
+
+The CI `test` job has no QEMU, no `qemu-img`, no `fzf`, no ISOs and no installed VMs; the developer's host has all of them. A test that reads any of that passes only on one side. Rules:
+
+- **Never resolve paths against the real checkout.** Relative profile paths (`isos/`, `artifacts/`, PID files under `artifacts/<vm>/runtime/`) resolve against `state.ROOT`, so tests must point it at a temp dir (`BaseVmctlTestCase` does; `test_vmtui.py` passes a temp `VMTUI_ROOT_DIR` with `vmctl/` and `bin/` symlinked from the checkout). Simulate disk state by writing files there: `mark_installed` (allocated data) / `mark_prepared` (sparse file, no `qemu-img`).
+- **Never load `vms/profiles/local.json`.** It is the developer's personal, gitignored file. Copy the tracked profiles into a temp config dir and skip it; a test-specific `local.json` in that temp dir is fine.
+- **Build subprocess environments from scratch**, not with `os.environ.copy()`: minimal PATH (temp tools dir, `Path(sys.executable).parent`, `os.defpath`), temp `HOME`, `LC_ALL=C.UTF-8`, explicit `VMTUI_UI=dialog`. Fake external tools (`dialog`, `fzf`) as tiny scripts in the temp tools dir.
+- **No external binaries in the `test` job.** Do not call `qemu-img`, `xorriso`, `bsdtar`, `virsh` or `qemu-system-*` in unit tests; mock `vmctl.runtime.run` or fake the artifact.
+- Before pushing, run the suite once with those tools hidden from PATH (e.g. a dir of symlinks to `/usr/bin/*` minus `qemu-*`, `fzf`, `dialog`, `xorriso`, `bsdtar`) to reproduce the CI runner locally.
+
 ### Artifact layout
 
 ```
