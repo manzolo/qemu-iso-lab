@@ -392,6 +392,19 @@ class VmctlTests(BaseVmctlTestCase):
             windowed = vmctl.qemu.common_args(self.vm_config, "std", dry_run=True, headless=False)
         self.assertNotIn("-vnc", windowed)
 
+    def test_common_args_headless_uses_profile_gpu_and_keeps_vnc(self):
+        self.create_disk()
+        self.vm_config["video"]["headless"] = ["-device", "virtio-vga-gl", "-display", "egl-headless"]
+        with mock.patch.object(vmctl.runtime, "require_command"):
+            cmd = vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True)
+            windowed = vmctl.qemu.common_args(self.vm_config, "std", dry_run=True)
+        self.assertIn("virtio-vga-gl", cmd)
+        self.assertEqual(cmd.count("-display"), 1)
+        self.assertEqual(cmd[cmd.index("-display") + 1], "egl-headless")
+        self.assertIn("-vnc", cmd)
+        self.assertIn("-qmp", cmd)
+        self.assertNotIn("egl-headless", windowed)
+
     def _attach_args(self, **overrides: object) -> argparse.Namespace:
         values: dict[str, object] = {"vm": self.vm_name, "viewer": None, "port": None, "no_viewer": False, "dry_run": False}
         values.update(overrides)

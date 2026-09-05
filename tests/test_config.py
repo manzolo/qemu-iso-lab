@@ -57,6 +57,15 @@ class ConfigTests(BaseVmctlTestCase):
 
         self.assertIn("video.default", str(ctx.exception))
 
+    def test_load_config_rejects_invalid_headless_video_args(self):
+        for value in (None, [], "egl-headless", ["-display", 1]):
+            with self.subTest(value=value):
+                self.vm_config["video"]["headless"] = value
+                self.write_config_dir()
+                with self.assertRaises(self.vmctl.VMError) as ctx:
+                    self.vmctl.load_config()
+                self.assertIn("video.headless", str(ctx.exception))
+
     def test_load_config_rejects_installer_order_with_unknown_variant(self):
         self.vm_config["video"]["installer_order"] = ["std", "ghost"]
         self.write_config_dir()

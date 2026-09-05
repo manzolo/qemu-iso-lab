@@ -5,17 +5,11 @@
       "name": "CachyOS (Local)",
       "ssh_provision": {
         "user": "YOUR_USER",
-        "ssh_key": "~/.ssh/id_ed25519",
-        "copy_from_host": [
-          {
-            "source": "~/.config/niri/",
-            "dest": "/home/{{user}}/.config/niri"
-          },
-          {
-            "source": "~/.config/DankMaterialShell/",
-            "dest": "/home/{{user}}/.config/DankMaterialShell"
-          }
-        ]
+        "ssh_key": "~/.ssh/id_ed25519"
+      },
+      "archinstall_config": {
+        "username": "YOUR_USER",
+        "password": "YOUR_PASSWORD"
       }
     },
     "ubuntu-niri-local": {

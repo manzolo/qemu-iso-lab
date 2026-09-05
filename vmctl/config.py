@@ -130,6 +130,10 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
 
     video = vm.get("video")
     if isinstance(video, dict):
+        if "headless" in video:
+            headless = video["headless"]
+            if not isinstance(headless, list) or not headless or not all(isinstance(arg, str) for arg in headless):
+                err("video.headless must be a non-empty list of strings")
         variants = video.get("variants")
         if not isinstance(variants, dict) or not variants:
             err("video.variants must be a non-empty object")

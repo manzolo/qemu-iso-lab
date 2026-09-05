@@ -152,6 +152,12 @@
       "audio": true,
       "video": {
         "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga-gl",
+          "-display",
+          "egl-headless"
+        ],
         "variants": {
           "std": [
             "-vga",
@@ -250,7 +256,8 @@
         ],
         "bootstrap_chroot_commands": [
           "systemctl enable sddm power-profiles-daemon",
-          "install -d -m 755 /etc/sddm.conf.d && printf '[Autologin]\\nUser={{user}}\\nSession=niri\\n' > /etc/sddm.conf.d/autologin.conf"
+          "install -d -m 755 /etc/sddm.conf.d && printf '[Autologin]\\nUser={{user}}\\nSession=niri\\n' > /etc/sddm.conf.d/autologin.conf",
+          "install -d -o {{user}} -g {{user}} /home/{{user}}/.config/niri/cfg && printf '%s\\n' '// qemu-iso-lab: the VM power button (vmctl stop) must reach logind, which powers off.' '// niri would otherwise inhibit it and map XF86PowerOff to suspend.' 'input {' '    disable-power-key-handling' '}' > /home/{{user}}/.config/niri/cfg/vm-power.kdl && grep -q 'cfg/vm-power.kdl' /home/{{user}}/.config/niri/config.kdl 2>/dev/null || echo 'include \"./cfg/vm-power.kdl\"' >> /home/{{user}}/.config/niri/config.kdl && chown -R {{user}}:{{user}} /home/{{user}}/.config/niri"
         ]
       },
       "ssh_provision": {
@@ -310,6 +317,12 @@
       "audio": true,
       "video": {
         "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga-gl",
+          "-display",
+          "egl-headless"
+        ],
         "variants": {
           "std": [
             "-vga",
@@ -408,7 +421,8 @@
         ],
         "bootstrap_chroot_commands": [
           "systemctl enable sddm power-profiles-daemon",
-          "install -d -m 755 /etc/sddm.conf.d && printf '[Autologin]\\nUser={{user}}\\nSession=niri\\n' > /etc/sddm.conf.d/autologin.conf"
+          "install -d -m 755 /etc/sddm.conf.d && printf '[Autologin]\\nUser={{user}}\\nSession=niri\\n' > /etc/sddm.conf.d/autologin.conf",
+          "install -d -o {{user}} -g {{user}} /home/{{user}}/.config/niri/cfg && printf '%s\\n' '// qemu-iso-lab: the VM power button (vmctl stop) must reach logind, which powers off.' '// niri would otherwise inhibit it and map XF86PowerOff to suspend.' 'input {' '    disable-power-key-handling' '}' > /home/{{user}}/.config/niri/cfg/vm-power.kdl && grep -q 'cfg/vm-power.kdl' /home/{{user}}/.config/niri/config.kdl 2>/dev/null || echo 'include \"./cfg/vm-power.kdl\"' >> /home/{{user}}/.config/niri/config.kdl && chown -R {{user}}:{{user}} /home/{{user}}/.config/niri"
         ]
       },
       "ssh_provision": {
@@ -416,6 +430,11 @@
         "user": "lab",
         "ssh_host_port": 2224,
         "copy_from_host": [
+          {
+            "source": "vms/profile-files/cachyos-local/bin/cachyos-post-install",
+            "dest": "/home/{{user}}/bin/cachyos-post-install",
+            "dest_mode": "755"
+          },
           {
             "source": "vms/profile-files/cachyos-nvidia-local/bin/cachyos-nvidia-post-install",
             "dest": "/home/{{user}}/bin/cachyos-nvidia-post-install",

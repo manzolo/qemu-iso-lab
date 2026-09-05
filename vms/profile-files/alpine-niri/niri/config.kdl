@@ -18,6 +18,10 @@ input {
         tap
         natural-scroll
     }
+
+    // The VM power button (vmctl stop) must reach logind, which powers off.
+    // niri would otherwise inhibit it and map XF86PowerOff to suspend.
+    disable-power-key-handling
 }
 
 spawn-at-startup "foot" "--server"

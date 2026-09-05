@@ -1,10 +1,49 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# niri + Noctalia are installed by the bootstrap (cachyos-niri-noctalia); this only checks the result.
-mkdir -p "$HOME/.config/niri"
+# Keep the configuration shipped by cachyos-niri-noctalia in /etc/skel.
+# Copying an unrelated host niri config can silently disable the desktop shell.
+for program in niri noctalia alacritty firefox nautilus xwayland-satellite; do
+  command -v "$program" >/dev/null || {
+    printf 'Missing CachyOS desktop component: %s\n' "$program" >&2
+    exit 1
+  }
+done
 
-command -v niri >/dev/null
-niri --version
-command -v noctalia-shell >/dev/null || command -v qs >/dev/null
+test -s "$HOME/.config/niri/config.kdl"
+niri validate
+noctalia --version
 systemctl is-enabled sddm
+xdg-user-dirs-update
+
+# SSH being available does not mean SDDM has finished starting the desktop.
+# Run the probe in the user manager so it inherits the graphical session's
+# WAYLAND_DISPLAY, NIRI_SOCKET and D-Bus environment, rather than SSH's.
+for attempt in {1..15}; do
+  if systemctl --user is-active --quiet niri.service &&
+     desktop_status=$(systemd-run --user --quiet --wait --pipe timeout 5 noctalia msg status) &&
+     [[ "$desktop_status" =~ \"barVisible\"[[:space:]]*:[[:space:]]*true ]]; then
+    printf '%s\n' "$desktop_status"
+    # niri takes logind's handle-power-key inhibitor and maps the power key to
+    # suspend. The bootstrap disables that (cfg/vm-power.kdl) so that the ACPI
+    # power button sent by `vmctl stop` powers the guest off instead.
+    inhibitors=$(systemd-inhibit --list --no-pager 2>/dev/null || true)
+    if [[ "$inhibitors" == *handle-power-key* ]]; then
+      printf '%s\n' \
+        'The compositor inhibits the power key: vmctl stop would suspend the VM instead of powering it off.' \
+        'Check that ~/.config/niri/config.kdl includes cfg/vm-power.kdl (input { disable-power-key-handling }), then log out and back in.' >&2
+      exit 1
+    fi
+    printf 'CachyOS desktop ready: niri + Noctalia\n'
+    exit 0
+  fi
+  sleep 2
+done
+
+printf '%s\n' \
+  'CachyOS desktop did not start: niri/Noctalia is not responding or the bar is not visible.' \
+  'Check niri msg outputs: a running compositor without a usable GPU/monitor is not a working desktop.' \
+  'Check ~/.config/niri/config.kdl and its includes: CachyOS starts noctalia from cfg/autostart.kdl.' \
+  'Remove host niri/DankMaterialShell imports from this profile in vms/profiles/local.json.' \
+  'See journalctl --user -b and ~/.cache/noctalia/noctalia.log for details.' >&2
+exit 1

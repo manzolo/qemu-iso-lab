@@ -277,7 +277,10 @@ def common_args(
     if spice_port is not None:
         args += spice_display_args(spice_port)
     elif headless:
-        args += ["-display", "none", "-monitor", "none"]
+        # Wayland desktops may require a render-capable GPU even without a
+        # local window (e.g. virtio-vga-gl with the egl-headless backend).
+        args += vm.get("video", {}).get("headless", ["-display", "none"])
+        args += ["-monitor", "none"]
         # A QMP socket lets `vmctl stop` ask the guest for an ACPI power-off instead of
         # killing QEMU: a SIGTERM is a power cut and left half-written files behind.
         qmp = qmp_socket_path(vm)

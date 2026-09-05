@@ -4,8 +4,6 @@
 # (niri + Noctalia come from cachyos-niri-noctalia, installed by the bootstrap).
 set -euo pipefail
 
-mkdir -p "$HOME/.config/niri"
-
 sudo pacman -Syu --noconfirm
 
 # DKMS needs the headers of every installed CachyOS kernel (linux-cachyos, -lts, -bore, ...).
@@ -30,3 +28,6 @@ niri --version
 pacman -Q nvidia-utils nvidia-open-dkms
 # nvidia-smi reports no device inside the VM unless a GPU is passed through.
 command -v nvidia-smi >/dev/null && (nvidia-smi || true)
+
+# The NVIDIA driver check alone cannot tell whether the desktop shell starts.
+bash "$HOME/bin/cachyos-post-install"

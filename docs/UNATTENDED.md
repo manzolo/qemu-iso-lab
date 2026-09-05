@@ -152,6 +152,40 @@ login prompt shows up before either is ready. Calamares remains available for a
 manual install (`vmctl install`). The `cachyos` profile (fixed VHD for Ventoy)
 stays interactive.
 
+Keep the CachyOS niri/Noctalia configuration from `/etc/skel`: do not copy an
+unrelated host `~/.config/niri` or `DankMaterialShell` into these two profiles
+through `local.json`. Such a copy replaces the includes that start Noctalia
+and can leave only CachyOS Hello over an empty grey desktop. The post-install
+checks the current `noctalia` executable (v5), validates niri's configuration
+and waits for both the niri service and a successful `noctalia msg status`
+with a visible bar inside the graphical session. A missing shell or a session
+without a usable display now fails provisioning.
+
+These two profiles use `video.headless` to keep `virtio-vga-gl` with QEMU's
+`egl-headless` backend during unattended installation and background boots.
+The generic VGA used by default in headless mode leaves niri without a usable
+output. EGL renders without a local window and `vmctl attach` still uses VNC;
+the host needs working EGL/DRI support, as it needs OpenGL for the windowed
+`virtio-gl` mode. QEMU documents this pairing in its
+[display options](https://www.qemu.org/docs/master/system/invocation.html).
+
+`vmctl stop` asks the guest for an ACPI power-off (QMP `system_powerdown`).
+niri takes logind's `handle-power-key` inhibitor and maps the power key to
+suspend, so a stock niri guest would suspend instead of powering off, and
+resuming a suspended VM under `virtio-vga-gl` has left niri and Noctalia
+unkillable at the following shutdown. The bootstrap therefore writes
+`~/.config/niri/cfg/vm-power.kdl` (`input { disable-power-key-handling }`)
+and includes it from the CachyOS `config.kdl`, leaving the power button to
+logind (`HandlePowerKey=poweroff`). The post-install fails if the compositor
+still holds that inhibitor. The niri configurations shipped for
+`arch-noctalia-local`, `arch-dms-local` and `alpine-niri` carry the same option.
+
+To repair an existing guest affected by those imports, first remove the two
+`copy_from_host` entries from its local override. Inside the guest, back up
+`~/.config/niri`, copy `/etc/skel/.config/niri/.` into `~/.config/niri/`, run
+`niri validate`, then log out and back in. This restores the matching CachyOS
+autostart and shortcuts while keeping the old configuration in the backup.
+
 ## Omarchy: cidata
 
 ```bash
