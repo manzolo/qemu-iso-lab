@@ -1,18 +1,79 @@
 # QEMU ISO Lab
 
-`QEMU ISO Lab` is a small local toolkit for managing test virtual machines from JSON-defined profiles.
+[![CI](https://github.com/manzolo/qemu-iso-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/manzolo/qemu-iso-lab/actions/workflows/ci.yml)
 
-It provides a reusable catalog of guest definitions for ISO-based installs, imports from physical disks, boot checks, and QEMU experiments.
+Test any Linux distro in a QEMU/KVM virtual machine from one JSON profile:
+ISO download, disk, firmware, unattended install and SSH provisioning,
+driven by a single CLI (`vmctl`) or a dashboard TUI (`vmtui`).
 
-Additional notes live in [docs/](docs/), including
-[ARCHITECTURE.md](docs/ARCHITECTURE.md) for a one-page mental map and
-[CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md) for the smoke-test rationale and
-[PROFILE_TODO.md](docs/PROFILE_TODO.md) for planned profile coverage.
+![vmtui dashboard: every profile with live state, RAM/CPU, SSH port and disk size](docs/screenshots/vmtui-dashboard.png)
+
+## Contents
+
+- [Why](#why)
+- [Quick start](#quick-start)
+- [What do you want to do?](#what-do-you-want-to-do)
+- [The catalog](#the-catalog)
+- [Unattended installs](#unattended-installs)
+- [The TUI](#the-tui)
+- [Make it yours](#make-it-yours)
+- [Documentation](#documentation)
+- [Development](#development)
+- [Repository layout](#repository-layout)
+
+## Why
+
+- **One profile, one VM.** Every guest is a JSON object: ISO source (with
+  mirror discovery and checksum validation), disk, EFI or BIOS firmware, RAM,
+  CPUs, network and video variants. `vmctl show <vm>` prints it resolved.
+- **Zero-click installs.** Ubuntu (autoinstall), Debian (preseed), AlmaLinux
+  (kickstart), Arch (pacstrap script) and Omarchy (cidata) install headless on a
+  serial console, boot, and finish with SSH provisioning: dotfiles, scripts,
+  extra packages. Ten minutes later `vmctl shell <vm>` drops you inside.
+- **Isolated and reproducible.** Each VM lives under `artifacts/<vm>/`; ISOs
+  are cached once under `isos/`. `vmctl clean <vm>` puts everything back.
+  A small Alpine guest boots in GitHub Actions on every push.
+
+## Quick start
+
+Host packages (Arch or Debian/Ubuntu shown):
+
+```bash
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python fzf
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 fzf
+```
+
+Clone, put the two commands on your `PATH`, check the host:
+
+```bash
+git clone https://github.com/manzolo/qemu-iso-lab.git
+cd qemu-iso-lab
+make install-cli          # symlinks vmctl and vmtui into ~/.local/bin
+vmctl setup               # verifies qemu, qemu-img, OVMF, KVM
+```
+
+Then pick a VM and go:
+
+```bash
+vmctl list                          # 42 profiles
+vmctl provision debian-netinst      # ISO + disk + installer, click through it
+vmctl start debian-netinst          # boot the installed disk
+
+vmctl bootstrap-preseed debian-server   # or: install Debian with zero clicks...
+vmctl shell debian-server               # ...and SSH into it
+```
+
+Optional tab completion of commands and VM names (zsh shown, `bash` works the same):
+
+```bash
+echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc
+```
 
 ## What do you want to do?
 
-Everything goes through one command, `vmctl` (`vmctl --help` shows the same
-map, grouped by task; `vmtui` is the same as a dialog menu).
+Everything goes through one command. `vmctl --help` shows the same map grouped
+by task, and `vmctl <command> --help` the options of one command. Every command
+accepts `--dry-run` in front of it.
 
 | I want to...                                          | Run                                                      |
 |-------------------------------------------------------|----------------------------------------------------------|
@@ -30,599 +91,117 @@ map, grouped by task; `vmtui` is the same as a dialog menu).
 | write a VM to a real USB disk, or import one          | `vmctl flash`, `vmctl import-device` (destructive, sudo) |
 | free disk space                                       | `vmctl clean <vm>`, `vmctl clean --all`, `vmctl delete-iso <vm>` |
 | see what a command would do without doing it          | `vmctl --dry-run <command> <vm>`                         |
-| add my own user, key and dotfiles to the VMs          | edit `vms/profiles/local.json` (see *Guest identity* below) |
-| add a new VM                                          | add a profile to `vms/profiles/*.json` (see *Adding A New VM*) |
-| hack on `vmctl` itself                                | `make check` (mypy + tests), `make help` for the rest    |
+| add my own user, key and dotfiles to the VMs          | edit `vms/profiles/local.json` ([Make it yours](#make-it-yours)) |
+| add a new VM                                          | add a profile to `vms/profiles/*.json` ([docs/PROFILES.md](docs/PROFILES.md#adding-a-new-vm)) |
+| hack on `vmctl` itself                                | `make check`, then [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 
-## Overview
+## The catalog
 
-The project currently provides:
+42 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
+prints them all; the table shows what each family offers.
 
-- a modular VM catalog under `vms/profiles/*.json`;
-- one Python CLI, `vmctl` (`bin/vmctl`, installable on your `PATH` with `make install-cli`);
-- a text UI, `vmtui` (fzf with dialog fallback), over the same commands;
-- a `Makefile` with developer targets only (tests, type checks, install of the CLI);
-- support for both `efi` and `bios` guests;
-- isolated per-VM artifacts under `artifacts/<vm>/`;
-- a lightweight CI smoke test based on `alpine-ci`.
+| Family | Profiles | Highlights | Unattended |
+|--------|----------|------------|------------|
+| Arch | `archlinux`, `endeavouros`, `cachyos`, `cachyos-local`, `cachyos-nvidia-local`, `arch-noctalia-local`, `arch-dms-local`, `arch-dms-nvidia-local`, `arch-omarchy-nvidia-local` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes | `bootstrap-archinstall`, `bootstrap-omarchy` |
+| Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop`, `ubuntu-server`, `ubuntu-server-headless`, `ubuntu-niri`, `ubuntu-niri-local`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
+| Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `almalinux-minimal`, `almalinux-server` | Fedora 42, AlmaLinux 10.1 | `bootstrap-kickstart` |
+| openSUSE / NixOS / Void | `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros | interactive |
+| Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `freebsd`, `kali-live` | the CI smoke-test guests, FreeBSD 14.3 | interactive |
+| Windows | `windows10-template`, `windows11-template` | import targets for physical disks (`vmctl import-device`) | n/a |
 
-Current profiles include desktop guests, installer/minimal guests, Windows import templates, and the `alpine-ci` smoke-test guest.
+Profiles ending in `-local` are full desktop recipes with SSH provisioning,
+meant to be personalised through `local.json`. Profiles named `*-ci` are tiny
+guests that boot under TCG in GitHub Actions.
 
-## Project Layout
+## Unattended installs
+
+Five installers run headless on a serial console. Each `bootstrap-*` command
+generates the answer file, extracts kernel and initrd from the ISO, boots the
+installer, waits for a completion token, starts the installed VM in the
+background and runs the profile's SSH provisioning.
+
+```bash
+vmctl bootstrap-unattended ubuntu-niri-local          # Ubuntu autoinstall + cloud-init
+vmctl bootstrap-preseed debian-server                 # Debian preseed
+vmctl bootstrap-kickstart almalinux-server            # AlmaLinux / RHEL kickstart
+vmctl bootstrap-archinstall arch-dms-local            # Arch: pacstrap script on the live ISO
+vmctl bootstrap-omarchy arch-omarchy-nvidia-local     # Omarchy: official cidata mechanism
+```
+
+How each flow works, and the sequencing rule every flow must respect, is in
+[docs/UNATTENDED.md](docs/UNATTENDED.md).
+
+## The TUI
+
+`vmtui` is a dashboard over the same `vmctl` commands: fzf when installed,
+`dialog` otherwise. Every action echoes the `vmctl` command it runs, so it
+doubles as a discovery tool for the CLI.
+
+![vmtui VM menu: one-line state summary and a contextual menu with the suggested next step preselected](docs/screenshots/vmtui-vm-menu.png)
+
+Opening a VM shows its state in one line and a single contextual menu grouped
+into INSTALL, RUN, MAINTENANCE and ADVANCED. Only actions that make sense right
+now are listed, and the suggested next step is preselected, so Enter does the
+obvious thing: install when there is no disk, boot when it is stopped, SSH when
+it is running. Details, filters, video profiles and remote SPICE viewing are in
+[docs/VMTUI.md](docs/VMTUI.md).
+
+## Make it yours
+
+Tracked profiles use a generic guest user `lab` (password `lab`) and write
+`{{user}}` wherever the name appears in a path or command. Put your identity in
+the git-ignored `vms/profiles/local.json` and every profile follows:
+
+```bash
+make init-local-profile      # copies vms/profiles/local.json.example
+$EDITOR vms/profiles/local.json
+```
+
+Replace `YOUR_USER`, the password hash (`openssl passwd -6`) and the SSH key
+path; add `copy_from_host` entries for your dotfiles and `post_install_run`
+commands for anything else. `local.json` is deep-merged over the tracked
+profiles, so you only write what differs. See
+[docs/PROVISIONING.md](docs/PROVISIONING.md).
+
+## Documentation
+
+| Page | What it covers |
+|------|----------------|
+| [docs/PROFILES.md](docs/PROFILES.md) | The profile model: ISO sources and discovery, disk, EFI/BIOS firmware, video variants, artifacts, Windows import templates, adding a new VM |
+| [docs/UNATTENDED.md](docs/UNATTENDED.md) | The five unattended flows step by step, the completion-token rule, boot checks and the local validation matrix |
+| [docs/PROVISIONING.md](docs/PROVISIONING.md) | `cloud_init`, `ssh_provision`, `autoinstall` and `omarchy_config` fields, `copy_from_host`, `post_install_run`, sudo, guest identity and `local.json` |
+| [docs/VMTUI.md](docs/VMTUI.md) | The TUI in depth: dashboard, filters, contextual menu, video profiles, post-install chaining, remote SPICE |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | One-page mental map of the code: modules, import order, who owns what |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Developer loop, local checks before pushing, CI jobs, test isolation rules |
+| [docs/CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md) | Why the smoke test boots Alpine under TCG and how the ISO is discovered |
+| [docs/PROFILE_TODO.md](docs/PROFILE_TODO.md) | Planned profile coverage |
+| [docs/VENTOY.md](docs/VENTOY.md) | Reusing a guest disk on a Ventoy USB key |
+
+## Development
+
+```bash
+make check      # mypy --strict + full test suite, run before every push
+make ci         # the unittest invocation GitHub Actions runs
+make help       # every developer target
+```
+
+The `Makefile` holds developer targets only; user-facing behaviour is a `vmctl`
+subcommand. Tests never touch the host: no QEMU, no ISOs, no personal
+`local.json`. Rules and the CI layout are in
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## Repository layout
 
 ```text
 .
-├── Makefile
-├── README.md
+├── bin/            vmctl, vmtui, ventoy-prep, ventoy-copy
+├── vmctl/          the Python package behind vmctl
 ├── vms/
-│   ├── profiles/
-│   └── profile-files/
-├── bin/
-│   ├── vmctl
-│   ├── vmtui
-│   ├── ventoy-prep
-│   └── ventoy-copy
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── CI_BOOT_STRATEGY.md
-│   └── PROFILE_TODO.md
-├── isos/
-├── artifacts/
-├── legacy/
-└── tests/
+│   ├── profiles/       *.json catalog, local.json (git-ignored), local.json.example
+│   └── profile-files/  scripts and dotfiles deployed by post-install
+├── docs/           the pages listed above
+├── tests/          unit tests (unittest / pytest)
+├── isos/           cached ISOs (git-ignored)
+├── artifacts/      per-VM disks, firmware vars, seeds, logs (git-ignored)
+└── legacy/         the original CachyOS bash prototypes, kept for reference
 ```
-
-`legacy/` holds the original CachyOS bash prototypes (`setup-vhd.sh`,
-`run-install.sh`, `run-boot.sh`) kept for reference. Their behavior is now
-covered by `vmctl prep`, `vmctl install`, and `vmctl start`.
-
-## Requirements
-
-Minimum host requirements:
-
-- `qemu-system-x86_64`
-- `qemu-img`
-- Python 3
-
-Optional:
-
-- `dialog` for the TUI frontend;
-- OVMF files for EFI guests, for example:
-  - `/usr/share/OVMF/OVMF_CODE_4M.fd`
-  - `/usr/share/OVMF/OVMF_VARS_4M.fd`
-
-## Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/manzolo/qemu-iso-lab.git
-cd qemu-iso-lab
-```
-
-Run the host check first:
-
-```bash
-vmctl setup
-```
-
-Put the CLI on your `PATH` (symlinks `vmctl` and `vmtui` into `~/.local/bin`):
-
-```bash
-make install-cli
-```
-
-The rest of this README assumes that. Without it, run `./bin/vmctl` and `./bin/vmtui` from the repository root.
-
-Optional tab completion of commands and VM names (zsh shown; `bash` works the same):
-
-```bash
-echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc
-```
-
-Install dependencies on Arch-based systems:
-
-```bash
-sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog make
-```
-
-Install dependencies on Debian/Ubuntu:
-
-```bash
-sudo apt update
-sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog
-```
-
-The minimum practical path is:
-
-```bash
-sudo pacman -S qemu-desktop qemu-base edk2-ovmf python dialog
-# or
-sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 dialog
-```
-
-## Quick Start
-
-### Local Guest Flow
-
-Use this path for a normal local guest:
-
-```bash
-vmctl setup
-vmctl list
-vmctl show <name>
-vmctl provision <name>     # = fetch-iso + prep + install, in one step
-```
-
-After the guest has been installed to disk:
-
-```bash
-vmctl start <name>
-```
-
-### Ubuntu Autoinstall Flow
-
-Use this path for Ubuntu-style local profiles that define `autoinstall` and SSH provisioning:
-
-```bash
-vmctl prep <name>
-vmctl install-unattended <name>
-vmctl post-install <name>
-```
-
-Or run the full flow in one step:
-
-```bash
-vmctl bootstrap-unattended <name>
-```
-
-After the first boot, you can open a shell with:
-
-```bash
-vmctl shell <name>
-```
-
-### Omarchy + NVIDIA Flow
-
-The `arch-omarchy-nvidia-local` profile uses the official Omarchy ISO and its
-supported unattended `cidata` mechanism. It installs the native Omarchy
-Hyprland desktop with Btrfs + Limine, then adds the NVIDIA open DKMS stack:
-
-```bash
-vmctl bootstrap-omarchy arch-omarchy-nvidia-local
-vmctl stop arch-omarchy-nvidia-local
-vmctl start arch-omarchy-nvidia-local
-```
-
-Omarchy is Hyprland-based, not Niri-based. The NVIDIA packages are installed as
-a bare-metal image recipe; `nvidia-smi` is expected to report no device in a VM
-unless an NVIDIA GPU is passed through.
-
-### Minimal Real Boot Check
-
-Use this path for the smallest real boot smoke test currently in the repo:
-
-```bash
-vmctl prep alpine-ci
-vmctl boot-check alpine-ci
-```
-
-This flow downloads a small Alpine `virt` ISO, prepares the disk, boots QEMU headless, and waits for the serial `login:` prompt.
-
-### Local VM Matrix
-
-Use this path to run the local validation matrix across multiple profiles:
-
-```bash
-vmctl check-vms
-vmctl check-vms ubuntu-niri arch-noctalia-local --timeout 600
-vmctl check-vms --parallel 4
-vmctl check-vms --parallel 4 --clean-first
-```
-
-`PARALLEL` controls how many VM checks run concurrently. This is mainly useful for heavier local bootstrap flows such as unattended Ubuntu installs and Arch post-install provisioning.
-Use `CLEAN_FIRST=1` to skip the prompt and always clean unattended/bootstrap profiles before the run.
-
-### Optional TUI
-
-If you prefer a terminal UI:
-
-```bash
-vmtui
-```
-
-The TUI is a thin frontend over `vmctl`: every action echoes the `vmctl` command it runs, so it doubles as a discovery tool for the CLI. It uses **fzf** when installed (fuzzy type-to-filter, cursor on the suggested entry) and falls back to **dialog** otherwise; force one with `VMTUI_UI=fzf` or `VMTUI_UI=dialog`.
-
-The main screen is a **dashboard** of all profiles with live state (`●` running, `■` disk has data, `□` disk prepared but still empty, `○` no disk), RAM/CPU, SSH port and disk size; installed VMs are listed first and the cursor starts on the VM you opened last. The rows above and below the list give `Filter` (all / installed / running / by distro family), `Find` (substring on name or title), `Tools` (`vmctl status`, remote hosts, clean all) and `Quit`.
-
-Opening a VM shows a one-line state summary (`■ stopped, disk has data · disk 8.8 GiB / 32.0 GiB · ISO ready · SSH port 2230`) and a single contextual menu. Only actions that make sense for the VM *right now* are listed, and the suggested next step is marked `▶` and preselected, so Enter does the obvious thing (install when there is no disk, boot when it is stopped, SSH when it is running):
-
-- `INSTALL` — the install flow matching the profile (`Full Bootstrap`, `Omarchy Bootstrap`, `Arch Bootstrap`, `Debian Preseed Bootstrap`, `Kickstart Bootstrap`, `Unattended Install`, `Cloud-Init Flow`, `Guided Provision`, `Installer Only`, `Seeded Installer`);
-- `RUN` — `Boot Desktop`, `Boot Headless`, `Stop VM` (only while running), `SSH Console` (only with `ssh_provision`), `First Boot` (cloud-init), `Remote SPICE`;
-- `MAINTENANCE` — `Video Profile`, `Post-Install`, `Boot Check`, `Fetch ISO`, `Prepare VM`, `Profile Details`;
-- `ADVANCED` — `Clean VM`, `Delete ISO`, `Flash Empty Disk`, `Force Flash`, `Import Disk`;
-- `Back` (or Esc) returns to the dashboard.
-
-`Video Profile` picks the `video.variants` entry used by every start/install action of that VM and remembers it (under `~/.local/state/vmtui/`), so the TUI never asks for a video profile again until you change it. Destructive actions (`Stop VM`, `Clean VM`, `Delete ISO`, flash/import) ask for confirmation; flash/import also require typing the device path.
-
-After an installer that doesn't auto-boot the VM (`Unattended Install`, `Guided Provision`, `Cloud-Init Flow`, `Arch Install (Interactive)`, `Installer Only`, `Seeded Installer`) the TUI offers `Start headless + SSH post-install` / `Start with display` / `Done`, so the install→boot→post-install chain finishes without navigating back through menus. The full-flow `Bootstrap` actions already do this end-to-end and skip the prompt.
-
-Installer and boot actions can choose a video profile before starting QEMU.
-
-For remote graphical access, create a local remote host config:
-
-```bash
-cp vms/remotes.json.example vms/remotes.json
-```
-
-Edit `vms/remotes.json` with the SSH target, remote project path, and SPICE ports. The TUI can also create and edit this file from `Remote Hosts` on the main menu.
-
-Then use `Choose VM` -> `Remote SPICE`. The TUI starts QEMU on the remote host with `--spice-port`, opens an SSH tunnel, and launches `remote-viewer` locally. If `remote-viewer` is missing, the TUI offers to install `virt-viewer` with the detected package manager.
-
-## Common Commands
-
-`vmctl --help` lists every command grouped by task; `vmctl <command> --help`
-shows the options of one command. The ones used daily:
-
-```bash
-vmctl setup                         # host prerequisites
-vmctl list                          # profiles (add --names for scripts)
-vmctl status                        # what is installed / running
-vmctl show <name>                   # resolved profile
-
-vmctl provision <name>              # ISO + disk + interactive installer
-vmctl bootstrap-unattended <name>   # Ubuntu autoinstall, headless, + post-install
-vmctl bootstrap-omarchy <name>      # Omarchy cidata install + post-install
-vmctl bootstrap-preseed <name>      # Debian
-vmctl bootstrap-kickstart <name>    # AlmaLinux / RHEL family
-vmctl bootstrap-archinstall <name>  # Arch
-
-vmctl start <name>                  # boot the installed disk
-vmctl start <name> --video safe     # ... with a conservative display
-vmctl start <name> --headless --background
-vmctl shell <name>                  # SSH in
-vmctl stop <name>
-vmctl post-install <name>           # (re)run the SSH provisioning steps
-
-vmctl boot-check alpine-ci          # serial-console smoke test
-vmctl check-vms --parallel 4        # local validation matrix
-
-vmctl clean <name>
-vmctl clean --all
-```
-
-Every command accepts `--dry-run` before the command name and prints what it
-would execute:
-
-```bash
-vmctl --dry-run prep <name>
-vmctl --dry-run bootstrap-preseed debian-server
-```
-
-## Local Validation Before Push
-
-Do not treat GitHub Actions as the first place to discover regressions. If you touch CI, unattended/bootstrap flows, or related tests, make the relevant local checks pass before pushing.
-
-Minimum baseline:
-
-```bash
-make check          # mypy --strict + pytest
-make ci             # the unittest invocation GitHub Actions uses
-```
-
-When changing unattended/bootstrap wiring, also run the focused dry-run command(s) you changed, for example:
-
-```bash
-vmctl --dry-run bootstrap-preseed debian-server
-vmctl --dry-run bootstrap-kickstart almalinux-server
-vmctl --dry-run install-unattended ubuntu-niri
-```
-
-## VM Profile Model
-
-Each VM entry in `vms/profiles/*.json` typically defines:
-
-- `name`
-- `iso`
-- `iso_url`
-- `iso_urls`
-- `iso_discovery`
-- `iso_size`
-- `iso_sha256`
-- `disk`
-- `firmware`
-- `machine`
-- `memory_mb`
-- `cpus`
-- `network`
-- `audio`
-- `video`
-
-`fetch-iso` downloads to a temporary `.part` file and atomically replaces the final ISO only after the download passes basic validation. If `Content-Length` is available, truncated downloads are rejected. Existing cached ISOs can also be validated with `iso_size` and `iso_sha256`; invalid cached files are removed and downloaded again.
-
-Profiles can define smarter ISO sources without giving up a hardcoded fallback:
-
-- `iso_discovery` reads a release index and extracts candidate ISO URLs with a regular expression;
-- `iso_urls` lists additional mirrors to try in order;
-- `iso_url` remains the final fallback and keeps older profiles working.
-
-Example discovery:
-
-```json
-"iso_discovery": {
-  "index_url": "https://example.invalid/releases/latest/",
-  "pattern": "href=\"(?P<url>example-[0-9.]+-x86_64\\.iso)\"",
-  "sort": "desc",
-  "limit": 1
-},
-"iso_urls": [
-  "https://mirror1.example.invalid/example.iso",
-  "https://mirror2.example.invalid/example.iso"
-],
-"iso_url": "https://example.invalid/hardcoded-fallback.iso"
-```
-
-Import-oriented profiles may omit every ISO download source on purpose. These are intended for flows such as `import-device`, where you bring an existing physical installation into a VM disk rather than booting a distro installer ISO.
-
-Profiles that define `cloud_init`, `ssh_provision`, `autoinstall`, or `omarchy_config` can also support higher-level flows such as Ubuntu/Omarchy unattended installs, SSH post-install provisioning, and interactive shell access.
-
-`status` reports basic runtime state in addition to artifact state, including tracked background QEMU processes and SSH forward ports when available.
-
-`clean` is intentionally conservative: it now attempts to stop the VM first, then removes generated artifacts.
-
-The repository now includes `windows10-template` and `windows11-template` as conservative import targets:
-
-- both use `q35` + EFI;
-- both default to a `sata` disk to avoid an immediate virtio storage driver dependency on first boot;
-- both use `e1000e` networking for broader out-of-the-box Windows compatibility;
-- `windows11-template` is usable for imported guests, but native Windows 11 requirements such as TPM/Secure Boot are not yet modeled by `vmctl`.
-
-Example:
-
-```json
-{
-  "my-vm": {
-    "name": "My VM",
-    "iso": "isos/example.iso",
-    "iso_url": "https://example.invalid/example.iso",
-    "disk": {
-      "path": "artifacts/my-vm/disk.qcow2",
-      "size": "32G",
-      "format": "qcow2",
-      "interface": "virtio"
-    },
-    "firmware": {
-      "type": "efi",
-      "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-      "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-      "vars_path": "artifacts/my-vm/OVMF_VARS.fd"
-    },
-    "machine": "q35",
-    "memory_mb": 4096,
-    "cpus": 4
-  }
-}
-```
-
-## Firmware Modes
-
-### EFI
-
-For `efi` profiles, `vmctl`:
-
-- prefers the `code` and `vars_template` paths from the profile definition;
-- falls back to common OVMF locations if the configured paths are missing;
-- accepts `OVMF_CODE` and `OVMF_VARS_TEMPLATE` environment overrides;
-- uses `OVMF_CODE` as read-only firmware;
-- creates a local copy of `OVMF_VARS`;
-- starts QEMU with pflash drives.
-
-This means entries such as:
-
-```json
-"firmware": {
-  "type": "efi",
-  "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-  "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-  "vars_path": "artifacts/ubuntu-desktop/OVMF_VARS.fd"
-}
-```
-
-are safe as defaults, and `vmctl setup` will tell you if your host needs a different OVMF package layout.
-
-### BIOS
-
-For `bios` profiles, `vmctl`:
-
-- does not use OVMF;
-- does not create NVRAM files;
-- uses the standard QEMU/SeaBIOS boot flow.
-
-## Artifacts
-
-Each VM stores its local state under:
-
-```text
-artifacts/<vm>/
-```
-
-Typical contents:
-
-```text
-artifacts/my-vm/
-├── disk.qcow2
-├── OVMF_VARS.fd
-├── logs/
-└── runtime/
-```
-
-This avoids collisions between different guest profiles.
-
-## Video Profiles
-
-Video variants depend on the profile. Common examples include:
-
-- `std`
-- `safe`
-- `virtio-gl`
-
-Typical usage:
-
-- `std`: simple default mode;
-- `safe`: adds serial output and is more useful for debugging;
-- `virtio-gl`: more aggressive setup for modern Wayland/compositor sessions.
-
-Practical note:
-
-Some Wayland compositors, such as `niri`, may still behave poorly inside a VM even when the guest boots correctly.
-
-## Adding A New VM
-
-Minimal workflow:
-
-1. Copy the ISO under `isos/`, or define `iso_url`.
-2. Add a new VM object under one of the files in `vms/profiles/`.
-3. Choose disk format, firmware type, and runtime settings.
-4. Prepare and boot it:
-
-```bash
-vmctl prep <name>
-vmctl install <name>
-```
-
-## Cloud-Init And Post-Install
-
-`vmctl` can also attach a generated `cloud-init` seed ISO from the VM profile and then finish guest setup over SSH.
-
-Supported profile fields:
-
-- `cloud_init.hostname`
-- `cloud_init.user`
-- `cloud_init.ssh_authorized_keys`
-- `cloud_init.ssh_authorized_keys_file`
-- `cloud_init.ssh_key`
-- `cloud_init.ssh_host_port`
-- `cloud_init.packages`
-- `cloud_init.runcmd`
-- `cloud_init.write_files`
-- `cloud_init.copy_from_host`
-- `cloud_init.post_install_run`
-- `ssh_provision.hostname`
-- `ssh_provision.user`
-- `ssh_provision.ssh_key`
-- `ssh_provision.ssh_host_port`
-- `ssh_provision.copy_from_host`
-- `ssh_provision.post_install_run`
-- `autoinstall.hostname`
-- `autoinstall.username`
-- `autoinstall.realname`
-- `autoinstall.password_hash`
-- `autoinstall.timezone`
-- `autoinstall.keyboard_layout`
-- `autoinstall.storage_layout`
-- `autoinstall.install_ssh`
-- `omarchy_config.hostname`
-- `omarchy_config.username`
-- `omarchy_config.password_hash`
-- `omarchy_config.timezone`
-- `omarchy_config.keyboard_layout`
-- `omarchy_config.locale`
-- `omarchy_config.disk_device`
-- `omarchy_config.encrypt`
-
-`ssh_provision` is used for guests whose installer runs interactively (CachyOS, Arch) rather than via cloud-init. Both `cloud_init` and `ssh_provision` support `copy_from_host` and `post_install_run`.
-
-`ssh_provision.sudo_password` is optional and exists for guests whose installer cannot set up
-passwordless sudo itself (Omarchy ignores archinstall's `custom_commands`). When it is present,
-post-install first writes `/etc/sudoers.d/vmctl-<user>` in the guest, feeding the password to
-`sudo -S` **on stdin** so it never appears in a command line or a log. Note that this step lives
-in the shared post-install path, so it applies to **every** profile that defines the field, not
-just the Omarchy one; profiles without it are untouched. Keep real passwords out of the tracked
-profiles — put the field in the git-ignored `vms/profiles/local.json`.
-
-Provisioning scripts can be versioned under `vms/profile-files/<vm>/` and deployed via `copy_from_host` with `dest_mode: "755"`. This keeps JSON profiles readable and puts the actual logic in plain shell scripts tracked by git.
-
-```json
-"copy_from_host": [
-  {
-    "source": "vms/profile-files/my-vm/bin/my-post-install",
-    "dest": "/home/user/bin/my-post-install",
-    "dest_mode": "755"
-  }
-],
-"post_install_run": ["~/bin/my-post-install"]
-```
-
-Typical usage:
-
-```bash
-vmctl start ubuntu-niri --cloud-init
-vmctl post-install ubuntu-niri
-```
-
-`start --cloud-init` generates `artifacts/<vm>/cloud-init/{user-data,meta-data,seed.iso}` and attaches `seed.iso` to the VM. `post-install` waits for SSH on the forwarded host port defined in the profile, copies any host files listed in `copy_from_host`, and runs the remote commands listed in `post_install_run`.
-
-To automate the Ubuntu Server installer as well:
-
-```bash
-vmctl install-unattended ubuntu-niri-local
-vmctl start ubuntu-niri-local
-vmctl post-install ubuntu-niri-local
-```
-
-`install-unattended` is currently an Ubuntu autoinstall flow. It generates an `autoinstall` seed, extracts `casper/vmlinuz` and `casper/initrd` from the ISO, and boots the installer with the `autoinstall` kernel argument. The QEMU process exits on the installer's final reboot (`-no-reboot`), after which you can boot the installed system normally and finish with `post-install`.
-
-Guest identity and personal overrides:
-
-- Tracked profiles use a generic guest user **`lab`** with password **`lab`**
-  (SHA-512 hash included). They work out of the box for a throwaway lab VM.
-- Wherever a profile needs the user name inside a path or a command
-  (`/home/{{user}}/bin`, `chown {{user}}:{{user}}`, sudoers content...) it
-  writes the placeholder **`{{user}}`**. At load time `vmctl` replaces it with
-  the guest user declared by the profile (`ssh_provision.user`,
-  `cloud_init.user`, `autoinstall.username`, `archinstall_config.username`,
-  `omarchy_config.username`, `preseed_config.username` or
-  `kickstart_config.username`; they must agree).
-- To use your own name, key and password, override only the identity fields in
-  the git-ignored `vms/profiles/local.json`; every `{{user}}` follows:
-  - copy `vms/profiles/local.json.example` to `vms/profiles/local.json`;
-  - replace `YOUR_USER`, `YOUR_PASSWORD`/`REPLACE_WITH_SHA512_HASH`
-    (`openssl passwd -6`) and the SSH/dotfile paths with your own values.
-
-Shortcut:
-
-```bash
-make init-local-profile
-```
-
-## CI Smoke Test
-
-The repository includes a real boot smoke test based on `alpine-ci`.
-
-That profile is intentionally small and CI-friendly:
-
-- it uses Alpine `virt`;
-- it boots in headless mode;
-- it uses serial-console detection;
-- it is designed for GitHub Actions with `tcg` rather than assuming `kvm`.
-
-`ci.accel` in VM profiles is treated as a GitHub Actions override. Local runs
-default to `kvm` when available, even if a profile declares `ci.accel: tcg` for
-CI portability.
-
-More detail is documented in [docs/CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md).
-
-## Ventoy Utilities
-
-Two helpers under `bin/` allow reusing a guest disk on a Ventoy USB key,
-independently from the main VM workflow:
-
-- `bin/ventoy-prep` — downloads the `vtoyboot` ISO, extracts it and runs
-  `vtoyboot.sh` inside a running VM so the guest disk becomes Ventoy-bootable.
-  Run as root **inside the guest**.
-- `bin/ventoy-copy <target> <file.vhd>` — copies a `.vhd` to a Ventoy
-  partition or mountpoint, appending the `.vtoy` suffix required by Ventoy.
-  Run as root **on the host**.
-
-These tools are off the main `vmctl` flow and are only relevant for the
-Ventoy multi-boot scenario.
