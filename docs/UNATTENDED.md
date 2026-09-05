@@ -1,22 +1,24 @@
 # Unattended installs
 
-Five installers run headless, driven over the serial console, and end with the
+Six installers run headless, driven over the serial console, and end with the
 VM installed, booted in the background and provisioned over SSH. Every
 `bootstrap-*` command accepts `--dry-run` and prints each step it would run.
 
 - [The common shape](#the-common-shape)
 - [Ubuntu: autoinstall](#ubuntu-autoinstall)
 - [Debian: preseed](#debian-preseed)
-- [AlmaLinux / RHEL: kickstart](#almalinux--rhel-kickstart)
+- [AlmaLinux / RHEL / Fedora: kickstart](#almalinux--rhel--fedora-kickstart)
 - [Arch: pacstrap script](#arch-pacstrap-script)
 - [Omarchy: cidata](#omarchy-cidata)
+- [Alpine: setup-alpine](#alpine-setup-alpine)
 - [The completion-token rule](#the-completion-token-rule)
 - [Boot checks and the validation matrix](#boot-checks-and-the-validation-matrix)
 
 ## The common shape
 
 1. Render the answer file from the profile section (`autoinstall`,
-   `preseed_config`, `kickstart_config`, `archinstall_config`, `omarchy_config`)
+   `preseed_config`, `kickstart_config`, `archinstall_config`, `omarchy_config`,
+   `alpine_config`)
    and pack it into a small seed ISO under `artifacts/<vm>/`.
 2. Extract the kernel and initrd from the distro ISO (`xorriso` or `bsdtar`)
    so QEMU can boot the installer directly with the right kernel arguments.
@@ -58,10 +60,11 @@ Renders `preseed.cfg` into a `PRESEED_CFG` seed ISO, extracts `vmlinuz` and
 `initrd.gz`, boots the Debian installer with the preseed kernel arguments and
 waits for `==> Debian preseed install complete!` on the serial console.
 
-## AlmaLinux / RHEL: kickstart
+## AlmaLinux / RHEL / Fedora: kickstart
 
 ```bash
 vmctl bootstrap-kickstart almalinux-server
+vmctl bootstrap-kickstart fedora-niri-dms-local
 ```
 
 Renders `ks.cfg` into a `KS_CFG` seed ISO, extracts `vmlinuz` and `initrd.img`,
@@ -69,6 +72,17 @@ boots anaconda in text mode (`inst.ks=hd:LABEL=KS_CFG:/ks.cfg inst.text
 inst.cmdline`) and waits for `==> Kickstart install complete!`. The kickstart
 creates the user in `wheel` with passwordless sudo and installs the SSH key
 when the profile provides one.
+
+The install source is `kickstart_config.inst_repo`: `cdrom` (default) for a
+full ISO such as AlmaLinux minimal, or a repository URL for a netinst image.
+`fedora-niri-dms-local` boots the Fedora Everything netinst and points
+`inst_repo` at the online Fedora 44 repository, so anaconda fetches both its
+stage2 image and the packages from the network; the rendered kickstart carries
+the matching `url --url=` directive. `ignore_missing_packages: true` renders
+`%packages --ignoremissing`, so a renamed desktop package does not abort the
+install. `post_commands` run in the installed system's chroot: the Fedora
+profile uses them for the greetd autologin and the graphical target, and leaves
+DankMaterialShell to the SSH post-install (COPR repositories need the network).
 
 ## Arch: pacstrap script
 
@@ -104,6 +118,41 @@ post-install configure passwordless sudo itself
 
 Omarchy is Hyprland-based, not niri-based. The NVIDIA packages are a bare-metal
 recipe: `nvidia-smi` reports no device in a VM unless a GPU is passed through.
+
+## Alpine: setup-alpine
+
+```bash
+vmctl bootstrap-alpine alpine-niri
+```
+
+Packs a `setup-alpine` answer file, an `install.sh` and a `run.sh` into an
+`ALPINESEED` seed ISO attached as a virtio CD-ROM, extracts `boot/vmlinuz-lts`
+and `boot/initramfs-lts` from the Alpine standard ISO and boots the live system
+with the ISO's own module list plus `console=ttyS0,115200`. `run_and_expect`
+answers the `localhost login:` prompt with `root`, mounts the seed at the shell
+prompt and runs it. `install.sh` then:
+
+1. exports `ERASE_DISKS=/dev/vda` and runs `setup-alpine -e -f answers`
+   (keymap, hostname, udev, DHCP, apk mirror + community repo, admin user with
+   the SSH key, sshd, chrony, `setup-disk -m sys`);
+2. mounts the installed root back, and in a chroot installs the profile's
+   `packages` (each `optional_packages` entry on its own, so a missing one is
+   only logged), sets the user's password hash, adds passwordless sudo and the
+   `seat` group, enables dbus and seatd, then runs `chroot_commands`;
+3. unmounts, syncs, flushes, prints `==> Alpine Linux installation complete!`
+   and powers off.
+
+`alpine-niri` uses `chroot_commands` for greetd: autologin into
+`dbus-run-session -- niri --session` (OpenRC has no systemd user session).
+Two Alpine specifics learned the hard way: without elogind nothing sets
+`XDG_RUNTIME_DIR`, so `pam-rundir` is installed and added to
+`/etc/pam.d/greetd`; and the niri apk does not depend on the Wayland
+libraries it dlopens, so `wayland-libs-server` and `wayland-libs-client` are
+listed explicitly (niri panics with `NoWaylandLib` otherwise). greetd runs
+`initial_session` once per boot and records it in `/run/greetd.run`;
+restarting the service alone shows the greeter, not the autologin.
+The kernel line of the installed system keeps a serial console
+(`alpine_config.kernel_opts`), so `post-install-serial.log` stays readable.
 
 ## The completion-token rule
 

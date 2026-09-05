@@ -23,6 +23,7 @@ vmctl --dry-run <command> <name>   # every command supports --dry-run
 vmctl bootstrap-archinstall arch-noctalia-local
 vmctl bootstrap-preseed debian-server
 vmctl bootstrap-kickstart almalinux-server
+vmctl bootstrap-alpine alpine-niri
 ```
 
 Before pushing, run the relevant local tests first. Do not use GitHub Actions as the first place to discover breakage in unit tests, dry-run bootstrap flows, or CI wiring. At minimum, if you touch CI or unattended/bootstrap code, run `python -m unittest discover -s tests -v` and any focused bootstrap/dry-run commands affected by the change.
@@ -35,7 +36,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ```
 errors ← state ← {ui, runtime} ← {config, iso, cloud_init, qemu, archinstall, disk_inspect}
-      ← {flash, import_dev, ssh, host_setup} ← lifecycle ← cli
+      ← {alpine, preseed, kickstart, omarchy} ← {flash, import_dev, ssh, host_setup} ← lifecycle ← cli
 ```
 
 Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always accessed as `state.ROOT`, never imported directly — a direct import captures a stale binding and breaks tests.
@@ -51,6 +52,8 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 | `cloud_init.py` | Renders cloud-init `user-data`/`meta-data` and Ubuntu `autoinstall` seed ISOs. |
 | `archinstall.py` | Arch-specific: renders archinstall JSON config (interactive) or a self-contained `pacstrap`-based `install.sh` (automated bootstrap). |
 | `iso.py` | ISO download with validation, discovery regex, and member extraction (`xorriso`/`bsdtar`). |
+| `alpine.py` | Alpine: `setup-alpine` answer file + chroot `install.sh` packed into a seed ISO, live-prompt automation constants. |
+| `kickstart.py` / `preseed.py` | AlmaLinux/Fedora kickstart and Debian preseed rendering; `kickstart.install_repo()` picks `cdrom` or a netinst URL. |
 | `ssh.py` | SSH/SCP helpers, `wait_for_ssh`, `post_install_copy`, `post_install_run`. |
 
 ### Profile model
@@ -59,7 +62,7 @@ All VM definitions live in `vms/profiles/*.json`. `load_config()` reads and merg
 
 Tracked profiles are generic on purpose: the guest user is `lab` (password `lab`, hash included) and every place where the user name appears inside a path, a command or a file body writes `{{user}}`. `config.expand_user_placeholder()` replaces it at load time with the identity declared by the profile (`ssh_provision.user`, `cloud_init.user`, `autoinstall.username`, `archinstall_config.username`, `preseed_config.username`, `kickstart_config.username`; they must agree). Overriding the identity in `local.json` therefore propagates everywhere. Never commit a real user name, password or hash into a tracked profile again; the repo is public.
 
-SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226, `arch-dms-local` → 2230, `arch-dms-nvidia-local` → 2231.
+SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226, `arch-dms-local` → 2230, `arch-dms-nvidia-local` → 2231, `arch-omarchy-nvidia-local` → 2232, `fedora-niri-dms-local` → 2233, `alpine-niri` → 2234 (2222/2227/2228/2229/2290 are Ubuntu/Debian/Alma; 2225 is taken by a local.json VM).
 
 ### Unattended install flows
 
@@ -82,11 +85,17 @@ SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` �
 3. Boots headless with serial stdio and appropriate preseed kernel appends.
 4. Uses `run_and_expect` to wait for `"==> Debian preseed install complete!"`, then starts installed VM headless.
 
-**AlmaLinux/RHEL** (`bootstrap-kickstart`):
+**AlmaLinux/RHEL/Fedora** (`bootstrap-kickstart`; `kickstart_config.inst_repo` = `cdrom` or a netinst repository URL, `ignore_missing_packages` → `%packages --ignoremissing`):
 1. Generates kickstart seed ISO (`KS_CFG`).
 2. Extracts `vmlinuz` + `initrd.img` from the ISO.
 3. Boots headless with serial stdio and appropriate kickstart kernel appends.
 4. Uses `run_and_expect` to wait for `"==> Kickstart install complete!"`, then starts installed VM headless.
+
+**Alpine** (`bootstrap-alpine`):
+1. Generates a `setup-alpine` answer file + `install.sh` (setup-alpine with `ERASE_DISKS`, then chroot: packages, password hash, sudo, `chroot_commands`) into an `ALPINESEED` seed ISO on a virtio CD-ROM.
+2. Extracts `boot/vmlinuz-<flavor>` + `boot/initramfs-<flavor>` (`lts` for the standard ISO).
+3. Boots with the ISO's `modules=` list plus `console=ttyS0,115200`; `auto_inputs` answer `localhost login:` with `root` and type the mount + run trigger at `localhost:~#`.
+4. Waits for `"==> Alpine Linux installation complete!"`, then the usual background start + post-install.
 
 The interactive variant (`install-archinstall`) generates archinstall JSON configs and attaches them as a second virtio CD-ROM (`/dev/vdb`) for the user to run manually.
 

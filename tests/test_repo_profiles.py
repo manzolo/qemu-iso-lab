@@ -40,6 +40,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "fedora-server-efi",
             "freebsd",
             "arch-omarchy-nvidia-local",
+            "fedora-niri-dms-local",
+            "alpine-niri",
         ):
             self.assertIn(profile, cfg["vms"])
 

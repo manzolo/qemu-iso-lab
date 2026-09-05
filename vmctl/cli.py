@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "post-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "bootstrap-alpine", "post-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell"]),
     ("Verify", "smoke tests and the local validation matrix",
@@ -45,7 +45,7 @@ typical flows:
   vmctl shell <vm>                      SSH into it (profiles with ssh_provision/cloud_init)
   vmctl bootstrap-unattended <vm>       Ubuntu: unattended install + post-install, no clicks
   vmctl bootstrap-omarchy <vm>          Omarchy: cidata install + NVIDIA post-install
-  vmctl bootstrap-preseed <vm>          same for Debian  (kickstart: AlmaLinux, archinstall: Arch)
+  vmctl bootstrap-preseed <vm>          same for Debian  (kickstart: AlmaLinux/Fedora, archinstall: Arch, alpine: Alpine)
   vmctl clean <vm>                      remove its disk and generated artifacts
   vmctl <command> --help                all options of one command
   vmtui                                 the same, as a dialog menu
@@ -136,10 +136,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_preseed)
 
-    p = _add(subparsers, "bootstrap-kickstart", help="fully automated AlmaLinux kickstart install + post-install via serial console")
+    p = _add(subparsers, "bootstrap-kickstart", help="fully automated AlmaLinux/Fedora kickstart install + post-install via serial console")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_kickstart)
+
+    p = _add(subparsers, "bootstrap-alpine", help="fully automated Alpine setup-alpine install + post-install via serial console")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_alpine)
 
     p = _add(subparsers, "install-archinstall", help="boot the Arch live ISO with a pre-built archinstall config disk")
     p.add_argument("vm", help=VM_HELP)

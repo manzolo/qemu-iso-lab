@@ -330,6 +330,21 @@ class VmtuiTests(unittest.TestCase):
         self.assertIn("Guided Provision", output)
         self.assertIn("Post-Install", output)
 
+    def test_unified_menu_for_alpine_vm(self):
+        output = self._unified_menu("alpine-niri")
+        self.assertIn("Alpine Bootstrap", output)
+        self.assertIn("Guided Provision", output)
+        self.assertIn("Post-Install", output)
+        self.assertNotIn("Kickstart Bootstrap", output)
+        # no disk yet: the bootstrap is the suggested first step
+        result = self.run_bash("source bin/vmtui; load_vm_facts alpine-niri; recommended_action")
+        self.assertEqual(result.stdout.strip(), "Alpine Bootstrap")
+
+    def test_unified_menu_for_fedora_dms_vm_uses_kickstart(self):
+        output = self._unified_menu("fedora-niri-dms-local")
+        self.assertIn("Kickstart Bootstrap", output)
+        self.assertNotIn("Alpine Bootstrap", output)
+
     def test_unified_menu_for_plain_vm_hides_inapplicable_entries(self):
         output = self._unified_menu("alpine-ci")
         self.assertNotIn("Full Bootstrap", output)
@@ -426,6 +441,7 @@ class VmtuiTests(unittest.TestCase):
             ("Omarchy Unattended Install", "install-omarchy"),
             ("Debian Preseed Bootstrap", "bootstrap-preseed"),
             ("Kickstart Bootstrap", "bootstrap-kickstart"),
+            ("Alpine Bootstrap", "bootstrap-alpine"),
             ("Unattended Install", "full-auto-install"),
             ("Cloud-Init Flow", "cloud-init-install"),
             ("Flash Empty Disk", "flash"),

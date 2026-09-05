@@ -1304,6 +1304,88 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual(pid_path.read_text(encoding="utf-8"), "4321\n")
         run_post_install.assert_called_once_with(self.vm_name, self.vm_config, 45, dry_run=False)
 
+    def test_cmd_bootstrap_kickstart_uses_profile_install_repo(self):
+        self.create_disk()
+        repo = "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/"
+        self.vm_config["kickstart_config"] = {"hostname": "fedora-test", "username": "tester", "password": "s3cret", "inst_repo": repo}
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2233}
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=False)
+
+        with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.lifecycle, "ensure_vm_disk"), \
+             mock.patch.object(vmctl.lifecycle, "reset_vm_nvram"), \
+             mock.patch.object(vmctl.kickstart, "create_kickstart_iso", return_value=self.root / "artifacts/testvm/kickstart/seed.iso"), \
+             mock.patch.object(vmctl.kickstart, "extract_kickstart_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.qemu, "common_args", side_effect=[["qemu-system-x86_64"], ["qemu-system-x86_64"]]), \
+             mock.patch.object(vmctl.qemu, "run_and_expect") as run_and_expect, \
+             mock.patch.object(vmctl.lifecycle, "prepare_background_vm_slot", return_value=(self.root / "artifacts/testvm/runtime/bootstrap-start.pid", self.root / "artifacts/testvm/logs/bootstrap-start.log")), \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=4321), \
+             mock.patch.object(vmctl.lifecycle, "run_post_install"):
+            self.vmctl.cmd_bootstrap_kickstart(args)
+
+        install_qemu_cmd = run_and_expect.call_args.args[0]
+        append_value = install_qemu_cmd[install_qemu_cmd.index("-append") + 1]
+        self.assertIn(f"inst.repo={repo}", append_value)
+        self.assertNotIn("inst.repo=cdrom", append_value)
+
+    def test_cmd_bootstrap_alpine_logs_in_runs_seed_and_post_installs(self):
+        self.create_disk()
+        self.vm_config["alpine_config"] = {"hostname": "alpine-test", "username": "tester", "password_hash": "$6$x$y"}
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2234}
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=False)
+
+        with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.lifecycle, "ensure_vm_disk"), \
+             mock.patch.object(vmctl.lifecycle, "reset_vm_nvram"), \
+             mock.patch.object(vmctl.alpine, "create_alpine_seed_iso", return_value=self.root / "artifacts/testvm/alpine/seed.iso"), \
+             mock.patch.object(vmctl.alpine, "extract_alpine_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.qemu, "common_args", side_effect=[["qemu-system-x86_64"], ["qemu-system-x86_64"]]), \
+             mock.patch.object(vmctl.qemu, "run_and_expect") as run_and_expect, \
+             mock.patch.object(vmctl.lifecycle, "prepare_background_vm_slot", return_value=(self.root / "artifacts/testvm/runtime/bootstrap-start.pid", self.root / "artifacts/testvm/logs/bootstrap-start.log")), \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=4321) as run_background, \
+             mock.patch.object(vmctl.lifecycle, "run_post_install") as run_post_install:
+            exit_code = self.vmctl.cmd_bootstrap_alpine(args)
+
+        self.assertEqual(exit_code, 0)
+        run_and_expect.assert_called_once()
+        install_qemu_cmd = run_and_expect.call_args.args[0]
+        self.assertIn("-cdrom", install_qemu_cmd)
+        self.assertIn(str(self.root / self.vm_config["iso"]), install_qemu_cmd)
+        self.assertIn(str(self.root / "artifacts/testvm/installer/vmlinuz"), install_qemu_cmd)
+        append_value = install_qemu_cmd[install_qemu_cmd.index("-append") + 1]
+        self.assertEqual(append_value, vmctl.alpine.LIVE_KERNEL_APPEND)
+        seed_drive = install_qemu_cmd[install_qemu_cmd.index("-drive") + 1]
+        self.assertIn("artifacts/testvm/alpine/seed.iso", seed_drive)
+        kwargs = run_and_expect.call_args.kwargs
+        self.assertEqual(kwargs["expected_text"], vmctl.alpine.BOOTSTRAP_COMPLETE_TOKEN)
+        self.assertEqual(kwargs["timeout_sec"], 45)
+        self.assertEqual(kwargs["log_path"], self.root / "artifacts/testvm/logs/bootstrap-serial.log")
+        auto_inputs = kwargs["auto_inputs"]
+        self.assertEqual(auto_inputs[0], ("localhost login:", "root\n"))
+        self.assertEqual(auto_inputs[1][0], "localhost:~#")
+        self.assertIn("mount -t iso9660 /dev/vdb", auto_inputs[1][1])
+        self.assertTrue(auto_inputs[1][1].endswith("run.sh\n"))
+
+        run_qemu_cmd = run_background.call_args.args[0]
+        self.assertIn(f"file:{self.root / 'artifacts/testvm/logs/post-install-serial.log'}", run_qemu_cmd)
+        self.assertEqual((self.root / "artifacts/testvm/runtime/bootstrap-start.pid").read_text(encoding="utf-8"), "4321\n")
+        run_post_install.assert_called_once_with(self.vm_name, self.vm_config, 45, dry_run=False)
+
+    def test_cmd_bootstrap_alpine_requires_alpine_config(self):
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=True)
+        with self.assertRaises(vmctl.errors.VMError):
+            self.vmctl.cmd_bootstrap_alpine(args)
+
+    def test_local_test_mode_picks_bootstrap_alpine(self):
+        self.vm_config["alpine_config"] = {"hostname": "alpine-test", "username": "tester", "password_hash": "$6$x$y"}
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2234}
+        self.assertEqual(self.vmctl.local_test_mode(self.vm_config)[0], "bootstrap-alpine")
+        del self.vm_config["ssh_provision"]
+        self.assertEqual(self.vmctl.local_test_mode(self.vm_config)[0], "skip")
+
     def test_cmd_bootstrap_kickstart_dry_run_allows_missing_disk_for_post_install_boot(self):
         self.vm_config["firmware"] = {
             "type": "efi",

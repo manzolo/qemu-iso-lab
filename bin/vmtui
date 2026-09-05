@@ -497,6 +497,7 @@ def facts(name, vm):
         "has_omarchy": has_section(vm, "omarchy_config"),
         "has_preseed": has_section(vm, "preseed_config"),
         "has_kickstart": has_section(vm, "kickstart_config"),
+        "has_alpine": has_section(vm, "alpine_config"),
         "has_cloud_init": has_section(vm, "cloud_init"),
         "video_default": str(video.get("default", "")),
         "video_variants": " ".join(sorted(video.get("variants") or {})),
@@ -766,6 +767,8 @@ primary_install_action() {
         printf '%s\n' "Debian Preseed Bootstrap"
     elif [[ "${FACTS[has_kickstart]:-0}" == "1" ]]; then
         printf '%s\n' "Kickstart Bootstrap"
+    elif [[ "${FACTS[has_alpine]:-0}" == "1" ]]; then
+        printf '%s\n' "Alpine Bootstrap"
     elif [[ "${FACTS[has_autoinstall]:-0}" == "1" && "${FACTS[has_ssh]:-0}" == "1" ]]; then
         printf '%s\n' "Full Bootstrap"
     elif [[ "${FACTS[has_autoinstall]:-0}" == "1" ]]; then
@@ -869,6 +872,9 @@ build_vm_menu_items() {
         emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
     elif [[ "${FACTS[has_kickstart]:-0}" == "1" ]]; then
         emit_action "Kickstart Bootstrap" "Fully automated AlmaLinux/RHEL install + post-install"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ "${FACTS[has_alpine]:-0}" == "1" ]]; then
+        emit_action "Alpine Bootstrap" "Fully automated setup-alpine install + post-install"
         emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
     elif [[ "${FACTS[has_autoinstall]:-0}" == "1" && $has_ssh == "1" ]]; then
         emit_action "Full Bootstrap" "Unattended install, first boot, and post-install"
@@ -1174,6 +1180,7 @@ resolve_action() {
         "Arch Install (Interactive)") printf '%s\n' install-archinstall ;;
         "Debian Preseed Bootstrap") printf '%s\n' bootstrap-preseed ;;
         "Kickstart Bootstrap") printf '%s\n' bootstrap-kickstart ;;
+        "Alpine Bootstrap") printf '%s\n' bootstrap-alpine ;;
         "Full Bootstrap") printf '%s\n' bootstrap-unattended ;;
         "Guided Install"|"Guided Provision") printf '%s\n' provision ;;
         "Boot Desktop") printf '%s\n' start ;;
@@ -1309,6 +1316,11 @@ run_action() {
         bootstrap-preseed)
             if confirm_box "Debian Preseed Bootstrap" "Run the fully automated Debian preseed bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the Debian netinst headless via serial console\n- automatically run preseed install + late_command (SSH keys, sudoers)\n- start the installed VM and run SSH post-install\n\nExpected time: ~10-15 min depending on download speed."; then
                 run_vmctl bootstrap-preseed "$current_vm" || true
+            fi
+            ;;
+        bootstrap-alpine)
+            if confirm_box "Alpine Bootstrap" "Run the fully automated Alpine bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk artifacts\n- boot the Alpine live ISO headless via serial console\n- run setup-alpine from an answer file, then the profile's chroot steps (packages, sudo, greetd)\n- start the installed VM and run SSH post-install\n\nExpected time: ~5 min depending on download speed."; then
+                run_vmctl bootstrap-alpine "$current_vm" || true
             fi
             ;;
         bootstrap-kickstart)

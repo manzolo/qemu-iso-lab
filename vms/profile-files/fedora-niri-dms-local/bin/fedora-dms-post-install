@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# DankMaterialShell on Fedora: the shell comes from the avengemedia/dms COPR, its
+# companions (dgop, matugen, danksearch, cliphist, fonts) from avengemedia/danklinux;
+# quickshell and niri are in the Fedora repositories. Runs as the guest user with
+# passwordless sudo, after the kickstart install (see the profile's post_commands
+# for greetd and the graphical target).
+set -euo pipefail
+
+sudo dnf -y copr enable avengemedia/dms
+sudo dnf -y copr enable avengemedia/danklinux
+sudo dnf -y install dms dgop matugen danksearch cliphist material-symbols-fonts
+
+mkdir -p "$HOME/.config/niri" "$HOME/.config/DankMaterialShell" "$HOME/bin" "$HOME/Pictures/Screenshots"
+xdg-user-dirs-update || true
+
+# niri-session runs niri as the systemd user unit niri.service; hooking dms.service
+# under it (what `systemctl --user add-wants niri.service dms.service` does) starts
+# and stops the shell with the compositor. Done system-wide, so no user bus is
+# needed over SSH.
+sudo mkdir -p /etc/systemd/user/niri.service.wants
+sudo ln -sfn /usr/lib/systemd/user/dms.service /etc/systemd/user/niri.service.wants/dms.service
+
+command -v niri >/dev/null
+command -v qs >/dev/null || command -v quickshell >/dev/null
+command -v dms >/dev/null
+command -v dgop >/dev/null
+command -v xwayland-satellite >/dev/null
+niri validate
+
+# dms launches the first available terminal.
+printf 'foot.desktop\norg.gnome.Ptyxis.desktop\n' > "$HOME/.config/xdg-terminals.list"
+fc-cache -f >/dev/null 2>&1 || true

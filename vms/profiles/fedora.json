@@ -233,6 +233,164 @@
         }
       },
       "usb_tablet": true
+    },
+    "fedora-niri-dms-local": {
+      "name": "Fedora 44 + niri + DankMaterialShell (Local)",
+      "meta": {
+        "slug": "fedora",
+        "family": "fedora",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Everything-netinst-x86_64-44.iso",
+      "iso_discovery": {
+        "index_url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/",
+        "pattern": "href=\"(Fedora-Everything-netinst-x86_64-44-[0-9.]+\\.iso)\"",
+        "sort": "desc",
+        "limit": 1
+      },
+      "iso_url": "https://fedora.mirror.garr.it/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+      "disk": {
+        "path": "artifacts/fedora-niri-dms-local/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-niri-dms-local/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 8192,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "virtio-gl",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "Same niri + DankMaterialShell desktop as arch-dms-local, on Fedora 44: kickstart from the Everything netinst (inst_repo points at the online repository), niri/quickshell from Fedora, DMS from the avengemedia COPRs in post-install. SELinux stays permissive because greetd is not covered by the Fedora policy.",
+      "kickstart_config": {
+        "hostname": "fedora-niri-dms-local",
+        "username": "lab",
+        "fullname": "Lab",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "Europe/Rome",
+        "keyboard_layout": "it",
+        "locale": "it_IT.UTF-8",
+        "inst_repo": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/",
+        "ignore_missing_packages": true,
+        "packages": [
+          "@core",
+          "openssh-server",
+          "sudo",
+          "dnf5-plugins",
+          "git",
+          "vim-enhanced",
+          "bash-completion",
+          "NetworkManager",
+          "niri",
+          "xwayland-satellite",
+          "quickshell",
+          "accountsservice",
+          "greetd",
+          "greetd-agreety",
+          "agreety",
+          "foot",
+          "fuzzel",
+          "polkit",
+          "pipewire",
+          "wireplumber",
+          "pipewire-pulseaudio",
+          "xdg-desktop-portal-gnome",
+          "xdg-desktop-portal-gtk",
+          "xdg-user-dirs",
+          "xdg-utils",
+          "wl-clipboard",
+          "grim",
+          "slurp",
+          "nautilus",
+          "gvfs",
+          "udisks2",
+          "brightnessctl",
+          "playerctl",
+          "pavucontrol",
+          "upower",
+          "power-profiles-daemon",
+          "mesa-dri-drivers",
+          "mesa-vulkan-drivers",
+          "jetbrains-mono-fonts-all",
+          "google-noto-sans-fonts",
+          "google-noto-color-emoji-fonts",
+          "papirus-icon-theme",
+          "adwaita-icon-theme",
+          "htop",
+          "fastfetch",
+          "ripgrep",
+          "fd-find",
+          "bat",
+          "jq",
+          "tree",
+          "unzip",
+          "rsync",
+          "wget",
+          "curl"
+        ],
+        "post_commands": [
+          "# greetd autologin into niri-session for the lab user (Fedora's greetd package may create either user)\nGREETER_USER=greeter\ngetent passwd greeter >/dev/null || GREETER_USER=greetd\ngetent passwd \"$GREETER_USER\" >/dev/null || useradd -r -M -d /var/lib/greetd -s /usr/sbin/nologin greeter\ninstall -d -m 755 /etc/greetd\ncat > /etc/greetd/config.toml <<EOF\n[terminal]\nvt = 1\n\n[initial_session]\ncommand = \"niri-session\"\nuser = \"{{user}}\"\n\n[default_session]\ncommand = \"agreety --cmd niri-session\"\nuser = \"$GREETER_USER\"\nEOF\nsystemctl enable greetd.service\nsystemctl set-default graphical.target"
+        ],
+        "disk_device": "vda",
+        "selinux": "permissive",
+        "firewall": "enabled"
+      },
+      "ssh_provision": {
+        "hostname": "fedora-niri-dms-local",
+        "user": "lab",
+        "ssh_host_port": 2233,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/fedora-niri-dms-local/bin/fedora-dms-post-install",
+            "dest": "/home/{{user}}/bin/fedora-dms-post-install",
+            "dest_mode": "755"
+          },
+          {
+            "source": "vms/profile-files/arch-dms-local/niri/config.kdl",
+            "dest": "/home/{{user}}/.config/niri/config.kdl",
+            "dest_mode": "644"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/fedora-dms-post-install",
+          "command -v dms >/dev/null && dms version || true",
+          "niri --version"
+        ]
+      }
     }
   }
 }

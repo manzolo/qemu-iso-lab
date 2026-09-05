@@ -43,7 +43,8 @@ order. Output goes to `artifacts/<vm>/logs/post-install.*.log`.
 | `autoinstall` (Ubuntu) | `hostname`, `username`, `realname`, `password_hash`, `timezone`, `keyboard_layout`, `storage_layout`, `install_ssh` |
 | `archinstall_config` (Arch) | `hostname`, `username`, `password`, `timezone`, `keyboard_layout`, `locale_lang`, `locale_enc`, `bootloader`, `kernels`, `audio`, `packages`, `bootstrap_chroot_commands` |
 | `preseed_config` (Debian) | `hostname`, `domain`, `username`, `fullname`, `password_hash` or `password`, `timezone`, `keyboard_layout`, `locale`, `language`, `country`, `mirror_hostname`, `mirror_directory`, `tasks`, `packages`, `late_commands`, `disk_device` |
-| `kickstart_config` (AlmaLinux/RHEL) | `hostname`, `username`, `fullname`, `password_hash` or `password`, `timezone`, `keyboard_layout`, `locale`, `packages`, `post_commands`, `disk_device`, `selinux`, `firewall` |
+| `kickstart_config` (AlmaLinux/RHEL/Fedora) | `hostname`, `username`, `fullname`, `password_hash` or `password`, `timezone`, `keyboard_layout`, `locale`, `inst_repo` (`cdrom` or a repository URL), `ignore_missing_packages`, `packages`, `post_commands`, `disk_device`, `selinux`, `firewall` |
+| `alpine_config` (Alpine) | `hostname`, `username`, `password_hash`, `timezone`, `keyboard_layout`, `keyboard_variant`, `user_groups`, `ntp`, `disk_device`, `kernel_flavor` (`lts` or `virt`), `kernel_opts`, `packages`, `optional_packages`, `chroot_commands` |
 | `omarchy_config` | `hostname`, `username`, `password_hash`, `timezone`, `keyboard_layout`, `locale`, `disk_device`, `encrypt` |
 
 `ssh_key` may be `null`: `vmctl` then generates a key pair under
@@ -79,8 +80,8 @@ Directories are copied recursively. Copies are idempotent, so re-running
 ## Sudo in the guest
 
 Unattended flows configure passwordless sudo for the guest user themselves:
-the kickstart `%post`, the preseed `late_command` and the Arch install script
-all drop a rule in `sudoers.d`, and the Ubuntu autoinstall user is created with
+the kickstart `%post`, the preseed `late_command`, the Arch install script and
+the Alpine chroot step all drop a rule in `sudoers.d`, and the Ubuntu autoinstall user is created with
 sudo through the installer.
 
 `ssh_provision.sudo_password` exists for guests whose installer cannot do that
@@ -102,7 +103,7 @@ Tracked profiles are generic on purpose:
   identity declared by the profile (`ssh_provision.user`, `cloud_init.user`,
   `autoinstall.username`, `archinstall_config.username`,
   `omarchy_config.username`, `preseed_config.username`,
-  `kickstart_config.username`; they must agree).
+  `kickstart_config.username`, `alpine_config.username`; they must agree).
 
 To use your own name, key and dotfiles, override only the identity fields in
 the git-ignored `vms/profiles/local.json`; every `{{user}}` follows:

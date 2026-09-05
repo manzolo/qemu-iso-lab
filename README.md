@@ -26,10 +26,11 @@ driven by a single CLI (`vmctl`) or a dashboard TUI (`vmtui`).
 - **One profile, one VM.** Every guest is a JSON object: ISO source (with
   mirror discovery and checksum validation), disk, EFI or BIOS firmware, RAM,
   CPUs, network and video variants. `vmctl show <vm>` prints it resolved.
-- **Zero-click installs.** Ubuntu (autoinstall), Debian (preseed), AlmaLinux
-  (kickstart), Arch (pacstrap script) and Omarchy (cidata) install headless on a
-  serial console, boot, and finish with SSH provisioning: dotfiles, scripts,
-  extra packages. Ten minutes later `vmctl shell <vm>` drops you inside.
+- **Zero-click installs.** Ubuntu (autoinstall), Debian (preseed), AlmaLinux and
+  Fedora (kickstart), Arch (pacstrap script), Omarchy (cidata) and Alpine
+  (setup-alpine) install headless on a serial console, boot, and finish with
+  SSH provisioning: dotfiles, scripts, extra packages. Ten minutes later
+  `vmctl shell <vm>` drops you inside.
 - **Isolated and reproducible.** Each VM lives under `artifacts/<vm>/`; ISOs
   are cached once under `isos/`. `vmctl clean <vm>` puts everything back.
   A small Alpine guest boots in GitHub Actions on every push.
@@ -55,7 +56,7 @@ vmctl setup               # verifies qemu, qemu-img, OVMF, KVM
 Then pick a VM and go:
 
 ```bash
-vmctl list                          # 42 profiles
+vmctl list                          # 44 profiles
 vmctl provision debian-netinst      # ISO + disk + installer, click through it
 vmctl start debian-netinst          # boot the installed disk
 
@@ -83,7 +84,7 @@ accepts `--dry-run` in front of it.
 | install a distro by hand (ISO, disk, installer)       | `vmctl provision <vm>` then click through the installer  |
 | install Ubuntu with zero clicks, ready with SSH       | `vmctl bootstrap-unattended <vm>`                        |
 | install Omarchy with zero clicks, ready with NVIDIA   | `vmctl bootstrap-omarchy arch-omarchy-nvidia-local`      |
-| same for Debian / AlmaLinux / Arch                    | `vmctl bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-archinstall <vm>` |
+| same for Debian / AlmaLinux / Fedora / Arch / Alpine  | `vmctl bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-archinstall`, `bootstrap-alpine <vm>` |
 | boot a VM I already installed                         | `vmctl start <vm>` (`--headless --background` to detach) |
 | get a shell inside it / stop it                       | `vmctl shell <vm>`, `vmctl stop <vm>`                    |
 | re-run the SSH provisioning steps of a profile        | `vmctl post-install <vm>`                                |
@@ -97,16 +98,16 @@ accepts `--dry-run` in front of it.
 
 ## The catalog
 
-42 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
+44 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
 prints them all; the table shows what each family offers.
 
 | Family | Profiles | Highlights | Unattended |
 |--------|----------|------------|------------|
 | Arch | `archlinux`, `endeavouros`, `cachyos`, `cachyos-local`, `cachyos-nvidia-local`, `arch-noctalia-local`, `arch-dms-local`, `arch-dms-nvidia-local`, `arch-omarchy-nvidia-local` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes | `bootstrap-archinstall`, `bootstrap-omarchy` |
 | Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop`, `ubuntu-server`, `ubuntu-server-headless`, `ubuntu-niri`, `ubuntu-niri-local`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
-| Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `almalinux-minimal`, `almalinux-server` | Fedora 42, AlmaLinux 10.1 | `bootstrap-kickstart` |
+| Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms-local`, `almalinux-minimal`, `almalinux-server` | Fedora 42/44, niri + DankMaterialShell on Fedora, AlmaLinux 10.1 | `bootstrap-kickstart` |
 | openSUSE / NixOS / Void | `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros | interactive |
-| Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `freebsd`, `kali-live` | the CI smoke-test guests, FreeBSD 14.3 | interactive |
+| Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.24 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
 | Windows | `windows10-template`, `windows11-template` | import targets for physical disks (`vmctl import-device`) | n/a |
 
 Profiles ending in `-local` are full desktop recipes with SSH provisioning,
@@ -115,7 +116,7 @@ guests that boot under TCG in GitHub Actions.
 
 ## Unattended installs
 
-Five installers run headless on a serial console. Each `bootstrap-*` command
+Six installers run headless on a serial console. Each `bootstrap-*` command
 generates the answer file, extracts kernel and initrd from the ISO, boots the
 installer, waits for a completion token, starts the installed VM in the
 background and runs the profile's SSH provisioning.
@@ -123,7 +124,9 @@ background and runs the profile's SSH provisioning.
 ```bash
 vmctl bootstrap-unattended ubuntu-niri-local          # Ubuntu autoinstall + cloud-init
 vmctl bootstrap-preseed debian-server                 # Debian preseed
-vmctl bootstrap-kickstart almalinux-server            # AlmaLinux / RHEL kickstart
+vmctl bootstrap-kickstart almalinux-server            # AlmaLinux / RHEL kickstart from the ISO
+vmctl bootstrap-kickstart fedora-niri-dms-local       # Fedora kickstart from the netinst + online repo
+vmctl bootstrap-alpine alpine-niri                    # Alpine: setup-alpine answer file + chroot steps
 vmctl bootstrap-archinstall arch-dms-local            # Arch: pacstrap script on the live ISO
 vmctl bootstrap-omarchy arch-omarchy-nvidia-local     # Omarchy: official cidata mechanism
 ```

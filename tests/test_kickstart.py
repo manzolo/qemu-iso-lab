@@ -101,6 +101,28 @@ class KickstartConfigTests(BaseVmctlTestCase):
         self.assertIn("blockdev --flushbufs /dev/vda /dev/vda1 /dev/vda2 || true", script)
         self.assertIn(vmctl.kickstart.BOOTSTRAP_COMPLETE_TOKEN, script)
 
+    def test_render_kickstart_cdrom_source_by_default(self):
+        self._kickstart_vm()
+        script = vmctl.kickstart.render_kickstart(self.vm_name, self.vm_config)
+        self.assertNotIn("url --url", script)
+        self.assertIn("\n%packages\n", script)
+        self.assertEqual(vmctl.kickstart.install_repo(self.vm_config), "cdrom")
+        self.assertIn("inst.repo=cdrom", vmctl.kickstart.kernel_append(self.vm_config))
+
+    def test_render_kickstart_network_source_and_ignoremissing(self):
+        self._kickstart_vm()
+        repo = "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/"
+        self.vm_config["kickstart_config"]["inst_repo"] = repo
+        self.vm_config["kickstart_config"]["ignore_missing_packages"] = True
+        script = vmctl.kickstart.render_kickstart(self.vm_name, self.vm_config)
+        self.assertIn(f'url --url="{repo}"', script)
+        self.assertIn("\n%packages --ignoremissing\n", script)
+        append = vmctl.kickstart.kernel_append(self.vm_config)
+        self.assertIn(f"inst.repo={repo}", append)
+        self.assertIn("inst.ks=hd:LABEL=KS_CFG:/ks.cfg", append)
+        self.assertIn("console=ttyS0,115200", append)
+
+
 class KickstartBootstrapTests(BaseVmctlTestCase):
     def _kickstart_vm(self) -> None:
         self.vm_config["kickstart_config"] = {
