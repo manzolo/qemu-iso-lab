@@ -1,6 +1,7 @@
 import os
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,8 +13,14 @@ VMTUI_PATH = ROOT / "bin" / "vmtui"
 
 class VmtuiTests(unittest.TestCase):
     def setUp(self):
+        # A throwaway repository root: vmtui resolves every relative profile
+        # path (isos/, artifacts/, PID files) against VMTUI_ROOT_DIR, so the
+        # state of the developer's host never leaks into the menu facts. The
+        # code itself is reached through symlinks to the real checkout.
         self.tempdir = tempfile.TemporaryDirectory()
         self.bindir = Path(self.tempdir.name)
+        (self.bindir / "vmctl").symlink_to(ROOT / "vmctl", target_is_directory=True)
+        (self.bindir / "bin").symlink_to(ROOT / "bin", target_is_directory=True)
         self.config_dir = self.bindir / "vms"
         profiles_dir = self.config_dir / "profiles"
         profiles_dir.mkdir(parents=True)
@@ -21,23 +28,13 @@ class VmtuiTests(unittest.TestCase):
             if profile_path.name == "local.json":
                 continue
             (profiles_dir / profile_path.name).write_text(profile_path.read_text(encoding="utf-8"), encoding="utf-8")
-        # Tracked profiles keep their disks under <repo>/artifacts, so the menu
-        # facts (prepared/installed) would leak the state of the developer's
-        # host into the tests. Point every disk into the temp tree instead:
-        # local.json is deep-merged last, exactly as in production.
-        overrides: dict[str, dict[str, object]] = {}
-        for profile_path in profiles_dir.glob("*.json"):
-            for vm_name, vm in json.loads(profile_path.read_text(encoding="utf-8")).get("vms", {}).items():
-                disk_name = Path(vm["disk"]["path"]).name
-                overrides[vm_name] = {"disk": {"path": str(self.bindir / "artifacts" / vm_name / disk_name)}}
-        (profiles_dir / "local.json").write_text(json.dumps({"vms": overrides}), encoding="utf-8")
         ssh_vm = {
             "vms": {
                 "test-ssh": {
                     "name": "Test SSH VM",
                     "iso": "isos/test.iso",
                     "disk": {
-                        "path": str(self.bindir / "artifacts" / "test-ssh" / "disk.qcow2"),
+                        "path": "artifacts/test-ssh/disk.qcow2",
                         "size": "16G",
                         "format": "qcow2",
                         "interface": "virtio",
@@ -80,11 +77,20 @@ class VmtuiTests(unittest.TestCase):
         dialog = self.bindir / "dialog"
         dialog.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
         dialog.chmod(0o755)
-        self.env = os.environ.copy()
-        self.env["PATH"] = f"{self.bindir}:{self.env['PATH']}"
-        self.env["VMTUI_TEST_MODE"] = "1"
-        self.env["VMTUI_CONFIG_DIR"] = str(self.config_dir)
-        self.env["VMTUI_STATE_DIR"] = str(self.bindir / "state")
+        # Built from scratch rather than copied from os.environ: no inherited
+        # VMTUI_* knobs, no ~/.profile PATH additions, no host fzf.
+        self.env = {
+            "PATH": os.pathsep.join([str(self.bindir), str(Path(sys.executable).parent), "/usr/local/bin", os.defpath]),
+            "HOME": str(self.bindir / "home"),
+            "LC_ALL": "C.UTF-8",
+            "TERM": "dumb",
+            "VMTUI_TEST_MODE": "1",
+            "VMTUI_UI": "dialog",
+            "VMTUI_ROOT_DIR": str(self.bindir),
+            "VMTUI_CONFIG_DIR": str(self.config_dir),
+            "VMTUI_STATE_DIR": str(self.bindir / "state"),
+        }
+        (self.bindir / "home").mkdir()
 
     def mark_installed(self, vm_name: str) -> None:
         # enough allocated data to count as an installed OS (> 16 MiB)
@@ -234,11 +240,13 @@ class VmtuiTests(unittest.TestCase):
         fake = self.bindir / "fzf"
         fake.write_text("#!/usr/bin/env sh\necho '0.44.1 (debian)'\n", encoding="utf-8")
         fake.chmod(0o755)
-        result = subprocess.run(["bash", "-lc", "source bin/vmtui; echo $UI_BACKEND"], cwd=ROOT, env=self.env,
+        # auto-detection: no VMTUI_UI in the environment
+        auto_env = {key: value for key, value in self.env.items() if key != "VMTUI_UI"}
+        result = subprocess.run(["bash", "-lc", "source bin/vmtui; echo $UI_BACKEND"], cwd=ROOT, env=auto_env,
                                 capture_output=True, text=True, check=True)
         self.assertEqual(result.stdout.strip(), "fzf")
         fake.write_text("#!/usr/bin/env sh\necho '0.29.0 (debian)'\n", encoding="utf-8")
-        result = subprocess.run(["bash", "-lc", "source bin/vmtui; echo $UI_BACKEND"], cwd=ROOT, env=self.env,
+        result = subprocess.run(["bash", "-lc", "source bin/vmtui; echo $UI_BACKEND"], cwd=ROOT, env=auto_env,
                                 capture_output=True, text=True, check=True)
         self.assertEqual(result.stdout.strip(), "dialog")
         env = dict(self.env, VMTUI_UI="fzf")
@@ -383,7 +391,7 @@ class VmtuiTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
 
     def test_is_na_action_boot_desktop_when_disk_missing(self):
-        # freebsd has no disk.qcow2 in artifacts/ (plain VM, never installed)
+        # freebsd has no disk in the temp root (plain VM, never installed)
         result = subprocess.run(
             ["bash", "-lc", "source bin/vmtui; is_na_action 'Boot Desktop' freebsd"],
             cwd=ROOT,
