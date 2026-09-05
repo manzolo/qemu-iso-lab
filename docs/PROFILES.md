@@ -95,6 +95,22 @@ Profiles can define smarter sources without giving up a hardcoded fallback:
 "iso_url": "https://example.invalid/hardcoded-fallback.iso"
 ```
 
+When the index lists one directory per release instead of ISO files (CachyOS),
+capture the release token and let `url_template` build the URL:
+
+```json
+"iso_discovery": {
+  "index_url": "https://mirror.cachyos.org/ISO/desktop/",
+  "pattern": "href=\"(\\d{6})/\"",
+  "url_template": "https://mirror.cachyos.org/ISO/desktop/{match}/cachyos-desktop-linux-{match}.iso",
+  "sort": "desc",
+  "limit": 1
+}
+```
+
+Give such profiles a stable cached name (`isos/cachyos-desktop-linux-latest.iso`)
+so a new release replaces the old file instead of piling up next to it.
+
 Import-oriented profiles may omit every ISO source on purpose: they exist for
 `vmctl import-device`, where an existing physical installation becomes the VM
 disk instead of booting an installer.

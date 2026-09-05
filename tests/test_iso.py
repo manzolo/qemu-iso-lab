@@ -141,6 +141,19 @@ class IsoTests(BaseVmctlTestCase):
         self.assertEqual(resolved, iso_path)
         download_file.assert_called_once_with("https://example.invalid/releases/test-2.iso", iso_path, dry_run=False, vm=self.vm_config)
 
+    def test_discovery_url_template_builds_iso_url_from_release_directories(self):
+        self.vm_config["iso_discovery"] = {
+            "index_url": "https://mirror.example.invalid/ISO/desktop/",
+            "pattern": r'href="(\d{6})/"',
+            "url_template": "https://mirror.example.invalid/ISO/desktop/{match}/example-{match}.iso",
+            "sort": "desc",
+            "limit": 1,
+        }
+        index = '<a href="../">..</a> <a href="260426/">260426/</a> <a href="260809/">260809/</a> <a href="260628/">260628/</a>'
+        with mock.patch.object(vmctl.iso, "fetch_text", return_value=index):
+            urls = self.vmctl.discover_iso_urls(self.vm_config)
+        self.assertEqual(urls, ["https://mirror.example.invalid/ISO/desktop/260809/example-260809.iso"])
+
     def test_ensure_iso_dry_run_skips_remote_discovery(self):
         iso_path = self.root / self.vm_config["iso"]
         self.vm_config["iso_discovery"] = {

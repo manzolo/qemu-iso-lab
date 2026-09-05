@@ -1,21 +1,21 @@
 {
   "vms": {
     "alpine-niri": {
-      "name": "Alpine Linux 3.24 + niri",
+      "name": "Alpine Linux 3.23 + niri",
       "meta": {
         "slug": "alpine-linux",
         "family": "alpine",
         "role": "desktop",
         "release_model": "stable"
       },
-      "iso": "isos/alpine-standard-latest-stable-x86_64.iso",
+      "iso": "isos/alpine-standard-3.23-x86_64.iso",
       "iso_discovery": {
-        "index_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/",
-        "pattern": "href=\"(alpine-standard-\\d+\\.\\d+\\.\\d+-x86_64\\.iso)\"",
+        "index_url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/",
+        "pattern": "href=\"(alpine-standard-3\\.23\\.\\d+-x86_64\\.iso)\"",
         "sort": "desc",
         "limit": 1
       },
-      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-standard-3.24.1-x86_64.iso",
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.4-x86_64.iso",
       "disk": {
         "path": "artifacts/alpine-niri/disk.qcow2",
         "size": "16G",
@@ -54,7 +54,7 @@
         }
       },
       "usb_tablet": true,
-      "notes": "musl + OpenRC desktop: niri from the community repo, seatd for seat management, greetd autologin (pam_rundir provides XDG_RUNTIME_DIR; greetd runs initial_session once per boot, see /run/greetd.run). No DankMaterialShell here: quickshell is not packaged in Alpine. Installed unattended by bootstrap-alpine.",
+      "notes": "musl + OpenRC desktop: niri from the community repo, seatd for seat management, greetd autologin (pam_rundir provides XDG_RUNTIME_DIR; greetd runs initial_session once per boot, see /run/greetd.run). Pinned to Alpine 3.23: the 3.24 Mesa build drops the virgl gallium driver, so virtio-vga-gl has no 3D acceleration there and niri (which refuses software renderers) never takes over the display. No DankMaterialShell here: quickshell is not packaged in Alpine. Installed unattended by bootstrap-alpine.",
       "alpine_config": {
         "hostname": "alpine-niri",
         "username": "lab",
@@ -65,7 +65,6 @@
         "kernel_flavor": "lts",
         "packages": [
           "niri",
-          "xwayland-satellite",
           "foot",
           "fuzzel",
           "greetd",
@@ -82,6 +81,7 @@
           "mesa-gl"
         ],
         "optional_packages": [
+          "xwayland-satellite",
           "pipewire",
           "pipewire-pulse",
           "wireplumber",

@@ -1,12 +1,31 @@
 #!/usr/bin/env bash
+# CachyOS + niri + NVIDIA open kernel modules (mainline branch, DKMS).
+# Runs as the guest user with passwordless sudo after the Calamares install.
 set -euo pipefail
 
 mkdir -p "$HOME/.config/niri" "$HOME/.config/DankMaterialShell"
 
-sudo pacman -Sy --noconfirm --needed \
+sudo pacman -Syu --noconfirm
+
+# DKMS needs the headers of every installed CachyOS kernel (linux-cachyos, -lts, -bore, ...).
+headers=()
+while read -r kernel; do
+  headers+=("${kernel}-headers")
+done < <(pacman -Qq | grep -E '^linux-cachyos(-[a-z0-9]+)*$' | grep -vE '(-headers|-nvidia)$' || true)
+
+sudo pacman -S --noconfirm --needed \
   foot niri \
-  nvidia-580xx-dkms nvidia-580xx-utils nvidia-580xx-settings \
-  lib32-nvidia-580xx-utils opencl-nvidia-580xx lib32-opencl-nvidia-580xx
+  "${headers[@]}" \
+  nvidia-open-dkms nvidia-utils nvidia-settings \
+  lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libva-nvidia-driver
+
+# Wayland compositors need the DRM KMS interface of the NVIDIA driver.
+printf 'options nvidia_drm modeset=1 fbdev=1\noptions nvidia NVreg_PreserveVideoMemoryAllocations=1\n' \
+  | sudo tee /etc/modprobe.d/nvidia.conf >/dev/null
+sudo systemctl enable nvidia-suspend nvidia-hibernate nvidia-resume 2>/dev/null || true
 
 command -v niri >/dev/null
 niri --version
+pacman -Q nvidia-utils nvidia-open-dkms
+# nvidia-smi reports no device inside the VM unless a GPU is passed through.
+command -v nvidia-smi >/dev/null && (nvidia-smi || true)

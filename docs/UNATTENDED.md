@@ -83,6 +83,10 @@ the matching `url --url=` directive. `ignore_missing_packages: true` renders
 install. `post_commands` run in the installed system's chroot: the Fedora
 profile uses them for the greetd autologin and the graphical target, and leaves
 DankMaterialShell to the SSH post-install (COPR repositories need the network).
+That script upgrades the system first: DMS 1.6 needs `quickshell >= 0.3`, which
+only the `avengemedia/danklinux` COPR provides for Fedora 44, built against the
+Qt 6.11 that lives in the `updates` repository. Fedora's `greetd` package ships
+`agreety` itself and creates the `greetd` user.
 
 ## Arch: pacstrap script
 
@@ -142,7 +146,10 @@ prompt and runs it. `install.sh` then:
 3. unmounts, syncs, flushes, prints `==> Alpine Linux installation complete!`
    and powers off.
 
-`alpine-niri` uses `chroot_commands` for greetd: autologin into
+`alpine-niri` is pinned to Alpine 3.23: the 3.24 Mesa build leaves out the
+virgl gallium driver, so `virtio-vga-gl` gives the guest no 3D acceleration
+and niri, which refuses software renderers, never takes over the display.
+It uses `chroot_commands` for greetd: autologin into
 `dbus-run-session -- niri --session` (OpenRC has no systemd user session).
 Two Alpine specifics learned the hard way: without elogind nothing sets
 `XDG_RUNTIME_DIR`, so `pam-rundir` is installed and added to

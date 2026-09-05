@@ -8,6 +8,12 @@ set -euo pipefail
 
 sudo dnf -y copr enable avengemedia/dms
 sudo dnf -y copr enable avengemedia/danklinux
+
+# DMS 1.6 needs quickshell >= 0.3 (`pragma AppId`), which the Fedora 44 release
+# repo does not have (0.2.1). The danklinux COPR builds 0.3.x against Qt 6.11,
+# shipped by the `updates` repo: upgrade first, then take quickshell from the COPR.
+sudo dnf -y --refresh upgrade
+sudo dnf -y install 'quickshell >= 0.3'
 sudo dnf -y install dms dgop matugen danksearch cliphist material-symbols-fonts
 
 mkdir -p "$HOME/.config/niri" "$HOME/.config/DankMaterialShell" "$HOME/bin" "$HOME/Pictures/Screenshots"

@@ -97,8 +97,14 @@ def discover_iso_urls(vm: dict[str, Any]) -> list[str]:
             href = match.group(1) if match.groups() else match.group(0)
         if not href:
             continue
-        base_url = str(discovery.get("base_url") or index_url)
-        candidate = urljoin(base_url, href)
+        template = discovery.get("url_template")
+        if template:
+            # Directory-per-release indexes (CachyOS): the regex captures the
+            # release token and the template turns it into the ISO URL.
+            candidate = str(template).replace("{match}", href)
+        else:
+            base_url = str(discovery.get("base_url") or index_url)
+            candidate = urljoin(base_url, href)
         if candidate not in urls:
             urls.append(candidate)
 

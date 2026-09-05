@@ -107,7 +107,7 @@ prints them all; the table shows what each family offers.
 | Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop`, `ubuntu-server`, `ubuntu-server-headless`, `ubuntu-niri`, `ubuntu-niri-local`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
 | Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms-local`, `almalinux-minimal`, `almalinux-server` | Fedora 42/44, niri + DankMaterialShell on Fedora, AlmaLinux 10.1 | `bootstrap-kickstart` |
 | openSUSE / NixOS / Void | `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros | interactive |
-| Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.24 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
+| Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.23 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
 | Windows | `windows10-template`, `windows11-template` | import targets for physical disks (`vmctl import-device`) | n/a |
 
 Profiles ending in `-local` are full desktop recipes with SSH provisioning,
