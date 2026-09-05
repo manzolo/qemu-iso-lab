@@ -21,6 +21,16 @@ class VmtuiTests(unittest.TestCase):
             if profile_path.name == "local.json":
                 continue
             (profiles_dir / profile_path.name).write_text(profile_path.read_text(encoding="utf-8"), encoding="utf-8")
+        # Tracked profiles keep their disks under <repo>/artifacts, so the menu
+        # facts (prepared/installed) would leak the state of the developer's
+        # host into the tests. Point every disk into the temp tree instead:
+        # local.json is deep-merged last, exactly as in production.
+        overrides: dict[str, dict[str, object]] = {}
+        for profile_path in profiles_dir.glob("*.json"):
+            for vm_name, vm in json.loads(profile_path.read_text(encoding="utf-8")).get("vms", {}).items():
+                disk_name = Path(vm["disk"]["path"]).name
+                overrides[vm_name] = {"disk": {"path": str(self.bindir / "artifacts" / vm_name / disk_name)}}
+        (profiles_dir / "local.json").write_text(json.dumps({"vms": overrides}), encoding="utf-8")
         ssh_vm = {
             "vms": {
                 "test-ssh": {
@@ -282,6 +292,8 @@ class VmtuiTests(unittest.TestCase):
         self.assertEqual(result.stdout.split("\n")[:5], ["0", "--video", "std", "0", "0"])
 
     def test_unified_menu_for_arch_bootstrap_vm(self):
+        # SSH Console is offered only once the disk holds an OS
+        self.mark_installed("arch-noctalia-local")
         output = self._unified_menu("arch-noctalia-local")
         self.assertIn("Arch Bootstrap", output)
         self.assertIn("Arch Install (Interactive)", output)
@@ -290,6 +302,7 @@ class VmtuiTests(unittest.TestCase):
         self.assertNotIn("Debian Preseed Bootstrap", output)
 
     def test_unified_menu_for_omarchy_bootstrap_vm(self):
+        self.mark_installed("arch-omarchy-nvidia-local")
         output = self._unified_menu("arch-omarchy-nvidia-local")
         self.assertIn("Omarchy Bootstrap", output)
         self.assertIn("Omarchy Unattended Install", output)
