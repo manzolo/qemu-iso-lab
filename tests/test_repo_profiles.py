@@ -42,8 +42,21 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "arch-omarchy-nvidia-local",
             "fedora-niri-dms-local",
             "alpine-niri",
+            "cachyos-nvidia-local",
         ):
             self.assertIn(profile, cfg["vms"])
+
+        # CachyOS rides the Arch pacstrap flow on its own archiso: kernel paths,
+        # serial prompts and the live pacman.conf must all be declared.
+        for profile in ("cachyos-local", "cachyos-nvidia-local"):
+            vm = cfg["vms"][profile]
+            self.assertEqual(vm["installer_boot"]["kernel"], "arch/boot/x86_64/vmlinuz-linux-cachyos")
+            arch_cfg = vm["archinstall_config"]
+            self.assertEqual(arch_cfg["kernels"], ["linux-cachyos"])
+            self.assertTrue(arch_cfg["inherit_live_pacman_conf"])
+            self.assertEqual(arch_cfg["live_login_prompt"], "CachyOS login:")
+            self.assertEqual(arch_cfg["live_shell_prompt"], "root@CachyOS")
+            self.assertIn("cachyos-keyring", arch_cfg["packages"])
 
 
 if __name__ == "__main__":

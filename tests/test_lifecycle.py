@@ -1223,6 +1223,49 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual(exit_code, 0)
         self.assertFalse(vars_path.exists())
 
+    def test_cmd_bootstrap_archinstall_uses_profile_live_prompts_and_kernel_append(self):
+        self.create_disk()
+        self.vm_config["installer_boot"] = {
+            "kernel": "arch/boot/x86_64/vmlinuz-linux-cachyos",
+            "initrd": "arch/boot/x86_64/initramfs-linux-cachyos.img",
+        }
+        self.vm_config["archinstall_config"] = {
+            "hostname": "cachyos-test",
+            "username": "tester",
+            "password": "s3cret",
+            "kernels": ["linux-cachyos"],
+            "inherit_live_pacman_conf": True,
+            "live_login_prompt": "CachyOS login:",
+            "live_shell_prompt": "root@CachyOS",
+            "live_kernel_append": "systemd.unit=multi-user.target",
+        }
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=False)
+
+        with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.lifecycle, "ensure_vm_disk"), \
+             mock.patch.object(vmctl.lifecycle, "reset_vm_nvram"), \
+             mock.patch.object(vmctl.archinstall, "create_bootstrap_iso", return_value=self.root / "artifacts/testvm/archinstall/bootstrap.iso"), \
+             mock.patch.object(vmctl.iso, "extract_arch_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")) as extract, \
+             mock.patch.object(vmctl.archinstall, "arch_iso_label", return_value="COS_202608"), \
+             mock.patch.object(vmctl.qemu, "common_args", side_effect=[["qemu-system-x86_64"], ["qemu-system-x86_64"]]), \
+             mock.patch.object(vmctl.qemu, "run_and_expect") as run_and_expect, \
+             mock.patch.object(vmctl.lifecycle, "prepare_background_vm_slot", return_value=(self.root / "artifacts/testvm/runtime/bootstrap-start.pid", self.root / "artifacts/testvm/logs/bootstrap-start.log")), \
+             mock.patch.object(vmctl.runtime, "run_background", return_value=None), \
+             mock.patch.object(vmctl.lifecycle, "run_post_install"):
+            exit_code = self.vmctl.cmd_bootstrap_archinstall(args)
+
+        self.assertEqual(exit_code, 0)
+        # The kernel/initrd helper receives the resolved profile, so installer_boot reaches it.
+        self.assertEqual(extract.call_args.args[0]["installer_boot"]["kernel"], "arch/boot/x86_64/vmlinuz-linux-cachyos")
+        install_cmd = run_and_expect.call_args.args[0]
+        append = install_cmd[install_cmd.index("-append") + 1]
+        self.assertEqual(append, "archisobasedir=arch archisolabel=COS_202608 console=ttyS0,115200 quiet systemd.unit=multi-user.target")
+        auto_inputs = run_and_expect.call_args.kwargs["auto_inputs"]
+        self.assertEqual(auto_inputs[0], ("CachyOS login:", "root\n"))
+        self.assertEqual(auto_inputs[1][0], "root@CachyOS")
+        self.assertIn("mount /dev/vdb /tmp/archconf", auto_inputs[1][1])
+
     def test_cmd_bootstrap_preseed_dry_run_allows_missing_disk_for_post_install_boot(self):
         self.vm_config["firmware"] = {
             "type": "efi",

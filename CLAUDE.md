@@ -79,6 +79,8 @@ SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` �
 4. Uses `run_and_expect` + `auto_inputs` to wait for `root@archiso` on the serial console, then sends the mount + run trigger automatically.
 5. Waits for `"==> Arch Linux installation complete!"`, then repeats step 3–4 of the Ubuntu flow.
 
+CachyOS (`cachyos-local`, `cachyos-nvidia-local`) rides the same handler on the CachyOS archiso: `installer_boot` selects `vmlinuz-linux-cachyos`/`initramfs-linux-cachyos.img`, `archinstall_config.live_login_prompt`/`live_shell_prompt` (`CachyOS login:` / `root@CachyOS`) replace the archiso prompts, `live_kernel_append` adds `systemd.unit=multi-user.target`, and `inherit_live_pacman_conf` copies the live `pacman.conf` + mirrorlists into the target after pacstrap (the `[cachyos]` repo would otherwise be lost). `archinstall.live_prompts()` / `live_kernel_append()` are the only places reading these fields.
+
 **Debian** (`bootstrap-preseed`):
 1. Generates preseed seed ISO (`PRESEED_CFG`).
 2. Extracts `vmlinuz` + `initrd.gz` from the ISO.

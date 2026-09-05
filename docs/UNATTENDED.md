@@ -106,6 +106,37 @@ and run commands automatically, and waits for
 archinstall JSON configs onto a second virtio CD-ROM (`/dev/vdb`) and boots the
 live ISO for you to run `archinstall` by hand.
 
+### CachyOS on the same flow
+
+```bash
+vmctl bootstrap-archinstall cachyos-nvidia-local
+```
+
+The CachyOS desktop ISO is an archiso too (label `COS_YYYYMM`, squashfs under
+`arch/`, root without a password on the serial getty), so the pacstrap flow
+works on it without a dedicated installer. Three profile fields adapt it:
+
+- `installer_boot.kernel` / `initrd` point at the CachyOS kernel
+  (`arch/boot/x86_64/vmlinuz-linux-cachyos`, `initramfs-linux-cachyos.img`)
+  instead of the Arch defaults;
+- `archinstall_config.live_login_prompt` / `live_shell_prompt` are what the
+  live system prints (`CachyOS login:`, `root@CachyOS`), and
+  `live_kernel_append` adds `systemd.unit=multi-user.target` so the live Plasma
+  session and Calamares never start while pacstrap runs headless;
+- `archinstall_config.inherit_live_pacman_conf` copies the live `pacman.conf`
+  and mirrorlists into the target after pacstrap. pacstrap resolves packages
+  with the live configuration, which already carries the `[cachyos]`
+  repository, but the target would otherwise get the stock file from the
+  `pacman` package and lose that repository (and `linux-cachyos` updates) on
+  first boot.
+
+`kernels` lists `linux-cachyos`; `packages` add `cachyos-keyring`, the
+mirrorlists, `cachyos-settings` and `cachyos-hooks`. The bootstrap script also
+waits for archiso's `pacman-init` and for DNS before pacstrap, since the serial
+login prompt shows up before either is ready. Calamares remains available for a
+manual install (`vmctl install`). The `cachyos` profile (fixed VHD for Ventoy)
+stays interactive.
+
 ## Omarchy: cidata
 
 ```bash

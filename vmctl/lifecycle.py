@@ -981,19 +981,20 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
     install_qemu_args += [
         "-kernel", str(kernel_path),
         "-initrd", str(initrd_path),
-        "-append", f"archisobasedir=arch archisolabel={iso_label} console=ttyS0,115200 quiet",
+        "-append", archinstall.live_kernel_append(vm, iso_label),
     ]
 
+    login_prompt, shell_prompt = archinstall.live_prompts(vm)
     trigger = "mkdir -p /tmp/archconf && mount /dev/vdb /tmp/archconf && bash /tmp/archconf/run.sh"
-    ui.print_note("Booting Arch live ISO — waiting for shell, then triggering automated install...")
+    ui.print_note("Booting the live ISO — waiting for shell, then triggering automated install...")
     serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
     qemu.run_and_expect(
         install_qemu_args,
         expected_text=archinstall.BOOTSTRAP_COMPLETE_TOKEN,
         timeout_sec=getattr(args, "timeout", 1800),
         auto_inputs=[
-            (archinstall.ARCH_SERIAL_LOGIN_PROMPT, "root\n"),
-            (archinstall.ARCH_LIVE_PROMPT, f"\n{trigger}\n"),
+            (login_prompt, "root\n"),
+            (shell_prompt, f"\n{trigger}\n"),
         ],
         dry_run=args.dry_run,
         log_path=serial_log,

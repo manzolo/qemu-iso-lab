@@ -865,7 +865,7 @@ build_vm_menu_items() {
         emit_action "Omarchy Bootstrap" "Official cidata install + NVIDIA post-install"
         emit_action "Omarchy Unattended Install" "Install from the official ISO and stop after reboot"
     elif [[ "${FACTS[has_archinstall]:-0}" == "1" ]]; then
-        emit_action "Arch Bootstrap" "Fully automated Arch install + post-install"
+        emit_action "Arch Bootstrap" "Fully automated pacstrap install + post-install (Arch, CachyOS)"
         emit_action "Arch Install (Interactive)" "Boot live ISO with pre-built archinstall config"
     elif [[ "${FACTS[has_preseed]:-0}" == "1" ]]; then
         emit_action "Debian Preseed Bootstrap" "Fully automated Debian install + post-install"
@@ -1299,7 +1299,7 @@ run_action() {
             fi
             ;;
         bootstrap-archinstall)
-            if confirm_box "Arch Bootstrap" "Run the fully automated Arch Linux bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the Arch live ISO headless via serial console\n- automatically trigger pacstrap, locale, user, GRUB\n- start the installed VM and run SSH post-install\n\nExpected time: ~15-30 min depending on download speed."; then
+            if confirm_box "Arch Bootstrap" "Run the fully automated Arch-based (pacstrap) bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the live ISO (Arch or CachyOS) headless via serial console\n- automatically trigger pacstrap, locale, user, GRUB\n- start the installed VM and run SSH post-install\n\nExpected time: ~15-30 min depending on download speed."; then
                 run_vmctl bootstrap-archinstall "$current_vm" || true
             fi
             ;;

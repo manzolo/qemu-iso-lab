@@ -45,6 +45,10 @@ ARCH_SERIAL_LOGIN_PROMPT = "archiso login:"
 # Shell prompt after root login on the serial console.
 ARCH_LIVE_PROMPT = "root@archiso"
 
+# Kernel arguments every archiso live system needs to find its squashfs and
+# talk on the serial console; the ISO label is filled in at boot time.
+LIVE_KERNEL_APPEND = "archisobasedir=arch archisolabel={label} console=ttyS0,115200 quiet"
+
 
 def archinstall_config(vm: dict[str, Any]) -> dict[str, Any] | None:
     cfg = vm.get("archinstall_config")
@@ -57,6 +61,34 @@ def archinstall_config(vm: dict[str, Any]) -> dict[str, Any] | None:
 
 def archinstall_artifact_dir(vm: dict[str, Any]) -> Path:
     return runtime.resolve_path(vm["disk"]["path"]).parent / "archinstall"
+
+
+def live_prompts(vm: dict[str, Any]) -> tuple[str, str]:
+    """(login prompt, shell prompt) of the live ISO on the serial console.
+
+    Arch derivatives built with archiso keep the same boot mechanics but a
+    different hostname, so the prompts differ: CachyOS shows ``CachyOS login:``
+    and ``[root@CachyOS ~]#``. Profiles override them with
+    ``archinstall_config.live_login_prompt`` / ``live_shell_prompt``.
+    """
+    cfg = archinstall_config(vm) or {}
+    login = str(cfg.get("live_login_prompt") or ARCH_SERIAL_LOGIN_PROMPT).strip()
+    shell = str(cfg.get("live_shell_prompt") or ARCH_LIVE_PROMPT).strip()
+    if not login or not shell:
+        raise VMError("archinstall_config.live_login_prompt / live_shell_prompt must not be empty")
+    return login, shell
+
+
+def live_kernel_append(vm: dict[str, Any], iso_label: str) -> str:
+    """Kernel command line for the live ISO; ``live_kernel_append`` adds to it.
+
+    CachyOS uses it for ``systemd.unit=multi-user.target`` so the live Plasma
+    session and Calamares never start while pacstrap runs headless.
+    """
+    cfg = archinstall_config(vm) or {}
+    extra = str(cfg.get("live_kernel_append") or "").strip()
+    append = LIVE_KERNEL_APPEND.format(label=iso_label)
+    return f"{append} {extra}" if extra else append
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +231,7 @@ def render_bootstrap_script(vm_name: str, vm: dict[str, Any]) -> str:
     packages: list[str] = list(cfg.get("packages") or [])
     services: list[str] = list(cfg.get("services") or [])
     bootstrap_chroot_commands: list[str] = list(cfg.get("bootstrap_chroot_commands") or [])
+    inherit_live_pacman_conf = bool(cfg.get("inherit_live_pacman_conf", False))
 
     if not username:
         raise VMError("archinstall_config.username is required for bootstrap")
@@ -239,9 +272,32 @@ echo "==> Bootstrap guest customization..."
 {rendered_commands}
 """
 
+    pacman_conf_block = ""
+    if inherit_live_pacman_conf:
+        pacman_conf_block = """
+echo "==> Copying the live pacman configuration into the target..."
+# pacstrap resolves packages with the live /etc/pacman.conf, but the target
+# gets the stock file from the pacman package: a derivative's repositories
+# (CachyOS: [cachyos] + its mirrorlists) would be missing on first boot.
+install -m 644 /etc/pacman.conf /mnt/etc/pacman.conf
+for mirrorlist in /etc/pacman.d/*mirrorlist*; do
+    [ -f "$mirrorlist" ] && install -m 644 "$mirrorlist" "/mnt/etc/pacman.d/$(basename "$mirrorlist")"
+done
+arch-chroot /mnt pacman-key --populate || true
+"""
+
     return f"""\
 #!/usr/bin/env bash
 set -euo pipefail
+
+echo "==> Waiting for the live network and pacman keyring..."
+# The serial login prompt comes up before archiso's pacman-init finished
+# populating the keyring and before DHCP settled; pacstrap needs both.
+systemctl start pacman-init.service 2>/dev/null || true
+for _ in $(seq 1 60); do
+    getent hosts archlinux.org >/dev/null 2>&1 && break
+    sleep 2
+done
 
 echo "==> Partitioning /dev/vda..."
 sgdisk --zap-all /dev/vda
@@ -264,7 +320,7 @@ pacstrap -K /mnt {package_line}
 
 echo "==> Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
-
+{pacman_conf_block}
 echo "==> Timezone..."
 arch-chroot /mnt ln -sf /usr/share/zoneinfo/{timezone} /etc/localtime
 arch-chroot /mnt hwclock --systohc

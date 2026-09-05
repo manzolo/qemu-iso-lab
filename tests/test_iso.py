@@ -1,4 +1,5 @@
 import argparse
+import shutil
 import sys
 import unittest
 import urllib.request
@@ -210,6 +211,31 @@ class IsoTests(BaseVmctlTestCase):
         with mock.patch.object(vmctl.runtime, "require_command"):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.cmd_prep(args)
+
+
+class ArchIsoBootArtifactTests(BaseVmctlTestCase):
+    def _extract(self) -> list[list[str]]:
+        iso_path = self.root / "isos" / "live.iso"
+        with mock.patch.object(shutil, "which", side_effect=lambda name: "/usr/bin/xorriso" if name == "xorriso" else None), \
+             mock.patch.object(vmctl.runtime, "run") as run:
+            kernel, initrd = vmctl.iso.extract_arch_installer_boot_artifacts(self.vm_config, iso_path)
+        self.assertEqual(kernel, self.root / "artifacts/testvm/installer/vmlinuz")
+        self.assertEqual(initrd, self.root / "artifacts/testvm/installer/initrd")
+        return [call.args[0] for call in run.call_args_list]
+
+    def test_extract_arch_boot_artifacts_defaults_to_arch_linux_paths(self):
+        commands = self._extract()
+        self.assertIn("/arch/boot/x86_64/vmlinuz-linux", commands[0])
+        self.assertIn("/arch/boot/x86_64/initramfs-linux.img", commands[1])
+
+    def test_extract_arch_boot_artifacts_honors_installer_boot_for_derivatives(self):
+        self.vm_config["installer_boot"] = {
+            "kernel": "arch/boot/x86_64/vmlinuz-linux-cachyos",
+            "initrd": "arch/boot/x86_64/initramfs-linux-cachyos.img",
+        }
+        commands = self._extract()
+        self.assertIn("/arch/boot/x86_64/vmlinuz-linux-cachyos", commands[0])
+        self.assertIn("/arch/boot/x86_64/initramfs-linux-cachyos.img", commands[1])
 
 
 if __name__ == "__main__":

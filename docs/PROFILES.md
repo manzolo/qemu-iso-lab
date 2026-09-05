@@ -59,6 +59,7 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | `audio` | Attach an audio device |
 | `usb_tablet` | Absolute pointer for graphical guests |
 | `video` | Named QEMU argument sets, see [Video profiles](#video-profiles) |
+| `installer_boot` | `kernel` and `initrd` paths inside the ISO for the unattended flows, when they differ from the flow's default (CachyOS: `arch/boot/x86_64/vmlinuz-linux-cachyos`) |
 | `notes` | Free text shown by `vmctl show` |
 | `ci` | Boot-check parameters: `accel`, `headless`, `boot_from`, `expect`, `timeout_sec` |
 

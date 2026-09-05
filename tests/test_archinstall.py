@@ -268,5 +268,71 @@ class ArchinstallBootstrapTests(BaseVmctlTestCase):
         self.assertIn("ARCHBOOT", cmd)
 
 
+class ArchinstallLiveIsoTests(BaseVmctlTestCase):
+    """archiso derivatives (CachyOS) reuse the Arch flow with other prompts, kernel and repos."""
+
+    def _arch_vm(self) -> None:
+        self.vm_config["archinstall_config"] = {
+            "hostname": "arch-test",
+            "username": "tester",
+            "password": "s3cret",
+        }
+
+    def test_live_prompts_default_to_arch_iso(self):
+        self._arch_vm()
+        login, shell = vmctl.archinstall.live_prompts(self.vm_config)
+        self.assertEqual(login, vmctl.archinstall.ARCH_SERIAL_LOGIN_PROMPT)
+        self.assertEqual(shell, vmctl.archinstall.ARCH_LIVE_PROMPT)
+
+    def test_live_prompts_follow_profile_overrides(self):
+        self._arch_vm()
+        self.vm_config["archinstall_config"]["live_login_prompt"] = "CachyOS login:"
+        self.vm_config["archinstall_config"]["live_shell_prompt"] = "root@CachyOS"
+        self.assertEqual(vmctl.archinstall.live_prompts(self.vm_config), ("CachyOS login:", "root@CachyOS"))
+
+    def test_live_prompts_reject_blank_override(self):
+        self._arch_vm()
+        self.vm_config["archinstall_config"]["live_shell_prompt"] = "   "
+        with self.assertRaises(vmctl.archinstall.VMError):
+            vmctl.archinstall.live_prompts(self.vm_config)
+
+    def test_live_kernel_append_uses_label_and_serial_console(self):
+        self._arch_vm()
+        append = vmctl.archinstall.live_kernel_append(self.vm_config, "ARCH_202609")
+        self.assertEqual(append, "archisobasedir=arch archisolabel=ARCH_202609 console=ttyS0,115200 quiet")
+
+    def test_live_kernel_append_adds_profile_extra_arguments(self):
+        self._arch_vm()
+        self.vm_config["archinstall_config"]["live_kernel_append"] = "systemd.unit=multi-user.target"
+        append = vmctl.archinstall.live_kernel_append(self.vm_config, "COS_202608")
+        self.assertTrue(append.startswith("archisobasedir=arch archisolabel=COS_202608 "))
+        self.assertTrue(append.endswith(" systemd.unit=multi-user.target"))
+
+    def test_bootstrap_script_waits_for_live_keyring_and_network_before_pacstrap(self):
+        self._arch_vm()
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        self.assertIn("systemctl start pacman-init.service 2>/dev/null || true", script)
+        self.assertIn("getent hosts archlinux.org", script)
+        self.assertLess(script.index("pacman-init.service"), script.index("pacstrap -K /mnt"))
+
+    def test_bootstrap_script_copies_live_pacman_conf_when_requested(self):
+        self._arch_vm()
+        self.vm_config["archinstall_config"]["inherit_live_pacman_conf"] = True
+        self.vm_config["archinstall_config"]["kernels"] = ["linux-cachyos"]
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        self.assertIn("install -m 644 /etc/pacman.conf /mnt/etc/pacman.conf", script)
+        self.assertIn("/etc/pacman.d/*mirrorlist*", script)
+        self.assertIn("arch-chroot /mnt pacman-key --populate || true", script)
+        self.assertIn("linux-cachyos", script)
+        # After pacstrap (which would otherwise overwrite it) and before the bootloader step.
+        self.assertLess(script.index("pacstrap -K /mnt"), script.index("install -m 644 /etc/pacman.conf"))
+        self.assertLess(script.index("install -m 644 /etc/pacman.conf"), script.index("grub-install"))
+
+    def test_bootstrap_script_leaves_pacman_conf_alone_by_default(self):
+        self._arch_vm()
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        self.assertNotIn("/mnt/etc/pacman.conf", script)
+
+
 if __name__ == "__main__":
     unittest.main()

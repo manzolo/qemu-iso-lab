@@ -268,9 +268,18 @@ def extract_installer_boot_artifacts(vm: dict[str, Any], iso_path: Path, dry_run
 
 
 def extract_arch_installer_boot_artifacts(vm: dict[str, Any], iso_path: Path, dry_run: bool = False) -> tuple[Path, Path]:
+    """Extract the live kernel/initrd of an archiso-based ISO.
+
+    Defaults to the Arch Linux paths; ``installer_boot.kernel``/``initrd`` in
+    the profile override them for derivatives that ship a different kernel
+    (CachyOS: ``vmlinuz-linux-cachyos`` / ``initramfs-linux-cachyos.img``).
+    """
     artifact_dir = installer_artifact_dir(vm)
     kernel_path = artifact_dir / "vmlinuz"
     initrd_path = artifact_dir / "initrd"
-    extract_iso_member(iso_path, "arch/boot/x86_64/vmlinuz-linux", kernel_path, dry_run=dry_run)
-    extract_iso_member(iso_path, "arch/boot/x86_64/initramfs-linux.img", initrd_path, dry_run=dry_run)
+    boot = vm.get("installer_boot", {})
+    kernel_member = str(boot.get("kernel") or "arch/boot/x86_64/vmlinuz-linux")
+    initrd_member = str(boot.get("initrd") or "arch/boot/x86_64/initramfs-linux.img")
+    extract_iso_member(iso_path, kernel_member, kernel_path, dry_run=dry_run)
+    extract_iso_member(iso_path, initrd_member, initrd_path, dry_run=dry_run)
     return kernel_path, initrd_path
