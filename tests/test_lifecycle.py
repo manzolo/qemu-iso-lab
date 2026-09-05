@@ -796,6 +796,65 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual(clean_vm.call_args.args[0], "ubuntu")
         bootstrap_unattended.assert_called_once()
 
+    def test_stash_and_restore_local_test_artifacts_round_trip(self):
+        base = self.root / "artifacts" / "ubuntu"
+        (base / "runtime").mkdir(parents=True)
+        (base / "disk.qcow2").write_bytes(b"ORIGINAL-INSTALL")
+
+        stashed = vmctl.lifecycle.stash_local_test_artifacts(["ubuntu", "never-installed"])
+        self.assertEqual(list(stashed), ["ubuntu"])  # only the one that existed
+        self.assertFalse(base.exists())  # moved out of the way
+        self.assertTrue((Path(stashed["ubuntu"]) / "disk.qcow2").exists())
+
+        # The matrix creates a throwaway install in its place.
+        base.mkdir(parents=True)
+        (base / "disk.qcow2").write_bytes(b"THROWAWAY-TEST-INSTALL")
+
+        with mock.patch.object(vmctl.lifecycle, "cmd_stop") as cmd_stop:
+            vmctl.lifecycle.restore_local_test_artifacts(stashed)
+        cmd_stop.assert_called_once()
+        self.assertEqual((base / "disk.qcow2").read_bytes(), b"ORIGINAL-INSTALL")
+        self.assertFalse(vmctl.lifecycle.restore_backup_base().exists())  # backup dir cleaned up
+
+    def test_cmd_test_local_restore_stashes_before_and_reverts_after(self):
+        ubuntu_vm = json.loads(json.dumps(self.vm_config))
+        ubuntu_vm["disk"]["path"] = "artifacts/ubuntu/disk.qcow2"
+        ubuntu_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
+        ubuntu_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+        self.write_extra_profile("restore.json", {"vms": {"ubuntu": ubuntu_vm}})
+        args = argparse.Namespace(vms=["ubuntu"], timeout=300, parallel=1, dry_run=True,
+                                  clean_first=False, no_clean_first=False, restore=True)
+
+        with mock.patch.object(vmctl.lifecycle, "stash_local_test_artifacts", return_value={"ubuntu": "/tmp/backup/ubuntu"}) as stash, \
+             mock.patch.object(vmctl.lifecycle, "restore_local_test_artifacts") as restore, \
+             mock.patch.object(vmctl.lifecycle, "maybe_clean_local_test_candidates") as clean, \
+             mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended"), \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop"):
+            exit_code = self.vmctl.cmd_test_local(args)
+
+        self.assertEqual(exit_code, 0)
+        clean.assert_not_called()  # --restore replaces the destructive --clean-first path
+        stash.assert_called_once()
+        self.assertEqual(stash.call_args.args[0], ["ubuntu"])
+        restore.assert_called_once_with({"ubuntu": "/tmp/backup/ubuntu"}, dry_run=True)
+
+    def test_cmd_test_local_restore_reverts_even_when_a_flow_raises(self):
+        ubuntu_vm = json.loads(json.dumps(self.vm_config))
+        ubuntu_vm["disk"]["path"] = "artifacts/ubuntu/disk.qcow2"
+        ubuntu_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
+        ubuntu_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+        self.write_extra_profile("restore-fail.json", {"vms": {"ubuntu": ubuntu_vm}})
+        args = argparse.Namespace(vms=["ubuntu"], timeout=300, parallel=1, dry_run=True,
+                                  clean_first=False, no_clean_first=False, restore=True)
+
+        with mock.patch.object(vmctl.lifecycle, "stash_local_test_artifacts", return_value={"ubuntu": "/tmp/backup/ubuntu"}), \
+             mock.patch.object(vmctl.lifecycle, "restore_local_test_artifacts") as restore, \
+             mock.patch.object(vmctl.lifecycle, "run_local_test_once", side_effect=RuntimeError("boom")):
+            with self.assertRaises(RuntimeError):
+                self.vmctl.cmd_test_local(args)
+
+        restore.assert_called_once()  # stashed artifacts come back on the way out
+
     def test_cmd_test_local_runs_matrix_and_summarizes_results(self):
         ubuntu_vm = json.loads(json.dumps(self.vm_config))
         ubuntu_vm["disk"]["path"] = "artifacts/ubuntu/disk.qcow2"

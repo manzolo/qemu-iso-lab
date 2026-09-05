@@ -1722,49 +1722,117 @@ def cmd_check_vm(args: argparse.Namespace) -> int:
     return 1 if status == "failed" else 0
 
 
+def restore_backup_base() -> Path:
+    return state.ROOT / "artifacts" / ".check-vms-restore"
+
+
+def stash_local_test_artifacts(candidates: list[str], dry_run: bool = False) -> dict[str, str]:
+    """Move each existing ``artifacts/<vm>`` aside so the matrix runs on a virgin
+    state, and return ``{vm: backup_path}`` for the ones actually moved.
+
+    This is the non-destructive alternative to ``--clean-first``: instead of
+    deleting an installed VM, the run borrows the artifact directory and
+    ``restore_local_test_artifacts`` puts it back afterwards.
+    """
+    stashed: dict[str, str] = {}
+    backup_base = restore_backup_base()
+    for vm_name in candidates:
+        base = runtime.vm_artifact_base(vm_name)
+        if not base.exists():
+            continue
+        dest = backup_base / vm_name
+        ui.print_note(f"Stashing {ui.pretty_path(base)} -> {ui.pretty_path(dest)}")
+        if not dry_run:
+            if dest.exists():
+                shutil.rmtree(dest)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(base), str(dest))
+        stashed[vm_name] = str(dest)
+    return stashed
+
+
+def restore_local_test_artifacts(stashed: dict[str, str], dry_run: bool = False) -> None:
+    """Remove what the matrix created for each stashed VM and move its original
+    artifact directory back into place."""
+    for vm_name, backup_path in stashed.items():
+        # A failed flow may have left a VM running on the throwaway disk.
+        cmd_stop(argparse.Namespace(vm=vm_name, dry_run=dry_run))
+        base = runtime.vm_artifact_base(vm_name)
+        if base.exists():
+            ui.print_note(f"Removing test artifacts {ui.pretty_path(base)}")
+            if not dry_run:
+                shutil.rmtree(base)
+        ui.print_note(f"Restoring {ui.pretty_path(Path(backup_path))} -> {ui.pretty_path(base)}")
+        if not dry_run:
+            base.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(backup_path, str(base))
+    backup_base = restore_backup_base()
+    if not dry_run and backup_base.exists() and not any(backup_base.iterdir()):
+        backup_base.rmdir()
+
+
 def cmd_test_local(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     selected_names = list(args.vms) if getattr(args, "vms", None) else sorted(cfg["vms"])
     results: list[tuple[str, str, str]] = []
     parallel = max(1, int(getattr(args, "parallel", 1)))
 
+    restore = getattr(args, "restore", False)
     ui.print_header("Local VM test matrix")
     ui.print_kv("timeout", f"{args.timeout}s")
     ui.print_kv("parallel", str(parallel))
-    maybe_clean_local_test_candidates(selected_names, cfg, args)
+    ui.print_kv("mode", "restore (stash + revert)" if restore else "in place")
 
-    if parallel == 1:
-        for vm_name in selected_names:
-            vm = config.get_vm(cfg, vm_name)
-            status, detail = run_local_test_once(vm_name, vm, args)
-            results.append((vm_name, status, detail))
+    stashed: dict[str, str] = {}
+    if restore:
+        candidates = local_test_clean_candidates(selected_names, cfg)
+        if candidates:
+            ui.print_header("Stash existing artifacts before the matrix")
+            ui.print_kv("profiles", ", ".join(candidates))
+            for vm_name in candidates:
+                cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+            stashed = stash_local_test_artifacts(candidates, dry_run=args.dry_run)
     else:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
-            future_map = {
-                executor.submit(run_local_test_vm_subprocess, vm_name, args): vm_name
-                for vm_name in selected_names
-            }
+        maybe_clean_local_test_candidates(selected_names, cfg, args)
+
+    try:
+        if parallel == 1:
             for vm_name in selected_names:
-                stdout_log = check_vm_stdout_log_path(vm_name)
-                stderr_log = check_vm_stderr_log_path(vm_name)
-                ui.print_note(
-                    f"{vm_name} logs: {ui.pretty_path(stdout_log)} | {ui.pretty_path(stderr_log)}"
-                )
-                ui.print_note(
-                    f"tail -f {ui.pretty_path(stdout_log)}"
-                )
-            for future in concurrent.futures.as_completed(future_map):
-                vm_name = future_map[future]
-                try:
-                    status, detail, output = future.result()
-                except Exception as exc:
-                    results.append((vm_name, "failed", str(exc)))
-                    ui.print_header(f"Test VM: {vm_name}")
-                    ui.print_status("fail", f"{vm_name}: {exc}", ok=False)
-                    continue
-                if output:
-                    print(output, end="" if output.endswith("\n") else "\n")
+                vm = config.get_vm(cfg, vm_name)
+                status, detail = run_local_test_once(vm_name, vm, args)
                 results.append((vm_name, status, detail))
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+                future_map = {
+                    executor.submit(run_local_test_vm_subprocess, vm_name, args): vm_name
+                    for vm_name in selected_names
+                }
+                for vm_name in selected_names:
+                    stdout_log = check_vm_stdout_log_path(vm_name)
+                    stderr_log = check_vm_stderr_log_path(vm_name)
+                    ui.print_note(
+                        f"{vm_name} logs: {ui.pretty_path(stdout_log)} | {ui.pretty_path(stderr_log)}"
+                    )
+                    ui.print_note(
+                        f"tail -f {ui.pretty_path(stdout_log)}"
+                    )
+                for future in concurrent.futures.as_completed(future_map):
+                    vm_name = future_map[future]
+                    try:
+                        status, detail, output = future.result()
+                    except Exception as exc:
+                        results.append((vm_name, "failed", str(exc)))
+                        ui.print_header(f"Test VM: {vm_name}")
+                        ui.print_status("fail", f"{vm_name}: {exc}", ok=False)
+                        continue
+                    if output:
+                        print(output, end="" if output.endswith("\n") else "\n")
+                    results.append((vm_name, status, detail))
+    finally:
+        if stashed:
+            ui.print_header("Restore stashed artifacts")
+            restore_local_test_artifacts(stashed, dry_run=args.dry_run)
+            ui.print_kv("restored", ", ".join(sorted(stashed)))
 
     passed = sum(1 for _, status, _ in results if status == "passed")
     failed = sum(1 for _, status, _ in results if status == "failed")

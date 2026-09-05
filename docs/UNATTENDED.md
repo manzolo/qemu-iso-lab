@@ -250,4 +250,9 @@ vmctl check-vms --parallel 4 --clean-first
 ```
 
 `--parallel` controls how many VMs run concurrently; `--clean-first` cleans
-unattended/bootstrap profiles before the run without asking.
+unattended/bootstrap profiles before the run without asking. `--restore` is the
+non-destructive alternative: it stashes each installed VM's `artifacts/<vm>`
+directory aside, runs the matrix on a virgin state, then removes what the test
+created and moves the originals back, so validating every unattended flow does
+not cost you the VMs you already have installed. A stash is kept under
+`artifacts/.check-vms-restore/` only for the duration of the run.

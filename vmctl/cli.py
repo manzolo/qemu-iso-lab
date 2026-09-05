@@ -216,6 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--parallel", type=int, default=1, help="number of VMs to test concurrently (default: 1)")
     p.add_argument("--clean-first", action="store_true", help="clean unattended/bootstrap VMs before running the matrix")
     p.add_argument("--no-clean-first", action="store_true", help="skip the unattended/bootstrap cleanup prompt and run with existing artifacts")
+    p.add_argument("--restore", action="store_true", help="stash existing VM artifacts, run the matrix on a virgin state, then restore them (non-destructive alternative to --clean-first)")
     p.set_defaults(func=lifecycle.cmd_test_local)
 
     p = subparsers.add_parser("_check-vm", help=argparse.SUPPRESS)
