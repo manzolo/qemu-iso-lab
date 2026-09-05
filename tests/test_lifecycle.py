@@ -816,6 +816,47 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual((base / "disk.qcow2").read_bytes(), b"ORIGINAL-INSTALL")
         self.assertFalse(vmctl.lifecycle.restore_backup_base().exists())  # backup dir cleaned up
 
+    @unittest.skipUnless(shutil.which("qemu-img"), "local-only: needs qemu-img (the CI test job has none)")
+    def test_check_vms_restore_returns_a_real_qcow2_byte_for_byte(self):
+        """End-to-end on a genuine qcow2: the matrix replaces the disk with a
+        fresh image and fails, --restore must hand the original back unchanged."""
+        import hashlib
+        ubuntu_vm = json.loads(json.dumps(self.vm_config))
+        ubuntu_vm["disk"]["path"] = "artifacts/ubuntu/disk.qcow2"
+        ubuntu_vm["autoinstall"] = {"username": "vmuser", "password_hash": "hash"}
+        ubuntu_vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
+        self.write_extra_profile("restore-real.json", {"vms": {"ubuntu": ubuntu_vm}})
+
+        disk = self.root / "artifacts/ubuntu/disk.qcow2"
+        disk.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["qemu-img", "create", "-q", "-f", "qcow2", str(disk), "64M"], check=True)
+        # Give the image real payload so a fresh empty qcow2 can never look identical.
+        subprocess.run(["qemu-img", "dd", "-f", "raw", "-O", "qcow2", f"if={self._payload_file()}", f"of={disk}", "bs=1M", "count=4"], check=True)
+        before = hashlib.sha256(disk.read_bytes()).hexdigest()
+
+        def fake_bootstrap(args: argparse.Namespace) -> int:
+            # What a real install does to the (now absent) disk: creates a new one, then fails.
+            disk.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["qemu-img", "create", "-q", "-f", "qcow2", str(disk), "64M"], check=True)
+            raise vmctl.lifecycle.VMError("Timed out after 5s")
+
+        args = argparse.Namespace(vms=["ubuntu"], timeout=5, parallel=1, dry_run=False,
+                                  clean_first=False, no_clean_first=True, restore=True)
+        with mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended", side_effect=fake_bootstrap), \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop", return_value=0):
+            exit_code = self.vmctl.cmd_test_local(args)
+
+        self.assertEqual(exit_code, 1)  # the flow failed...
+        self.assertEqual(hashlib.sha256(disk.read_bytes()).hexdigest(), before)  # ...the disk came back intact
+        info = subprocess.run(["qemu-img", "info", "--output=json", str(disk)], check=True, capture_output=True, text=True).stdout
+        self.assertEqual(json.loads(info)["format"], "qcow2")
+        self.assertFalse(vmctl.lifecycle.restore_backup_base().exists())
+
+    def _payload_file(self) -> Path:
+        payload = self.root / "payload.bin"
+        payload.write_bytes(bytes(range(256)) * (4 * 1024 * 1024 // 256))
+        return payload
+
     def test_cmd_test_local_restore_stashes_before_and_reverts_after(self):
         ubuntu_vm = json.loads(json.dumps(self.vm_config))
         ubuntu_vm["disk"]["path"] = "artifacts/ubuntu/disk.qcow2"
