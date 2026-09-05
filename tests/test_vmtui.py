@@ -309,6 +309,21 @@ class VmtuiTests(unittest.TestCase):
         self.assertNotIn("Full Bootstrap", output)
         self.assertNotIn("Debian Preseed Bootstrap", output)
 
+    def test_unified_menu_offers_attach_display_only_while_running(self):
+        self.mark_installed("test-ssh")
+        self.assertNotIn("Attach Display", self._unified_menu("test-ssh"))
+        # A "running" VM is a tracked PID whose /proc cmdline names qemu-system-x86_64:
+        # a renamed sleep is enough, no QEMU needed (the CI runner has none).
+        fake_qemu = subprocess.Popen(["bash", "-c", "exec -a qemu-system-x86_64 sleep 120"])
+        self.addCleanup(fake_qemu.kill)
+        pid_file = self.bindir / "artifacts" / "test-ssh" / "runtime" / "bootstrap-start.pid"
+        pid_file.parent.mkdir(parents=True, exist_ok=True)
+        pid_file.write_text(f"{fake_qemu.pid}\n", encoding="utf-8")
+        output = self._unified_menu("test-ssh")
+        self.assertIn("Attach Display", output)
+        self.assertIn("Stop VM", output)
+        self.assertIn("VNC viewer", self._description_of(output, "Attach Display"))
+
     def test_unified_menu_for_omarchy_bootstrap_vm(self):
         self.mark_installed("arch-omarchy-nvidia-local")
         output = self._unified_menu("arch-omarchy-nvidia-local")
@@ -442,6 +457,7 @@ class VmtuiTests(unittest.TestCase):
             ("Debian Preseed Bootstrap", "bootstrap-preseed"),
             ("Kickstart Bootstrap", "bootstrap-kickstart"),
             ("Alpine Bootstrap", "bootstrap-alpine"),
+            ("Attach Display", "attach"),
             ("Unattended Install", "full-auto-install"),
             ("Cloud-Init Flow", "cloud-init-install"),
             ("Flash Empty Disk", "flash"),

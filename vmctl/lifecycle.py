@@ -11,6 +11,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -1591,6 +1592,76 @@ def cmd_clean_stale(args: argparse.Namespace) -> int:
     else:
         ui.print_status("ok", "No stale bootstrap PID files found")
     return 0
+
+
+def running_qemu_pid(name: str, vm: dict[str, Any]) -> int | None:
+    """PID of the QEMU serving this VM: the tracked background slot, else discovered by disk path."""
+    running, pid, _ = is_bootstrap_vm_running(name)
+    if running and pid is not None:
+        return pid
+    pid, _ = find_qemu_process_by_disk_path(runtime.resolve_path(vm["disk"]["path"]))
+    return pid
+
+
+def viewer_command(url: str, host: str, port: int, requested: str | None) -> list[str] | None:
+    """The VNC viewer to launch: the user's template, else the first known viewer on PATH."""
+    if requested:
+        return [part.format(url=url, host=host, port=port) for part in shlex.split(requested)]
+    if shutil.which("remote-viewer"):
+        return ["remote-viewer", url]
+    if shutil.which("vncviewer"):
+        return ["vncviewer", f"{host}::{port}"]
+    if shutil.which("remmina"):
+        return ["remmina", "-c", url]
+    return None
+
+
+def wait_for_interrupt() -> None:
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+
+
+def cmd_attach(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = config.get_vm(cfg, args.vm)
+    sock_path = qemu.vnc_socket_path(vm)
+    ui.print_header(f"Attach display: {args.vm}")
+    if args.dry_run:
+        ui.print_kv("vnc socket", ui.pretty_path(sock_path))
+        ui.print_status("ok", "Would bridge the VNC socket to 127.0.0.1 and open a viewer")
+        return 0
+
+    pid = running_qemu_pid(args.vm, vm)
+    if pid is None:
+        raise VMError(f"VM '{args.vm}' is not running (start it with: vmctl start {args.vm} --headless --background)")
+    if not sock_path.exists():
+        raise VMError(
+            f"VM '{args.vm}' (pid {pid}) has no VNC socket: it was started with its own display window, "
+            "or by an older vmctl. Only headless VMs can be attached."
+        )
+
+    bridge = qemu.UnixSocketBridge(sock_path, port=int(getattr(args, "port", None) or 0))
+    bridge.start()
+    ui.print_kv("pid", str(pid))
+    ui.print_kv("vnc", bridge.url)
+    try:
+        cmd = None if getattr(args, "no_viewer", False) else viewer_command(bridge.url, bridge.host, bridge.port, getattr(args, "viewer", None))
+        if cmd is None:
+            if not getattr(args, "no_viewer", False):
+                ui.print_status("warn", "No VNC viewer found (remote-viewer, vncviewer, remmina): install virt-viewer or pass --viewer", ok=False)
+            ui.print_note("Display exposed on the address above; connect any VNC viewer. Ctrl-C to detach.")
+            wait_for_interrupt()
+            return 0
+        ui.print_command(cmd)
+        result = subprocess.run(cmd, check=False)
+        if result.returncode != 0:
+            ui.print_status("warn", f"Viewer exited with status {result.returncode}", ok=False)
+        return 0
+    finally:
+        bridge.close()
 
 
 def cmd_shell(args: argparse.Namespace) -> int:

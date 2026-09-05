@@ -897,6 +897,7 @@ build_vm_menu_items() {
         # A VM can be running on a disk that has no OS yet (installer in
         # progress): Stop/SSH must be reachable regardless of `installed`.
         emit_action "Stop VM" "Graceful power-off of the running VM"
+        emit_action "Attach Display" "Watch the screen of the headless VM in a VNC viewer"
         if [[ $has_ssh == "1" ]]; then
             emit_action "SSH Console" "Open a shell inside the VM"
         fi
@@ -1187,6 +1188,7 @@ resolve_action() {
         "Boot Headless") printf '%s\n' start-headless ;;
         "Remote SPICE") printf '%s\n' remote-spice ;;
         "SSH Console") printf '%s\n' shell ;;
+        "Attach Display") printf '%s\n' attach ;;
         "Fetch ISO") printf '%s\n' fetch-iso ;;
         "Prepare VM") printf '%s\n' prep ;;
         "Installer Only") printf '%s\n' install ;;
@@ -1337,6 +1339,7 @@ run_action() {
         start)
             if [[ "${FACTS[running]:-0}" == "1" ]] || vm_is_running_headless "$current_vm"; then
                 local -a opts=()
+                opts+=("Attach Display" "Watch the screen of the running VM in a VNC viewer")
                 if [[ "${FACTS[has_ssh]:-0}" == "1" ]]; then
                     opts+=("SSH Console" "Open an SSH session inside the running VM")
                 fi
@@ -1347,6 +1350,9 @@ run_action() {
                     "VM '$current_vm' is already running.\nWhat do you want to do?" \
                     "${opts[@]}") || return 0
                 case "$choice" in
+                    "Attach Display")
+                        run_vmctl attach "$current_vm" || true
+                        ;;
                     "SSH Console")
                         run_vmctl shell "$current_vm" || true
                         ;;
@@ -1379,6 +1385,9 @@ run_action() {
             ;;
         shell)
             run_vmctl shell "$current_vm" || true
+            ;;
+        attach)
+            run_vmctl attach "$current_vm" || true
             ;;
         stop)
             if confirm_box "Stop VM" "Power off '$current_vm'?\n\nvmctl tries a graceful shutdown first (QMP / SSH) and only then kills the process."; then

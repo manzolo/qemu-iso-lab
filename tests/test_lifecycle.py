@@ -1,11 +1,14 @@
 import argparse
+import contextlib
 import io
 import json
 import os
 import pathlib
 import shutil
+import socket
 import subprocess
 import sys
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -377,6 +380,114 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("none", qemu_cmd)
         self.assertIn("-monitor", qemu_cmd)
         self.assertNotIn("-vga", qemu_cmd)
+
+    def test_common_args_headless_serves_the_display_on_a_vnc_unix_socket(self):
+        self.create_disk()
+        with mock.patch.object(vmctl.runtime, "require_command"):
+            cmd = vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True)
+        self.assertIn("-vnc", cmd)
+        self.assertEqual(cmd[cmd.index("-vnc") + 1], f"unix:{self.root / 'artifacts/testvm/runtime/vnc.sock'}")
+        self.assertIn("none", cmd)  # still no local window
+        with mock.patch.object(vmctl.runtime, "require_command"):
+            windowed = vmctl.qemu.common_args(self.vm_config, "std", dry_run=True, headless=False)
+        self.assertNotIn("-vnc", windowed)
+
+    def _attach_args(self, **overrides: object) -> argparse.Namespace:
+        values: dict[str, object] = {"vm": self.vm_name, "viewer": None, "port": None, "no_viewer": False, "dry_run": False}
+        values.update(overrides)
+        return argparse.Namespace(**values)
+
+    def test_cmd_attach_requires_a_running_vm(self):
+        self.create_disk()
+        with mock.patch.object(vmctl.lifecycle, "is_bootstrap_vm_running", return_value=(False, None, None)), \
+             mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_disk_path", return_value=(None, None)):
+            with self.assertRaisesRegex(vmctl.lifecycle.VMError, "not running"):
+                self.vmctl.cmd_attach(self._attach_args())
+
+    def test_cmd_attach_requires_the_vnc_socket_of_a_headless_vm(self):
+        self.create_disk()
+        with mock.patch.object(vmctl.lifecycle, "is_bootstrap_vm_running", return_value=(True, 4242, "qemu-system-x86_64")):
+            with self.assertRaisesRegex(vmctl.lifecycle.VMError, "no VNC socket"):
+                self.vmctl.cmd_attach(self._attach_args())
+
+    def test_cmd_attach_dry_run_touches_nothing(self):
+        self.create_disk()
+        with mock.patch.object(vmctl.lifecycle, "is_bootstrap_vm_running") as running:
+            self.assertEqual(self.vmctl.cmd_attach(self._attach_args(dry_run=True)), 0)
+        running.assert_not_called()
+
+    def _fake_vnc_server(self) -> Path:
+        """A unix socket that answers every client with the RFB greeting and echoes what it receives."""
+        sock_path = self.root / "artifacts/testvm/runtime/vnc.sock"
+        sock_path.parent.mkdir(parents=True, exist_ok=True)
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(str(sock_path))
+        server.listen(1)
+        self.addCleanup(server.close)
+
+        def serve() -> None:
+            try:
+                conn, _ = server.accept()
+            except OSError:
+                return
+            with conn:
+                conn.sendall(b"RFB 003.008\n")
+                data = conn.recv(64)
+                if data:
+                    conn.sendall(data)
+
+        threading.Thread(target=serve, daemon=True).start()
+        return sock_path
+
+    def test_cmd_attach_bridges_the_socket_to_tcp_and_launches_the_viewer(self):
+        self.create_disk()
+        self._fake_vnc_server()
+        seen: dict[str, object] = {}
+
+        def fake_viewer(cmd: list[str], check: bool = False) -> mock.Mock:
+            seen["cmd"] = cmd
+            host, port = cmd[1].removeprefix("vnc://").split(":")
+            with socket.create_connection((host, int(port)), timeout=5) as client:
+                client.settimeout(5)
+                seen["greeting"] = client.recv(64)
+                client.sendall(b"RFB 003.008\n")
+                seen["echo"] = client.recv(64)
+            return mock.Mock(returncode=0)
+
+        with mock.patch.object(vmctl.lifecycle, "is_bootstrap_vm_running", return_value=(True, 4242, "qemu-system-x86_64")), \
+             mock.patch.object(shutil, "which", side_effect=lambda name: "/usr/bin/remote-viewer" if name == "remote-viewer" else None), \
+             mock.patch.object(vmctl.lifecycle.subprocess, "run", side_effect=fake_viewer):
+            self.assertEqual(self.vmctl.cmd_attach(self._attach_args()), 0)
+
+        cmd = seen["cmd"]
+        assert isinstance(cmd, list)
+        self.assertEqual(cmd[0], "remote-viewer")
+        self.assertTrue(cmd[1].startswith("vnc://127.0.0.1:"))
+        self.assertEqual(seen["greeting"], b"RFB 003.008\n")
+        self.assertEqual(seen["echo"], b"RFB 003.008\n")
+
+    def test_cmd_attach_without_viewer_prints_the_address_and_waits(self):
+        self.create_disk()
+        self._fake_vnc_server()
+        out = io.StringIO()
+        with mock.patch.object(vmctl.lifecycle, "is_bootstrap_vm_running", return_value=(True, 4242, "qemu-system-x86_64")), \
+             mock.patch.object(vmctl.lifecycle, "wait_for_interrupt") as wait, \
+             mock.patch.object(vmctl.lifecycle.subprocess, "run") as viewer, \
+             contextlib.redirect_stdout(out):
+            self.assertEqual(self.vmctl.cmd_attach(self._attach_args(no_viewer=True, port=0)), 0)
+        wait.assert_called_once()
+        viewer.assert_not_called()
+        self.assertIn("vnc://127.0.0.1:", out.getvalue())
+
+    def test_viewer_command_prefers_the_user_template_then_known_viewers(self):
+        self.assertEqual(
+            vmctl.lifecycle.viewer_command("vnc://127.0.0.1:5901", "127.0.0.1", 5901, "myviewer --connect {host}:{port} {url}"),
+            ["myviewer", "--connect", "127.0.0.1:5901", "vnc://127.0.0.1:5901"],
+        )
+        with mock.patch.object(shutil, "which", side_effect=lambda name: "/usr/bin/vncviewer" if name == "vncviewer" else None):
+            self.assertEqual(vmctl.lifecycle.viewer_command("vnc://127.0.0.1:5901", "127.0.0.1", 5901, None), ["vncviewer", "127.0.0.1::5901"])
+        with mock.patch.object(shutil, "which", return_value=None):
+            self.assertIsNone(vmctl.lifecycle.viewer_command("vnc://127.0.0.1:5901", "127.0.0.1", 5901, None))
 
     def test_cmd_start_headless_background_tracks_pid_and_log(self):
         self.create_disk()

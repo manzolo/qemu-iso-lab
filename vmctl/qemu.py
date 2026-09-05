@@ -6,6 +6,7 @@ import os
 import re
 import selectors
 import socket
+import threading
 import shutil
 import subprocess
 import sys
@@ -161,6 +162,79 @@ def qmp_socket_path(vm: dict[str, Any]) -> Path:
     return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "qmp.sock"
 
 
+def vnc_socket_path(vm: dict[str, Any]) -> Path:
+    """VNC display socket of a headless VM, next to its QMP socket (`vmctl attach`)."""
+    return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "vnc.sock"
+
+
+class UnixSocketBridge:
+    """Expose a unix-domain socket on 127.0.0.1:<port> for viewers that only speak TCP.
+
+    QEMU serves the headless display on a unix socket (no port collisions
+    between VMs, nothing listening while nobody is attached); most VNC viewers
+    want a host:port. Each accepted TCP client gets its own upstream
+    connection and two pump threads, one per direction.
+    """
+
+    def __init__(self, unix_path: Path, port: int = 0, host: str = "127.0.0.1") -> None:
+        self.unix_path = unix_path
+        self.host = host
+        self._listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._listener.bind((host, port))
+        self._listener.listen(4)
+        self.port: int = int(self._listener.getsockname()[1])
+        self._closing = False
+        self._thread = threading.Thread(target=self._accept_loop, name="vnc-bridge", daemon=True)
+
+    @property
+    def url(self) -> str:
+        return f"vnc://{self.host}:{self.port}"
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def close(self) -> None:
+        self._closing = True
+        try:
+            self._listener.close()
+        except OSError:
+            pass
+
+    def _accept_loop(self) -> None:
+        while not self._closing:
+            try:
+                client, _ = self._listener.accept()
+            except OSError:
+                return
+            upstream = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            try:
+                upstream.connect(str(self.unix_path))
+            except OSError:
+                client.close()
+                upstream.close()
+                continue
+            for src, dst in ((client, upstream), (upstream, client)):
+                threading.Thread(target=self._pump, args=(src, dst), daemon=True).start()
+
+    @staticmethod
+    def _pump(src: socket.socket, dst: socket.socket) -> None:
+        try:
+            while True:
+                data = src.recv(65536)
+                if not data:
+                    break
+                dst.sendall(data)
+        except OSError:
+            pass
+        finally:
+            for sock in (src, dst):
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+
+
 def qmp_command(sock_path: Path, command: str, timeout: float = 5.0) -> bool:
     """Send one QMP command (after the capabilities handshake); True if QEMU acknowledged it."""
     try:
@@ -209,6 +283,10 @@ def common_args(
         qmp = qmp_socket_path(vm)
         qmp.parent.mkdir(parents=True, exist_ok=True)
         args += ["-qmp", f"unix:{qmp},server,nowait"]
+        # The guest still renders to its emulated VGA; a VNC server on a unix socket keeps
+        # that screen reachable, and `vmctl attach` bridges it to a local viewer to watch
+        # a headless boot or an unattended install without restarting the VM.
+        args += ["-vnc", f"unix:{vnc_socket_path(vm)}"]
     else:
         args += video_args(vm, variant)
     if serial_stdio:

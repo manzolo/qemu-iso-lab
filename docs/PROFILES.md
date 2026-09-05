@@ -181,7 +181,7 @@ artifacts/<vm>/
 ├── preseed/ kickstart/ omarchy/   the other unattended seeds
 ├── ssh/                generated key pair when the profile asks for one
 ├── logs/               install, post-install and boot-check logs
-└── runtime/            PID files of background VMs
+└── runtime/            PID files, QMP and VNC sockets of background VMs
 ```
 
 `vmctl status` reports these together with runtime state (tracked background

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # CachyOS + niri + NVIDIA open kernel modules (mainline branch, DKMS).
-# Runs as the guest user with passwordless sudo after the Calamares install.
+# Runs as the guest user with passwordless sudo after the unattended pacstrap install
+# (niri + Noctalia come from cachyos-niri-noctalia, installed by the bootstrap).
 set -euo pipefail
 
-mkdir -p "$HOME/.config/niri" "$HOME/.config/DankMaterialShell"
+mkdir -p "$HOME/.config/niri"
 
 sudo pacman -Syu --noconfirm
 

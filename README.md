@@ -87,6 +87,7 @@ accepts `--dry-run` in front of it.
 | same for Debian / AlmaLinux / Fedora / Arch / Alpine  | `vmctl bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-archinstall`, `bootstrap-alpine <vm>` |
 | boot a VM I already installed                         | `vmctl start <vm>` (`--headless --background` to detach) |
 | get a shell inside it / stop it                       | `vmctl shell <vm>`, `vmctl stop <vm>`                    |
+| watch the screen of a headless VM (even mid-bootstrap) | `vmctl attach <vm>` (VNC viewer, `--no-viewer` for the address only) |
 | re-run the SSH provisioning steps of a profile        | `vmctl post-install <vm>`                                |
 | prove a VM still boots (CI-style)                     | `vmctl boot-check <vm>`, `vmctl check-vms`               |
 | write a VM to a real USB disk, or import one          | `vmctl flash`, `vmctl import-device` (destructive, sudo) |

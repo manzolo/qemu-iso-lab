@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p "$HOME/.config/niri" "$HOME/.config/DankMaterialShell"
-
-sudo pacman -Sy --noconfirm --needed foot niri
+# niri + Noctalia are installed by the bootstrap (cachyos-niri-noctalia); this only checks the result.
+mkdir -p "$HOME/.config/niri"
 
 command -v niri >/dev/null
 niri --version
+command -v noctalia-shell >/dev/null || command -v qs >/dev/null
+systemctl is-enabled sddm

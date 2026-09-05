@@ -24,6 +24,7 @@ vmctl bootstrap-archinstall arch-noctalia-local
 vmctl bootstrap-preseed debian-server
 vmctl bootstrap-kickstart almalinux-server
 vmctl bootstrap-alpine alpine-niri
+vmctl attach <name>                # VNC view of a headless VM, also while a bootstrap runs
 ```
 
 Before pushing, run the relevant local tests first. Do not use GitHub Actions as the first place to discover breakage in unit tests, dry-run bootstrap flows, or CI wiring. At minimum, if you touch CI or unattended/bootstrap code, run `python -m unittest discover -s tests -v` and any focused bootstrap/dry-run commands affected by the change.
@@ -145,7 +146,7 @@ artifacts/<vm>/
 ├── cloud-init/         # cloud-init seed
 ├── archinstall/        # Arch config ISO / bootstrap script
 ├── logs/
-└── runtime/            # PID files for background VMs
+└── runtime/            # PID files, qmp.sock (graceful stop) and vnc.sock (`vmctl attach`) of background VMs
 ```
 
 ### CI

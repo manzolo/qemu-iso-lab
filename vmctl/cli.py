@@ -28,7 +28,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
      ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "bootstrap-alpine", "post-install"]),
     ("Run", "use a VM that is already installed",
-     ["start", "stop", "shell"]),
+     ["start", "stop", "shell", "attach"]),
     ("Verify", "smoke tests and the local validation matrix",
      ["boot-check", "check-vms"]),
     ("Physical disks", "DESTRUCTIVE, ask for sudo, require --confirm-device",
@@ -43,6 +43,7 @@ typical flows:
   vmctl provision <vm>                  ISO + disk + installer, then click through it
   vmctl start <vm> [--headless]         boot the installed disk (add --background to detach)
   vmctl shell <vm>                      SSH into it (profiles with ssh_provision/cloud_init)
+  vmctl attach <vm>                     watch the screen of a headless VM (VNC), even mid-bootstrap
   vmctl bootstrap-unattended <vm>       Ubuntu: unattended install + post-install, no clicks
   vmctl bootstrap-omarchy <vm>          Omarchy: cidata install + NVIDIA post-install
   vmctl bootstrap-preseed <vm>          same for Debian  (kickstart: AlmaLinux/Fedora, archinstall: Arch, alpine: Alpine)
@@ -190,6 +191,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = _add(subparsers, "shell", help="SSH into a running VM")
     p.add_argument("vm", help=VM_HELP)
     p.set_defaults(func=lifecycle.cmd_shell)
+
+    p = _add(subparsers, "attach", help="open the screen of a running headless VM in a VNC viewer (also during a bootstrap)")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--viewer", help="viewer command to run; {url}, {host} and {port} are substituted (default: remote-viewer, vncviewer or remmina, whichever exists)")
+    p.add_argument("--port", type=int, help="local TCP port for the VNC bridge (default: any free port)")
+    p.add_argument("--no-viewer", action="store_true", help="only expose the display on 127.0.0.1 and print the address; Ctrl-C to detach")
+    p.set_defaults(func=lifecycle.cmd_attach)
 
     p = _add(subparsers, "post-install", help="run post-install SSH provisioning steps")
     p.add_argument("vm", help=VM_HELP)

@@ -32,6 +32,15 @@ Logs land in `artifacts/<vm>/logs/`. The interactive variants (`install-unattend
 `install-archinstall`, `install-omarchy`) stop after step 3 so you can watch
 the installer or boot the disk by hand with `vmctl start`.
 
+Headless does not mean invisible: every headless QEMU (the install stage of a
+bootstrap, the background VM it starts afterwards, `vmctl start --headless`)
+serves its screen on a VNC unix socket under `artifacts/<vm>/runtime/`. From
+another terminal, or from the vmtui RUN menu, `vmctl attach <vm>` bridges it
+to 127.0.0.1 and opens `remote-viewer` (or `vncviewer`/`remmina`, or the
+command given with `--viewer`); `--no-viewer` only prints the address. The
+serial log stays the source of truth for the automation, the VNC screen is
+for watching.
+
 ## Ubuntu: autoinstall
 
 ```bash
@@ -130,8 +139,14 @@ works on it without a dedicated installer. Three profile fields adapt it:
   `pacman` package and lose that repository (and `linux-cachyos` updates) on
   first boot.
 
-`kernels` lists `linux-cachyos`; `packages` add `cachyos-keyring`, the
-mirrorlists, `cachyos-settings` and `cachyos-hooks`. The bootstrap script also
+`kernels` lists `linux-cachyos`; `packages` reproduce what Calamares installs
+for its "Niri" desktop choice (read from the ISO's `netinstall.yaml`): the
+required set (`cachyos-keyring`, mirrorlists, `cachyos-hooks`, `chwd`), the
+"CachyOS Packages" group (`cachyos-settings`, `cachyos-hello`,
+`cachyos-kernel-manager`, ...), the common network/audio/fonts/hardware groups
+and `cachyos-niri-noctalia` + `sddm`. That metapackage brings niri, the
+Noctalia shell and the CachyOS niri defaults; `bootstrap_chroot_commands`
+enable SDDM with autologin into the niri session. The bootstrap script also
 waits for archiso's `pacman-init` and for DNS before pacstrap, since the serial
 login prompt shows up before either is ready. Calamares remains available for a
 manual install (`vmctl install`). The `cachyos` profile (fixed VHD for Ventoy)

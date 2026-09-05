@@ -54,7 +54,7 @@ SSH when it is running.
 | Section | Entries |
 |---------|---------|
 | INSTALL | The install flow matching the profile: `Full Bootstrap`, `Omarchy Bootstrap`, `Arch Bootstrap`, `Arch Install (Interactive)`, `Debian Preseed Bootstrap`, `Kickstart Bootstrap`, `Unattended Install`, `Cloud-Init Flow`, `Seeded Installer`, `Guided Provision`, `Installer Only` |
-| RUN | `Boot Desktop`, `Boot Headless`, `Stop VM` (only while running), `SSH Console` (only with SSH provisioning, also while an installer is running on an empty disk), `First Boot` (cloud-init), `Remote SPICE` |
+| RUN | `Boot Desktop`, `Boot Headless`, `Stop VM` and `Attach Display` (only while running: the screen of the headless VM in a VNC viewer), `SSH Console` (only with SSH provisioning, also while an installer is running on an empty disk), `First Boot` (cloud-init), `Remote SPICE` |
 | MAINTENANCE | `Video Profile`, `Post-Install`, `Boot Check`, `Fetch ISO`, `Prepare VM`, `Profile Details` |
 | ADVANCED | `Clean VM`, `Delete ISO`, `Flash Empty Disk`, `Force Flash`, `Import Disk` |
 | | `Back` (or Esc) returns to the dashboard |
