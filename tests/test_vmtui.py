@@ -83,10 +83,12 @@ class VmtuiTests(unittest.TestCase):
         disk.write_bytes(b"\x01" * (24 * 1024 * 1024))
 
     def mark_prepared(self, vm_name: str) -> None:
-        # a freshly created, still empty image
+        # a freshly created, still empty image: a sparse file with no allocated
+        # blocks, so the test does not need qemu-img (the CI test job has none)
         disk = self.bindir / "artifacts" / vm_name / "disk.qcow2"
         disk.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["qemu-img", "create", "-f", "qcow2", str(disk), "1G"], check=True, capture_output=True)
+        with disk.open("wb") as handle:
+            handle.truncate(1024 * 1024 * 1024)
 
     def tearDown(self):
         self.tempdir.cleanup()
