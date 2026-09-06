@@ -43,8 +43,27 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "fedora-niri-dms-local",
             "alpine-niri",
             "cachyos-nvidia-local",
+            "windows11-unattended",
+            "windows10-unattended",
         ):
             self.assertIn(profile, cfg["vms"])
+
+        # Windows rides bootstrap-windows: generic identity, virtio disk (viostor is injected
+        # in WinPE), OpenSSH post-install, no download URL (Microsoft publishes none).
+        win = cfg["vms"]["windows11-unattended"]
+        self.assertEqual(win["windows_config"]["username"], "lab")
+        self.assertEqual(win["ssh_provision"]["user"], "lab")
+        self.assertEqual(win["disk"]["interface"], "virtio")
+        self.assertEqual(win["windows_config"]["driver_flavor"], "w11")
+        self.assertNotIn("iso_url", win)
+        self.assertEqual(cfg["vms"]["windows11-template"]["meta"]["role"], "import-template")
+        w10 = cfg["vms"]["windows10-unattended"]
+        self.assertEqual(w10["windows_config"]["driver_flavor"], "w10")
+        self.assertEqual(w10["windows_config"]["edition"], "Windows 10 Pro")
+        self.assertFalse(w10["windows_config"]["bypass_requirements"])
+        self.assertNotEqual(w10["ssh_provision"]["ssh_host_port"], win["ssh_provision"]["ssh_host_port"])
+        for profile in (win, w10):  # first shutdown commits feature operations: far longer than 60 s
+            self.assertGreaterEqual(profile["acpi_poweroff_grace_sec"], 300)
 
         # CachyOS rides the Arch pacstrap flow on its own archiso: kernel paths,
         # serial prompts and the live pacman.conf must all be declared.

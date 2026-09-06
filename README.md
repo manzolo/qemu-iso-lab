@@ -27,9 +27,10 @@ driven by a single CLI (`vmctl`) or a dashboard TUI (`vmtui`).
   mirror discovery and checksum validation), disk, EFI or BIOS firmware, RAM,
   CPUs, network and video variants. `vmctl show <vm>` prints it resolved.
 - **Zero-click installs.** Ubuntu (autoinstall), Debian (preseed), AlmaLinux and
-  Fedora (kickstart), Arch (pacstrap script), Omarchy (cidata) and Alpine
-  (setup-alpine) install headless on a serial console, boot, and finish with
-  SSH provisioning: dotfiles, scripts, extra packages. Ten minutes later
+  Fedora (kickstart), Arch (pacstrap script), Omarchy (cidata), Alpine
+  (setup-alpine) and Windows 11 (autounattend) install headless on a serial
+  console, boot, and finish with SSH provisioning: dotfiles, scripts, extra
+  packages. Ten minutes later
   `vmctl shell <vm>` drops you inside.
 - **Isolated and reproducible.** Each VM lives under `artifacts/<vm>/`; ISOs
   are cached once under `isos/`. `vmctl clean <vm>` puts everything back.
@@ -85,6 +86,7 @@ accepts `--dry-run` in front of it.
 | install Ubuntu with zero clicks, ready with SSH       | `vmctl bootstrap-unattended <vm>`                        |
 | install Omarchy with zero clicks, ready with NVIDIA   | `vmctl bootstrap-omarchy arch-omarchy-nvidia-local`      |
 | same for Debian / AlmaLinux / Fedora / Arch / Alpine  | `vmctl bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-archinstall`, `bootstrap-alpine <vm>` |
+| install Windows 11 with zero clicks, ready with OpenSSH | `vmctl bootstrap-windows windows11-unattended` (your ISO in `isos/`) |
 | boot a VM I already installed                         | `vmctl start <vm>` (`--headless --background` to detach) |
 | get a shell inside it / stop it                       | `vmctl shell <vm>`, `vmctl stop <vm>`                    |
 | watch the screen of a headless VM (even mid-bootstrap) | `vmctl attach <vm>` (VNC viewer, `--no-viewer` for the address only) |
@@ -100,7 +102,7 @@ accepts `--dry-run` in front of it.
 
 ## The catalog
 
-44 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
+46 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
 prints them all; the table shows what each family offers.
 
 | Family | Profiles | Highlights | Unattended |
@@ -110,7 +112,7 @@ prints them all; the table shows what each family offers.
 | Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms-local`, `almalinux-minimal`, `almalinux-server` | Fedora 42/44, niri + DankMaterialShell on Fedora, AlmaLinux 10.1 | `bootstrap-kickstart` |
 | openSUSE / NixOS / Void | `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros | interactive |
 | Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.23 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
-| Windows | `windows10-template`, `windows11-template` | import targets for physical disks (`vmctl import-device`) | n/a |
+| Windows | `windows11-unattended`, `windows10-unattended`, `windows10-template`, `windows11-template` | unattended Windows 11 and 10 (autounattend.xml, virtio drivers, OpenSSH), import targets for physical disks (`vmctl import-device`) | `bootstrap-windows` |
 
 Profiles ending in `-local` are full desktop recipes with SSH provisioning,
 meant to be personalised through `local.json`. Profiles named `*-ci` are tiny
@@ -118,7 +120,7 @@ guests that boot under TCG in GitHub Actions.
 
 ## Unattended installs
 
-Six installers run headless on a serial console. Each `bootstrap-*` command
+Seven installers run headless on a serial console. Each `bootstrap-*` command
 generates the answer file, extracts kernel and initrd from the ISO, boots the
 installer, waits for a completion token, starts the installed VM in the
 background and runs the profile's SSH provisioning.
@@ -131,6 +133,7 @@ vmctl bootstrap-kickstart fedora-niri-dms-local       # Fedora kickstart from th
 vmctl bootstrap-alpine alpine-niri                    # Alpine: setup-alpine answer file + chroot steps
 vmctl bootstrap-archinstall arch-dms-local            # Arch: pacstrap script on the live ISO
 vmctl bootstrap-omarchy arch-omarchy-nvidia-local     # Omarchy: official cidata mechanism
+vmctl bootstrap-windows windows11-unattended          # Windows 11: autounattend.xml on a seed CD, prompt-free ISO
 ```
 
 How each flow works, and the sequencing rule every flow must respect, is in

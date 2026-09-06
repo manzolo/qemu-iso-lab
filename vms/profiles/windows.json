@@ -1,5 +1,165 @@
 {
   "vms": {
+    "windows10-unattended": {
+      "name": "Windows 10 (unattended)",
+      "meta": {
+        "slug": "windows-10",
+        "family": "windows",
+        "role": "desktop",
+        "release_model": "custom"
+      },
+      "iso": "isos/windows10.iso",
+      "disk": {
+        "path": "artifacts/windows10-unattended/disk.qcow2",
+        "size": "64G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/windows10-unattended/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "virtio-net-pci",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "Unattended Windows 10 via autounattend.xml (bootstrap-windows), same flow as windows11-unattended: put the retail ISO at isos/windows10.iso (or point 'iso' at it in local.json), it is rebuilt once as isos/windows10-noprompt.iso. Multi-edition ISOs carry several images: 'edition' must name one of them ('Windows 10 Pro' here). No TPM/Secure Boot bypass needed. OpenSSH Server is an optional capability on 1809+.",
+      "windows_config": {
+        "username": "lab",
+        "password": "lab",
+        "realname": "Lab User",
+        "computer_name": "WIN10-LAB",
+        "organization": "Lab",
+        "edition": "Windows 10 Pro",
+        "language": "en-US",
+        "input_locale": "en-US",
+        "timezone": "UTC",
+        "driver_flavor": "w10",
+        "virtio_iso": "isos/virtio-win.iso",
+        "virtio_iso_url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso",
+        "bypass_requirements": false,
+        "auto_logon": true,
+        "install_guest_tools": true,
+        "install_openssh": true,
+        "setup_commands": [
+          "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server' -Name fDenyTSConnections -Value 0",
+          "Enable-NetFirewallRule -DisplayGroup 'Desktop remoto' -ErrorAction SilentlyContinue; Enable-NetFirewallRule -DisplayGroup 'Remote Desktop' -ErrorAction SilentlyContinue"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "win10-lab",
+        "user": "lab",
+        "ssh_host_port": 2236,
+        "post_install_run": [
+          "ver",
+          "powershell -NoProfile -Command \"(Get-CimInstance Win32_OperatingSystem).Caption; (Get-Service sshd).Status\"",
+          "type C:\\vmctl\\setup.log"
+        ]
+      },
+      "acpi_poweroff_grace_sec": 300
+    },
+    "windows11-unattended": {
+      "name": "Windows 11 (unattended)",
+      "meta": {
+        "slug": "windows-11",
+        "family": "windows",
+        "role": "desktop",
+        "release_model": "custom"
+      },
+      "iso": "isos/windows11.iso",
+      "disk": {
+        "path": "artifacts/windows11-unattended/disk.qcow2",
+        "size": "64G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/windows11-unattended/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 8192,
+      "cpus": 4,
+      "network": "user",
+      "network_device": "virtio-net-pci",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "Unattended Windows 11 via autounattend.xml (bootstrap-windows). Microsoft publishes no stable download URL: put the retail ISO at isos/windows11.iso (or point 'iso' at it in local.json). The ISO is rebuilt once as isos/windows11-noprompt.iso (UEFI efisys_noprompt.bin, no 'Press any key' wait); the answer file rides on a VMCTLSEED CD, the virtio-win ISO (downloaded from fedorapeople) supplies viostor/NetKVM in WinPE and the guest tools at first logon. TPM/Secure Boot/CPU/RAM checks are bypassed through the LabConfig registry keys (no swtpm needed). Edition/language must exist in the ISO ('Windows 11 Pro', en-US on the multi-edition English ISO; it-IT on the Italian one). Post-install runs over Windows OpenSSH with cmd.exe semantics.",
+      "windows_config": {
+        "username": "lab",
+        "password": "lab",
+        "realname": "Lab User",
+        "computer_name": "WIN11-LAB",
+        "organization": "Lab",
+        "edition": "Windows 11 Pro",
+        "language": "en-US",
+        "input_locale": "en-US",
+        "timezone": "UTC",
+        "driver_flavor": "w11",
+        "virtio_iso": "isos/virtio-win.iso",
+        "virtio_iso_url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso",
+        "bypass_requirements": true,
+        "auto_logon": true,
+        "install_guest_tools": true,
+        "install_openssh": true,
+        "setup_commands": [
+          "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server' -Name fDenyTSConnections -Value 0",
+          "Enable-NetFirewallRule -DisplayGroup 'Desktop remoto' -ErrorAction SilentlyContinue; Enable-NetFirewallRule -DisplayGroup 'Remote Desktop' -ErrorAction SilentlyContinue"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "win11-lab",
+        "user": "lab",
+        "ssh_host_port": 2235,
+        "post_install_run": [
+          "ver",
+          "powershell -NoProfile -Command \"(Get-CimInstance Win32_OperatingSystem).Caption; (Get-Service sshd).Status\"",
+          "type C:\\vmctl\\setup.log"
+        ]
+      },
+      "acpi_poweroff_grace_sec": 300
+    },
     "windows10-template": {
       "name": "Windows 10 Template",
       "meta": {

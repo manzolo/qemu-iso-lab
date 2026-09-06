@@ -46,6 +46,7 @@ order. Output goes to `artifacts/<vm>/logs/post-install.*.log`.
 | `kickstart_config` (AlmaLinux/RHEL/Fedora) | `hostname`, `username`, `fullname`, `password_hash` or `password`, `timezone`, `keyboard_layout`, `locale`, `inst_repo` (`cdrom` or a repository URL), `ignore_missing_packages`, `packages`, `post_commands`, `disk_device`, `selinux`, `firewall` |
 | `alpine_config` (Alpine) | `hostname`, `username`, `password_hash`, `timezone`, `keyboard_layout`, `keyboard_variant`, `user_groups`, `ntp`, `disk_device`, `kernel_flavor` (`lts` or `virt`), `kernel_opts`, `packages`, `optional_packages`, `chroot_commands` |
 | `omarchy_config` | `hostname`, `username`, `password_hash`, `timezone`, `keyboard_layout`, `locale`, `disk_device`, `encrypt` |
+| `windows_config` (Windows 10/11) | `username`, `password` (plain text), `realname`, `computer_name`, `organization`, `edition` or `image_index`, `product_key`, `language`, `input_locale`, `timezone`, `driver_flavor`, `bypass_requirements`, `auto_logon`, `install_guest_tools`, `install_openssh`, `virtio_iso`, `virtio_iso_url`, `setup_commands` (PowerShell). With `ssh_provision`, `post_install_run` runs in cmd.exe and `copy_from_host` is a plain `scp -r` (no `sudo`/`dest_mode`) |
 
 `ssh_key` may be `null`: `vmctl` then generates a key pair under
 `artifacts/<vm>/ssh/` and injects the public half through the answer file.
@@ -103,7 +104,8 @@ Tracked profiles are generic on purpose:
   identity declared by the profile (`ssh_provision.user`, `cloud_init.user`,
   `autoinstall.username`, `archinstall_config.username`,
   `omarchy_config.username`, `preseed_config.username`,
-  `kickstart_config.username`, `alpine_config.username`; they must agree).
+  `kickstart_config.username`, `alpine_config.username`,
+  `windows_config.username`; they must agree).
 
 To use your own name, key and dotfiles, override only the identity fields in
 the git-ignored `vms/profiles/local.json`; every `{{user}}` follows:

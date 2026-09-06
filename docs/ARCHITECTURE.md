@@ -92,6 +92,7 @@ produces isolated per-VM artifacts.
 | `iso.py`                  | ~255  | ISO download, validation, discovery, installer extraction.     |
 | `cloud_init.py`           | ~192  | cloud-init / autoinstall seed builders.                         |
 | `omarchy.py`              | ~210  | Omarchy config rendering and unattended `cidata` builder.       |
+| `windows.py`              | ~430  | Windows autounattend.xml + first-logon script, prompt-free ISO. |
 | `qemu.py`                 | ~244  | QEMU command builders: machine, firmware, disk, video, audio.   |
 | `disk_inspect.py`         | ~242  | `wipefs`, `lsblk`, GPT geometry, `cmd_list_*_devices`.          |
 | `flash.py`                | ~214  | `cmd_flash`, `cmd_flash_helper`, sudo re-exec target.           |

@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 
 import vmctl  # noqa: E402
 import vmctl.cloud_init  # noqa: E402
+import vmctl.errors  # noqa: E402
 import vmctl.iso  # noqa: E402
 import vmctl.lifecycle  # noqa: E402
 import vmctl.runtime  # noqa: E402
@@ -29,6 +30,25 @@ import vmctl.qemu  # noqa: E402
 import vmctl.state  # noqa: E402
 
 from tests._common import BaseVmctlTestCase  # noqa: E402
+
+
+class RunAndExpectExitTests(unittest.TestCase):
+    def test_process_exit_without_token_fails_immediately(self):
+        # Regression: an EOF on stdout kept select() "readable" forever and the loop never
+        # reached process.poll(), so a QEMU that died (or was stopped) hung until the timeout.
+        cmd = [sys.executable, "-c", "print('booting'); import sys; sys.stdout.flush()"]
+        started = time.monotonic()
+        with contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(vmctl.errors.VMError) as ctx:
+                vmctl.qemu.run_and_expect(cmd, expected_text="never printed", timeout_sec=60)
+        self.assertLess(time.monotonic() - started, 10)
+        self.assertIn("exited before emitting", str(ctx.exception))
+        self.assertIn("booting", str(ctx.exception))
+
+    def test_token_printed_before_exit_is_accepted_after_eof(self):
+        cmd = [sys.executable, "-c", "print('==> done!')"]
+        with contextlib.redirect_stdout(io.StringIO()):
+            vmctl.qemu.run_and_expect(cmd, expected_text="==> done!", timeout_sec=60)
 
 
 class VmctlTests(BaseVmctlTestCase):

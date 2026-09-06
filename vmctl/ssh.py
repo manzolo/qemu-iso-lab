@@ -124,13 +124,14 @@ def scp_base_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     return ["scp"] + opts + ["-P", str(port)]
 
 
-def wait_for_ssh(vm: dict[str, Any], timeout_sec: int, dry_run: bool = False) -> None:
+def wait_for_ssh(vm: dict[str, Any], timeout_sec: int, dry_run: bool = False, probe_command: str = "true") -> None:
+    """Poll SSH until *probe_command* succeeds (``exit 0`` for guests whose login shell is cmd.exe)."""
     host, port, _ = ssh_target(vm)
     if dry_run:
         ui.print_note(f"Would wait for SSH on {host}:{port}")
         return
     deadline = time.monotonic() + timeout_sec
-    probe_cmd = ssh_base_cmd(vm, dry_run=dry_run) + ["true"]
+    probe_cmd = ssh_base_cmd(vm, dry_run=dry_run) + [probe_command]
     while time.monotonic() < deadline:
         try:
             result = subprocess.run(
@@ -383,6 +384,56 @@ def post_install_run(
 ) -> None:
     runtime.run(
         remote_shell_cmd(vm, command, dry_run=dry_run),
+        dry_run=dry_run,
+        stdout_log=stdout_log,
+        stderr_log=stderr_log,
+        append=True,
+    )
+
+
+def post_install_run_raw(
+    vm: dict[str, Any],
+    command: str,
+    dry_run: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+) -> None:
+    """Run *command* through the guest's own login shell (cmd.exe on Windows), no ``sh -lc`` wrapper."""
+    runtime.run(
+        ssh_base_cmd(vm, dry_run=dry_run) + [command],
+        dry_run=dry_run,
+        stdout_log=stdout_log,
+        stderr_log=stderr_log,
+        append=True,
+    )
+
+
+def post_install_copy_raw(
+    vm: dict[str, Any],
+    entry: dict[str, Any],
+    dry_run: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+) -> None:
+    """Plain ``scp -r source user@host:dest`` for guests without a POSIX shell (Windows OpenSSH).
+
+    *dest* is a guest path in scp form (``C:/Users/lab/Desktop/tools``); sudo, dest_mode and
+    the read-only fix-ups of :func:`post_install_copy` do not apply.
+    """
+    host, _, user = ssh_target(vm)
+    source_raw = str(entry.get("source") or "").strip()
+    dest_raw = str(entry.get("dest") or "").strip()
+    if not source_raw or not dest_raw:
+        raise VMError("copy_from_host entries require source and dest")
+    for unsupported in ("source_sudo", "dest_sudo", "dest_mode"):
+        if entry.get(unsupported):
+            raise VMError(f"copy_from_host.{unsupported} is not supported for Windows guests")
+    source = runtime.expand_host_path(source_raw)
+    if not dry_run and not source.exists():
+        ui.print_status("warn", f"Skipping missing host path: {source}", ok=False)
+        return
+    runtime.run(
+        scp_base_cmd(vm, dry_run=dry_run) + ["-r", str(source), f"{user}@{host}:{dest_raw}"],
         dry_run=dry_run,
         stdout_log=stdout_log,
         stderr_log=stderr_log,

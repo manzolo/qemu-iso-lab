@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import alpine, archinstall, cloud_init, config, host_setup, iso, omarchy, preseed, kickstart, qemu, runtime, ssh, state, ui
+from vmctl import alpine, archinstall, cloud_init, config, host_setup, iso, omarchy, preseed, kickstart, qemu, runtime, ssh, state, ui, windows
 from vmctl.errors import VMError
 
 
@@ -197,7 +197,10 @@ def stop_qemu_process(
     dry_run: bool = False,
     qmp_socket: Path | None = None,
     ssh_poweroff_cmd: list[str] | None = None,
+    grace_sec: int | None = None,
 ) -> int:
+    grace = ACPI_POWEROFF_GRACE_SEC if grace_sec is None else grace_sec
+
     def finalize_stop(message: str) -> int:
         if pid_path is not None and pid_path.exists():
             pid_path.unlink()
@@ -218,12 +221,12 @@ def stop_qemu_process(
     if qmp_socket is not None and qmp_socket.exists():
         ui.print_note("Asking the guest to power off (ACPI, via QMP)...")
         if qemu.qmp_command(qmp_socket, "system_powerdown"):
-            deadline = time.monotonic() + ACPI_POWEROFF_GRACE_SEC
+            deadline = time.monotonic() + grace
             while time.monotonic() < deadline:
                 if process_cmdline(pid) is None:
                     return finalize_stop(f"Stopped {description} (guest powered off cleanly)")
                 time.sleep(1)
-            ui.print_status("warn", f"{description} ignored the ACPI power-off for {ACPI_POWEROFF_GRACE_SEC}s", ok=False)
+            ui.print_status("warn", f"{description} ignored the ACPI power-off for {grace}s", ok=False)
         else:
             ui.print_status("warn", "QMP power-off request failed", ok=False)
 
@@ -235,7 +238,7 @@ def stop_qemu_process(
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except (OSError, subprocess.TimeoutExpired):
                 pass
-            deadline = time.monotonic() + ACPI_POWEROFF_GRACE_SEC
+            deadline = time.monotonic() + grace
             while time.monotonic() < deadline:
                 if process_cmdline(pid) is None:
                     return finalize_stop(f"Stopped {description} (guest powered off over SSH)")
@@ -338,6 +341,10 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-alpine", "setup-alpine + post-install")
         return ("skip", "alpine_config without SSH post-install")
+    if windows.windows_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-windows", "autounattend + post-install")
+        return ("skip", "windows_config without SSH post-install")
     ci = vm.get("ci", {})
     if isinstance(ci, dict) and ci.get("expect"):
         return ("boot-check", "serial boot expectation")
@@ -398,6 +405,11 @@ def ci_boot_accel(vm: dict[str, Any], default: str = "kvm") -> str:
 
 
 def local_test_prereq_skip(vm_name: str, vm: dict[str, Any]) -> str | None:
+    # Windows and other ISOs without a public download URL: nothing to fetch, nothing to test.
+    iso_path = runtime.resolve_path(vm["iso"])
+    if not iso_path.exists() and not iso.iso_url_candidates(vm, allow_discovery=False):
+        return f"skipped: ISO {iso_path.name} is not present and the profile has no download source"
+
     ci = vm.get("ci", {})
     if not isinstance(ci, dict):
         return None
@@ -423,7 +435,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-alpine"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-alpine", "bootstrap-windows"}:
             candidates.append(vm_name)
     return candidates
 
@@ -550,6 +562,22 @@ def run_local_test_vm(
     if mode == "bootstrap-alpine":
         try:
             cmd_bootstrap_alpine(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                )
+            )
+        finally:
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-windows":
+        try:
+            cmd_bootstrap_windows(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -1099,6 +1127,113 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
     return 0
 
 
+def start_installed_vm_headless(vm_name: str, vm: dict[str, Any], disk_exists: bool, dry_run: bool = False) -> None:
+    """Boot the freshly installed disk in the background, serial to post-install-serial.log."""
+    pid_path, log_path = prepare_background_vm_slot(vm_name, dry_run=dry_run)
+    run_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        allow_missing_disk=dry_run and not disk_exists,
+    )
+    post_serial_log = runtime.resolve_path(f"artifacts/{vm_name}/logs/post-install-serial.log")
+    runtime.ensure_parent(post_serial_log)
+    run_qemu_args += ["-serial", f"file:{post_serial_log}"]
+    stderr_log = companion_stderr_log_path(log_path)
+    pid = runtime.run_background(run_qemu_args, log_path, dry_run=dry_run, stderr_path=stderr_log)
+    if pid is not None:
+        pid_path.write_text(f"{pid}\n", encoding="utf-8")
+        ui.print_kv("pid", str(pid))
+
+
+def run_windows_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int, dry_run: bool = False) -> None:
+    """Post-install over Windows OpenSSH: commands run in cmd.exe, copies are plain scp."""
+    ssh_cfg = cloud_init.ssh_access_config(vm)
+    if ssh_cfg is None:
+        raise VMError(f"VM '{vm_name}' does not define SSH provisioning")
+    runtime.require_command("ssh")
+    runtime.require_command("scp")
+    stdout_log, stderr_log = announce_phase_logs(vm_name, "post-install")
+    ssh.wait_for_ssh(vm, timeout_sec, dry_run=dry_run, probe_command="exit 0")
+    ui.print_status("ok", f"SSH is ready for VM '{vm_name}'")
+    ui.print_note("Running post-install provisioning (cmd.exe semantics)")
+    for entry in ssh_cfg.get("copy_from_host", []):
+        if not isinstance(entry, dict):
+            raise VMError("Invalid copy_from_host entry: expected object")
+        ssh.post_install_copy_raw(vm, entry, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    for command in ssh_cfg.get("post_install_run", []):
+        ssh.post_install_run_raw(vm, str(command), dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+
+
+def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if windows.windows_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define windows_config")
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Windows (autounattend): {args.vm}")
+
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    install_iso = windows.ensure_noprompt_iso(iso_path, dry_run=args.dry_run)
+    virtio_iso = windows.ensure_virtio_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+
+    seed_iso = windows.create_windows_seed_iso(args.vm, vm, dry_run=args.dry_run)
+
+    # Setup reboots several times (WinPE -> specialize -> OOBE), so no -no-reboot here. The
+    # disk gets bootindex 1 and the prompt-free install CD bootindex 2: OVMF falls through to
+    # the CD only while the disk has no bootloader, then every reboot lands on Windows.
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+        disk_bootindex=1,
+    )
+    install_qemu_args += windows.install_media_args(install_iso, virtio_iso, seed_iso)
+
+    ui.print_note("Booting Windows Setup — waiting for the first-logon script to report completion on COM1...")
+    ui.print_note(f"Watch the screen with: vmctl attach {args.vm}")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    try:
+        qemu.run_and_expect(
+            install_qemu_args,
+            expected_text=windows.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=getattr(args, "timeout", 3600),
+            dry_run=args.dry_run,
+            log_path=serial_log,
+            exit_grace_sec=windows.SHUTDOWN_GRACE_SEC,
+        )
+    except VMError as exc:
+        # The first-logon script shuts the guest down after a failure too, with its own token:
+        # QEMU exits without the success token and we land here with the failure in the output.
+        if windows.BOOTSTRAP_FAILED_TOKEN in str(exc):
+            failed_line = next((line for line in str(exc).splitlines() if windows.BOOTSTRAP_FAILED_TOKEN in line), "")
+            raise VMError(
+                f"Windows first-logon setup reported failures: {failed_line.strip()} "
+                f"(details in {ui.pretty_path(serial_log)} and C:\\vmctl\\setup.log in the guest)"
+            ) from exc
+        raise
+    if cloud_init.ssh_access_config(vm) is None:
+        ui.print_status("ok", f"Installation complete for VM '{args.vm}' (no ssh_provision: skipping post-install)")
+        return 0
+    ui.print_status("ok", "Installation complete — starting installed VM for post-install")
+
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
+    run_windows_post_install(args.vm, vm, getattr(args, "timeout", 600), dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
+    return 0
+
+
 def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = resolved_vm(args, cfg)
@@ -1420,7 +1555,10 @@ def run_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int, dry_run
 def cmd_post_install(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
-    run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
+    if windows.windows_config(vm) is not None:
+        run_windows_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
+    else:
+        run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
     ui.print_status("ok", f"Post-install completed for VM '{args.vm}'")
     return 0
 
@@ -1516,15 +1654,29 @@ def cmd_bootstrap_omarchy(args: argparse.Namespace) -> int:
     return 0
 
 
+def poweroff_grace_sec(vm: dict[str, Any]) -> int:
+    """How long `vmctl stop` lets the guest power itself off after the ACPI request.
+
+    Profiles may raise it with ``acpi_poweroff_grace_sec``: Windows commits pending feature
+    operations (e.g. the OpenSSH capability) during its first shutdown and needs minutes, and a
+    SIGTERM in the middle of that would corrupt the guest.
+    """
+    value = vm.get("acpi_poweroff_grace_sec")
+    return ACPI_POWEROFF_GRACE_SEC if value is None else max(1, int(value))
+
+
 def ssh_poweroff_command(vm: dict[str, Any]) -> list[str] | None:
-    """`systemctl poweroff` over the VM's SSH access, or None when the profile has no SSH."""
+    """Power-off over the VM's SSH access (`systemctl poweroff`, `shutdown /s` on Windows), or None without SSH."""
     ssh_cfg = cloud_init.ssh_access_config(vm)
     if ssh_cfg is None or not ssh_cfg.get("ssh_host_port"):
         return None
     try:
-        return ssh.ssh_base_cmd(vm) + ["-o", "ConnectTimeout=5", "sudo", "systemctl", "poweroff"]
+        base = ssh.ssh_base_cmd(vm) + ["-o", "ConnectTimeout=5"]
     except VMError:
         return None
+    if windows.windows_config(vm) is not None:
+        return base + ["shutdown /s /t 0 /f"]
+    return base + ["sudo", "systemctl", "poweroff"]
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
@@ -1545,6 +1697,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     dry_run=args.dry_run,
                     qmp_socket=qemu.qmp_socket_path(vm),
                     ssh_poweroff_cmd=ssh_poweroff_command(vm),
+                    grace_sec=poweroff_grace_sec(vm),
                 )
         ui.print_status("ok", f"No tracked background VM for '{args.vm}'")
         return 0
@@ -1562,6 +1715,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     dry_run=args.dry_run,
                     qmp_socket=qemu.qmp_socket_path(vm),
                     ssh_poweroff_cmd=ssh_poweroff_command(vm),
+                    grace_sec=poweroff_grace_sec(vm),
                 )
         return 0
 
@@ -1574,6 +1728,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         qmp_socket=qemu.qmp_socket_path(vm),
         ssh_poweroff_cmd=ssh_poweroff_command(vm),
+        grace_sec=poweroff_grace_sec(vm),
     )
 
 
@@ -1918,6 +2073,7 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
         preseed.preseed_artifact_dir(vm),
         kickstart.kickstart_artifact_dir(vm),
         alpine.alpine_artifact_dir(vm),
+        windows.windows_artifact_dir(vm),
         omarchy.omarchy_artifact_dir(vm),
         cloud_init.cloud_init_artifact_dir(vm),
         cloud_init.autoinstall_artifact_dir(vm),

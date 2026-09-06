@@ -68,6 +68,11 @@ Profiles that add `cloud_init`, `ssh_provision`, `autoinstall`, `archinstall_con
 provisioning flows described in [UNATTENDED.md](UNATTENDED.md) and
 [PROVISIONING.md](PROVISIONING.md).
 
+`acpi_poweroff_grace_sec` (optional, default 60) is how long `vmctl stop` waits
+for the guest to honour the ACPI power-off before falling back to SSH and
+SIGTERM; the Windows profiles set 300 because their first shutdown commits
+pending feature operations.
+
 ## ISO sources
 
 `vmctl fetch-iso` downloads to a temporary `.part` file and atomically replaces
@@ -197,6 +202,13 @@ for `vmctl import-device`:
   dependency on first boot;
 - both use `e1000e` networking for out-of-the-box compatibility;
 - native Windows 11 requirements such as TPM and Secure Boot are not modeled.
+
+`windows11-unattended` and `windows10-unattended` are the installable counterparts: a `virtio` disk (the
+storage driver is injected during Setup), `virtio-net-pci`, and a
+`windows_config` section driving `vmctl bootstrap-windows` (`driver_flavor` `w11`/`w10`, no requirement bypass on 10)
+([UNATTENDED.md](UNATTENDED.md#windows-1011-autounattend)). Its `iso` has no
+download URL: drop the Microsoft ISO at `isos/windows11.iso` or point `iso` at
+your copy in `local.json`, together with your `edition`/`language` (multi-edition ISOs carry several images, `edition` must name one of them).
 
 ## Adding a new VM
 

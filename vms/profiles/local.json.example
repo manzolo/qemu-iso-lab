@@ -94,6 +94,20 @@
           }
         ]
       }
+    },
+    "windows11-unattended": {
+      "name": "Windows 11 (Local)",
+      "iso": "/path/to/Win11_24H2_English_x64.iso",
+      "windows_config": {
+        "username": "YOUR_USER",
+        "password": "YOUR_PASSWORD",
+        "realname": "Your Name",
+        "language": "en-US",
+        "timezone": "W. Europe Standard Time"
+      },
+      "ssh_provision": {
+        "user": "YOUR_USER"
+      }
     }
   }
 }

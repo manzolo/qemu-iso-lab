@@ -1,6 +1,6 @@
 # Unattended installs
 
-Six installers run headless, driven over the serial console, and end with the
+Seven installers run headless, driven over the serial console, and end with the
 VM installed, booted in the background and provisioned over SSH. Every
 `bootstrap-*` command accepts `--dry-run` and prints each step it would run.
 
@@ -11,6 +11,7 @@ VM installed, booted in the background and provisioned over SSH. Every
 - [Arch: pacstrap script](#arch-pacstrap-script)
 - [Omarchy: cidata](#omarchy-cidata)
 - [Alpine: setup-alpine](#alpine-setup-alpine)
+- [Windows 10/11: autounattend](#windows-1011-autounattend)
 - [The completion-token rule](#the-completion-token-rule)
 - [Boot checks and the validation matrix](#boot-checks-and-the-validation-matrix)
 
@@ -18,7 +19,7 @@ VM installed, booted in the background and provisioned over SSH. Every
 
 1. Render the answer file from the profile section (`autoinstall`,
    `preseed_config`, `kickstart_config`, `archinstall_config`, `omarchy_config`,
-   `alpine_config`)
+   `alpine_config`, `windows_config`)
    and pack it into a small seed ISO under `artifacts/<vm>/`.
 2. Extract the kernel and initrd from the distro ISO (`xorriso` or `bsdtar`)
    so QEMU can boot the installer directly with the right kernel arguments.
@@ -241,6 +242,104 @@ restarting the service alone shows the greeter, not the autologin.
 The kernel line of the installed system keeps a serial console
 (`alpine_config.kernel_opts`), so `post-install-serial.log` stays readable.
 
+## Windows 10/11: autounattend
+
+```bash
+vmctl bootstrap-windows windows11-unattended
+vmctl bootstrap-windows windows10-unattended     # same flow, driver_flavor w10, no requirement bypass
+```
+
+The technique comes from the kvm-lab repository (`scripts/win11/create_win11_vm.sh`
+and its `autounattend.xml`), reworked for plain QEMU. Prerequisites: the retail
+ISO at the profile's `iso` path (Microsoft publishes no stable URL, so nothing
+is downloaded; `local.json` may point `iso` at an existing file), `7z` and
+`xorriso` on the host. The virtio-win driver ISO is fetched from fedorapeople
+(`windows_config.virtio_iso_url`) unless `virtio_iso` points at a local copy.
+
+1. **Prompt-free ISO, once.** The Microsoft ISO is unpacked with `7z` (its
+   files live in UDF only, the ISO 9660 tree holds a README) and rebuilt with
+   `xorriso -as mkisofs` using `efi/microsoft/boot/efisys_noprompt.bin` as the
+   UEFI El Torito image and an emptied `boot/bootfix.bin`, so the guest never
+   waits at "Press any key to boot from CD or DVD". The result is cached as
+   `isos/<stem>-noprompt.iso` with a `.source` stamp (resolved path, size,
+   mtime of the original): it does not depend on the profile, and a replaced or
+   same-named source ISO triggers a rebuild.
+2. **Answer file on a seed CD.** `autounattend.xml` and `vmctl-setup.ps1` go
+   into a `VMCTLSEED` ISO under `artifacts/<vm>/windows/`. Windows Setup
+   searches the root of every removable drive for the answer file, so the big
+   ISO is never rebuilt when the profile changes.
+3. **Boot.** QEMU starts headless with serial stdio (COM1 in the guest), no
+   `-no-reboot` (Setup reboots several times), the disk as
+   `virtio-blk-pci,bootindex=1` and three SATA CD-ROMs on their own AHCI ports:
+   the install ISO (`bootindex=2`), virtio-win and the seed. OVMF falls through
+   to the CD only while the disk has no bootloader. In WinPE the answer file
+   injects `viostor` and `NetKVM` from the virtio-win CD (listed for every drive
+   letter D..G), wipes disk 0 into EFI + MSR + Windows, bypasses the TPM /
+   Secure Boot / CPU / RAM checks through `HKLM\SYSTEM\Setup\LabConfig` (no
+   swtpm needed), installs `windows_config.edition` with the matching generic
+   KMS client key, then creates the local administrator and enables autologon.
+   Nothing runs in the specialize pass on purpose: a `RunSynchronousCommand`
+   that exits non-zero there blocks Setup with a modal dialog, and disabling
+   UAC there leaves the Windows 11 OOBE (a modern app) on a black screen.
+   At first logon, `FirstLogonCommands` runs one short `cmd.exe /c for %d in
+   (D E F G) ...` line that finds `vmctl-setup.ps1` on the seed CD and starts it
+   with PowerShell. Setup stores FirstLogonCommands as `HKLM\...\RunOnce`
+   values, and **Windows 10 silently skips RunOnce values longer than 260
+   characters** (MAX_PATH): the previous PowerShell one-liner was 294 characters
+   and never ran on Windows 10 (the entry survived every reboot, UAC on or off),
+   while Windows 11 ran it. Verified in the guest with a 307-character test
+   entry (ignored) next to a short one (executed). The `<OOBE>` block uses only
+   `HideEULAPage`, `HideLocalAccountScreen`, `HideOnlineAccountScreens`,
+   `HideWirelessSetupInOOBE` and `ProtectYourPC` (the deprecated
+   `SkipMachineOOBE`/`SkipUserOOBE` are gone), and
+   `Microsoft-Windows-International-Core` is declared in oobeSystem as well as in
+   specialize, otherwise Windows 10 stops at the region and keyboard pages.
+4. **First logon.** `vmctl-setup.ps1` runs as the local administrator (elevated)
+   and installs the virtio guest tools,
+   OpenSSH Server (`Add-WindowsCapability`, retried while Windows Update wakes
+   up) with the project's public key in `administrators_authorized_keys` (strict
+   ACL via `icacls`), disables sleep and hibernation, runs the profile's
+   PowerShell `setup_commands`, logs each step to `C:\vmctl\setup.log` and to
+   COM1. `setup_commands` run in the administrator's user context, so HKCU
+   refers to that user.
+   Every step is checked (installer exit codes, `sshd` running, `icacls`
+   result, a non-zero exit code in a `setup_commands` entry); only when none
+   failed does it write `==> Windows installation complete!` on COM1, otherwise
+   `==> Windows installation FAILED: <steps>`. It shuts down in both cases, so a
+   failure surfaces as soon as QEMU exits instead of at the timeout.
+5. **Post-install over OpenSSH.** The installed VM starts headless; the SSH
+   probe is `exit 0` (cmd.exe has no `true`), `copy_from_host` is a plain
+   `scp -r` to a `C:/...` path and `post_install_run` commands run in cmd.exe.
+   Keep them locale-independent: on an Italian Windows `systeminfo` and `sc`
+   print translated labels, PowerShell one-liners do not. `vmctl post-install`
+   takes the same Windows path for profiles with `windows_config`.
+   `vmctl stop` sends the ACPI power button and waits `acpi_poweroff_grace_sec`
+   (300 s in the Windows profiles, 60 s by default) before trying `shutdown /s`
+   over SSH and finally SIGTERM: the first shutdown after the bootstrap commits
+   the OpenSSH feature operation and took well over a minute on Windows 10.
+
+Latest builds without the Microsoft download page (which blocks scripted
+requests by IP): [UUP dump](https://uupdump.net) builds an ISO from Windows
+Update files with its `uup_download_linux.sh` (needs `aria2`, `wimtools`,
+`chntpw`); pick the build on the site or via `api.uupdump.net/listid.php`,
+choose language and edition, run the script, and point `iso` at the result.
+
+`windows_config` fields: `username`, `password` (plain text, the answer file
+cannot take a hash), `realname`, `computer_name` (NetBIOS-safe, 15 chars),
+`organization`, `edition` (the image name inside `install.wim`: Microsoft ISOs
+say `Windows 11 Pro`, UUP dump builds say `Windows 11 Professional`; the generic
+key follows the Pro/Home/Enterprise/Education family) or `image_index`,
+`product_key`, `language`, `input_locale`, `timezone`
+(Windows name, e.g. `W. Europe Standard Time`), `driver_flavor` (`w11`/`w10`),
+`bypass_requirements`, `auto_logon`, `install_guest_tools`, `install_openssh`,
+`virtio_iso`, `virtio_iso_url`, `setup_commands` (PowerShell, run as SYSTEM:
+use `HKLM`, not `HKCU`, for settings).
+
+The token rule holds here too, with a twist: Windows has no `sync` + `poweroff -f`
+split, its own shutdown is the flush, so the token is written right before
+`shutdown /s` and `run_and_expect` waits up to `windows.SHUTDOWN_GRACE_SEC`
+(10 minutes) for QEMU to exit on its own instead of the usual 30 seconds.
+
 ## The completion-token rule
 
 Every flow signals success by printing a token on the serial console, and every
@@ -255,7 +354,8 @@ echo "==> ... installation complete!"      # the token, AFTER the flush
 poweroff -f
 ```
 
-On the host, `run_and_expect` waits up to 30 seconds for QEMU to exit on its
+On the host, `run_and_expect` waits up to 30 seconds (`exit_grace_sec`; 10
+minutes for Windows, whose shutdown *is* the flush) for QEMU to exit on its
 own after the token and only then falls back to terminating it. Do not "speed
 up" either side. The full story is in [ARCH_GRUB_BOOT_FIX.md](ARCH_GRUB_BOOT_FIX.md).
 

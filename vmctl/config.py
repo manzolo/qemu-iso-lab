@@ -20,6 +20,7 @@ USER_IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
     ("preseed_config", "username"),
     ("kickstart_config", "username"),
     ("alpine_config", "username"),
+    ("windows_config", "username"),
 )
 
 

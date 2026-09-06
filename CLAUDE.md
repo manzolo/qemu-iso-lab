@@ -24,6 +24,7 @@ vmctl bootstrap-archinstall arch-noctalia-local
 vmctl bootstrap-preseed debian-server
 vmctl bootstrap-kickstart almalinux-server
 vmctl bootstrap-alpine alpine-niri
+vmctl bootstrap-windows windows11-unattended   # needs isos/windows11.iso (no public URL) + 7z
 vmctl attach <name>                # VNC view of a headless VM, also while a bootstrap runs
 ```
 
@@ -37,7 +38,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ```
 errors ← state ← {ui, runtime} ← {config, iso, cloud_init, qemu, archinstall, disk_inspect}
-      ← {alpine, preseed, kickstart, omarchy} ← {flash, import_dev, ssh, host_setup} ← lifecycle ← cli
+      ← {alpine, preseed, kickstart, omarchy, windows} ← {flash, import_dev, ssh, host_setup} ← lifecycle ← cli
 ```
 
 Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always accessed as `state.ROOT`, never imported directly — a direct import captures a stale binding and breaks tests.
@@ -54,6 +55,7 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 | `archinstall.py` | Arch-specific: renders archinstall JSON config (interactive) or a self-contained `pacstrap`-based `install.sh` (automated bootstrap). |
 | `iso.py` | ISO download with validation, discovery regex, and member extraction (`xorriso`/`bsdtar`). |
 | `alpine.py` | Alpine: `setup-alpine` answer file + chroot `install.sh` packed into a seed ISO, live-prompt automation constants. |
+| `windows.py` | Windows 10/11: `autounattend.xml` + first-logon `vmctl-setup.ps1` in a `VMCTLSEED` CD, prompt-free ISO rebuild (`7z` + `xorriso`), virtio-win ISO, SATA CD-ROM args. |
 | `kickstart.py` / `preseed.py` | AlmaLinux/Fedora kickstart and Debian preseed rendering; `kickstart.install_repo()` picks `cdrom` or a netinst URL. |
 | `ssh.py` | SSH/SCP helpers, `wait_for_ssh`, `post_install_copy`, `post_install_run`. |
 
@@ -61,9 +63,9 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 
 All VM definitions live in `vms/profiles/*.json`. `load_config()` reads and merges every file in that directory; `vms/profiles/local.json` is gitignored, loaded last, and deep-merged over the tracked profiles (dicts merge, lists concatenate). It is the only place for personal data — copy from `local.json.example`.
 
-Tracked profiles are generic on purpose: the guest user is `lab` (password `lab`, hash included) and every place where the user name appears inside a path, a command or a file body writes `{{user}}`. `config.expand_user_placeholder()` replaces it at load time with the identity declared by the profile (`ssh_provision.user`, `cloud_init.user`, `autoinstall.username`, `archinstall_config.username`, `preseed_config.username`, `kickstart_config.username`; they must agree). Overriding the identity in `local.json` therefore propagates everywhere. Never commit a real user name, password or hash into a tracked profile again; the repo is public.
+Tracked profiles are generic on purpose: the guest user is `lab` (password `lab`, hash included) and every place where the user name appears inside a path, a command or a file body writes `{{user}}`. `config.expand_user_placeholder()` replaces it at load time with the identity declared by the profile (`ssh_provision.user`, `cloud_init.user`, `autoinstall.username`, `archinstall_config.username`, `preseed_config.username`, `kickstart_config.username`, `alpine_config.username`, `windows_config.username`; they must agree). Overriding the identity in `local.json` therefore propagates everywhere. Never commit a real user name, password or hash into a tracked profile again; the repo is public.
 
-SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226, `arch-dms-local` → 2230, `arch-dms-nvidia-local` → 2231, `arch-omarchy-nvidia-local` → 2232, `fedora-niri-dms-local` → 2233, `alpine-niri` → 2234 (2222/2227/2228/2229/2290 are Ubuntu/Debian/Alma; 2225 is taken by a local.json VM).
+SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226, `arch-dms-local` → 2230, `arch-dms-nvidia-local` → 2231, `arch-omarchy-nvidia-local` → 2232, `fedora-niri-dms-local` → 2233, `alpine-niri` → 2234, `windows11-unattended` → 2235, `windows10-unattended` → 2236 (2222/2227/2228/2229/2290 are Ubuntu/Debian/Alma; 2225 is taken by a local.json VM).
 
 ### Unattended install flows
 
@@ -99,6 +101,16 @@ CachyOS (`cachyos-local`, `cachyos-nvidia-local`) rides the same handler on the 
 2. Extracts `boot/vmlinuz-<flavor>` + `boot/initramfs-<flavor>` (`lts` for the standard ISO).
 3. Boots with the ISO's `modules=` list plus `console=ttyS0,115200`; `auto_inputs` answer `localhost login:` with `root` and type the mount + run trigger at `localhost:~#`.
 4. Waits for `"==> Alpine Linux installation complete!"`, then the usual background start + post-install.
+
+**Windows 10/11** (`bootstrap-windows`, the kvm-lab `autounattend` technique on plain QEMU):
+1. Rebuilds the Microsoft ISO once as `isos/<stem>-noprompt.iso` (`7z x` because the files live in UDF only, then `xorriso -as mkisofs` with `efi/microsoft/boot/efisys_noprompt.bin` as the UEFI El Torito image and an emptied `boot/bootfix.bin`): no "Press any key to boot from CD or DVD". Profile-independent, so it is cached forever.
+2. Renders `autounattend.xml` + `vmctl-setup.ps1` into a `VMCTLSEED` seed ISO. Windows Setup searches the root of every removable drive for the answer file, so the 6 GB ISO never changes with the profile.
+3. Boots headless with serial stdio (= COM1 in the guest), **without** `-no-reboot` (Setup reboots several times), three SATA CD-ROMs pinned to `ide.0`/`ide.1`/`ide.2` (install ISO with `bootindex=2`, virtio-win, seed) and the disk as `virtio-blk-pci,bootindex=1` (`common_args(disk_bootindex=1)`): OVMF falls through to the CD only while the disk is empty. The answer file injects `viostor`/`NetKVM` from the virtio-win CD in WinPE (every drive letter D..G), wipes disk 0 (GPT EFI/MSR/Windows), bypasses the TPM/Secure Boot/CPU/RAM checks via `HKLM\SYSTEM\Setup\LabConfig`, creates the local administrator with autologon. Nothing runs in specialize: a non-zero `RunSynchronousCommand` blocks Setup with a modal dialog (verified), and `EnableLUA=0` there leaves the Windows 11 OOBE black (verified). FirstLogonCommands is ONE short `cmd.exe /c for %d in (D E F G) do if exist %d:\vmctl-setup.ps1 powershell ... -File %d:\vmctl-setup.ps1` line (`windows.first_logon_command`, asserted < `RUNONCE_MAX_COMMAND_LENGTH` = 260): Setup stores it as an HKLM `RunOnce` value and **Windows 10 silently skips RunOnce values longer than 260 chars** (verified in-guest: 307-char test entry ignored, short one executed; the old 294-char PowerShell one-liner never ran on Win10 while Win11 ran it). The `<OOBE>` block uses only the Hide*/ProtectYourPC flags plus `Microsoft-Windows-International-Core` in oobeSystem (without the deprecated `SkipMachineOOBE`/`SkipUserOOBE`, Win10 otherwise stops at the region/keyboard pages). Do not reintroduce Skip*OOBE, scheduled tasks or UAC toggles.
+4. At first logon `vmctl-setup.ps1` runs as the local administrator (`setup_commands` may target that user's HKCU), which installs the virtio guest tools, OpenSSH Server (`Add-WindowsCapability`, retried; project public key in `administrators_authorized_keys` with the strict ACL), disables sleep/hibernation, runs the profile's PowerShell `setup_commands`, logs every step to `C:\vmctl\setup.log` **and** to COM1, then writes `"==> Windows installation complete!"` on COM1 and runs `shutdown /s`. Every step is an `Invoke-Step` under `$ErrorActionPreference = 'Stop'` with exit-code checks; after any failure the script writes `"==> Windows installation FAILED: <steps>"` instead and still shuts down, so the host fails fast (`cmd_bootstrap_windows` rewrites the VMError). The prompt-free ISO cache carries a `.source` stamp (path+size+mtime) and is rebuilt when the source changes. `edition` must match the image name in `install.wim` (`Windows 11 Pro` on Microsoft ISOs, `Windows 11 Professional` on UUP dump builds; `image_index` is the alternative), generic keys resolve by family. `run_and_expect(..., exit_grace_sec=windows.SHUTDOWN_GRACE_SEC)` waits up to 10 minutes for that shutdown (the guest's own shutdown is the flush here).
+5. `vmctl stop` honours `acpi_poweroff_grace_sec` (300 in the Windows profiles: the first shutdown commits the OpenSSH feature operation and exceeds the default 60 s; a SIGTERM there would corrupt the guest) and its SSH fallback is `shutdown /s /t 0 /f` for `windows_config` profiles.
+6. Starts the installed VM headless and runs `run_windows_post_install`: `wait_for_ssh(probe_command="exit 0")`, `copy_from_host` as plain `scp -r`, `post_install_run` through cmd.exe (no `sh -lc`; keep commands locale-independent, e.g. PowerShell one-liners rather than `findstr` on localized `systeminfo` output).
+
+Prerequisites: the retail ISO at the profile's `iso` path (Microsoft has no stable URL; `local.json` may point at an existing file), `7z`, `xorriso`. `windows_config.password` is plain text (the answer file cannot take a hash); `edition`/`language` must exist in the ISO.
 
 The interactive variant (`install-archinstall`) generates archinstall JSON configs and attaches them as a second virtio CD-ROM (`/dev/vdb`) for the user to run manually.
 

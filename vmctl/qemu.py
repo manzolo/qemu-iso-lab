@@ -113,16 +113,20 @@ def firmware_args(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     return ["-drive", f"if=pflash,format=raw,readonly=on,file={code}", "-drive", f"if=pflash,format=raw,file={vars_path}"]
 
 
-def disk_args(vm: dict[str, Any], allow_missing: bool = False) -> list[str]:
+def disk_args(vm: dict[str, Any], allow_missing: bool = False, bootindex: int | None = None) -> list[str]:
+    """The VM disk; *bootindex* pins it in the firmware boot order (OVMF ignores ``-boot order``)."""
     disk = vm["disk"]
     disk_path = runtime.resolve_path(disk["path"])
     if not disk_path.exists() and not allow_missing:
         raise VMError(f"Disk image not found: {disk_path}")
     interface = disk.get("interface", "virtio")
+    boot = f",bootindex={bootindex}" if bootindex is not None else ""
     if interface == "virtio":
-        return ["-drive", f"file={disk_path},format={disk['format']},if=virtio"]
+        if bootindex is None:
+            return ["-drive", f"file={disk_path},format={disk['format']},if=virtio"]
+        return ["-drive", f"id=disk0,file={disk_path},format={disk['format']},if=none", "-device", f"virtio-blk-pci,drive=disk0{boot}"]
     if interface == "sata":
-        return ["-device", "ich9-ahci,id=ahci0", "-drive", f"id=disk0,file={disk_path},format={disk['format']},if=none", "-device", "ide-hd,drive=disk0,bus=ahci0.0"]
+        return ["-device", "ich9-ahci,id=ahci0", "-drive", f"id=disk0,file={disk_path},format={disk['format']},if=none", "-device", f"ide-hd,drive=disk0,bus=ahci0.0{boot}"]
     raise VMError(f"Unsupported disk interface: {interface}")
 
 
@@ -265,6 +269,7 @@ def common_args(
     vm: dict[str, Any], variant: str | None, dry_run: bool = False, accel: str | None = "kvm",
     headless: bool = False, serial_stdio: bool = False, no_reboot: bool = False,
     allow_missing_disk: bool = False, enable_clipboard: bool = True, spice_port: int | None = None,
+    disk_bootindex: int | None = None,
 ) -> list[str]:
     runtime.require_command("qemu-system-x86_64")
     cpu_model = "host" if accel == "kvm" else vm.get("cpu_model", "max")
@@ -273,7 +278,7 @@ def common_args(
     if accel == "kvm":
         args.insert(1, "-enable-kvm")
     args += firmware_args(vm, dry_run=dry_run)
-    args += disk_args(vm, allow_missing=allow_missing_disk)
+    args += disk_args(vm, allow_missing=allow_missing_disk, bootindex=disk_bootindex)
     if spice_port is not None:
         args += spice_display_args(spice_port)
     elif headless:
@@ -319,8 +324,14 @@ def common_args(
 def run_and_expect(
     cmd: list[str], expected_text: str, timeout_sec: int,
     auto_inputs: list[tuple[str, str]] | None = None, dry_run: bool = False,
-    log_path: Path | None = None,
+    log_path: Path | None = None, exit_grace_sec: int = 30,
 ) -> None:
+    """Drive QEMU on the serial console until *expected_text* appears, then let the guest power off.
+
+    *exit_grace_sec* is how long the guest gets to exit on its own after the token (Windows
+    prints it right before its own shutdown, which takes minutes, hence the parameter).
+    Only after that does QEMU get terminated, then killed: see CLAUDE.md, the token/flush rule.
+    """
     ui.print_command(cmd)
     if dry_run:
         return
@@ -345,6 +356,9 @@ def run_and_expect(
             events = selector.select(timeout=min(0.2, remaining))
             if events:
                 chunk = os.read(process.stdout.fileno(), 4096).decode(errors="replace")
+                # An empty read is EOF: QEMU closed stdout (it died or was stopped). select()
+                # would report it readable forever, so fall through to the exit check below
+                # instead of `continue`, or this loop spins until the timeout.
                 if chunk:
                     sys.stdout.write(chunk)
                     sys.stdout.flush()
@@ -367,7 +381,7 @@ def run_and_expect(
                                     log_file.flush()
                     if expected_text in full_output_clean:
                         try:
-                            process.wait(timeout=30)
+                            process.wait(timeout=exit_grace_sec)
                         except subprocess.TimeoutExpired:
                             process.terminate()
                             try:
@@ -376,7 +390,7 @@ def run_and_expect(
                                 process.kill()
                                 process.wait(timeout=10)
                         return
-                continue
+                    continue
             if process.poll() is not None:
                 remaining_output = process.stdout.read()
                 if remaining_output:

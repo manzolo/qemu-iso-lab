@@ -345,6 +345,15 @@ class VmtuiTests(unittest.TestCase):
         self.assertIn("Guided Provision", output)
         self.assertIn("Post-Install", output)
 
+    def test_unified_menu_for_windows_unattended_vm(self):
+        output = self._unified_menu("windows11-unattended")
+        self.assertIn("Windows Bootstrap", output)
+        self.assertNotIn("Alpine Bootstrap", output)
+        result = self.run_bash("source bin/vmtui; load_vm_facts windows11-unattended; recommended_action")
+        self.assertEqual(result.stdout.strip(), "Windows Bootstrap")
+        # the import templates keep the manual flow
+        self.assertNotIn("Windows Bootstrap", self._unified_menu("windows11-template"))
+
     def test_unified_menu_for_alpine_vm(self):
         output = self._unified_menu("alpine-niri")
         self.assertIn("Alpine Bootstrap", output)
@@ -457,6 +466,7 @@ class VmtuiTests(unittest.TestCase):
             ("Debian Preseed Bootstrap", "bootstrap-preseed"),
             ("Kickstart Bootstrap", "bootstrap-kickstart"),
             ("Alpine Bootstrap", "bootstrap-alpine"),
+            ("Windows Bootstrap", "bootstrap-windows"),
             ("Attach Display", "attach"),
             ("Unattended Install", "full-auto-install"),
             ("Cloud-Init Flow", "cloud-init-install"),
