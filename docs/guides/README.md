@@ -13,6 +13,8 @@ stessa installazione si può rifare a mano o capire quando qualcosa si ferma.
 | [almalinux-fedora.md](almalinux-fedora.md) | `almalinux-server`, `fedora-niri-dms-local` | `vmctl bootstrap-kickstart` |
 | [alpine-niri.md](alpine-niri.md) | `alpine-niri` | `vmctl bootstrap-alpine` |
 | [ubuntu-niri.md](ubuntu-niri.md) | `ubuntu-niri`, `ubuntu-niri-local` | `vmctl bootstrap-unattended` |
+| [network-lab.md](network-lab.md) | `pfsense-lab`, `pihole-lab`, `lubuntu22-lab` | `vmctl lab install`, `vmctl bootstrap-pfsense` |
+| [virsh-cheatsheet.md](virsh-cheatsheet.md) | VM esportate con `vmctl export-libvirt`, VM legacy libvirt | `virsh ...` (bignami ereditato da kvm-lab) |
 
 I PDF si generano con `make guides` (servono i pacchetti Python `markdown` e `weasyprint`) e
 finiscono in `docs/guides/pdf/`, non versionati. I file `.md` sono la fonte: le stringhe
