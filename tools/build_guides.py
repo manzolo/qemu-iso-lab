@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render docs/guides/*.md into printable PDFs (docs/guides/pdf/) with markdown + weasyprint.
+"""Render docs/guides/*.md (markdown) and *.html (curated pages) into PDFs under docs/guides/pdf/ with weasyprint.
 
 Developer tool, not part of vmctl: `make guides`. Needs the `markdown` and `weasyprint`
 Python packages (pip install --user markdown weasyprint).
@@ -18,7 +18,7 @@ except ImportError as exc:  # pragma: no cover - developer tool
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "docs" / "guides"
-OUT = SRC / "pdf"
+OUT = SRC / "pdf"  # qemu-iso-lab-guide.pdf (cover + every chapter) and singole/<name>.pdf
 
 CSS = """
 @page { size: A4; margin: 18mm 16mm 20mm 16mm;
@@ -44,21 +44,80 @@ blockquote p { margin: 0; }
 """
 
 
-def render(md_path: Path) -> Path:
-    text = md_path.read_text(encoding="utf-8")
+ORDER_NOTE = "I capitoli seguono l'ordine dei nomi file (00-, 10-, 20-...)."
+
+COVER_CSS = """
+@page { size: A4; margin: 0; }
+html { font: 11pt/1.5 "DejaVu Sans", "Noto Sans", sans-serif; color: #1c1c1c; }
+.cover { height: 297mm; padding: 40mm 22mm; box-sizing: border-box;
+  background: linear-gradient(160deg, #11223f 0%, #1d3a6e 55%, #2f6fb0 100%); color: #fff; }
+.cover h1 { font-size: 34pt; margin: 0 0 4mm; letter-spacing: -0.01em; }
+.cover .mono { font-family: "DejaVu Sans Mono", monospace; color: #ffd479; }
+.cover .sub { font-size: 13pt; color: #c7d6ee; margin-bottom: 18mm; }
+.cover h2 { font-size: 12pt; color: #ffd479; margin: 0 0 3mm; text-transform: uppercase; letter-spacing: .08em; }
+.cover ol { margin: 0; padding-left: 8mm; font-size: 11.5pt; line-height: 1.9; }
+.cover ol li span { color: #aebfdc; font-size: 9.5pt; margin-left: 2mm; }
+.cover .foot { position: absolute; bottom: 18mm; left: 22mm; right: 22mm; font-size: 9pt; color: #aebfdc; }
+"""
+
+
+def title_of(path: Path) -> str:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if path.suffix == ".html":
+        import re
+        match = re.search(r"<title>(.*?)</title>", text, re.S)
+        return match.group(1).strip() if match else path.stem
+    for line in text.splitlines():
+        if line.startswith("# "):
+            return line[2:].strip()
+    return path.stem
+
+
+def cover_html(sources: list[Path]) -> str:
+    items = "".join(
+        f"<li>{title_of(src)} <span>{src.name}</span></li>" for src in sources
+    )
+    return (
+        f"<!doctype html><html lang='it'><head><meta charset='utf-8'><style>{COVER_CSS}</style></head><body>"
+        f"<div class='cover'><h1><span class='mono'>qemu-iso-lab</span> · guida</h1>"
+        f"<div class='sub'>Installazioni non presidiate su QEMU/KVM, laboratorio di rete, libvirt: le guide passo passo in un solo manuale</div>"
+        f"<h2>Capitoli</h2><ol>{items}</ol>"
+        f"<div class='foot'>Generato il {date.today().isoformat()} da docs/guides/ con <code>make guides</code> · sorgenti Markdown e HTML nel repository manzolo/qemu-iso-lab · {ORDER_NOTE}</div>"
+        f"</div></body></html>"
+    )
+
+
+def document(src: Path):  # type: ignore[no-untyped-def] - weasyprint Document, developer tool
+    if src.suffix == ".html":
+        return HTML(filename=str(src)).render()
+    text = src.read_text(encoding="utf-8")
     body = markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists", "toc"])
-    meta = f'<p class="meta">qemu-iso-lab · generato il {date.today().isoformat()} da docs/guides/{md_path.name}</p>'
+    meta = f'<p class="meta">qemu-iso-lab · generato il {date.today().isoformat()} da docs/guides/{src.name}</p>'
     html = f"<!doctype html><html lang='it'><head><meta charset='utf-8'><style>{CSS}</style></head><body>{body}{meta}</body></html>"
-    OUT.mkdir(parents=True, exist_ok=True)
-    pdf_path = OUT / (md_path.stem + ".pdf")
-    HTML(string=html, base_url=str(SRC)).write_pdf(str(pdf_path))
-    return pdf_path
+    return HTML(string=html, base_url=str(SRC)).render()
+
+
+def guide_sources() -> list[Path]:
+    return sorted(p for p in list(SRC.glob("*.md")) + list(SRC.glob("*.html")) if p.name != "README.md")
 
 
 def main(argv: list[str]) -> int:
-    sources = [Path(a) for a in argv[1:]] or sorted(SRC.glob("*.md"))
+    sources = [Path(a) for a in argv[1:]] or guide_sources()
+    singles = OUT / "singole"
+    singles.mkdir(parents=True, exist_ok=True)
+    documents = []
     for src in sources:
-        print(f"  {src.relative_to(ROOT)} -> {render(src).relative_to(ROOT)}")
+        doc = document(src)
+        pdf_path = singles / (src.stem + ".pdf")
+        doc.write_pdf(str(pdf_path))
+        documents.append(doc)
+        print(f"  {src.relative_to(ROOT)} -> {pdf_path.relative_to(ROOT)}")
+    if len(documents) > 1:
+        cover = HTML(string=cover_html(sources)).render()
+        pages = [page for doc in [cover, *documents] for page in doc.pages]
+        manual = OUT / "qemu-iso-lab-guide.pdf"
+        cover.copy(pages).write_pdf(str(manual))
+        print(f"  {len(pages)} pagine -> {manual.relative_to(ROOT)}")
     return 0
 
 

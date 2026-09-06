@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Network lab: pfSense, Pi-hole e Lubuntu su QEMU</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm;
+    @bottom-center { content: "qemu-iso-lab · network lab · " counter(page) " / " counter(pages); font: 8.5pt "DejaVu Sans", sans-serif; color: #777; } }
+  html { font: 10.5pt/1.45 "DejaVu Sans", "Liberation Sans", sans-serif; color: #1d232b; }
+  body { margin: 0; }
+  h1 { font-size: 21pt; margin: 0 0 2mm; letter-spacing: -0.01em; }
+  h2 { font-size: 13.5pt; margin: 7mm 0 2.5mm; padding-bottom: 1.2mm; border-bottom: 1.5px solid #cfd6de; page-break-after: avoid; }
+  h3 { font-size: 11pt; margin: 5mm 0 1.5mm; page-break-after: avoid; }
+  p { margin: 0 0 2.6mm; }
+  .sub { color: #5a6570; font-size: 10pt; margin-bottom: 6mm; }
+  table { border-collapse: collapse; width: 100%; margin: 2mm 0 4mm; font-size: 9.6pt; }
+  tr { page-break-inside: avoid; } thead { display: table-header-group; }
+  th, td { text-align: left; padding: 1.6mm 2.4mm; border-bottom: 1px solid #e1e6ec; vertical-align: top; }
+  th { background: #f1f4f8; font-weight: 600; border-bottom: 1.5px solid #cfd6de; }
+  code, .mono { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 9.2pt; }
+  code { background: #f1f4f8; padding: 0 0.3em; border-radius: 2px; }
+  pre { background: #f1f4f8; border: 1px solid #e1e6ec; border-radius: 3px; padding: 2.5mm 3mm; font-size: 9pt; line-height: 1.4; page-break-inside: avoid; white-space: pre-wrap; }
+  pre .c { color: #6b7681; }
+  ul, ol { margin: 0 0 3mm; padding-left: 5mm; } li { margin-bottom: 1mm; }
+  .grid > div { margin-bottom: 3mm; }
+  .card ul { columns: 2; column-gap: 6mm; margin-bottom: 0; }
+  .card li { break-inside: avoid; }
+  .card p { margin-bottom: 1.5mm; }
+  .card { border: 1px solid #dfe5ec; border-left: 4px solid var(--c, #888); border-radius: 3px; padding: 2.2mm 3.2mm; page-break-inside: avoid; }
+  .card h3 { margin-top: 0; }
+  .card small { color: #5a6570; }
+  .fw { --c: #c0392b; } .dns { --c: #1f77b4; } .cli { --c: #2a9d5c; } .host { --c: #6c4bb6; }
+  .note { background: #fff7e0; border: 1px solid #f1dc9a; border-radius: 3px; padding: 2.5mm 3.2mm; margin: 3mm 0; page-break-inside: avoid; }
+  .ok { background: #e7f5ec; border-color: #b9dfc6; }
+  figure { margin: 3mm 0 5mm; page-break-inside: avoid; }
+  figcaption { font-size: 9pt; color: #5a6570; margin-top: 1.5mm; }
+  svg text { font-family: "DejaVu Sans", sans-serif; }
+  .steps li { margin-bottom: 1.8mm; }
+  .two { display: flex; gap: 5mm; } .two > div { flex: 1; }
+</style>
+</head>
+<body>
+
+<h1>Network lab: pfSense, Pi-hole e Lubuntu</h1>
+<p class="sub">Laboratorio riproducibile di <span class="mono">manzolo/qemu-iso-lab</span> · profili <span class="mono">pfsense-lab</span>, <span class="mono">pihole-lab</span>, <span class="mono">lubuntu22-lab</span> · segmento <span class="mono">lab-lan</span>, dominio <span class="mono">qlan</span> · porting del network lab di kvm-lab su QEMU puro, con la strada libvirt tramite <span class="mono">vmctl export-libvirt</span></p>
+
+<p>Tre macchine virtuali ricreano una piccola rete aziendale su un segmento isolato: un firewall/router che fa NAT verso Internet, un resolver DNS con filtro pubblicità che distribuisce anche gli indirizzi via DHCP, e un client desktop. Tutto si installa da zero senza interazione (<code>vmctl lab install</code>) e si può distruggere e ricreare in una mezz'ora. La differenza rispetto a kvm-lab è dove sta l'host: su QEMU puro il segmento è un socket multicast fra le VM e l'host <em>non</em> ha un indirizzo sulla LAN, quindi entra dal lato WAN del firewall attraverso i port forward; dopo l'export in libvirt il segmento diventa la rete <code>lab-lan</code> e l'host torna a essere <code>.254</code>, come prima.</p>
+
+<h2>1. Schema della rete (QEMU puro)</h2>
+<figure>
+<svg viewBox="0 0 760 430" width="100%" xmlns="http://www.w3.org/2000/svg" font-size="11">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a6570"/>
+    </marker>
+    <marker id="arrp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6c4bb6"/>
+    </marker>
+  </defs>
+
+  <!-- Internet -->
+  <ellipse cx="90" cy="60" rx="62" ry="30" fill="#f1f4f8" stroke="#8a97a5" stroke-width="1.4"/>
+  <text x="90" y="56" text-anchor="middle" font-weight="bold" fill="#1d232b">Internet</text>
+  <text x="90" y="71" text-anchor="middle" fill="#5a6570" font-size="9.5">OpenDNS 208.67.222.222</text>
+
+  <!-- host box -->
+  <rect x="180" y="18" width="562" height="396" rx="8" fill="none" stroke="#b8c2cc" stroke-width="1.4" stroke-dasharray="6 4"/>
+  <text x="192" y="36" fill="#5a6570" font-size="10" font-weight="bold">Host Linux (QEMU puro, nessun root)</text>
+
+  <!-- slirp WAN -->
+  <rect x="196" y="48" width="150" height="46" rx="5" fill="#fbfcfd" stroke="#8a97a5" stroke-width="1.2"/>
+  <text x="271" y="66" text-anchor="middle" font-weight="bold" fill="#1d232b">WAN slirp (user)</text>
+  <text x="271" y="82" text-anchor="middle" fill="#5a6570" font-size="9.5">10.0.2.0/24 · NAT di QEMU</text>
+  <line x1="152" y1="60" x2="194" y2="66" stroke="#5a6570" stroke-width="1.6" marker-end="url(#arr)" marker-start="url(#arr)"/>
+
+  <!-- pfSense -->
+  <rect x="396" y="40" width="200" height="86" rx="6" fill="#fdecea" stroke="#c0392b" stroke-width="1.8"/>
+  <text x="496" y="60" text-anchor="middle" font-weight="bold" font-size="12.5" fill="#1d232b">pfSense CE 2.7.2</text>
+  <text x="496" y="76" text-anchor="middle" fill="#3a434c" font-size="9.8">firewall · router · NAT · Unbound</text>
+  <text x="404" y="97" fill="#3a434c" font-size="9.5">WAN vtnet0 → slirp (DHCP 10.0.2.15)</text>
+  <text x="404" y="113" fill="#3a434c" font-size="9.5" font-weight="bold">LAN vtnet1 → lab-lan 192.168.0.1/24</text>
+  <line x1="346" y1="71" x2="394" y2="71" stroke="#5a6570" stroke-width="1.6" marker-end="url(#arr)" marker-start="url(#arr)"/>
+
+  <!-- host admin via forwards -->
+  <rect x="196" y="112" width="150" height="58" rx="5" fill="#f3effc" stroke="#6c4bb6" stroke-width="1.4"/>
+  <text x="271" y="130" text-anchor="middle" font-weight="bold" fill="#1d232b">host 127.0.0.1</text>
+  <text x="271" y="145" text-anchor="middle" fill="#5a6570" font-size="9.2">:8080 GUI pfSense · :2237 ssh</text>
+  <text x="271" y="159" text-anchor="middle" fill="#5a6570" font-size="9.2">:8081 Pi-hole · :2238 :2239 ssh</text>
+  <path d="M346,141 C372,141 380,80 394,80" fill="none" stroke="#6c4bb6" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#arrp)"/>
+  <text x="352" y="132" fill="#6c4bb6" font-size="8.5">hostfwd + NAT</text>
+
+  <!-- pfSense -> switch -->
+  <line x1="496" y1="126" x2="496" y2="196" stroke="#1d232b" stroke-width="2.2"/>
+
+  <!-- lab-lan segment -->
+  <rect x="236" y="196" width="480" height="40" rx="6" fill="#e8f0f8" stroke="#3b5f83" stroke-width="1.8"/>
+  <text x="476" y="213" text-anchor="middle" font-weight="bold" font-size="12" fill="#1d232b">segmento "lab-lan" · 192.168.0.0/24</text>
+  <text x="476" y="228" text-anchor="middle" fill="#3a434c" font-size="9.5">netdev socket multicast condiviso dalle VM · nessun DHCP/DNS dell'host · l'host non c'è</text>
+
+  <!-- drops -->
+  <line x1="330" y1="236" x2="330" y2="284" stroke="#1d232b" stroke-width="2.2"/>
+  <line x1="622" y1="236" x2="622" y2="284" stroke="#1d232b" stroke-width="2.2"/>
+
+  <!-- Pi-hole -->
+  <rect x="216" y="284" width="228" height="98" rx="6" fill="#e6f1fb" stroke="#1f77b4" stroke-width="1.8"/>
+  <text x="330" y="305" text-anchor="middle" font-weight="bold" font-size="12.5" fill="#1d232b">Pi-hole v6</text>
+  <text x="330" y="320" text-anchor="middle" fill="#3a434c" font-size="9.8">Ubuntu Server 22.04.5 · pi-hole</text>
+  <text x="226" y="340" fill="#3a434c" font-size="9.5" font-weight="bold">192.168.0.10/24 (statico)</text>
+  <text x="226" y="355" fill="#3a434c" font-size="9.5">DNS filtrante + record locali *.qlan</text>
+  <text x="226" y="370" fill="#3a434c" font-size="9.5">DHCP server: .150 – .199, gw .1, dns .10</text>
+
+  <!-- Lubuntu -->
+  <rect x="508" y="284" width="228" height="98" rx="6" fill="#e7f5ec" stroke="#2a9d5c" stroke-width="1.8"/>
+  <text x="622" y="305" text-anchor="middle" font-weight="bold" font-size="12.5" fill="#1d232b">Lubuntu 22.04</text>
+  <text x="622" y="320" text-anchor="middle" fill="#3a434c" font-size="9.8">client desktop LXQt · lubuntu</text>
+  <text x="518" y="340" fill="#3a434c" font-size="9.5" font-weight="bold">192.168.0.100/24 (statico)</text>
+  <text x="518" y="355" fill="#3a434c" font-size="9.5">gateway .1 · DNS .10 · search qlan</text>
+  <text x="518" y="370" fill="#3a434c" font-size="9.5">cartella host su /mnt/shared (virtiofs)</text>
+
+  <!-- other VMs -->
+  <text x="476" y="404" text-anchor="middle" fill="#5a6570" font-size="9.5">altre VM del catalogo: <tspan font-family="DejaVu Sans Mono" font-size="9">vmctl lab attach &lt;vm&gt; --apply</tspan> → DHCP da Pi-hole o IP statico fuori dal pool</text>
+</svg>
+<figcaption>Topologia su QEMU puro. L'unica uscita di <span class="mono">lab-lan</span> verso Internet è il firewall; l'unico ingresso dall'host sono i port forward della sua WAN (tratteggio viola).</figcaption>
+</figure>
+
+<h2>2. I tre componenti</h2>
+<div class="grid">
+  <div class="card fw">
+    <h3>pfSense · firewall e gateway <small>· profilo <span class="mono">pfsense-lab</span></small></h3>
+    <p><small>FreeBSD, pfSense CE 2.7.2, ZFS, BIOS, console seriale · install scriptata di bsdinstall, config.xml generato da vmctl</small></p>
+    <ul>
+      <li>NAT: tutto ciò che esce da <code>lab-lan</code> viene mascherato con l'IP WAN preso dallo slirp di QEMU.</li>
+      <li>Regole LAN "allow LAN to any" (IPv4 e IPv6); regole WAN che permettono GUI (80) e SSH (22) dal lato WAN, cioè dall'host.</li>
+      <li>Port forward NAT: 8081 → Pi-hole :80, 2238 → Pi-hole :22, 2239 → Lubuntu :22.</li>
+      <li>DHCP LAN <strong>disabilitato</strong>: lo fa Pi-hole. Unbound attivo; DNS di sistema .10.</li>
+      <li>GUI in HTTP su <code>http://127.0.0.1:8080/</code>, utenti <code>admin</code> e quello del profilo (stessa password, hash bcrypt); chiave SSH del progetto già nei due account.</li>
+    </ul>
+  </div>
+  <div class="card dns">
+    <h3>Pi-hole · DNS e DHCP <small>· profilo <span class="mono">pihole-lab</span></small></h3>
+    <p><small>Ubuntu Server 22.04.5 (autoinstall) + Pi-hole v6 dall'installer ufficiale con <span class="mono">pihole.toml</span> pre-compilato</small></p>
+    <ul>
+      <li>Resolver per tutta la LAN con blocklist StevenBlack.</li>
+      <li>Upstream OpenDNS <code>208.67.222.222</code> e <code>.220.220</code>, raggiunti attraverso pfSense.</li>
+      <li>Record locali generati: il router e ogni membro del lab (<code>firewall.qlan</code>, <code>pi-hole.qlan</code>, <code>lubuntu.qlan</code>), più quelli in <code>network_lab.hosts</code>; CNAME <code>pfsense.qlan</code>.</li>
+      <li>DHCP per gli ospiti: pool <code>.150–.199</code>, lease 24 h, gateway .1, DNS .10, dominio qlan.</li>
+      <li>GUI su <code>http://127.0.0.1:8081/admin/</code> (attraverso il router), password <code>network_lab.password</code>.</li>
+    </ul>
+  </div>
+  <div class="card cli">
+    <h3>Lubuntu · client <small>· profilo <span class="mono">lubuntu22-lab</span></small></h3>
+    <p><small>Ubuntu Server 22.04.5 + lubuntu-desktop, LXQt, autologin SDDM</small></p>
+    <ul>
+      <li>IP statico <code>.100</code>, gateway .1, DNS .10: la postazione utente.</li>
+      <li>NIC agganciata dal MAC nel netplan (<code>match</code> + <code>set-name</code>), stesso slot e stesso MAC in fase install e runtime.</li>
+      <li>Cartella <code>shared/</code> dell'host su <code>/mnt/shared</code> (virtiofs), link <code>~/shared</code> e sul desktop.</li>
+      <li><code>systemd-networkd-wait-online</code> disabilitato: con renderer NetworkManager bloccava ogni boot per 120 s.</li>
+    </ul>
+  </div>
+  <div class="card host">
+    <h3>Host · dove si comanda</h3>
+    <p><small>QEMU puro: 127.0.0.1 + forward · libvirt: 192.168.0.254 sul bridge virbr-lab</small></p>
+    <ul>
+      <li><code>vmctl lab up/down/status</code>, <code>vmctl shell &lt;vm&gt;</code>, <code>vmctl attach &lt;vm&gt;</code> per lo schermo.</li>
+      <li>I forward sono nel profilo del router (<code>networks[].hostfwd</code>) e nelle regole NAT del config.xml: <code>vmctl lab plan</code> verifica che coincidano.</li>
+      <li>Dopo <code>vmctl export-libvirt</code> l'host sta sulla LAN e tutto è raggiungibile sugli IP veri.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>3. Indirizzamento</h2>
+<table>
+  <tr><th>Elemento</th><th>Interfaccia</th><th>Indirizzo</th><th>Note</th></tr>
+  <tr><td>WAN (QEMU puro)</td><td>netdev <code>user</code></td><td>10.0.2.0/24, host = 10.0.2.2</td><td>NAT di QEMU; DHCP interno</td></tr>
+  <tr><td>WAN (libvirt)</td><td>rete <code>default</code></td><td>192.168.122.0/24</td><td>NAT libvirt, dopo l'export</td></tr>
+  <tr><td>pfSense WAN</td><td>vtnet0</td><td>DHCP</td><td>unico punto di contatto con l'esterno; <code>blockpriv</code> spento perché la WAN è una rete privata virtuale</td></tr>
+  <tr><td>Segmento <code>lab-lan</code></td><td>socket mcast / <code>virbr-lab</code></td><td>192.168.0.0/24</td><td>gruppo e porta multicast derivati dal nome (<code>qemu.segment_endpoint</code>)</td></tr>
+  <tr><td>pfSense LAN</td><td>vtnet1</td><td>192.168.0.1</td><td>gateway; <code>firewall.qlan</code>, alias <code>pfsense.qlan</code></td></tr>
+  <tr><td>Pi-hole</td><td>NIC unica</td><td>192.168.0.10</td><td>DNS e DHCP; <code>pi-hole.qlan</code></td></tr>
+  <tr><td>Lubuntu</td><td>NIC unica</td><td>192.168.0.100</td><td>client statico; <code>lubuntu.qlan</code></td></tr>
+  <tr><td>Host (libvirt)</td><td>virbr-lab</td><td>192.168.0.254</td><td>solo amministrazione, non instrada</td></tr>
+  <tr><td>Pool DHCP</td><td>—</td><td>192.168.0.150 – .199</td><td>servito da Pi-hole, lease 24 h</td></tr>
+</table>
+
+<h3>Accesso dall'host su QEMU puro</h3>
+<table>
+  <tr><th>Host</th><th>Percorso nel guest</th><th>Servizio</th></tr>
+  <tr><td><code>127.0.0.1:8080</code></td><td>pfSense :80</td><td>GUI pfSense (regola WAN "pass")</td></tr>
+  <tr><td><code>127.0.0.1:2237</code></td><td>pfSense :22</td><td><code>vmctl shell pfsense-lab</code></td></tr>
+  <tr><td><code>127.0.0.1:8081</code></td><td>pfSense :8081 → NAT → 192.168.0.10:80</td><td>GUI Pi-hole <code>/admin/</code></td></tr>
+  <tr><td><code>127.0.0.1:2238</code></td><td>pfSense :2238 → NAT → 192.168.0.10:22</td><td><code>vmctl shell pihole-lab</code></td></tr>
+  <tr><td><code>127.0.0.1:2239</code></td><td>pfSense :2239 → NAT → 192.168.0.100:22</td><td><code>vmctl shell lubuntu22-lab</code></td></tr>
+</table>
+<p>Le porte 2238 e 2239 sono le stesse <code>ssh_host_port</code> dei membri: durante l'installazione sono un forward slirp sulla VM stessa, dopo sono un forward sul router. <code>vmctl shell</code> non cambia.</p>
+
+<h2>4. Dominio <span class="mono">qlan</span> e flusso DNS</h2>
+<p>Ogni client chiede a Pi-hole. Se il nome è nel dominio locale Pi-hole risponde dai suoi record; altrimenti filtra il nome contro la blocklist e, se non è bloccato, lo chiede a OpenDNS passando dal NAT di pfSense. Unbound su pfSense non conosce <code>qlan</code>: chiedere a .1 un nome locale dà NXDOMAIN, ed è il comportamento atteso.</p>
+<figure>
+<svg viewBox="0 0 760 120" width="100%" xmlns="http://www.w3.org/2000/svg" font-size="10.5">
+  <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1f77b4"/></marker></defs>
+  <rect x="10" y="30" width="150" height="50" rx="5" fill="#e7f5ec" stroke="#2a9d5c" stroke-width="1.5"/>
+  <text x="85" y="51" text-anchor="middle" font-weight="bold">Lubuntu .100</text>
+  <text x="85" y="67" text-anchor="middle" fill="#3a434c" font-size="9.5">example.org? / lubuntu.qlan?</text>
+  <line x1="160" y1="55" x2="228" y2="55" stroke="#1f77b4" stroke-width="1.8" marker-end="url(#a2)"/>
+  <text x="194" y="47" text-anchor="middle" fill="#1f77b4" font-size="9">1 · query</text>
+  <rect x="230" y="20" width="190" height="70" rx="5" fill="#e6f1fb" stroke="#1f77b4" stroke-width="1.5"/>
+  <text x="325" y="41" text-anchor="middle" font-weight="bold">Pi-hole .10</text>
+  <text x="325" y="57" text-anchor="middle" fill="#3a434c" font-size="9.5">record *.qlan → risponde subito</text>
+  <text x="325" y="72" text-anchor="middle" fill="#3a434c" font-size="9.5">blocklist → 0.0.0.0 se pubblicità</text>
+  <line x1="420" y1="55" x2="488" y2="55" stroke="#1f77b4" stroke-width="1.8" marker-end="url(#a2)"/>
+  <text x="454" y="47" text-anchor="middle" fill="#1f77b4" font-size="9">2 · upstream</text>
+  <rect x="490" y="30" width="120" height="50" rx="5" fill="#fdecea" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="550" y="51" text-anchor="middle" font-weight="bold">pfSense .1</text>
+  <text x="550" y="67" text-anchor="middle" fill="#3a434c" font-size="9.5">NAT verso WAN</text>
+  <line x1="610" y1="55" x2="668" y2="55" stroke="#1f77b4" stroke-width="1.8" marker-end="url(#a2)"/>
+  <text x="639" y="47" text-anchor="middle" fill="#1f77b4" font-size="9">3</text>
+  <ellipse cx="712" cy="55" rx="42" ry="24" fill="#f1f4f8" stroke="#8a97a5" stroke-width="1.3"/>
+  <text x="712" y="52" text-anchor="middle" font-weight="bold" font-size="10">OpenDNS</text>
+  <text x="712" y="65" text-anchor="middle" fill="#5a6570" font-size="8.5">208.67.222.222</text>
+  <text x="380" y="110" text-anchor="middle" fill="#5a6570" font-size="9">Solo il passo 2 esce dalla LAN: i nomi locali e i domini bloccati non lasciano mai Pi-hole.</text>
+</svg>
+<figcaption>Percorso di una risoluzione DNS dal client.</figcaption>
+</figure>
+
+<h2>5. Flussi di rete in breve</h2>
+<table>
+  <tr><th>Flusso</th><th>Percorso</th><th>Chi decide</th></tr>
+  <tr><td>Navigazione dal client</td><td>Lubuntu → pfSense LAN .1 → NAT → WAN slirp → Internet</td><td>regola "allow LAN to any" di pfSense</td></tr>
+  <tr><td>Risoluzione nomi</td><td>client → Pi-hole .10 → (se pubblico) OpenDNS via pfSense</td><td>Pi-hole: record locali, blocklist, upstream</td></tr>
+  <tr><td>Indirizzo per un nuovo host</td><td>DHCP DISCOVER sul segmento → Pi-hole assegna .150–.199</td><td>Pi-hole; pfSense ha il DHCP spento</td></tr>
+  <tr><td>Amministrazione (QEMU puro)</td><td>host 127.0.0.1:porta → hostfwd WAN → pfSense → NAT verso il membro</td><td>profilo del router + regole WAN/NAT del config.xml</td></tr>
+  <tr><td>Amministrazione (libvirt)</td><td>host .254 → GUI pfSense (.1), GUI Pi-hole (.10), <code>virsh</code></td><td>l'host è sulla LAN ma non instrada nulla</td></tr>
+  <tr><td>File verso il client</td><td>host <code>shared/</code> → virtiofs → Lubuntu <code>/mnt/shared</code></td><td>fuori banda: non passa dalla rete</td></tr>
+</table>
+
+<h2>6. Come si costruisce e si ricrea</h2>
+<p>La topologia sta una volta sola in <code>pfsense-lab.network_lab</code> (subnet, indirizzi, pool DHCP, dominio, dati per la rete libvirt); i membri dichiarano solo ruolo, <code>gateway_vm</code> e IP. Le identità dei profili tracciati sono generiche (<code>lab</code>/<code>lab</code>); quelle vere vanno in <code>vms/profiles/local.json</code>, insieme al percorso della ISO pfSense (Netgate non pubblica un URL stabile).</p>
+<pre>vmctl lab plan                 <span class="c"># anteprima: topologia, forward, ordine, XML della rete libvirt</span>
+vmctl lab install              <span class="c"># pfsense-lab → pihole-lab → lubuntu22-lab, da dischi vuoti (~30 min)</span>
+vmctl lab up                   <span class="c"># avvia le tre VM headless in background, in ordine</span>
+vmctl lab status · vmctl lab down
+
+vmctl bootstrap-pfsense pfsense-lab          <span class="c"># oppure una VM alla volta</span>
+vmctl bootstrap-unattended pihole-lab
+vmctl bootstrap-unattended lubuntu22-lab
+
+vmctl clean pihole-lab                        <span class="c"># disco + artefatti (mai le ISO); lab install rifiuta dischi esistenti</span>
+vmctl lab attach arch-dms-local --apply       <span class="c"># mette un'altra VM sul segmento (scrive local.json)</span></pre>
+
+<div class="two">
+  <div>
+    <h3>pfSense, cosa succede</h3>
+    <ol class="steps">
+      <li><code>config.xml</code> renderizzato dalla topologia: interfacce, utenti (bcrypt), Unbound, NAT, regole WAN, forward.</li>
+      <li>Copia della ISO in <code>artifacts/pfsense-lab/pfsense/install.iso</code>: <code>xorriso</code> estrae <code>rc.local</code> e <code>bsdinstall/script</code>, <code>growisofs -M</code> innesta <code>installerconfig</code>, il nuovo <code>rc.local</code> e lo script patchato (una ricostruzione perderebbe gli extent El Torito nascosti di FreeBSD).</li>
+      <li>QEMU <code>pc</code>/BIOS, disco <code>bootindex=1</code>, CD IDE <code>bootindex=2</code>, seriale su stdio.</li>
+      <li>bsdinstall: GPT, pool ZFS su <code>vtbd0</code>, <code>base.txz</code>, <code>/cf/conf/config.xml</code>; poi <code>sync</code>, token <code>==&gt; pfSense installation complete!</code>, <code>shutdown -p</code>.</li>
+    </ol>
+  </div>
+  <div>
+    <h3>Pi-hole e Lubuntu, cosa succede</h3>
+    <ol class="steps">
+      <li>Autoinstall Ubuntu sulla NIC di fase <em>install</em> (slirp con il forward SSH del profilo), come ogni altro profilo Ubuntu.</li>
+      <li>Primo avvio in background, attesa SSH, cloud-init e apt.</li>
+      <li>Hook <code>network_lab</code>: nome dell'interfaccia dal MAC, upload di <code>lan.yaml</code> (+ <code>pihole.toml</code>, liste, password), <code>setup.sh</code> con sudo: installer Pi-hole <code>--unattended</code>, <code>pihole setpassword</code>, netplan statico, cloud-init fuori dalla rete, DHCP FTL, wait-online spento sul client.</li>
+      <li>Stop. Dal prossimo avvio la stessa NIC è sul segmento con l'indirizzo statico.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="note"><strong>Perché è tutto isolato.</strong> Il segmento non ha servizi dell'host: senza pfSense acceso i client non escono e senza Pi-hole non risolvono nulla. È voluto: lo scopo è vedere cosa succede quando manca un pezzo, cambiare regole sul firewall o le liste DNS e osservare l'effetto sul client, senza toccare la rete vera dell'host. In più, su QEMU puro non serve alcun privilegio: niente bridge, niente tap.</div>
+
+<h2>7. La strada libvirt</h2>
+<pre>vmctl lab export               <span class="c"># lab down, export-libvirt delle tre VM, virsh start in ordine, verifica GUI e SSH sulla LAN</span>
+vmctl lab check                <span class="c"># le stesse sonde, in qualunque momento (capisce da solo se il lab è in libvirt o in QEMU)</span>
+vmctl lab unexport             <span class="c"># virsh shutdown atteso, unexport-libvirt: si torna a QEMU puro</span>
+vmctl lab libvirt-test         <span class="c"># export + check + unexport in un colpo; --keep lo lascia in libvirt</span>
+
+<span class="c"># a mano, se serve:</span>
+virsh -c qemu:///system net-list            <span class="c"># lab-lan: bridge virbr-lab, host 192.168.0.254, senza DHCP/DNS</span>
+virsh -c qemu:///system start pfsense-lab   <span class="c"># poi pihole-lab, lubuntu22-lab</span>
+xdg-open http://192.168.0.1/  ·  http://192.168.0.10/admin/</pre>
+<p>L'export traduce le NIC di runtime: la WAN slirp diventa la rete libvirt <code>default</code>, il segmento la rete <code>lab-lan</code>, definita e avviata se manca. Disco e NVRAM restano quelli di <code>artifacts/</code>, per percorso assoluto. Non avviare lo stesso disco con QEMU e con libvirt insieme: dopo l'export si usa <code>virsh</code> finché non si fa <code>unexport-libvirt</code>.</p>
+
+<h2>8. Verifiche</h2>
+<table>
+  <tr><th>Controllo</th><th>Come</th><th>Stato</th></tr>
+  <tr><td>pfSense installato e avviato da disco</td><td><code>vmctl attach pfsense-lab</code>; GUI <code>http://127.0.0.1:8080/</code> con <code>lab</code> e <code>admin</code>; <code>vmctl shell pfsense-lab</code></td><td class="ok">verificato il 6 settembre 2026: install 3 min, GUI in 20 s, login ok, SSH con chiave ok, LAN .1 su vtnet1</td></tr>
+  <tr><td>Pi-hole e Lubuntu installati da zero</td><td><code>vmctl shell pihole-lab</code>: <code>pihole status</code>; <code>vmctl attach lubuntu22-lab</code>: desktop con autologin</td><td>vedi <code>docs/NETWORK-LAB.md</code> per lo stato corrente</td></tr>
+  <tr><td>DNS e uscita dal client</td><td><code>resolvectl query pfsense.qlan</code> → .1; <code>curl -sI https://example.org</code> → 200</td><td>idem</td></tr>
+  <tr><td>Forward verso i membri</td><td><code>http://127.0.0.1:8081/admin/</code>, <code>ssh -p 2238</code>, <code>ssh -p 2239</code> con pfSense acceso</td><td>idem</td></tr>
+  <tr><td>Boot del client</td><td><code>systemd-analyze</code> ben sotto il minuto</td><td>idem</td></tr>
+</table>
+
+<p class="sub" style="margin-top:6mm">Documentazione completa in <span class="mono">docs/NETWORK-LAB.md</span> (differenze da kvm-lab, checklist) e <span class="mono">docs/UNATTENDED.md</span> (flusso pfSense). Sorgente di questa pagina: <span class="mono">docs/guides/network-lab.html</span>, PDF con <span class="mono">make guides</span>.</p>
+
+</body>
+</html>
