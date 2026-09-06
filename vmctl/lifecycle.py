@@ -640,6 +640,11 @@ def run_local_test_vm(
             detail = f"{detail}; {prep_note}"
         return ("passed", detail)
     if mode == "boot-check":
+        ci = prepared_vm.get("ci", {})
+        if not (isinstance(ci, dict) and ci.get("boot_from") == "disk"):
+            # A live/ISO boot-check still attaches the profile disk: create the empty image the
+            # way `vmctl prep` does, so the matrix never fails on "Disk image not found".
+            ensure_vm_disk(prepared_vm, dry_run=args.dry_run)
         with report.watch_boot(vm_name, prepared_vm, args):
             cmd_boot_check(
                 argparse.Namespace(

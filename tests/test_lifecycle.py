@@ -32,6 +32,24 @@ import vmctl.state  # noqa: E402
 from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
+class BootCheckMatrixDiskTests(BaseVmctlTestCase):
+    def test_iso_boot_check_in_the_matrix_prepares_the_empty_disk(self):
+        self.vm_config["ci"] = {"expect": "READY", "accel": "tcg", "headless": True}
+        self.write_config_dir()
+        args = argparse.Namespace(vms=[self.vm_name], timeout=5, dry_run=False, report=None)
+        with mock.patch.object(vmctl.lifecycle, "ensure_vm_disk") as ensure, \
+             mock.patch.object(vmctl.lifecycle, "cmd_boot_check", return_value=0):
+            status, _ = self.vmctl.run_local_test_vm(self.vm_name, self.vm_config, args)
+        self.assertEqual(status, "passed")
+        ensure.assert_called_once()
+        self.vm_config["ci"]["boot_from"] = "disk"
+        self.create_disk()
+        with mock.patch.object(vmctl.lifecycle, "ensure_vm_disk") as ensure, \
+             mock.patch.object(vmctl.lifecycle, "cmd_boot_check", return_value=0):
+            self.vmctl.run_local_test_vm(self.vm_name, self.vm_config, args)
+        ensure.assert_not_called()
+
+
 class RunAndExpectExitTests(unittest.TestCase):
     def test_process_exit_without_token_fails_immediately(self):
         # Regression: an EOF on stdout kept select() "readable" forever and the loop never
