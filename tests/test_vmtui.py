@@ -444,6 +444,14 @@ class VmtuiTests(unittest.TestCase):
         result = self.run_bash("source bin/vmtui; vm_status_summary freebsd")
         self.assertEqual(result.stdout.strip(), "not installed")
 
+    def test_libvirt_menu_and_actions(self):
+        self.mark_installed("test-ssh")
+        output = self._unified_menu("test-ssh")
+        for label, command in (("Export to libvirt", "export-libvirt"), ("Remove from libvirt", "unexport-libvirt")):
+            self.assertIn(label, output)
+            result = self.run_bash(f"source bin/vmtui; resolve_action {label!r}")
+            self.assertEqual(result.stdout.strip(), command)
+
     def test_resolve_action_separator_returns_noop(self):
         result = self.run_bash("source bin/vmtui; resolve_action __sep_INSTALL")
         self.assertEqual(result.stdout.strip(), "noop")

@@ -29,6 +29,8 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
      ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "post-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "attach"]),
+    ("Libvirt", "hand an installed VM to virt-manager",
+     ["export-libvirt", "unexport-libvirt"]),
     ("Verify", "smoke tests and the local validation matrix",
      ["boot-check", "check-vms"]),
     ("Physical disks", "DESTRUCTIVE, ask for sudo, require --confirm-device",
@@ -194,6 +196,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.set_defaults(func=lifecycle.cmd_stop)
 
+    for command, handler in (("export-libvirt", lifecycle.cmd_export_libvirt), ("unexport-libvirt", lifecycle.cmd_unexport_libvirt)):
+        p = _add(subparsers, command, help="define an installed VM in libvirt" if command == "export-libvirt" else "remove a libvirt definition, preserving the disk")
+        p.add_argument("vm", help=VM_HELP)
+        p.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS, help="preview without changing files or libvirt")
+        p.add_argument("--name", help="libvirt domain name (default: profile name)")
+        p.add_argument("--connect", default="qemu:///system", help="libvirt connection URI")
+        if command == "export-libvirt":
+            p.add_argument("--no-define", action="store_true", help="only generate XML")
+            p.add_argument("--replace", action="store_true", help="replace an existing stopped domain")
+            p.add_argument("--autostart", action="store_true", help="enable libvirt autostart")
+        p.set_defaults(func=handler)
+
     p = _add(subparsers, "shell", help="SSH into a running VM")
     p.add_argument("vm", help=VM_HELP)
     p.set_defaults(func=lifecycle.cmd_shell)
@@ -223,12 +237,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--clean-first", action="store_true", help="clean unattended/bootstrap VMs before running the matrix")
     p.add_argument("--no-clean-first", action="store_true", help="skip the unattended/bootstrap cleanup prompt and run with existing artifacts")
     p.add_argument("--restore", action="store_true", help="stash existing VM artifacts, run the matrix on a virgin state, then restore them (non-destructive alternative to --clean-first)")
+    p.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS, help="preview without running the matrix")
+    p.add_argument("--report", nargs="?", const="", metavar="DIR", help="write a self-contained HTML report (default: artifacts/check-vms/<timestamp>)")
+    p.add_argument("--open", action="store_true", help="generate and open the report with xdg-open")
     p.set_defaults(func=lifecycle.cmd_test_local)
 
     p = subparsers.add_parser("_check-vm", help=argparse.SUPPRESS)
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=300, help=argparse.SUPPRESS)
     p.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
+    p.add_argument("--report-dir", dest="_report_dir", help=argparse.SUPPRESS)
     p.set_defaults(func=lifecycle.cmd_check_vm)
 
     p = _add(subparsers, "flash", help="copy a VM disk to a physical block device (DESTRUCTIVE; requires sudo)")
@@ -285,7 +303,7 @@ _vmctl() {{
   fi
   case $words[2] in
     completion) _values 'shell' bash zsh ;;
-    check-vms|clean|clean-stale|delete-iso|fetch-iso|prep|provision|install*|bootstrap-*|start|stop|shell|show|post-install|boot-check|flash|import-device)
+    export-libvirt|unexport-libvirt|check-vms|clean|clean-stale|delete-iso|fetch-iso|prep|provision|install*|bootstrap-*|start|stop|shell|show|post-install|boot-check|flash|import-device)
       vms=(${{(f)"$(vmctl list --names 2>/dev/null)"}})
       _alternative 'vms:VM profile:compadd -a vms' 'options:option:_default' ;;
     *) _default ;;

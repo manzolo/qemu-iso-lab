@@ -918,9 +918,11 @@ build_vm_menu_items() {
             emit_action "First Boot" "Start the VM with cloud-init enabled"
         fi
     fi
+    emit_action "Export to libvirt" "Define the installed VM for virt-manager"
     emit_action "Remote SPICE" "Start this VM on a remote host and open SPICE viewer"
 
     emit_section "MAINTENANCE"
+    emit_action "Remove from libvirt" "Remove definition and preserve the disk"
     emit_action "Video Profile" "$(video_profile_desc)"
     if [[ $has_ssh == "1" ]]; then
         emit_action "Post-Install" "Run configured SSH provisioning tasks"
@@ -1179,6 +1181,8 @@ prompt_post_install() {
 
 resolve_action() {
     case "$1" in
+        "Export to libvirt") printf '%s\n' export-libvirt ;;
+        "Remove from libvirt") printf '%s\n' unexport-libvirt ;;
         "Profile Details") printf '%s\n' show ;;
         "Back") printf '%s\n' back ;;
         "Arch Bootstrap") printf '%s\n' bootstrap-archinstall ;;
@@ -1405,6 +1409,9 @@ run_action() {
             if confirm_box "Stop VM" "Power off '$current_vm'?\n\nvmctl tries a graceful shutdown first (QMP / SSH) and only then kills the process."; then
                 run_vmctl stop "$current_vm" || true
             fi
+            ;;
+        export-libvirt|unexport-libvirt)
+            run_vmctl "$action" "$current_vm" || true
             ;;
         post-install)
             run_vmctl post-install "$current_vm" || true

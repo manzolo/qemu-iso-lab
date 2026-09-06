@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import alpine, archinstall, cloud_init, config, host_setup, iso, omarchy, preseed, kickstart, qemu, runtime, ssh, state, ui, windows
+from vmctl import alpine, archinstall, cloud_init, config, host_setup, iso, libvirt, omarchy, preseed, kickstart, qemu, report, runtime, ssh, state, ui, windows
 from vmctl.errors import VMError
 
 
@@ -466,6 +466,7 @@ def run_local_test_vm(
     vm: dict[str, Any],
     args: argparse.Namespace,
 ) -> tuple[str, str]:
+    args._report_phase = "prerequisites"
     prepared_vm, prep_note = prepare_vm_for_local_test(vm_name, vm)
     if prep_note is not None and prep_note.startswith("disk already in use"):
         return ("skipped", prep_note)
@@ -476,6 +477,7 @@ def run_local_test_vm(
     if mode == "skip":
         detail = note if prep_note is None else f"{note}; {prep_note}"
         return ("skipped", detail)
+    args._report_phase = mode
     if mode == "bootstrap-unattended":
         try:
             cmd_bootstrap_unattended(
@@ -486,9 +488,12 @@ def run_local_test_vm(
                     spice_port=None,
                     dry_run=args.dry_run,
                     _vm_override=prepared_vm,
+                    _report_parent=args,
                 )
             )
+            args._report_phase = "post-install"
         finally:
+            report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
         if prep_note is not None:
@@ -503,9 +508,12 @@ def run_local_test_vm(
                     spice_port=None,
                     dry_run=args.dry_run,
                     _vm_override=prepared_vm,
+                    _report_parent=args,
                 )
             )
+            args._report_phase = "post-install"
         finally:
+            report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
         if prep_note is not None:
@@ -519,9 +527,12 @@ def run_local_test_vm(
                     timeout=args.timeout,
                     dry_run=args.dry_run,
                     _vm_override=prepared_vm,
+                    _report_parent=args,
                 )
             )
+            args._report_phase = "post-install"
         finally:
+            report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
         if prep_note is not None:
@@ -535,9 +546,12 @@ def run_local_test_vm(
                     timeout=args.timeout,
                     dry_run=args.dry_run,
                     _vm_override=prepared_vm,
+                    _report_parent=args,
                 )
             )
+            args._report_phase = "post-install"
         finally:
+            report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
         if prep_note is not None:
@@ -551,9 +565,12 @@ def run_local_test_vm(
                     timeout=args.timeout,
                     dry_run=args.dry_run,
                     _vm_override=prepared_vm,
+                    _report_parent=args,
                 )
             )
+            args._report_phase = "post-install"
         finally:
+            report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
         if prep_note is not None:
@@ -567,9 +584,12 @@ def run_local_test_vm(
                     timeout=args.timeout,
                     dry_run=args.dry_run,
                     _vm_override=prepared_vm,
+                    _report_parent=args,
                 )
             )
+            args._report_phase = "post-install"
         finally:
+            report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
         if prep_note is not None:
@@ -583,24 +603,29 @@ def run_local_test_vm(
                     timeout=args.timeout,
                     dry_run=args.dry_run,
                     _vm_override=prepared_vm,
+                    _report_parent=args,
                 )
             )
+            args._report_phase = "post-install"
         finally:
+            report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
         if prep_note is not None:
             detail = f"{detail}; {prep_note}"
         return ("passed", detail)
     if mode == "boot-check":
-        cmd_boot_check(
-            argparse.Namespace(
-                vm=vm_name,
-                expect=None,
-                timeout=args.timeout,
-                dry_run=args.dry_run,
-                _vm_override=prepared_vm,
+        with report.watch_boot(vm_name, prepared_vm, args):
+            cmd_boot_check(
+                argparse.Namespace(
+                    vm=vm_name,
+                    expect=None,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
             )
-        )
         detail = note if prep_note is None else f"{note}; {prep_note}"
         return ("passed", detail)
     detail = note if prep_note is None else f"{note}; {prep_note}"
@@ -612,16 +637,19 @@ def run_local_test_once(vm_name: str, vm: dict[str, Any], args: argparse.Namespa
     ui.print_header(f"Test VM: {vm_name}")
     ui.print_kv("mode", mode)
     ui.print_kv("check", note)
+    started = time.monotonic()
+    args._screenshot_error = None
     try:
         status, detail = run_local_test_vm(vm_name, vm, args)
-    except VMError as exc:
+    except (VMError, OSError, subprocess.CalledProcessError) as exc:
         status = "failed"
         detail = str(exc)
-        ui.print_status("fail", f"{vm_name}: {exc}", ok=False)
-        return (status, detail)
 
+    report.record(vm_name, vm, args, status, detail, time.monotonic() - started, mode)
     if status == "passed":
         ui.print_status("ok", f"{vm_name}: {detail}")
+    elif status == "failed":
+        ui.print_status("fail", f"{vm_name}: {detail}", ok=False)
     else:
         ui.print_status("warn", f"{vm_name}: {detail}", ok=False)
     return (status, detail)
@@ -665,6 +693,8 @@ def run_local_test_vm_subprocess(vm_name: str, args: argparse.Namespace) -> tupl
     ]
     if getattr(args, "dry_run", False):
         cmd.append("--dry-run")
+    if getattr(args, "_report_dir", None):
+        cmd += ["--report-dir", str(args._report_dir)]
     result = subprocess.run(
         cmd,
         check=False,
@@ -1048,6 +1078,7 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")
         ui.print_kv("pid", str(pid))
 
+    report.phase(args, "post-install")
     run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
     ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0
@@ -1122,6 +1153,7 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")
         ui.print_kv("pid", str(pid))
 
+    report.phase(args, "post-install")
     run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
     ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0
@@ -1229,6 +1261,7 @@ def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
+    report.phase(args, "post-install")
     run_windows_post_install(args.vm, vm, getattr(args, "timeout", 600), dry_run=args.dry_run)
     ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0
@@ -1309,6 +1342,7 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")
         ui.print_kv("pid", str(pid))
 
+    report.phase(args, "post-install")
     run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
     ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0
@@ -1379,6 +1413,7 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")
         ui.print_kv("pid", str(pid))
 
+    report.phase(args, "post-install")
     run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
     ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0
@@ -1603,6 +1638,7 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")
         ui.print_kv("pid", str(pid))
 
+    report.phase(args, "post-install")
     run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
 
     ui.print_status("ok", f"Post-install completed for VM '{args.vm}'")
@@ -1650,6 +1686,7 @@ def cmd_bootstrap_omarchy(args: argparse.Namespace) -> int:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")
         ui.print_kv("pid", str(pid))
 
+    report.phase(args, "post-install")
     run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
     ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0
@@ -1820,6 +1857,18 @@ def cmd_attach(args: argparse.Namespace) -> int:
         bridge.close()
 
 
+def cmd_export_libvirt(args: argparse.Namespace) -> int:
+    vm = config.get_vm(config.load_config(), args.vm)
+    if running_qemu_pid(args.vm, vm) is not None or qemu.qmp_command(qemu.qmp_socket_path(vm), "query-status"):
+        raise VMError(f"VM '{args.vm}' is running in QEMU; stop it before exporting to libvirt")
+    return libvirt.export(args, vm)
+
+
+def cmd_unexport_libvirt(args: argparse.Namespace) -> int:
+    config.get_vm(config.load_config(), args.vm)
+    return libvirt.unexport(args)
+
+
 def cmd_shell(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -1930,6 +1979,11 @@ def restore_local_test_artifacts(stashed: dict[str, str], dry_run: bool = False)
 def cmd_test_local(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     selected_names = list(args.vms) if getattr(args, "vms", None) else sorted(cfg["vms"])
+    selected_names = list(dict.fromkeys(selected_names))
+    for vm_name in selected_names:
+        config.get_vm(cfg, vm_name)
+    args.vms = selected_names
+    report_directory = report.init(args)
     results: list[tuple[str, str, str]] = []
     parallel = max(1, int(getattr(args, "parallel", 1)))
 
@@ -1989,6 +2043,9 @@ def cmd_test_local(args: argparse.Namespace) -> int:
             ui.print_header("Restore stashed artifacts")
             restore_local_test_artifacts(stashed, dry_run=args.dry_run)
             ui.print_kv("restored", ", ".join(sorted(stashed)))
+
+    if report_directory is not None:
+        report.finish(report_directory, args, results, cfg)
 
     passed = sum(1 for _, status, _ in results if status == "passed")
     failed = sum(1 for _, status, _ in results if status == "failed")

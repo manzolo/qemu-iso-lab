@@ -391,3 +391,43 @@ directory aside, runs the matrix on a virgin state, then removes what the test
 created and moves the originals back, so validating every unattended flow does
 not cost you the VMs you already have installed. A stash is kept under
 `artifacts/.check-vms-restore/` only for the duration of the run.
+
+### HTML reports and screenshots
+
+```bash
+vmctl prep alpine-ci  # boot-check profiles require a prepared disk
+vmctl check-vms alpine-ci debian-server --restore --report --open
+vmctl check-vms alpine-ci debian-server --parallel 2 --restore --report
+vmctl check-vms debian-server --report artifacts/check-vms/my-run
+```
+
+`--report [DIR]` writes `report.html`, `results/<profile>.json`, and
+`screens/<profile>.png` under `artifacts/check-vms/<timestamp>/` by default.
+Use a new directory for each run, outside per-VM artifact directories so
+`--restore` cannot remove the report. Put profile names before `--report`:
+a following bare argument is interpreted as its directory. `--open` also
+implies a report and opens the completed HTML with `xdg-open`.
+
+The report includes host, UTC date, Git commit, totals, profile ID/display
+name, flow, outcome, last phase, elapsed seconds, detail/error and final screen.
+CSS and PNGs are embedded: `report.html` can be shared by itself. The separate
+PNGs and JSON records are useful for automation. Filter the report by VM name/ID
+and outcome directly in the browser; the counter shows the visible subset while
+the summary cards retain the totals for the complete run. Screenshot conversion uses
+Python's standard library; Pillow and ImageMagick are not required.
+
+Bootstrap screenshots are taken through QMP before the final `cmd_stop`,
+on success and on failure. Boot checks retain the latest live framebuffer
+while serial validation runs, without changing the token/poweroff sequence.
+Parallel workers write separate results and screenshots; the parent renders
+the report after the workers complete. Report files survive artifact restore.
+
+PASS means validation and capture succeeded; WARN means validation passed but
+no screenshot was available; FAIL means validation failed; SKIP means the flow
+could not be run. A black framebuffer can still produce a screenshot: the
+report does not infer desktop readiness from pixels. Missing screenshots are
+explained in the detail field. Screenshot warnings do not change the matrix's
+exit status (nonzero for validation failures). During installation the phase identifies the attempted bootstrap flow;
+it changes to `post-install` before SSH provisioning, including when that
+provisioning fails. Durations include capture and shutdown. A worker that exits
+without a result is reported at phase `worker` with unavailable duration (0).

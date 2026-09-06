@@ -38,7 +38,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ```
 errors ← state ← {ui, runtime} ← {config, iso, cloud_init, qemu, archinstall, disk_inspect}
-      ← {alpine, preseed, kickstart, omarchy, windows} ← {flash, import_dev, ssh, host_setup} ← lifecycle ← cli
+      ← {alpine, preseed, kickstart, omarchy, windows} ← {flash, import_dev, ssh, host_setup, libvirt, report} ← lifecycle ← cli
 ```
 
 Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always accessed as `state.ROOT`, never imported directly — a direct import captures a stale binding and breaks tests.
@@ -57,6 +57,8 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 | `alpine.py` | Alpine: `setup-alpine` answer file + chroot `install.sh` packed into a seed ISO, live-prompt automation constants. |
 | `windows.py` | Windows 10/11: `autounattend.xml` + first-logon `vmctl-setup.ps1` in a `VMCTLSEED` CD, prompt-free ISO rebuild (`7z` + `xorriso`), virtio-win ISO, SATA CD-ROM args. |
 | `kickstart.py` / `preseed.py` | AlmaLinux/Fedora kickstart and Debian preseed rendering; `kickstart.install_repo()` picks `cdrom` or a netinst URL. |
+| `libvirt.py` | Render persistent libvirt XML and define/undefine existing disks; `export-libvirt` / `unexport-libvirt` handlers in lifecycle enforce running-VM checks. |
+| `report.py` | `check-vms --report [DIR] --open`: self-contained HTML, per-worker JSON and QMP P6→PNG screenshots before stop, outside restored artifacts. |
 | `ssh.py` | SSH/SCP helpers, `wait_for_ssh`, `post_install_copy`, `post_install_run`. |
 
 ### Profile model

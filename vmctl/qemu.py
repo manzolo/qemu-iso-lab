@@ -371,7 +371,7 @@ class UnixSocketBridge:
                     pass
 
 
-def qmp_command(sock_path: Path, command: str, timeout: float = 5.0) -> bool:
+def qmp_command(sock_path: Path, command: str, timeout: float = 5.0, *, arguments: dict[str, Any] | None = None) -> bool:
     """Send one QMP command (after the capabilities handshake); True if QEMU acknowledged it."""
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
@@ -382,7 +382,10 @@ def qmp_command(sock_path: Path, command: str, timeout: float = 5.0) -> bool:
             if "QMP" not in greeting:
                 return False
             for execute in ("qmp_capabilities", command):
-                stream.write((json.dumps({"execute": execute}) + "\n").encode())
+                payload: dict[str, Any] = {"execute": execute}
+                if execute == command and arguments is not None:
+                    payload["arguments"] = arguments
+                stream.write((json.dumps(payload) + "\n").encode())
                 while True:  # skip asynchronous events until the reply arrives
                     line = stream.readline()
                     if not line:

@@ -90,6 +90,8 @@ accepts `--dry-run` in front of it.
 | boot a VM I already installed                         | `vmctl start <vm>` (`--headless --background` to detach) |
 | get a shell inside it / stop it                       | `vmctl shell <vm>`, `vmctl stop <vm>`                    |
 | watch the screen of a headless VM (even mid-bootstrap) | `vmctl attach <vm>` (VNC viewer, `--no-viewer` for the address only) |
+| use an installed VM in virt-manager | `vmctl export-libvirt <vm>`; return with `vmctl unexport-libvirt <vm>` ([guide](docs/LIBVIRT.md)) |
+| save a matrix report with screenshots | `vmctl check-vms alpine-ci debian-server --restore --report --open` |
 | test every unattended flow without losing my VMs      | `vmctl check-vms --restore` (stashes disks, runs, restores) |
 | re-run the SSH provisioning steps of a profile        | `vmctl post-install <vm>`                                |
 | prove a VM still boots (CI-style)                     | `vmctl boot-check <vm>`, `vmctl check-vms`               |
