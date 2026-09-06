@@ -1,16 +1,19 @@
 # Unattended installs
 
-Seven installers run headless, driven over the serial console, and end with the
+Eight installers run headless, driven over the serial console, and end with the
 VM installed, booted in the background and provisioned over SSH. Every
 `bootstrap-*` command accepts `--dry-run` and prints each step it would run.
 
 - [The common shape](#the-common-shape)
 - [Ubuntu: autoinstall](#ubuntu-autoinstall)
 - [Debian: preseed](#debian-preseed)
-- [AlmaLinux / RHEL / Fedora: kickstart](#almalinux--rhel--fedora-kickstart)
+- [AlmaLinux / Rocky / Fedora: kickstart](#almalinux--rhel--fedora-kickstart)
+- [Fedora Silverblue: kickstart + ostree](#fedora-silverblue-kickstart--ostree)
+- [openSUSE: AutoYaST](#opensuse-autoyast)
 - [Arch: pacstrap script](#arch-pacstrap-script)
 - [Omarchy: cidata](#omarchy-cidata)
 - [Alpine: setup-alpine](#alpine-setup-alpine)
+- [Ubuntu desktop flavors](#ubuntu-desktop-flavors)
 - [Windows 10/11: autounattend](#windows-1011-autounattend)
 - [The completion-token rule](#the-completion-token-rule)
 - [Boot checks and the validation matrix](#boot-checks-and-the-validation-matrix)
@@ -105,6 +108,65 @@ That script upgrades the system first: DMS 1.6 needs `quickshell >= 0.3`, which
 only the `avengemedia/danklinux` COPR provides for Fedora 44, built against the
 Qt 6.11 that lives in the `updates` repository. Fedora's `greetd` package ships
 `agreety` itself and creates the `greetd` user.
+
+## Fedora Silverblue: kickstart + ostree
+
+```bash
+vmctl bootstrap-kickstart fedora-silverblue
+```
+
+The same flow with one profile block, `kickstart_config.ostree`. When it is
+present the rendered kickstart drops the `%packages` section entirely and grows
+an `ostreesetup --osname=... --remote=... --url=... --ref=... --nogpg` line, and
+`autopart` loses `--type=plain` (an ostree deployment cannot use it).
+
+The ref names the Fedora version, so hard-coding it in the profile would break
+at the next release: `kickstart.resolve_ostree_ref()` extracts
+`/ostree/repo/refs/heads` from the ISO with xorriso and picks the ref matching
+`ostree.ref_match`, printing `[ok] ostree ref: ...`. `ostree.ref` is only the
+fallback for a dry run or a failed read.
+
+An immutable system also changes what `%post` can do: it configures (GDM
+autologin, `systemctl enable`) but installs nothing. Extra packages are layered
+afterwards, in the SSH post-install, with `rpm-ostree install --idempotent
+--allow-inactive`, and become active at the next boot.
+
+## openSUSE: AutoYaST
+
+```bash
+vmctl bootstrap-autoyast opensuse-tumbleweed-autoyast
+```
+
+Renders an AutoYaST XML profile (`autoyast_config`) into an `AUTOINST` seed CD,
+extracts `boot/x86_64/loader/linux` and its initrd from the DVD, and boots with
+`autoyast=cd:///autoinst.xml ifcfg=*=dhcp netsetup=dhcp textmode=1
+console=ttyS0,115200`.
+
+Both media are attached as **SATA CD-ROMs** (`ide-cd` on `ide.0` and `ide.1`):
+linuxrc scans `/dev/sr*` only, so on a virtio CD-ROM the answer file is
+invisible and the installer stops asking questions no one answers.
+
+The profile drives partitioning (GPT, 512 MB EFI + btrfs root), patterns
+(`enhanced_base`, `gnome`, `kvm_server` by default) and services, and its chroot
+script creates the user and group, the passwordless sudo drop-in, the SSH
+authorized key, the GDM autologin, enables `sshd` and a `ttyS0` getty, then runs
+the profile's `chroot_commands` and ends with the mandatory sequence: `sync`,
+`blockdev --flushbufs`, `==> AutoYaST install complete!`. YaST then reboots and
+QEMU, started with `-no-reboot`, exits by itself.
+
+## Ubuntu desktop flavors
+
+```bash
+vmctl bootstrap-unattended kubuntu-24.04
+```
+
+`lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04` and
+`ubuntu-budgie-24.04` are the kvm-lab flavor family with no new code: the same
+Ubuntu Server 24.04.4 ISO, the desktop chosen by the metapackage in
+`autoinstall.packages`, and a cloud-init autologin drop-in for the display
+manager that flavor ships (`/etc/sddm.conf.d/` for Lubuntu and Kubuntu,
+`/etc/lightdm/lightdm.conf.d/` for the other three) plus a `serial-getty@ttyS0`.
+Another version or another desktop is a profile, not a patch.
 
 ## Arch: pacstrap script
 

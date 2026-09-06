@@ -106,7 +106,7 @@ produces isolated per-VM artifacts.
 | `lifecycle.py`            | ~717  | All other `cmd_*` handlers + background-VM tracking.            |
 | `cli.py`                  | ~181  | `build_parser`, `dispatch_internal`, `main`. Wires it together. |
 
-**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`iso`/`cloud_init`/`omarchy`/`qemu`/`disk_inspect` ← {`alpine`, `preseed`, `kickstart`, `windows`} ← {`flash`, `import_dev`, `ssh`, `host_setup`, `report`} ← `netlab` ← {`pfsense`, `libvirt`} ← `lifecycle` ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
+**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`iso`/`cloud_init`/`omarchy`/`qemu`/`disk_inspect` ← {`alpine`, `autoyast`, `preseed`, `kickstart`, `windows`} ← {`flash`, `import_dev`, `ssh`, `host_setup`, `report`} ← `netlab` ← {`pfsense`, `libvirt`} ← `lifecycle` ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
 
 ## Typical flows
 
@@ -128,6 +128,10 @@ produces isolated per-VM artifacts.
   preseed artifacts under `artifacts/<vm>/preseed/`, boots headless via serial,
   waits for the completion token, then starts the installed disk for SSH
   post-install work.
+- `./bin/vmctl bootstrap-autoyast <name>` is the openSUSE path: `autoyast.py`
+  renders the XML profile into an `AUTOINST` seed CD under
+  `artifacts/<vm>/autoyast/`, boots the DVD loader kernel with both media on
+  SATA CD-ROMs and waits for `==> AutoYaST install complete!`.
 - `./bin/vmctl bootstrap-kickstart <name>` is the AlmaLinux/RHEL kickstart
   path. It builds kickstart artifacts under `artifacts/<vm>/kickstart/`, boots
   headless via serial, waits for the completion token, then starts the

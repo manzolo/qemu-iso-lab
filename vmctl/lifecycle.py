@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import alpine, archinstall, cloud_init, config, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, report, runtime, ssh, state, ui, windows
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, report, runtime, ssh, state, ui, windows
 from vmctl.errors import VMError
 
 
@@ -342,6 +342,10 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-kickstart", "kickstart + post-install")
         return ("skip", "kickstart without SSH post-install")
+    if autoyast.autoyast_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-autoyast", "AutoYaST + post-install")
+        return ("skip", "autoyast_config without SSH post-install")
     if alpine.alpine_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-alpine", "setup-alpine + post-install")
@@ -452,7 +456,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense"}:
             candidates.append(vm_name)
     return candidates
 
@@ -591,6 +595,25 @@ def run_local_test_vm(
     if mode == "bootstrap-kickstart":
         try:
             cmd_bootstrap_kickstart(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
+            args._report_phase = "post-install"
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-autoyast":
+        try:
+            cmd_bootstrap_autoyast(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -1683,7 +1706,10 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
     ensure_vm_disk(vm, dry_run=args.dry_run)
     reset_vm_nvram(vm, dry_run=args.dry_run)
 
-    seed_iso = kickstart.create_kickstart_iso(args.vm, vm, dry_run=args.dry_run)
+    ostree_ref = kickstart.resolve_ostree_ref(vm, iso_path, dry_run=args.dry_run)
+    if ostree_ref:
+        ui.print_status("ok", f"ostree ref: {ostree_ref}")
+    seed_iso = kickstart.create_kickstart_iso(args.vm, vm, dry_run=args.dry_run, ostree_ref=ostree_ref)
     kernel_path, initrd_path = kickstart.extract_kickstart_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
 
     install_qemu_args = qemu.common_args(
@@ -1736,6 +1762,60 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         pid_path.write_text(f"{pid}\n", encoding="utf-8")
         ui.print_kv("pid", str(pid))
 
+    report.phase(args, "post-install")
+    run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
+    return 0
+
+
+def cmd_bootstrap_autoyast(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if autoyast.autoyast_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define autoyast_config")
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap openSUSE (AutoYaST): {args.vm}")
+
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+
+    seed_iso = autoyast.create_autoyast_iso(args.vm, vm, dry_run=args.dry_run)
+    kernel_path, initrd_path = autoyast.extract_autoyast_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+        network_phase="install",
+    )
+    install_qemu_args += autoyast.install_media_args(iso_path, seed_iso)
+    install_qemu_args += [
+        "-kernel", str(kernel_path),
+        "-initrd", str(initrd_path),
+        "-append", autoyast.kernel_append(vm),
+    ]
+
+    ui.print_note("Booting AutoYaST installer — waiting for completion token...")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    qemu.run_and_expect(
+        install_qemu_args,
+        expected_text=autoyast.BOOTSTRAP_COMPLETE_TOKEN,
+        timeout_sec=getattr(args, "timeout", 1800),
+        dry_run=args.dry_run,
+        log_path=serial_log,
+    )
+    ui.print_status("ok", "Installation complete — starting installed VM for post-install")
+
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
     report.phase(args, "post-install")
     run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
     ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")

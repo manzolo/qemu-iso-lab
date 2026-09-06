@@ -388,6 +388,94 @@
           "niri --version"
         ]
       }
+    },
+    "fedora-silverblue": {
+      "name": "Fedora Silverblue 44 (immutable, kickstart + ostree)",
+      "meta": {
+        "slug": "silverblue",
+        "family": "fedora",
+        "role": "desktop",
+        "release_model": "stable"
+      },
+      "iso": "isos/Fedora-Silverblue-ostree-x86_64-44-1.7.iso",
+      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Silverblue/x86_64/iso/Fedora-Silverblue-ostree-x86_64-44-1.7.iso",
+      "disk": {
+        "path": "artifacts/fedora-silverblue/disk.qcow2",
+        "size": "40G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-silverblue/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Fedora Silverblue through the kickstart flow, ported from kvm-lab. kickstart_config.ostree replaces the %packages transaction with ostreesetup: the tree comes from the repository on the ISO (file:///ostree/repo) and the ref is read from the media at bootstrap time, so a new Fedora release only needs the ISO swapped. GDM autologin from %post. rpm-ostree layering (guest agent, spice-vdagent) happens in the post-install and takes effect at the next boot: on an immutable system nothing can be dnf-installed into the running deployment.",
+      "kickstart_config": {
+        "hostname": "silverblue",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "locale": "en_US.UTF-8",
+        "ostree": {
+          "osname": "fedora",
+          "remote": "fedora",
+          "url": "file:///ostree/repo",
+          "ref": "fedora/44/x86_64/silverblue",
+          "ref_match": "silverblue"
+        },
+        "bootloader_options": "--timeout=2",
+        "post_commands": [
+          "install -d -m0755 /etc/gdm\ncat > /etc/gdm/custom.conf <<'GDMEOF'\n[daemon]\nWaylandEnable=true\nAutomaticLoginEnable=True\nAutomaticLogin={{user}}\nGDMEOF",
+          "systemctl set-default graphical.target",
+          "systemctl enable gdm.service",
+          "systemctl enable sshd.service"
+        ],
+        "disk_device": "vda",
+        "selinux": "enforcing",
+        "firewall": "enabled"
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2246,
+        "ssh_key": null,
+        "post_install_run": [
+          "rpm-ostree status",
+          "systemctl get-default",
+          "sudo rpm-ostree install --idempotent --allow-inactive qemu-guest-agent spice-vdagent || echo 'layering skipped'"
+        ]
+      }
     }
   }
 }

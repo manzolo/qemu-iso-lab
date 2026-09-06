@@ -66,7 +66,8 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | `ci` | Boot-check parameters: `accel`, `headless`, `boot_from`, `expect`, `timeout_sec` |
 
 Profiles that add `cloud_init`, `ssh_provision`, `autoinstall`, `archinstall_config`,
-`preseed_config`, `kickstart_config` or `omarchy_config` unlock the unattended and
+`preseed_config`, `kickstart_config` (with an optional `ostree` block for Silverblue),
+`autoyast_config` or `omarchy_config` unlock the unattended and
 provisioning flows described in [UNATTENDED.md](UNATTENDED.md) and
 [PROVISIONING.md](PROVISIONING.md).
 

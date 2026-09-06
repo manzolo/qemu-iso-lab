@@ -30,7 +30,9 @@ The bilingual index is [guides/README.md](guides/README.md).
 | 05 | [05-interacting.md](guides/en/05-interacting.md) | [05-interagire.md](guides/it/05-interagire.md) | Getting a command line in a guest: SSH, serial console (`vmctl console`), VNC screen; typical checks on Linux, Windows (PowerShell over SSH) and pfSense |
 | 10 | [10-ubuntu-niri.md](guides/en/10-ubuntu-niri.md) | [it](guides/it/10-ubuntu-niri.md) | Ubuntu autoinstall + cloud-init (`bootstrap-unattended`) |
 | 20 | [20-debian-server.md](guides/en/20-debian-server.md) | [it](guides/it/20-debian-server.md) | Debian preseed (`bootstrap-preseed`) |
-| 30 | [30-almalinux-fedora.md](guides/en/30-almalinux-fedora.md) | [it](guides/it/30-almalinux-fedora.md) | AlmaLinux / Fedora kickstart (`bootstrap-kickstart`) |
+| 15 | [15-ubuntu-flavors.md](guides/en/15-ubuntu-flavors.md) | [it](guides/it/15-ubuntu-flavors.md) | The five Ubuntu desktop flavors on the server ISO (`bootstrap-unattended`) |
+| 30 | [30-almalinux-fedora.md](guides/en/30-almalinux-fedora.md) | [it](guides/it/30-almalinux-fedora.md) | AlmaLinux, Rocky, Fedora and Silverblue kickstart (`bootstrap-kickstart`) |
+| 35 | [35-opensuse-autoyast.md](guides/en/35-opensuse-autoyast.md) | [it](guides/it/35-opensuse-autoyast.md) | openSUSE Tumbleweed with AutoYaST (`bootstrap-autoyast`) |
 | 40 | [40-arch-niri.md](guides/en/40-arch-niri.md) | [it](guides/it/40-arch-niri.md) | Arch and CachyOS pacstrap script (`bootstrap-archinstall`) |
 | 50 | [50-alpine-niri.md](guides/en/50-alpine-niri.md) | [it](guides/it/50-alpine-niri.md) | Alpine `setup-alpine` (`bootstrap-alpine`) |
 | 60 | [60-windows.md](guides/en/60-windows.md) | [it](guides/it/60-windows.md) | Windows 10/11 autounattend (`bootstrap-windows`) |

@@ -156,3 +156,73 @@ class KickstartBootstrapTests(BaseVmctlTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KickstartOstreeTests(BaseVmctlTestCase):
+    """Fedora Silverblue: ostreesetup replaces the package transaction."""
+
+    def _ostree_vm(self) -> None:
+        self.vm_config["kickstart_config"] = {
+            "hostname": "silverblue",
+            "username": "tester",
+            "password_hash": "$6$salt$hash",
+            "disk_device": "vda",
+            "bootloader_options": "--timeout=2",
+            "ostree": {
+                "osname": "fedora",
+                "remote": "fedora",
+                "url": "file:///ostree/repo",
+                "ref": "fedora/44/x86_64/silverblue",
+                "ref_match": "silverblue",
+            },
+        }
+
+    def test_render_uses_ostreesetup_and_drops_the_packages_section(self):
+        self._ostree_vm()
+        text = vmctl.kickstart.render_kickstart("fedora-silverblue", self.vm_config)
+        self.assertIn('ostreesetup --osname="fedora" --remote="fedora" --url="file:///ostree/repo"', text)
+        self.assertIn('--ref="fedora/44/x86_64/silverblue" --nogpg', text)
+        self.assertNotIn("%packages", text)
+        self.assertIn("autopart --noswap", text)  # an ostree install cannot use --type=plain
+        self.assertIn("bootloader --timeout=2", text)
+        # a package install keeps the section and the historical defaults
+        self.vm_config["kickstart_config"].pop("ostree")
+        self.vm_config["kickstart_config"].pop("bootloader_options")
+        plain = vmctl.kickstart.render_kickstart("almalinux", self.vm_config)
+        self.assertIn("%packages", plain)
+        self.assertIn("autopart --type=plain --noswap", plain)
+        self.assertNotIn("ostreesetup", plain)
+
+    def test_ref_is_read_from_the_iso_with_the_profile_value_as_fallback(self):
+        self._ostree_vm()
+        iso_path = self.root / "isos" / "silverblue.iso"
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_bytes(b"ISO")
+
+        def fake_run(cmd, **kwargs):
+            dest = Path(cmd[cmd.index("-extract") + 2])
+            ref = dest / "fedora" / "45" / "x86_64" / "silverblue"
+            ref.parent.mkdir(parents=True, exist_ok=True)
+            ref.write_text("abc\n", encoding="utf-8")
+
+        with mock.patch.object(vmctl.runtime, "run", side_effect=fake_run):
+            self.assertEqual(
+                vmctl.kickstart.resolve_ostree_ref(self.vm_config, iso_path),
+                "fedora/45/x86_64/silverblue",
+            )
+        # xorriso missing or the ISO without refs: the profile value keeps the flow alive
+        with mock.patch.object(vmctl.runtime, "run", side_effect=OSError("no xorriso")):
+            self.assertEqual(
+                vmctl.kickstart.resolve_ostree_ref(self.vm_config, iso_path),
+                "fedora/44/x86_64/silverblue",
+            )
+        # a dry run never touches the media
+        with mock.patch.object(vmctl.runtime, "run") as run:
+            self.assertEqual(
+                vmctl.kickstart.resolve_ostree_ref(self.vm_config, iso_path, dry_run=True),
+                "fedora/44/x86_64/silverblue",
+            )
+        run.assert_not_called()
+        # a profile without ostree has no ref at all
+        self.vm_config["kickstart_config"].pop("ostree")
+        self.assertIsNone(vmctl.kickstart.resolve_ostree_ref(self.vm_config, iso_path))

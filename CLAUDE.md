@@ -45,7 +45,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ```
 errors ← state ← {ui, runtime} ← {config, iso, cloud_init, qemu, archinstall, disk_inspect}
-      ← {alpine, preseed, kickstart, omarchy, windows} ← {flash, import_dev, ssh, host_setup, report} ← netlab ← {pfsense, libvirt} ← lifecycle ← cli
+      ← {alpine, autoyast, preseed, kickstart, omarchy, windows} ← {flash, import_dev, ssh, host_setup, report} ← netlab ← {pfsense, libvirt} ← lifecycle ← cli
 ```
 
 Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always accessed as `state.ROOT`, never imported directly — a direct import captures a stale binding and breaks tests.
@@ -62,8 +62,9 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 | `archinstall.py` | Arch-specific: renders archinstall JSON config (interactive) or a self-contained `pacstrap`-based `install.sh` (automated bootstrap). |
 | `iso.py` | ISO download with validation, discovery regex, and member extraction (`xorriso`/`bsdtar`). |
 | `alpine.py` | Alpine: `setup-alpine` answer file + chroot `install.sh` packed into a seed ISO, live-prompt automation constants. |
+| `autoyast.py` | openSUSE: AutoYaST XML profile + chroot script packed into an `AUTOINST` seed CD, DVD loader kernel/initrd, SATA CD-ROM args. |
 | `windows.py` | Windows 10/11: `autounattend.xml` + first-logon `vmctl-setup.ps1` in a `VMCTLSEED` CD, prompt-free ISO rebuild (`7z` + `xorriso`), virtio-win ISO, SATA CD-ROM args. |
-| `kickstart.py` / `preseed.py` | AlmaLinux/Fedora kickstart and Debian preseed rendering; `kickstart.install_repo()` picks `cdrom` or a netinst URL. |
+| `kickstart.py` / `preseed.py` | AlmaLinux/Rocky/Fedora kickstart and Debian preseed rendering; `kickstart.install_repo()` picks `cdrom` or a netinst URL; `kickstart.ostree_config()`/`resolve_ostree_ref()` switch the flow to `ostreesetup` for Silverblue. |
 | `libvirt.py` | Render persistent libvirt XML and define/undefine existing disks; `export-libvirt` / `unexport-libvirt` handlers in lifecycle enforce running-VM checks. |
 | `report.py` | `check-vms --report [DIR] --open`: self-contained HTML, per-worker JSON and QMP P6→PNG screenshots before stop, outside restored artifacts. |
 | `netlab.py` | Network lab: `network_lab` topology resolution/validation, netplan + `pihole.toml` + guest `setup.sh` rendering, SSH post-install hook (`provision_guest`), libvirt segment network XML, `vmctl lab` helpers. |
@@ -76,7 +77,7 @@ All VM definitions live in `vms/profiles/*.json`. `load_config()` reads and merg
 
 Tracked profiles are generic on purpose: the guest user is `lab` (password `lab`, hash included) and every place where the user name appears inside a path, a command or a file body writes `{{user}}`. `config.expand_user_placeholder()` replaces it at load time with the identity declared by the profile (`ssh_provision.user`, `cloud_init.user`, `autoinstall.username`, `archinstall_config.username`, `preseed_config.username`, `kickstart_config.username`, `alpine_config.username`, `windows_config.username`; they must agree). Overriding the identity in `local.json` therefore propagates everywhere. Never commit a real user name, password or hash into a tracked profile again; the repo is public.
 
-SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226, `arch-dms-local` → 2230, `arch-dms-nvidia-local` → 2231, `arch-omarchy-nvidia-local` → 2232, `fedora-niri-dms-local` → 2233, `alpine-niri` → 2234, `windows11-unattended` → 2235, `windows10-unattended` → 2236, `pfsense-lab` → 2237, `pihole-lab` → 2238, `lubuntu22-lab` → 2239 (the last two are also NAT forwards on the router's WAN, see `network_lab`) (2222/2227/2228/2229/2290 are Ubuntu/Debian/Alma; 2225 is taken by a local.json VM).
+SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226, `arch-dms-local` → 2230, `arch-dms-nvidia-local` → 2231, `arch-omarchy-nvidia-local` → 2232, `fedora-niri-dms-local` → 2233, `alpine-niri` → 2234, `windows11-unattended` → 2235, `windows10-unattended` → 2236, `pfsense-lab` → 2237, `pihole-lab` → 2238, `lubuntu22-lab` → 2239 (the last two are also NAT forwards on the router's WAN, see `network_lab`), `lubuntu-24.04` → 2240, `kubuntu-24.04` → 2241, `xubuntu-24.04` → 2242, `ubuntu-mate-24.04` → 2243, `ubuntu-budgie-24.04` → 2244, `rocky9` → 2245, `fedora-silverblue` → 2246, `opensuse-tumbleweed-autoyast` → 2247 (a test in `test_repo_profiles.py` fails if two tracked profiles share a port) (2222/2227/2228/2229/2290 are Ubuntu/Debian/Alma; 2225 is taken by a local.json VM).
 
 ### Unattended install flows
 
@@ -100,6 +101,12 @@ CachyOS (`cachyos-local`, `cachyos-nvidia-local`) rides the same handler on the 
 2. Extracts `vmlinuz` + `initrd.gz` from the ISO.
 3. Boots headless with serial stdio and appropriate preseed kernel appends.
 4. Uses `run_and_expect` to wait for `"==> Debian preseed install complete!"`, then starts installed VM headless.
+
+**openSUSE** (`bootstrap-autoyast`, `autoyast_config`): renders an AutoYaST XML profile (partitioning, patterns, services) whose chroot script creates the user, sudoers drop-in, SSH key, GDM autologin, `sshd` and a `ttyS0` getty, then `sync` → `blockdev --flushbufs` → `==> AutoYaST install complete!`. The seed goes on an `AUTOINST` CD and **both media are SATA `ide-cd`** (`autoyast.install_media_args`): linuxrc only scans `/dev/sr*`, so a virtio CD-ROM would hide the answer file. Kernel/initrd come from `boot/x86_64/loader/` and the append is `autoyast=cd:///autoinst.xml ifcfg=*=dhcp netsetup=dhcp textmode=1 console=ttyS0,115200`. `final_reboot` stays true and QEMU runs with `-no-reboot`, so the guest's own reboot ends the install.
+
+**Fedora Silverblue** rides `bootstrap-kickstart`: `kickstart_config.ostree` replaces the `%packages` section with one `ostreesetup` line and `autopart` drops `--type=plain`. `kickstart.resolve_ostree_ref()` reads the ref from `refs/heads` inside the ISO (xorriso) and falls back to `ostree.ref` on a dry run or when the read fails, so a new Fedora release only needs a new `iso`/`iso_url`. `%post` can configure but not install: extra packages are layered in the post-install with `rpm-ostree install` and take effect at the next boot.
+
+**Ubuntu desktop flavors** (`lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `ubuntu-budgie-24.04`) are `bootstrap-unattended` on the plain Ubuntu Server ISO: the flavor is the metapackage in `autoinstall.packages`, plus a cloud-init autologin drop-in for the display manager it ships (SDDM for Lubuntu/Kubuntu, LightDM for the others) and a `serial-getty@ttyS0`. No new code: a sixth flavor is a profile.
 
 **AlmaLinux/RHEL/Fedora** (`bootstrap-kickstart`; `kickstart_config.inst_repo` = `cdrom` or a netinst repository URL, `ignore_missing_packages` → `%packages --ignoremissing`):
 1. Generates kickstart seed ISO (`KS_CFG`).

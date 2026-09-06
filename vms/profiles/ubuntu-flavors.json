@@ -1,0 +1,494 @@
+{
+  "vms": {
+    "lubuntu-24.04": {
+      "name": "Lubuntu 24.04 LTS (LXQt)",
+      "meta": {
+        "slug": "lubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/lubuntu-24.04/disk.qcow2",
+        "size": "30G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/lubuntu-24.04/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Ubuntu Server 24.04.4 autoinstall + lubuntu-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), sddm gets an autologin drop-in for the Lubuntu session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "autoinstall": {
+        "hostname": "lubuntu",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true,
+        "packages": [
+          "lubuntu-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "lubuntu",
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          },
+          {
+            "path": "/etc/sddm.conf.d/vmctl-autologin.conf",
+            "permissions": "0644",
+            "content": "[Autologin]\nUser={{user}}\nSession=Lubuntu\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl set-default graphical.target",
+          "systemctl enable sddm",
+          "systemctl enable --now serial-getty@ttyS0.service"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "lubuntu",
+        "user": "lab",
+        "ssh_host_port": 2240,
+        "post_install_run": [
+          "systemctl get-default",
+          "systemctl is-enabled sddm",
+          "dpkg-query -W -f='${Status}\\n' lubuntu-desktop"
+        ]
+      }
+    },
+    "kubuntu-24.04": {
+      "name": "Kubuntu 24.04 LTS (KDE Plasma)",
+      "meta": {
+        "slug": "kubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/kubuntu-24.04/disk.qcow2",
+        "size": "30G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/kubuntu-24.04/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Ubuntu Server 24.04.4 autoinstall + kubuntu-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), sddm gets an autologin drop-in for the plasma session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "autoinstall": {
+        "hostname": "kubuntu",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true,
+        "packages": [
+          "kubuntu-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "kubuntu",
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          },
+          {
+            "path": "/etc/sddm.conf.d/vmctl-autologin.conf",
+            "permissions": "0644",
+            "content": "[Autologin]\nUser={{user}}\nSession=plasma\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl set-default graphical.target",
+          "systemctl enable sddm",
+          "systemctl enable --now serial-getty@ttyS0.service"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "kubuntu",
+        "user": "lab",
+        "ssh_host_port": 2241,
+        "post_install_run": [
+          "systemctl get-default",
+          "systemctl is-enabled sddm",
+          "dpkg-query -W -f='${Status}\\n' kubuntu-desktop"
+        ]
+      }
+    },
+    "xubuntu-24.04": {
+      "name": "Xubuntu 24.04 LTS (Xfce)",
+      "meta": {
+        "slug": "xubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/xubuntu-24.04/disk.qcow2",
+        "size": "30G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/xubuntu-24.04/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Ubuntu Server 24.04.4 autoinstall + xubuntu-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), lightdm gets an autologin drop-in for the xubuntu session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "autoinstall": {
+        "hostname": "xubuntu",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true,
+        "packages": [
+          "xubuntu-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "xubuntu",
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          },
+          {
+            "path": "/etc/lightdm/lightdm.conf.d/vmctl-autologin.conf",
+            "permissions": "0644",
+            "content": "[Seat:*]\nautologin-user={{user}}\nautologin-user-timeout=0\nautologin-session=xubuntu\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl set-default graphical.target",
+          "systemctl enable lightdm",
+          "systemctl enable --now serial-getty@ttyS0.service"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "xubuntu",
+        "user": "lab",
+        "ssh_host_port": 2242,
+        "post_install_run": [
+          "systemctl get-default",
+          "systemctl is-enabled lightdm",
+          "dpkg-query -W -f='${Status}\\n' xubuntu-desktop"
+        ]
+      }
+    },
+    "ubuntu-mate-24.04": {
+      "name": "Ubuntu MATE 24.04 LTS",
+      "meta": {
+        "slug": "ubuntu-mate",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-mate-24.04/disk.qcow2",
+        "size": "30G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-mate-24.04/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Ubuntu Server 24.04.4 autoinstall + ubuntu-mate-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), lightdm gets an autologin drop-in for the mate session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "autoinstall": {
+        "hostname": "ubuntu-mate",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true,
+        "packages": [
+          "ubuntu-mate-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "ubuntu-mate",
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          },
+          {
+            "path": "/etc/lightdm/lightdm.conf.d/vmctl-autologin.conf",
+            "permissions": "0644",
+            "content": "[Seat:*]\nautologin-user={{user}}\nautologin-user-timeout=0\nautologin-session=mate\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl set-default graphical.target",
+          "systemctl enable lightdm",
+          "systemctl enable --now serial-getty@ttyS0.service"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-mate",
+        "user": "lab",
+        "ssh_host_port": 2243,
+        "post_install_run": [
+          "systemctl get-default",
+          "systemctl is-enabled lightdm",
+          "dpkg-query -W -f='${Status}\\n' ubuntu-mate-desktop"
+        ]
+      }
+    },
+    "ubuntu-budgie-24.04": {
+      "name": "Ubuntu Budgie 24.04 LTS",
+      "meta": {
+        "slug": "ubuntu-budgie",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts"
+      },
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-budgie-24.04/disk.qcow2",
+        "size": "30G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-budgie-24.04/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Ubuntu Server 24.04.4 autoinstall + ubuntu-budgie-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), lightdm gets an autologin drop-in for the ubuntu-budgie-desktop session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "autoinstall": {
+        "hostname": "ubuntu-budgie",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true,
+        "packages": [
+          "ubuntu-budgie-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "ubuntu-budgie",
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          },
+          {
+            "path": "/etc/lightdm/lightdm.conf.d/vmctl-autologin.conf",
+            "permissions": "0644",
+            "content": "[Seat:*]\nautologin-user={{user}}\nautologin-user-timeout=0\nautologin-session=ubuntu-budgie-desktop\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl set-default graphical.target",
+          "systemctl enable lightdm",
+          "systemctl enable --now serial-getty@ttyS0.service"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-budgie",
+        "user": "lab",
+        "ssh_host_port": 2244,
+        "post_install_run": [
+          "systemctl get-default",
+          "systemctl is-enabled lightdm",
+          "dpkg-query -W -f='${Status}\\n' ubuntu-budgie-desktop"
+        ]
+      }
+    }
+  }
+}

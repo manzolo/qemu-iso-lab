@@ -8,7 +8,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import vmctl.autoyast  # noqa: E402
 import vmctl.config  # noqa: E402
+import vmctl.kickstart  # noqa: E402
 import vmctl.netlab  # noqa: E402
 import vmctl.state  # noqa: E402
 import vmctl.windows  # noqa: E402
@@ -51,8 +53,54 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "pihole-lab",
             "lubuntu22-lab",
             "windows7-unattended",
+            "lubuntu-24.04",
+            "kubuntu-24.04",
+            "xubuntu-24.04",
+            "ubuntu-mate-24.04",
+            "ubuntu-budgie-24.04",
+            "rocky9",
+            "fedora-silverblue",
+            "opensuse-tumbleweed-autoyast",
         ):
             self.assertIn(profile, cfg["vms"])
+
+        # Every tracked profile that provisions over SSH needs its own host port:
+        # two VMs on the same forward silently break a parallel check-vms run.
+        ports: dict[int, str] = {}
+        for name, vm in cfg["vms"].items():
+            port = (vm.get("ssh_provision") or {}).get("ssh_host_port")
+            if port is None:
+                continue
+            self.assertNotIn(int(port), ports, f"{name} reuses port {port} of {ports.get(int(port))}")
+            ports[int(port)] = name
+
+        # The Ubuntu desktop flavors: one autoinstall recipe, the desktop metapackage and an
+        # autologin drop-in for the display manager that flavor ships.
+        for name, package, dm_file in (
+            ("lubuntu-24.04", "lubuntu-desktop", "/etc/sddm.conf.d/vmctl-autologin.conf"),
+            ("kubuntu-24.04", "kubuntu-desktop", "/etc/sddm.conf.d/vmctl-autologin.conf"),
+            ("xubuntu-24.04", "xubuntu-desktop", "/etc/lightdm/lightdm.conf.d/vmctl-autologin.conf"),
+            ("ubuntu-mate-24.04", "ubuntu-mate-desktop", "/etc/lightdm/lightdm.conf.d/vmctl-autologin.conf"),
+            ("ubuntu-budgie-24.04", "ubuntu-budgie-desktop", "/etc/lightdm/lightdm.conf.d/vmctl-autologin.conf"),
+        ):
+            vm = cfg["vms"][name]
+            self.assertIn(package, vm["autoinstall"]["packages"])
+            self.assertEqual(vm["autoinstall"]["username"], "lab")
+            self.assertEqual(vm["ssh_provision"]["user"], "lab")
+            self.assertEqual(vm["cloud_init"]["user"], "lab")
+            self.assertIn(dm_file, [f["path"] for f in vm["cloud_init"]["write_files"]])
+
+        # Fedora Silverblue rides the kickstart flow with an ostree source instead of %packages.
+        silverblue = cfg["vms"]["fedora-silverblue"]
+        self.assertIsNotNone(vmctl.kickstart.ostree_config(silverblue))
+        self.assertEqual(silverblue["kickstart_config"]["ostree"]["ref_match"], "silverblue")
+        self.assertNotIn("%packages", vmctl.kickstart.render_kickstart("fedora-silverblue", silverblue))
+
+        # openSUSE Tumbleweed: AutoYaST profile, DVD loader kernel, SATA seed CD.
+        tumbleweed = cfg["vms"]["opensuse-tumbleweed-autoyast"]
+        self.assertEqual(tumbleweed["autoyast_config"]["username"], "lab")
+        self.assertEqual(tumbleweed["installer_boot"]["kernel"], "boot/x86_64/loader/linux")
+        self.assertIn("<pattern>gnome</pattern>", vmctl.autoyast.render_autoyast("opensuse-tumbleweed-autoyast", tumbleweed))
 
         # Windows 7: BIOS, e1000e (no NetKVM needed), no SSH (no OpenSSH on 7), generic identity.
         w7 = cfg["vms"]["windows7-unattended"]

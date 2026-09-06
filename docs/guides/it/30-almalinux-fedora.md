@@ -1,8 +1,9 @@
-# AlmaLinux 10 server e Fedora con niri via kickstart
+# AlmaLinux, Rocky, Fedora e Silverblue via kickstart
 
-Profili: `almalinux-server` (SSH 2229, dalla ISO minimal) e `fedora-niri-dms-local`
-(SSH 2233, dalla netinst Everything più repository online). Flusso `bootstrap-kickstart`
-con Anaconda in modalità testo. Tempo: 10 minuti Alma, 20-30 Fedora.
+Profili: `almalinux-server` (SSH 2229, dalla ISO minimal), `rocky9` (2245, la stessa ricetta
+su Rocky Linux 9), `fedora-niri-dms-local` (2233, dalla netinst Everything più repository
+online) e `fedora-silverblue` (2246, quello immutabile). Flusso `bootstrap-kickstart` con
+Anaconda in modalità testo. Tempo: 10 minuti Alma e Rocky, 20-30 Fedora, 25-35 Silverblue.
 
 ## 1. Prerequisiti
 
@@ -53,3 +54,45 @@ cat /etc/os-release | head -2; sudo dnf -q repolist
 Al menu di boot della ISO aggiungi la riga kernel sopra puntando `inst.ks=` al tuo `ks.cfg`
 (file su una chiavetta con etichetta, oppure `inst.ks=http://...`). Senza `inst.cmdline`
 Anaconda mostra il menu testuale e chiede conferma dove il kickstart è incompleto.
+
+## 6. Rocky Linux 9
+
+`rocky9` è `almalinux-server` con un'altra ISO: stesso kickstart, sorgente di installazione
+sul supporto (`inst.repo=cdrom`), `@^minimal-environment`, SELinux enforcing.
+
+```bash
+vmctl bootstrap-kickstart rocky9
+vmctl shell rocky9 -- cat /etc/rocky-release
+```
+
+## 7. Fedora Silverblue (immutabile)
+
+`fedora-silverblue` usa lo stesso comando, ma il profilo porta un blocco
+`kickstart_config.ostree` e questo cambia il lavoro di Anaconda: sparisce la transazione
+`%packages` e al suo posto compare una riga `ostreesetup`, quindi il sistema è un deployment
+dell'albero ostree che la ISO si porta dietro (`file:///ostree/repo`).
+
+```json
+"ostree": { "osname": "fedora", "remote": "fedora", "url": "file:///ostree/repo",
+            "ref": "fedora/44/x86_64/silverblue", "ref_match": "silverblue" }
+```
+
+Il ref contiene la versione di Fedora, perciò `vmctl` lo legge da `refs/heads` **dentro la
+ISO** al momento del bootstrap e ricade sul valore del profilo solo se non ci riesce (dry
+run, xorriso assente). Passare alla release successiva è questione di cambiare `iso`/`iso_url`;
+la riga `[ok] ostree ref: fedora/NN/x86_64/silverblue` sul terminale dice quale albero è
+stato usato.
+
+Due conseguenze dell'immutabilità:
+
+- `%post` gira dentro il deployment: può scrivere configurazione (autologin GDM, servizi) ma
+  non può installare pacchetti.
+- Il software in più si layera dopo e ha effetto al riavvio successivo. Il post-install lancia
+  `rpm-ostree install --idempotent --allow-inactive qemu-guest-agent spice-vdagent`;
+  `rpm-ostree status` mostra il deployment in attesa.
+
+```bash
+vmctl shell fedora-silverblue
+rpm-ostree status
+systemctl get-default
+```

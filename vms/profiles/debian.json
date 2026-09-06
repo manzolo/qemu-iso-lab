@@ -239,7 +239,7 @@
         "hostname": "debian-server",
         "domain": "local",
         "username": "lab",
-        "fullname": "Andrea Manzi",
+        "fullname": "Lab User",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "timezone": "Europe/Rome",
         "keyboard_layout": "it",
@@ -415,7 +415,7 @@
       "autoinstall": {
         "hostname": "ubuntu-server-headless",
         "username": "lab",
-        "realname": "Andrea Manzi",
+        "realname": "Lab User",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "timezone": "UTC",
         "keyboard_layout": "us",

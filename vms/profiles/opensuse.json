@@ -91,6 +91,108 @@
         }
       },
       "usb_tablet": true
+    },
+    "opensuse-tumbleweed-autoyast": {
+      "name": "openSUSE Tumbleweed GNOME (AutoYaST)",
+      "meta": {
+        "slug": "opensuse",
+        "family": "suse",
+        "role": "desktop",
+        "release_model": "rolling"
+      },
+      "iso": "isos/openSUSE-Tumbleweed-DVD-x86_64-Current.iso",
+      "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-DVD-x86_64-Current.iso",
+      "disk": {
+        "path": "artifacts/opensuse-tumbleweed-autoyast/disk.qcow2",
+        "size": "40G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/opensuse-tumbleweed-autoyast/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "installer_boot": {
+        "kernel": "boot/x86_64/loader/linux",
+        "initrd": "boot/x86_64/loader/initrd"
+      },
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "openSUSE Tumbleweed installed unattended with AutoYaST, ported from kvm-lab. The rendered profile lands on a CD labelled AUTOINST and linuxrc finds it through autoyast=cd:///autoinst.xml, so both media are SATA CD-ROMs: linuxrc only scans /dev/sr*. The chroot script creates the user, the sudoers drop-in and the SSH key, enables sshd and a getty on ttyS0, then syncs, flushes and prints the completion token. The rolling DVD is ~4.7 GB and the install takes 30-45 minutes.",
+      "autoyast_config": {
+        "hostname": "tumbleweed",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "english-us",
+        "language": "en_US",
+        "disk_device": "vda",
+        "autologin": true,
+        "default_target": "graphical",
+        "products": [
+          "openSUSE"
+        ],
+        "patterns": [
+          "enhanced_base",
+          "gnome",
+          "kvm_server"
+        ],
+        "packages": [
+          "openssh",
+          "qemu-guest-agent",
+          "spice-vdagent",
+          "NetworkManager",
+          "iproute2",
+          "curl",
+          "vim"
+        ],
+        "enable_services": [
+          "NetworkManager",
+          "sshd",
+          "qemu-guest-agent"
+        ],
+        "chroot_commands": [],
+        "final_reboot": true
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2247,
+        "ssh_key": null,
+        "post_install_run": [
+          "cat /etc/os-release",
+          "systemctl get-default",
+          "systemctl is-active sshd"
+        ]
+      }
     }
   }
 }

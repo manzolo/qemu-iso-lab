@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "post-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "post-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -148,6 +148,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_kickstart)
+
+    p = _add(subparsers, "bootstrap-autoyast", help="fully automated openSUSE AutoYaST install + post-install via serial console")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=3600, help="seconds to wait for the install to complete (default: 3600)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_autoyast)
 
     p = _add(subparsers, "bootstrap-alpine", help="fully automated Alpine setup-alpine install + post-install via serial console")
     p.add_argument("vm", help=VM_HELP)

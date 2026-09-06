@@ -169,3 +169,27 @@ jobs:
 
       - name: Prepare almalinux-server unattended install dry-run
         run: ./bin/vmctl --dry-run bootstrap-kickstart almalinux-server
+
+  opensuse-autoyast-dry-run:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dry-run host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils xorriso genisoimage
+
+      - name: Prepare openSUSE AutoYaST unattended install dry-run
+        run: ./bin/vmctl --dry-run bootstrap-autoyast opensuse-tumbleweed-autoyast
+
+      - name: Prepare Fedora Silverblue ostree kickstart dry-run
+        run: ./bin/vmctl --dry-run bootstrap-kickstart fedora-silverblue

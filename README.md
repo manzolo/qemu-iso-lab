@@ -105,15 +105,16 @@ accepts `--dry-run` in front of it.
 
 ## The catalog
 
-46 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
+54 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
 prints them all; the table shows what each family offers.
 
 | Family | Profiles | Highlights | Unattended |
 |--------|----------|------------|------------|
 | Arch | `archlinux`, `endeavouros`, `cachyos`, `cachyos-local`, `cachyos-nvidia-local`, `arch-noctalia-local`, `arch-dms-local`, `arch-dms-nvidia-local`, `arch-omarchy-nvidia-local` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes | `bootstrap-archinstall`, `bootstrap-omarchy` |
 | Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop`, `ubuntu-server`, `ubuntu-server-headless`, `ubuntu-niri`, `ubuntu-niri-local`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
-| Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms-local`, `almalinux-minimal`, `almalinux-server` | Fedora 42/44, niri + DankMaterialShell on Fedora, AlmaLinux 10.1 | `bootstrap-kickstart` |
-| openSUSE / NixOS / Void | `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros | interactive |
+| Ubuntu desktop flavors | `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `ubuntu-budgie-24.04` | LXQt, Plasma, Xfce, MATE and Budgie on the 24.04 LTS server ISO, display-manager autologin (kvm-lab's flavor family) | `bootstrap-unattended` |
+| Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms-local`, `fedora-silverblue`, `almalinux-minimal`, `almalinux-server`, `rocky9` | Fedora 42/44, niri + DankMaterialShell on Fedora, immutable Silverblue (ostree), AlmaLinux 10.1, Rocky Linux 9 | `bootstrap-kickstart` |
+| openSUSE / NixOS / Void | `opensuse-tumbleweed-autoyast`, `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros, Tumbleweed GNOME installed unattended with AutoYaST | `bootstrap-autoyast`, interactive |
 | Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.23 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
 | Windows | `windows11-unattended`, `windows10-unattended`, `windows7-unattended`, `windows10-template`, `windows11-template` | unattended Windows 11 and 10 (autounattend.xml, virtio drivers, OpenSSH), Windows 7 Ultimate (BIOS/MBR, install only), import targets for physical disks (`vmctl import-device`) | `bootstrap-windows` |
 | Network lab | `pfsense-lab`, `pihole-lab`, `lubuntu22-lab` | pfSense CE 2.7.2 router + Pi-hole v6 + Lubuntu client on an isolated LAN segment (kvm-lab's network lab on plain QEMU; libvirt network after export) | `vmctl lab install`, `bootstrap-pfsense`, `bootstrap-unattended` |
@@ -124,7 +125,7 @@ guests that boot under TCG in GitHub Actions.
 
 ## Unattended installs
 
-Seven installers run headless on a serial console. Each `bootstrap-*` command
+Eight installers run headless on a serial console. Each `bootstrap-*` command
 generates the answer file, extracts kernel and initrd from the ISO, boots the
 installer, waits for a completion token, starts the installed VM in the
 background and runs the profile's SSH provisioning.
@@ -134,6 +135,8 @@ vmctl bootstrap-unattended ubuntu-niri-local          # Ubuntu autoinstall + clo
 vmctl bootstrap-preseed debian-server                 # Debian preseed
 vmctl bootstrap-kickstart almalinux-server            # AlmaLinux / RHEL kickstart from the ISO
 vmctl bootstrap-kickstart fedora-niri-dms-local       # Fedora kickstart from the netinst + online repo
+vmctl bootstrap-kickstart fedora-silverblue           # Fedora Silverblue: ostreesetup instead of %packages
+vmctl bootstrap-autoyast opensuse-tumbleweed-autoyast # openSUSE Tumbleweed: AutoYaST profile on a seed CD
 vmctl bootstrap-alpine alpine-niri                    # Alpine: setup-alpine answer file + chroot steps
 vmctl bootstrap-archinstall arch-dms-local            # Arch: pacstrap script on the live ISO
 vmctl bootstrap-omarchy arch-omarchy-nvidia-local     # Omarchy: official cidata mechanism

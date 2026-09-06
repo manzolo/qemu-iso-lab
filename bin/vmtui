@@ -497,6 +497,7 @@ def facts(name, vm):
         "has_omarchy": has_section(vm, "omarchy_config"),
         "has_preseed": has_section(vm, "preseed_config"),
         "has_kickstart": has_section(vm, "kickstart_config"),
+        "has_autoyast": has_section(vm, "autoyast_config"),
         "has_alpine": has_section(vm, "alpine_config"),
         "has_windows": has_section(vm, "windows_config"),
         "has_pfsense": has_section(vm, "pfsense_config"),
@@ -792,6 +793,8 @@ primary_install_action() {
         printf '%s\n' "Debian Preseed Bootstrap"
     elif [[ "${FACTS[has_kickstart]:-0}" == "1" ]]; then
         printf '%s\n' "Kickstart Bootstrap"
+    elif [[ "${FACTS[has_autoyast]:-0}" == "1" ]]; then
+        printf '%s\n' "AutoYaST Bootstrap"
     elif [[ "${FACTS[has_alpine]:-0}" == "1" ]]; then
         printf '%s\n' "Alpine Bootstrap"
     elif [[ "${FACTS[has_pfsense]:-0}" == "1" ]]; then
@@ -901,6 +904,9 @@ build_vm_menu_items() {
         emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
     elif [[ "${FACTS[has_kickstart]:-0}" == "1" ]]; then
         emit_action "Kickstart Bootstrap" "Fully automated AlmaLinux/RHEL install + post-install"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ "${FACTS[has_autoyast]:-0}" == "1" ]]; then
+        emit_action "AutoYaST Bootstrap" "Fully automated openSUSE install + post-install"
         emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
     elif [[ "${FACTS[has_alpine]:-0}" == "1" ]]; then
         emit_action "Alpine Bootstrap" "Fully automated setup-alpine install + post-install"
@@ -1222,6 +1228,7 @@ resolve_action() {
         "Arch Install (Interactive)") printf '%s\n' install-archinstall ;;
         "Debian Preseed Bootstrap") printf '%s\n' bootstrap-preseed ;;
         "Kickstart Bootstrap") printf '%s\n' bootstrap-kickstart ;;
+        "AutoYaST Bootstrap") printf '%s\n' bootstrap-autoyast ;;
         "Alpine Bootstrap") printf '%s\n' bootstrap-alpine ;;
         "Windows Bootstrap") printf '%s\n' bootstrap-windows ;;
         "pfSense Bootstrap") printf '%s\n' bootstrap-pfsense ;;
@@ -1382,6 +1389,11 @@ run_action() {
             ;;
         lab-plan)
             run_vmctl lab plan "$current_vm" || true
+            ;;
+        bootstrap-autoyast)
+            if confirm_box "AutoYaST Bootstrap" "Run the fully automated openSUSE AutoYaST bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the openSUSE DVD headless via serial console\n- run the AutoYaST profile (partitioning, patterns, chroot script)\n- start the installed VM and run SSH post-install\n\nExpected time: ~40 min depending on download speed."; then
+                run_vmctl bootstrap-autoyast "$current_vm" || true
+            fi
             ;;
         bootstrap-kickstart)
             if confirm_box "Kickstart Bootstrap" "Run the fully automated AlmaLinux/RHEL kickstart bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the AlmaLinux minimal ISO headless via serial console\n- automatically run kickstart install + %post (SSH keys, sudoers, SELinux)\n- start the installed VM and run SSH post-install\n\nExpected time: ~10 min depending on download speed."; then
