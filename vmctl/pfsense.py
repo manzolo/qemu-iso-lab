@@ -484,6 +484,8 @@ def ensure_install_iso(vm_name: str, vm: dict[str, Any], source_iso: Path, confi
                  "-extract", "/etc/rc.local", str(rc_original),
                  "-extract", "/usr/libexec/bsdinstall/script", str(bsdinstall_script)], dry_run=dry_run, quiet=True)
     if not dry_run:
+        for extracted in (rc_original, bsdinstall_script):
+            extracted.chmod(0o644)  # xorriso keeps the ISO's read-only mode; the script gets patched in place
         if RC_LOCAL_MARKER not in rc_original.read_text(encoding="utf-8", errors="replace"):
             raise VMError("Incompatible ISO: this flow needs the offline pfSense CE 2.7.2 installer (rc.local runs bsdinstall script)")
         bsdinstall_script.write_text(patch_bsdinstall_script(bsdinstall_script.read_text(encoding="utf-8", errors="replace")), encoding="utf-8")

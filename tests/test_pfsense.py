@@ -208,8 +208,11 @@ class PfsenseIsoBuildTests(PfsenseLabBase):
 
         def fake_run(cmd, **kwargs):
             if cmd[0] == "xorriso":
+                # xorriso -osirrox recreates the ISO's modes: the FreeBSD files are read-only (seen live)
                 (work / "rc.original").write_text("...\nbsdinstall script /etc/installerconfig\n", encoding="utf-8")
                 (work / "bsdinstall-script").write_text('x\nbsdinstall umount\nif [ "$ZFSBOOT_DISKS" ]; then\nfi\n', encoding="utf-8")
+                (work / "rc.original").chmod(0o555)
+                (work / "bsdinstall-script").chmod(0o555)
             elif cmd[0] == "cp":
                 Path(cmd[2]).write_bytes(Path(cmd[1]).read_bytes())
             elif cmd[0] == "growisofs":
