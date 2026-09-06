@@ -51,3 +51,6 @@ init-local-profile: ## Create vms/profiles/local.json from the example
 		printf "  [ok] created vms/profiles/local.json from the template\n"; \
 		printf "  edit YOUR_USER, the password/hash and the SSH/dotfile paths before using the *-local profiles\n"; \
 	fi
+
+guides: ## Render docs/guides/*.md into PDFs under docs/guides/pdf/ (needs python markdown + weasyprint)
+	python3 tools/build_guides.py
