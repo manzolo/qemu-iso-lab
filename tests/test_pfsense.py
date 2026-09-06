@@ -325,6 +325,29 @@ class PfsenseBootstrapTests(PfsenseLabBase):
             self.vmctl.cmd_bootstrap_pfsense(args)
         self.assertIn("bsdinstall reported a failure", str(ctx.exception))
 
+    def test_matrix_boots_the_installed_router_for_the_report_screenshot(self):
+        (self.root / "isos").mkdir(exist_ok=True)
+        (self.root / "isos/router.iso").write_bytes(b"x")  # otherwise the matrix skips: no ISO, no download source
+        args = argparse.Namespace(vms=["router"], timeout=5, dry_run=False, report="", _report_dir=str(self.root / "report"))
+        with mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_pfsense", return_value=0), \
+             mock.patch.object(vmctl.lifecycle, "start_installed_vm_headless") as boot, \
+             mock.patch.object(vmctl.lifecycle.time, "sleep") as sleep, \
+             mock.patch.object(vmctl.lifecycle.report, "capture") as capture, \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop", return_value=0) as stop:
+            status, _ = self.vmctl.run_local_test_vm("router", self.lab["router"], args)
+        self.assertEqual(status, "passed")
+        boot.assert_called_once()
+        sleep.assert_called_once_with(vmctl.lifecycle.INSTALL_ONLY_SCREENSHOT_WAIT_SEC)
+        capture.assert_called_once()
+        stop.assert_called_once()
+        # without a report nothing is booted
+        args = argparse.Namespace(vms=["router"], timeout=5, dry_run=False, report=None)
+        with mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_pfsense", return_value=0), \
+             mock.patch.object(vmctl.lifecycle, "start_installed_vm_headless") as boot, \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop", return_value=0):
+            self.vmctl.run_local_test_vm("router", self.lab["router"], args)
+        boot.assert_not_called()
+
     def test_requires_pfsense_config_and_dispatches_in_check_vms(self):
         with self.assertRaises(vmctl.errors.VMError):
             self.vmctl.cmd_bootstrap_pfsense(argparse.Namespace(vm=self.vm_name, timeout=1, dry_run=True))

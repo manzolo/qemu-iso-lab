@@ -261,6 +261,76 @@
         }
       },
       "usb_tablet": true
+    },
+    "windows7-unattended": {
+      "name": "Windows 7 Ultimate (unattended)",
+      "meta": {
+        "slug": "windows-7",
+        "family": "windows",
+        "role": "desktop",
+        "release_model": "legacy"
+      },
+      "iso": "isos/windows7.iso",
+      "disk": {
+        "path": "artifacts/windows7-unattended/disk.qcow2",
+        "size": "40G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "e1000e",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "qxl": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "acpi_poweroff_grace_sec": 300,
+      "notes": "Unattended Windows 7 Ultimate via bootstrap-windows, ported from kvm-lab's Windows7U: BIOS/MBR answer file (System Reserved + Windows), viostor injected in WinPE from the virtio-win CD (w7 drivers, network e1000e so no NetKVM needed), the Red Hat driver certificate imported in specialize from the seed CD (vmctl-cert.cmd), Skip*OOBE + NetworkLocation, autologon. No OpenSSH on Windows 7 and PowerShell 2.0 in the guest: the first-logon script only runs setup_commands, prints the completion token on COM1 and shuts down; there is no SSH post-install and check-vms reports the install alone. Guest tools (virtio-win, SPICE) stay a manual step; no virtiofs (no WinFSP for 7). Put the retail ISO at isos/windows7.iso or point 'iso' at it in local.json; image_index 4 = Ultimate on the standard multi-edition media. Retail media without the SHA-2 updates cannot verify newer drivers: the same virtio-win 0.1.285 viostor worked on this ISO in kvm-lab.",
+      "windows_config": {
+        "username": "lab",
+        "password": "lab",
+        "realname": "Lab User",
+        "computer_name": "WIN7-LAB",
+        "organization": "Lab",
+        "edition": "Windows 7 Ultimate",
+        "image_index": 4,
+        "language": "en-US",
+        "input_locale": "en-US",
+        "timezone": "UTC",
+        "driver_flavor": "w7",
+        "virtio_iso": "isos/virtio-win.iso",
+        "virtio_iso_url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso",
+        "bypass_requirements": false,
+        "install_guest_tools": false,
+        "install_openssh": false,
+        "setup_commands": []
+      }
     }
   }
 }

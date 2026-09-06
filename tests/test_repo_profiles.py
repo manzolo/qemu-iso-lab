@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
 import vmctl.config  # noqa: E402
 import vmctl.netlab  # noqa: E402
 import vmctl.state  # noqa: E402
+import vmctl.windows  # noqa: E402
 
 
 class RepositoryProfileCatalogTests(unittest.TestCase):
@@ -49,8 +50,19 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "pfsense-lab",
             "pihole-lab",
             "lubuntu22-lab",
+            "windows7-unattended",
         ):
             self.assertIn(profile, cfg["vms"])
+
+        # Windows 7: BIOS, e1000e (no NetKVM needed), no SSH (no OpenSSH on 7), generic identity.
+        w7 = cfg["vms"]["windows7-unattended"]
+        self.assertEqual(w7["firmware"]["type"], "bios")
+        self.assertEqual(w7["network_device"], "e1000e")
+        self.assertNotIn("ssh_provision", w7)
+        self.assertNotIn("shared_dir", w7)
+        self.assertTrue(vmctl.windows.is_legacy_windows(w7["windows_config"]))
+        self.assertEqual(w7["windows_config"]["username"], "lab")
+        self.assertFalse(w7["windows_config"]["bypass_requirements"])
 
         # The network lab: one topology on the router, members pointing at it, generic identities,
         # a local-only pfSense ISO and the Ubuntu 22.04.5 ISO with a public URL for the members.

@@ -115,7 +115,7 @@ prints them all; the table shows what each family offers.
 | Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms-local`, `almalinux-minimal`, `almalinux-server` | Fedora 42/44, niri + DankMaterialShell on Fedora, AlmaLinux 10.1 | `bootstrap-kickstart` |
 | openSUSE / NixOS / Void | `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros | interactive |
 | Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.23 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
-| Windows | `windows11-unattended`, `windows10-unattended`, `windows10-template`, `windows11-template` | unattended Windows 11 and 10 (autounattend.xml, virtio drivers, OpenSSH), import targets for physical disks (`vmctl import-device`) | `bootstrap-windows` |
+| Windows | `windows11-unattended`, `windows10-unattended`, `windows7-unattended`, `windows10-template`, `windows11-template` | unattended Windows 11 and 10 (autounattend.xml, virtio drivers, OpenSSH), Windows 7 Ultimate (BIOS/MBR, install only), import targets for physical disks (`vmctl import-device`) | `bootstrap-windows` |
 | Network lab | `pfsense-lab`, `pihole-lab`, `lubuntu22-lab` | pfSense CE 2.7.2 router + Pi-hole v6 + Lubuntu client on an isolated LAN segment (kvm-lab's network lab on plain QEMU; libvirt network after export) | `vmctl lab install`, `bootstrap-pfsense`, `bootstrap-unattended` |
 
 Profiles ending in `-local` are full desktop recipes with SSH provisioning,

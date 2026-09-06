@@ -351,7 +351,7 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
     if windows.windows_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-windows", "autounattend + post-install")
-        return ("skip", "windows_config without SSH post-install")
+        return ("bootstrap-windows", "autounattend install only (no SSH server: Windows 7)")
     ci = vm.get("ci", {})
     if isinstance(ci, dict) and ci.get("expect"):
         return ("boot-check", "serial boot expectation")
@@ -476,6 +476,20 @@ def maybe_clean_local_test_candidates(selected_names: list[str], cfg: dict[str, 
         vm = config.get_vm(cfg, vm_name)
         cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         clean_vm(vm_name, vm, dry_run=args.dry_run)
+
+
+INSTALL_ONLY_SCREENSHOT_WAIT_SEC = 120
+
+
+def boot_for_report_screenshot(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> None:
+    """Install-only flows (pfSense, Windows without SSH) end with the guest powered off, so there is
+    nothing to photograph: when a report is being written, boot the installed disk headless, give it
+    time to reach its console/desktop, and let the caller's capture + stop do the rest."""
+    if not getattr(args, "_report_dir", None) or args.dry_run:
+        return
+    ui.print_note(f"Report: booting the installed {vm_name} for the final screenshot")
+    start_installed_vm_headless(vm_name, vm, True, dry_run=False)
+    time.sleep(INSTALL_ONLY_SCREENSHOT_WAIT_SEC)
 
 
 def run_local_test_vm(
@@ -623,6 +637,8 @@ def run_local_test_vm(
                     _report_parent=args,
                 )
             )
+            if cloud_init.ssh_access_config(prepared_vm) is None:
+                boot_for_report_screenshot(vm_name, prepared_vm, args)
             args._report_phase = "post-install"
         finally:
             report.capture(vm_name, prepared_vm, args)
@@ -642,6 +658,7 @@ def run_local_test_vm(
                     _report_parent=args,
                 )
             )
+            boot_for_report_screenshot(vm_name, prepared_vm, args)
         finally:
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))

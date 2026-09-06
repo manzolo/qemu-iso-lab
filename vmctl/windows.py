@@ -61,7 +61,14 @@ GENERIC_PRODUCT_KEYS = {
     "Windows 10 Home": "TX9XD-98N7V-6WMQ6-BX7FG-H8Q99",
     "Windows 10 Enterprise": "NPPR9-FWDCX-D2C8J-H872K-2YT43",
     "Windows 10 Education": "NW6C2-QMPVW-D7KKK-3GKT6-VCFB2",
+    # Windows 7: KMS client keys (Enterprise/Professional); Ultimate is not a KMS edition, the
+    # Enterprise key installs the Ultimate image with /IMAGE/INDEX and leaves it unactivated,
+    # as kvm-lab did on the same ISO.
+    "Windows 7 Ultimate": "33PXH-7Y6KF-2VJC9-XBBR8-HVTHH",
+    "Windows 7 Enterprise": "33PXH-7Y6KF-2VJC9-XBBR8-HVTHH",
+    "Windows 7 Professional": "FJ82H-XT6CR-J8D7P-XQJJ2-GPDD4",
 }
+CERT_SCRIPT_NAME = "vmctl-cert.cmd"
 
 DEFAULT_WINFSP_URL = "https://github.com/winfsp/winfsp/releases/download/v2.1/winfsp-2.1.25156.msi"
 DEFAULT_VIRTIO_ISO = "isos/virtio-win.iso"
@@ -113,18 +120,35 @@ def computer_name(vm_name: str, cfg: dict[str, Any]) -> str:
 
 
 def edition_family(edition: str) -> str | None:
-    """``Pro`` / ``Home`` / ``Enterprise`` / ``Education`` from an image name such as
-    ``Windows 11 Pro``, ``Windows 11 Professional`` (UUP dump) or ``Windows 10 Pro N``."""
+    """``Pro`` / ``Home`` / ``Enterprise`` / ``Education`` / ``Ultimate`` from an image name such as
+    ``Windows 11 Pro``, ``Windows 11 Professional`` (UUP dump), ``Windows 10 Pro N`` or ``Windows 7 ULTIMATE``."""
     words = set(re.findall(r"[a-z]+", edition.lower()))
     for family, aliases in (
         ("Enterprise", {"enterprise"}),
         ("Education", {"education"}),
+        ("Ultimate", {"ultimate"}),
         ("Home", {"home", "core"}),
         ("Pro", {"pro", "professional"}),
     ):
         if words & aliases:
             return family
     return None
+
+
+def windows_generation(cfg: dict[str, Any]) -> str:
+    """``"7"``, ``"10"`` or ``"11"`` from the edition name (or ``driver_flavor`` w7/w10/w11)."""
+    edition = str(cfg.get("edition") or "Windows 11 Pro")
+    flavor = str(cfg.get("driver_flavor") or "")
+    if re.search(r"\b7\b", edition) or flavor == "w7":
+        return "7"
+    if "10" in edition or flavor == "w10":
+        return "10"
+    return "11"
+
+
+def is_legacy_windows(cfg: dict[str, Any]) -> bool:
+    """Windows 7: BIOS/MBR install, PowerShell 2.0, no OpenSSH capability, no WinFSP/virtiofs."""
+    return windows_generation(cfg) == "7"
 
 
 def product_key(cfg: dict[str, Any]) -> str:
@@ -135,8 +159,9 @@ def product_key(cfg: dict[str, Any]) -> str:
     generic = GENERIC_PRODUCT_KEYS.get(edition)
     if generic is None:
         family = edition_family(edition)
-        major = "10" if "10" in edition else "11"
-        generic = GENERIC_PRODUCT_KEYS.get(f"Windows {major} {family}") if family else None
+        if family == "Pro" and windows_generation(cfg) == "7":
+            family = "Professional"
+        generic = GENERIC_PRODUCT_KEYS.get(f"Windows {windows_generation(cfg)} {family}") if family else None
     if generic is None:
         raise VMError(f"No generic product key known for edition {edition!r}: set windows_config.product_key")
     return generic
@@ -154,6 +179,8 @@ def _resolve_ssh_pubkey(vm: dict[str, Any], dry_run: bool = False) -> str | None
 
 def install_openssh(vm: dict[str, Any]) -> bool:
     cfg = windows_config(vm) or {}
+    if is_legacy_windows(cfg):
+        return False  # Windows 7 has no OpenSSH capability; PowerShell 2.0 cannot install it either
     value = cfg.get("install_openssh")
     if value is None:
         return isinstance(vm.get("ssh_provision"), dict)
@@ -218,34 +245,49 @@ def render_autounattend(vm_name: str, vm: dict[str, Any]) -> str:
     language = str(cfg.get("language") or "en-US").strip()
     input_locale = str(cfg.get("input_locale") or language).strip()
     timezone = str(cfg.get("timezone") or "UTC").strip()
-    flavor = str(cfg.get("driver_flavor") or "w11").strip()
-    bypass = bool(cfg.get("bypass_requirements", True))
+    legacy = is_legacy_windows(cfg)
+    flavor = str(cfg.get("driver_flavor") or ("w7" if legacy else "w11")).strip()
+    bypass = bool(cfg.get("bypass_requirements", not legacy))
     auto_logon = bool(cfg.get("auto_logon", True))
     name = computer_name(vm_name, cfg)
     key = product_key(cfg)
-
-    international_pe = f"""    <component name="Microsoft-Windows-International-Core-WinPE" {_COMPONENT_ATTRS}>
-      <SetupUILanguage>
-        <UILanguage>{_x(language)}</UILanguage>
-      </SetupUILanguage>
-      <InputLocale>{_x(input_locale)}</InputLocale>
-      <SystemLocale>{_x(language)}</SystemLocale>
-      <UILanguage>{_x(language)}</UILanguage>
-      <UserLocale>{_x(language)}</UserLocale>
-    </component>"""
-
-    setup_pe = f"""    <component name="Microsoft-Windows-Setup" {_COMPONENT_ATTRS}>
-      <UserData>
-        <AcceptEula>true</AcceptEula>
-        <FullName>{_x(realname)}</FullName>
-        <Organization>{_x(organization)}</Organization>
-        <ProductKey>
-          <Key>{_x(key)}</Key>
-          <WillShowUI>OnError</WillShowUI>
-        </ProductKey>
-      </UserData>
-      <DiskConfiguration>
-        <Disk wcm:action="add">
+    if legacy:
+        # BIOS/MBR layout of Windows 7 Setup: the 100 MB "System Reserved" partition + Windows.
+        disk_xml = """        <Disk wcm:action="add">
+          <DiskID>0</DiskID>
+          <WillWipeDisk>true</WillWipeDisk>
+          <CreatePartitions>
+            <CreatePartition wcm:action="add">
+              <Order>1</Order>
+              <Type>Primary</Type>
+              <Size>100</Size>
+            </CreatePartition>
+            <CreatePartition wcm:action="add">
+              <Order>2</Order>
+              <Type>Primary</Type>
+              <Extend>true</Extend>
+            </CreatePartition>
+          </CreatePartitions>
+          <ModifyPartitions>
+            <ModifyPartition wcm:action="add">
+              <Order>1</Order>
+              <PartitionID>1</PartitionID>
+              <Label>System Reserved</Label>
+              <Format>NTFS</Format>
+              <Active>true</Active>
+            </ModifyPartition>
+            <ModifyPartition wcm:action="add">
+              <Order>2</Order>
+              <PartitionID>2</PartitionID>
+              <Label>Windows</Label>
+              <Format>NTFS</Format>
+              <Letter>C</Letter>
+            </ModifyPartition>
+          </ModifyPartitions>
+        </Disk>"""
+        install_partition = 2
+    else:
+        disk_xml = """        <Disk wcm:action="add">
           <DiskID>0</DiskID>
           <WillWipeDisk>true</WillWipeDisk>
           <CreatePartitions>
@@ -284,7 +326,31 @@ def render_autounattend(vm_name: str, vm: dict[str, Any]) -> str:
               <Letter>C</Letter>
             </ModifyPartition>
           </ModifyPartitions>
-        </Disk>
+        </Disk>"""
+        install_partition = 3
+
+    international_pe = f"""    <component name="Microsoft-Windows-International-Core-WinPE" {_COMPONENT_ATTRS}>
+      <SetupUILanguage>
+        <UILanguage>{_x(language)}</UILanguage>
+      </SetupUILanguage>
+      <InputLocale>{_x(input_locale)}</InputLocale>
+      <SystemLocale>{_x(language)}</SystemLocale>
+      <UILanguage>{_x(language)}</UILanguage>
+      <UserLocale>{_x(language)}</UserLocale>
+    </component>"""
+
+    setup_pe = f"""    <component name="Microsoft-Windows-Setup" {_COMPONENT_ATTRS}>
+      <UserData>
+        <AcceptEula>true</AcceptEula>
+        <FullName>{_x(realname)}</FullName>
+        <Organization>{_x(organization)}</Organization>
+        <ProductKey>
+          <Key>{_x(key)}</Key>
+          <WillShowUI>OnError</WillShowUI>
+        </ProductKey>
+      </UserData>
+      <DiskConfiguration>
+{disk_xml}
       </DiskConfiguration>
       <ImageInstall>
         <OSImage>
@@ -296,7 +362,7 @@ def render_autounattend(vm_name: str, vm: dict[str, Any]) -> str:
           </InstallFrom>
           <InstallTo>
             <DiskID>0</DiskID>
-            <PartitionID>3</PartitionID>
+            <PartitionID>{install_partition}</PartitionID>
           </InstallTo>
           <WillShowUI>OnError</WillShowUI>
         </OSImage>
@@ -325,6 +391,22 @@ def render_autounattend(vm_name: str, vm: dict[str, Any]) -> str:
       <UILanguage>{_x(language)}</UILanguage>
       <UserLocale>{_x(language)}</UserLocale>
     </component>"""
+    if legacy:
+        # Windows 7 keeps UAC on and the RunOnce first-logon script is not elevated, so the Red
+        # Hat driver certificate (needed by the later virtio driver installs) is imported here as
+        # SYSTEM. The command loops over the CD letters and always exits 0: a failure in
+        # specialize would otherwise block Setup with a dialog. Verified approach in kvm-lab.
+        cert_cmd = f"cmd.exe /c for %d in ({' '.join(DRIVER_CD_LETTERS)}) do if exist %d:\\{CERT_SCRIPT_NAME} call %d:\\{CERT_SCRIPT_NAME}"
+        specialize += f"""
+    <component name="Microsoft-Windows-Deployment" {_COMPONENT_ATTRS}>
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Path>{_x(cert_cmd)}</Path>
+          <Description>vmctl: import the Red Hat VirtIO certificate</Description>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>"""
 
     auto_logon_xml = ""
     if auto_logon:
@@ -341,6 +423,20 @@ def render_autounattend(vm_name: str, vm: dict[str, Any]) -> str:
 
     # International-Core must be declared in oobeSystem too: without it (and without the
     # deprecated Skip*OOBE flags) Windows 10 stops at the region/keyboard OOBE pages.
+    # Windows 7 still honours Skip*OOBE and needs NetworkLocation; Hide*AccountScreens do not exist there.
+    if legacy:
+        oobe_flags = """        <HideEULAPage>true</HideEULAPage>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <NetworkLocation>Work</NetworkLocation>
+        <ProtectYourPC>3</ProtectYourPC>
+        <SkipMachineOOBE>true</SkipMachineOOBE>
+        <SkipUserOOBE>true</SkipUserOOBE>"""
+    else:
+        oobe_flags = """        <HideEULAPage>true</HideEULAPage>
+        <HideLocalAccountScreen>true</HideLocalAccountScreen>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <ProtectYourPC>3</ProtectYourPC>"""
     oobe = f"""    <component name="Microsoft-Windows-International-Core" {_COMPONENT_ATTRS}>
       <InputLocale>{_x(input_locale)}</InputLocale>
       <SystemLocale>{_x(language)}</SystemLocale>
@@ -349,11 +445,7 @@ def render_autounattend(vm_name: str, vm: dict[str, Any]) -> str:
     </component>
     <component name="Microsoft-Windows-Shell-Setup" {_COMPONENT_ATTRS}>
       <OOBE>
-        <HideEULAPage>true</HideEULAPage>
-        <HideLocalAccountScreen>true</HideLocalAccountScreen>
-        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
-        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-        <ProtectYourPC>3</ProtectYourPC>
+{oobe_flags}
       </OOBE>
       <UserAccounts>
         <LocalAccounts>
@@ -401,6 +493,96 @@ def _ps_sq(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def render_cert_script() -> str:
+    """``vmctl-cert.cmd`` (Windows 7, specialize pass, SYSTEM): trust the Red Hat driver certificate."""
+    letters = " ".join(DRIVER_CD_LETTERS)
+    return (
+        "@echo off\r\n"
+        "setlocal EnableExtensions\r\n"
+        'set "LOG=C:\\vmctl-cert.log"\r\n'
+        'echo ==== vmctl-cert %DATE% %TIME% ==== > "%LOG%"\r\n'
+        'set "CERT="\r\n'
+        f"for %%D in ({letters}) do if exist \"%%D:\\cert\\Virtio_Win_Red_Hat_CA.cer\" set \"CERT=%%D:\\cert\\Virtio_Win_Red_Hat_CA.cer\"\r\n"
+        'if not defined CERT ( echo virtio-win certificate not found on any CD >> "%LOG%" & exit /b 0 )\r\n'
+        'echo Certificate: %CERT% >> "%LOG%"\r\n'
+        'certutil -addstore -f Root "%CERT%" >> "%LOG%" 2>&1\r\n'
+        'certutil -addstore -f TrustedPublisher "%CERT%" >> "%LOG%" 2>&1\r\n'
+        "reg add HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\NewNetworkWindowOff /f >> \"%LOG%\" 2>&1\r\n"
+        "exit /b 0\r\n"
+    )
+
+
+def render_legacy_setup_script(vm_name: str, vm: dict[str, Any]) -> str:
+    """``vmctl-setup.ps1`` for Windows 7: PowerShell 2.0, not elevated (UAC stays on), no OpenSSH.
+
+    It only runs the profile's ``setup_commands``, writes the completion token on COM1 and shuts
+    down: driver certificate trust happened in specialize (``vmctl-cert.cmd``), guest tools stay a
+    manual step (see the guide), there is no post-install because there is no SSH server.
+    """
+    cfg = windows_config(vm)
+    if cfg is None:
+        raise VMError("VM profile does not define windows_config")
+    _require_identity(cfg)
+    setup_commands: list[str] = [str(c) for c in (cfg.get("setup_commands") or [])]
+    command_blocks = []
+    for index, command in enumerate(setup_commands, start=1):
+        body = "\n".join(f"    {line}" for line in command.splitlines())
+        command_blocks.append(
+            f"Invoke-Step 'setup command {index}' {{\n"
+            "    $global:LASTEXITCODE = 0\n"
+            f"{body}\n"
+            "    if ($LASTEXITCODE -is [int] -and $LASTEXITCODE -ne 0) { throw \"exit code $LASTEXITCODE\" }\n"
+            "}"
+        )
+    commands_block = "\n".join(command_blocks) if command_blocks else "# (no setup_commands in the profile)"
+    return f"""# Windows 7 first-logon setup generated by vmctl for {vm_name} (PowerShell 2.0 compatible)
+# Launched from the VMCTLSEED CD-ROM by FirstLogonCommands as the autologon user (not elevated: UAC is on).
+$ErrorActionPreference = 'Stop'
+$LogDir = {_ps_sq(GUEST_LOG_DIR)}
+New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+$LogFile = Join-Path $LogDir 'setup.log'
+$script:Failures = @()
+
+function Write-Serial([string]$Text) {{
+    try {{
+        $port = New-Object System.IO.Ports.SerialPort 'COM1', 115200, 'None', 8, 'One'
+        $port.Open()
+        $port.WriteLine($Text)
+        $port.Close()
+    }} catch {{ }}
+}}
+
+function Log([string]$Message) {{
+    $line = "[vmctl-windows] $Message"
+    Add-Content -Path $LogFile -Value $line
+    Write-Serial $line
+}}
+
+function Invoke-Step([string]$Name, [scriptblock]$Body) {{
+    Log "Step: $Name"
+    try {{
+        & $Body
+    }} catch {{
+        $script:Failures += $Name
+        Log "ERROR in step '$Name': $($_.Exception.Message)"
+    }}
+}}
+
+Log "Setup script started on $env:COMPUTERNAME as $env:USERNAME (Windows 7, PowerShell $($PSVersionTable.PSVersion))"
+{commands_block}
+
+if ($script:Failures.Count -eq 0) {{
+    Set-Content -Path (Join-Path $LogDir 'setup-done.txt') -Value 'done'
+    Log "Setup script finished"
+    Write-Serial {_ps_sq(BOOTSTRAP_COMPLETE_TOKEN)}
+}} else {{
+    Log "Setup script FAILED in: $($script:Failures -join ', ')"
+    Write-Serial "{BOOTSTRAP_FAILED_TOKEN}: $($script:Failures -join ', ')"
+}}
+shutdown.exe /s /t 10 /f
+"""
+
+
 def render_setup_script(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> str:
     """Render ``vmctl-setup.ps1``: runs once at the first (auto)logon of the administrator.
 
@@ -414,6 +596,8 @@ def render_setup_script(vm_name: str, vm: dict[str, Any], dry_run: bool = False)
     if cfg is None:
         raise VMError("VM profile does not define windows_config")
     _require_identity(cfg)
+    if is_legacy_windows(cfg):
+        return render_legacy_setup_script(vm_name, vm)
     guest_tools = bool(cfg.get("install_guest_tools", True))
     setup_commands: list[str] = [str(c) for c in (cfg.get("setup_commands") or [])]
     pubkey = _resolve_ssh_pubkey(vm, dry_run=dry_run) if install_openssh(vm) else None
@@ -588,12 +772,15 @@ shutdown.exe /s /t 10 /f
 
 def create_windows_seed_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
     """Pack autounattend.xml + the setup script into the VMCTLSEED ISO (root of a CD-ROM)."""
+    files = {
+        "autounattend.xml": render_autounattend(vm_name, vm),
+        SETUP_SCRIPT_NAME: render_setup_script(vm_name, vm, dry_run=dry_run),
+    }
+    if is_legacy_windows(windows_config(vm) or {}):
+        files[CERT_SCRIPT_NAME] = render_cert_script()
     return cloud_init.create_iso_with_files(
         windows_artifact_dir(vm),
-        {
-            "autounattend.xml": render_autounattend(vm_name, vm),
-            SETUP_SCRIPT_NAME: render_setup_script(vm_name, vm, dry_run=dry_run),
-        },
+        files,
         dry_run=dry_run,
         volume_id=SEED_VOLUME_ID,
     )

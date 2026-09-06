@@ -349,6 +349,20 @@ split, its own shutdown is the flush, so the token is written right before
 `shutdown /s` and `run_and_expect` waits up to `windows.SHUTDOWN_GRACE_SEC`
 (10 minutes) for QEMU to exit on its own instead of the usual 30 seconds.
 
+### Windows 7 on the same flow
+
+`windows7-unattended` (kvm-lab's `Windows7U`) reuses `bootstrap-windows` with the
+legacy branch of `windows.py`, selected by the edition name (`Windows 7 ...`) or
+`driver_flavor: w7`: BIOS profile and MBR disk layout (System Reserved + Windows),
+no `LabConfig` bypass, `viostor` from the `w7` directory of the virtio-win CD
+(the NIC is `e1000e`, native on 7), `Skip*OOBE` + `NetworkLocation`, and one
+specialize command, `vmctl-cert.cmd` from the seed, that imports the Red Hat
+driver certificate as SYSTEM and always exits 0. Windows 7 has no OpenSSH
+capability and ships PowerShell 2.0, so the first-logon script only runs
+`setup_commands`, prints the token on COM1 and shuts down: no SSH post-install,
+no `vmctl shell`, no virtiofs (no WinFSP); `check-vms` treats a Windows profile
+without `ssh_provision` as "install only". Guest tools are a manual step.
+
 ## pfSense: scripted bsdinstall
 
 ```bash

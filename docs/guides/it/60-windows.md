@@ -112,3 +112,28 @@ I file generati sono in `artifacts/<vm>/windows/` (`autounattend.xml`, `vmctl-se
 `seed.iso`). Qualunque QEMU o libvirt che avvii la ISO senza prompt con quel seed e la ISO
 virtio-win come CD aggiuntivi riproduce la stessa installazione; il seriale (COM1) è
 facoltativo, serve solo a leggere i progressi.
+
+## 8. Windows 7 Ultimate (`windows7-unattended`)
+
+Stesso comando (`vmctl bootstrap-windows windows7-unattended`), stessa tecnica del `Windows7U`
+di kvm-lab, con le differenze che Windows 7 impone:
+
+- **BIOS e MBR**: profilo con `firmware.type: bios`, answer file con partizione "System
+  Reserved" (100 MB, attiva) + Windows; nessun bypass TPM/CPU (`LabConfig`) perché non serve.
+- **Driver**: `viostor` iniettato in WinPE dal CD virtio-win (`driver_flavor: w7`); la rete è
+  `e1000e`, nativa su Windows 7, quindi NetKVM non è necessario. Il certificato Red Hat dei
+  driver viene importato nel pass specialize (come SYSTEM) da `vmctl-cert.cmd` sul seed:
+  è l'unico comando in specialize e termina sempre con esito 0.
+- **Edizione**: `image_index: 4` (Ultimate sul media multi-edizione standard) e chiave KMS
+  generica `33PXH-7Y6KF-2VJC9-XBBR8-HVTHH`; installa, non attiva.
+- **OOBE**: `SkipMachineOOBE`/`SkipUserOOBE` (qui funzionano), `NetworkLocation=Work`,
+  autologon.
+- **Primo logon**: PowerShell 2.0, non elevato (UAC resta attivo): lo script esegue solo i
+  `setup_commands`, scrive `==> Windows installation complete!` su COM1 e spegne. **Niente
+  OpenSSH** su Windows 7, quindi nessun post-install SSH: `check-vms` considera passata la sola
+  installazione, e `vmctl shell` non è disponibile. Guest tools virtio/SPICE restano un passo
+  manuale (`virtio-win-guest-tools.exe` dal CD virtio-win, come in kvm-lab); niente cartella
+  condivisa virtiofs (WinFSP non esiste per 7).
+- **ISO**: `isos/windows7.iso` o il percorso in `local.json`; la ISO senza prompt viene
+  ricostruita una volta come per 10 e 11 (`bootfix.bin` svuotato basta per il boot BIOS).
+

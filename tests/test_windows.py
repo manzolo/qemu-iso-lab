@@ -145,7 +145,7 @@ class WindowsRenderTests(BaseVmctlTestCase):
         self.assertEqual(vmctl.windows.product_key({"edition": "Windows 11 Professional"}), "W269N-WFGWX-YVC9B-4J6C9-T83GX")
         self.assertEqual(vmctl.windows.product_key({"edition": "Windows 10 Pro N"}), "W269N-WFGWX-YVC9B-4J6C9-T83GX")
         self.assertEqual(vmctl.windows.product_key({"edition": "Windows 11 Home Single Language"}), "TX9XD-98N7V-6WMQ6-BX7FG-H8Q99")
-        self.assertEqual(vmctl.windows.edition_family("Windows 11 Ultimate Deluxe"), None)
+        self.assertEqual(vmctl.windows.edition_family("Windows 11 Starter Deluxe"), None)
 
     def test_image_index_replaces_the_image_name(self):
         self._windows_vm(image_index=1)
@@ -380,6 +380,92 @@ class WindowsMediaTests(BaseVmctlTestCase):
         self.assertFalse(result.exists())
 
 
+class Windows7RenderTests(BaseVmctlTestCase):
+    """Windows 7 rides the same flow with a BIOS/MBR answer file, PowerShell 2.0 and no OpenSSH."""
+
+    def _win7(self, **extra) -> None:
+        self.vm_config["firmware"] = {"type": "bios"}
+        self.vm_config["windows_config"] = {
+            "username": "lab", "password": "lab", "realname": "Lab User", "edition": "Windows 7 Ultimate",
+            "image_index": 4, "language": "it-IT", "timezone": "W. Europe Standard Time", **extra,
+        }
+
+    def test_generation_family_and_keys(self):
+        self.assertEqual(vmctl.windows.edition_family("Windows 7 ULTIMATE"), "Ultimate")
+        self.assertEqual(vmctl.windows.windows_generation({"edition": "Windows 7 Ultimate"}), "7")
+        self.assertEqual(vmctl.windows.windows_generation({"edition": "Windows 10 Pro"}), "10")
+        self.assertEqual(vmctl.windows.windows_generation({"edition": "Windows 11 Pro"}), "11")
+        self.assertEqual(vmctl.windows.windows_generation({"driver_flavor": "w7"}), "7")
+        self.assertEqual(vmctl.windows.product_key({"edition": "Windows 7 Ultimate"}), "33PXH-7Y6KF-2VJC9-XBBR8-HVTHH")
+        self.assertEqual(vmctl.windows.product_key({"edition": "Windows 7 PROFESSIONAL"}), "FJ82H-XT6CR-J8D7P-XQJJ2-GPDD4")
+        self.assertTrue(vmctl.windows.is_legacy_windows({"edition": "Windows 7 Enterprise"}))
+        self.assertFalse(vmctl.windows.is_legacy_windows({"edition": "Windows 10 Pro"}))
+
+    def test_autounattend_is_bios_mbr_without_bypass_and_trusts_the_driver_certificate(self):
+        self._win7()
+        xml = vmctl.windows.render_autounattend(self.vm_name, self.vm_config)
+        ET.fromstring(xml)
+        self.assertIn("<Label>System Reserved</Label>", xml)
+        self.assertIn("<Active>true</Active>", xml)
+        self.assertNotIn("<Type>EFI</Type>", xml)
+        self.assertNotIn("<Type>MSR</Type>", xml)
+        self.assertIn("<PartitionID>2</PartitionID>\n          </InstallTo>", xml)
+        self.assertIn("<Key>/IMAGE/INDEX</Key>", xml)
+        self.assertIn("<Value>4</Value>", xml)
+        self.assertIn("<Key>33PXH-7Y6KF-2VJC9-XBBR8-HVTHH</Key>", xml)
+        self.assertNotIn("LabConfig", xml)  # no TPM/CPU bypass on Windows 7
+        self.assertIn("D:\\viostor\\w7\\amd64", xml)
+        self.assertIn("G:\\NetKVM\\w7\\amd64", xml)
+        self.assertIn("<SkipMachineOOBE>true</SkipMachineOOBE>", xml)
+        self.assertIn("<SkipUserOOBE>true</SkipUserOOBE>", xml)
+        self.assertIn("<NetworkLocation>Work</NetworkLocation>", xml)
+        self.assertNotIn("HideLocalAccountScreen", xml)
+        self.assertNotIn("HideOnlineAccountScreens", xml)
+        # the only specialize command: the certificate import, looping over the CD letters, never failing
+        self.assertIn("<Path>cmd.exe /c for %d in (D E F G) do if exist %d:\\vmctl-cert.cmd call %d:\\vmctl-cert.cmd</Path>", xml)
+        self.assertIn("<CommandLine>cmd.exe /c for %d in (D E F G) do if exist %d:\\vmctl-setup.ps1", xml)
+
+    def test_windows_11_answer_file_is_untouched_by_the_legacy_branch(self):
+        self.vm_config["windows_config"] = {"username": "lab", "password": "lab", "edition": "Windows 11 Pro"}
+        xml = vmctl.windows.render_autounattend(self.vm_name, self.vm_config)
+        self.assertIn("<Type>EFI</Type>", xml)
+        self.assertIn("LabConfig", xml)
+        self.assertNotIn("SkipMachineOOBE", xml)
+        self.assertNotIn("vmctl-cert.cmd", xml)
+        self.assertIn("<HideLocalAccountScreen>true</HideLocalAccountScreen>", xml)
+
+    def test_legacy_setup_script_is_powershell_2_and_has_no_openssh(self):
+        self._win7(setup_commands=["Write-Host 'hi'"])
+        script = vmctl.windows.render_setup_script(self.vm_name, self.vm_config)
+        for forbidden in ("Add-WindowsCapability", "Get-CimInstance", "-notin", "Invoke-WebRequest", "New-NetFirewallRule", "powercfg", "virtio-win-guest-tools"):
+            self.assertNotIn(forbidden, script, forbidden)
+        self.assertIn("System.IO.Ports.SerialPort 'COM1'", script)
+        self.assertIn(vmctl.windows.BOOTSTRAP_COMPLETE_TOKEN, script)
+        self.assertIn(vmctl.windows.BOOTSTRAP_FAILED_TOKEN, script)
+        self.assertIn("Invoke-Step 'setup command 1'", script)
+        self.assertIn("shutdown.exe /s /t 10 /f", script)
+        self.assertFalse(vmctl.windows.install_openssh(self.vm_config))
+        self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2240}
+        self.assertFalse(vmctl.windows.install_openssh(self.vm_config))  # even when asked: not available on 7
+
+    def test_cert_script_and_seed_contents(self):
+        cert = vmctl.windows.render_cert_script()
+        self.assertIn("certutil -addstore -f Root", cert)
+        self.assertIn("certutil -addstore -f TrustedPublisher", cert)
+        self.assertIn("Virtio_Win_Red_Hat_CA.cer", cert)
+        self.assertTrue(cert.rstrip().endswith("exit /b 0"))
+        self.assertIn("\r\n", cert)
+        self._win7()
+        with mock.patch.object(vmctl.cloud_init, "create_iso_with_files", return_value=self.root / "seed.iso") as create:
+            vmctl.windows.create_windows_seed_iso(self.vm_name, self.vm_config)
+        self.assertEqual(sorted(create.call_args.args[1]), ["autounattend.xml", "vmctl-cert.cmd", "vmctl-setup.ps1"])
+        self.vm_config["windows_config"]["edition"] = "Windows 11 Pro"
+        self.vm_config["firmware"] = {"type": "efi", "code": "c", "vars_template": "t", "vars_path": "artifacts/testvm/VARS.fd"}
+        with mock.patch.object(vmctl.cloud_init, "create_iso_with_files", return_value=self.root / "seed.iso") as create:
+            vmctl.windows.create_windows_seed_iso(self.vm_name, self.vm_config)
+        self.assertEqual(sorted(create.call_args.args[1]), ["autounattend.xml", "vmctl-setup.ps1"])
+
+
 class WindowsBootstrapTests(BaseVmctlTestCase):
     def _windows_vm(self) -> None:
         self.vm_config["windows_config"] = {"username": "tester", "password": "pw"}
@@ -545,7 +631,10 @@ class WindowsBootstrapTests(BaseVmctlTestCase):
         self._windows_vm()
         self.assertEqual(self.vmctl.local_test_mode(self.vm_config)[0], "bootstrap-windows")
         del self.vm_config["ssh_provision"]
-        self.assertEqual(self.vmctl.local_test_mode(self.vm_config)[0], "skip")
+        # no SSH server (Windows 7): the matrix still installs, it only skips the post-install
+        mode, note = self.vmctl.local_test_mode(self.vm_config)
+        self.assertEqual(mode, "bootstrap-windows")
+        self.assertIn("install only", note)
 
     def test_local_test_skips_when_the_iso_is_missing_and_not_downloadable(self):
         self._windows_vm()
