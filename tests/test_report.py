@@ -41,6 +41,17 @@ class ReportTests(BaseVmctlTestCase):
         self.assertNotIn("<script>", html)
         self.assertNotIn('src="http', html)
 
+    def test_cards_and_badges_are_status_filters(self):
+        results = [{"id": "a", "name": "A", "flow": "boot-check", "status": "PASS", "phase": "boot", "seconds": 1, "detail": ""},
+                   {"id": "b", "name": "B", "flow": "bootstrap-preseed", "status": "FAIL", "phase": "install", "seconds": 2, "detail": "x"}]
+        html_text = report.render_html(results, {"host": "h", "date": "2026-09-06T00:00:00+00:00", "commit": "abc"}, self.root)
+        self.assertIn('<button type="button" class="metric PASS" data-status="PASS"', html_text)
+        self.assertIn('<button type="button" class="metric total" data-status=""', html_text)
+        self.assertIn('<button type="button" class="badge FAIL" data-status="FAIL"', html_text)
+        self.assertNotIn('<span class="badge', html_text)
+        self.assertIn("function setStatus(value)", html_text)
+        self.assertIn(".metric[data-status], .badge[data-status]", html_text)
+
     def test_capture_qmp_arguments(self):
         def qmp_call(path, command, **kwargs):
             self.assertEqual(command, "screendump")

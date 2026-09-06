@@ -156,11 +156,12 @@ def render_html(results: list[dict[str, Any]], metadata: dict[str, str], directo
     counts = {status: sum(r["status"] == status for r in results) for status in ("PASS", "WARN", "FAIL", "SKIP")}
     overall = "FAIL" if counts["FAIL"] else "WARN" if counts["WARN"] else "PASS" if counts["PASS"] else "SKIP"
     headline = {"PASS": "All checks passed", "WARN": "Completed with warnings", "FAIL": "Some checks failed", "SKIP": "No checks completed"}[overall]
-    cards = f'<div class="metric total"><span>Total profiles</span><strong>{len(results)}</strong><small>Validation matrix</small></div>'
+    cards = (f'<button type="button" class="metric total" data-status="" title="Show every VM"><span>Total profiles</span>'
+             f'<strong>{len(results)}</strong><small>Validation matrix · show all</small></button>')
     labels = {"PASS": "Passed", "WARN": "Warnings", "FAIL": "Failed", "SKIP": "Skipped"}
     for status, count in counts.items():
-        cards += (f'<div class="metric {status}"><span>{labels[status]}</span><strong>{count}</strong>'
-                  f'<small>{status}: {count}</small></div>')
+        cards += (f'<button type="button" class="metric {status}" data-status="{status}" title="Show only {status} results">'
+                  f'<span>{labels[status]}</span><strong>{count}</strong><small>{status}: {count} · click to filter</small></button>')
     rows: list[str] = []
     lightboxes: list[str] = []
     for index, result in enumerate(results, 1):
@@ -188,7 +189,7 @@ def render_html(results: list[dict[str, Any]], metadata: dict[str, str], directo
             f'<tr data-vm="{esc(str(result.get("name", "")) + " " + str(result.get("id", "")))}" data-status="{status}"><td class="vm-cell"><span class="row-number">{index:02d}</span><div><strong>{esc(result.get("name", ""))}</strong>'
             f'<code>{esc(result.get("id", ""))}</code></div></td>'
             f'<td><code class="flow">{esc(result.get("flow", ""))}</code></td>'
-            f'<td><span class="badge {status}"><i></i>{status}</span></td>'
+            f'<td><button type="button" class="badge {status}" data-status="{status}" title="Show only {status} results"><i></i>{status}</button></td>'
             f'<td><span class="phase">{esc(result.get("phase", ""))}</span></td>'
             f'<td class="duration"><strong>{duration}</strong><small>{seconds:g} s</small></td>'
             f'<td class="detail">{esc(result.get("detail", ""))}</td><td>{image}</td></tr>')
@@ -219,6 +220,9 @@ h1{font-size:32px;line-height:1.2;letter-spacing:-.035em;margin:15px 0 10px;font
 .metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin:0 0 32px}.metric{padding:20px 22px;
 border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,#172235,#111a28);position:relative;overflow:hidden}
 .metric:before{content:"";position:absolute;left:0;top:20px;bottom:20px;width:3px;background:currentColor;border-radius:4px}
+.metric{font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;transition:border-color .15s,transform .15s}
+.metric:hover{border-color:currentColor;transform:translateY(-1px)}.metric:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.metric.active{border-color:currentColor;box-shadow:0 0 0 1px currentColor inset,0 10px 30px #0004}
 .metric span{display:block;font-size:12px;font-weight:600}.metric strong{display:block;font-size:34px;line-height:1.3;margin:8px 0;font-weight:650;
 font-variant-numeric:tabular-nums;letter-spacing:-.04em}.metric small{color:var(--muted);font-size:11px}.total{color:var(--blue)}
 .PASS{color:var(--green)}.WARN{color:var(--amber)}.FAIL{color:var(--red)}.SKIP{color:#9eabc0}
@@ -240,7 +244,8 @@ tr:hover td{background:#17233580}.vm-cell{display:flex;gap:12px}.row-number{colo
 .vm-cell strong{display:block;font-size:14px;font-weight:600;margin-bottom:6px}.vm-cell code{font-size:11px;color:var(--muted);white-space:normal;
 overflow-wrap:break-word}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.flow{font-size:11px;white-space:nowrap;color:#bfd0e7}
 .badge{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;font-size:10px;font-weight:750;letter-spacing:.04em;border-radius:6px;
-background:#ffffff06;border:1px solid #ffffff0d;white-space:nowrap}.badge.PASS{background:#143c2b;border-color:#24523e}.badge.FAIL{background:#422332;border-color:#633546}
+background:#ffffff06;border:1px solid #ffffff0d;white-space:nowrap;font-family:inherit;cursor:pointer}.badge:hover{border-color:currentColor}
+.badge:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.badge.PASS{background:#143c2b;border-color:#24523e}.badge.FAIL{background:#422332;border-color:#633546}
 .badge.WARN{background:#3a3220;border-color:#584a2e}.badge i{width:5px;height:5px;background:currentColor;border-radius:50%}
 .phase{font-size:11px;color:#b2c2d7;padding:5px 8px;border-radius:5px;background:#1e2a3b;display:inline-block;white-space:nowrap}
 .duration strong{display:block;font-size:12px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}.duration small{display:block;
@@ -288,6 +293,18 @@ function applyFilters() {
   counter.textContent = `Showing ${shown} of ${rows.length} VMs`;
   empty.hidden = shown !== 0;
   reset.disabled = !search.value && !status.value;
+  for (const card of document.querySelectorAll('.metric[data-status]')) {
+    card.classList.toggle('active', card.dataset.status === status.value);
+  }
+}
+function setStatus(value) {
+  // a card or a badge filters on its status; clicking the active one again shows every result
+  status.value = status.value === value ? '' : value;
+  applyFilters();
+  document.getElementById('results').scrollIntoView({ block: 'nearest' });
+}
+for (const trigger of document.querySelectorAll('.metric[data-status], .badge[data-status]')) {
+  trigger.addEventListener('click', () => setStatus(trigger.dataset.status));
 }
 search.addEventListener('input', applyFilters);
 status.addEventListener('change', applyFilters);
