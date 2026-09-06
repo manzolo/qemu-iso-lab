@@ -354,6 +354,16 @@ class VmtuiTests(unittest.TestCase):
         # the import templates keep the manual flow
         self.assertNotIn("Windows Bootstrap", self._unified_menu("windows11-template"))
 
+    def test_unified_menu_for_pfsense_router(self):
+        output = self._unified_menu("pfsense-lab")
+        self.assertIn("pfSense Bootstrap", output)
+        self.assertIn("Network Lab Plan", output)
+        self.assertNotIn("Windows Bootstrap", output)
+        result = self.run_bash("source bin/vmtui; load_vm_facts pfsense-lab; recommended_action")
+        self.assertEqual(result.stdout.strip(), "pfSense Bootstrap")
+        # the Linux members ride the Ubuntu autoinstall flow
+        self.assertIn("Full Bootstrap", self._unified_menu("pihole-lab"))
+
     def test_unified_menu_for_alpine_vm(self):
         output = self._unified_menu("alpine-niri")
         self.assertIn("Alpine Bootstrap", output)
@@ -475,6 +485,8 @@ class VmtuiTests(unittest.TestCase):
             ("Kickstart Bootstrap", "bootstrap-kickstart"),
             ("Alpine Bootstrap", "bootstrap-alpine"),
             ("Windows Bootstrap", "bootstrap-windows"),
+            ("pfSense Bootstrap", "bootstrap-pfsense"),
+            ("Network Lab Plan", "lab-plan"),
             ("Attach Display", "attach"),
             ("Unattended Install", "full-auto-install"),
             ("Cloud-Init Flow", "cloud-init-install"),

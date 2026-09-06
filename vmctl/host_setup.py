@@ -28,7 +28,7 @@ def host_install_hints() -> list[str]:
     return [
         "Install QEMU, Python 3, make, and OVMF/edk2 firmware with your distro package manager.",
         "Optional: install dialog if you want to use make tui.",
-        "Optional: virtiofsd for shared_dir profiles, 7z (p7zip) for bootstrap-windows.",
+        "Optional: virtiofsd for shared_dir profiles, 7z (p7zip) for bootstrap-windows, growisofs (dvd+rw-tools) + python bcrypt for bootstrap-pfsense.",
     ]
 
 
@@ -56,6 +56,8 @@ def host_install_commands() -> list[list[str]] | None:
             "xorriso",
             "virtiofsd",
             "p7zip",
+            "dvd+rw-tools",
+            "python-bcrypt",
         ]]
     if {"debian", "ubuntu"} & distro_tokens:
         return [
@@ -75,6 +77,8 @@ def host_install_commands() -> list[list[str]] | None:
                 "xorriso",
                 "virtiofsd",
                 "p7zip-full",
+                "dvd+rw-tools",
+                "python3-bcrypt",
             ],
         ]
     return None

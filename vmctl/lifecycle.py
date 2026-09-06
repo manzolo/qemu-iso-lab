@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import alpine, archinstall, cloud_init, config, host_setup, iso, libvirt, omarchy, preseed, kickstart, qemu, report, runtime, ssh, state, ui, windows
+from vmctl import alpine, archinstall, cloud_init, config, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, report, runtime, ssh, state, ui, windows
 from vmctl.errors import VMError
 
 
@@ -341,6 +341,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-alpine", "setup-alpine + post-install")
         return ("skip", "alpine_config without SSH post-install")
+    if pfsense.pfsense_config(vm) is not None:
+        return ("bootstrap-pfsense", "pfSense scripted install (network lab router)")
     if windows.windows_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-windows", "autounattend + post-install")
@@ -607,6 +609,24 @@ def run_local_test_vm(
                 )
             )
             args._report_phase = "post-install"
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-pfsense":
+        try:
+            cmd_bootstrap_pfsense(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
         finally:
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
@@ -1034,6 +1054,7 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
         no_reboot=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
+        network_phase="install",
     )
     install_qemu_args += ["-cdrom", str(iso_path)]
     install_qemu_args += archinstall.config_iso_drive_args(bootstrap_iso)
@@ -1068,6 +1089,7 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
         accel=automation_accel(vm),
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
+        network_phase="install",
     )
     post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     runtime.ensure_parent(post_serial_log)
@@ -1111,6 +1133,7 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
         no_reboot=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
+        network_phase="install",
     )
     install_qemu_args += ["-cdrom", str(iso_path)]
     install_qemu_args += alpine.seed_iso_drive_args(seed_iso)
@@ -1143,6 +1166,7 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
         accel=automation_accel(vm),
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
+        network_phase="install",
     )
     post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     runtime.ensure_parent(post_serial_log)
@@ -1169,6 +1193,7 @@ def start_installed_vm_headless(vm_name: str, vm: dict[str, Any], disk_exists: b
         accel=automation_accel(vm),
         headless=True,
         allow_missing_disk=dry_run and not disk_exists,
+        network_phase="install",
     )
     post_serial_log = runtime.resolve_path(f"artifacts/{vm_name}/logs/post-install-serial.log")
     runtime.ensure_parent(post_serial_log)
@@ -1230,6 +1255,7 @@ def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
         disk_bootindex=1,
+        network_phase="install",
     )
     install_qemu_args += windows.install_media_args(install_iso, virtio_iso, seed_iso)
 
@@ -1267,6 +1293,164 @@ def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
     return 0
 
 
+def pfsense_source_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
+    """The retail pfSense CE ISO: Netgate publishes no stable URL, so it is a local file (local.json may point at it)."""
+    iso_path = runtime.resolve_path(vm["iso"])
+    if iso_path.is_file():
+        return iso_path
+    if iso.iso_url_candidates(vm, allow_discovery=False):
+        return iso.ensure_iso(vm, dry_run=dry_run)
+    if dry_run:
+        ui.print_status("warn", f"ISO {ui.pretty_path(iso_path)} is missing: dry-run continues with the path", ok=False)
+        return iso_path
+    raise VMError(
+        f"pfSense ISO not found: {iso_path}. Download pfSense CE 2.7.2 (amd64, DVD image) from Netgate, "
+        f"then put it there or set \"iso\" for '{vm_name}' in vms/profiles/local.json"
+    )
+
+
+def cmd_bootstrap_pfsense(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if pfsense.pfsense_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define pfsense_config")
+    pfsense.check_profile(args.vm, vm)
+    top = netlab.topology(cfg, args.vm)
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap pfSense (scripted bsdinstall): {args.vm}")
+    for line in netlab.describe(top):
+        ui.print_note(line)
+
+    source_iso = pfsense_source_iso(args.vm, vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    config_xml = pfsense.render_config_xml(
+        args.vm, vm, top,
+        password_hash="dry-run" if args.dry_run else None,
+        authorized_keys=cloud_init._authorized_keys_for_vm(vm, dry_run=args.dry_run),
+    )
+    install_iso = pfsense.ensure_install_iso(args.vm, vm, source_iso, config_xml, dry_run=args.dry_run)
+
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+        disk_bootindex=1,
+        network_phase="install",
+    )
+    install_qemu_args += pfsense.install_media_args(install_iso)
+
+    ui.print_note("Booting the pfSense installer — waiting for the completion token on the serial console...")
+    ui.print_note(f"Watch the screen with: vmctl attach {args.vm}")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    try:
+        qemu.run_and_expect(
+            install_qemu_args,
+            expected_text=pfsense.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=getattr(args, "timeout", 1800),
+            dry_run=args.dry_run,
+            log_path=serial_log,
+            exit_grace_sec=pfsense.SHUTDOWN_GRACE_SEC,
+        )
+    except VMError as exc:
+        if pfsense.BOOTSTRAP_FAILED_TOKEN in str(exc):
+            raise VMError(
+                f"pfSense bsdinstall reported a failure (the installer log follows the token in {ui.pretty_path(serial_log)})"
+            ) from exc
+        raise
+    ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
+    router_user = str((pfsense.pfsense_config(vm) or {}).get("username"))
+    for host_port, guest_port in sorted(top["router_gui"].items()):
+        scheme = "https" if guest_port == 443 else "http"
+        ui.print_note(f"Web GUI once started: {scheme}://127.0.0.1:{host_port}/  (user {router_user} or admin)")
+    ui.print_note(f"Start it with: vmctl start {args.vm} --headless --background   (or: vmctl lab up)")
+    return 0
+
+
+def cmd_lab(args: argparse.Namespace) -> int:
+    """Network lab orchestration: plan, install (router, Pi-hole, clients in order), up/down, status, attach."""
+    cfg = config.load_config()
+    action = str(args.action)
+    if action == "attach":
+        if not args.vm:
+            raise VMError("lab attach needs the profile to connect: vmctl lab attach <vm> [--apply]")
+        router = netlab.resolve_router(cfg, getattr(args, "router", None))
+        snippet = netlab.attach_snippet(cfg, router, args.vm)
+        top = netlab.topology(cfg, router)
+        ui.print_header(f"Attach {args.vm} to {top['lan']['name']}")
+        ui.print_note(f"Gateway {top['router_ip']}, DNS {top['dns_ip']}: the guest takes DHCP from Pi-hole or a free static address outside "
+                      f"{top['dhcp']['start']}-{top['dhcp']['end']}. Nothing is changed inside the guest.")
+        if not getattr(args, "apply", False):
+            ui.print_note("Add this to vms/profiles/local.json (or rerun with --apply):")
+            print(json.dumps(snippet, indent=2))
+            return 0
+        path = netlab.write_local_override(snippet, dry_run=args.dry_run)
+        ui.print_status("ok", f"{args.vm} now lists a {top['lan']['name']} NIC in {ui.pretty_path(path)}; its slirp NIC (and SSH forward) is gone")
+        return 0
+
+    router = netlab.resolve_router(cfg, args.vm)
+    top = netlab.topology(cfg, router)
+    names = netlab.lab_vm_names(cfg, router)
+    if action == "plan":
+        ui.print_header(f"Network lab behind {router}")
+        for line in netlab.describe(top):
+            ui.print_note(line)
+        ui.print_note("libvirt network for export-libvirt:")
+        print(netlab.segment_network_xml(top), end="")
+        ui.print_note(f"Install order: {' -> '.join(names)}")
+        return 0
+    if action == "status":
+        ui.print_header(f"Network lab behind {router}")
+        for name in names:
+            vm = config.get_vm(cfg, name)
+            disk_state, _, _ = disk_status(vm)
+            runtime_str, _ = vm_runtime_status(name, vm)
+            role = str((netlab.lab_config(vm) or {}).get("role"))
+            address = top["router_ip"] if role == "pfsense" else netlab.member_of(top, name)["ip"]
+            ui.print_kv(name, f"{role:<8} {address:<16} disk: {disk_state:<10} {runtime_str}")
+        return 0
+    if action == "install":
+        existing = [name for name in names if runtime.resolve_path(config.get_vm(cfg, name)["disk"]["path"]).exists()]
+        if existing:
+            raise VMError(
+                f"Disk already present for: {', '.join(existing)}. The lab never reinstalls implicitly: "
+                f"vmctl clean <vm> (or move the disk away) first, then rerun vmctl lab install"
+            )
+        ui.print_header(f"Install the network lab: {' -> '.join(names)}")
+        for name in names:
+            vm = config.get_vm(cfg, name)
+            role = str((netlab.lab_config(vm) or {}).get("role"))
+            if role == "pfsense":
+                cmd_bootstrap_pfsense(argparse.Namespace(vm=name, timeout=args.timeout, dry_run=args.dry_run))
+                continue
+            if cloud_init.autoinstall_config(vm) is None:
+                raise VMError(f"{name}: lab members install with the Ubuntu autoinstall flow (autoinstall section missing)")
+            try:
+                cmd_bootstrap_unattended(argparse.Namespace(vm=name, video=None, timeout=args.timeout, dry_run=args.dry_run))
+            finally:
+                cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+        ui.print_status("ok", "Network lab installed. Start it with: vmctl lab up")
+        return 0
+    if action == "up":
+        for name in names:
+            cmd_start(argparse.Namespace(vm=name, headless=True, background=True, video=None, cloud_init=False, spice_port=None, dry_run=args.dry_run))
+        for line in netlab.describe(top):
+            ui.print_note(line)
+        return 0
+    if action == "down":
+        for name in reversed(names):
+            cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+        return 0
+    raise VMError(f"Unknown lab action: {action}")
+
+
 def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = resolved_vm(args, cfg)
@@ -1296,6 +1480,7 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
         no_reboot=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
+        network_phase="install",
     )
     install_qemu_args += ["-cdrom", str(iso_path)]
 
@@ -1332,6 +1517,7 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
         accel=automation_accel(vm),
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
+        network_phase="install",
     )
     post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     runtime.ensure_parent(post_serial_log)
@@ -1375,6 +1561,7 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         no_reboot=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
+        network_phase="install",
     )
     install_qemu_args += ["-cdrom", str(iso_path)]
     install_qemu_args += kickstart.kickstart_iso_drive_args(seed_iso)
@@ -1403,6 +1590,7 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         accel=automation_accel(vm),
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
+        network_phase="install",
     )
     post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     runtime.ensure_parent(post_serial_log)
@@ -1471,6 +1659,7 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
         spice_port=getattr(args, "spice_port", None),
+        network_phase="install",
     )
     qemu_args += ["-cdrom", str(iso_path)]
     qemu_args += cloud_init.cloud_init_drive_args(seed_path)
@@ -1501,6 +1690,7 @@ def cmd_install_omarchy(args: argparse.Namespace) -> int:
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
         spice_port=getattr(args, "spice_port", None),
+        network_phase="install",
     )
     qemu_args += ["-cdrom", str(iso_path)]
     qemu_args += omarchy.cidata_drive_args(seed_path)
@@ -1577,6 +1767,7 @@ def run_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int, dry_run
     )
     ssh.wait_for_guest_post_install_ready(vm, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     ssh.provision_shared_dir(vm, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    netlab.provision_guest(vm_name, vm, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     ui.print_note("Running post-install provisioning")
 
     for entry in ssh_cfg.get("copy_from_host", []):
@@ -1631,6 +1822,7 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
         headless=True,
         serial_stdio=True,
         allow_missing_disk=args.dry_run and not disk_exists,
+        network_phase="install",
     )
     stderr_log = companion_stderr_log_path(log_path)
     pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
@@ -1676,6 +1868,7 @@ def cmd_bootstrap_omarchy(args: argparse.Namespace) -> int:
         accel=automation_accel(vm),
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
+        network_phase="install",
     )
     post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     runtime.ensure_parent(post_serial_log)
@@ -2141,6 +2334,8 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
         kickstart.kickstart_artifact_dir(vm),
         alpine.alpine_artifact_dir(vm),
         windows.windows_artifact_dir(vm),
+        pfsense.pfsense_artifact_dir(vm),
+        netlab.netlab_artifact_dir(vm),
         omarchy.omarchy_artifact_dir(vm),
         cloud_init.cloud_init_artifact_dir(vm),
         cloud_init.autoinstall_artifact_dir(vm),

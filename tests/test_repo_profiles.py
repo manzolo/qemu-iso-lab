@@ -9,6 +9,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import vmctl.config  # noqa: E402
+import vmctl.netlab  # noqa: E402
 import vmctl.state  # noqa: E402
 
 
@@ -45,8 +46,29 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "cachyos-nvidia-local",
             "windows11-unattended",
             "windows10-unattended",
+            "pfsense-lab",
+            "pihole-lab",
+            "lubuntu22-lab",
         ):
             self.assertIn(profile, cfg["vms"])
+
+        # The network lab: one topology on the router, members pointing at it, generic identities,
+        # a local-only pfSense ISO and the Ubuntu 22.04.5 ISO with a public URL for the members.
+        router = cfg["vms"]["pfsense-lab"]
+        self.assertEqual(router["pfsense_config"]["username"], "lab")
+        self.assertEqual(router["firmware"]["type"], "bios")
+        self.assertNotIn("iso_url", router)
+        top = vmctl.netlab.topology(cfg, "pfsense-lab")
+        self.assertEqual(top["lan"]["name"], "lab-lan")
+        self.assertEqual(top["dns_ip"], "192.168.0.10")
+        self.assertEqual([m["name"] for m in top["members"]], ["lubuntu22-lab", "pihole-lab"])
+        self.assertEqual(vmctl.netlab.lab_vm_names(cfg, "pfsense-lab"), ["pfsense-lab", "pihole-lab", "lubuntu22-lab"])
+        for member in ("pihole-lab", "lubuntu22-lab"):
+            vm = cfg["vms"][member]
+            self.assertEqual(vm["autoinstall"]["username"], "lab")
+            self.assertTrue(vm["iso_url"].startswith("https://releases.ubuntu.com/22.04.5/"))
+            self.assertEqual([n["phase"] for n in vm["networks"]], ["install", "runtime"])
+        self.assertEqual(cfg["vms"]["lubuntu22-lab"]["shared_dir"], {"source": "shared", "tag": "shared"})
 
         # Windows rides bootstrap-windows: generic identity, virtio disk (viostor is injected
         # in WinPE), OpenSSH post-install, no download URL (Microsoft publishes none).

@@ -119,6 +119,36 @@ jobs:
       - name: Prepare debian-server unattended install dry-run
         run: ./bin/vmctl --dry-run bootstrap-preseed debian-server
 
+  network-lab-dry-run:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dry-run host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils xorriso genisoimage
+
+      - name: Network lab plan (topology, forwards, libvirt network)
+        run: ./bin/vmctl --dry-run lab plan
+
+      - name: pfSense router bootstrap dry-run (no ISO on the runner)
+        run: ./bin/vmctl --dry-run bootstrap-pfsense pfsense-lab
+
+      - name: Pi-hole member bootstrap dry-run (autoinstall + network_lab hook)
+        run: ./bin/vmctl --dry-run bootstrap-unattended pihole-lab
+
+      - name: Whole lab install dry-run
+        run: ./bin/vmctl --dry-run lab install
+
   almalinux-server-dry-run:
     needs: test
     runs-on: ubuntu-latest

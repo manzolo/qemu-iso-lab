@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from vmctl import qemu, runtime, ui
+from vmctl import config, netlab, qemu, runtime, ui
 from vmctl.errors import VMError
 
 
@@ -53,10 +53,15 @@ def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
     ET.SubElement(node, "driver", name="qemu", type="vpc" if fmt == "vhd" else fmt)
     ET.SubElement(node, "source", file=str(runtime.resolve_path(disk["path"]).resolve()))
     ET.SubElement(node, "target", dev="vda" if bus == "virtio" else "sda", bus=bus)
-    net = ET.SubElement(devices, "interface", type="network")
-    ET.SubElement(net, "source", network="default")
-    model = str(vm.get("network_device", "virtio-net-pci"))
-    ET.SubElement(net, "model", type="virtio" if model == "virtio-net-pci" else model)
+    for spec in qemu.network_specs(vm, "runtime"):
+        # slirp NICs land on libvirt's default NAT network; segment NICs on the libvirt network of
+        # the same name (created by export when missing, see ensure_segment_networks).
+        net = ET.SubElement(devices, "interface", type="network")
+        ET.SubElement(net, "source", network="default" if spec["type"] == "user" else str(spec["name"]))
+        if not spec["legacy"]:
+            ET.SubElement(net, "mac", address=str(spec["mac"]))
+        model = str(spec["device"])
+        ET.SubElement(net, "model", type="virtio" if model == "virtio-net-pci" else model)
     graphics = ET.SubElement(devices, "graphics", type="spice", autoport="yes")
     ET.SubElement(graphics, "listen", type="none")
     video = ET.SubElement(devices, "video")
@@ -78,6 +83,44 @@ def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
         ET.SubElement(tpm, "backend", type="emulator", version="2.0")
     ET.indent(domain)
     return ET.tostring(domain, encoding="unicode") + "\n"
+
+
+def segment_names(vm: dict[str, Any]) -> list[str]:
+    return [str(spec["name"]) for spec in qemu.network_specs(vm, "runtime") if spec["type"] == "segment"]
+
+
+def ensure_segment_networks(uri: str, vm_name: str, vm: dict[str, Any], dry_run: bool) -> list[Path]:
+    """Define + start + autostart the libvirt network of every segment NIC that libvirt does not know yet.
+
+    The network XML comes from the lab topology (bridge name, host address, no DHCP/DNS/NAT); a VM
+    attached with ``vmctl lab attach`` resolves the same lab through the router that owns the segment.
+    """
+    written: list[Path] = []
+    names = segment_names(vm)
+    if not names:
+        return written
+    cfg = config.load_config()
+    known = [] if dry_run else virsh_output(uri, "net-list", "--all", "--name").splitlines()
+    active = [] if dry_run else virsh_output(uri, "net-list", "--name").splitlines()
+    for name in names:
+        owners = [router for router in netlab.routers(cfg) if netlab.topology(cfg, router)["lan"]["name"] == name]
+        if not owners:
+            raise VMError(f"Segment '{name}' is not the LAN of any network_lab router profile: cannot render its libvirt network")
+        xml = netlab.segment_network_xml(netlab.topology(cfg, owners[0]))
+        path = runtime.vm_artifact_base(vm_name) / "libvirt" / f"network-{name}.xml"
+        if dry_run:
+            print(xml, end="")
+            ui.print_note(f"Would write {path}")
+        else:
+            runtime.ensure_parent(path)
+            path.write_text(xml, encoding="utf-8")
+        written.append(path)
+        if name not in known:
+            runtime.run(["virsh", "--connect", uri, "net-define", str(path)], dry_run=dry_run)
+        if name not in active:
+            runtime.run(["virsh", "--connect", uri, "net-start", name], dry_run=dry_run)
+        runtime.run(["virsh", "--connect", uri, "net-autostart", name], dry_run=dry_run)
+    return written
 
 
 def virsh_output(uri: str, *args: str) -> str:
@@ -131,6 +174,7 @@ def export(args: argparse.Namespace, vm: dict[str, Any]) -> int:
         runtime.ensure_parent(destination)
         destination.write_text(xml, encoding="utf-8")
     if not args.no_define:
+        ensure_segment_networks(args.connect, args.vm, vm, args.dry_run)
         if replace_existing:
             undefine(args.connect, name, False)
         runtime.run(["virsh", "--connect", args.connect, "define", str(destination)], dry_run=args.dry_run)

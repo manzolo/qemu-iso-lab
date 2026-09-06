@@ -56,6 +56,7 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | `machine` | QEMU machine type, `q35` for modern guests, `pc` for old ones |
 | `memory_mb`, `cpus` | Guest RAM and vCPUs |
 | `network` | `user` (slirp with optional SSH port forward) |
+| `networks` | Optional list of NICs replacing the single slirp one: `{"type": "user", "hostfwd": [{"host_port": 8080, "guest_port": 80}]}` (slirp; the first user NIC carries the `ssh_host_port` forward unless `"ssh": false`) or `{"type": "segment", "name": "lab-lan"}` (a host-local L2 segment shared by every VM naming it: multicast socket on plain QEMU, libvirt network after export). `phase` = `install`, `runtime` or `both` (default): install NICs exist only during a bootstrap and its SSH post-install, runtime NICs afterwards; a NIC keeps its slot and MAC (`mac`, or derived from disk path + slot) across phases. See [NETWORK-LAB.md](NETWORK-LAB.md). |
 | `audio` | Attach an audio device |
 | `usb_tablet` | Absolute pointer for graphical guests |
 | `shared_dir` | Host folder shared with the guest over virtiofs: `{"source": "shared", "tag": "shared"}`. `source` is `~`-expanded, relative paths live under the repository (the default `shared/` is git-ignored). Needs `virtiofsd` on the host; every QEMU launch starts one per VM and the guest RAM becomes a shared memfd backend. On Linux guests the SSH post-install adds `/mnt/<tag>` to fstab (systemd automount), mounts it and links it as `~/<tag>` and on the desktop (`xdg-user-dir DESKTOP`, `Desktop` or `Scrivania`), like kvm-lab; Windows profiles get WinFSP + `VirtioFsSvc` at first logon, the share appears as a drive letter and a `<tag>.lnk` shortcut lands on the desktop. |
@@ -68,6 +69,11 @@ Profiles that add `cloud_init`, `ssh_provision`, `autoinstall`, `archinstall_con
 `preseed_config`, `kickstart_config` or `omarchy_config` unlock the unattended and
 provisioning flows described in [UNATTENDED.md](UNATTENDED.md) and
 [PROVISIONING.md](PROVISIONING.md).
+
+`network_lab` (role `pfsense` with the LAN topology, or `pihole`/`client` with
+`gateway_vm` and `ip`) and `pfsense_config` (`username`, `password`, `timezone`
+of the router; the account is created by the installer, `admin` gets the same
+password) build the network lab described in [NETWORK-LAB.md](NETWORK-LAB.md).
 
 `acpi_poweroff_grace_sec` (optional, default 60) is how long `vmctl stop` waits
 for the guest to honour the ACPI power-off before falling back to SSH and

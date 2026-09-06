@@ -115,6 +115,7 @@ prints them all; the table shows what each family offers.
 | openSUSE / NixOS / Void | `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros | interactive |
 | Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.23 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
 | Windows | `windows11-unattended`, `windows10-unattended`, `windows10-template`, `windows11-template` | unattended Windows 11 and 10 (autounattend.xml, virtio drivers, OpenSSH), import targets for physical disks (`vmctl import-device`) | `bootstrap-windows` |
+| Network lab | `pfsense-lab`, `pihole-lab`, `lubuntu22-lab` | pfSense CE 2.7.2 router + Pi-hole v6 + Lubuntu client on an isolated LAN segment (kvm-lab's network lab on plain QEMU; libvirt network after export) | `vmctl lab install`, `bootstrap-pfsense`, `bootstrap-unattended` |
 
 Profiles ending in `-local` are full desktop recipes with SSH provisioning,
 meant to be personalised through `local.json`. Profiles named `*-ci` are tiny
@@ -136,6 +137,8 @@ vmctl bootstrap-alpine alpine-niri                    # Alpine: setup-alpine ans
 vmctl bootstrap-archinstall arch-dms-local            # Arch: pacstrap script on the live ISO
 vmctl bootstrap-omarchy arch-omarchy-nvidia-local     # Omarchy: official cidata mechanism
 vmctl bootstrap-windows windows11-unattended          # Windows 11: autounattend.xml on a seed CD, prompt-free ISO
+vmctl bootstrap-pfsense pfsense-lab                   # pfSense CE: scripted bsdinstall, rendered config.xml (network lab)
+vmctl lab install                                     # the whole network lab: router -> Pi-hole -> client
 ```
 
 How each flow works, and the sequencing rule every flow must respect, is in
@@ -179,6 +182,9 @@ profiles, so you only write what differs. See
 |------|----------------|
 | [docs/PROFILES.md](docs/PROFILES.md) | The profile model: ISO sources and discovery, disk, EFI/BIOS firmware, video variants, artifacts, Windows import templates, adding a new VM |
 | [docs/UNATTENDED.md](docs/UNATTENDED.md) | The five unattended flows step by step, the completion-token rule, boot checks and the local validation matrix |
+| [docs/NETWORK-LAB.md](docs/NETWORK-LAB.md) | The network lab: pfSense + Pi-hole + client on an isolated segment, `networks`/phases, host access through the router, libvirt road, differences from kvm-lab |
+| [docs/LIBVIRT.md](docs/LIBVIRT.md) | `export-libvirt` / `unexport-libvirt`: hand an installed VM to virt-manager and back |
+| [docs/guides/](docs/guides/README.md) | Printable step-by-step guides per flow (PDF via `make guides`) and the virsh cheat sheet |
 | [docs/PROVISIONING.md](docs/PROVISIONING.md) | `cloud_init`, `ssh_provision`, `autoinstall` and `omarchy_config` fields, `copy_from_host`, `post_install_run`, sudo, guest identity and `local.json` |
 | [docs/VMTUI.md](docs/VMTUI.md) | The TUI in depth: dashboard, filters, contextual menu, video profiles, post-install chaining, remote SPICE |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | One-page mental map of the code: modules, import order, who owns what |
@@ -191,6 +197,7 @@ profiles, so you only write what differs. See
 
 ```bash
 make check      # mypy --strict + full test suite, run before every push
+make validate-vms   # local only: reinstall every unattended profile, restore the disks, open the HTML report (hours)
 make ci         # the unittest invocation GitHub Actions runs
 make help       # every developer target
 ```

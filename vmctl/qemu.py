@@ -1,6 +1,7 @@
 """QEMU command-line argument builders and firmware helpers."""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -293,6 +294,111 @@ def shared_dir_args(vm: dict[str, Any]) -> tuple[str, list[str], list[str]]:
     return ",memory-backend=mem0", memory, device
 
 
+# --- networking ------------------------------------------------------------------
+#
+# Without a ``networks`` list a profile has the historical single slirp NIC (``network: user``,
+# SSH port forward from ``ssh_host_port``). ``networks`` describes several NICs, each with a
+# *type* (``user`` = slirp, ``segment`` = a host-local L2 segment shared by every VM that names
+# the same segment: a multicast socket netdev on plain QEMU, a libvirt network after
+# ``export-libvirt``) and a *phase*: ``install`` NICs exist only while a bootstrap runs and
+# provisions the guest over SSH, ``runtime`` NICs only afterwards, ``both`` always. A NIC keeps
+# its position (PCI slot) and MAC across phases, so the guest sees the same interface.
+
+NETWORK_PHASES = ("install", "runtime")
+_NETWORK_TYPES = ("user", "segment")
+_MAC_RE = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
+
+
+def network_specs(vm: dict[str, Any], phase: str = "runtime") -> list[dict[str, Any]]:
+    """Normalised NIC list of *vm* for *phase* (``install`` or ``runtime``)."""
+    if phase not in NETWORK_PHASES:
+        raise VMError(f"Unknown network phase: {phase}")
+    raw = vm.get("networks")
+    if raw is None:
+        mode = vm.get("network", "user")
+        if mode != "user":
+            raise VMError(f"Unsupported network mode: {mode}")
+        return [{"id": "n1", "type": "user", "phase": "both", "ssh": True, "hostfwd": [], "legacy": True,
+                 "device": str(vm.get("network_device", "virtio-net-pci")), "mac": None, "name": None, "mcast": None}]
+    if not isinstance(raw, list) or not raw:
+        raise VMError("networks must be a non-empty list of NIC objects")
+    specs: list[dict[str, Any]] = []
+    ssh_seen = False
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, dict):
+            raise VMError("networks entries must be objects")
+        kind = str(entry.get("type") or "user")
+        if kind not in _NETWORK_TYPES:
+            raise VMError(f"networks[{index}].type must be one of: {', '.join(_NETWORK_TYPES)}")
+        nic_phase = str(entry.get("phase") or "both")
+        if nic_phase not in ("both", *NETWORK_PHASES):
+            raise VMError(f"networks[{index}].phase must be install, runtime or both")
+        if nic_phase not in ("both", phase):
+            continue
+        slot = len(specs)
+        name = str(entry.get("name") or "").strip() or None
+        if kind == "segment" and not name:
+            raise VMError(f"networks[{index}]: a segment NIC needs a name (the segment shared with the other VMs)")
+        mac = str(entry.get("mac") or "").strip().lower() or None
+        if mac is not None and not _MAC_RE.match(mac):
+            raise VMError(f"networks[{index}].mac {mac!r} is not a valid MAC address")
+        forwards: list[dict[str, int]] = []
+        for fwd in entry.get("hostfwd", []) or []:
+            if not isinstance(fwd, dict) or "host_port" not in fwd or "guest_port" not in fwd:
+                raise VMError(f"networks[{index}].hostfwd entries need host_port and guest_port")
+            forwards.append({"host_port": int(fwd["host_port"]), "guest_port": int(fwd["guest_port"])})
+        if kind != "user" and forwards:
+            raise VMError(f"networks[{index}]: hostfwd applies to user (slirp) NICs only")
+        ssh_default = kind == "user" and not ssh_seen
+        ssh = bool(entry.get("ssh", ssh_default)) if kind == "user" else False
+        ssh_seen = ssh_seen or ssh
+        specs.append({
+            "id": str(entry.get("id") or f"net{slot}"), "type": kind, "phase": nic_phase, "ssh": ssh,
+            "hostfwd": forwards, "legacy": False, "device": str(entry.get("device") or vm.get("network_device", "virtio-net-pci")),
+            "mac": mac or default_nic_mac(vm, slot), "name": name, "mcast": entry.get("mcast"),
+        })
+    if not specs:
+        raise VMError(f"networks: no NIC is active in the {phase} phase")
+    return specs
+
+
+def default_nic_mac(vm: dict[str, Any], slot: int) -> str:
+    """A stable, locally administered MAC per (VM disk, NIC slot): guests keep their interface names."""
+    digest = hashlib.sha256(f"{vm['disk']['path']}#{slot}".encode()).digest()
+    return "52:54:00:" + ":".join(f"{b:02x}" for b in digest[:3])
+
+
+def segment_endpoint(name: str, override: Any = None) -> str:
+    """``group:port`` of the multicast socket that carries segment *name* between the VMs of this host."""
+    if override:
+        text = str(override)
+        if not re.fullmatch(r"2(2[4-9]|3\d)\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}", text):
+            raise VMError(f"mcast {text!r} must look like 239.x.y.z:port")
+        return text
+    digest = hashlib.sha256(name.encode()).digest()
+    port = 20000 + int.from_bytes(digest[3:5], "big") % 40000
+    return f"239.{digest[0]}.{digest[1]}.{digest[2]}:{port}"
+
+
+def network_args(vm: dict[str, Any], phase: str = "runtime") -> list[str]:
+    args: list[str] = []
+    ssh_cfg = cloud_init.ssh_access_config(vm)
+    for spec in network_specs(vm, phase):
+        if spec["type"] == "user":
+            netdev = f"user,id={spec['id']}"
+            if spec["ssh"] and ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
+                netdev += f",hostfwd=tcp:127.0.0.1:{int(ssh_cfg['ssh_host_port'])}-:22"
+            for fwd in spec["hostfwd"]:
+                netdev += f",hostfwd=tcp:127.0.0.1:{fwd['host_port']}-:{fwd['guest_port']}"
+        else:
+            netdev = f"socket,id={spec['id']},mcast={segment_endpoint(str(spec['name']), spec['mcast'])}"
+        device = f"{spec['device']},netdev={spec['id']}"
+        if not spec["legacy"]:
+            device += f",mac={spec['mac']}"
+        args += ["-netdev", netdev, "-device", device]
+    return args
+
+
 def qmp_socket_path(vm: dict[str, Any]) -> Path:
     """QMP control socket of a headless VM, next to its runtime PID file."""
     return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "qmp.sock"
@@ -404,7 +510,7 @@ def common_args(
     vm: dict[str, Any], variant: str | None, dry_run: bool = False, accel: str | None = "kvm",
     headless: bool = False, serial_stdio: bool = False, no_reboot: bool = False,
     allow_missing_disk: bool = False, enable_clipboard: bool = True, spice_port: int | None = None,
-    disk_bootindex: int | None = None,
+    disk_bootindex: int | None = None, network_phase: str = "runtime",
 ) -> list[str]:
     runtime.require_command("qemu-system-x86_64")
     cpu_model = "host" if accel == "kvm" else vm.get("cpu_model", "max")
@@ -443,16 +549,7 @@ def common_args(
     if enable_clipboard and vm.get("clipboard") and not headless and spice_port is None:
         args += ["-device", "virtio-serial-pci", "-chardev", "qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on",
                  "-device", "virtserialport,chardev=vdagent0,name=com.redhat.spice.0"]
-    network_mode = vm.get("network", "user")
-    if network_mode == "user":
-        network_device = vm.get("network_device", "virtio-net-pci")
-        netdev = "user,id=n1"
-        ssh_cfg = cloud_init.ssh_access_config(vm)
-        if ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
-            netdev += f",hostfwd=tcp:127.0.0.1:{int(ssh_cfg['ssh_host_port'])}-:22"
-        args += ["-netdev", netdev, "-device", f"{network_device},netdev=n1"]
-    else:
-        raise VMError(f"Unsupported network mode: {network_mode}")
+    args += network_args(vm, network_phase)
     if shared_device:
         # virtiofsd must be listening before QEMU starts: it is launched here, right before the caller
         # hands these arguments to Popen; it exits by itself when this QEMU goes away.

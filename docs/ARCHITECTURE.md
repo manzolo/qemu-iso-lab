@@ -99,10 +99,14 @@ produces isolated per-VM artifacts.
 | `import_dev.py`           | ~187  | `cmd_import_device`, `cmd_import_helper`, sudo re-exec target.  |
 | `ssh.py`                  | ~209  | SSH/SCP helpers: target, base cmds, wait, post-install copy/run.|
 | `host_setup.py`           | ~85   | OS detection, install hints, `prompt_yes_no`.                   |
+| `libvirt.py`              | ~195  | `export-libvirt`/`unexport-libvirt`: domain XML from the profile, segment networks, NVRAM-preserving undefine. |
+| `report.py`               | ~347  | `check-vms --report`: self-contained HTML matrix report, QMP screenshots to PNG. |
+| `netlab.py`               | ~447  | Network lab topology (`network_lab`), netplan/Pi-hole rendering, SSH hook, `vmctl lab` helpers. |
+| `pfsense.py`              | ~534  | pfSense CE scripted install: config.xml render, ISO graft (`growisofs -M`), CD args. |
 | `lifecycle.py`            | ~717  | All other `cmd_*` handlers + background-VM tracking.            |
 | `cli.py`                  | ~181  | `build_parser`, `dispatch_internal`, `main`. Wires it together. |
 
-**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`iso`/`cloud_init`/`omarchy`/`qemu`/`disk_inspect` ← {`flash`, `import_dev`, `ssh`, `host_setup`} ← `lifecycle` ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
+**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`iso`/`cloud_init`/`omarchy`/`qemu`/`disk_inspect` ← {`alpine`, `preseed`, `kickstart`, `windows`} ← {`flash`, `import_dev`, `ssh`, `host_setup`, `report`} ← `netlab` ← {`pfsense`, `libvirt`} ← `lifecycle` ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
 
 ## Typical flows
 

@@ -26,11 +26,13 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "post-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "post-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
      ["export-libvirt", "unexport-libvirt"]),
+    ("Network lab", "pfSense router + Pi-hole DNS + clients on an isolated LAN segment",
+     ["lab"]),
     ("Verify", "smoke tests and the local validation matrix",
      ["boot-check", "check-vms"]),
     ("Physical disks", "DESTRUCTIVE, ask for sudo, require --confirm-device",
@@ -50,6 +52,7 @@ typical flows:
   vmctl bootstrap-omarchy <vm>          Omarchy: cidata install + NVIDIA post-install
   vmctl bootstrap-preseed <vm>          same for Debian  (kickstart: AlmaLinux/Fedora, archinstall: Arch, alpine: Alpine)
   vmctl bootstrap-windows <vm>          Windows 10/11: autounattend.xml install + OpenSSH post-install
+  vmctl lab install                     network lab: pfSense + Pi-hole + client, then `vmctl lab up`
   vmctl clean <vm>                      remove its disk and generated artifacts
   vmctl <command> --help                all options of one command
   vmtui                                 the same, as a dialog menu
@@ -154,6 +157,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=3600, help="seconds to wait for the install to complete (default: 3600)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_windows)
+
+    p = _add(subparsers, "bootstrap-pfsense", help="fully automated pfSense CE install for the network lab router (scripted bsdinstall, rendered config.xml)")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_pfsense)
+
+    p = _add(subparsers, "lab", help="network lab: plan, install (router -> Pi-hole -> clients), up/down, status, attach a VM to the LAN")
+    p.add_argument("action", choices=["plan", "install", "up", "down", "status", "attach"], help="what to do with the lab")
+    p.add_argument("vm", nargs="?", help="a lab profile to select the lab (default: the only one); for attach, the VM to connect")
+    p.add_argument("--router", help="attach: the lab's pfsense profile when several labs exist")
+    p.add_argument("--apply", action="store_true", help="attach: write the networks override into vms/profiles/local.json")
+    p.add_argument("--timeout", type=int, default=3600, help="install: seconds per VM install (default: 3600)")
+    p.set_defaults(func=lifecycle.cmd_lab)
 
     p = _add(subparsers, "install-archinstall", help="boot the Arch live ISO with a pre-built archinstall config disk")
     p.add_argument("vm", help=VM_HELP)
@@ -303,7 +319,7 @@ _vmctl() {{
   fi
   case $words[2] in
     completion) _values 'shell' bash zsh ;;
-    export-libvirt|unexport-libvirt|check-vms|clean|clean-stale|delete-iso|fetch-iso|prep|provision|install*|bootstrap-*|start|stop|shell|show|post-install|boot-check|flash|import-device)
+    export-libvirt|unexport-libvirt|lab|check-vms|clean|clean-stale|delete-iso|fetch-iso|prep|provision|install*|bootstrap-*|start|stop|shell|show|post-install|boot-check|flash|import-device)
       vms=(${{(f)"$(vmctl list --names 2>/dev/null)"}})
       _alternative 'vms:VM profile:compadd -a vms' 'options:option:_default' ;;
     *) _default ;;

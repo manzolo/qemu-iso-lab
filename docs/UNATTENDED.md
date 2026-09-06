@@ -341,6 +341,43 @@ split, its own shutdown is the flush, so the token is written right before
 `shutdown /s` and `run_and_expect` waits up to `windows.SHUTDOWN_GRACE_SEC`
 (10 minutes) for QEMU to exit on its own instead of the usual 30 seconds.
 
+## pfSense: scripted bsdinstall
+
+```bash
+vmctl bootstrap-pfsense pfsense-lab        # the router of the network lab; usually via: vmctl lab install
+```
+
+Ported from kvm-lab's `network-lab`. The offline pfSense CE 2.7.2 ISO is a
+FreeBSD installer whose `/etc/rc.local` runs `bsdinstall script
+/etc/installerconfig` when that file exists. `pfsense.py` renders the whole
+`config.xml` from the `network_lab` topology ([NETWORK-LAB.md](NETWORK-LAB.md))
+and builds a per-VM copy of the ISO (`artifacts/<vm>/pfsense/install.iso`, with
+a `.source` stamp of source ISO + config hash):
+
+1. `xorriso -osirrox` extracts `rc.local` and `usr/libexec/bsdinstall/script`
+   from the source ISO; the flow refuses an ISO whose `rc.local` does not run the
+   scripted installer (other versions, the Netgate online installer).
+2. `bsdinstall/script` gets one patch: `bsdinstall umount || [ -n
+   "$ZFSBOOT_DISKS" ]` (ZFS has no fstab mounts, `umount -a` may return 1 with
+   nothing left; the pool export that follows is what matters).
+3. `cp` + `growisofs -M ... -graft-points` update the copy in place with
+   `installerconfig` (ZFS on `vtbd0`, BIOS, `config.xml` heredoc into
+   `/cf/conf`), the new `rc.local` and the patched script. An xorriso rebuild
+   would drop FreeBSD's hidden El Torito extents; the in-place update keeps
+   them.
+4. QEMU boots the `pc` machine in BIOS mode with the disk at `bootindex=1`, the
+   CD at `bootindex=2` (`ide-cd` on `ide.1`), serial stdio (`cuau0` in the
+   guest), WAN slirp + LAN segment, `-no-reboot`.
+5. `rc.local` runs the install, then **`sync`, the token `==> pfSense
+   installation complete!` on `/dev/cuau0`, `shutdown -p now`**, in that order;
+   on failure `==> pfSense installation FAILED` plus the bsdinstall log, then
+   the same power-off so the host fails fast instead of waiting for the timeout.
+
+There is no SSH post-install: the account (`pfsense_config.username`, bcrypt
+hash of the password, the project's public key) and every rule are in the
+config.xml. The Linux members of the lab ride `bootstrap-unattended` with the
+`network_lab` post-install hook.
+
 ## The completion-token rule
 
 Every flow signals success by printing a token on the serial console, and every

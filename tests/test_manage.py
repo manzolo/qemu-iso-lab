@@ -326,7 +326,7 @@ class ManageTests(BaseVmctlTestCase):
         self.assertIn("[missing] qemu-img", output)
         self.assertIn("Unable to locate OVMF firmware files for EFI guest.", output)
         self.assertIn("Affected EFI profiles: testvm", output)
-        self.assertIn("sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog cloud-image-utils xorriso virtiofsd p7zip-full", output)
+        self.assertIn("sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog cloud-image-utils xorriso virtiofsd p7zip-full dvd+rw-tools python3-bcrypt", output)
         self.assertIn("[missing] virtiofsd", output)
         self.assertIn("[missing] 7z", output)
 
@@ -372,7 +372,7 @@ class ManageTests(BaseVmctlTestCase):
         self.assertEqual(executed[0], ["sudo", "apt", "update"])
         self.assertEqual(
             executed[1],
-            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "make", "dialog", "cloud-image-utils", "xorriso", "virtiofsd", "p7zip-full"],
+            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "make", "dialog", "cloud-image-utils", "xorriso", "virtiofsd", "p7zip-full", "dvd+rw-tools", "python3-bcrypt"],
         )
 
     def test_cmd_setup_passes_when_requirements_and_firmware_are_available(self):

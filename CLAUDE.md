@@ -13,6 +13,7 @@ python -m pytest tests/ -k "test_render"       # filter by name
 make ci                                        # python -m unittest discover -s tests -v (what GitHub Actions runs)
 make lint                                      # python -m mypy vmctl/ --strict (enforced)
 make install-cli                               # symlink vmctl + vmtui into ~/.local/bin
+make validate-vms                              # LOCAL ONLY (hours): check-vms --restore --report over every unattended profile, opens the HTML report
 
 # VM lifecycle: ONE front door, the vmctl CLI (./bin/vmctl if not installed).
 vmctl --help                       # commands grouped by task + typical flows: read this first
@@ -25,6 +26,9 @@ vmctl bootstrap-preseed debian-server
 vmctl bootstrap-kickstart almalinux-server
 vmctl bootstrap-alpine alpine-niri
 vmctl bootstrap-windows windows11-unattended   # needs isos/windows11.iso (no public URL) + 7z
+vmctl bootstrap-pfsense pfsense-lab            # needs isos/pfSense-CE-2.7.2-RELEASE-amd64.iso (no public URL) + growisofs + python bcrypt
+vmctl lab plan|install|up|down|status|attach   # the network lab (pfSense + Pi-hole + client)
+vmctl export-libvirt <name>                    # hand an installed VM (and the lab-lan network) to libvirt
 vmctl attach <name>                # VNC view of a headless VM, also while a bootstrap runs
 ```
 
@@ -38,7 +42,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ```
 errors ← state ← {ui, runtime} ← {config, iso, cloud_init, qemu, archinstall, disk_inspect}
-      ← {alpine, preseed, kickstart, omarchy, windows} ← {flash, import_dev, ssh, host_setup, libvirt, report} ← lifecycle ← cli
+      ← {alpine, preseed, kickstart, omarchy, windows} ← {flash, import_dev, ssh, host_setup, report} ← netlab ← {pfsense, libvirt} ← lifecycle ← cli
 ```
 
 Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always accessed as `state.ROOT`, never imported directly — a direct import captures a stale binding and breaks tests.
@@ -59,6 +63,8 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 | `kickstart.py` / `preseed.py` | AlmaLinux/Fedora kickstart and Debian preseed rendering; `kickstart.install_repo()` picks `cdrom` or a netinst URL. |
 | `libvirt.py` | Render persistent libvirt XML and define/undefine existing disks; `export-libvirt` / `unexport-libvirt` handlers in lifecycle enforce running-VM checks. |
 | `report.py` | `check-vms --report [DIR] --open`: self-contained HTML, per-worker JSON and QMP P6→PNG screenshots before stop, outside restored artifacts. |
+| `netlab.py` | Network lab: `network_lab` topology resolution/validation, netplan + `pihole.toml` + guest `setup.sh` rendering, SSH post-install hook (`provision_guest`), libvirt segment network XML, `vmctl lab` helpers. |
+| `pfsense.py` | pfSense CE 2.7.2 scripted install: `config.xml` render (bcrypt users, WAN admin rules, NAT forwards), per-VM ISO rebuild (`xorriso` extract + `growisofs -M` graft), `rc.local`/`installerconfig`, CD-ROM args, profile checks. |
 | `ssh.py` | SSH/SCP helpers, `wait_for_ssh`, `post_install_copy`, `post_install_run`. |
 
 ### Profile model
@@ -67,7 +73,7 @@ All VM definitions live in `vms/profiles/*.json`. `load_config()` reads and merg
 
 Tracked profiles are generic on purpose: the guest user is `lab` (password `lab`, hash included) and every place where the user name appears inside a path, a command or a file body writes `{{user}}`. `config.expand_user_placeholder()` replaces it at load time with the identity declared by the profile (`ssh_provision.user`, `cloud_init.user`, `autoinstall.username`, `archinstall_config.username`, `preseed_config.username`, `kickstart_config.username`, `alpine_config.username`, `windows_config.username`; they must agree). Overriding the identity in `local.json` therefore propagates everywhere. Never commit a real user name, password or hash into a tracked profile again; the repo is public.
 
-SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226, `arch-dms-local` → 2230, `arch-dms-nvidia-local` → 2231, `arch-omarchy-nvidia-local` → 2232, `fedora-niri-dms-local` → 2233, `alpine-niri` → 2234, `windows11-unattended` → 2235, `windows10-unattended` → 2236 (2222/2227/2228/2229/2290 are Ubuntu/Debian/Alma; 2225 is taken by a local.json VM).
+SSH-provisioned ports in use: `cachyos-local` → 2223, `cachyos-nvidia-local` → 2224, `arch-noctalia-local` → 2226, `arch-dms-local` → 2230, `arch-dms-nvidia-local` → 2231, `arch-omarchy-nvidia-local` → 2232, `fedora-niri-dms-local` → 2233, `alpine-niri` → 2234, `windows11-unattended` → 2235, `windows10-unattended` → 2236, `pfsense-lab` → 2237, `pihole-lab` → 2238, `lubuntu22-lab` → 2239 (the last two are also NAT forwards on the router's WAN, see `network_lab`) (2222/2227/2228/2229/2290 are Ubuntu/Debian/Alma; 2225 is taken by a local.json VM).
 
 ### Unattended install flows
 
@@ -111,6 +117,8 @@ CachyOS (`cachyos-local`, `cachyos-nvidia-local`) rides the same handler on the 
 4. At first logon `vmctl-setup.ps1` runs as the local administrator (`setup_commands` may target that user's HKCU), which installs the virtio guest tools, OpenSSH Server (`Add-WindowsCapability`, retried; project public key in `administrators_authorized_keys` with the strict ACL), disables sleep/hibernation, runs the profile's PowerShell `setup_commands`, logs every step to `C:\vmctl\setup.log` **and** to COM1, then writes `"==> Windows installation complete!"` on COM1 and runs `shutdown /s`. Every step is an `Invoke-Step` under `$ErrorActionPreference = 'Stop'` with exit-code checks; after any failure the script writes `"==> Windows installation FAILED: <steps>"` instead and still shuts down, so the host fails fast (`cmd_bootstrap_windows` rewrites the VMError). The prompt-free ISO cache carries a `.source` stamp (path+size+mtime) and is rebuilt when the source changes. `edition` must match the image name in `install.wim` (`Windows 11 Pro` on Microsoft ISOs, `Windows 11 Professional` on UUP dump builds; `image_index` is the alternative), generic keys resolve by family. `run_and_expect(..., exit_grace_sec=windows.SHUTDOWN_GRACE_SEC)` waits up to 10 minutes for that shutdown (the guest's own shutdown is the flush here).
 5. `vmctl stop` honours `acpi_poweroff_grace_sec` (300 in the Windows profiles: the first shutdown commits the OpenSSH feature operation and exceeds the default 60 s; a SIGTERM there would corrupt the guest) and its SSH fallback is `shutdown /s /t 0 /f` for `windows_config` profiles.
 6. Starts the installed VM headless and runs `run_windows_post_install`: `wait_for_ssh(probe_command="exit 0")`, `copy_from_host` as plain `scp -r`, `post_install_run` through cmd.exe (no `sh -lc`; keep commands locale-independent, e.g. PowerShell one-liners rather than `findstr` on localized `systeminfo` output).
+
+**pfSense / network lab** (`bootstrap-pfsense`, `vmctl lab`): `vms/profiles/network-lab.json` = `pfsense-lab` (router, `pfsense_config` + `network_lab.role=pfsense` with the LAN topology), `pihole-lab` and `lubuntu22-lab` (Ubuntu 22.04.5 autoinstall members with `network_lab.gateway_vm`). NICs come from the profile's `networks` list (`qemu.network_specs`/`network_args`; no `networks` = the historical single slirp NIC, byte-identical args): `type` `user` (slirp, `hostfwd`) or `segment` (multicast socket netdev derived from the segment name; libvirt network after export), `phase` `install`/`runtime`/`both`. Every bootstrap handler and `start_installed_vm_headless` pass `network_phase="install"`; `vmctl start` uses runtime. The router renders the whole `config.xml` (`pfsense.render_config_xml`, bcrypt via the optional `bcrypt` module), builds `artifacts/<vm>/pfsense/install.iso` by grafting `installerconfig`/`rc.local`/patched `bsdinstall/script` into a copy of the local ISO with `growisofs -M` (an xorriso rebuild loses FreeBSD's hidden El Torito extents), boots BIOS/`pc` with disk `bootindex=1` + IDE CD `bootindex=2`, and waits for `==> pfSense installation complete!` (rc.local: `sync` → token → `shutdown -p now`; the FAILED token also powers off). Linux members: `netlab.provision_guest` runs inside `run_post_install` (after `provision_shared_dir`), detects the guest NIC name from the MAC, uploads `artifacts/<vm>/netlab/` to `/tmp/vmctl-netlab` and runs `setup.sh` (Pi-hole `basic-install.sh --unattended` with pre-seeded `pihole.toml`; static netplan for the next boot; cloud-init network disabled; client: wait-online disabled). Host access on plain QEMU is only through the router's WAN forwards (8080 GUI, 8081 Pi-hole, 2238/2239 SSH) which `netlab.topology` cross-checks against the NAT rules. `libvirt.ensure_segment_networks` defines/starts `lab-lan` on export.
 
 `shared_dir` (`{"source", "tag"}`, in `qemu.py`): every `common_args()` call for such a VM starts a per-VM `virtiofsd --sandbox none` on `artifacts/<vm>/runtime/virtiofs-<tag>.sock` (`ensure_virtiofsd`, waits for the socket, daemon exits with QEMU), switches the RAM to `memory-backend-memfd,share=on` + `-machine memory-backend=mem0` and adds `vhost-user-fs-pci`. Windows profiles then install WinFSP (`windows_config.winfsp_url`), start `VirtioFsSvc`, wait for the new drive letter and drop a `<tag>.lnk` on the desktop in the first-logon script; on Linux guests `ssh.provision_shared_dir` (called by `run_post_install`) writes the fstab automount entry for `/mnt/<tag>`, mounts it and links `~/<tag>` plus the desktop folder. `vmctl setup` looks for `virtiofsd` in `/usr/libexec` too and for `7z`/`7zz`/`7za`.
 
