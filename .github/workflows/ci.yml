@@ -135,7 +135,7 @@ jobs:
       - name: Install dry-run host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils xorriso genisoimage dvd+rw-tools
+          sudo apt-get install -y qemu-system-x86 qemu-utils xorriso genisoimage dvd+rw-tools virtiofsd
 
       - name: Network lab plan (topology, forwards, libvirt network)
         run: ./bin/vmctl --dry-run lab plan
