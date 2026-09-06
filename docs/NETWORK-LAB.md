@@ -18,7 +18,7 @@ Profiles: `vms/profiles/network-lab.json`. Commands:
 
 ```bash
 vmctl lab plan                 # topology, port forwards, install order, libvirt network XML
-vmctl lab install              # pfsense-lab -> pihole-lab -> lubuntu22-lab, from empty disks
+vmctl lab install              # pfsense-lab -> pihole-lab -> lubuntu22-lab, from empty disks (--export: then hand it to libvirt)
 vmctl lab up                   # start the three VMs headless in the background, in order
 vmctl lab status               # role, address, disk and runtime state of every member
 vmctl lab down                 # stop them in reverse order
@@ -26,8 +26,11 @@ vmctl lab check                # probe the GUIs and SSH ports from the host (for
 vmctl lab export               # lab down, export-libvirt of the three VMs (lab-lan created if missing), virsh start, check
 vmctl lab unexport             # virsh shutdown (waited), unexport-libvirt, back to plain QEMU
 vmctl lab libvirt-test         # export + check + unexport in one go (--keep leaves it in libvirt)
+vmctl lab clean                # stop and remove the three VMs (disks + artifacts, ISOs kept); refuses while the lab is in libvirt
 vmctl lab attach arch-dms-local --apply   # put another profile on lab-lan (writes local.json)
 ```
+
+From zero to virt-manager in one line: `vmctl lab clean && vmctl lab install --export`.
 
 ## Where the lab differs from kvm-lab
 

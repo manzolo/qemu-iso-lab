@@ -236,7 +236,8 @@
 <h2>6. Come si costruisce e si ricrea</h2>
 <p>La topologia sta una volta sola in <code>pfsense-lab.network_lab</code> (subnet, indirizzi, pool DHCP, dominio, dati per la rete libvirt); i membri dichiarano solo ruolo, <code>gateway_vm</code> e IP. Le identità dei profili tracciati sono generiche (<code>lab</code>/<code>lab</code>); quelle vere vanno in <code>vms/profiles/local.json</code>, insieme al percorso della ISO pfSense (Netgate non pubblica un URL stabile).</p>
 <pre>vmctl lab plan                 <span class="c"># anteprima: topologia, forward, ordine, XML della rete libvirt</span>
-vmctl lab install              <span class="c"># pfsense-lab → pihole-lab → lubuntu22-lab, da dischi vuoti (~30 min)</span>
+vmctl lab install              <span class="c"># pfsense-lab → pihole-lab → lubuntu22-lab, da dischi vuoti (~30 min); --export consegna poi a libvirt</span>
+vmctl lab clean                <span class="c"># ferma e rimuove le tre VM (dischi + artefatti, mai le ISO); rifiuta se il lab è in libvirt</span>
 vmctl lab up                   <span class="c"># avvia le tre VM headless in background, in ordine</span>
 vmctl lab status · vmctl lab down
 

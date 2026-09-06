@@ -102,3 +102,12 @@ package manager.
 | `VMTUI_ROOT_DIR` | Repository root (default: resolved from the script location) |
 | `VMTUI_CONFIG_DIR` | Directory holding `profiles/` and `remotes.json` (default: `<root>/vms`) |
 | `VMTUI_STATE_DIR` | Where video preferences are stored (default: `~/.local/state/vmtui`) |
+
+
+## Network lab
+
+When the catalog has a `network_lab` router profile the dashboard shows a
+"Network Lab" row above Tools: a submenu with the whole `vmctl lab` surface
+(plan, status, install, install + export to libvirt, up, down, check, export,
+unexport, libvirt round trip, clean). Install and clean ask for confirmation;
+everything else runs the `vmctl lab ...` command directly and shows its output.

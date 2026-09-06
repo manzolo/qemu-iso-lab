@@ -1421,6 +1421,18 @@ def cmd_lab(args: argparse.Namespace) -> int:
             address = top["router_ip"] if role == "pfsense" else netlab.member_of(top, name)["ip"]
             ui.print_kv(name, f"{role:<8} {address:<16} disk: {disk_state:<10} {runtime_str}")
         return 0
+    if action == "clean":
+        uri = str(getattr(args, "connect", None) or "qemu:///system")
+        if lab_in_libvirt(uri, names, args.dry_run):
+            raise VMError(f"The lab is defined in libvirt ({uri}): run vmctl lab unexport first, then vmctl lab clean")
+        ui.print_header(f"Clean the network lab: {', '.join(names)} (disks and artifacts; ISOs are kept)")
+        for name in reversed(names):
+            vm = config.get_vm(cfg, name)
+            if running_qemu_pid(name, vm) is not None:
+                cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+            clean_vm(name, vm, dry_run=args.dry_run)
+        ui.print_status("ok", "Network lab removed. Reinstall with: vmctl lab install")
+        return 0
     if action == "install":
         existing = [name for name in names if runtime.resolve_path(config.get_vm(cfg, name)["disk"]["path"]).exists()]
         if existing:
@@ -1441,6 +1453,9 @@ def cmd_lab(args: argparse.Namespace) -> int:
                 cmd_bootstrap_unattended(argparse.Namespace(vm=name, video=None, timeout=args.timeout, dry_run=args.dry_run))
             finally:
                 cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+        if getattr(args, "export", False):
+            ui.print_status("ok", "Network lab installed; handing it to libvirt (--export)")
+            return lab_export(cfg, top, names, str(getattr(args, "connect", None) or "qemu:///system"), args)
         ui.print_status("ok", "Network lab installed. Start it with: vmctl lab up")
         return 0
     if action == "up":

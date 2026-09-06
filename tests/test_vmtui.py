@@ -354,6 +354,14 @@ class VmtuiTests(unittest.TestCase):
         # the import templates keep the manual flow
         self.assertNotIn("Windows Bootstrap", self._unified_menu("windows11-template"))
 
+    def test_network_lab_menu_exists_when_a_router_profile_is_defined(self):
+        self.assertEqual(self.run_bash("source bin/vmtui; catalog_has_network_lab && echo yes").stdout.strip(), "yes")
+        items = self.run_bash("source bin/vmtui; list_lab_menu_items").stdout.splitlines()
+        tags = items[0::2]
+        for tag in ("Plan", "Install", "Install + Export", "Up", "Down", "Check", "Export to libvirt", "Unexport", "Libvirt Round Trip", "Clean"):
+            self.assertIn(tag, tags)
+        self.assertEqual(len(items) % 2, 0)
+
     def test_unified_menu_for_pfsense_router(self):
         output = self._unified_menu("pfsense-lab")
         self.assertIn("pfSense Bootstrap", output)

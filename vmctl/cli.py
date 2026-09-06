@@ -164,8 +164,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_pfsense)
 
-    p = _add(subparsers, "lab", help="network lab: plan, install (router -> Pi-hole -> clients), up/down/status/check on plain QEMU, export/unexport/libvirt-test for the libvirt road, attach a VM to the LAN")
-    p.add_argument("action", choices=["plan", "install", "up", "down", "status", "check", "export", "unexport", "libvirt-test", "attach"], help="what to do with the lab")
+    p = _add(subparsers, "lab", help="network lab: plan, install [--export] (router -> Pi-hole -> clients), up/down/status/check on plain QEMU, export/unexport/libvirt-test for the libvirt road, clean (disks + artifacts), attach a VM to the LAN")
+    p.add_argument("action", choices=["plan", "install", "up", "down", "status", "check", "export", "unexport", "libvirt-test", "clean", "attach"], help="what to do with the lab")
     p.add_argument("vm", nargs="?", help="a lab profile to select the lab (default: the only one); for attach, the VM to connect")
     p.add_argument("--router", help="attach: the lab's pfsense profile when several labs exist")
     p.add_argument("--apply", action="store_true", help="attach: write the networks override into vms/profiles/local.json")
@@ -174,6 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--connect", default="qemu:///system", help="export/unexport/libvirt-test/check: libvirt connection URI")
     p.add_argument("--replace", action="store_true", help="export: replace existing stopped libvirt domains with the same names")
     p.add_argument("--keep", action="store_true", help="libvirt-test: leave the lab defined and running in libvirt instead of unexporting it")
+    p.add_argument("--export", action="store_true", help="install: once the three VMs are installed, hand the lab to libvirt (same as lab export)")
     p.add_argument("--libvirt", action="store_true", help="check: probe the LAN addresses (host on lab-lan) instead of the 127.0.0.1 forwards")
     p.set_defaults(func=lifecycle.cmd_lab)
 

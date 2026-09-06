@@ -28,7 +28,7 @@ vmctl bootstrap-kickstart almalinux-server
 vmctl bootstrap-alpine alpine-niri
 vmctl bootstrap-windows windows11-unattended   # needs isos/windows11.iso (no public URL) + 7z
 vmctl bootstrap-pfsense pfsense-lab            # needs isos/pfSense-CE-2.7.2-RELEASE-amd64.iso (no public URL) + growisofs + python bcrypt
-vmctl lab plan|install|up|down|status|check    # the network lab (pfSense + Pi-hole + client) on plain QEMU
+vmctl lab plan|install [--export]|up|down|status|check|clean   # the network lab (pfSense + Pi-hole + client) on plain QEMU
 vmctl lab export|unexport|libvirt-test         # the same lab handed to libvirt (lab-lan network) and back
 vmctl export-libvirt <name>                    # hand an installed VM (and the lab-lan network) to libvirt
 vmctl attach <name>                # VNC view of a headless VM, also while a bootstrap runs

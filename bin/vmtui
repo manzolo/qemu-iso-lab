@@ -660,6 +660,28 @@ vm_has_unattended_install() {
     vm_has_section "$1" "autoinstall"
 }
 
+# The network lab exists when a profile declares network_lab.role = pfsense.
+catalog_has_network_lab() {
+    python3 -c "$PY_COMMON
+raise SystemExit(0 if any((vm.get('network_lab') or {}).get('role') == 'pfsense' for vm in VMS.values()) else 1)" "$ROOT_DIR" "$CONFIG_DIR"
+}
+
+# Tag/description pairs of the Network Lab submenu (also used by the tests).
+list_lab_menu_items() {
+    printf '%s\n' \
+        "Plan"           "Topology, forwards, install order, libvirt network XML (vmctl lab plan)" \
+        "Status"         "Role, address, disk and runtime state of every member" \
+        "Install"        "pfSense -> Pi-hole -> client from empty disks, ~30 min (vmctl lab install)" \
+        "Install + Export" "Install, then hand the whole lab to libvirt (vmctl lab install --export)" \
+        "Up"             "Start the three VMs headless in the background, in order" \
+        "Down"           "Stop them in reverse order" \
+        "Check"          "Probe the pfSense GUI, the Pi-hole UI and the SSH ports from the host" \
+        "Export to libvirt" "Lab down, export-libvirt of the three VMs, virsh start, checks on the LAN" \
+        "Unexport"       "virsh shutdown, unexport-libvirt: back to plain QEMU" \
+        "Libvirt Round Trip" "export + check + unexport in one go (vmctl lab libvirt-test)" \
+        "Clean"          "Stop and remove the three VMs: disks and artifacts, never the ISOs"
+}
+
 vm_disk_path() {
     python3 -c "$PY_COMMON
 disk = VMS[sys.argv[3]].get('disk') or {}
@@ -1613,6 +1635,43 @@ tools_menu_loop() {
     done
 }
 
+lab_menu_loop() {
+    while true; do
+        local -a items=()
+        mapfile -t items < <(list_lab_menu_items)
+        local selected
+        selected=$(MENU_CANCEL_LABEL="Back" menu_choose \
+            "Network Lab" \
+            "pfSense router + Pi-hole DNS/DHCP + Lubuntu client on the isolated segment lab-lan (vmctl lab ...)" \
+            "${items[@]}") || return 0
+        case "$selected" in
+            "Plan") run_vmctl lab plan || true ;;
+            "Status") run_vmctl lab status || true ;;
+            "Install")
+                if confirm_box "Install the network lab" "Install pfsense-lab, pihole-lab and lubuntu22-lab from empty disks?\n\nRequires the pfSense CE 2.7.2 ISO (local.json) and downloads Ubuntu 22.04.5.\nRefuses if one of the three disks already exists (Clean first).\n\nExpected time: ~30 min."; then
+                    run_vmctl lab install || true
+                fi
+                ;;
+            "Install + Export")
+                if confirm_box "Install and export the network lab" "Install the three VMs from empty disks, then define and start them in libvirt (network lab-lan, host on 192.168.0.254)?\n\nExpected time: ~30 min."; then
+                    run_vmctl lab install --export || true
+                fi
+                ;;
+            "Up") run_vmctl lab up || true ;;
+            "Down") run_vmctl lab down || true ;;
+            "Check") run_vmctl lab check || true ;;
+            "Export to libvirt") run_vmctl lab export || true ;;
+            "Unexport") run_vmctl lab unexport || true ;;
+            "Libvirt Round Trip") run_vmctl lab libvirt-test || true ;;
+            "Clean")
+                if confirm_box "Clean the network lab" "Stop and remove pfsense-lab, pihole-lab and lubuntu22-lab (disks and artifacts; ISOs are kept)?\n\nRefused while the lab is defined in libvirt (Unexport first)."; then
+                    run_vmctl lab clean || true
+                fi
+                ;;
+        esac
+    done
+}
+
 # ---------------------------------------------------------------------------
 # Dashboard (main screen)
 # ---------------------------------------------------------------------------
@@ -1682,6 +1741,9 @@ dashboard_loop() {
         else
             items+=("__none" "    (no VM matches this filter)")
         fi
+        if catalog_has_network_lab; then
+            items+=("__lab" "▸ Network Lab: pfSense · Pi-hole · Lubuntu  —  plan · install · up/down · check · libvirt")
+        fi
         items+=(
             "__tools" "▸ Tools: status table · remote hosts · clean all"
             "__quit"  "▸ Quit"
@@ -1705,6 +1767,7 @@ dashboard_loop() {
             __filter) choose_filter ;;
             __find) choose_find ;;
             __tools) tools_menu_loop ;;
+            __lab) lab_menu_loop ;;
             __quit) clear; exit 0 ;;
             __none) ;;
             *)

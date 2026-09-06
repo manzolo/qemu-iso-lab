@@ -218,6 +218,31 @@ class LabCommandTests(NetlabBase):
         self.assertIn("dns", str(ctx.exception))
         self.assertIn("vmctl clean", str(ctx.exception))
 
+    def test_clean_stops_and_removes_every_member_unless_the_lab_is_in_libvirt(self):
+        for name in ("router", "dns", "desk"):
+            disk = self.root / f"artifacts/{name}/disk.qcow2"
+            disk.parent.mkdir(parents=True)
+            disk.write_bytes(b"x")
+        with mock.patch.object(vmctl.lifecycle, "lab_in_libvirt", return_value=False), \
+             mock.patch.object(vmctl.lifecycle, "running_qemu_pid", side_effect=lambda name, vm: 7 if name == "router" else None), \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop", return_value=0) as stop:
+            self.assertEqual(self.run_lab("clean", connect="qemu:///system")[0], 0)
+        self.assertEqual([c.args[0].vm for c in stop.call_args_list], ["router"])
+        for name in ("router", "dns", "desk"):
+            self.assertFalse((self.root / f"artifacts/{name}/disk.qcow2").exists())
+        with mock.patch.object(vmctl.lifecycle, "lab_in_libvirt", return_value=True), self.assertRaises(vmctl.errors.VMError) as ctx:
+            self.run_lab("clean", connect="qemu:///system")
+        self.assertIn("lab unexport", str(ctx.exception))
+
+    def test_install_with_export_hands_the_lab_to_libvirt(self):
+        with mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_pfsense", return_value=0), \
+             mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended", return_value=0), \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop", return_value=0), \
+             mock.patch.object(vmctl.lifecycle, "lab_export", return_value=0) as export:
+            self.assertEqual(self.run_lab("install", export=True, connect="qemu:///session", replace=False, wait=5)[0], 0)
+        export.assert_called_once()
+        self.assertEqual(export.call_args.args[3], "qemu:///session")
+
     def test_up_and_down_start_and_stop_in_order(self):
         started, stopped = [], []
         with mock.patch.object(vmctl.lifecycle, "cmd_start", side_effect=lambda a: started.append((a.vm, a.headless, a.background)) or 0):
