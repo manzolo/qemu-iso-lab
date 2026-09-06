@@ -164,7 +164,7 @@
           ]
         }
       },
-      "notes": "Installs with the Ubuntu autoinstall flow on a slirp NIC (SSH 2238), then the post-install hook of network_lab installs Pi-hole v6 unattended (pre-seeded pihole.toml: upstreams, local records, DHCP pool) and writes the static LAN address 192.168.0.10 for the next boot. At runtime the only NIC is on lab-lan: SSH and the web UI reach it through the router (127.0.0.1:2238 and http://127.0.0.1:8081/admin/). The cloud-init sudoers drop-in gives the user passwordless sudo: the network_lab post-install hook runs its setup script with sudo over SSH.",
+      "notes": "Installs with the Ubuntu autoinstall flow on a slirp NIC (SSH 2238), then the post-install hook of network_lab installs Pi-hole v6 unattended (pre-seeded pihole.toml: upstreams, local records, DHCP pool) and writes the static LAN address 192.168.0.10 for the next boot. At runtime the only NIC is on lab-lan: SSH and the web UI reach it through the router (127.0.0.1:2238 and http://127.0.0.1:8081/admin/). The cloud-init sudoers drop-in gives the user passwordless sudo: the network_lab post-install hook runs its setup script with sudo over SSH. A getty on ttyS0 makes `vmctl console` a login prompt.",
       "autoinstall": {
         "hostname": "pi-hole",
         "username": "lab",
@@ -190,6 +190,9 @@
             "permissions": "0440",
             "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
           }
+        ],
+        "runcmd": [
+          "systemctl enable --now serial-getty@ttyS0.service"
         ]
       },
       "ssh_provision": {
@@ -289,7 +292,7 @@
           ]
         }
       },
-      "notes": "Ubuntu Server 22.04.5 autoinstall + lubuntu-desktop with SDDM autologin (the lab client of kvm-lab, on plain QEMU). Installs and provisions on a slirp NIC (SSH 2239); the network_lab hook writes the static LAN address 192.168.0.100 (gateway 192.168.0.1, DNS 192.168.0.10) and disables systemd-networkd-wait-online, otherwise every boot stalls 120 s once the renderer is NetworkManager. At runtime SSH goes through the router: 127.0.0.1:2239. The host folder ./shared lands on the desktop via virtiofs. The cloud-init sudoers drop-in gives the user passwordless sudo: the network_lab post-install hook runs its setup script with sudo over SSH.",
+      "notes": "Ubuntu Server 22.04.5 autoinstall + lubuntu-desktop with SDDM autologin (the lab client of kvm-lab, on plain QEMU). Installs and provisions on a slirp NIC (SSH 2239); the network_lab hook writes the static LAN address 192.168.0.100 (gateway 192.168.0.1, DNS 192.168.0.10) and disables systemd-networkd-wait-online, otherwise every boot stalls 120 s once the renderer is NetworkManager. At runtime SSH goes through the router: 127.0.0.1:2239. The host folder ./shared lands on the desktop via virtiofs. The cloud-init sudoers drop-in gives the user passwordless sudo: the network_lab post-install hook runs its setup script with sudo over SSH. A getty on ttyS0 makes `vmctl console` a login prompt.",
       "autoinstall": {
         "hostname": "lubuntu",
         "username": "lab",
@@ -323,7 +326,8 @@
         ],
         "runcmd": [
           "systemctl set-default graphical.target",
-          "systemctl enable sddm"
+          "systemctl enable sddm",
+          "systemctl enable --now serial-getty@ttyS0.service"
         ]
       },
       "ssh_provision": {

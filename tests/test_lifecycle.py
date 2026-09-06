@@ -536,7 +536,9 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("-display", qemu_cmd)
         self.assertIn("none", qemu_cmd)
         self.assertIn("-chardev", qemu_cmd)
-        self.assertIn("stdio,id=char0,signal=off", qemu_cmd)
+        # the serial of a background VM is a unix socket (vmctl console) that logs to logs/serial.log
+        self.assertNotIn("stdio,id=char0,signal=off", qemu_cmd)
+        self.assertTrue(any(a.startswith("socket,id=char0,path=") and "runtime/serial.sock" in a and "logfile=" in a for a in qemu_cmd))
         self.assertIn("-serial", qemu_cmd)
         self.assertIn("chardev:char0", qemu_cmd)
         self.assertEqual(log_path, self.root / "artifacts/testvm/logs/bootstrap-start.log")
@@ -1548,7 +1550,7 @@ class VmctlTests(BaseVmctlTestCase):
              mock.patch.object(vmctl.lifecycle, "reset_vm_nvram"), \
              mock.patch.object(vmctl.kickstart, "create_kickstart_iso", return_value=self.root / "artifacts/testvm/kickstart/seed.iso"), \
              mock.patch.object(vmctl.kickstart, "extract_kickstart_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
-             mock.patch.object(vmctl.qemu, "common_args", side_effect=[["qemu-system-x86_64"], ["qemu-system-x86_64"]]), \
+             mock.patch.object(vmctl.qemu, "common_args", side_effect=[["qemu-system-x86_64"], ["qemu-system-x86_64"]]) as common_args, \
              mock.patch.object(vmctl.qemu, "run_and_expect") as run_and_expect, \
              mock.patch.object(vmctl.lifecycle, "prepare_background_vm_slot", return_value=(self.root / "artifacts/testvm/runtime/bootstrap-start.pid", self.root / "artifacts/testvm/logs/bootstrap-start.log")), \
              mock.patch.object(vmctl.runtime, "run_background", return_value=4321) as run_background, \
@@ -1574,11 +1576,9 @@ class VmctlTests(BaseVmctlTestCase):
 
         run_qemu_cmd = run_background.call_args.args[0]
         self.assertEqual(run_qemu_cmd[0], "qemu-system-x86_64")
-        self.assertIn("-serial", run_qemu_cmd)
-        self.assertIn(
-            f"file:{self.root / 'artifacts/testvm/logs/post-install-serial.log'}",
-            run_qemu_cmd,
-        )
+        # the background boot puts the serial on a unix socket (vmctl console) that logs to post-install-serial.log
+        self.assertEqual(common_args.call_args_list[-1].kwargs["serial_log"], self.root / "artifacts/testvm/logs/post-install-serial.log")
+        self.assertEqual(common_args.call_args_list[-1].kwargs["serial_socket"], self.root / "artifacts/testvm/runtime/serial.sock")
         pid_path = self.root / "artifacts/testvm/runtime/bootstrap-start.pid"
         self.assertEqual(pid_path.read_text(encoding="utf-8"), "4321\n")
         run_post_install.assert_called_once_with(self.vm_name, self.vm_config, 45, dry_run=False)
@@ -1620,7 +1620,7 @@ class VmctlTests(BaseVmctlTestCase):
              mock.patch.object(vmctl.lifecycle, "reset_vm_nvram"), \
              mock.patch.object(vmctl.alpine, "create_alpine_seed_iso", return_value=self.root / "artifacts/testvm/alpine/seed.iso"), \
              mock.patch.object(vmctl.alpine, "extract_alpine_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
-             mock.patch.object(vmctl.qemu, "common_args", side_effect=[["qemu-system-x86_64"], ["qemu-system-x86_64"]]), \
+             mock.patch.object(vmctl.qemu, "common_args", side_effect=[["qemu-system-x86_64"], ["qemu-system-x86_64"]]) as common_args, \
              mock.patch.object(vmctl.qemu, "run_and_expect") as run_and_expect, \
              mock.patch.object(vmctl.lifecycle, "prepare_background_vm_slot", return_value=(self.root / "artifacts/testvm/runtime/bootstrap-start.pid", self.root / "artifacts/testvm/logs/bootstrap-start.log")), \
              mock.patch.object(vmctl.runtime, "run_background", return_value=4321) as run_background, \
@@ -1648,7 +1648,9 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertTrue(auto_inputs[1][1].endswith("run.sh\n"))
 
         run_qemu_cmd = run_background.call_args.args[0]
-        self.assertIn(f"file:{self.root / 'artifacts/testvm/logs/post-install-serial.log'}", run_qemu_cmd)
+        # the background boot puts the serial on a unix socket (vmctl console) that logs to post-install-serial.log
+        self.assertEqual(common_args.call_args_list[-1].kwargs["serial_log"], self.root / "artifacts/testvm/logs/post-install-serial.log")
+        self.assertEqual(common_args.call_args_list[-1].kwargs["serial_socket"], self.root / "artifacts/testvm/runtime/serial.sock")
         self.assertEqual((self.root / "artifacts/testvm/runtime/bootstrap-start.pid").read_text(encoding="utf-8"), "4321\n")
         run_post_install.assert_called_once_with(self.vm_name, self.vm_config, 45, dry_run=False)
 

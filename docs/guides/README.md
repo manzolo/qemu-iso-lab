@@ -8,6 +8,7 @@ danno l'ordine di lettura; la mappa di tutta la documentazione è in [../README.
 | # | Guida | Profili | Comando |
 |---|---|---|---|
 | 00 | [00-comune.md](00-comune.md) | tutti | prerequisiti host, `vmctl`, personalizzazione, uso quotidiano |
+| 05 | [05-interagire.md](05-interagire.md) | tutti | `vmctl shell`, `vmctl console` (seriale), `vmctl attach`; comandi tipici in Linux, Windows (PowerShell via SSH) e pfSense |
 | 10 | [10-ubuntu-niri.md](10-ubuntu-niri.md) | `ubuntu-niri`, `ubuntu-niri-local` | `vmctl bootstrap-unattended` |
 | 20 | [20-debian-server.md](20-debian-server.md) | `debian-server` | `vmctl bootstrap-preseed` |
 | 30 | [30-almalinux-fedora.md](30-almalinux-fedora.md) | `almalinux-server`, `fedora-niri-dms-local` | `vmctl bootstrap-kickstart` |

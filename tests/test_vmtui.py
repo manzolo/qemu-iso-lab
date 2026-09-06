@@ -488,6 +488,7 @@ class VmtuiTests(unittest.TestCase):
             ("pfSense Bootstrap", "bootstrap-pfsense"),
             ("Network Lab Plan", "lab-plan"),
             ("Attach Display", "attach"),
+            ("Serial Console", "console"),
             ("Unattended Install", "full-auto-install"),
             ("Cloud-Init Flow", "cloud-init-install"),
             ("Flash Empty Disk", "flash"),

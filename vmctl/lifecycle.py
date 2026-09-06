@@ -30,6 +30,11 @@ def bootstrap_pid_path(name: str) -> Path:
     return runtime.vm_artifact_base(name) / "runtime" / "bootstrap-start.pid"
 
 
+def serial_log_path(name: str) -> Path:
+    """Everything the guest prints on its serial console while running in the background (`vmctl console` log)."""
+    return runtime.resolve_path(f"artifacts/{name}/logs/serial.log")
+
+
 def bootstrap_log_path(name: str) -> Path:
     return runtime.vm_artifact_base(name) / "logs" / "bootstrap-start.log"
 
@@ -1082,6 +1087,7 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     run_qemu_args = qemu.common_args(
         vm,
         None,
@@ -1090,10 +1096,9 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         network_phase="install",
+        serial_socket=qemu.serial_socket_path(vm),
+        serial_log=post_serial_log,
     )
-    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
-    runtime.ensure_parent(post_serial_log)
-    run_qemu_args += ["-serial", f"file:{post_serial_log}"]
     stderr_log = companion_stderr_log_path(log_path)
     pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
     if pid is not None:
@@ -1159,6 +1164,7 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     run_qemu_args = qemu.common_args(
         vm,
         None,
@@ -1167,10 +1173,9 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         network_phase="install",
+        serial_socket=qemu.serial_socket_path(vm),
+        serial_log=post_serial_log,
     )
-    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
-    runtime.ensure_parent(post_serial_log)
-    run_qemu_args += ["-serial", f"file:{post_serial_log}"]
     stderr_log = companion_stderr_log_path(log_path)
     pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
     if pid is not None:
@@ -1186,6 +1191,7 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
 def start_installed_vm_headless(vm_name: str, vm: dict[str, Any], disk_exists: bool, dry_run: bool = False) -> None:
     """Boot the freshly installed disk in the background, serial to post-install-serial.log."""
     pid_path, log_path = prepare_background_vm_slot(vm_name, dry_run=dry_run)
+    post_serial_log = runtime.resolve_path(f"artifacts/{vm_name}/logs/post-install-serial.log")
     run_qemu_args = qemu.common_args(
         vm,
         None,
@@ -1194,10 +1200,9 @@ def start_installed_vm_headless(vm_name: str, vm: dict[str, Any], disk_exists: b
         headless=True,
         allow_missing_disk=dry_run and not disk_exists,
         network_phase="install",
+        serial_socket=qemu.serial_socket_path(vm),
+        serial_log=post_serial_log,
     )
-    post_serial_log = runtime.resolve_path(f"artifacts/{vm_name}/logs/post-install-serial.log")
-    runtime.ensure_parent(post_serial_log)
-    run_qemu_args += ["-serial", f"file:{post_serial_log}"]
     stderr_log = companion_stderr_log_path(log_path)
     pid = runtime.run_background(run_qemu_args, log_path, dry_run=dry_run, stderr_path=stderr_log)
     if pid is not None:
@@ -1591,6 +1596,7 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     run_qemu_args = qemu.common_args(
         vm,
         None,
@@ -1599,10 +1605,9 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         network_phase="install",
+        serial_socket=qemu.serial_socket_path(vm),
+        serial_log=post_serial_log,
     )
-    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
-    runtime.ensure_parent(post_serial_log)
-    run_qemu_args += ["-serial", f"file:{post_serial_log}"]
     stderr_log = companion_stderr_log_path(log_path)
     pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
     if pid is not None:
@@ -1664,6 +1669,7 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     run_qemu_args = qemu.common_args(
         vm,
         None,
@@ -1672,10 +1678,9 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         network_phase="install",
+        serial_socket=qemu.serial_socket_path(vm),
+        serial_log=post_serial_log,
     )
-    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
-    runtime.ensure_parent(post_serial_log)
-    run_qemu_args += ["-serial", f"file:{post_serial_log}"]
     stderr_log = companion_stderr_log_path(log_path)
     pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
     if pid is not None:
@@ -1815,10 +1820,12 @@ def cmd_start(args: argparse.Namespace) -> int:
                 args.video,
                 dry_run=args.dry_run,
                 headless=True,
-                serial_stdio=True,
                 spice_port=spice_port,
+                serial_socket=qemu.serial_socket_path(vm),
+                serial_log=serial_log_path(args.vm),
             )
             qemu_args += cloud_init_args
+            ui.print_kv("serial", f"{ui.pretty_path(serial_log_path(args.vm))}  (interactive: vmctl console {args.vm})")
         pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
         stderr_log = companion_stderr_log_path(log_path)
         pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
@@ -1942,6 +1949,7 @@ def cmd_bootstrap_omarchy(args: argparse.Namespace) -> int:
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
     qemu_args = qemu.common_args(
         vm,
         None,
@@ -1950,10 +1958,9 @@ def cmd_bootstrap_omarchy(args: argparse.Namespace) -> int:
         headless=True,
         allow_missing_disk=args.dry_run and not disk_exists,
         network_phase="install",
+        serial_socket=qemu.serial_socket_path(vm),
+        serial_log=post_serial_log,
     )
-    post_serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log")
-    runtime.ensure_parent(post_serial_log)
-    qemu_args += ["-serial", f"file:{post_serial_log}"]
     stderr_log = companion_stderr_log_path(log_path)
     pid = runtime.run_background(qemu_args, log_path, dry_run=args.dry_run, stderr_path=stderr_log)
     if pid is not None:
@@ -2129,6 +2136,30 @@ def cmd_attach(args: argparse.Namespace) -> int:
         return 0
     finally:
         bridge.close()
+
+
+def cmd_console(args: argparse.Namespace) -> int:
+    """Interactive serial console of a background VM (login on ttyS0, the pfSense menu); Ctrl-] detaches."""
+    cfg = config.load_config()
+    vm = config.get_vm(cfg, args.vm)
+    sock_path = qemu.serial_socket_path(vm)
+    ui.print_header(f"Serial console: {args.vm}")
+    if args.dry_run:
+        ui.print_kv("serial socket", ui.pretty_path(sock_path))
+        ui.print_status("ok", "Would attach the terminal to the guest serial port (Ctrl-] to detach)")
+        return 0
+    pid = running_qemu_pid(args.vm, vm)
+    if pid is None:
+        raise VMError(f"VM '{args.vm}' is not running (start it with: vmctl start {args.vm} --headless --background)")
+    if not sock_path.exists():
+        raise VMError(
+            f"VM '{args.vm}' (pid {pid}) has no serial socket: it was started with a window, during a bootstrap "
+            "(the serial is the automation's stdio there), or by an older vmctl. Its log may still be in artifacts/{args.vm}/logs/."
+        )
+    ui.print_kv("pid", str(pid))
+    ui.print_note("Attached to COM1/ttyS0. Linux guests need a getty on ttyS0 (the lab profiles enable it); pfSense shows its console menu. Detach with Ctrl-].")
+    qemu.serial_console(sock_path)
+    return 0
 
 
 def cmd_export_libvirt(args: argparse.Namespace) -> int:

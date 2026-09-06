@@ -423,7 +423,9 @@ class WindowsBootstrapTests(BaseVmctlTestCase):
         self.assertGreaterEqual(vmctl.windows.SHUTDOWN_GRACE_SEC, 300)
         self.assertEqual(kwargs["log_path"], self.root / "artifacts/testvm/logs/bootstrap-serial.log")
         run_qemu_cmd = run_background.call_args.args[0]
-        self.assertIn(f"file:{self.root / 'artifacts/testvm/logs/post-install-serial.log'}", run_qemu_cmd)
+        # the background boot puts the serial on a unix socket (vmctl console) that logs to post-install-serial.log
+        self.assertEqual(common_args.call_args_list[-1].kwargs["serial_log"], self.root / "artifacts/testvm/logs/post-install-serial.log")
+        self.assertEqual(common_args.call_args_list[-1].kwargs["serial_socket"], self.root / "artifacts/testvm/runtime/serial.sock")
         self.assertEqual((self.root / "artifacts/testvm/runtime/bootstrap-start.pid").read_text(encoding="utf-8"), "4321\n")
         post_install.assert_called_once_with(self.vm_name, self.vm_config, 45, dry_run=False)
 

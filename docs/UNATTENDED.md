@@ -42,6 +42,14 @@ command given with `--viewer`); `--no-viewer` only prints the address. The
 serial log stays the source of truth for the automation, the VNC screen is
 for watching.
 
+Once a VM runs in the background (`vmctl start --headless --background`, the
+post-install boot, `vmctl lab up`), its COM1/ttyS0 is a unix socket under
+`artifacts/<vm>/runtime/` too: `vmctl console <vm>` attaches the terminal to it
+(login on ttyS0 where a getty is enabled, the pfSense console menu), `Ctrl-]`
+detaches, and everything the guest prints there is logged to
+`artifacts/<vm>/logs/serial.log`. Bootstraps keep the serial on the automation's
+stdio, so `console` is for installed VMs.
+
 ## Ubuntu: autoinstall
 
 ```bash

@@ -913,6 +913,7 @@ build_vm_menu_items() {
         emit_action "Attach Display" "Watch the screen of the headless VM in a VNC viewer"
         if [[ $has_ssh == "1" ]]; then
             emit_action "SSH Console" "Open a shell inside the VM"
+            emit_action "Serial Console" "Attach to the serial port (ttyS0 login, pfSense menu); Ctrl-] detaches"
         fi
         emit_action "Boot Desktop" "Already running: restart with display, or open SSH"
     elif [[ $installed == "1" ]]; then
@@ -920,6 +921,7 @@ build_vm_menu_items() {
         emit_action "Boot Headless" "Start the VM in the background"
         if [[ $has_ssh == "1" ]]; then
             emit_action "SSH Console" "Open a shell inside the VM"
+            emit_action "Serial Console" "Attach to the serial port (ttyS0 login, pfSense menu); Ctrl-] detaches"
         fi
         if [[ $has_cloud_init == "1" ]]; then
             emit_action "First Boot" "Start the VM with cloud-init enabled"
@@ -1208,6 +1210,7 @@ resolve_action() {
         "Boot Headless") printf '%s\n' start-headless ;;
         "Remote SPICE") printf '%s\n' remote-spice ;;
         "SSH Console") printf '%s\n' shell ;;
+        "Serial Console") printf '%s\n' console ;;
         "Attach Display") printf '%s\n' attach ;;
         "Fetch ISO") printf '%s\n' fetch-iso ;;
         "Prepare VM") printf '%s\n' prep ;;
@@ -1421,6 +1424,9 @@ run_action() {
             ;;
         attach)
             run_vmctl attach "$current_vm" || true
+            ;;
+        console)
+            run_vmctl console "$current_vm" || true
             ;;
         stop)
             if confirm_box "Stop VM" "Power off '$current_vm'?\n\nvmctl tries a graceful shutdown first (QMP / SSH) and only then kills the process."; then

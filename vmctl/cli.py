@@ -28,7 +28,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
      ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "post-install"]),
     ("Run", "use a VM that is already installed",
-     ["start", "stop", "shell", "attach"]),
+     ["start", "stop", "shell", "console", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
      ["export-libvirt", "unexport-libvirt"]),
     ("Network lab", "pfSense router + Pi-hole DNS + clients on an isolated LAN segment",
@@ -48,6 +48,7 @@ typical flows:
   vmctl start <vm> [--headless]         boot the installed disk (add --background to detach)
   vmctl shell <vm>                      SSH into it (profiles with ssh_provision/cloud_init)
   vmctl attach <vm>                     watch the screen of a headless VM (VNC), even mid-bootstrap
+  vmctl console <vm>                    serial console of a background VM (ttyS0 login, pfSense menu); Ctrl-] detaches
   vmctl bootstrap-unattended <vm>       Ubuntu: unattended install + post-install, no clicks
   vmctl bootstrap-omarchy <vm>          Omarchy: cidata install + NVIDIA post-install
   vmctl bootstrap-preseed <vm>          same for Debian  (kickstart: AlmaLinux/Fedora, archinstall: Arch, alpine: Alpine)
@@ -240,6 +241,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-viewer", action="store_true", help="only expose the display on 127.0.0.1 and print the address; Ctrl-C to detach")
     p.set_defaults(func=lifecycle.cmd_attach)
 
+    p = _add(subparsers, "console", help="attach the terminal to the serial console of a running background VM (login on ttyS0, pfSense menu); Ctrl-] detaches")
+    p.add_argument("vm", help=VM_HELP)
+    p.set_defaults(func=lifecycle.cmd_console)
+
     p = _add(subparsers, "post-install", help="run post-install SSH provisioning steps")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=300, help="seconds to wait for SSH to become reachable (default: 300)")
@@ -324,7 +329,7 @@ _vmctl() {{
   fi
   case $words[2] in
     completion) _values 'shell' bash zsh ;;
-    export-libvirt|unexport-libvirt|lab|check-vms|clean|clean-stale|delete-iso|fetch-iso|prep|provision|install*|bootstrap-*|start|stop|shell|show|post-install|boot-check|flash|import-device)
+    export-libvirt|unexport-libvirt|lab|check-vms|clean|clean-stale|delete-iso|fetch-iso|prep|provision|install*|bootstrap-*|start|stop|shell|console|attach|show|post-install|boot-check|flash|import-device)
       vms=(${{(f)"$(vmctl list --names 2>/dev/null)"}})
       _alternative 'vms:VM profile:compadd -a vms' 'options:option:_default' ;;
     *) _default ;;

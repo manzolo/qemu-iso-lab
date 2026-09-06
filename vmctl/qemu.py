@@ -399,6 +399,62 @@ def network_args(vm: dict[str, Any], phase: str = "runtime") -> list[str]:
     return args
 
 
+def serial_socket_path(vm: dict[str, Any]) -> Path:
+    """Unix socket of the guest's first serial port (COM1 / ttyS0 / cuau0) for background VMs: `vmctl console`."""
+    return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "serial.sock"
+
+
+def serial_socket_args(sock_path: Path, log_path: Path | None) -> list[str]:
+    """COM1 on a unix socket (server, no wait) that also logs everything the guest prints to *log_path*."""
+    sock_path.parent.mkdir(parents=True, exist_ok=True)
+    chardev = f"socket,id=char0,path={sock_path},server=on,wait=off"
+    if log_path is not None:
+        runtime.ensure_parent(log_path)
+        chardev += f",logfile={log_path},logappend=on"
+    return ["-chardev", chardev, "-serial", "chardev:char0"]
+
+
+CONSOLE_ESCAPE = b"\x1d"  # Ctrl-]
+
+
+def serial_console(sock_path: Path, escape: bytes = CONSOLE_ESCAPE) -> None:
+    """Attach the terminal to the guest serial socket until *escape* (Ctrl-]) is typed."""
+    import termios
+    import tty
+
+    if not sys.stdin.isatty():
+        raise VMError("vmctl console needs an interactive terminal")
+    conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        conn.connect(str(sock_path))
+    except OSError as exc:
+        raise VMError(f"Cannot connect to the serial socket {sock_path}: {exc}") from exc
+    stdin_fd = sys.stdin.fileno()
+    saved = termios.tcgetattr(stdin_fd)
+    tty.setraw(stdin_fd)
+    try:
+        sel = selectors.DefaultSelector()
+        sel.register(conn, selectors.EVENT_READ)
+        sel.register(stdin_fd, selectors.EVENT_READ)
+        conn.sendall(b"\r")  # nudge the getty / menu to redraw its prompt
+        while True:
+            for key, _ in sel.select():
+                if key.fileobj is conn:
+                    data = conn.recv(4096)
+                    if not data:
+                        return
+                    os.write(sys.stdout.fileno(), data)
+                else:
+                    data = os.read(stdin_fd, 1024)
+                    if not data or escape in data:
+                        return
+                    conn.sendall(data)
+    finally:
+        termios.tcsetattr(stdin_fd, termios.TCSADRAIN, saved)
+        conn.close()
+        os.write(sys.stdout.fileno(), b"\r\n")
+
+
 def qmp_socket_path(vm: dict[str, Any]) -> Path:
     """QMP control socket of a headless VM, next to its runtime PID file."""
     return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "qmp.sock"
@@ -511,6 +567,7 @@ def common_args(
     headless: bool = False, serial_stdio: bool = False, no_reboot: bool = False,
     allow_missing_disk: bool = False, enable_clipboard: bool = True, spice_port: int | None = None,
     disk_bootindex: int | None = None, network_phase: str = "runtime",
+    serial_socket: Path | None = None, serial_log: Path | None = None,
 ) -> list[str]:
     runtime.require_command("qemu-system-x86_64")
     cpu_model = "host" if accel == "kvm" else vm.get("cpu_model", "max")
@@ -540,8 +597,14 @@ def common_args(
         args += ["-vnc", f"unix:{vnc_socket_path(vm)}"]
     else:
         args += video_args(vm, variant)
+    if serial_stdio and serial_socket is not None:
+        raise VMError("serial_stdio and serial_socket are mutually exclusive")
     if serial_stdio:
         args += ["-chardev", "stdio,id=char0,signal=off", "-serial", "chardev:char0"]
+    elif serial_socket is not None:
+        # Background VMs: the serial console stays reachable (`vmctl console`) and everything the
+        # guest prints on it is still logged.
+        args += serial_socket_args(serial_socket, serial_log)
     if vm.get("usb_tablet"):
         args += ["-usb", "-device", "qemu-xhci", "-device", "usb-tablet"]
     if vm.get("audio"):

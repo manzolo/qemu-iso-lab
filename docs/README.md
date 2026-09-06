@@ -27,6 +27,7 @@ reading order; `make guides` renders them with weasyprint into
 | # | Guide | Covers |
 |---|---|---|
 | 00 | [00-comune.md](guides/00-comune.md) | Host prerequisites, how a bootstrap works, `local.json`, daily use |
+| 05 | [05-interagire.md](guides/05-interagire.md) | Getting a command line in a guest: SSH, serial console (`vmctl console`), VNC screen; typical checks on Linux, Windows (PowerShell over SSH) and pfSense |
 | 10 | [10-ubuntu-niri.md](guides/10-ubuntu-niri.md) | Ubuntu autoinstall + cloud-init (`bootstrap-unattended`) |
 | 20 | [20-debian-server.md](guides/20-debian-server.md) | Debian preseed (`bootstrap-preseed`) |
 | 30 | [30-almalinux-fedora.md](guides/30-almalinux-fedora.md) | AlmaLinux / Fedora kickstart (`bootstrap-kickstart`) |

@@ -32,6 +32,7 @@ vmctl lab plan|install|up|down|status|check    # the network lab (pfSense + Pi-h
 vmctl lab export|unexport|libvirt-test         # the same lab handed to libvirt (lab-lan network) and back
 vmctl export-libvirt <name>                    # hand an installed VM (and the lab-lan network) to libvirt
 vmctl attach <name>                # VNC view of a headless VM, also while a bootstrap runs
+vmctl console <name>               # serial console (ttyS0 login / pfSense menu) of a background VM, Ctrl-] detaches
 ```
 
 Before pushing, run the relevant local tests first. Do not use GitHub Actions as the first place to discover breakage in unit tests, dry-run bootstrap flows, or CI wiring. At minimum, if you touch CI or unattended/bootstrap code, run `python -m unittest discover -s tests -v` and any focused bootstrap/dry-run commands affected by the change.
@@ -172,7 +173,7 @@ artifacts/<vm>/
 ├── cloud-init/         # cloud-init seed
 ├── archinstall/        # Arch config ISO / bootstrap script
 ├── logs/
-└── runtime/            # PID files, qmp.sock (graceful stop) and vnc.sock (`vmctl attach`) of background VMs
+└── runtime/            # PID files, qmp.sock (graceful stop), vnc.sock (`vmctl attach`) and serial.sock (`vmctl console`, logged to logs/serial.log) of background VMs
 ```
 
 ### CI
