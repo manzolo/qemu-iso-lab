@@ -76,11 +76,13 @@ percorsi e nei comandi del profilo segue. `vmctl show <vm> --json` mostra il pro
 | Avvio con finestra | `vmctl start <vm>` |
 | Avvio headless in background | `vmctl start <vm> --headless --background` |
 | Shell nel guest | `vmctl shell <vm>` (SSH con la chiave di `artifacts/<vm>/ssh/`) |
+| Console seriale di una VM in background | `vmctl console <vm>` (`Ctrl-]` per uscire) |
 | Schermo di una VM headless | `vmctl attach <vm>` |
 | Spegnimento pulito | `vmctl stop <vm>` (pulsante ACPI, poi SSH, poi SIGTERM) |
 | Rifare il post-install | `vmctl post-install <vm>` |
 | Cancellare disco e artefatti | `vmctl clean <vm>` |
 | Menu testuale | `vmtui` |
+| Lab di rete (pfSense + Pi-hole + Lubuntu) | `vmctl lab install` (da zero), `lab up`/`down`, `lab check`, `lab export`/`unexport` (libvirt), `lab clean`; `vmctl lab install --export` installa e consegna subito a libvirt. In `vmtui` è la riga "Network Lab" del dashboard. Guida 70. |
 
 SSH diretto senza `vmctl shell`:
 

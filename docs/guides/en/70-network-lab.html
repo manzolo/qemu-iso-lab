@@ -153,6 +153,7 @@
       <li><code>vmctl lab up/down/status/check</code>, <code>vmctl shell &lt;vm&gt;</code>, <code>vmctl console &lt;vm&gt;</code> for the serial, <code>vmctl attach &lt;vm&gt;</code> for the screen.</li>
       <li>The forwards live in the router profile (<code>networks[].hostfwd</code>) and in the NAT rules of the config.xml: <code>vmctl lab plan</code> checks they agree.</li>
       <li>After <code>vmctl lab export</code> the host sits on the LAN and everything is reachable at the real IPs.</li>
+      <li>In <code>vmtui</code> the "Network Lab" dashboard row gathers the same actions (plan, install, install + export, up, down, check, export, unexport, round trip, clean).</li>
     </ul>
   </div>
 </div>

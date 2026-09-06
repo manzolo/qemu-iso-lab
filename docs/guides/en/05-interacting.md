@@ -127,6 +127,8 @@ profile user or `admin`, same password.
 ```bash
 vmctl lab status                         # role, IP, disk, state of every member
 vmctl lab check                          # HTTP and TCP probes: pfSense GUI, Pi-hole GUI, SSH ports
+vmctl lab install [--export]             # the whole lab from scratch (--export ends in libvirt); lab clean removes it
+vmctl lab export · unexport · libvirt-test   # libvirt road: the same probes on the real IPs
 tail -f artifacts/pfsense-lab/logs/serial.log       # the serial of a background VM
 curl -s http://127.0.0.1:8081/admin/ | head -3      # Pi-hole through the router forward
 ```

@@ -164,6 +164,7 @@
       <li><code>vmctl lab up/down/status/check</code>, <code>vmctl shell &lt;vm&gt;</code>, <code>vmctl console &lt;vm&gt;</code> per la seriale, <code>vmctl attach &lt;vm&gt;</code> per lo schermo.</li>
       <li>I forward sono nel profilo del router (<code>networks[].hostfwd</code>) e nelle regole NAT del config.xml: <code>vmctl lab plan</code> verifica che coincidano.</li>
       <li>Dopo <code>vmctl export-libvirt</code> l'host sta sulla LAN e tutto è raggiungibile sugli IP veri.</li>
+      <li>In <code>vmtui</code> la riga "Network Lab" del dashboard raccoglie le stesse azioni (plan, install, install + export, up, down, check, export, unexport, round trip, clean).</li>
     </ul>
   </div>
 </div>

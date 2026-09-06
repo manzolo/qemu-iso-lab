@@ -84,6 +84,7 @@ profile's paths and commands follows. `vmctl show <vm> --json` prints the resolv
 | Redo the post-install | `vmctl post-install <vm>` |
 | Delete disk and artifacts | `vmctl clean <vm>` |
 | Text menu | `vmtui` |
+| Network lab (pfSense + Pi-hole + Lubuntu) | `vmctl lab install` (from scratch), `lab up`/`down`, `lab check`, `lab export`/`unexport` (libvirt), `lab clean`; `vmctl lab install --export` installs and hands it to libvirt at once. In `vmtui` it is the "Network Lab" dashboard row. Guide 70. |
 
 Plain SSH without `vmctl shell`:
 

@@ -329,6 +329,8 @@ class PfsenseBootstrapTests(PfsenseLabBase):
         with self.assertRaises(vmctl.errors.VMError):
             self.vmctl.cmd_bootstrap_pfsense(argparse.Namespace(vm=self.vm_name, timeout=1, dry_run=True))
         self.assertEqual(self.vmctl.local_test_mode(self.lab["router"])[0], "bootstrap-pfsense")
+        # --restore / --clean-first must treat the router like every other bootstrap flow
+        self.assertIn("router", self.vmctl.local_test_clean_candidates(["router", self.vm_name], self.cfg))
         self.assertEqual(self.vmctl.local_test_mode(self.lab["dns"])[0], "bootstrap-unattended")
 
 
