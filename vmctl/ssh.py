@@ -45,6 +45,18 @@ def ensure_generated_ssh_keypair(vm: dict[str, Any], dry_run: bool = False) -> P
     return private
 
 
+def key_needs_passphrase(path: Path) -> bool:
+    """True when *path* is an OpenSSH private key that cannot be loaded without a passphrase.
+
+    vmctl only ever runs ssh in BatchMode: such a key would make every probe fail silently and
+    ``wait_for_ssh`` time out after an hour on a guest whose sshd is perfectly fine.
+    """
+    if shutil.which("ssh-keygen") is None:
+        return False
+    result = subprocess.run(["ssh-keygen", "-y", "-P", "", "-f", str(path)], capture_output=True, text=True, check=False)
+    return result.returncode != 0 and "passphrase" in (result.stderr + result.stdout).lower()
+
+
 def resolve_ssh_private_key(vm: dict[str, Any], cfg: dict[str, Any], dry_run: bool = False) -> Path | None:
     configured = _configured_ssh_key(cfg)
     if configured is not None:
@@ -52,6 +64,11 @@ def resolve_ssh_private_key(vm: dict[str, Any], cfg: dict[str, Any], dry_run: bo
             if dry_run:
                 return None
             raise VMError(f"SSH private key not found: {configured}")
+        if not dry_run and key_needs_passphrase(configured):
+            raise VMError(
+                f"SSH private key {configured} is passphrase-protected: vmctl runs ssh in BatchMode and could never log in. "
+                "Point ssh_key at a key without passphrase, or remove ssh_key to let vmctl generate one per VM."
+            )
         return configured
     if cloud_init.ssh_access_config(vm) is cfg:
         return ensure_generated_ssh_keypair(vm, dry_run=dry_run)
