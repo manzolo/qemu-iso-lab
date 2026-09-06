@@ -164,7 +164,7 @@ Not verified by the unit tests (they never start a VM); run them once after
 | Check | How |
 |---|---|
 | pfSense installed and booting from disk | `vmctl attach pfsense-lab`: console menu, WAN with a `10.0.2.x` address, LAN `192.168.0.1` |
-| pfSense GUI login | `http://127.0.0.1:8080/` with `lab` and with `admin` |
+| pfSense GUI login | `http://127.0.0.1:8080/` with `lab` and with `admin` (verified live on 2026-09-06: install 3 min, GUI up 20 s after boot, both logins land on the first-time setup wizard, which can be closed; SSH with the project key works) |
 | Pi-hole up, DHCP state | `vmctl shell pihole-lab`, then `pihole status` and `pihole-FTL --config dhcp.active` |
 | Local DNS | on the client: `resolvectl query pfsense.qlan` → `firewall.qlan` → `192.168.0.1` |
 | Public DNS and HTTPS through the firewall | on the client: `curl -sI https://example.org` |

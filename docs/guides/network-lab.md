@@ -129,7 +129,7 @@ I singoli passi si possono lanciare a mano: `vmctl bootstrap-pfsense pfsense-lab
 
 | Cosa | Dove |
 |---|---|
-| GUI pfSense | `http://127.0.0.1:8080/` (utente del profilo o `admin`) |
+| GUI pfSense | `http://127.0.0.1:8080/` (utente del profilo o `admin`); al primo accesso pfSense propone il wizard iniziale, si può chiudere |
 | GUI Pi-hole | `http://127.0.0.1:8081/admin/` |
 | Shell | `vmctl shell pfsense-lab`, `vmctl shell pihole-lab`, `vmctl shell lubuntu22-lab` |
 | Desktop del client | `vmctl attach lubuntu22-lab`, oppure `vmctl start lubuntu22-lab` con finestra |
