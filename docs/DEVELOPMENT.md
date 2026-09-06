@@ -92,3 +92,15 @@ VMs, a personal `local.json`) and in the bare CI runner (with none of them).
 
 The `alpine-ci` profile is the stable CI guest: keep it small and TCG-capable
 ([CI_BOOT_STRATEGY.md](CI_BOOT_STRATEGY.md)).
+
+## Full local validation (never in CI)
+
+`make validate-vms` runs `vmctl check-vms --restore --report --open` over every
+profile: each unattended flow is reinstalled from a virgin state, the existing
+disks and NVRAM are stashed and restored afterwards, and a self-contained HTML
+report (search, PASS/WARN/FAIL/SKIP filter, final screenshots) opens at the end
+under `artifacts/check-vms/<timestamp>/`. It takes hours and needs KVM, the
+local-only ISOs (Windows, pfSense) and the network: profiles whose ISO is
+missing are reported as skipped. Narrow it with `VMS="debian-server alpine-ci"`
+and speed it up with `PARALLEL=2` (`TIMEOUT=` per VM). GitHub Actions only runs
+the dry-runs and the small TCG guests.

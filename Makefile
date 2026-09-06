@@ -8,7 +8,7 @@
 PREFIX ?= $(HOME)/.local
 BIN := $(abspath bin)
 
-.PHONY: help setup install-cli uninstall-cli test lint check ci tui init-local-profile
+.PHONY: help setup install-cli uninstall-cli test lint check ci tui init-local-profile validate-vms guides
 
 help: ## Show this help
 	@printf "\033[1mqemu-iso-lab: developer targets\033[0m\n\n"
@@ -51,6 +51,9 @@ init-local-profile: ## Create vms/profiles/local.json from the example
 		printf "  [ok] created vms/profiles/local.json from the template\n"; \
 		printf "  edit YOUR_USER, the password/hash and the SSH/dotfile paths before using the *-local profiles\n"; \
 	fi
+
+validate-vms: ## Local-only full matrix: reinstall every unattended profile from scratch, restore the installed disks, write the HTML report (hours; VMS="a b" PARALLEL=2 to narrow/speed up)
+	@./bin/vmctl check-vms $(VMS) --restore --no-clean-first --report $(if $(PARALLEL),--parallel $(PARALLEL),) $(if $(TIMEOUT),--timeout $(TIMEOUT),) --open
 
 guides: ## Render docs/guides/*.md into PDFs under docs/guides/pdf/ (needs python markdown + weasyprint)
 	python3 tools/build_guides.py
