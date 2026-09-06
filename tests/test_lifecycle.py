@@ -1124,6 +1124,7 @@ class VmctlTests(BaseVmctlTestCase):
         args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=True, headless=False, background=False, dry_run=True)
 
         with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_hostfwd_port", return_value=(None, None)), \
              mock.patch.object(vmctl.cloud_init, "create_cloud_init_seed", return_value=self.root / "artifacts/testvm/cloud-init/seed.iso") as create_seed, \
              mock.patch.object(vmctl.runtime, "run") as run_cmd:
             exit_code = self.vmctl.cmd_start(args)

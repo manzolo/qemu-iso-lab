@@ -372,17 +372,27 @@ def prepare_vm_for_local_test(vm_name: str, vm: dict[str, Any]) -> tuple[dict[st
     if disk_pid is not None:
         return prepared, f"disk already in use by qemu pid {disk_pid}"
 
+    notes: list[str] = []
+    # Extra slirp forwards (the network lab router exposes its members' ports): another VM of the
+    # matrix may hold the same host port while installing, so move the host side to a free port.
+    # The guest side stays (the pfSense NAT rules point at it), only the host address changes.
+    for spec in prepared.get("networks", []) or []:
+        if not isinstance(spec, dict) or spec.get("type", "user") != "user":
+            continue
+        for fwd in spec.get("hostfwd", []) or []:
+            if isinstance(fwd, dict) and fwd.get("host_port") and local_tcp_port_open(int(fwd["host_port"])):
+                new_port = pick_free_local_port()
+                notes.append(f"host port {fwd['host_port']} busy, forwarding {new_port} instead")
+                fwd["host_port"] = new_port
+
     ssh_cfg = cloud_init.ssh_access_config(prepared)
-    if ssh_cfg is None or not ssh_cfg.get("ssh_host_port"):
-        return prepared, None
-
-    port = int(ssh_cfg["ssh_host_port"])
-    if not local_tcp_port_open(port):
-        return prepared, None
-
-    new_port = pick_free_local_port()
-    ssh_cfg["ssh_host_port"] = new_port
-    return prepared, f"SSH host port {port} busy, using {new_port} for check-vms"
+    if ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
+        port = int(ssh_cfg["ssh_host_port"])
+        if local_tcp_port_open(port):
+            new_port = pick_free_local_port()
+            ssh_cfg["ssh_host_port"] = new_port
+            notes.append(f"SSH host port {port} busy, using {new_port} for check-vms")
+    return prepared, ("; ".join(notes) if notes else None)
 
 
 def resolved_vm(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, Any]:

@@ -372,6 +372,26 @@ class LabCheckTests(NetlabBase):
         unexport.assert_not_called()
 
 
+class MatrixPortTests(NetlabBase):
+    def test_check_vms_moves_busy_router_forwards_to_free_host_ports(self):
+        busy = {2239, 2237}
+        with mock.patch.object(vmctl.lifecycle, "local_tcp_port_open", side_effect=lambda port, **kw: port in busy), \
+             mock.patch.object(vmctl.lifecycle, "pick_free_local_port", side_effect=[40001, 40002]), \
+             mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_disk_path", return_value=(None, None)):
+            prepared, note = self.vmctl.prepare_vm_for_local_test("router", self.lab["router"])
+        forwards = {f["guest_port"]: f["host_port"] for f in prepared["networks"][0]["hostfwd"]}
+        self.assertEqual(forwards[2239], 40001)  # the member's install-phase slirp holds 2239 during the matrix
+        self.assertEqual(forwards[80], 8080)  # free ports are untouched
+        self.assertEqual(prepared["ssh_provision"]["ssh_host_port"], 40002)
+        self.assertIn("2239 busy", note)
+        self.assertIn("SSH host port 2237 busy", note)
+        self.assertEqual(self.lab["router"]["networks"][0]["hostfwd"][3]["host_port"], 2239)  # the profile itself is untouched
+        with mock.patch.object(vmctl.lifecycle, "local_tcp_port_open", return_value=False), \
+             mock.patch.object(vmctl.lifecycle, "find_qemu_process_by_disk_path", return_value=(None, None)):
+            _, note = self.vmctl.prepare_vm_for_local_test("router", self.lab["router"])
+        self.assertIsNone(note)
+
+
 class LibvirtSegmentTests(NetlabBase):
     def test_domain_xml_maps_segment_nics_to_the_lab_network_with_their_mac(self):
         xml = ET.fromstring(vmctl.libvirt.render_domain_xml("router", self.lab["router"]))
