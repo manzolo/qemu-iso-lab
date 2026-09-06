@@ -298,9 +298,10 @@ is downloaded; `local.json` may point `iso` at an existing file), `7z` and
    and installs the virtio guest tools,
    OpenSSH Server (`Add-WindowsCapability`, retried while Windows Update wakes
    up) with the project's public key in `administrators_authorized_keys` (strict
-   ACL via `icacls`), disables sleep and hibernation, runs the profile's
-   PowerShell `setup_commands`, logs each step to `C:\vmctl\setup.log` and to
-   COM1. `setup_commands` run in the administrator's user context, so HKCU
+   ACL via `icacls`), disables sleep and hibernation, installs WinFSP and
+   starts `VirtioFsSvc` when the profile has a `shared_dir` (the host folder
+   shows up as a drive letter and gets a shortcut on the desktop), runs the profile's PowerShell
+   `setup_commands`, logs each step to `C:\vmctl\setup.log` and to COM1. `setup_commands` run in the administrator's user context, so HKCU
    refers to that user.
    Every step is checked (installer exit codes, `sshd` running, `icacls`
    result, a non-zero exit code in a `setup_commands` entry); only when none

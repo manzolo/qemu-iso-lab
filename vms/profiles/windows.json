@@ -75,10 +75,15 @@
         "post_install_run": [
           "ver",
           "powershell -NoProfile -Command \"(Get-CimInstance Win32_OperatingSystem).Caption; (Get-Service sshd).Status\"",
-          "type C:\\vmctl\\setup.log"
+          "type C:\\vmctl\\setup.log",
+          "powershell -NoProfile -Command \"(Get-Service VirtioFsSvc).Status; Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Description -like '*virtio*' -or $_.Name -ne 'C' } | Select-Object -ExpandProperty Root\""
         ]
       },
-      "acpi_poweroff_grace_sec": 300
+      "acpi_poweroff_grace_sec": 300,
+      "shared_dir": {
+        "source": "shared",
+        "tag": "shared"
+      }
     },
     "windows11-unattended": {
       "name": "Windows 11 (unattended)",
@@ -155,10 +160,15 @@
         "post_install_run": [
           "ver",
           "powershell -NoProfile -Command \"(Get-CimInstance Win32_OperatingSystem).Caption; (Get-Service sshd).Status\"",
-          "type C:\\vmctl\\setup.log"
+          "type C:\\vmctl\\setup.log",
+          "powershell -NoProfile -Command \"(Get-Service VirtioFsSvc).Status; Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Description -like '*virtio*' -or $_.Name -ne 'C' } | Select-Object -ExpandProperty Root\""
         ]
       },
-      "acpi_poweroff_grace_sec": 300
+      "acpi_poweroff_grace_sec": 300,
+      "shared_dir": {
+        "source": "shared",
+        "tag": "shared"
+      }
     },
     "windows10-template": {
       "name": "Windows 10 Template",

@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import cloud_init, flash, runtime, ui
+from vmctl import cloud_init, flash, qemu, runtime, ui
 from vmctl.errors import VMError
 
 
@@ -439,3 +439,52 @@ def post_install_copy_raw(
         stderr_log=stderr_log,
         append=True,
     )
+
+
+def shared_dir_mountpoint(vm: dict[str, Any]) -> str:
+    cfg = qemu.shared_dir_config(vm)
+    return f"/mnt/{cfg['tag'] if cfg else 'shared'}"
+
+
+def shared_dir_system_script(vm: dict[str, Any]) -> str:
+    """Root part: fstab entry (systemd automount when available) and an immediate mount."""
+    cfg = qemu.shared_dir_config(vm)
+    assert cfg is not None
+    tag, mnt = shlex.quote(cfg["tag"]), shlex.quote(shared_dir_mountpoint(vm))
+    return (
+        f"tag={tag}; mnt={mnt}; mkdir -p \"$mnt\"; "
+        "if command -v systemctl >/dev/null 2>&1; then opts=nofail,x-systemd.automount,x-systemd.idle-timeout=60; else opts=nofail; fi; "
+        "if ! grep -q \"^$tag[[:space:]]\" /etc/fstab; then "
+        "printf '%s\\t%s\\tvirtiofs\\t%s\\t0\\t0\\n' \"$tag\" \"$mnt\" \"$opts\" >> /etc/fstab; fi; "
+        "command -v systemctl >/dev/null 2>&1 && systemctl daemon-reload; "
+        "mountpoint -q \"$mnt\" || mount -t virtiofs \"$tag\" \"$mnt\" || echo \"[vmctl] virtiofs mount of $tag deferred to next boot\""
+    )
+
+
+def shared_dir_user_script(vm: dict[str, Any]) -> str:
+    """User part: ``~/<tag>`` and a link on the desktop (xdg DESKTOP dir, Desktop or Scrivania)."""
+    cfg = qemu.shared_dir_config(vm)
+    assert cfg is not None
+    tag, mnt = shlex.quote(cfg["tag"]), shlex.quote(shared_dir_mountpoint(vm))
+    return (
+        f"tag={tag}; mnt={mnt}; ln -sfn \"$mnt\" \"$HOME/$tag\"; "
+        "for d in \"$(xdg-user-dir DESKTOP 2>/dev/null)\" \"$HOME/Desktop\" \"$HOME/Scrivania\"; do "
+        "[ -n \"$d\" ] && [ \"$d\" != \"$HOME\" ] && [ -d \"$d\" ] && ln -sfn \"$mnt\" \"$d/$tag\"; done; true"
+    )
+
+
+def provision_shared_dir(
+    vm: dict[str, Any],
+    dry_run: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+) -> None:
+    """Make the virtiofs share of a ``shared_dir`` profile usable in a Linux guest (kvm-lab style):
+    ``/mnt/<tag>`` in fstab with automount, mounted now, linked as ``~/<tag>`` and on the desktop."""
+    if qemu.shared_dir_config(vm) is None:
+        return
+    ui.print_note(f"Mounting the virtiofs share at {shared_dir_mountpoint(vm)} and linking it on the desktop")
+    runtime.run(remote_sudo_shell_cmd(vm, shared_dir_system_script(vm), dry_run=dry_run),
+                dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log, append=True)
+    runtime.run(remote_shell_cmd(vm, shared_dir_user_script(vm), dry_run=dry_run),
+                dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log, append=True)

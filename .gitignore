@@ -25,3 +25,7 @@ AGENTS.md
 # Local VM profile overrides
 vms/profiles/local.json
 vms/remotes.json
+# default host folder shared with guests (shared_dir.source: "shared")
+shared/
+# rendered guides (make guides)
+docs/guides/pdf/

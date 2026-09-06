@@ -17,7 +17,7 @@ CONFIG_DIR: Path = _ORIGINAL_CONFIG_DIR
 HTTP_USER_AGENT: str = "Mozilla/5.0 (compatible; vmctl/1.0; +https://local.repo)"
 
 REQUIRED_COMMANDS = ["qemu-system-x86_64", "qemu-img", "python3"]
-OPTIONAL_COMMANDS = {"dialog": "required only for the TUI", "7z": "required only by bootstrap-windows (unpacks the UDF Windows ISO)", "xorriso": "seed ISOs and the prompt-free Windows ISO"}
+OPTIONAL_COMMANDS = {"dialog": "required only for the TUI", "7z": "required only by bootstrap-windows (unpacks the UDF Windows ISO)", "xorriso": "seed ISOs and the prompt-free Windows ISO", "virtiofsd": "required only by profiles with shared_dir (host folder shared with the guest)"}
 COMMON_OVMF_PAIRS = [
     ("/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd"),
     ("/usr/share/OVMF/OVMF_CODE.fd", "/usr/share/OVMF/OVMF_VARS.fd"),

@@ -161,6 +161,138 @@ def installer_video_variant(vm: dict[str, Any], requested: str | None) -> str | 
     return None
 
 
+# ---- shared folder (virtiofs) -------------------------------------------------------------
+# What libvirt does for a <filesystem driver='virtiofs'> plus <memoryBacking><source type='memfd'/>
+# <access mode='shared'/>: a virtiofsd per VM on a unix socket, the guest RAM as a shared memfd
+# backend and a vhost-user-fs-pci device carrying the mount tag.
+
+VIRTIOFSD_CANDIDATES = ("virtiofsd", "/usr/libexec/virtiofsd", "/usr/lib/qemu/virtiofsd")
+VIRTIOFSD_SOCKET_WAIT_SEC = 5.0
+_TAG_RE = re.compile(r"^[A-Za-z0-9_.-]{1,36}$")
+
+
+def shared_dir_config(vm: dict[str, Any]) -> dict[str, str] | None:
+    """``shared_dir`` of a profile as ``{"source", "tag"}``, or None when the VM shares nothing."""
+    cfg = vm.get("shared_dir")
+    if cfg is None:
+        return None
+    if not isinstance(cfg, dict):
+        raise VMError("Invalid shared_dir: expected an object with source and tag")
+    source = str(cfg.get("source") or "").strip()
+    if not source:
+        raise VMError("shared_dir.source is required (host directory to share)")
+    tag = str(cfg.get("tag") or "shared").strip()
+    if not _TAG_RE.match(tag):
+        raise VMError(f"shared_dir.tag {tag!r} must be 1-36 characters of letters, digits, '_', '.' or '-'")
+    return {"source": source, "tag": tag}
+
+
+def shared_dir_source(vm: dict[str, Any]) -> Path:
+    """Host directory of the share: ``~`` expanded, relative paths under the repository root."""
+    cfg = shared_dir_config(vm)
+    if cfg is None:
+        raise VMError("VM profile does not define shared_dir")
+    path = runtime.expand_host_path(cfg["source"])
+    return path if path.is_absolute() else runtime.resolve_path(str(path))
+
+
+def virtiofs_socket_path(vm: dict[str, Any]) -> Path:
+    cfg = shared_dir_config(vm)
+    tag = cfg["tag"] if cfg else "shared"
+    return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / f"virtiofs-{tag}.sock"
+
+
+def find_virtiofsd() -> str | None:
+    for candidate in VIRTIOFSD_CANDIDATES:
+        found = shutil.which(candidate)  # also accepts absolute paths; mockable in tests
+        if found:
+            return found
+    return None
+
+
+def virtiofsd_command(vm: dict[str, Any]) -> list[str]:
+    binary = find_virtiofsd()
+    if binary is None:
+        raise VMError("Missing virtiofsd (package virtiofsd): required by profiles with shared_dir")
+    return [
+        binary,
+        "--socket-path", str(virtiofs_socket_path(vm)),
+        "--shared-dir", str(shared_dir_source(vm)),
+        "--sandbox", "none",  # unprivileged: no user namespaces or capabilities needed
+        "--cache", "auto",
+    ]
+
+
+def virtiofsd_pid_path(vm: dict[str, Any]) -> Path:
+    """virtiofsd writes ``<socket>.pid`` next to its socket and holds a lock on it."""
+    sock = virtiofs_socket_path(vm)
+    return sock.with_name(sock.name + ".pid")
+
+
+def _virtiofsd_running(vm: dict[str, Any]) -> bool:
+    """A daemon from a previous ``common_args`` call is still waiting on its socket."""
+    pid_path = virtiofsd_pid_path(vm)
+    if not pid_path.is_file() or not virtiofs_socket_path(vm).exists():
+        return False
+    try:
+        pid = int(pid_path.read_text(encoding="utf-8").strip())
+        os.kill(pid, 0)
+    except (ValueError, OSError):
+        return False
+    return True
+
+
+def ensure_virtiofsd(vm: dict[str, Any], dry_run: bool = False) -> None:
+    """Start the per-VM virtiofsd right before QEMU (which connects to its socket at startup).
+
+    Idempotent: ``common_args`` may be called more than once per launch (``vmctl start`` does),
+    and a daemon that is already waiting on the socket is reused. The daemon exits on its own
+    when QEMU disconnects. A relative ``source`` that does not exist yet is created under the repo.
+    """
+    cfg = shared_dir_config(vm)
+    if cfg is None:
+        return
+    if not dry_run and _virtiofsd_running(vm):
+        return
+    source = shared_dir_source(vm)
+    if not source.is_dir():
+        if Path(cfg["source"]).expanduser().is_absolute():
+            raise VMError(f"shared_dir.source does not exist: {source}")
+        ui.print_note(f"Creating shared directory {ui.pretty_path(source)}")
+        if not dry_run:
+            source.mkdir(parents=True, exist_ok=True)
+    cmd = virtiofsd_command(vm)
+    sock = virtiofs_socket_path(vm)
+    ui.print_note(f"Sharing {ui.pretty_path(source)} as virtiofs tag '{cfg['tag']}'")
+    if dry_run:
+        ui.print_command(cmd)
+        return
+    sock.parent.mkdir(parents=True, exist_ok=True)
+    for stale in (sock, virtiofsd_pid_path(vm)):
+        if stale.exists():
+            stale.unlink()
+    log_path = runtime.resolve_path(vm["disk"]["path"]).parent / "logs" / "virtiofsd.log"
+    runtime.run_background(cmd, log_path)
+    deadline = time.monotonic() + VIRTIOFSD_SOCKET_WAIT_SEC
+    while not sock.exists():
+        if time.monotonic() > deadline:
+            raise VMError(f"virtiofsd did not create {sock} within {VIRTIOFSD_SOCKET_WAIT_SEC:.0f}s (see {ui.pretty_path(log_path)})")
+        time.sleep(0.1)
+
+
+def shared_dir_args(vm: dict[str, Any]) -> tuple[str, list[str], list[str]]:
+    """(extra -machine option, memory-backend objects, vhost-user-fs device) for a shared_dir VM."""
+    cfg = shared_dir_config(vm)
+    if cfg is None:
+        return "", [], []
+    memory = ["-object", f"memory-backend-memfd,id=mem0,size={int(vm['memory_mb'])}M,share=on"]
+    device = [
+        "-chardev", f"socket,id=virtiofs0,path={virtiofs_socket_path(vm)}",
+        "-device", f"vhost-user-fs-pci,chardev=virtiofs0,tag={cfg['tag']}",
+    ]
+    return ",memory-backend=mem0", memory, device
+
+
 def qmp_socket_path(vm: dict[str, Any]) -> Path:
     """QMP control socket of a headless VM, next to its runtime PID file."""
     return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "qmp.sock"
@@ -273,10 +405,12 @@ def common_args(
 ) -> list[str]:
     runtime.require_command("qemu-system-x86_64")
     cpu_model = "host" if accel == "kvm" else vm.get("cpu_model", "max")
+    machine_extra, memory_objects, shared_device = shared_dir_args(vm)
     args = ["qemu-system-x86_64", "-m", str(vm["memory_mb"]), "-cpu", cpu_model, "-smp", str(vm["cpus"]),
-            "-machine", machine_arg(vm, accel=accel), "-boot", "menu=on"]
+            "-machine", machine_arg(vm, accel=accel) + machine_extra, "-boot", "menu=on"]
     if accel == "kvm":
         args.insert(1, "-enable-kvm")
+    args += memory_objects
     args += firmware_args(vm, dry_run=dry_run)
     args += disk_args(vm, allow_missing=allow_missing_disk, bootindex=disk_bootindex)
     if spice_port is not None:
@@ -316,6 +450,11 @@ def common_args(
         args += ["-netdev", netdev, "-device", f"{network_device},netdev=n1"]
     else:
         raise VMError(f"Unsupported network mode: {network_mode}")
+    if shared_device:
+        # virtiofsd must be listening before QEMU starts: it is launched here, right before the caller
+        # hands these arguments to Popen; it exits by itself when this QEMU goes away.
+        ensure_virtiofsd(vm, dry_run=dry_run)
+        args += shared_device
     if no_reboot:
         args += ["-no-reboot"]
     return args

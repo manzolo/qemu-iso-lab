@@ -58,6 +58,7 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | `network` | `user` (slirp with optional SSH port forward) |
 | `audio` | Attach an audio device |
 | `usb_tablet` | Absolute pointer for graphical guests |
+| `shared_dir` | Host folder shared with the guest over virtiofs: `{"source": "shared", "tag": "shared"}`. `source` is `~`-expanded, relative paths live under the repository (the default `shared/` is git-ignored). Needs `virtiofsd` on the host; every QEMU launch starts one per VM and the guest RAM becomes a shared memfd backend. On Linux guests the SSH post-install adds `/mnt/<tag>` to fstab (systemd automount), mounts it and links it as `~/<tag>` and on the desktop (`xdg-user-dir DESKTOP`, `Desktop` or `Scrivania`), like kvm-lab; Windows profiles get WinFSP + `VirtioFsSvc` at first logon, the share appears as a drive letter and a `<tag>.lnk` shortcut lands on the desktop. |
 | `video` | Named QEMU argument sets, see [Video profiles](#video-profiles). Optional `headless` argument list replaces `-display none` for background/unattended boots; QMP and VNC are still added. |
 | `installer_boot` | `kernel` and `initrd` paths inside the ISO for the unattended flows, when they differ from the flow's default (CachyOS: `arch/boot/x86_64/vmlinuz-linux-cachyos`) |
 | `notes` | Free text shown by `vmctl show` |

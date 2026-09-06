@@ -41,8 +41,8 @@ driven by a single CLI (`vmctl`) or a dashboard TUI (`vmtui`).
 Host packages (Arch or Debian/Ubuntu shown):
 
 ```bash
-sudo pacman -S qemu-desktop qemu-base edk2-ovmf python fzf
-sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 fzf
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python fzf xorriso virtiofsd p7zip
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 fzf xorriso virtiofsd p7zip-full
 ```
 
 Clone, put the two commands on your `PATH`, check the host:

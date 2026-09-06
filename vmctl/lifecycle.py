@@ -1541,6 +1541,7 @@ def run_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int, dry_run
         stderr_log=stderr_log,
     )
     ssh.wait_for_guest_post_install_ready(vm, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    ssh.provision_shared_dir(vm, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     ui.print_note("Running post-install provisioning")
 
     for entry in ssh_cfg.get("copy_from_host", []):
@@ -2003,6 +2004,15 @@ def cmd_test_local(args: argparse.Namespace) -> int:
 
 # --- setup / clean -------------------------------------------------------------
 
+def optional_tool_present(name: str) -> bool:
+    """Same lookup the flows use: virtiofsd lives in /usr/libexec, 7z may be 7zz/7za."""
+    if name == "virtiofsd":
+        return qemu.find_virtiofsd() is not None
+    if name == "7z":
+        return any(shutil.which(candidate) for candidate in ("7z", "7zz", "7za"))
+    return shutil.which(name) is not None
+
+
 def cmd_setup(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     status_ok = True
@@ -2016,7 +2026,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
     ui.print_header("Optional tools")
     for name, note in state.OPTIONAL_COMMANDS.items():
-        present = shutil.which(name) is not None
+        present = optional_tool_present(name)
         marker = "ok" if present else "missing"
         ui.print_status(marker, f"{name} ({note})", ok=present)
 

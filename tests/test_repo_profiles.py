@@ -64,6 +64,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         self.assertNotEqual(w10["ssh_provision"]["ssh_host_port"], win["ssh_provision"]["ssh_host_port"])
         for profile in (win, w10):  # first shutdown commits feature operations: far longer than 60 s
             self.assertGreaterEqual(profile["acpi_poweroff_grace_sec"], 300)
+            self.assertEqual(profile["shared_dir"], {"source": "shared", "tag": "shared"})
 
         # CachyOS rides the Arch pacstrap flow on its own archiso: kernel paths,
         # serial prompts and the live pacman.conf must all be declared.

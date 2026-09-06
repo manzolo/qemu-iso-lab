@@ -107,6 +107,10 @@
       },
       "ssh_provision": {
         "user": "YOUR_USER"
+      },
+      "shared_dir": {
+        "source": "~/Shared",
+        "tag": "shared"
       }
     }
   }

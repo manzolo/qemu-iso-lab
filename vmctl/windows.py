@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 from xml.sax.saxutils import escape as _x
 
-from vmctl import cloud_init, iso, runtime, ssh, state, ui
+from vmctl import cloud_init, iso, qemu, runtime, ssh, state, ui
 from vmctl.errors import VMError
 
 
@@ -63,6 +63,7 @@ GENERIC_PRODUCT_KEYS = {
     "Windows 10 Education": "NW6C2-QMPVW-D7KKK-3GKT6-VCFB2",
 }
 
+DEFAULT_WINFSP_URL = "https://github.com/winfsp/winfsp/releases/download/v2.1/winfsp-2.1.25156.msi"
 DEFAULT_VIRTIO_ISO = "isos/virtio-win.iso"
 DEFAULT_VIRTIO_ISO_URL = "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso"
 
@@ -470,6 +471,37 @@ def render_setup_script(vm_name: str, vm: dict[str, Any], dry_run: bool = False)
 }}
 {key_block}"""
 
+    shared_block = ""
+    shared = qemu.shared_dir_config(vm)
+    if shared is not None:
+        winfsp_url = str(cfg.get("winfsp_url") or DEFAULT_WINFSP_URL)
+        shared_block = f"""Invoke-Step 'virtiofs share (WinFSP)' {{
+    # The viofs driver and the VirtioFsSvc service come with the virtio guest tools above;
+    # WinFSP is the user-mode file system layer they need. The share appears as a drive letter.
+    $msi = Join-Path $env:TEMP 'winfsp.msi'
+    Invoke-WebRequest -Uri {_ps_sq(winfsp_url)} -OutFile $msi -UseBasicParsing
+    $proc = Start-Process -FilePath msiexec.exe -ArgumentList '/i', $msi, '/qn', '/norestart' -Wait -PassThru
+    if ($proc.ExitCode -notin @(0, 3010)) {{ throw "WinFSP installer exited with code $($proc.ExitCode)" }}
+    if (-not (Get-Service -Name VirtioFsSvc -ErrorAction SilentlyContinue)) {{ throw 'VirtioFsSvc not found: virtio guest tools missing?' }}
+    $before = @(Get-CimInstance Win32_LogicalDisk | Select-Object -ExpandProperty DeviceID)
+    Set-Service -Name VirtioFsSvc -StartupType Automatic
+    Start-Service -Name VirtioFsSvc
+    # the service mounts the share on the first free drive letter: wait for it, then put a shortcut on the desktop
+    $drive = $null
+    for ($i = 0; $i -lt 30 -and -not $drive; $i++) {{
+        Start-Sleep -Seconds 2
+        $drive = Get-CimInstance Win32_LogicalDisk | Where-Object {{ $_.DriveType -ne 5 -and $before -notcontains $_.DeviceID }} | Select-Object -First 1
+    }}
+    if (-not $drive) {{ throw 'the virtiofs drive did not appear within 60 s' }}
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $desktop ({_ps_sq(shared['tag'])} + '.lnk')))
+    $shortcut.TargetPath = $drive.DeviceID + '\\'
+    $shortcut.Description = 'Host folder shared over virtiofs'
+    $shortcut.Save()
+    Log "virtiofs share {_ps_sq(shared['tag'])} mounted as $($drive.DeviceID), shortcut on the desktop"
+}}
+"""
+
     command_blocks = []
     for index, command in enumerate(setup_commands, start=1):
         body = "\n".join(f"    {line}" for line in command.splitlines())
@@ -537,6 +569,7 @@ Invoke-Step 'Power settings' {{
     }}
 }}
 {openssh_block}
+{shared_block}
 {commands_block}
 
 # Completion: the success token only when every step passed; otherwise the FAILED token, so the

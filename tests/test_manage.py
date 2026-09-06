@@ -326,7 +326,16 @@ class ManageTests(BaseVmctlTestCase):
         self.assertIn("[missing] qemu-img", output)
         self.assertIn("Unable to locate OVMF firmware files for EFI guest.", output)
         self.assertIn("Affected EFI profiles: testvm", output)
-        self.assertIn("sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog cloud-image-utils xorriso", output)
+        self.assertIn("sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 make dialog cloud-image-utils xorriso virtiofsd p7zip-full", output)
+        self.assertIn("[missing] virtiofsd", output)
+        self.assertIn("[missing] 7z", output)
+
+    def test_cmd_setup_finds_virtiofsd_outside_path_and_7z_variants(self):
+        with mock.patch.object(shutil, "which", side_effect=lambda name: "/usr/bin/7zz" if name == "7zz" else None), \
+             mock.patch.object(vmctl.qemu, "find_virtiofsd", return_value="/usr/libexec/virtiofsd"):
+            self.assertTrue(self.vmctl.optional_tool_present("virtiofsd"))
+            self.assertTrue(self.vmctl.optional_tool_present("7z"))
+            self.assertFalse(self.vmctl.optional_tool_present("dialog"))
 
     def test_cmd_setup_can_install_missing_packages_after_confirmation(self):
         self.vm_config["firmware"] = {
@@ -363,7 +372,7 @@ class ManageTests(BaseVmctlTestCase):
         self.assertEqual(executed[0], ["sudo", "apt", "update"])
         self.assertEqual(
             executed[1],
-            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "make", "dialog", "cloud-image-utils", "xorriso"],
+            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "make", "dialog", "cloud-image-utils", "xorriso", "virtiofsd", "p7zip-full"],
         )
 
     def test_cmd_setup_passes_when_requirements_and_firmware_are_available(self):
