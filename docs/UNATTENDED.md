@@ -363,6 +363,12 @@ capability and ships PowerShell 2.0, so the first-logon script only runs
 no `vmctl shell`, no virtiofs (no WinFSP); `check-vms` treats a Windows profile
 without `ssh_provision` as "install only". Guest tools are a manual step.
 
+The prompt-free ISO for 7 is built with two differences, both found live: `boot/bootfix.bin`
+is deleted rather than emptied (`etfsboot.com` hangs at "Booting from DVD/CD..." on an empty
+file) and xorriso keeps the exact ISO 9660 names (`-D -N -d`: `CDBOOT` looks up `BOOTMGR`,
+not `BOOTMGR.;1`). The cache stamp records both, so a legacy build never shares the cache
+with a Windows 10/11 one.
+
 ## pfSense: scripted bsdinstall
 
 ```bash

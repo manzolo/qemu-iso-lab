@@ -135,5 +135,9 @@ di kvm-lab, con le differenze che Windows 7 impone:
   manuale (`virtio-win-guest-tools.exe` dal CD virtio-win, come in kvm-lab); niente cartella
   condivisa virtiofs (WinFSP non esiste per 7).
 - **ISO**: `isos/windows7.iso` o il percorso in `local.json`; la ISO senza prompt viene
-  ricostruita una volta come per 10 e 11 (`bootfix.bin` svuotato basta per il boot BIOS).
+  ricostruita una volta come per 10 e 11, con due differenze imposte dal loader BIOS di Windows 7:
+  `boot/bootfix.bin` viene cancellato, non svuotato (`etfsboot.com` si blocca su "Booting from
+  DVD/CD..." con un file vuoto), e xorriso mantiene i nomi ISO 9660 esatti (`-D -N -d`: `CDBOOT`
+  cerca `BOOTMGR`, non `BOOTMGR.;1`). Entrambe verificate dal vivo; il timbro della cache cambia
+  con loro.
 

@@ -453,6 +453,11 @@ class Windows7RenderTests(BaseVmctlTestCase):
         iso.parent.mkdir(parents=True)
         iso.write_bytes(b"ISO")
         work = self.root / "isos/windows7-noprompt.extract"
+        dest = vmctl.windows.noprompt_iso_path(iso)
+        dest.write_bytes(b"old build with BOOTMGR.;1")
+        vmctl.windows.noprompt_source_stamp_path(dest).write_text(
+            vmctl.windows._source_stamp(iso) + "bootfix:removed\n", encoding="utf-8"
+        )
 
         def fake_run(cmd, **kwargs):
             if cmd[0] == "7z":
@@ -462,6 +467,9 @@ class Windows7RenderTests(BaseVmctlTestCase):
                 (work / "efi/microsoft/boot").mkdir(parents=True, exist_ok=True)
                 (work / "efi/microsoft/boot/efisys_noprompt.bin").write_bytes(b"x")
             elif cmd[0] == "xorriso":
+                for flag in ("-D", "-N", "-d"):
+                    self.assertEqual(flag in cmd, self.legacy)
+                self.assertNotIn("-udf", cmd)  # unsupported by xorriso
                 self.assertFalse((work / "boot" / "bootfix.bin").exists() if self.legacy else (work / "boot" / "bootfix.bin").read_bytes() != b"")
                 Path(cmd[cmd.index("-o") + 1]).write_bytes(b"ISO2")
 
@@ -471,8 +479,12 @@ class Windows7RenderTests(BaseVmctlTestCase):
                  mock.patch.object(vmctl.windows, "_iso_volume_id", return_value="X"):
                 dest = vmctl.windows.ensure_noprompt_iso(iso, legacy=self.legacy)
             self.assertTrue(dest.is_file())
+            self.assertEqual(dest.read_bytes(), b"ISO2")  # old legacy cache must be rebuilt
             stamp = (dest.with_name(dest.name + ".source")).read_text()
             self.assertEqual("bootfix:removed" in stamp, self.legacy)  # a legacy and a normal build never share the cache
+            with mock.patch.object(vmctl.runtime, "run") as cached_run:
+                vmctl.windows.ensure_noprompt_iso(iso, legacy=self.legacy)
+            cached_run.assert_not_called()
 
     def test_cert_script_and_seed_contents(self):
         cert = vmctl.windows.render_cert_script()

@@ -135,5 +135,8 @@ Same command (`vmctl bootstrap-windows windows7-unattended`), same technique as 
   (`virtio-win-guest-tools.exe` from the virtio-win CD, as in kvm-lab); no virtiofs shared
   folder (there is no WinFSP for 7).
 - **ISO**: `isos/windows7.iso` or the path in `local.json`; the prompt-free ISO is rebuilt once
-  as for 10 and 11 (an emptied `bootfix.bin` is enough for the BIOS boot).
+  as for 10 and 11, with two differences the Windows 7 BIOS loader imposes: `boot/bootfix.bin` is
+  deleted, not emptied (`etfsboot.com` hangs at "Booting from DVD/CD..." on an empty file), and
+  xorriso keeps the exact ISO 9660 names (`-D -N -d`: `CDBOOT` looks up `BOOTMGR`, not
+  `BOOTMGR.;1`). Both verified live; the cache stamp changes with them.
 

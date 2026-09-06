@@ -838,11 +838,12 @@ def ensure_noprompt_iso(iso_path: Path, dry_run: bool = False, legacy: bool = Fa
     two ISOs with the same name in different directories, trigger a rebuild. *legacy* (Windows 7)
     deletes ``boot/bootfix.bin`` instead of emptying it: the Windows 7 ``etfsboot.com`` hangs at
     "Booting from DVD/CD..." on an empty file (observed live), while Windows 10/11 boot fine with
-    the emptied one (kvm-lab did the same in both cases).
+    the emptied one (kvm-lab did the same in both cases). It also preserves extensionless
+    ISO 9660 names such as BOOTMGR without a trailing dot or version suffix.
     """
     dest = noprompt_iso_path(iso_path)
     stamp_path = noprompt_source_stamp_path(dest)
-    stamp = (_source_stamp(iso_path) + ("bootfix:removed\n" if legacy else "")) if iso_path.is_file() else None
+    stamp = (_source_stamp(iso_path) + ("bootfix:removed\niso9660:exact-names-v1\n" if legacy else "")) if iso_path.is_file() else None
     if dest.is_file():
         recorded = stamp_path.read_text(encoding="utf-8") if stamp_path.is_file() else None
         if stamp is None or recorded == stamp:
@@ -881,6 +882,8 @@ def ensure_noprompt_iso(iso_path: Path, dry_run: bool = False, legacy: bool = Fa
         [
             "xorriso", "-as", "mkisofs",
             "-iso-level", "3", "-J", "-joliet-long", "-relaxed-filenames",
+            # Windows 7 CDBOOT looks up BOOTMGR in ISO 9660: neither BOOTMGR.;1 nor BOOTMGR.
+            *(["-D", "-N", "-d"] if legacy else []),
             "-V", volume_id,
             "-o", str(partial),
             "-b", "boot/etfsboot.com", "-no-emul-boot", "-boot-load-size", "8",
