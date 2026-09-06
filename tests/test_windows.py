@@ -448,6 +448,32 @@ class Windows7RenderTests(BaseVmctlTestCase):
         self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2240}
         self.assertFalse(vmctl.windows.install_openssh(self.vm_config))  # even when asked: not available on 7
 
+    def test_legacy_noprompt_iso_removes_bootfix_instead_of_emptying_it(self):
+        iso = self.root / "isos/windows7.iso"
+        iso.parent.mkdir(parents=True)
+        iso.write_bytes(b"ISO")
+        work = self.root / "isos/windows7-noprompt.extract"
+
+        def fake_run(cmd, **kwargs):
+            if cmd[0] == "7z":
+                (work / "boot").mkdir(parents=True, exist_ok=True)
+                (work / "boot" / "bootfix.bin").write_bytes(b"press any key")
+                (work / "boot" / "etfsboot.com").write_bytes(b"x")
+                (work / "efi/microsoft/boot").mkdir(parents=True, exist_ok=True)
+                (work / "efi/microsoft/boot/efisys_noprompt.bin").write_bytes(b"x")
+            elif cmd[0] == "xorriso":
+                self.assertFalse((work / "boot" / "bootfix.bin").exists() if self.legacy else (work / "boot" / "bootfix.bin").read_bytes() != b"")
+                Path(cmd[cmd.index("-o") + 1]).write_bytes(b"ISO2")
+
+        for self.legacy in (True, False):
+            with mock.patch.object(shutil, "which", return_value="/usr/bin/tool"), \
+                 mock.patch.object(vmctl.runtime, "run", side_effect=fake_run), \
+                 mock.patch.object(vmctl.windows, "_iso_volume_id", return_value="X"):
+                dest = vmctl.windows.ensure_noprompt_iso(iso, legacy=self.legacy)
+            self.assertTrue(dest.is_file())
+            stamp = (dest.with_name(dest.name + ".source")).read_text()
+            self.assertEqual("bootfix:removed" in stamp, self.legacy)  # a legacy and a normal build never share the cache
+
     def test_cert_script_and_seed_contents(self):
         cert = vmctl.windows.render_cert_script()
         self.assertIn("certutil -addstore -f Root", cert)
@@ -491,7 +517,7 @@ class WindowsBootstrapTests(BaseVmctlTestCase):
             exit_code = self.vmctl.cmd_bootstrap_windows(args)
 
         self.assertEqual(exit_code, 0)
-        noprompt.assert_called_once_with(self.root / "isos/win11.iso", dry_run=False)
+        noprompt.assert_called_once_with(self.root / "isos/win11.iso", dry_run=False, legacy=False)
         install_kwargs = common_args.call_args_list[0].kwargs
         self.assertTrue(install_kwargs["serial_stdio"])
         self.assertEqual(install_kwargs["disk_bootindex"], 1)

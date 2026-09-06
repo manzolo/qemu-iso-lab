@@ -1271,7 +1271,7 @@ def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
     ui.print_header(f"Bootstrap Windows (autounattend): {args.vm}")
 
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
-    install_iso = windows.ensure_noprompt_iso(iso_path, dry_run=args.dry_run)
+    install_iso = windows.ensure_noprompt_iso(iso_path, dry_run=args.dry_run, legacy=windows.is_legacy_windows(windows.windows_config(vm) or {}))
     virtio_iso = windows.ensure_virtio_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)

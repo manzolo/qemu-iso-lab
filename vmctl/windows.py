@@ -831,15 +831,18 @@ def _source_stamp(iso_path: Path) -> str:
     return f"{iso_path.resolve()}\n{st.st_size}\n{st.st_mtime_ns}\n"
 
 
-def ensure_noprompt_iso(iso_path: Path, dry_run: bool = False) -> Path:
+def ensure_noprompt_iso(iso_path: Path, dry_run: bool = False, legacy: bool = False) -> Path:
     """Rebuild the Microsoft ISO with the prompt-free UEFI boot image; cached in isos/.
 
     The cache is keyed to the *source*, not only to its file name: a replaced windows11.iso, or
-    two ISOs with the same name in different directories, trigger a rebuild.
+    two ISOs with the same name in different directories, trigger a rebuild. *legacy* (Windows 7)
+    deletes ``boot/bootfix.bin`` instead of emptying it: the Windows 7 ``etfsboot.com`` hangs at
+    "Booting from DVD/CD..." on an empty file (observed live), while Windows 10/11 boot fine with
+    the emptied one (kvm-lab did the same in both cases).
     """
     dest = noprompt_iso_path(iso_path)
     stamp_path = noprompt_source_stamp_path(dest)
-    stamp = _source_stamp(iso_path) if iso_path.is_file() else None
+    stamp = (_source_stamp(iso_path) + ("bootfix:removed\n" if legacy else "")) if iso_path.is_file() else None
     if dest.is_file():
         recorded = stamp_path.read_text(encoding="utf-8") if stamp_path.is_file() else None
         if stamp is None or recorded == stamp:
@@ -869,7 +872,10 @@ def ensure_noprompt_iso(iso_path: Path, dry_run: bool = False) -> Path:
             efi_image = "efi/microsoft/boot/efisys.bin"
         bootfix = work / "boot" / "bootfix.bin"
         if bootfix.is_file():
-            bootfix.write_bytes(b"")  # the BIOS-side "press any key" helper
+            if legacy:
+                bootfix.unlink()  # Windows 7: an empty bootfix.bin hangs etfsboot.com
+            else:
+                bootfix.write_bytes(b"")  # the BIOS-side "press any key" helper
     volume_id = "WINDOWS_VMCTL" if dry_run else _iso_volume_id(iso_path)
     runtime.run(
         [
