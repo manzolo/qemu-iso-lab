@@ -270,7 +270,9 @@ class LibvirtSegmentTests(NetlabBase):
         nics = xml.findall("devices/interface")
         self.assertEqual([n.find("source").get("network") for n in nics], ["default", "lab-lan"])
         self.assertEqual(nics[1].find("mac").get("address"), vmctl.qemu.network_specs(self.lab["router"])[1]["mac"])
-        member = ET.fromstring(vmctl.libvirt.render_domain_xml("dns", self.lab["dns"]))
+        # The member is EFI with fake firmware paths: never let the host's OVMF resolve them (bare CI has none).
+        with mock.patch.object(vmctl.qemu, "resolve_efi_firmware", return_value=(self.root / "CODE.fd", self.root / "VARS.fd", self.root / "vars.fd")):
+            member = ET.fromstring(vmctl.libvirt.render_domain_xml("dns", self.lab["dns"]))
         self.assertEqual([n.find("source").get("network") for n in member.findall("devices/interface")], ["lab-lan"])
         legacy = ET.fromstring(vmctl.libvirt.render_domain_xml("plain", self.vm_config))
         self.assertIsNone(legacy.find("devices/interface/mac"))
