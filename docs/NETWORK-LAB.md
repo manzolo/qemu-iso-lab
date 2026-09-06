@@ -22,6 +22,10 @@ vmctl lab install              # pfsense-lab -> pihole-lab -> lubuntu22-lab, fro
 vmctl lab up                   # start the three VMs headless in the background, in order
 vmctl lab status               # role, address, disk and runtime state of every member
 vmctl lab down                 # stop them in reverse order
+vmctl lab check                # probe the GUIs and SSH ports from the host (forwards, or the LAN after export)
+vmctl lab export               # lab down, export-libvirt of the three VMs (lab-lan created if missing), virsh start, check
+vmctl lab unexport             # virsh shutdown (waited), unexport-libvirt, back to plain QEMU
+vmctl lab libvirt-test         # export + check + unexport in one go (--keep leaves it in libvirt)
 vmctl lab attach arch-dms-local --apply   # put another profile on lab-lan (writes local.json)
 ```
 
@@ -137,7 +141,11 @@ the segment. `vmctl lab install` stops each member after its post-install.
 
 ### libvirt road
 
-`vmctl export-libvirt pfsense-lab` (and the members) renders the runtime NICs:
+`vmctl lab export` does it in one go (QEMU lab down, three exports, `virsh start`
+in order, then the same checks as `vmctl lab check --libvirt`); `vmctl lab
+unexport` shuts the domains down with virsh, waits for `shut off` and removes
+the definitions, disks untouched; `vmctl lab libvirt-test` chains the two.
+Under the hood `vmctl export-libvirt pfsense-lab` (and the members) renders the runtime NICs:
 slirp → libvirt `default`, segment → libvirt network `lab-lan`, defined,
 started and set to autostart from `netlab.segment_network_xml()` when libvirt
 does not have it yet (bridge `virbr-lab`, host `192.168.0.254/24`, no DHCP/DNS/

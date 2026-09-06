@@ -29,10 +29,22 @@
           "type": "user",
           "ssh": true,
           "hostfwd": [
-            {"host_port": 8080, "guest_port": 80},
-            {"host_port": 8081, "guest_port": 8081},
-            {"host_port": 2238, "guest_port": 2238},
-            {"host_port": 2239, "guest_port": 2239}
+            {
+              "host_port": 8080,
+              "guest_port": 80
+            },
+            {
+              "host_port": 8081,
+              "guest_port": 8081
+            },
+            {
+              "host_port": 2238,
+              "guest_port": 2238
+            },
+            {
+              "host_port": 2239,
+              "guest_port": 2239
+            }
           ]
         },
         {
@@ -46,8 +58,18 @@
       "video": {
         "default": "std",
         "variants": {
-          "std": ["-vga", "std", "-display", "gtk"],
-          "safe": ["-vga", "std", "-display", "gtk"]
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
         }
       },
       "notes": "Unattended pfSense via bootstrap-pfsense: the offline CE 2.7.2 installer is scripted (bsdinstall, ZFS on vtbd0, BIOS) and the whole config.xml is rendered from network_lab. Netgate publishes no stable download URL: put the DVD ISO at isos/pfSense-CE-2.7.2-RELEASE-amd64.iso or point 'iso' at it in local.json. WAN = vtnet0 (slirp, DHCP), LAN = vtnet1 (segment lab-lan, 192.168.0.1). From the host: web GUI http://127.0.0.1:8080/ (WAN rules allow GUI + SSH from the WAN side), SSH 127.0.0.1:2237; 8081/2238/2239 are NAT forwards to Pi-hole web and to the members' SSH. Not a Linux guest: no ssh_provision post-install, the account below is created by the installer.",
@@ -107,20 +129,42 @@
       "cpus": 2,
       "network": "user",
       "networks": [
-        {"id": "install", "type": "user", "phase": "install"},
-        {"id": "lan", "type": "segment", "name": "lab-lan", "phase": "runtime"}
+        {
+          "id": "install",
+          "type": "user",
+          "phase": "install"
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "lab-lan",
+          "phase": "runtime"
+        }
       ],
       "audio": false,
       "usb_tablet": false,
       "video": {
         "default": "safe",
-        "installer_order": ["std", "safe"],
+        "installer_order": [
+          "std",
+          "safe"
+        ],
         "variants": {
-          "std": ["-vga", "std", "-display", "gtk"],
-          "safe": ["-vga", "std", "-display", "gtk"]
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
         }
       },
-      "notes": "Installs with the Ubuntu autoinstall flow on a slirp NIC (SSH 2238), then the post-install hook of network_lab installs Pi-hole v6 unattended (pre-seeded pihole.toml: upstreams, local records, DHCP pool) and writes the static LAN address 192.168.0.10 for the next boot. At runtime the only NIC is on lab-lan: SSH and the web UI reach it through the router (127.0.0.1:2238 and http://127.0.0.1:8081/admin/).",
+      "notes": "Installs with the Ubuntu autoinstall flow on a slirp NIC (SSH 2238), then the post-install hook of network_lab installs Pi-hole v6 unattended (pre-seeded pihole.toml: upstreams, local records, DHCP pool) and writes the static LAN address 192.168.0.10 for the next boot. At runtime the only NIC is on lab-lan: SSH and the web UI reach it through the router (127.0.0.1:2238 and http://127.0.0.1:8081/admin/). The cloud-init sudoers drop-in gives the user passwordless sudo: the network_lab post-install hook runs its setup script with sudo over SSH.",
       "autoinstall": {
         "hostname": "pi-hole",
         "username": "lab",
@@ -130,7 +174,23 @@
         "keyboard_layout": "us",
         "storage_layout": "direct",
         "install_ssh": true,
-        "packages": ["curl", "ca-certificates", "dnsutils", "qemu-guest-agent"]
+        "packages": [
+          "curl",
+          "ca-certificates",
+          "dnsutils",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "pi-hole",
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          }
+        ]
       },
       "ssh_provision": {
         "hostname": "pi-hole",
@@ -149,10 +209,17 @@
         "ip": "192.168.0.10",
         "web_host_port": 8081,
         "password": "lab",
-        "upstream_dns": ["208.67.222.222", "208.67.220.220"],
+        "upstream_dns": [
+          "208.67.222.222",
+          "208.67.220.220"
+        ],
         "hosts": [],
-        "cnames": ["pfsense.qlan,firewall.qlan"],
-        "adlists": ["https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"]
+        "cnames": [
+          "pfsense.qlan,firewall.qlan"
+        ],
+        "adlists": [
+          "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+        ]
       }
     },
     "lubuntu22-lab": {
@@ -182,22 +249,47 @@
       "cpus": 2,
       "network": "user",
       "networks": [
-        {"id": "install", "type": "user", "phase": "install"},
-        {"id": "lan", "type": "segment", "name": "lab-lan", "phase": "runtime"}
+        {
+          "id": "install",
+          "type": "user",
+          "phase": "install"
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "lab-lan",
+          "phase": "runtime"
+        }
       ],
       "audio": true,
       "usb_tablet": true,
       "clipboard": true,
-      "shared_dir": {"source": "shared", "tag": "shared"},
+      "shared_dir": {
+        "source": "shared",
+        "tag": "shared"
+      },
       "video": {
         "default": "std",
-        "installer_order": ["std", "safe"],
+        "installer_order": [
+          "std",
+          "safe"
+        ],
         "variants": {
-          "std": ["-device", "qxl-vga", "-display", "gtk"],
-          "safe": ["-vga", "std", "-display", "gtk"]
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
         }
       },
-      "notes": "Ubuntu Server 22.04.5 autoinstall + lubuntu-desktop with SDDM autologin (the lab client of kvm-lab, on plain QEMU). Installs and provisions on a slirp NIC (SSH 2239); the network_lab hook writes the static LAN address 192.168.0.100 (gateway 192.168.0.1, DNS 192.168.0.10) and disables systemd-networkd-wait-online, otherwise every boot stalls 120 s once the renderer is NetworkManager. At runtime SSH goes through the router: 127.0.0.1:2239. The host folder ./shared lands on the desktop via virtiofs.",
+      "notes": "Ubuntu Server 22.04.5 autoinstall + lubuntu-desktop with SDDM autologin (the lab client of kvm-lab, on plain QEMU). Installs and provisions on a slirp NIC (SSH 2239); the network_lab hook writes the static LAN address 192.168.0.100 (gateway 192.168.0.1, DNS 192.168.0.10) and disables systemd-networkd-wait-online, otherwise every boot stalls 120 s once the renderer is NetworkManager. At runtime SSH goes through the router: 127.0.0.1:2239. The host folder ./shared lands on the desktop via virtiofs. The cloud-init sudoers drop-in gives the user passwordless sudo: the network_lab post-install hook runs its setup script with sudo over SSH.",
       "autoinstall": {
         "hostname": "lubuntu",
         "username": "lab",
@@ -207,12 +299,22 @@
         "keyboard_layout": "us",
         "storage_layout": "direct",
         "install_ssh": true,
-        "packages": ["lubuntu-desktop", "spice-vdagent", "qemu-guest-agent", "arc-theme"]
+        "packages": [
+          "lubuntu-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent",
+          "arc-theme"
+        ]
       },
       "cloud_init": {
         "hostname": "lubuntu",
         "user": "lab",
         "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          },
           {
             "path": "/etc/sddm.conf.d/vmctl-autologin.conf",
             "permissions": "0644",

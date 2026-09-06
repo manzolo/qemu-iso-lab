@@ -1448,7 +1448,88 @@ def cmd_lab(args: argparse.Namespace) -> int:
         for name in reversed(names):
             cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
         return 0
+    uri = str(getattr(args, "connect", None) or "qemu:///system")
+    if action == "check":
+        mode = "libvirt" if getattr(args, "libvirt", False) or lab_in_libvirt(uri, names, args.dry_run) else "qemu"
+        return lab_check(top, mode, int(getattr(args, "wait", 180)), args.dry_run)
+    if action == "export":
+        return lab_export(cfg, top, names, uri, args)
+    if action == "unexport":
+        return lab_unexport(names, uri, args)
+    if action == "libvirt-test":
+        code = lab_export(cfg, top, names, uri, args)
+        if getattr(args, "keep", False):
+            ui.print_note("--keep: the lab stays defined and running in libvirt (vmctl lab unexport brings it back)")
+            return code
+        return max(code, lab_unexport(names, uri, args))
     raise VMError(f"Unknown lab action: {action}")
+
+
+def lab_in_libvirt(uri: str, names: list[str], dry_run: bool) -> bool:
+    if dry_run or shutil.which("virsh") is None:
+        return False
+    try:
+        defined = libvirt.virsh_output(uri, "list", "--all", "--name").splitlines()
+    except subprocess.CalledProcessError:
+        return False
+    return names[0] in defined
+
+
+def lab_check(top: dict[str, Any], mode: str, wait_sec: int, dry_run: bool) -> int:
+    """Probe the GUIs and SSH ports of the lab from the host; 0 when everything answers."""
+    ui.print_header(f"Network lab check ({mode}: {'through the router forwards on 127.0.0.1' if mode == 'qemu' else 'host on the LAN at ' + top['lan']['host_ip']})")
+    targets = netlab.check_targets(top, mode)
+    if dry_run:
+        for target in targets:
+            ui.print_note(f"Would probe {target['label']}: " + (str(target["url"]) if target["kind"] == "http" else f"{target['host']}:{target['port']}"))
+        return 0
+    failed = 0
+    for target, ok, detail in netlab.wait_targets(targets, wait_sec):
+        where = str(target["url"]) if target["kind"] == "http" else f"{target['host']}:{target['port']}"
+        ui.print_status("ok" if ok else "fail", f"{target['label']}: {where} ({detail})", ok=ok)
+        failed += 0 if ok else 1
+    return 1 if failed else 0
+
+
+def lab_export(cfg: dict[str, Any], top: dict[str, Any], names: list[str], uri: str, args: argparse.Namespace) -> int:
+    """QEMU lab down, every VM defined in libvirt (lab-lan network included), started with virsh, then checked."""
+    ui.print_header(f"Network lab -> libvirt ({uri})")
+    for name in reversed(names):
+        cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+    for name in names:
+        cmd_export_libvirt(argparse.Namespace(vm=name, name=None, connect=uri, no_define=False,
+                                              replace=bool(getattr(args, "replace", False)), autostart=False, dry_run=args.dry_run))
+    running = [] if args.dry_run else libvirt.virsh_output(uri, "list", "--name").splitlines()
+    for name in names:
+        if name in running:
+            ui.print_note(f"{name} is already running in libvirt")
+            continue
+        runtime.run(["virsh", "--connect", uri, "start", name], dry_run=args.dry_run)
+    for line in netlab.describe(top):
+        ui.print_note(line)
+    ui.print_note(f"On libvirt the host is on the LAN: GUI http://{top['router_ip']}/ ; the 127.0.0.1 forwards above apply to plain QEMU only")
+    return lab_check(top, "libvirt", int(getattr(args, "wait", 180)), args.dry_run)
+
+
+def lab_unexport(names: list[str], uri: str, args: argparse.Namespace) -> int:
+    """virsh shutdown (waited) and unexport-libvirt for every lab VM, members first, router last."""
+    ui.print_header(f"Network lab <- libvirt ({uri})")
+    if not args.dry_run:
+        running = libvirt.virsh_output(uri, "list", "--name").splitlines()
+        for name in reversed(names):
+            if name in running:
+                runtime.run(["virsh", "--connect", uri, "shutdown", name])
+        deadline = time.monotonic() + int(getattr(args, "wait", 180))
+        pending = [name for name in reversed(names) if name in running]
+        while pending and time.monotonic() < deadline:
+            time.sleep(3)
+            pending = [name for name in pending if libvirt.virsh_output(uri, "domstate", name).strip() != "shut off"]
+        if pending:
+            raise VMError(f"Still running in libvirt after the grace period: {', '.join(pending)} (virsh destroy them by hand, then rerun vmctl lab unexport)")
+    for name in reversed(names):
+        cmd_unexport_libvirt(argparse.Namespace(vm=name, name=None, connect=uri, dry_run=args.dry_run))
+    ui.print_status("ok", "Network lab is back on plain QEMU: vmctl lab up")
+    return 0
 
 
 def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:

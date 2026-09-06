@@ -17,6 +17,10 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import socket
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -445,3 +449,79 @@ def shell_hint(top: dict[str, Any], member: dict[str, Any]) -> str:
         return f"vmctl shell {member['name']} (127.0.0.1:{member['ssh_port']} forwarded by {top['router']})"
     return f"{member['name']}: no SSH port"
 
+
+# --- reachability checks -------------------------------------------------------------------
+
+def probe_http(url: str, timeout: float = 3.0) -> int | None:
+    """HTTP status of *url* (redirects followed), None when nothing answers."""
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310 - lab-local URLs
+            return int(response.status)
+    except urllib.error.HTTPError as exc:
+        return int(exc.code)
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+def probe_tcp(host: str, port: int, timeout: float = 2.0) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def check_targets(top: dict[str, Any], mode: str) -> list[dict[str, Any]]:
+    """What must answer once the lab is up: the GUIs and the SSH ports, from the host's point of view.
+
+    ``qemu``: everything goes through the router's WAN forwards on 127.0.0.1. ``libvirt``: the host
+    sits on the LAN (``lan.host_ip``) and reaches the real addresses.
+    """
+    targets: list[dict[str, Any]] = []
+    if mode == "qemu":
+        for host_port, guest_port in sorted(top["router_gui"].items()):
+            scheme = "https" if guest_port == 443 else "http"
+            targets.append({"label": f"{top['router']} web GUI", "kind": "http", "url": f"{scheme}://127.0.0.1:{host_port}/"})
+        if top["router_ssh_port"]:
+            targets.append({"label": f"{top['router']} SSH", "kind": "tcp", "host": "127.0.0.1", "port": top["router_ssh_port"]})
+        for fwd in top["forwards"]:
+            if fwd["target_port"] == DEFAULT_PIHOLE_WEB_PORT:
+                targets.append({"label": fwd["descr"], "kind": "http", "url": f"http://127.0.0.1:{fwd['wan_port']}/admin/"})
+            else:
+                targets.append({"label": fwd["descr"], "kind": "tcp", "host": "127.0.0.1", "port": int(fwd["wan_port"])})
+        return targets
+    if mode != "libvirt":
+        raise VMError(f"Unknown check mode: {mode}")
+    targets.append({"label": f"{top['router']} web GUI", "kind": "http", "url": f"http://{top['router_ip']}/"})
+    targets.append({"label": f"{top['router']} SSH", "kind": "tcp", "host": top["router_ip"], "port": 22})
+    for member in top["members"]:
+        if member["role"] == "pihole":
+            targets.append({"label": f"Pi-hole web UI on {member['name']}", "kind": "http", "url": f"http://{member['ip']}/admin/"})
+        targets.append({"label": f"SSH to {member['name']}", "kind": "tcp", "host": member["ip"], "port": 22})
+    return targets
+
+
+def wait_targets(targets: list[dict[str, Any]], timeout_sec: int, sleep: float = 3.0) -> list[tuple[dict[str, Any], bool, str]]:
+    """Poll every target until it answers or *timeout_sec* elapses; returns (target, ok, detail) per target."""
+    deadline = time.monotonic() + timeout_sec
+    pending = list(targets)
+    results: dict[int, tuple[bool, str]] = {}
+    while pending:
+        for target in list(pending):
+            if target["kind"] == "http":
+                status = probe_http(str(target["url"]))
+                if status is not None:
+                    results[id(target)] = (status < 500, f"HTTP {status}")
+                    pending.remove(target)
+            else:
+                if probe_tcp(str(target["host"]), int(target["port"])):
+                    results[id(target)] = (True, "port open")
+                    pending.remove(target)
+        if not pending or time.monotonic() >= deadline:
+            break
+        time.sleep(sleep)
+    out: list[tuple[dict[str, Any], bool, str]] = []
+    for target in targets:
+        ok, detail = results.get(id(target), (False, "no answer"))
+        out.append((target, ok, detail))
+    return out

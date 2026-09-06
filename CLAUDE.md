@@ -13,6 +13,7 @@ python -m pytest tests/ -k "test_render"       # filter by name
 make ci                                        # python -m unittest discover -s tests -v (what GitHub Actions runs)
 make lint                                      # python -m mypy vmctl/ --strict (enforced)
 make install-cli                               # symlink vmctl + vmtui into ~/.local/bin
+make guides                                    # docs/guides -> pdf/qemu-iso-lab-guide.pdf (manual) + pdf/singole/ (markdown + weasyprint)
 make validate-vms                              # LOCAL ONLY (hours): check-vms --restore --report over every unattended profile, opens the HTML report
 
 # VM lifecycle: ONE front door, the vmctl CLI (./bin/vmctl if not installed).
@@ -27,7 +28,8 @@ vmctl bootstrap-kickstart almalinux-server
 vmctl bootstrap-alpine alpine-niri
 vmctl bootstrap-windows windows11-unattended   # needs isos/windows11.iso (no public URL) + 7z
 vmctl bootstrap-pfsense pfsense-lab            # needs isos/pfSense-CE-2.7.2-RELEASE-amd64.iso (no public URL) + growisofs + python bcrypt
-vmctl lab plan|install|up|down|status|attach   # the network lab (pfSense + Pi-hole + client)
+vmctl lab plan|install|up|down|status|check    # the network lab (pfSense + Pi-hole + client) on plain QEMU
+vmctl lab export|unexport|libvirt-test         # the same lab handed to libvirt (lab-lan network) and back
 vmctl export-libvirt <name>                    # hand an installed VM (and the lab-lan network) to libvirt
 vmctl attach <name>                # VNC view of a headless VM, also while a bootstrap runs
 ```

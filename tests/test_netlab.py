@@ -257,11 +257,95 @@ class LabCommandTests(NetlabBase):
         parser = vmctl.cli.build_parser()
         args = parser.parse_args(["lab", "install", "--timeout", "10"])
         self.assertIs(args.func, vmctl.lifecycle.cmd_lab)
+        args = parser.parse_args(["lab", "libvirt-test", "--keep", "--connect", "qemu:///session", "--wait", "5"])
+        self.assertTrue(args.keep)
+        self.assertEqual(args.connect, "qemu:///session")
         args = parser.parse_args(["bootstrap-pfsense", "router"])
         self.assertIs(args.func, vmctl.lifecycle.cmd_bootstrap_pfsense)
         self.assertEqual(args.timeout, 1800)
         with self.assertRaises(SystemExit):
             parser.parse_args(["lab", "explode"])
+
+
+class LabCheckTests(NetlabBase):
+    def test_check_targets_per_mode(self):
+        top = vmctl.netlab.topology(self.cfg, "router")
+        qemu_targets = vmctl.netlab.check_targets(top, "qemu")
+        urls = [t["url"] for t in qemu_targets if t["kind"] == "http"]
+        ports = [(t["host"], t["port"]) for t in qemu_targets if t["kind"] == "tcp"]
+        self.assertEqual(urls, ["http://127.0.0.1:8080/", "http://127.0.0.1:8081/admin/"])
+        self.assertEqual(sorted(ports), [("127.0.0.1", 2237), ("127.0.0.1", 2238), ("127.0.0.1", 2239)])
+        lv = vmctl.netlab.check_targets(top, "libvirt")
+        self.assertEqual([t["url"] for t in lv if t["kind"] == "http"], ["http://192.168.0.1/", "http://192.168.0.10/admin/"])
+        self.assertEqual(sorted((t["host"], t["port"]) for t in lv if t["kind"] == "tcp"),
+                         [("192.168.0.1", 22), ("192.168.0.10", 22), ("192.168.0.100", 22)])
+        with self.assertRaises(vmctl.errors.VMError):
+            vmctl.netlab.check_targets(top, "bridge")
+
+    def test_wait_targets_reports_each_target_once(self):
+        targets = [{"label": "gui", "kind": "http", "url": "http://x/"}, {"label": "ssh", "kind": "tcp", "host": "h", "port": 22},
+                   {"label": "dead", "kind": "tcp", "host": "h", "port": 23}]
+        with mock.patch.object(vmctl.netlab, "probe_http", return_value=200), \
+             mock.patch.object(vmctl.netlab, "probe_tcp", side_effect=lambda host, port, timeout=2.0: port == 22), \
+             mock.patch.object(vmctl.netlab.time, "sleep"):
+            results = vmctl.netlab.wait_targets(targets, timeout_sec=0)
+        self.assertEqual([(t["label"], ok, detail) for t, ok, detail in results],
+                         [("gui", True, "HTTP 200"), ("ssh", True, "port open"), ("dead", False, "no answer")])
+        with mock.patch.object(vmctl.netlab, "probe_http", return_value=503), mock.patch.object(vmctl.netlab.time, "sleep"):
+            self.assertEqual(vmctl.netlab.wait_targets(targets[:1], timeout_sec=0)[0][1:], (False, "HTTP 503"))
+
+    def test_lab_check_picks_the_mode_and_fails_on_a_missing_service(self):
+        args = argparse.Namespace(action="check", vm=None, router=None, apply=False, timeout=60, dry_run=False, wait=1, connect="qemu:///system", libvirt=False)
+        with mock.patch.object(vmctl.lifecycle, "lab_in_libvirt", return_value=False), \
+             mock.patch.object(vmctl.netlab, "wait_targets", side_effect=lambda targets, wait: [(t, True, "ok") for t in targets]) as wait:
+            self.assertEqual(self.vmctl.cmd_lab(args), 0)
+        self.assertEqual(wait.call_args.args[0][0]["url"], "http://127.0.0.1:8080/")
+        with mock.patch.object(vmctl.lifecycle, "lab_in_libvirt", return_value=True), \
+             mock.patch.object(vmctl.netlab, "wait_targets", side_effect=lambda targets, wait: [(t, t["kind"] == "http", "x") for t in targets]) as wait:
+            self.assertEqual(self.vmctl.cmd_lab(args), 1)
+        self.assertEqual(wait.call_args.args[0][0]["url"], "http://192.168.0.1/")
+        args.dry_run = True
+        self.assertEqual(self.vmctl.cmd_lab(args), 0)
+
+    def test_export_and_unexport_round_trip(self):
+        calls: list[tuple[str, str]] = []
+        outputs = {("list", "--name"): "", ("domstate", "router"): "shut off\n", ("domstate", "dns"): "shut off\n", ("domstate", "desk"): "shut off\n"}
+        with mock.patch.object(vmctl.lifecycle, "cmd_stop", side_effect=lambda a: calls.append(("stop", a.vm)) or 0), \
+             mock.patch.object(vmctl.lifecycle, "cmd_export_libvirt", side_effect=lambda a: calls.append(("export", a.vm)) or 0) as export, \
+             mock.patch.object(vmctl.lifecycle, "cmd_unexport_libvirt", side_effect=lambda a: calls.append(("unexport", a.vm)) or 0), \
+             mock.patch.object(vmctl.libvirt, "virsh_output", side_effect=lambda uri, *a: outputs.get(a, "")), \
+             mock.patch.object(vmctl.runtime, "run", side_effect=lambda cmd, **kw: calls.append((cmd[3], cmd[4]))), \
+             mock.patch.object(vmctl.lifecycle, "lab_check", return_value=0) as check, \
+             mock.patch.object(vmctl.lifecycle.time, "sleep"):
+            args = argparse.Namespace(action="libvirt-test", vm=None, router=None, apply=False, timeout=60, dry_run=False, wait=5,
+                                      connect="qemu:///system", replace=True, keep=False, libvirt=False)
+            self.assertEqual(self.vmctl.cmd_lab(args), 0)
+        self.assertEqual(calls, [("stop", "desk"), ("stop", "dns"), ("stop", "router"),
+                                 ("export", "router"), ("export", "dns"), ("export", "desk"),
+                                 ("start", "router"), ("start", "dns"), ("start", "desk"),
+                                 ("unexport", "desk"), ("unexport", "dns"), ("unexport", "router")])
+        self.assertTrue(export.call_args_list[0].args[0].replace)
+        self.assertEqual(check.call_args.args[1], "libvirt")
+
+    def test_unexport_shuts_down_running_domains_and_gives_up_after_the_grace(self):
+        state = {"router": "running"}
+        outputs = {("list", "--name"): "router\n"}
+        with mock.patch.object(vmctl.lifecycle, "cmd_unexport_libvirt", return_value=0) as unexport, \
+             mock.patch.object(vmctl.libvirt, "virsh_output", side_effect=lambda uri, *a: outputs.get(a, state["router"] + "\n" if a[0] == "domstate" else "")), \
+             mock.patch.object(vmctl.runtime, "run") as run, \
+             mock.patch.object(vmctl.lifecycle.time, "sleep", side_effect=lambda s: state.__setitem__("router", "shut off")):
+            args = argparse.Namespace(action="unexport", vm=None, router=None, apply=False, timeout=60, dry_run=False, wait=30, connect="qemu:///system")
+            self.assertEqual(self.vmctl.cmd_lab(args), 0)
+        self.assertEqual(run.call_args.args[0][3:], ["shutdown", "router"])
+        self.assertEqual([c.args[0].vm for c in unexport.call_args_list], ["desk", "dns", "router"])
+        with mock.patch.object(vmctl.lifecycle, "cmd_unexport_libvirt") as unexport, \
+             mock.patch.object(vmctl.libvirt, "virsh_output", side_effect=lambda uri, *a: "router\n" if a[0] == "list" else "running\n"), \
+             mock.patch.object(vmctl.runtime, "run"), \
+             mock.patch.object(vmctl.lifecycle.time, "sleep"), \
+             mock.patch.object(vmctl.lifecycle.time, "monotonic", side_effect=[0, 0, 100, 100, 100, 100]), \
+             self.assertRaises(vmctl.errors.VMError):
+            self.vmctl.cmd_lab(argparse.Namespace(action="unexport", vm=None, router=None, apply=False, timeout=60, dry_run=False, wait=30, connect="qemu:///system"))
+        unexport.assert_not_called()
 
 
 class LibvirtSegmentTests(NetlabBase):
