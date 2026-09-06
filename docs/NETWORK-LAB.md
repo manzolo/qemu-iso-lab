@@ -164,23 +164,27 @@ not exported.
 - Ubuntu 22.04.5 live server ISO: downloaded automatically.
 - `virtiofsd` for the client's shared folder.
 
-## Checklist to verify a fresh install
+## Verified on 2026-09-06 (live, plain QEMU and libvirt)
 
-Not verified by the unit tests (they never start a VM); run them once after
+Not covered by the unit tests (they never start a VM); rerun them after a fresh
 `vmctl lab install && vmctl lab up`:
 
-| Check | How |
-|---|---|
-| pfSense installed and booting from disk | `vmctl attach pfsense-lab`: console menu, WAN with a `10.0.2.x` address, LAN `192.168.0.1` |
-| pfSense GUI login | `http://127.0.0.1:8080/` with `lab` and with `admin` (verified live on 2026-09-06: install 3 min, GUI up 20 s after boot, both logins land on the first-time setup wizard, which can be closed; SSH with the project key works) |
-| Pi-hole up, DHCP state | `vmctl shell pihole-lab`, then `pihole status` and `pihole-FTL --config dhcp.active` |
-| Local DNS | on the client: `resolvectl query pfsense.qlan` → `firewall.qlan` → `192.168.0.1` |
-| Public DNS and HTTPS through the firewall | on the client: `curl -sI https://example.org` |
-| Client routing | `ip route` shows only the LAN and `default via 192.168.0.1` |
-| Client desktop and autologin | `vmctl attach lubuntu22-lab` |
-| Shared folder | `~/shared` and the desktop link show `./shared` of the host |
-| Boot time of the client | `systemd-analyze` well under a minute (no wait-online stall) |
-| Pi-hole web UI through the forward | `http://127.0.0.1:8081/admin/` |
+| Check | How | Result |
+|---|---|---|
+| pfSense installed and booting from disk | `vmctl attach pfsense-lab`, GUI `http://127.0.0.1:8080/` with `lab` and `admin` | install 3 min, GUI up 20 s after boot, both logins land on the first-time wizard (closable), SSH with the project key |
+| Pi-hole up, DHCP state | `vmctl shell pihole-lab`, `pihole status`, `sudo pihole-FTL --config dhcp.active` | Pi-hole 6.4.3 / FTL 6.7, blocking enabled, DHCP `true`, local records for the router and the members |
+| Local DNS from the client | `resolvectl query pfsense.qlan` | CNAME → `firewall.qlan` → `192.168.0.1` |
+| Public DNS and HTTPS through the firewall | `curl -sI https://example.org` | HTTP/2 200 via OpenDNS and the pfSense NAT |
+| Client routing | `ip route` | `default via 192.168.0.1`, LAN only |
+| Client boot time | `systemd-analyze` | 7.3 s (wait-online disabled) |
+| Shared folder | `ls ~/shared` | the host's `shared/` |
+| Host access through the forwards | `vmctl lab check` | 5/5: pfSense GUI 8080, Pi-hole UI 8081, SSH 2237/2238/2239 |
+| Serial console | `vmctl console pfsense-lab` | pfSense console menu on the socket |
+| libvirt road | `vmctl lab libvirt-test` | export of the three VMs on the existing `lab-lan`, `virsh start`, 5/5 probes at `192.168.0.1`/`.10`/`.100` from the host, shutdown and unexport |
+
+Two things found only by these runs, both fixed: xorriso extracts the pfSense
+files read-only (chmod before patching), and the Linux members need
+passwordless sudo for the post-install hook (cloud-init sudoers drop-in).
 
 ## References
 

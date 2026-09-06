@@ -41,7 +41,7 @@ diretti). Su libvirt, dopo `vmctl lab export`, si usa l'IP vero: `ssh lab@192.16
 Dal client Lubuntu (`vmctl shell lubuntu22-lab`):
 
 ```bash
-ip -br addr                              # enp0s2: 192.168.0.100/24
+ip -br addr                              # la NIC (enp0s4 sul client, enp0s2 su Pi-hole): 192.168.0.100/24
 ip route                                 # default via 192.168.0.1
 ping -c 3 192.168.0.1                    # il firewall risponde sul segmento
 ping -c 3 192.168.0.10                   # Pi-hole
@@ -57,7 +57,7 @@ Da Pi-hole (`vmctl shell pihole-lab`):
 ```bash
 pihole status                            # FTL attivo, blocking enabled
 pihole -t                                # tail delle query in tempo reale (Ctrl-C per uscire)
-pihole-FTL --config dhcp.active          # true: DHCP per gli ospiti del segmento
+sudo pihole-FTL --config dhcp.active     # true: DHCP per gli ospiti del segmento (senza sudo legge un valore non affidabile)
 dig @127.0.0.1 lubuntu.qlan +short       # 192.168.0.100
 sudo cat /etc/pihole/pihole.toml | head  # la configurazione generata da vmctl
 ```
@@ -100,10 +100,13 @@ esiste più (niente slirp); si rientra da `vmctl attach` o, su libvirt, via IP.
 ## 4. pfSense: console e shell
 
 ```bash
-vmctl console pfsense-lab                # menu console: 8) Shell, poi Ctrl-] per uscire
-vmctl shell pfsense-lab                  # shell FreeBSD via SSH (porta 2237)
+vmctl console pfsense-lab                # menu console (root): 8) Shell, poi Ctrl-] per uscire
+vmctl shell pfsense-lab                  # shell FreeBSD via SSH (porta 2237) come utente del profilo
+ssh -i artifacts/pfsense-lab/ssh/id_ed25519 -p 2237 admin@127.0.0.1   # come admin (uid 0): serve per pfctl
 ```
 
+`pfctl` legge `/dev/pf` e vuole root: l'utente del profilo ha la shell ma non i privilegi
+(pfSense non ha sudo), quindi o si entra come `admin` con la stessa chiave, o dal menu console.
 Nella shell:
 
 ```sh

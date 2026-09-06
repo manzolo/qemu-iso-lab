@@ -161,7 +161,7 @@
     <h3>Host · dove si comanda</h3>
     <p><small>QEMU puro: 127.0.0.1 + forward · libvirt: 192.168.0.254 sul bridge virbr-lab</small></p>
     <ul>
-      <li><code>vmctl lab up/down/status</code>, <code>vmctl shell &lt;vm&gt;</code>, <code>vmctl attach &lt;vm&gt;</code> per lo schermo.</li>
+      <li><code>vmctl lab up/down/status/check</code>, <code>vmctl shell &lt;vm&gt;</code>, <code>vmctl console &lt;vm&gt;</code> per la seriale, <code>vmctl attach &lt;vm&gt;</code> per lo schermo.</li>
       <li>I forward sono nel profilo del router (<code>networks[].hostfwd</code>) e nelle regole NAT del config.xml: <code>vmctl lab plan</code> verifica che coincidano.</li>
       <li>Dopo <code>vmctl export-libvirt</code> l'host sta sulla LAN e tutto è raggiungibile sugli IP veri.</li>
     </ul>
@@ -286,13 +286,13 @@ xdg-open http://192.168.0.1/  ·  http://192.168.0.10/admin/</pre>
 <table>
   <tr><th>Controllo</th><th>Come</th><th>Stato</th></tr>
   <tr><td>pfSense installato e avviato da disco</td><td><code>vmctl attach pfsense-lab</code>; GUI <code>http://127.0.0.1:8080/</code> con <code>lab</code> e <code>admin</code>; <code>vmctl shell pfsense-lab</code></td><td class="ok">verificato il 6 settembre 2026: install 3 min, GUI in 20 s, login ok, SSH con chiave ok, LAN .1 su vtnet1</td></tr>
-  <tr><td>Pi-hole e Lubuntu installati da zero</td><td><code>vmctl shell pihole-lab</code>: <code>pihole status</code>; <code>vmctl attach lubuntu22-lab</code>: desktop con autologin</td><td>vedi <code>docs/NETWORK-LAB.md</code> per lo stato corrente</td></tr>
-  <tr><td>DNS e uscita dal client</td><td><code>resolvectl query pfsense.qlan</code> → .1; <code>curl -sI https://example.org</code> → 200</td><td>idem</td></tr>
-  <tr><td>Forward verso i membri</td><td><code>http://127.0.0.1:8081/admin/</code>, <code>ssh -p 2238</code>, <code>ssh -p 2239</code> con pfSense acceso</td><td>idem</td></tr>
-  <tr><td>Boot del client</td><td><code>systemd-analyze</code> ben sotto il minuto</td><td>idem</td></tr>
+  <tr><td>Pi-hole e Lubuntu installati da zero</td><td><code>vmctl shell pihole-lab</code>: <code>pihole status</code>; <code>vmctl attach lubuntu22-lab</code>: desktop con autologin</td><td class="ok">verificato il 6 settembre 2026: Pi-hole 6.4.3, FTL attivo, DHCP acceso; boot Lubuntu 7,3 s, cartella condivisa montata</td></tr>
+  <tr><td>DNS e uscita dal client</td><td><code>resolvectl query pfsense.qlan</code> → .1; <code>curl -sI https://example.org</code> → 200</td><td class="ok">verificato: CNAME risolto da Pi-hole, HTTP/2 200 attraverso il NAT di pfSense</td></tr>
+  <tr><td>Forward verso i membri</td><td><code>http://127.0.0.1:8081/admin/</code>, <code>ssh -p 2238</code>, <code>ssh -p 2239</code> con pfSense acceso</td><td class="ok">verificato: <code>vmctl lab check</code> tutto verde su QEMU puro</td></tr>
+  <tr><td>Strada libvirt</td><td><code>vmctl lab libvirt-test</code>: GUI e SSH su 192.168.0.1 / .10 / .100 dall'host</td><td class="ok">verificato: export, virsh start, cinque sonde ok sulla LAN, shutdown e unexport</td></tr>
 </table>
 
-<p class="sub" style="margin-top:6mm">Documentazione completa in <span class="mono">docs/NETWORK-LAB.md</span> (differenze da kvm-lab, checklist) e <span class="mono">docs/UNATTENDED.md</span> (flusso pfSense). Sorgente di questa pagina: <span class="mono">docs/guides/network-lab.html</span>, PDF con <span class="mono">make guides</span>.</p>
+<p class="sub" style="margin-top:6mm">Documentazione completa in <span class="mono">docs/NETWORK-LAB.md</span> (differenze da kvm-lab, checklist) e <span class="mono">docs/UNATTENDED.md</span> (flusso pfSense). Sorgente di questa pagina: <span class="mono">docs/guides/it/70-network-lab.html</span>, PDF con <span class="mono">make guides</span>.</p>
 
 </body>
 </html>

@@ -309,7 +309,7 @@ class LabCheckTests(NetlabBase):
 
     def test_export_and_unexport_round_trip(self):
         calls: list[tuple[str, str]] = []
-        outputs = {("list", "--name"): "", ("domstate", "router"): "shut off\n", ("domstate", "dns"): "shut off\n", ("domstate", "desk"): "shut off\n"}
+        outputs = {("list", "--name"): ""}
         with mock.patch.object(vmctl.lifecycle, "cmd_stop", side_effect=lambda a: calls.append(("stop", a.vm)) or 0), \
              mock.patch.object(vmctl.lifecycle, "cmd_export_libvirt", side_effect=lambda a: calls.append(("export", a.vm)) or 0) as export, \
              mock.patch.object(vmctl.lifecycle, "cmd_unexport_libvirt", side_effect=lambda a: calls.append(("unexport", a.vm)) or 0), \
@@ -328,18 +328,17 @@ class LabCheckTests(NetlabBase):
         self.assertEqual(check.call_args.args[1], "libvirt")
 
     def test_unexport_shuts_down_running_domains_and_gives_up_after_the_grace(self):
-        state = {"router": "running"}
-        outputs = {("list", "--name"): "router\n"}
+        state = {"running": "router\n"}
         with mock.patch.object(vmctl.lifecycle, "cmd_unexport_libvirt", return_value=0) as unexport, \
-             mock.patch.object(vmctl.libvirt, "virsh_output", side_effect=lambda uri, *a: outputs.get(a, state["router"] + "\n" if a[0] == "domstate" else "")), \
+             mock.patch.object(vmctl.libvirt, "virsh_output", side_effect=lambda uri, *a: state["running"] if a == ("list", "--name") else ""), \
              mock.patch.object(vmctl.runtime, "run") as run, \
-             mock.patch.object(vmctl.lifecycle.time, "sleep", side_effect=lambda s: state.__setitem__("router", "shut off")):
+             mock.patch.object(vmctl.lifecycle.time, "sleep", side_effect=lambda s: state.__setitem__("running", "")):
             args = argparse.Namespace(action="unexport", vm=None, router=None, apply=False, timeout=60, dry_run=False, wait=30, connect="qemu:///system")
             self.assertEqual(self.vmctl.cmd_lab(args), 0)
         self.assertEqual(run.call_args.args[0][3:], ["shutdown", "router"])
         self.assertEqual([c.args[0].vm for c in unexport.call_args_list], ["desk", "dns", "router"])
         with mock.patch.object(vmctl.lifecycle, "cmd_unexport_libvirt") as unexport, \
-             mock.patch.object(vmctl.libvirt, "virsh_output", side_effect=lambda uri, *a: "router\n" if a[0] == "list" else "running\n"), \
+             mock.patch.object(vmctl.libvirt, "virsh_output", side_effect=lambda uri, *a: "router\n" if a[0] == "list" else ""), \
              mock.patch.object(vmctl.runtime, "run"), \
              mock.patch.object(vmctl.lifecycle.time, "sleep"), \
              mock.patch.object(vmctl.lifecycle.time, "monotonic", side_effect=[0, 0, 100, 100, 100, 100]), \

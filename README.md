@@ -188,7 +188,7 @@ using the lab, for the printable guides and for developing. The pages:
 | [docs/UNATTENDED.md](docs/UNATTENDED.md) | The five unattended flows step by step, the completion-token rule, boot checks and the local validation matrix |
 | [docs/NETWORK-LAB.md](docs/NETWORK-LAB.md) | The network lab: pfSense + Pi-hole + client on an isolated segment, `networks`/phases, host access through the router, libvirt road, differences from kvm-lab |
 | [docs/LIBVIRT.md](docs/LIBVIRT.md) | `export-libvirt` / `unexport-libvirt`: hand an installed VM to virt-manager and back |
-| [docs/guides/](docs/guides/README.md) | Printable step-by-step guides in reading order (Italian), the network lab schema and the virsh cheat sheet; `make guides` builds one manual PDF plus one PDF per guide |
+| [docs/guides/](docs/guides/README.md) | Printable step-by-step guides in reading order, in English (`en/`) and Italian (`it/`): every flow, working inside the guests, the network lab schema, the virsh cheat sheet; `make guides` builds one manual PDF per language plus one PDF per guide |
 | [docs/PROVISIONING.md](docs/PROVISIONING.md) | `cloud_init`, `ssh_provision`, `autoinstall` and `omarchy_config` fields, `copy_from_host`, `post_install_run`, sudo, guest identity and `local.json` |
 | [docs/VMTUI.md](docs/VMTUI.md) | The TUI in depth: dashboard, filters, contextual menu, video profiles, post-install chaining, remote SPICE |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | One-page mental map of the code: modules, import order, who owns what |

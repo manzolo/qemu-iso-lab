@@ -55,5 +55,5 @@ init-local-profile: ## Create vms/profiles/local.json from the example
 validate-vms: ## Local-only full matrix: reinstall every unattended profile from scratch, restore the installed disks, write the HTML report (hours; VMS="a b" PARALLEL=2 to narrow/speed up)
 	@./bin/vmctl check-vms $(VMS) --restore --no-clean-first --report $(if $(PARALLEL),--parallel $(PARALLEL),) $(if $(TIMEOUT),--timeout $(TIMEOUT),) --open
 
-guides: ## Render docs/guides/*.md into PDFs under docs/guides/pdf/ (needs python markdown + weasyprint)
+guides: ## Render docs/guides/{it,en} into docs/guides/pdf/<lang>/ (one manual + single PDFs; needs python markdown + weasyprint)
 	python3 tools/build_guides.py

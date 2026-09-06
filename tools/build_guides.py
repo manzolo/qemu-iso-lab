@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render docs/guides/*.md (markdown) and *.html (curated pages) into PDFs under docs/guides/pdf/ with weasyprint.
+"""Render docs/guides/<lang>/*.md (markdown) and *.html (curated pages) into PDFs under docs/guides/pdf/<lang>/ with weasyprint.
 
 Developer tool, not part of vmctl: `make guides`. Needs the `markdown` and `weasyprint`
 Python packages (pip install --user markdown weasyprint).
@@ -18,7 +18,7 @@ except ImportError as exc:  # pragma: no cover - developer tool
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "docs" / "guides"
-OUT = SRC / "pdf"  # qemu-iso-lab-guide.pdf (cover + every chapter) and singole/<name>.pdf
+OUT = SRC / "pdf"  # pdf/<lang>/qemu-iso-lab-guide.pdf (cover + every chapter) and pdf/<lang>/singole|single/<name>.pdf
 
 CSS = """
 @page { size: A4; margin: 18mm 16mm 20mm 16mm;
@@ -44,7 +44,22 @@ blockquote p { margin: 0; }
 """
 
 
-ORDER_NOTE = "I capitoli seguono l'ordine dei nomi file (00-, 10-, 20-...)."
+LANGS = {
+    "it": {
+        "title": "guida", "html_lang": "it",
+        "sub": "Installazioni non presidiate su QEMU/KVM, laboratorio di rete, libvirt: le guide passo passo in un solo manuale",
+        "chapters": "Capitoli", "singles": "singole",
+        "foot": "Generato il {date} da docs/guides/it/ con make guides · sorgenti Markdown e HTML nel repository manzolo/qemu-iso-lab · i capitoli seguono l'ordine dei nomi file (00-, 05-, 10-...)",
+        "meta": "qemu-iso-lab · generato il {date} da docs/guides/it/{name}",
+    },
+    "en": {
+        "title": "guide", "html_lang": "en",
+        "sub": "Unattended installs on QEMU/KVM, the network lab, libvirt: the step-by-step guides in one manual",
+        "chapters": "Chapters", "singles": "single",
+        "foot": "Generated on {date} from docs/guides/en/ with make guides · Markdown and HTML sources in the manzolo/qemu-iso-lab repository · chapters follow the file-name order (00-, 05-, 10-...)",
+        "meta": "qemu-iso-lab · generated on {date} from docs/guides/en/{name}",
+    },
+}
 
 COVER_CSS = """
 @page { size: A4; margin: 0; }
@@ -73,51 +88,59 @@ def title_of(path: Path) -> str:
     return path.stem
 
 
-def cover_html(sources: list[Path]) -> str:
-    items = "".join(
-        f"<li>{title_of(src)} <span>{src.name}</span></li>" for src in sources
-    )
+def cover_html(lang: str, sources: list[Path]) -> str:
+    text = LANGS[lang]
+    items = "".join(f"<li>{title_of(src)} <span>{src.name}</span></li>" for src in sources)
     return (
-        f"<!doctype html><html lang='it'><head><meta charset='utf-8'><style>{COVER_CSS}</style></head><body>"
-        f"<div class='cover'><h1><span class='mono'>qemu-iso-lab</span> · guida</h1>"
-        f"<div class='sub'>Installazioni non presidiate su QEMU/KVM, laboratorio di rete, libvirt: le guide passo passo in un solo manuale</div>"
-        f"<h2>Capitoli</h2><ol>{items}</ol>"
-        f"<div class='foot'>Generato il {date.today().isoformat()} da docs/guides/ con <code>make guides</code> · sorgenti Markdown e HTML nel repository manzolo/qemu-iso-lab · {ORDER_NOTE}</div>"
+        f"<!doctype html><html lang='{text['html_lang']}'><head><meta charset='utf-8'><style>{COVER_CSS}</style></head><body>"
+        f"<div class='cover'><h1><span class='mono'>qemu-iso-lab</span> · {text['title']}</h1>"
+        f"<div class='sub'>{text['sub']}</div>"
+        f"<h2>{text['chapters']}</h2><ol>{items}</ol>"
+        f"<div class='foot'>{text['foot'].format(date=date.today().isoformat())}</div>"
         f"</div></body></html>"
     )
 
 
-def document(src: Path):  # type: ignore[no-untyped-def] - weasyprint Document, developer tool
+def document(lang: str, src: Path):  # type: ignore[no-untyped-def] - weasyprint Document, developer tool
     if src.suffix == ".html":
         return HTML(filename=str(src)).render()
     text = src.read_text(encoding="utf-8")
     body = markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists", "toc"])
-    meta = f'<p class="meta">qemu-iso-lab · generato il {date.today().isoformat()} da docs/guides/{src.name}</p>'
-    html = f"<!doctype html><html lang='it'><head><meta charset='utf-8'><style>{CSS}</style></head><body>{body}{meta}</body></html>"
-    return HTML(string=html, base_url=str(SRC)).render()
+    meta = f'<p class="meta">{LANGS[lang]["meta"].format(date=date.today().isoformat(), name=src.name)}</p>'
+    html = f"<!doctype html><html lang='{LANGS[lang]['html_lang']}'><head><meta charset='utf-8'><style>{CSS}</style></head><body>{body}{meta}</body></html>"
+    return HTML(string=html, base_url=str(src.parent)).render()
 
 
-def guide_sources() -> list[Path]:
-    return sorted(p for p in list(SRC.glob("*.md")) + list(SRC.glob("*.html")) if p.name != "README.md")
+def guide_sources(lang: str) -> list[Path]:
+    folder = SRC / lang
+    return sorted(p for p in list(folder.glob("*.md")) + list(folder.glob("*.html")) if p.name != "README.md")
 
 
-def main(argv: list[str]) -> int:
-    sources = [Path(a) for a in argv[1:]] or guide_sources()
-    singles = OUT / "singole"
+def build_language(lang: str) -> None:
+    sources = guide_sources(lang)
+    out = OUT / lang
+    singles = out / LANGS[lang]["singles"]
     singles.mkdir(parents=True, exist_ok=True)
     documents = []
     for src in sources:
-        doc = document(src)
+        doc = document(lang, src)
         pdf_path = singles / (src.stem + ".pdf")
         doc.write_pdf(str(pdf_path))
         documents.append(doc)
         print(f"  {src.relative_to(ROOT)} -> {pdf_path.relative_to(ROOT)}")
-    if len(documents) > 1:
-        cover = HTML(string=cover_html(sources)).render()
-        pages = [page for doc in [cover, *documents] for page in doc.pages]
-        manual = OUT / "qemu-iso-lab-guide.pdf"
-        cover.copy(pages).write_pdf(str(manual))
-        print(f"  {len(pages)} pagine -> {manual.relative_to(ROOT)}")
+    cover = HTML(string=cover_html(lang, sources)).render()
+    pages = [page for doc in [cover, *documents] for page in doc.pages]
+    manual = out / "qemu-iso-lab-guide.pdf"
+    cover.copy(pages).write_pdf(str(manual))
+    print(f"  {len(pages)} pages -> {manual.relative_to(ROOT)}")
+
+
+def main(argv: list[str]) -> int:
+    langs = argv[1:] or sorted(LANGS)
+    for lang in langs:
+        if lang not in LANGS:
+            sys.exit(f"unknown language {lang!r}: choose from {', '.join(sorted(LANGS))}")
+        build_language(lang)
     return 0
 
 

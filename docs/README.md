@@ -18,24 +18,24 @@ essential steps in Italian for the terminal-at-hand case.
 
 ## 2. Printable guides (`guides/`)
 
-Step-by-step cheat sheets in Italian, one per unattended flow, numbered in
-reading order; `make guides` renders them with weasyprint into
-`guides/pdf/qemu-iso-lab-guide.pdf` (one manual with a cover and index) and
-`guides/pdf/singole/` (one PDF each). The index is
-[guides/README.md](guides/README.md).
+Step-by-step cheat sheets, in Italian (`guides/it/`) and English (`guides/en/`),
+one per unattended flow, numbered in reading order; `make guides` renders both
+languages with weasyprint into `guides/pdf/<lang>/qemu-iso-lab-guide.pdf` (one
+manual with a cover and index) and `guides/pdf/<lang>/single/` (one PDF each).
+The bilingual index is [guides/README.md](guides/README.md).
 
-| # | Guide | Covers |
-|---|---|---|
-| 00 | [00-comune.md](guides/00-comune.md) | Host prerequisites, how a bootstrap works, `local.json`, daily use |
-| 05 | [05-interagire.md](guides/05-interagire.md) | Getting a command line in a guest: SSH, serial console (`vmctl console`), VNC screen; typical checks on Linux, Windows (PowerShell over SSH) and pfSense |
-| 10 | [10-ubuntu-niri.md](guides/10-ubuntu-niri.md) | Ubuntu autoinstall + cloud-init (`bootstrap-unattended`) |
-| 20 | [20-debian-server.md](guides/20-debian-server.md) | Debian preseed (`bootstrap-preseed`) |
-| 30 | [30-almalinux-fedora.md](guides/30-almalinux-fedora.md) | AlmaLinux / Fedora kickstart (`bootstrap-kickstart`) |
-| 40 | [40-arch-niri.md](guides/40-arch-niri.md) | Arch and CachyOS pacstrap script (`bootstrap-archinstall`) |
-| 50 | [50-alpine-niri.md](guides/50-alpine-niri.md) | Alpine `setup-alpine` (`bootstrap-alpine`) |
-| 60 | [60-windows.md](guides/60-windows.md) | Windows 10/11 autounattend (`bootstrap-windows`) |
-| 70 | [70-network-lab.html](guides/70-network-lab.html) | The network lab with the SVG topology (`vmctl lab`, `bootstrap-pfsense`) |
-| 80 | [80-virsh-cheatsheet.html](guides/80-virsh-cheatsheet.html) | virsh cheat sheet, vmctl ↔ virsh map |
+| # | English | Italiano | Covers |
+|---|---|---|---|
+| 00 | [00-common.md](guides/en/00-common.md) | [00-comune.md](guides/it/00-comune.md) | Host prerequisites, how a bootstrap works, `local.json`, daily use |
+| 05 | [05-interacting.md](guides/en/05-interacting.md) | [05-interagire.md](guides/it/05-interagire.md) | Getting a command line in a guest: SSH, serial console (`vmctl console`), VNC screen; typical checks on Linux, Windows (PowerShell over SSH) and pfSense |
+| 10 | [10-ubuntu-niri.md](guides/en/10-ubuntu-niri.md) | [it](guides/it/10-ubuntu-niri.md) | Ubuntu autoinstall + cloud-init (`bootstrap-unattended`) |
+| 20 | [20-debian-server.md](guides/en/20-debian-server.md) | [it](guides/it/20-debian-server.md) | Debian preseed (`bootstrap-preseed`) |
+| 30 | [30-almalinux-fedora.md](guides/en/30-almalinux-fedora.md) | [it](guides/it/30-almalinux-fedora.md) | AlmaLinux / Fedora kickstart (`bootstrap-kickstart`) |
+| 40 | [40-arch-niri.md](guides/en/40-arch-niri.md) | [it](guides/it/40-arch-niri.md) | Arch and CachyOS pacstrap script (`bootstrap-archinstall`) |
+| 50 | [50-alpine-niri.md](guides/en/50-alpine-niri.md) | [it](guides/it/50-alpine-niri.md) | Alpine `setup-alpine` (`bootstrap-alpine`) |
+| 60 | [60-windows.md](guides/en/60-windows.md) | [it](guides/it/60-windows.md) | Windows 10/11 autounattend (`bootstrap-windows`) |
+| 70 | [70-network-lab.html](guides/en/70-network-lab.html) | [it](guides/it/70-network-lab.html) | The network lab with the SVG topology (`vmctl lab`, `bootstrap-pfsense`) |
+| 80 | [80-virsh-cheatsheet.html](guides/en/80-virsh-cheatsheet.html) | [it](guides/it/80-virsh-cheatsheet.html) | virsh cheat sheet, vmctl ↔ virsh map |
 
 ## 3. Develop
 

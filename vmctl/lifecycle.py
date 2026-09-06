@@ -1528,7 +1528,9 @@ def lab_unexport(names: list[str], uri: str, args: argparse.Namespace) -> int:
         pending = [name for name in reversed(names) if name in running]
         while pending and time.monotonic() < deadline:
             time.sleep(3)
-            pending = [name for name in pending if libvirt.virsh_output(uri, "domstate", name).strip() != "shut off"]
+            # `virsh list --name` is locale-independent; `domstate` prints translated states ("terminato").
+            still_running = libvirt.virsh_output(uri, "list", "--name").splitlines()
+            pending = [name for name in pending if name in still_running]
         if pending:
             raise VMError(f"Still running in libvirt after the grace period: {', '.join(pending)} (virsh destroy them by hand, then rerun vmctl lab unexport)")
     for name in reversed(names):

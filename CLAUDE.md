@@ -13,7 +13,7 @@ python -m pytest tests/ -k "test_render"       # filter by name
 make ci                                        # python -m unittest discover -s tests -v (what GitHub Actions runs)
 make lint                                      # python -m mypy vmctl/ --strict (enforced)
 make install-cli                               # symlink vmctl + vmtui into ~/.local/bin
-make guides                                    # docs/guides -> pdf/qemu-iso-lab-guide.pdf (manual) + pdf/singole/ (markdown + weasyprint)
+make guides                                    # docs/guides/{it,en} -> pdf/<lang>/qemu-iso-lab-guide.pdf (manual) + pdf/<lang>/single|singole/ (markdown + weasyprint); keep both languages in sync
 make validate-vms                              # LOCAL ONLY (hours): check-vms --restore --report over every unattended profile, opens the HTML report
 
 # VM lifecycle: ONE front door, the vmctl CLI (./bin/vmctl if not installed).

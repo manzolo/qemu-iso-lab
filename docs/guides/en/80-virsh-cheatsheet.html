@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>virsh — Cheat Sheet (qemu-iso-lab)</title>
+<style>
+  @page { size: A4 portrait; margin: 10mm 9mm 9mm; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: "Noto Sans", system-ui, "Segoe UI", Roboto, sans-serif;
+    color: #1f2733; margin: 0; font-size: 9pt; line-height: 1.32;
+  }
+  code, .cmd { font-family: "DejaVu Sans Mono", "Liberation Mono", ui-monospace, monospace; }
+
+  /* ---- Header band ---- */
+  .hero {
+    background: linear-gradient(120deg, #11223f 0%, #1d3a6e 55%, #2f6fb0 100%);
+    color: #fff; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .hero h1 { margin: 0; font-size: 21pt; letter-spacing: .5px; font-weight: 800; }
+  .hero h1 .mono { font-family: "DejaVu Sans Mono", monospace; color: #ffd479; }
+  .hero .sub { margin-top: 2px; font-size: 8.5pt; color: #c7d6ee; }
+  .hero .tag {
+    text-align: right; font-size: 7.5pt; color: #aebfdc; line-height: 1.5;
+  }
+  .hero .tag b { color: #ffd479; }
+
+  /* ---- Columns ---- */
+  .grid { column-count: 2; column-gap: 9px; }
+  .card {
+    break-inside: avoid; border: 1px solid #e1e6f0; border-radius: 9px;
+    padding: 7px 10px 3px; margin: 0 0 9px; background: #ffffff;
+    box-shadow: 0 1px 0 #eef1f7;
+  }
+  .card h2 {
+    margin: 0 0 6px; font-size: 9.5pt; font-weight: 800; color: #16213a;
+    display: flex; align-items: center; gap: 6px;
+    border-bottom: 2px solid var(--accent, #2f6fb0); padding-bottom: 4px;
+  }
+  .card h2 .ic {
+    width: 16px; height: 16px; border-radius: 5px; background: var(--accent, #2f6fb0);
+    color: #fff; font-size: 9pt; line-height: 16px; text-align: center; font-weight: 700;
+    flex: none;
+  }
+
+  .row { margin: 0 0 5px; }
+  .cmd {
+    display: block; background: #f3f6fc; border: 1px solid #e6ecf7; color: #15315c;
+    border-radius: 5px; padding: 2px 6px; font-size: 8pt; white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .cmd .c { color: #8a93a6; }            /* commento */
+  .cmd .v { color: #b3530b; font-style: italic; } /* placeholder/variabile */
+  .cmd .k { color: #1763b6; font-weight: 700; }    /* keyword opzione */
+  .desc { font-size: 7.6pt; color: #5b6679; margin: 1px 1px 5px; }
+
+  .danger { --accent: #c0392b; }
+  .danger .card-note { background: #fdecea; border: 1px solid #f6c9c2; color: #8c2f23;
+    border-radius: 6px; padding: 5px 7px; font-size: 7.6pt; margin-top: 4px; }
+  .ok { --accent: #1e8e5a; }
+  .amber { --accent: #b9821a; }
+  .violet { --accent: #6c4bb6; }
+  .teal { --accent: #1b8a93; }
+  .slate { --accent: #41506b; }
+
+  .pill { display:inline-block; background:#eef2fb; color:#33415c; border-radius: 20px;
+    padding: 0 7px; font-size: 7pt; font-weight: 700; }
+  .foot { margin-top: 4px; text-align: center; color: #8a93a6; font-size: 7pt; }
+  .kbd { display:inline-block; border:1px solid #cfd6e4; border-bottom-width:2px;
+    border-radius:4px; padding:0 4px; font-size:7.5pt; background:#fbfcfe; font-family:"DejaVu Sans Mono",monospace; }
+</style>
+</head>
+<body>
+
+  <div class="hero">
+    <div>
+      <h1><span class="mono">virsh</span> Cheat Sheet</h1>
+      <div class="sub">QEMU / KVM · libvirt · qemu-iso-lab — the most used commands at a glance, inherited from kvm-lab</div>
+    </div>
+    <div class="tag">
+      connection: <b>qemu:///system</b><br>
+      <span class="mono">&lt;VM&gt;</span> = domain name · e.g. <b>debian-server</b> after <b>vmctl export-libvirt</b><br>
+      placeholders in <b>orange</b>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- INVENTARIO & STATO -->
+    <div class="card slate">
+      <h2><span class="ic">≣</span> Inventory &amp; state</h2>
+      <div class="row"><span class="cmd">virsh list --all</span><div class="desc">Every VM (running and off) with its state.</div></div>
+      <div class="row"><span class="cmd">virsh list <span class="k">--state-running</span></span><div class="desc">Only the running ones.</div></div>
+      <div class="row"><span class="cmd">virsh domstate <span class="v">&lt;VM&gt;</span></span><div class="desc">Single state: running / shut off / paused.</div></div>
+      <div class="row"><span class="cmd">virsh dominfo <span class="v">&lt;VM&gt;</span></span><div class="desc">CPU, RAM, autostart, persistence, UUID.</div></div>
+      <div class="row"><span class="cmd">virsh domid <span class="v">&lt;VM&gt;</span>   <span class="c"># numeric id (only when running)</span></span></div>
+      <div class="row"><span class="cmd">virsh domifaddr <span class="v">&lt;VM&gt;</span></span><div class="desc">IP addresses (needs the guest agent or a DHCP lease).</div></div>
+    </div>
+
+    <!-- AVVIO / SPEGNIMENTO -->
+    <div class="card ok">
+      <h2><span class="ic">⏻</span> Start &amp; shutdown</h2>
+      <div class="row"><span class="cmd">virsh start <span class="v">&lt;VM&gt;</span></span><div class="desc">Starts the VM.</div></div>
+      <div class="row"><span class="cmd">virsh shutdown <span class="v">&lt;VM&gt;</span></span><div class="desc">Orderly shutdown (ACPI). Needs an OS that answers.</div></div>
+      <div class="row"><span class="cmd">virsh reboot <span class="v">&lt;VM&gt;</span></span><div class="desc">Orderly reboot.</div></div>
+      <div class="row"><span class="cmd">virsh destroy <span class="v">&lt;VM&gt;</span></span><div class="desc"><b>Forced</b> power-off (pulls the plug).</div></div>
+      <div class="row"><span class="cmd">virsh suspend <span class="v">&lt;VM&gt;</span>   <span class="c"># pause</span>
+virsh resume  <span class="v">&lt;VM&gt;</span>   <span class="c"># resume</span></span></div>
+      <div class="row"><span class="cmd">virsh autostart <span class="v">&lt;VM&gt;</span>          <span class="c"># on at host boot</span>
+virsh autostart <span class="k">--disable</span> <span class="v">&lt;VM&gt;</span></span></div>
+    </div>
+
+    <!-- CONSOLE & SCHERMO -->
+    <div class="card violet">
+      <h2><span class="ic">▣</span> Console &amp; screen</h2>
+      <div class="row"><span class="cmd">virt-viewer <span class="v">&lt;VM&gt;</span>   <span class="c"># GUI SPICE/VNC</span></span><div class="desc">Graphical window of the VM (virt-viewer package).</div></div>
+      <div class="row"><span class="cmd">virsh console <span class="v">&lt;VM&gt;</span></span><div class="desc">Text serial console (leave with <span class="kbd">Ctrl</span>+<span class="kbd">]</span>).</div></div>
+      <div class="row"><span class="cmd">virsh screenshot <span class="v">&lt;VM&gt;</span> shot.ppm
+convert shot.ppm shot.png   <span class="c"># ImageMagick</span></span><div class="desc">Captures the screen. Convert the .ppm to .png.</div></div>
+      <div class="row"><span class="cmd">virsh send-key <span class="v">&lt;VM&gt;</span> KEY_SPACE   <span class="c"># wake up</span>
+virsh send-key <span class="v">&lt;VM&gt;</span> KEY_ESC</span><div class="desc">Keys to the guest: handy to leave the screensaver before a screenshot.</div></div>
+      <div class="row"><span class="cmd">virsh send-key <span class="v">&lt;VM&gt;</span> KEY_LEFTCTRL KEY_LEFTALT KEY_DELETE</span><div class="desc">Ctrl-Alt-Del to the guest.</div></div>
+    </div>
+
+    <!-- GUEST AGENT -->
+    <div class="card teal">
+      <h2><span class="ic">◇</span> Guest agent (in-VM)</h2>
+      <div class="row"><span class="cmd">virsh qemu-agent-command <span class="v">&lt;VM&gt;</span> \
+  '{"execute":"guest-ping"}'</span><div class="desc">Checks that the agent answers (OS booted and ready).</div></div>
+      <div class="row"><span class="cmd">virsh qemu-agent-command <span class="v">&lt;VM&gt;</span> \
+  '{"execute":"guest-get-osinfo"}'</span><div class="desc">OS name/version from the guest (handy on Windows).</div></div>
+      <div class="row"><span class="cmd">virsh domtime <span class="v">&lt;VM&gt;</span> <span class="k">--sync</span></span><div class="desc">Syncs the guest clock through the agent.</div></div>
+      <div class="row"><span class="cmd"><span class="c"># run a command in a Linux guest</span>
+guest-exec → path:/bin/sh  arg:["-c","..."]</span><div class="desc">On Windows: path <code>cmd.exe</code>, arg <code>["/c","..."]</code>. Then <code>guest-exec-status</code> with the pid for the output.</div></div>
+    </div>
+
+    <!-- DISCHI & STORAGE -->
+    <div class="card amber">
+      <h2><span class="ic">▤</span> Disks &amp; storage pools</h2>
+      <div class="row"><span class="cmd">virsh domblklist <span class="v">&lt;VM&gt;</span></span><div class="desc">Attached disks/ISOs and their paths.</div></div>
+      <div class="row"><span class="cmd">virsh pool-list --all
+virsh pool-info <span class="v">&lt;pool&gt;</span>
+virsh pool-refresh <span class="v">&lt;pool&gt;</span>   <span class="c"># after adding files</span></span></div>
+      <div class="row"><span class="cmd">virsh vol-list <span class="v">&lt;pool&gt;</span>
+virsh vol-info --pool <span class="v">&lt;pool&gt;</span> <span class="v">&lt;vol&gt;</span></span></div>
+      <div class="row"><span class="cmd">qemu-img info <span class="v">disco.qcow2</span>
+qemu-img create -f qcow2 -o preallocation=off <span class="v">new.qcow2</span> 20G</span></div>
+      <div class="row"><span class="cmd">virt-cat -a <span class="v">disco.qcow2</span> /var/log/syslog</span><div class="desc">Reads files <b>inside</b> the disk with the VM <b>off</b> (libguestfs) — great to diagnose failed installs.</div></div>
+      <p class="pill">vmctl disks: artifacts/&lt;vm&gt;/disk.qcow2 · NVRAM: artifacts/&lt;vm&gt;/OVMF_VARS.fd · kvm-lab pools: hdd · shared · Linux · Windows · addons</p>
+    </div>
+
+    <!-- RETE -->
+    <div class="card slate">
+      <h2><span class="ic">⇄</span> Network</h2>
+      <div class="row"><span class="cmd">virsh net-list --all
+virsh net-info default
+virsh net-dhcp-leases default</span><div class="desc">Virtual networks and assigned DHCP leases.</div></div>
+      <div class="row"><span class="cmd">virsh domiflist <span class="v">&lt;VM&gt;</span></span><div class="desc">Network interfaces of the VM (model, MAC, bridge).</div></div>
+      <div class="row"><span class="cmd">virsh net-dumpxml lab-lan
+virsh net-start lab-lan · virsh net-autostart lab-lan</span><div class="desc">The isolated LAN of the network lab (bridge <code>virbr-lab</code>, host .254), created by <code>vmctl export-libvirt</code>.</div></div>
+    </div>
+
+    <!-- SNAPSHOT -->
+    <div class="card violet">
+      <h2><span class="ic">⧉</span> Snapshot</h2>
+      <div class="row"><span class="cmd">virsh snapshot-create-as <span class="v">&lt;VM&gt;</span> <span class="v">name</span> \
+  "description"</span><div class="desc">Creates a snapshot (disk+RAM when running).</div></div>
+      <div class="row"><span class="cmd">virsh snapshot-list <span class="v">&lt;VM&gt;</span>
+virsh snapshot-revert <span class="v">&lt;VM&gt;</span> <span class="v">name</span>
+virsh snapshot-delete <span class="v">&lt;VM&gt;</span> <span class="v">name</span></span></div>
+    </div>
+
+    <!-- DEFINIZIONE / XML -->
+    <div class="card teal">
+      <h2><span class="ic">&lt;/&gt;</span> Definition &amp; XML</h2>
+      <div class="row"><span class="cmd">virsh dumpxml <span class="v">&lt;VM&gt;</span> &gt; vm.xml</span><div class="desc">Exports the XML configuration.</div></div>
+      <div class="row"><span class="cmd">virsh edit <span class="v">&lt;VM&gt;</span>     <span class="c"># edit + validate</span></span></div>
+      <div class="row"><span class="cmd">virsh define vm.xml   <span class="c"># create/update from a file</span></span></div>
+      <div class="row"><span class="cmd">virsh dominfo <span class="v">&lt;VM&gt;</span> | grep Persistent</span><div class="desc">Persistent vs transient.</div></div>
+    </div>
+
+    <!-- ELIMINAZIONE SICURA -->
+    <div class="card danger">
+      <h2><span class="ic">⚠</span> Deleting a VM (safely)</h2>
+      <div class="row"><span class="cmd"><span class="c"># 1. delete ONLY the main disk</span>
+virsh vol-delete --pool hdd <span class="v">&lt;nome&gt;</span>.qcow2
+<span class="c"># 2. remove the definition (+ NVRAM if UEFI)</span>
+virsh undefine <span class="v">&lt;VM&gt;</span> <span class="k">--nvram</span></span></div>
+      <div class="card-note"><b>NEVER</b> <code>virsh undefine --remove-all-storage</code>: it deletes <b>every</b> registered volume, the ISOs in the pools included (Windows, Linux, addons…) → irreversible loss.</div>
+      <div class="row" style="margin-top:5px"><span class="cmd">vmctl unexport-libvirt <span class="v">&lt;vm&gt;</span>   <span class="c"># VM exported by vmctl</span></span><div class="desc">Removes the definition, keeps disk and NVRAM in <code>artifacts/</code>. Then <code>vmctl clean &lt;vm&gt;</code> if you want the disk gone too.</div></div>
+    </div>
+
+    <!-- DIAGNOSTICA -->
+    <div class="card amber">
+      <h2><span class="ic">✛</span> Diagnostics</h2>
+      <div class="row"><span class="cmd">virsh dominfo <span class="v">&lt;VM&gt;</span>
+virsh domstats <span class="v">&lt;VM&gt;</span>      <span class="c"># cpu/mem/blk/net live</span></span></div>
+      <div class="row"><span class="cmd">virsh domblkerror <span class="v">&lt;VM&gt;</span>    <span class="c"># disk I/O errors</span>
+virsh domblkstat <span class="v">&lt;VM&gt;</span> vda</span></div>
+      <div class="row"><span class="cmd">sudo virsh dommemstat <span class="v">&lt;VM&gt;</span></span><div class="desc">Memory statistics (needs balloon/agent).</div></div>
+      <div class="row"><span class="cmd">journalctl -u libvirtd --since today
+cat /var/log/libvirt/qemu/<span class="v">&lt;VM&gt;</span>.log</span><div class="desc">Host log of the VM's QEMU process.</div></div>
+    </div>
+
+    <!-- LAB: virtiofs -->
+    <div class="card ok">
+      <h2><span class="ic">⊟</span> Shared folder (virtiofs)</h2>
+      <div class="desc">The VM needs <code>memfd</code> memory backing and the virtiofs filesystem; Windows guests need <b>WinFSP</b>. It is the XML <code>vmctl export-libvirt</code> renders for profiles with <code>shared_dir</code>.</div>
+      <div class="row"><span class="cmd"><span class="c">&lt;memoryBacking&gt;</span>
+  &lt;source type='memfd'/&gt;
+  &lt;access mode='shared'/&gt;
+<span class="c">&lt;/memoryBacking&gt;</span>
+&lt;filesystem type='mount' accessmode='passthrough'&gt;
+  &lt;driver type='virtiofs'/&gt;
+  &lt;source dir='…/storage/shared/'/&gt;
+  &lt;target dir='shared'/&gt;
+&lt;/filesystem&gt;</span></div>
+    </div>
+
+    <!-- LAB: vmctl <-> virsh -->
+    <div class="card slate">
+      <h2><span class="ic">⌘</span> vmctl ↔ virsh</h2>
+      <div class="row"><span class="cmd">vmctl stop <span class="v">&lt;vm&gt;</span>
+vmctl export-libvirt <span class="v">&lt;vm&gt;</span> [--dry-run] [--replace]</span><div class="desc">Install and provision on plain QEMU, then hand over to libvirt: XML in <code>artifacts/&lt;vm&gt;/libvirt/</code>, disk by absolute path, never copied.</div></div>
+      <div class="row"><span class="cmd">virsh start <span class="v">&lt;vm&gt;</span> · virt-viewer <span class="v">&lt;vm&gt;</span>
+virsh domifaddr <span class="v">&lt;vm&gt;</span> → ssh <span class="v">utente</span>@<span class="v">IP</span></span><div class="desc">After the export use virsh/virt-manager; the hostfwd port of <code>vmctl shell</code> is gone: SSH to port 22 of the DHCP address.</div></div>
+      <div class="row"><span class="cmd">vmctl lab install · vmctl lab up   <span class="c"># network lab</span>
+vmctl export-libvirt pfsense-lab   <span class="c"># creates lab-lan too</span></span><div class="desc">On plain QEMU the host enters through the router forwards (127.0.0.1:8080…); on libvirt it sits at <code>192.168.0.254</code>.</div></div>
+      <div class="row"><span class="cmd">virsh shutdown <span class="v">&lt;vm&gt;</span>   <span class="c"># until "shut off"</span>
+vmctl unexport-libvirt <span class="v">&lt;vm&gt;</span> · vmctl start <span class="v">&lt;vm&gt;</span></span><div class="desc">Back to vmctl. Never the same disk running in QEMU and libvirt at once.</div></div>
+    </div>
+
+  </div>
+
+  <div class="foot">
+    qemu-iso-lab · source: <code>docs/guides/en/80-virsh-cheatsheet.html</code> · PDF with <code>make guides</code> (weasyprint) · details in <code>docs/LIBVIRT.md</code>
+  </div>
+
+</body>
+</html>
