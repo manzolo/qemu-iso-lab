@@ -975,6 +975,7 @@ class VmctlTests(BaseVmctlTestCase):
         with mock.patch.object(vmctl.host_setup, "prompt_yes_no_default_yes", return_value=False), \
              mock.patch.object(vmctl.lifecycle, "cmd_bootstrap_unattended") as bootstrap_unattended, \
              mock.patch.object(vmctl.lifecycle, "cmd_boot_check") as boot_check, \
+             mock.patch.object(vmctl.lifecycle, "ensure_vm_disk"), \
              mock.patch.object(vmctl.lifecycle, "cmd_stop") as cmd_stop, \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_test_local(args)
@@ -999,6 +1000,7 @@ class VmctlTests(BaseVmctlTestCase):
         args = argparse.Namespace(vm="alpine", timeout=300, dry_run=True)
 
         with mock.patch.object(vmctl.lifecycle, "cmd_boot_check"), \
+             mock.patch.object(vmctl.lifecycle, "ensure_vm_disk"), \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_check_vm(args)
 
