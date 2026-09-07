@@ -8,14 +8,8 @@
         "role": "ci",
         "release_model": "stable"
       },
-      "iso": "isos/alpine-virt-latest-stable-x86_64.iso",
-      "iso_discovery": {
-        "index_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/",
-        "pattern": "href=\"(alpine-virt-\\d+\\.\\d+\\.\\d+-x86_64\\.iso)\"",
-        "sort": "desc",
-        "limit": 1
-      },
-      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
+      "iso": "isos/alpine-virt-3.24.1-x86_64.iso",
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
       "disk": {
         "path": "artifacts/alpine-ci/disk.qcow2",
         "size": "2G",
@@ -55,7 +49,8 @@
         ],
         "expect": "login:",
         "timeout_sec": 180
-      }
+      },
+      "iso_sha256": "e73a6241bd5f3c5c2d4d38c02cc52c378c0415a7c888bd292066bf36e0f41a39"
     },
     "alpine-ci-installed": {
       "name": "Alpine Linux Virt Installed CI",
@@ -65,14 +60,8 @@
         "role": "ci-installed",
         "release_model": "stable"
       },
-      "iso": "isos/alpine-virt-latest-stable-x86_64.iso",
-      "iso_discovery": {
-        "index_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/",
-        "pattern": "href=\"(alpine-virt-\\d+\\.\\d+\\.\\d+-x86_64\\.iso)\"",
-        "sort": "desc",
-        "limit": 1
-      },
-      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
+      "iso": "isos/alpine-virt-3.24.1-x86_64.iso",
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
       "disk": {
         "path": "artifacts/alpine-ci-installed/disk.qcow2",
         "size": "2G",
@@ -103,7 +92,8 @@
         "boot_from": "disk",
         "expect": "login:",
         "timeout_sec": 120
-      }
+      },
+      "iso_sha256": "e73a6241bd5f3c5c2d4d38c02cc52c378c0415a7c888bd292066bf36e0f41a39"
     }
   }
 }

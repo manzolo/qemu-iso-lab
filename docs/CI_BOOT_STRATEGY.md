@@ -121,3 +121,7 @@ Inference from those sources:
 - Alpine `virt` is a better first CI guest than a desktop ISO;
 - serial-console boot detection is a realistic smoke-test strategy on GitHub-hosted runners;
 - software emulation is the safer default assumption for CI guest boot tests.
+
+## Pinned Alpine media
+
+`alpine-ci` and `alpine-ci-installed` use Alpine Virt 3.24.1 from the versioned v3.24 directory, with no discovery. The SHA-256 is published at https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso.sha256. Update `iso`, `iso_url` and `iso_sha256` together after explicitly validating a new release. Existing `latest-stable` cache files are not renamed or deleted.

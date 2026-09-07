@@ -64,6 +64,14 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         ):
             self.assertIn(profile, cfg["vms"])
 
+        # CI media must never drift when the upstream latest-stable pointer moves.
+        for name in ("alpine-ci", "alpine-ci-installed"):
+            vm = cfg["vms"][name]
+            self.assertNotIn("iso_discovery", vm)
+            self.assertNotIn("latest", vm["iso_url"])
+            self.assertEqual(Path(vm["iso"]).name, vm["iso_url"].rsplit("/", 1)[1])
+            self.assertRegex(vm["iso_sha256"], r"^[0-9a-f]{64}$")
+
         # Every tracked profile that provisions over SSH needs its own host port:
         # two VMs on the same forward silently break a parallel check-vms run.
         ports: dict[int, str] = {}
