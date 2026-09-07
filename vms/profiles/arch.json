@@ -662,11 +662,13 @@
         ],
         "post_install_run": [
           "~/bin/arch-noctalia-post-install",
-          "command -v noctalia >/dev/null && noctalia --version",
+          "qs --version",
+          "test -f /etc/xdg/quickshell/noctalia-shell/shell.qml",
           "command -v niri >/dev/null && niri --version"
         ],
         "verify_after_reboot": [
-          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager pacman --package niri --compositor niri"
+          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager pacman --package niri --compositor niri",
+          "pgrep -u \"{{user}}\" -f 'qs -c noctalia-shell' >/dev/null"
         ]
       }
     },
