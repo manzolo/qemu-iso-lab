@@ -70,20 +70,25 @@ class AutoyastRenderTests(BaseVmctlTestCase):
         with self.assertRaises(vmctl.errors.VMError):
             vmctl.autoyast.render_autoyast("tumbleweed", self.vm_config)
 
-    def test_kernel_append_points_linuxrc_at_the_seed_cd(self):
+    def test_kernel_append_points_linuxrc_at_the_usb_seed(self):
         vm = self._vm()
         append = vmctl.autoyast.kernel_append(vm)
-        self.assertIn("autoyast=cd:///autoinst.xml", append)
+        self.assertIn("autoyast=usb:///autoinst.xml", append)
         self.assertIn("console=ttyS0,115200", append)
+        self.assertNotIn("install=", append)
+        vm["autoyast_config"]["install_repo"] = "https://example.invalid/repo/oss/"
+        self.assertTrue(vmctl.autoyast.kernel_append(vm).startswith("install=https://example.invalid/repo/oss/"))
         vm["autoyast_config"]["kernel_append"] = "vga=off"
         self.assertTrue(vmctl.autoyast.kernel_append(vm).endswith("vga=off"))
 
-    def test_both_media_are_sata_cdroms(self):
+    def test_only_the_install_medium_is_a_cdrom_and_the_seed_is_usb(self):
         args = vmctl.autoyast.install_media_args(Path("/tmp/install.iso"), Path("/tmp/seed.iso"))
         joined = " ".join(args)
-        # linuxrc only scans /dev/sr*: a virtio CD-ROM would make the seed invisible.
+        # linuxrc only scans /dev/sr* for the repository, so the install ISO must be a real CD;
+        # a second CD makes YaST ask which drive holds Disc 1 and the install stops (seen live).
         self.assertIn("ide-cd,drive=aycd0,bus=ide.0", joined)
-        self.assertIn("ide-cd,drive=aycd1,bus=ide.1", joined)
+        self.assertIn("usb-storage,drive=ayseed", joined)
+        self.assertNotIn("aycd1", joined)
         self.assertNotIn("if=virtio", joined)
 
     def test_boot_artifacts_come_from_the_dvd_loader_directory(self):

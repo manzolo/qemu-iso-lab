@@ -32,13 +32,24 @@ def autoyast_artifact_dir(vm: dict[str, Any]) -> Path:
 
 
 def kernel_append(vm: dict[str, Any]) -> str:
-    """linuxrc arguments. ``autoyast=cd:///`` scans every CD drive, so the seed can move."""
+    """linuxrc arguments.
+
+    The seed is a **USB stick**, not a second CD: with two CD drives YaST cannot tell which
+    one carries the installation repository and stops mid-install on "Insert 'cd-<id>'
+    (Disc 1)" (observed live). One CD, one USB stick, no ambiguity.
+
+    ``autoyast_config.install_repo`` adds an explicit ``install=`` source, for an installer
+    ISO that carries no packages (the NET image) or to install from an online mirror.
+    """
     cfg = autoyast_config(vm) or {}
     extra = str(cfg.get("kernel_append") or "").strip()
+    repo = str(cfg.get("install_repo") or "").strip()
     append = (
-        "autoyast=cd:///autoinst.xml ifcfg=*=dhcp netsetup=dhcp textmode=1 "
+        "autoyast=usb:///autoinst.xml ifcfg=*=dhcp netsetup=dhcp textmode=1 "
         "console=ttyS0,115200 console=tty0"
     )
+    if repo:
+        append = f"install={repo} {append}"
     return f"{append} {extra}".strip()
 
 
@@ -269,10 +280,15 @@ def create_autoyast_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False)
 
 
 def install_media_args(install_iso: Path, seed_iso: Path) -> list[str]:
-    """Both media as SATA CD-ROMs: linuxrc only scans /dev/sr*, a virtio CD would be invisible."""
+    """The installer ISO as the only SATA CD-ROM, the seed as a USB stick.
+
+    linuxrc scans ``/dev/sr*`` for the installation repository, so the install medium must be
+    a real CD-ROM (a virtio CD would be invisible). The answer file instead travels on
+    ``usb://``: a second CD makes YaST ask which drive holds Disc 1 and the install stops.
+    """
     return [
         "-drive", f"id=aycd0,file={install_iso},format=raw,if=none,media=cdrom,readonly=on",
         "-device", "ide-cd,drive=aycd0,bus=ide.0",
-        "-drive", f"id=aycd1,file={seed_iso},format=raw,if=none,media=cdrom,readonly=on",
-        "-device", "ide-cd,drive=aycd1,bus=ide.1",
+        "-drive", f"id=ayseed,file={seed_iso},format=raw,if=none,readonly=on",
+        "-device", "usb-storage,drive=ayseed,removable=on",
     ]

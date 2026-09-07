@@ -1,13 +1,14 @@
 # openSUSE Tumbleweed with AutoYaST
 
 Profile: `opensuse-tumbleweed-autoyast` (SSH 2247). The kvm-lab Tumbleweed recipe on plain
-QEMU, through the `bootstrap-autoyast` command. Typical time: 30-45 minutes, most of it the
-4.7 GB DVD download.
+QEMU, through the `bootstrap-autoyast` command. Typical time: 30-45 minutes, most of it
+package downloads.
 
 ## 1. Specific prerequisites
 
-Only `xorriso` (for the seed CD) beyond the common prerequisites of guide 00. The ISO is
-`openSUSE-Tumbleweed-DVD-x86_64-Current.iso`, fetched automatically. It is a rolling image:
+Only `xorriso` (for the seed image) beyond the common prerequisites of guide 00. The ISO is
+`openSUSE-Tumbleweed-NET-x86_64-Current.iso`, about 250 MB, fetched automatically: it boots
+the installer and takes the packages from the online `oss` repository. It is a rolling image:
 the same URL gives a different build every week, which is exactly what makes this profile a
 good weekly smoke test.
 
@@ -20,11 +21,13 @@ vmctl attach opensuse-tumbleweed-autoyast          # to watch the installer
 
 ## 3. What happens, step by step
 
-1. **Seed CD**: the profile renders an AutoYaST XML profile into a CD labelled `AUTOINST`.
-2. **Boot**: `boot/x86_64/loader/linux` and the matching initrd are extracted from the DVD
-   and booted with `autoyast=cd:///autoinst.xml ifcfg=*=dhcp netsetup=dhcp textmode=1` and
-   the serial console. Both media are attached as **SATA** CD-ROMs, because linuxrc only
-   scans `/dev/sr*`: on a virtio CD the answer file would be invisible.
+1. **Seed**: the profile renders an AutoYaST XML profile into an image labelled `AUTOINST`,
+   attached as a **USB stick**.
+2. **Boot**: `boot/x86_64/loader/linux` and the matching initrd are extracted from the ISO
+   and booted with `install=<repo> autoyast=usb:///autoinst.xml ifcfg=*=dhcp netsetup=dhcp
+   textmode=1` and the serial console. The installer ISO is the **only CD-ROM** and it is a
+   SATA one: linuxrc scans `/dev/sr*` for the repository, so a virtio CD would be invisible,
+   while a *second* CD makes YaST stop mid-install asking which drive holds Disc 1.
 3. **Install**: YaST partitions the disk (GPT, 512 MB EFI + btrfs root), installs the
    patterns (`enhanced_base`, `gnome`, `kvm_server`) and the packages of the profile.
 4. **Chroot script**: inside the installed system it creates the user and its group, the
@@ -49,7 +52,9 @@ off last. Never print the token earlier.
 }
 ```
 
-`patterns` is where you swap desktop: `gnome`, `kde`, `xfce`. `chroot_commands` are appended
+`install_repo` is the installation source on the kernel line; with a full DVD as the `iso`
+you can drop it, but then the DVD must be the only CD in the machine. `patterns` is where you
+swap desktop: `gnome`, `kde`, `xfce`. `chroot_commands` are appended
 to the chroot script before the flush, so they run inside the installed system with the
 network still unconfigured; use `zypper` only for packages already on the DVD.
 

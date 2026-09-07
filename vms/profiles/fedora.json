@@ -398,6 +398,9 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Silverblue-ostree-x86_64-44-1.7.iso",
+      "iso_urls": [
+        "https://mirrors.mit.edu/fedora/linux/releases/44/Silverblue/x86_64/iso/Fedora-Silverblue-ostree-x86_64-44-1.7.iso"
+      ],
       "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Silverblue/x86_64/iso/Fedora-Silverblue-ostree-x86_64-44-1.7.iso",
       "disk": {
         "path": "artifacts/fedora-silverblue/disk.qcow2",
@@ -439,7 +442,7 @@
           ]
         }
       },
-      "notes": "Fedora Silverblue through the kickstart flow, ported from kvm-lab. kickstart_config.ostree replaces the %packages transaction with ostreesetup: the tree comes from the repository on the ISO (file:///ostree/repo) and the ref is read from the media at bootstrap time, so a new Fedora release only needs the ISO swapped. GDM autologin from %post. rpm-ostree layering (guest agent, spice-vdagent) happens in the post-install and takes effect at the next boot: on an immutable system nothing can be dnf-installed into the running deployment.",
+      "notes": "Fedora Silverblue through the kickstart flow, ported from kvm-lab. kickstart_config.ostree replaces the %packages transaction with ostreesetup: the tree comes from the repository on the ISO (file:///ostree/repo) and the ref is read from the media at bootstrap time, so a new Fedora release only needs the ISO swapped. GDM autologin from %post. rpm-ostree layering (guest agent, spice-vdagent) happens in the post-install and takes effect at the next boot: on an immutable system nothing can be dnf-installed into the running deployment. iso_urls names a concrete mirror because dl.fedoraproject.org sometimes answers the redirect with an HTML mirror page, which the downloader refuses; iso_url stays as the fallback.",
       "kickstart_config": {
         "hostname": "silverblue",
         "username": "lab",

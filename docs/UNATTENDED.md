@@ -137,14 +137,21 @@ afterwards, in the SSH post-install, with `rpm-ostree install --idempotent
 vmctl bootstrap-autoyast opensuse-tumbleweed-autoyast
 ```
 
-Renders an AutoYaST XML profile (`autoyast_config`) into an `AUTOINST` seed CD,
-extracts `boot/x86_64/loader/linux` and its initrd from the DVD, and boots with
-`autoyast=cd:///autoinst.xml ifcfg=*=dhcp netsetup=dhcp textmode=1
-console=ttyS0,115200`.
+Renders an AutoYaST XML profile (`autoyast_config`) into an `AUTOINST` image,
+extracts `boot/x86_64/loader/linux` and its initrd from the installer ISO, and
+boots with `install=<repo> autoyast=usb:///autoinst.xml ifcfg=*=dhcp
+netsetup=dhcp textmode=1 console=ttyS0,115200`.
 
-Both media are attached as **SATA CD-ROMs** (`ide-cd` on `ide.0` and `ide.1`):
-linuxrc scans `/dev/sr*` only, so on a virtio CD-ROM the answer file is
-invisible and the installer stops asking questions no one answers.
+The installer ISO is the **only CD-ROM** (SATA `ide-cd` on `ide.0`) and the seed
+travels on a **USB stick**. Both halves of that sentence were paid for live:
+linuxrc scans `/dev/sr*` for the installation repository, so the install medium
+cannot be a virtio CD; but with two CD drives YaST cannot tell which one is the
+repository and stops halfway through the package install on `Insert 'cd-<id>'
+(Disc 1)`, waiting for an answer nobody gives.
+
+`autoyast_config.install_repo` names the installation source explicitly. The
+profile uses the NET image, which carries no packages, plus the online `oss`
+repository: a 250 MB download instead of the 4.7 GB DVD.
 
 The profile drives partitioning (GPT, 512 MB EFI + btrfs root), patterns
 (`enhanced_base`, `gnome`, `kvm_server` by default) and services, and its chroot
