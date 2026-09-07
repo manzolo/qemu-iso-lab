@@ -511,7 +511,7 @@
       "network": "user",
       "audio": true,
       "video": {
-        "default": "safe",
+        "default": "virtio-gl",
         "headless": [
           "-device",
           "virtio-vga-gl",
@@ -560,8 +560,7 @@
         "ssh_host_port": 2222,
         "packages": [
           "software-properties-common",
-          "foot",
-          "waybar"
+          "foot"
         ],
         "runcmd": [
           "mkdir -p /home/vmuser/.config/niri",
