@@ -60,6 +60,18 @@ class ReportTests(BaseVmctlTestCase):
         self.assertNotIn("<script>", html)
         self.assertNotIn('src="http', html)
 
+    def test_screenshot_dialog_closes_on_escape_without_scrolling_away(self):
+        html = report.render_html(
+            [{"id": "vm", "name": "VM", "flow": "f", "status": "PASS", "phase": "p",
+              "seconds": 1, "detail": "d", "screenshot": "screens/vm.png"}],
+            {"host": "h", "date": "d", "commit": "c"}, self.root)
+        self.assertIn("event.key === 'Escape'", html)
+        self.assertIn("closeLightbox", html)
+        # The dialogs sit at the end of the document: a bare hash jump would scroll the
+        # table away, so both directions restore the reader's position.
+        self.assertIn("window.scrollTo({ top: y, behavior: 'instant' })", html)
+        self.assertIn("Esc closes it", html)
+
     def test_cards_and_badges_are_status_filters(self):
         results = [{"id": "a", "name": "A", "flow": "boot-check", "status": "PASS", "phase": "boot", "seconds": 1, "detail": ""},
                    {"id": "b", "name": "B", "flow": "bootstrap-preseed", "status": "FAIL", "phase": "install", "seconds": 2, "detail": "x"}]

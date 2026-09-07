@@ -450,6 +450,28 @@ function setStatus(value) {
 for (const trigger of document.querySelectorAll('.metric[data-status], .badge[data-status]')) {
   trigger.addEventListener('click', () => setStatus(trigger.dataset.status));
 }
+// The screenshot dialog is a :target section and the sections live at the end of the
+// document, so a bare hash navigation scrolls the table away under the overlay: both
+// opening and closing keep the reader where they were.
+function goToHash(hash, event) {
+  if (event) event.preventDefault();
+  const y = window.scrollY;
+  window.location.hash = hash;
+  window.scrollTo({ top: y, behavior: 'instant' });
+}
+function closeLightbox(event) {
+  if (!document.querySelector('.lightbox:target')) return;
+  goToHash('results', event);
+}
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeLightbox(event);
+});
+for (const opener of document.querySelectorAll('a.screen[href^="#screen-"]')) {
+  opener.addEventListener('click', (event) => goToHash(opener.getAttribute('href').slice(1), event));
+}
+for (const closer of document.querySelectorAll('.lightbox-backdrop, .lightbox-content header a')) {
+  closer.addEventListener('click', closeLightbox);
+}
 search.addEventListener('input', applyFilters);
 status.addEventListener('change', applyFilters);
 reset.addEventListener('click', () => {
@@ -467,7 +489,7 @@ applyFilters();
             f'<div class="run-state {overall}">● &nbsp;{headline}</div></header>'
             f'<div class="metadata">{"".join(meta_items)}</div><div class="metrics">{cards}</div>'
             '<section class="results" id="results"><div class="section-heading"><h2>Test results</h2>'
-            f'<span>Total: {len(results)} · Click a screen to inspect the guest</span></div>'
+            f'<span>Total: {len(results)} · Click a screen to inspect the guest, Esc closes it</span></div>'
             '<div class="filters" role="search" aria-label="Filter VM results">'
             '<label class="filter-search"><span aria-hidden="true">⌕</span><input id="vm-filter" type="search" autocomplete="off" '
             'aria-label="Filter by VM name or profile ID" placeholder="Filter by VM name or profile ID…"></label>'
