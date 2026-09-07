@@ -59,10 +59,33 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | `networks` | Optional list of NICs replacing the single slirp one: `{"type": "user", "hostfwd": [{"host_port": 8080, "guest_port": 80}]}` (slirp; the first user NIC carries the `ssh_host_port` forward unless `"ssh": false`) or `{"type": "segment", "name": "lab-lan"}` (a host-local L2 segment shared by every VM naming it: multicast socket on plain QEMU, libvirt network after export). `phase` = `install`, `runtime` or `both` (default): install NICs exist only during a bootstrap and its SSH post-install, runtime NICs afterwards; a NIC keeps its slot and MAC (`mac`, or derived from disk path + slot) across phases. See [NETWORK-LAB.md](NETWORK-LAB.md). |
 | `audio` | Attach an audio device |
 | `usb_tablet` | Absolute pointer for graphical guests |
+| `guest_agent` | Optional boolean (default `false`). Adds a QEMU guest agent channel; see [Guest agent](#guest-agent). |
 | `shared_dir` | Host folder shared with the guest over virtiofs: `{"source": "shared", "tag": "shared"}`. `source` is `~`-expanded, relative paths live under the repository (the default `shared/` is git-ignored). Needs `virtiofsd` on the host; every QEMU launch starts one per VM and the guest RAM becomes a shared memfd backend. On Linux guests the SSH post-install adds `/mnt/<tag>` to fstab (systemd automount), mounts it and links it as `~/<tag>` and on the desktop (`xdg-user-dir DESKTOP`, `Desktop` or `Scrivania`), like kvm-lab; Windows profiles get WinFSP + `VirtioFsSvc` at first logon, the share appears as a drive letter and a `<tag>.lnk` shortcut lands on the desktop. |
 | `video` | Named QEMU argument sets, see [Video profiles](#video-profiles). Optional `headless` argument list replaces `-display none` for background/unattended boots; QMP and VNC are still added. |
 | `installer_boot` | `kernel` and `initrd` paths inside the ISO for the unattended flows, when they differ from the flow's default (CachyOS: `arch/boot/x86_64/vmlinuz-linux-cachyos`) |
 | `notes` | Free text shown by `vmctl show` |
+
+## Guest agent
+
+Set `"guest_agent": true` in a profile or its `local.json` override, then restart
+the VM to attach the channel. The guest must have `qemu-guest-agent` installed
+and running; Windows also needs the virtio serial driver. Enabling the channel
+does not install guest software. The socket is `runtime/qga.sock` beside the disk.
+
+```sh
+bin/vmctl agent <vm>           # OS information and addresses
+bin/vmctl agent <vm> ping      # Check whether the service answers
+bin/vmctl agent <vm> ip        # IPv4/IPv6 addresses, excluding loopback
+bin/vmctl agent <vm> shutdown  # Submit a guest power-off request
+```
+
+These commands work without SSH. Older agents that lack OS information can
+still report addresses. Requests have a five-second overall timeout.
+`shutdown` reports submission, not confirmed power-off: the
+[QEMU agent protocol](https://www.qemu.org/docs/master/interop/qemu-ga-ref.html#command-guest-shutdown)
+does not send a success response for this asynchronous command.
+`vmctl stop <vm>` tries the agent first when enabled, waits for QEMU to exit,
+then uses the existing ACPI/SSH/signal fallback if needed.
 | `ci` | Boot-check parameters: `accel`, `headless`, `boot_from`, `expect`, `timeout_sec` |
 
 Profiles that add `cloud_init`, `ssh_provision`, `autoinstall`, `archinstall_config`,

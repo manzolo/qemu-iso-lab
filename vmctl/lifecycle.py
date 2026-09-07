@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, report, runtime, ssh, state, ui, windows
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, report, runtime, ssh, state, ui, windows
 from vmctl.errors import VMError
 
 
@@ -204,6 +204,7 @@ def stop_qemu_process(
     qmp_socket: Path | None = None,
     ssh_poweroff_cmd: list[str] | None = None,
     grace_sec: int | None = None,
+    agent_vm: dict[str, Any] | None = None,
 ) -> int:
     grace = ACPI_POWEROFF_GRACE_SEC if grace_sec is None else grace_sec
 
@@ -224,6 +225,21 @@ def stop_qemu_process(
         ui.print_status("ok", f"Would stop {description} (pid {pid})")
         return 0
 
+    # The guest agent asks the operating system directly, so it works where ACPI is ignored
+    # and where there is no SSH server to fall back on (Windows 7).
+    if agent_vm is not None and guest_agent.enabled(agent_vm):
+        ui.print_note("Asking the guest to power off (QEMU guest agent)...")
+        try:
+            guest_agent.shutdown(agent_vm)
+        except VMError as exc:
+            ui.print_status("warn", f"Guest agent shutdown failed: {exc}", ok=False)
+        else:
+            deadline = time.monotonic() + grace
+            while time.monotonic() < deadline:
+                if process_cmdline(pid) is None:
+                    return finalize_stop(f"Stopped {description} (guest agent powered it off)")
+                time.sleep(1)
+            ui.print_status("warn", f"{description} is still up after the agent shutdown", ok=False)
     if qmp_socket is not None and qmp_socket.exists():
         ui.print_note("Asking the guest to power off (ACPI, via QMP)...")
         if qemu.qmp_command(qmp_socket, "system_powerdown"):
@@ -2039,6 +2055,33 @@ def run_verify_after_reboot(
         ssh.post_install_run(vm, command, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
 
 
+def cmd_agent(args: argparse.Namespace) -> int:
+    """Ask the guest itself: alive, what it is, which addresses it holds, or shut it down."""
+    cfg = config.load_config()
+    vm = config.get_vm(cfg, args.vm)
+    if not guest_agent.enabled(vm):
+        raise VMError(f"VM '{args.vm}' does not declare guest_agent: true")
+    if args.dry_run:
+        ui.print_note(f"Would talk to the guest agent on {guest_agent.socket_path(vm)}")
+        return 0
+    action = args.action or "info"
+    if action == "ping":
+        guest_agent.command(vm, "guest-ping")
+        ui.print_status("ok", f"Guest agent answers for '{args.vm}'")
+    elif action == "info":
+        ui.print_header(f"Guest agent: {args.vm}")
+        guest_agent.print_report(args.vm, vm)
+    elif action == "ip":
+        for interface, address in guest_agent.addresses(vm):
+            ui.print_kv(interface, address)
+    elif action == "shutdown":
+        guest_agent.shutdown(vm)
+        ui.print_status("ok", f"Asked '{args.vm}' to power off through the guest agent")
+    else:
+        raise VMError(f"Unknown agent action: {action}")
+    return 0
+
+
 def cmd_post_install(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -2189,6 +2232,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     qmp_socket=qemu.qmp_socket_path(vm),
                     ssh_poweroff_cmd=ssh_poweroff_command(vm),
                     grace_sec=poweroff_grace_sec(vm),
+                    agent_vm=vm,
                 )
         ui.print_status("ok", f"No tracked background VM for '{args.vm}'")
         return 0
@@ -2207,6 +2251,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     qmp_socket=qemu.qmp_socket_path(vm),
                     ssh_poweroff_cmd=ssh_poweroff_command(vm),
                     grace_sec=poweroff_grace_sec(vm),
+                    agent_vm=vm,
                 )
         return 0
 
@@ -2220,6 +2265,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
         qmp_socket=qemu.qmp_socket_path(vm),
         ssh_poweroff_cmd=ssh_poweroff_command(vm),
         grace_sec=poweroff_grace_sec(vm),
+        agent_vm=vm,
     )
 
 

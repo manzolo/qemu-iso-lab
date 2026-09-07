@@ -137,6 +137,8 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
         err("memory_mb must be an integer")
     if "cpus" in vm and not isinstance(vm["cpus"], int):
         err("cpus must be an integer")
+    if "guest_agent" in vm and not isinstance(vm["guest_agent"], bool):
+        err("guest_agent must be a boolean")
 
     meta = vm.get("meta")
     if "meta" in vm:

@@ -558,6 +558,113 @@
         ]
       },
       "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
+    },
+    "ubuntu-gnome-24.04": {
+      "name": "Ubuntu 24.04 LTS (GNOME)",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "unattended"
+      },
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-gnome-24.04/disk.qcow2",
+        "size": "35G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-gnome-24.04/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Ubuntu Server 24.04.4 autoinstall plus the ubuntu-desktop metapackage: the plain GNOME desktop kvm-lab installs, on the same ISO the five flavour profiles already use. gdm3 gets the autologin drop-in and the user joins the autologin and nopasswdlogin groups; the post-install asserts an active local graphical session, not just an enabled service. Expect 40-50 minutes: ubuntu-desktop is the largest metapackage of the family.",
+      "autoinstall": {
+        "hostname": "ubuntu-gnome",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true,
+        "packages": [
+          "ubuntu-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "ubuntu-gnome",
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          },
+          {
+            "path": "/etc/gdm3/custom.conf",
+            "permissions": "0644",
+            "content": "[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl set-default graphical.target",
+          "for dm in gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
+          "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
+          "systemctl enable --now serial-getty@ttyS0.service"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-gnome",
+        "user": "lab",
+        "ssh_host_port": 2248,
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service gdm3.service --package-manager dpkg --package ubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ]
+      },
+      "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433",
+      "guest_agent": true
     }
   }
 }

@@ -28,7 +28,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
      ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "post-install"]),
     ("Run", "use a VM that is already installed",
-     ["start", "stop", "shell", "console", "attach"]),
+     ["start", "stop", "shell", "console", "agent", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
      ["export-libvirt", "unexport-libvirt"]),
     ("Network lab", "pfSense router + Pi-hole DNS + clients on an isolated LAN segment",
@@ -246,6 +246,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--port", type=int, help="local TCP port for the VNC bridge (default: any free port)")
     p.add_argument("--no-viewer", action="store_true", help="only expose the display on 127.0.0.1 and print the address; Ctrl-C to detach")
     p.set_defaults(func=lifecycle.cmd_attach)
+
+    p = _add(subparsers, "agent", help="talk to the QEMU guest agent of a running VM (no SSH needed)")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("action", nargs="?", choices=["info", "ping", "ip", "shutdown"], default="info",
+                   help="info (default): guest name and addresses; ping; ip; shutdown")
+    p.set_defaults(func=lifecycle.cmd_agent)
 
     p = _add(subparsers, "console", help="attach the terminal to the serial console of a running background VM (login on ttyS0, pfSense menu); Ctrl-] detaches")
     p.add_argument("vm", help=VM_HELP)

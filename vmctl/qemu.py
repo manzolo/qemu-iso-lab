@@ -460,6 +460,28 @@ def qmp_socket_path(vm: dict[str, Any]) -> Path:
     return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "qmp.sock"
 
 
+def guest_agent_socket_path(vm: dict[str, Any]) -> Path:
+    """QEMU guest agent channel of a VM, next to its QMP and VNC sockets."""
+    return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "qga.sock"
+
+
+def guest_agent_args(vm: dict[str, Any]) -> list[str]:
+    """``guest_agent: true`` adds the virtio-serial channel the agent listens on.
+
+    Opt-in per profile so the argument list of every other VM stays exactly as it was, and
+    because the channel is only useful where the guest actually runs qemu-guest-agent.
+    """
+    if vm.get("guest_agent") is not True:
+        return []
+    path = guest_agent_socket_path(vm)
+    runtime.ensure_parent(path)
+    return [
+        "-chardev", f"socket,path={path},server=on,wait=off,id=qga0",
+        "-device", "virtio-serial-pci,id=qga-serial",
+        "-device", "virtserialport,bus=qga-serial.0,chardev=qga0,name=org.qemu.guest_agent.0",
+    ]
+
+
 def vnc_socket_path(vm: dict[str, Any]) -> Path:
     """VNC display socket of a headless VM, next to its QMP socket (`vmctl attach`)."""
     return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "vnc.sock"
@@ -597,6 +619,7 @@ def common_args(
         args += ["-vnc", f"unix:{vnc_socket_path(vm)}"]
     else:
         args += video_args(vm, variant)
+    args += guest_agent_args(vm)
     if serial_stdio and serial_socket is not None:
         raise VMError("serial_stdio and serial_socket are mutually exclusive")
     if serial_stdio:
