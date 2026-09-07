@@ -876,7 +876,7 @@
           "command -v niri >/dev/null && niri --version"
         ],
         "verify_after_reboot": [
-          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager pacman --package niri --compositor niri"
+          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager pacman --package niri --compositor niri --process dms"
         ]
       }
     },
@@ -1100,7 +1100,7 @@
           "nvidia-smi 2>/dev/null || echo 'nvidia-smi: no NVIDIA GPU in this VM (expected; the driver is here for bare metal)'"
         ],
         "verify_after_reboot": [
-          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager pacman --package niri --compositor niri"
+          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager pacman --package niri --compositor niri --process dms"
         ]
       }
     },

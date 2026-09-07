@@ -6,6 +6,7 @@ service=display-manager.service
 manager=
 packages=
 compositor=
+process=
 attempts=60
 interval=2
 while [ "$#" -gt 0 ]; do
@@ -16,6 +17,7 @@ while [ "$#" -gt 0 ]; do
         --package-manager) manager=$2 ;;
         --package) packages="$packages $2" ;;
         --compositor) compositor=$2 ;;
+        --process) process=$2 ;;
         --attempts) attempts=$2 ;;
         --interval) interval=$2 ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
@@ -35,6 +37,13 @@ for package in $packages; do
         *) fail "unsupported package manager: $manager" ;;
     esac
 done
+# A shell that draws the bar starts with graphical-session.target, so it appears a little
+# after the session does: waiting for it here is also what makes the report screenshot show
+# a painted desktop instead of an empty compositor.
+shell_ready() {
+    [ -z "$process" ] && return 0
+    pgrep -u "$user" -x "$process" >/dev/null
+}
 session_matches() {
     properties=$(loginctl show-session "$1" -p Name -p Active -p Remote -p Type -p Class 2>/dev/null) || return 1
     printf '%s\n' "$properties" | grep -Fxq "Name=$user" || return 1
@@ -54,8 +63,8 @@ while [ "$attempt" -le "$attempts" ]; do
     if systemctl is-active --quiet "$service"; then
         sessions=$(loginctl list-sessions --no-legend --no-pager 2>/dev/null) || sessions=
         for session in $(printf '%s\n' "$sessions" | awk '{print $1}'); do
-            if session_matches "$session"; then
-                printf 'Desktop ready: %s has an active local graphical session (%s)\n' "$user" "$session"
+            if session_matches "$session" && shell_ready; then
+                printf 'Desktop ready: %s has an active local graphical session (%s)%s\n' "$user" "$session" "${process:+, $process running}"
                 exit 0
             fi
         done
