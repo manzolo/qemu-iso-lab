@@ -7,6 +7,9 @@ sudo apt update
 sudo apt install -y niri dms
 # DankMaterialShell brings its own bar: waybar on top of it paints a second, broken one.
 sudo systemctl --global disable waybar.service || true
+# Nothing would start the DankMaterialShell bar otherwise: the profile installs dms
+# and niri came up bare, exactly as the report screenshot showed.
+sudo systemctl --global enable dms.service || true
 mkdir -p "$HOME/.config/niri"
 command -v niri >/dev/null
 niri --version
