@@ -64,3 +64,5 @@ Copy one profile and change three fields: `iso`/`iso_url` (any `ubuntu-<version>
 the metapackage and the session. 22.04 and 26.04 work the same way; kvm-lab keeps all three
 versions of all five flavors, this repo tracks the current LTS to keep the validation matrix
 short. Personal variants belong in `local.json`, never in a tracked profile.
+
+Post-install now fails unless graphical.target is the default, the desktop metapackage is installed, the display manager is active and the configured user has an active local graphical session. An active greeter alone is not a successful autologin. The check waits up to roughly two minutes for session startup; no live verification was performed for this change.

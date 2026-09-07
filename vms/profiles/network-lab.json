@@ -7,7 +7,9 @@
         "slug": "pfsense",
         "family": "bsd",
         "role": "router",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended",
+        "verified": "2026-09-06"
       },
       "iso": "isos/pfSense-CE-2.7.2-RELEASE-amd64.iso",
       "disk": {
@@ -108,7 +110,9 @@
         "slug": "pihole",
         "family": "debian",
         "role": "server",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-06"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
@@ -223,20 +227,23 @@
         "adlists": [
           "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
         ]
-      }
+      },
+      "iso_sha256": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0"
     },
-    "lubuntu22-lab": {
+    "lubuntu-lab": {
       "name": "Lubuntu 22.04 (network lab client)",
       "meta": {
         "slug": "lubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-06"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/lubuntu22-lab/disk.qcow2",
+        "path": "artifacts/lubuntu-lab/disk.qcow2",
         "size": "30G",
         "format": "qcow2",
         "interface": "virtio"
@@ -245,7 +252,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/lubuntu22-lab/OVMF_VARS.fd"
+        "vars_path": "artifacts/lubuntu-lab/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -335,9 +342,16 @@
         "user": "lab",
         "ssh_host_port": 2239,
         "post_install_run": [
-          "systemctl get-default",
           "sudo cat /etc/netplan/01-vmctl-lab.yaml",
-          "systemctl is-enabled systemd-networkd-wait-online.service || true"
+          "systemctl is-enabled systemd-networkd-wait-online.service || true",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package lubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       },
       "network_lab": {
@@ -345,7 +359,8 @@
         "gateway_vm": "pfsense-lab",
         "hostname": "lubuntu",
         "ip": "192.168.0.100"
-      }
+      },
+      "iso_sha256": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0"
     }
   }
 }

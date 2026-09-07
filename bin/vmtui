@@ -1660,7 +1660,7 @@ lab_menu_loop() {
             "Plan") run_vmctl lab plan || true ;;
             "Status") run_vmctl lab status || true ;;
             "Install")
-                if confirm_box "Install the network lab" "Install pfsense-lab, pihole-lab and lubuntu22-lab from empty disks?\n\nRequires the pfSense CE 2.7.2 ISO (local.json) and downloads Ubuntu 22.04.5.\nRefuses if one of the three disks already exists (Clean first).\n\nExpected time: ~30 min."; then
+                if confirm_box "Install the network lab" "Install pfsense-lab, pihole-lab and lubuntu-lab from empty disks?\n\nRequires the pfSense CE 2.7.2 ISO (local.json) and downloads Ubuntu 22.04.5.\nRefuses if one of the three disks already exists (Clean first).\n\nExpected time: ~30 min."; then
                     run_vmctl lab install || true
                 fi
                 ;;
@@ -1676,7 +1676,7 @@ lab_menu_loop() {
             "Unexport") run_vmctl lab unexport || true ;;
             "Libvirt Round Trip") run_vmctl lab libvirt-test || true ;;
             "Clean")
-                if confirm_box "Clean the network lab" "Stop and remove pfsense-lab, pihole-lab and lubuntu22-lab (disks and artifacts; ISOs are kept)?\n\nRefused while the lab is defined in libvirt (Unexport first)."; then
+                if confirm_box "Clean the network lab" "Stop and remove pfsense-lab, pihole-lab and lubuntu-lab (disks and artifacts; ISOs are kept)?\n\nRefused while the lab is defined in libvirt (Unexport first)."; then
                     run_vmctl lab clean || true
                 fi
                 ;;

@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import vmctl
-from vmctl import disk_inspect, flash, import_dev, lifecycle, ui
+from vmctl import config, disk_inspect, flash, import_dev, lifecycle, ui
 from vmctl.errors import VMError
 
 
@@ -397,6 +397,10 @@ def main() -> int:
 
     parser = build_parser()
     args = parser.parse_args()
+    if getattr(args, "vm", None):
+        args.vm = config.canonical_vm_name(args.vm)
+    if getattr(args, "vms", None):
+        args.vms = [config.canonical_vm_name(name) for name in args.vms]
 
     if args.command == "clean" and not args.all and not args.vm:
         parser.error("clean requires a VM name or --all")

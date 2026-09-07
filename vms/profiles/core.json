@@ -6,16 +6,11 @@
         "slug": "alpine-linux",
         "family": "alpine",
         "role": "ci",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
-      "iso": "isos/alpine-virt-latest-stable-x86_64.iso",
-      "iso_discovery": {
-        "index_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/",
-        "pattern": "href=\"(alpine-virt-\\d+\\.\\d+\\.\\d+-x86_64\\.iso)\"",
-        "sort": "desc",
-        "limit": 1
-      },
-      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
+      "iso": "isos/alpine-virt-3.24.1-x86_64.iso",
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
       "disk": {
         "path": "artifacts/alpine-ci/disk.qcow2",
         "size": "2G",
@@ -55,26 +50,22 @@
         ],
         "expect": "login:",
         "timeout_sec": 180
-      }
+      },
+      "iso_sha256": "e73a6241bd5f3c5c2d4d38c02cc52c378c0415a7c888bd292066bf36e0f41a39"
     },
-    "alpine-installed-ci": {
+    "alpine-ci-installed": {
       "name": "Alpine Linux Virt Installed CI",
       "meta": {
         "slug": "alpine-linux",
         "family": "alpine",
         "role": "ci-installed",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
-      "iso": "isos/alpine-virt-latest-stable-x86_64.iso",
-      "iso_discovery": {
-        "index_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/",
-        "pattern": "href=\"(alpine-virt-\\d+\\.\\d+\\.\\d+-x86_64\\.iso)\"",
-        "sort": "desc",
-        "limit": 1
-      },
-      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
+      "iso": "isos/alpine-virt-3.24.1-x86_64.iso",
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
       "disk": {
-        "path": "artifacts/alpine-installed-ci/disk.qcow2",
+        "path": "artifacts/alpine-ci-installed/disk.qcow2",
         "size": "2G",
         "format": "qcow2",
         "interface": "virtio"
@@ -103,7 +94,8 @@
         "boot_from": "disk",
         "expect": "login:",
         "timeout_sec": 120
-      }
+      },
+      "iso_sha256": "e73a6241bd5f3c5c2d4d38c02cc52c378c0415a7c888bd292066bf36e0f41a39"
     }
   }
 }

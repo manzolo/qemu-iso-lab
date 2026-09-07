@@ -6,10 +6,11 @@
         "slug": "fedora-workstation",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
       "disk": {
         "path": "artifacts/fedora-cinnamon/disk.qcow2",
         "size": "32G",
@@ -44,7 +45,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "673e96e3c8defa8245df35fd722bab207df74011c4fc32b71578294a33e979ba"
     },
     "fedora-server": {
       "name": "Fedora Server 42 Netinst",
@@ -52,10 +54,11 @@
         "slug": "fedora-workstation",
         "family": "fedora",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "disk": {
         "path": "artifacts/fedora-server/disk.qcow2",
         "size": "20G",
@@ -90,7 +93,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "231f3e0d1dc8f565c01a9f641b3d16c49cae44530074bc2047fe2373a721c82f"
     },
     "fedora-server-efi": {
       "name": "Fedora Server 42 EFI Baseline",
@@ -98,10 +102,11 @@
         "slug": "fedora-server",
         "family": "fedora",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "disk": {
         "path": "artifacts/fedora-server-efi/disk.qcow2",
         "size": "20G",
@@ -140,7 +145,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "231f3e0d1dc8f565c01a9f641b3d16c49cae44530074bc2047fe2373a721c82f"
     },
     "fedora-workstation": {
       "name": "Fedora Workstation 42",
@@ -148,10 +154,11 @@
         "slug": "fedora-workstation",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Workstation-Live-42-1.1.x86_64.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
       "disk": {
         "path": "artifacts/fedora-workstation/disk.qcow2",
         "size": "36G",
@@ -186,7 +193,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "98958d80e8a80eabe61275337f969c8e2212adc3a223d9bbdab9411bb1c95cba"
     },
     "fedora-xfce": {
       "name": "Fedora Xfce 42",
@@ -194,10 +202,11 @@
         "slug": "fedora-workstation",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Xfce-Live-42-1.1.x86_64.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
       "disk": {
         "path": "artifacts/fedora-xfce/disk.qcow2",
         "size": "28G",
@@ -232,15 +241,17 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "c458667014c2e97e026a4bfc94b25899ee8777569734b0559665c50ae267a66d"
     },
-    "fedora-niri-dms-local": {
+    "fedora-niri-dms": {
       "name": "Fedora 44 + niri + DankMaterialShell (Local)",
       "meta": {
         "slug": "fedora",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended"
       },
       "iso": "isos/Fedora-Everything-netinst-x86_64-44.iso",
       "iso_discovery": {
@@ -251,7 +262,7 @@
       },
       "iso_url": "https://fedora.mirror.garr.it/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
       "disk": {
-        "path": "artifacts/fedora-niri-dms-local/disk.qcow2",
+        "path": "artifacts/fedora-niri-dms/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -260,7 +271,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/fedora-niri-dms-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/fedora-niri-dms/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 8192,
@@ -295,9 +306,9 @@
         }
       },
       "usb_tablet": true,
-      "notes": "Same niri + DankMaterialShell desktop as arch-dms-local, on Fedora 44: kickstart from the Everything netinst (inst_repo points at the online repository), niri/quickshell from Fedora, DMS from the avengemedia COPRs in post-install. SELinux stays permissive because greetd is not covered by the Fedora policy.",
+      "notes": "Same niri + DankMaterialShell desktop as arch-dms, on Fedora 44: kickstart from the Everything netinst (inst_repo points at the online repository), niri/quickshell from Fedora, DMS from the avengemedia COPRs in post-install. SELinux stays permissive because greetd is not covered by the Fedora policy.",
       "kickstart_config": {
-        "hostname": "fedora-niri-dms-local",
+        "hostname": "fedora-niri-dms",
         "username": "lab",
         "fullname": "Lab",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
@@ -367,25 +378,31 @@
         "firewall": "enabled"
       },
       "ssh_provision": {
-        "hostname": "fedora-niri-dms-local",
+        "hostname": "fedora-niri-dms",
         "user": "lab",
         "ssh_host_port": 2233,
         "copy_from_host": [
           {
-            "source": "vms/profile-files/fedora-niri-dms-local/bin/fedora-dms-post-install",
+            "source": "vms/profile-files/fedora-niri-dms/bin/fedora-dms-post-install",
             "dest": "/home/{{user}}/bin/fedora-dms-post-install",
             "dest_mode": "755"
           },
           {
-            "source": "vms/profile-files/arch-dms-local/niri/config.kdl",
+            "source": "vms/profile-files/arch-dms/niri/config.kdl",
             "dest": "/home/{{user}}/.config/niri/config.kdl",
             "dest_mode": "644"
+          },
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
           }
         ],
         "post_install_run": [
           "~/bin/fedora-dms-post-install",
-          "command -v dms >/dev/null && dms version || true",
-          "niri --version"
+          "command -v dms >/dev/null && dms version",
+          "niri --version",
+          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager rpm --package niri --compositor niri"
         ]
       }
     },
@@ -395,7 +412,9 @@
         "slug": "silverblue",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/Fedora-Silverblue-ostree-x86_64-44-1.7.iso",
       "iso_urls": [
@@ -475,10 +494,18 @@
         "ssh_key": null,
         "post_install_run": [
           "rpm-ostree status",
-          "systemctl get-default",
-          "sudo rpm-ostree install --idempotent --allow-inactive qemu-guest-agent spice-vdagent || echo 'layering skipped'"
+          "sudo rpm-ostree install --idempotent --allow-inactive qemu-guest-agent spice-vdagent || echo 'layering skipped'",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager rpm --package gnome-shell"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
-      }
+      },
+      "iso_sha256": "9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682"
     }
   }
 }

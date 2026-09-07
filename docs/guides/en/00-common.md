@@ -58,7 +58,7 @@ Example: change user, SSH key and shared folder of a profile.
 ```json
 {
   "vms": {
-    "arch-dms-local": {
+    "arch-dms": {
       "archinstall_config": { "username": "YOUR_USER", "password": "YOUR_PASSWORD" },
       "ssh_provision": { "user": "YOUR_USER", "ssh_key": "~/.ssh/id_ed25519" },
       "shared_dir": { "source": "~/Workspaces/qemu/storage/shared", "tag": "shared" }
@@ -117,3 +117,9 @@ Golden rule of every flow: the completion token is printed **after** `sync` and
 `blockdev --flushbufs`, and the host waits for the guest to power itself off. If an install
 looks successful but the first boot ends in `grub rescue>`, it is almost always this
 sequence that was broken.
+
+## Profile name migration
+
+Old profile names remain accepted with a deprecation warning. Preview disk-directory migration with `python3 tools/migrate_profile_names.py --root /path/to/checkout`; stop affected VMs and switch that checkout to the renamed catalog before adding `--apply`. `--local-config /path/to/local.json` backs up and updates personal overrides. SSH ports are unchanged.
+
+`vmctl list` shows `manual`, `unattended` or `experimental` and the last recorded live PASS date. An absent date means no date is recorded. Historical verification is separate from the current HTML report result; unit tests and dry runs never advance it.

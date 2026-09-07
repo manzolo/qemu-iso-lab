@@ -6,7 +6,8 @@
         "slug": "freebsd",
         "family": "bsd",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/FreeBSD-14.3-RELEASE-amd64-disc1.iso",
       "iso_url": "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/FreeBSD-14.3-RELEASE-amd64-disc1.iso",
@@ -42,7 +43,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "f564822bc72d420d1e1a6faacb72f6056d828fcf539dfafd52e08503ef5fab68"
     }
   }
 }

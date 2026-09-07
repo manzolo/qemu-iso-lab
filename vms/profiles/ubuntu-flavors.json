@@ -6,7 +6,9 @@
         "slug": "lubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -98,11 +100,17 @@
         "user": "lab",
         "ssh_host_port": 2240,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled sddm",
-          "dpkg-query -W -f='${Status}\\n' lubuntu-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package lubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
-      }
+      },
+      "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
     },
     "kubuntu-24.04": {
       "name": "Kubuntu 24.04 LTS (KDE Plasma)",
@@ -110,7 +118,9 @@
         "slug": "kubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -202,11 +212,17 @@
         "user": "lab",
         "ssh_host_port": 2241,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled sddm",
-          "dpkg-query -W -f='${Status}\\n' kubuntu-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package kubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
-      }
+      },
+      "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
     },
     "xubuntu-24.04": {
       "name": "Xubuntu 24.04 LTS (Xfce)",
@@ -214,7 +230,9 @@
         "slug": "xubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -306,11 +324,17 @@
         "user": "lab",
         "ssh_host_port": 2242,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled lightdm",
-          "dpkg-query -W -f='${Status}\\n' xubuntu-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package xubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
-      }
+      },
+      "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
     },
     "ubuntu-mate-24.04": {
       "name": "Ubuntu MATE 24.04 LTS",
@@ -318,7 +342,9 @@
         "slug": "ubuntu-mate",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -410,11 +436,17 @@
         "user": "lab",
         "ssh_host_port": 2243,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled lightdm",
-          "dpkg-query -W -f='${Status}\\n' ubuntu-mate-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package ubuntu-mate-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
-      }
+      },
+      "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
     },
     "ubuntu-budgie-24.04": {
       "name": "Ubuntu Budgie 24.04 LTS",
@@ -422,7 +454,8 @@
         "slug": "ubuntu-budgie",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "experimental"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -514,11 +547,17 @@
         "user": "lab",
         "ssh_host_port": 2244,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled lightdm",
-          "dpkg-query -W -f='${Status}\\n' ubuntu-budgie-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package ubuntu-budgie-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
-      }
+      },
+      "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
     }
   }
 }

@@ -183,6 +183,8 @@ def record(vm_name: str, vm: dict[str, Any], args: argparse.Namespace, status: s
     if not screenshot.exists():
         detail += "; " + (error or "Screenshot unavailable: no live framebuffer captured")
     result = {"id": vm_name, "name": vm.get("name", vm_name), "flow": flow,
+              "profile_status": vm.get("meta", {}).get("status", "manual"),
+              "profile_verified": vm.get("meta", {}).get("verified"),
               "status": outcome, "phase": getattr(args, "_report_phase", "validation"),
               "seconds": round(seconds, 3), "detail": detail,
               "screenshot": f"screens/{vm_name}.png" if screenshot.exists() else None}
@@ -229,7 +231,9 @@ def render_html(results: list[dict[str, Any]], metadata: dict[str, str], directo
         duration = f"{minutes}m {remaining:02d}s" if minutes else f"{remaining}s"
         rows.append(
             f'<tr data-vm="{esc(str(result.get("name", "")) + " " + str(result.get("id", "")))}" data-status="{status}"><td class="vm-cell"><span class="row-number">{index:02d}</span><div><strong>{esc(result.get("name", ""))}</strong>'
-            f'<code>{esc(result.get("id", ""))}</code></div></td>'
+            f'<code>{esc(result.get("id", ""))}</code>'
+            f'<small class="profile-meta">Profile status: {esc(result.get("profile_status") or "not recorded")}</small>'
+            f'<small class="profile-meta">Last live PASS: {esc(result.get("profile_verified") or "not recorded")}</small></div></td>'
             f'<td><code class="flow">{esc(result.get("flow", ""))}</code></td>'
             f'<td><button type="button" class="badge {status}" data-status="{status}" title="Show only {status} results"><i></i>{status}</button></td>'
             f'<td><span class="phase">{esc(result.get("phase", ""))}</span></td>'
@@ -256,6 +260,7 @@ letter-spacing:.18em;font-size:11px;font-weight:700;color:var(--blue);display:fl
 display:inline-grid;place-items:center;border:1px solid #45638c;border-radius:7px;background:#1b2a40;font-size:15px;letter-spacing:0}
 h1{font-size:32px;line-height:1.2;letter-spacing:-.035em;margin:15px 0 10px;font-weight:650}.subtitle{margin:0;color:var(--muted)}
 .run-state{padding:10px 16px;border:1px solid var(--line);border-radius:30px;font-weight:600;white-space:nowrap}
+.profile-meta{display:block;color:var(--muted);font-size:11px;margin-top:6px}
 .metadata{display:flex;flex-wrap:wrap;gap:28px;border-top:1px solid var(--line);padding-top:20px;margin-bottom:28px}
 .metadata div{display:flex;gap:10px;align-items:center}.metadata span{text-transform:uppercase;font-size:10px;letter-spacing:.12em;color:var(--muted)}
 .metadata strong{font-size:12px;font-weight:500;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}

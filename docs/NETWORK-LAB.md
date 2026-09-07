@@ -9,7 +9,7 @@ Internet ──► slirp WAN (QEMU user netdev) ──► pfsense-lab  WAN: DHCP
                                                   │
                                     segment lab-lan (192.168.0.0/24, domain qlan)
                                     ├── pihole-lab      192.168.0.10   DNS + DHCP .150-.199
-                                    ├── lubuntu22-lab   192.168.0.100  desktop client
+                                    ├── lubuntu-lab   192.168.0.100  desktop client
                                     ├── other VMs       `vmctl lab attach <vm>`
                                     └── host            192.168.0.254  (libvirt road only)
 ```
@@ -18,7 +18,7 @@ Profiles: `vms/profiles/network-lab.json`. Commands:
 
 ```bash
 vmctl lab plan                 # topology, port forwards, install order, libvirt network XML
-vmctl lab install              # pfsense-lab -> pihole-lab -> lubuntu22-lab, from empty disks (--export: then hand it to libvirt)
+vmctl lab install              # pfsense-lab -> pihole-lab -> lubuntu-lab, from empty disks (--export: then hand it to libvirt)
 vmctl lab up                   # start the three VMs headless in the background, in order
 vmctl lab status               # role, address, disk and runtime state of every member
 vmctl lab down                 # stop them in reverse order
@@ -27,7 +27,7 @@ vmctl lab export               # lab down, export-libvirt of the three VMs (lab-
 vmctl lab unexport             # virsh shutdown (waited), unexport-libvirt, back to plain QEMU
 vmctl lab libvirt-test         # export + check + unexport in one go (--keep leaves it in libvirt)
 vmctl lab clean                # stop and remove the three VMs (disks + artifacts, ISOs kept); refuses while the lab is in libvirt
-vmctl lab attach arch-dms-local --apply   # put another profile on lab-lan (writes local.json)
+vmctl lab attach arch-dms --apply   # put another profile on lab-lan (writes local.json)
 ```
 
 From zero to virt-manager in one line: `vmctl lab clean && vmctl lab install --export`.
@@ -104,7 +104,7 @@ The router's WAN NIC forwards:
 | `127.0.0.1:2237` | pfSense `:22` | `vmctl shell pfsense-lab` (the project key is in the pfSense accounts) |
 | `127.0.0.1:8081` | pfSense `:8081` → NAT → `192.168.0.10:80` | Pi-hole web UI: `http://127.0.0.1:8081/admin/` |
 | `127.0.0.1:2238` | pfSense `:2238` → NAT → `192.168.0.10:22` | `vmctl shell pihole-lab` |
-| `127.0.0.1:2239` | pfSense `:2239` → NAT → `192.168.0.100:22` | `vmctl shell lubuntu22-lab` |
+| `127.0.0.1:2239` | pfSense `:2239` → NAT → `192.168.0.100:22` | `vmctl shell lubuntu-lab` |
 
 The rendered `config.xml` carries the matching WAN pass rules (GUI and SSH to
 the WAN address) and the NAT rules; `topology()` refuses a router profile whose

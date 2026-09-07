@@ -56,7 +56,7 @@ stdio, so `console` is for installed VMs.
 ## Ubuntu: autoinstall
 
 ```bash
-vmctl bootstrap-unattended ubuntu-niri-local
+vmctl bootstrap-unattended ubuntu-niri-gl
 ```
 
 Generates the cloud-init seed and the `autoinstall` seed, extracts
@@ -65,10 +65,10 @@ waits for the installer to exit, then starts the installed VM and runs
 `cloud_init.post_install_run` / `ssh_provision`. Step by step:
 
 ```bash
-vmctl prep ubuntu-niri-local
-vmctl install-unattended ubuntu-niri-local
-vmctl start ubuntu-niri-local --headless --background
-vmctl post-install ubuntu-niri-local
+vmctl prep ubuntu-niri-gl
+vmctl install-unattended ubuntu-niri-gl
+vmctl start ubuntu-niri-gl --headless --background
+vmctl post-install ubuntu-niri-gl
 ```
 
 ## Debian: preseed
@@ -85,7 +85,7 @@ waits for `==> Debian preseed install complete!` on the serial console.
 
 ```bash
 vmctl bootstrap-kickstart almalinux-server
-vmctl bootstrap-kickstart fedora-niri-dms-local
+vmctl bootstrap-kickstart fedora-niri-dms
 ```
 
 Renders `ks.cfg` into a `KS_CFG` seed ISO, extracts `vmlinuz` and `initrd.img`,
@@ -96,7 +96,7 @@ when the profile provides one.
 
 The install source is `kickstart_config.inst_repo`: `cdrom` (default) for a
 full ISO such as AlmaLinux minimal, or a repository URL for a netinst image.
-`fedora-niri-dms-local` boots the Fedora Everything netinst and points
+`fedora-niri-dms` boots the Fedora Everything netinst and points
 `inst_repo` at the online Fedora 44 repository, so anaconda fetches both its
 stage2 image and the packages from the network; the rendered kickstart carries
 the matching `url --url=` directive. `ignore_missing_packages: true` renders
@@ -188,7 +188,7 @@ Another version or another desktop is a profile, not a patch.
 ## Arch: pacstrap script
 
 ```bash
-vmctl bootstrap-archinstall arch-dms-local
+vmctl bootstrap-archinstall arch-dms
 ```
 
 Generates a self-contained `install.sh` (sgdisk, pacstrap, arch-chroot, GRUB,
@@ -206,7 +206,7 @@ live ISO for you to run `archinstall` by hand.
 ### CachyOS on the same flow
 
 ```bash
-vmctl bootstrap-archinstall cachyos-nvidia-local
+vmctl bootstrap-archinstall cachyos-nvidia
 ```
 
 The CachyOS desktop ISO is an archiso too (label `COS_YYYYMM`, squashfs under
@@ -237,7 +237,7 @@ Noctalia shell and the CachyOS niri defaults; `bootstrap_chroot_commands`
 enable SDDM with autologin into the niri session. The bootstrap script also
 waits for archiso's `pacman-init` and for DNS before pacstrap, since the serial
 login prompt shows up before either is ready. Calamares remains available for a
-manual install (`vmctl install`). The `cachyos` profile (fixed VHD for Ventoy)
+manual install (`vmctl install`). The `cachyos-live` profile (fixed VHD for Ventoy)
 stays interactive.
 
 Keep the CachyOS niri/Noctalia configuration from `/etc/skel`: do not copy an
@@ -266,7 +266,7 @@ unkillable at the following shutdown. The bootstrap therefore writes
 and includes it from the CachyOS `config.kdl`, leaving the power button to
 logind (`HandlePowerKey=poweroff`). The post-install fails if the compositor
 still holds that inhibitor. The niri configurations shipped for
-`arch-noctalia-local`, `arch-dms-local` and `alpine-niri` carry the same option.
+`arch-noctalia`, `arch-dms` and `alpine-niri` carry the same option.
 
 To repair an existing guest affected by those imports, first remove the two
 `copy_from_host` entries from its local override. Inside the guest, back up
@@ -277,7 +277,7 @@ autostart and shortcuts while keeping the old configuration in the backup.
 ## Omarchy: cidata
 
 ```bash
-vmctl bootstrap-omarchy arch-omarchy-nvidia-local
+vmctl bootstrap-omarchy arch-omarchy-nvidia
 ```
 
 Uses the official Omarchy ISO and its supported unattended `cidata` mechanism:
@@ -524,7 +524,7 @@ heavier bootstrap flows:
 
 ```bash
 vmctl check-vms
-vmctl check-vms ubuntu-niri arch-noctalia-local --timeout 600
+vmctl check-vms ubuntu-niri arch-noctalia --timeout 600
 vmctl check-vms --parallel 4 --clean-first
 ```
 

@@ -1,7 +1,7 @@
 # AlmaLinux, Rocky, Fedora and Silverblue via kickstart
 
-Profiles: `almalinux-server` (SSH 2229, from the minimal ISO), `rocky9` (2245, the same
-recipe on Rocky Linux 9), `fedora-niri-dms-local` (2233, from the Everything netinst plus
+Profiles: `almalinux-server` (SSH 2229, from the minimal ISO), `rocky-9` (2245, the same
+recipe on Rocky Linux 9), `fedora-niri-dms` (2233, from the Everything netinst plus
 online repositories) and `fedora-silverblue` (2246, the immutable one). Flow
 `bootstrap-kickstart` with Anaconda in text mode. Time: 10 minutes Alma and Rocky, 20-30
 Fedora, 25-35 Silverblue.
@@ -17,7 +17,7 @@ Fedora, 25-35 Silverblue.
 
 ```bash
 vmctl bootstrap-kickstart almalinux-server
-vmctl bootstrap-kickstart fedora-niri-dms-local
+vmctl bootstrap-kickstart fedora-niri-dms
 ```
 
 ## 3. What happens
@@ -59,12 +59,12 @@ text menu and asks for confirmation where the kickstart is incomplete.
 
 ## 6. Rocky Linux 9
 
-`rocky9` is `almalinux-server` with another ISO: same kickstart, install source on the media
+`rocky-9` is `almalinux-server` with another ISO: same kickstart, install source on the media
 (`inst.repo=cdrom`), `@^minimal-environment`, SELinux enforcing.
 
 ```bash
-vmctl bootstrap-kickstart rocky9
-vmctl shell rocky9 -- cat /etc/rocky-release
+vmctl bootstrap-kickstart rocky-9
+vmctl shell rocky-9 -- cat /etc/rocky-release
 ```
 
 ## 7. Fedora Silverblue (immutable)

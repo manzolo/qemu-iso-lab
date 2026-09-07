@@ -11,8 +11,8 @@ Usage:
     - an already-mounted mountpoint (e.g. /run/media/user/Ventoy)
 
 Examples:
-  sudo bin/ventoy-copy /dev/sdb1 artifacts/cachyos/disk.vhd
-  sudo bin/ventoy-copy /run/media/user/Ventoy artifacts/cachyos/disk.vhd
+  sudo bin/ventoy-copy /dev/sdb1 artifacts/cachyos-live/disk.vhd
+  sudo bin/ventoy-copy /run/media/user/Ventoy artifacts/cachyos-live/disk.vhd
 
 Notes:
   - The file is copied with the .vtoy suffix required by Ventoy

@@ -1,6 +1,6 @@
 # Arch GRUB Boot Fix
 
-`bootstrap-archinstall` uses a shared Arch bootstrap script. The `arch-noctalia-local`
+`bootstrap-archinstall` uses a shared Arch bootstrap script. The `arch-noctalia`
 first reboot once reached the UEFI GRUB loader and then dropped to the minimal
 `grub>` prompt.
 

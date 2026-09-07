@@ -1,90 +1,43 @@
-# Profile TODO
+# Profile status and backlog
 
-This document tracks VM profile gaps that would improve coverage across
-firmware types, install styles, operating system families, and CI flows.
+## Selection rule
 
-## Selection Rule
+Add profiles that cover a new axis: firmware, installation flow, operating system family, graphical session, recovery tooling or installed-disk validation. Keep Alpine CI small.
 
-New profiles should add at least one new coverage axis instead of being only
-"another distro". Useful axes include:
+## Implemented
 
-- `bios` vs `efi`
-- `pc` vs `q35`
-- manual install vs unattended install
-- ISO boot vs installed-disk boot
-- desktop vs headless/server
-- Linux vs non-Linux
-- live/rescue vs normal installer
-- graphical validation vs serial-console validation
+- BIOS/EFI baselines: `debian-bios`, `debian-efi`, `fedora-server-efi` and the Alpine CI pair.
+- Automated servers: `debian-server` (preseed), `almalinux-server` and `rocky-9` (kickstart), `ubuntu-server-ci` (autoinstall plus disk boot).
+- Windows installation: `windows10-unattended`, `windows11-unattended`, `windows7-unattended`; import templates remain available separately.
+- Immutable desktop: `fedora-silverblue` with ostree kickstart.
+- openSUSE automation: `opensuse-tumbleweed-autoyast`.
+- Ubuntu desktop flavors: five autoinstall recipes with explicit package, display-manager and graphical-session checks.
+- Network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab`.
+- Non-Linux manual coverage: `freebsd`.
+- Canonical names with legacy aliases, safe host-directory migration and pinned CI media with vendor checksums.
 
-## First Wave
+## Status semantics
 
-These are the first five profiles to implement.
+Every tracked profile has `meta.status`:
 
-1. `alpine-installed-ci` - implemented
-   Minimal installed-on-disk follow-up to `alpine-ci`.
-   Coverage added: unattended-ish CI path, disk boot after install, stronger CI smoke test.
+- `manual`: interactive installation, live media or an import template; automation may still boot or inspect it.
+- `unattended`: an automated installation/provisioning recipe exists; this is not a claim that this revision passed a live test.
+- `experimental`: a known incomplete or unsettled flow. Currently Budgie (autologin still needs live verification), the package-only Ubuntu niri recipes and the custom Omarchy/NVIDIA flow.
 
-2. `debian-efi` - implemented
-   Small Debian EFI baseline for manual install coverage.
-   Coverage added: conservative EFI baseline for a mainstream Debian guest.
+`meta.verified` is the last live PASS date supplied by the maintainer. It is omitted when no date is recorded, and is never updated by unit tests or dry runs. A historical date does not certify subsequent profile changes. The list and HTML report show both fields separately from the current run's PASS/FAIL result.
 
-3. `debian-bios` - implemented
-   Normal BIOS Debian guest outside the ultra-minimal Alpine CI case.
-   Coverage added: BIOS regression coverage for a mainstream installer guest.
+Recorded dates:
 
-4. `fedora-server-efi` - implemented
-   Fedora Server EFI baseline kept as a manual install profile.
-   Coverage added: conservative Fedora Server EFI baseline without relying on fragile netinst automation.
+- 2026-09-07: `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `rocky-9`, `fedora-silverblue`, `opensuse-tumbleweed-autoyast`.
+- 2026-09-06: the three network-lab profiles and all Windows profiles.
+- Budgie has no recorded PASS date.
 
-5. `freebsd` - implemented
-   Non-Linux guest for broader compatibility validation.
-   Coverage added: different bootloader, device naming, serial behavior, and provisioning assumptions.
+## Remaining work
 
-## Backlog
-
-These are useful after the first wave.
-
-- `debian-server` - implemented
-  Automated Debian preseed server profile with SSH post-install.
-  Coverage added: non-Ubuntu unattended install path, EFI server bootstrap, serial token completion flow.
-
-- `almalinux-server` - implemented
-  Automated AlmaLinux kickstart server profile with SSH post-install.
-  Coverage added: enterprise-style unattended install path, RHEL-family provisioning, serial token completion flow.
-
-- `ubuntu-server-headless`
-  Headless, SSH-oriented server baseline for shell and post-install workflows.
-
-- `windows11-installer`
-  True Windows installer profile, separate from the current import templates.
-
-- `almalinux` or `rockylinux`
-  Stable enterprise-style Linux profile distinct from rolling/open desktop guests.
-
-- `immutable-desktop`
-  Example: Fedora Silverblue or openSUSE Aeon/Kalpa.
-  Useful for testing provisioning assumptions on image-based desktop systems.
-
-## Notes By Area
-
-### CI
-
-- Extend CI from "boot installer ISO until prompt" to "install minimal guest, then boot from disk".
-- Add at least one reliable EFI-oriented CI guest once a serial-visible boot milestone is identified.
-
-### Firmware
-
-- Keep at least one mainstream `bios` guest in addition to `alpine-ci`.
-- Maintain both `pc` and `q35` examples where the guest actually benefits from the distinction.
-
-### Automation
-
-- Avoid making Ubuntu autoinstall the only documented unattended path.
-- Keep Debian preseed and Alma/RHEL kickstart unattended flows healthy as first-class bootstrap paths, not one-off experiments.
-- Add focused local dry-run and CI validation whenever a new unattended/bootstrap path is introduced.
-
-### Compatibility
-
-- Keep one non-Linux guest in the catalog for broader QEMU/device assumptions.
-- Keep one rescue/live profile for disk tooling and troubleshooting workflows.
+- Validate Budgie autologin live with the new session assertions; promote it only after a real PASS.
+- Revalidate the modified desktop assertions on installed guests, including greetd and OpenRC differences.
+- Add a dedicated live/rescue profile for disk and boot repair.
+- Consider a small Alpine EFI smoke profile alongside the BIOS baseline.
+- Automate a FreeBSD installation to test provisioning assumptions outside Linux.
+- Retrieve matching vendor checksums for discovery-selected Alpine/Fedora images; do not attach a static hash to a changing URL.
+- Replace or investigate the two mismatching local Fedora ISO files listed in `ISO_CHECKSUMS.md`; preserve the official checksums.

@@ -6,10 +6,11 @@
         "slug": "debian",
         "family": "debian",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/debian-live-13.4.0-amd64-gnome.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
       "disk": {
         "path": "artifacts/debian-gnome-live/disk.qcow2",
         "size": "28G",
@@ -44,7 +45,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "2c87761c60115c9323f306f386c2253eb4fc21e050187ab2bceede9da64713e3"
     },
     "debian-netinst": {
       "name": "Debian 13 Netinst",
@@ -52,10 +54,11 @@
         "slug": "debian",
         "family": "debian",
         "role": "installer",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
       "disk": {
         "path": "artifacts/debian-netinst/disk.qcow2",
         "size": "20G",
@@ -87,7 +90,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc"
     },
     "debian-efi": {
       "name": "Debian 13 EFI Baseline",
@@ -95,10 +99,11 @@
         "slug": "debian",
         "family": "debian",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
       "disk": {
         "path": "artifacts/debian-efi/disk.qcow2",
         "size": "20G",
@@ -137,7 +142,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc"
     },
     "debian-bios": {
       "name": "Debian 13 BIOS Baseline",
@@ -145,10 +151,11 @@
         "slug": "debian",
         "family": "debian",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
       "disk": {
         "path": "artifacts/debian-bios/disk.qcow2",
         "size": "20G",
@@ -184,7 +191,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc"
     },
     "debian-server": {
       "name": "Debian 13 Server (Preseed)",
@@ -192,10 +200,11 @@
         "slug": "debian",
         "family": "debian",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
       "disk": {
         "path": "artifacts/debian-server/disk.qcow2",
         "size": "20G",
@@ -248,8 +257,16 @@
         "country": "US",
         "mirror_hostname": "deb.debian.org",
         "mirror_directory": "/debian",
-        "tasks": ["standard"],
-        "packages": ["openssh-server", "sudo", "curl", "ca-certificates", "locales"],
+        "tasks": [
+          "standard"
+        ],
+        "packages": [
+          "openssh-server",
+          "sudo",
+          "curl",
+          "ca-certificates",
+          "locales"
+        ],
         "late_commands": [
           "sed -i 's/^# *it_IT.UTF-8 UTF-8/it_IT.UTF-8 UTF-8/' /etc/locale.gen",
           "locale-gen",
@@ -261,20 +278,22 @@
         "user": "lab",
         "ssh_host_port": 2228,
         "ssh_key": null
-      }
+      },
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc"
     },
-    "ubuntu-desktop": {
+    "ubuntu-desktop-live": {
       "name": "Ubuntu 26.04 Desktop",
       "meta": {
         "slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "manual"
       },
       "iso": "isos/ubuntu-26.04-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-desktop-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-desktop/disk.qcow2",
+        "path": "artifacts/ubuntu-desktop-live/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -283,7 +302,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-desktop/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-desktop-live/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -311,20 +330,22 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "487f87faaf547ea30e0aba4d5b53346292571256b25333a978db1692bcee9dd2"
     },
-    "ubuntu-server": {
+    "ubuntu-server-live": {
       "name": "Ubuntu 26.04 Server",
       "meta": {
         "slug": "ubuntu",
         "family": "debian",
         "role": "server",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "manual"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-server/disk.qcow2",
+        "path": "artifacts/ubuntu-server-live/disk.qcow2",
         "size": "20G",
         "format": "qcow2",
         "interface": "virtio"
@@ -333,7 +354,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-server/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-server-live/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 2048,
@@ -361,20 +382,22 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
     },
-    "ubuntu-server-headless": {
+    "ubuntu-server-ci": {
       "name": "Ubuntu 26.04 Server Headless CI",
       "meta": {
         "slug": "ubuntu",
         "family": "debian",
         "role": "ci-installed",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-server-headless/disk.qcow2",
+        "path": "artifacts/ubuntu-server-ci/disk.qcow2",
         "size": "16G",
         "format": "qcow2",
         "interface": "virtio"
@@ -383,7 +406,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-server-headless/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-server-ci/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 2048,
@@ -413,7 +436,7 @@
       },
       "usb_tablet": true,
       "autoinstall": {
-        "hostname": "ubuntu-server-headless",
+        "hostname": "ubuntu-server-ci",
         "username": "lab",
         "realname": "Lab User",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
@@ -423,7 +446,7 @@
         "install_ssh": true
       },
       "cloud_init": {
-        "hostname": "ubuntu-server-headless",
+        "hostname": "ubuntu-server-ci",
         "user": "lab",
         "ssh_host_port": 2290,
         "write_files": [
@@ -456,7 +479,8 @@
         "boot_from": "disk",
         "expect": "__VMCTL_UBUNTU_SERVER_HEADLESS_BOOTED__",
         "timeout_sec": 240
-      }
+      },
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
     },
     "ubuntu-niri": {
       "name": "Ubuntu 26.04 Niri",
@@ -464,7 +488,8 @@
         "slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "experimental"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -551,22 +576,25 @@
           }
         ],
         "post_install_run": [
-          "~/bin/ubuntu-niri-post-install"
+          "~/bin/ubuntu-niri-post-install",
+          "test \"$(dpkg-query -W -f='${Status}' niri)\" = \"install ok installed\" && test \"$(dpkg-query -W -f='${Status}' dms)\" = \"install ok installed\""
         ]
-      }
+      },
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
     },
-    "ubuntu-niri-local": {
+    "ubuntu-niri-gl": {
       "name": "Ubuntu 26.04 Niri",
       "meta": {
         "catalog_slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "experimental"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-niri-local/disk.qcow2",
+        "path": "artifacts/ubuntu-niri-gl/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -575,7 +603,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-niri-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-niri-gl/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -613,7 +641,7 @@
       },
       "usb_tablet": true,
       "autoinstall": {
-        "hostname": "ubuntu-niri-local",
+        "hostname": "ubuntu-niri-gl",
         "username": "lab",
         "realname": "{{user}}",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
@@ -623,7 +651,7 @@
         "install_ssh": true
       },
       "cloud_init": {
-        "hostname": "ubuntu-niri-local",
+        "hostname": "ubuntu-niri-gl",
         "user": "lab",
         "ssh_host_port": 2227,
         "packages": [
@@ -643,15 +671,17 @@
         ],
         "copy_from_host": [
           {
-            "source": "vms/profile-files/ubuntu-niri-local/bin/ubuntu-niri-local-post-install",
-            "dest": "/home/{{user}}/bin/ubuntu-niri-local-post-install",
+            "source": "vms/profile-files/ubuntu-niri-gl/bin/ubuntu-niri-gl-post-install",
+            "dest": "/home/{{user}}/bin/ubuntu-niri-gl-post-install",
             "dest_mode": "755"
           }
         ],
         "post_install_run": [
-          "~/bin/ubuntu-niri-local-post-install"
+          "~/bin/ubuntu-niri-gl-post-install",
+          "test \"$(dpkg-query -W -f='${Status}' niri)\" = \"install ok installed\" && test \"$(dpkg-query -W -f='${Status}' dms)\" = \"install ok installed\""
         ]
-      }
+      },
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
     }
   }
 }

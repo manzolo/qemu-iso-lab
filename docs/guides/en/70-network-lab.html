@@ -42,7 +42,7 @@
 <body>
 
 <h1>Network lab: pfSense, Pi-hole and Lubuntu</h1>
-<p class="sub">Reproducible lab of <span class="mono">manzolo/qemu-iso-lab</span> · profiles <span class="mono">pfsense-lab</span>, <span class="mono">pihole-lab</span>, <span class="mono">lubuntu22-lab</span> · segment <span class="mono">lab-lan</span>, domain <span class="mono">qlan</span> · kvm-lab's network lab ported to plain QEMU, with the libvirt road through <span class="mono">vmctl export-libvirt</span></p>
+<p class="sub">Reproducible lab of <span class="mono">manzolo/qemu-iso-lab</span> · profiles <span class="mono">pfsense-lab</span>, <span class="mono">pihole-lab</span>, <span class="mono">lubuntu-lab</span> · segment <span class="mono">lab-lan</span>, domain <span class="mono">qlan</span> · kvm-lab's network lab ported to plain QEMU, with the libvirt road through <span class="mono">vmctl export-libvirt</span></p>
 
 <p>Three virtual machines recreate a small company network on an isolated segment: a firewall/router doing NAT towards the Internet, an ad-filtering DNS resolver that also hands out addresses over DHCP, and a desktop client. Everything installs from scratch without interaction (<code>vmctl lab install</code>) and can be destroyed and recreated in half an hour. The difference from kvm-lab is where the host sits: on plain QEMU the segment is a multicast socket between the VMs and the host has <em>no</em> address on the LAN, so it enters from the WAN side of the firewall through port forwards; after the export to libvirt the segment becomes the <code>lab-lan</code> network and the host is <code>.254</code> again, as before.</p>
 
@@ -137,7 +137,7 @@
     </ul>
   </div>
   <div class="card cli">
-    <h3>Lubuntu · client <small>· profile <span class="mono">lubuntu22-lab</span></small></h3>
+    <h3>Lubuntu · client <small>· profile <span class="mono">lubuntu-lab</span></small></h3>
     <p><small>Ubuntu Server 22.04.5 + lubuntu-desktop, LXQt, SDDM autologin</small></p>
     <ul>
       <li>Static IP <code>.100</code>, gateway .1, DNS .10: the user workstation.</li>
@@ -179,7 +179,7 @@
   <tr><td><code>127.0.0.1:2237</code></td><td>pfSense :22</td><td><code>vmctl shell pfsense-lab</code></td></tr>
   <tr><td><code>127.0.0.1:8081</code></td><td>pfSense :8081 → NAT → 192.168.0.10:80</td><td>Pi-hole GUI <code>/admin/</code></td></tr>
   <tr><td><code>127.0.0.1:2238</code></td><td>pfSense :2238 → NAT → 192.168.0.10:22</td><td><code>vmctl shell pihole-lab</code></td></tr>
-  <tr><td><code>127.0.0.1:2239</code></td><td>pfSense :2239 → NAT → 192.168.0.100:22</td><td><code>vmctl shell lubuntu22-lab</code></td></tr>
+  <tr><td><code>127.0.0.1:2239</code></td><td>pfSense :2239 → NAT → 192.168.0.100:22</td><td><code>vmctl shell lubuntu-lab</code></td></tr>
 </table>
 <p>Ports 2238 and 2239 are the members' own <code>ssh_host_port</code>: during the install they are a slirp forward on the VM itself, afterwards a forward on the router. <code>vmctl shell</code> does not change.</p>
 
@@ -226,17 +226,17 @@
 <h2>6. How it is built and rebuilt</h2>
 <p>The topology lives once, in <code>pfsense-lab.network_lab</code> (subnet, addresses, DHCP pool, domain, data for the libvirt network); the members declare only role, <code>gateway_vm</code> and IP. The identities of the tracked profiles are generic (<code>lab</code>/<code>lab</code>); the real ones go in <code>vms/profiles/local.json</code>, together with the path of the pfSense ISO (Netgate publishes no stable URL).</p>
 <pre>vmctl lab plan                 <span class="c"># preview: topology, forwards, order, libvirt network XML</span>
-vmctl lab install              <span class="c"># pfsense-lab → pihole-lab → lubuntu22-lab, from empty disks (~30 min); --export then hands it to libvirt</span>
+vmctl lab install              <span class="c"># pfsense-lab → pihole-lab → lubuntu-lab, from empty disks (~30 min); --export then hands it to libvirt</span>
 vmctl lab clean                <span class="c"># stop and remove the three VMs (disks + artifacts, never the ISOs); refuses while the lab is in libvirt</span>
 vmctl lab up                   <span class="c"># start the three VMs headless in the background, in order</span>
 vmctl lab status · vmctl lab check · vmctl lab down
 
 vmctl bootstrap-pfsense pfsense-lab          <span class="c"># or one VM at a time</span>
 vmctl bootstrap-unattended pihole-lab
-vmctl bootstrap-unattended lubuntu22-lab
+vmctl bootstrap-unattended lubuntu-lab
 
 vmctl clean pihole-lab                        <span class="c"># disk + artifacts (never the ISOs); lab install refuses existing disks</span>
-vmctl lab attach arch-dms-local --apply       <span class="c"># puts another VM on the segment (writes local.json)</span></pre>
+vmctl lab attach arch-dms --apply       <span class="c"># puts another VM on the segment (writes local.json)</span></pre>
 
 <div class="two">
   <div>
@@ -269,7 +269,7 @@ vmctl lab libvirt-test         <span class="c"># export + check + unexport in on
 
 <span class="c"># by hand, if needed:</span>
 virsh -c qemu:///system net-list            <span class="c"># lab-lan: bridge virbr-lab, host 192.168.0.254, no DHCP/DNS</span>
-virsh -c qemu:///system start pfsense-lab   <span class="c"># then pihole-lab, lubuntu22-lab</span>
+virsh -c qemu:///system start pfsense-lab   <span class="c"># then pihole-lab, lubuntu-lab</span>
 xdg-open http://192.168.0.1/  ·  http://192.168.0.10/admin/</pre>
 <p>The export translates the runtime NICs: the slirp WAN becomes the libvirt <code>default</code> network, the segment the <code>lab-lan</code> network, defined and started when missing. Disk and NVRAM stay the ones in <code>artifacts/</code>, by absolute path. Never run the same disk in QEMU and libvirt at the same time: after the export use <code>virsh</code> until you <code>unexport-libvirt</code>.</p>
 
@@ -277,7 +277,7 @@ xdg-open http://192.168.0.1/  ·  http://192.168.0.10/admin/</pre>
 <table>
   <tr><th>Check</th><th>How</th><th>State</th></tr>
   <tr><td>pfSense installed and booting from disk</td><td><code>vmctl attach pfsense-lab</code>; GUI <code>http://127.0.0.1:8080/</code> with <code>lab</code> and <code>admin</code>; <code>vmctl shell pfsense-lab</code></td><td class="ok">verified on 6 September 2026: install 3 min, GUI in 20 s, logins ok, SSH with key ok, LAN .1 on vtnet1</td></tr>
-  <tr><td>Pi-hole and Lubuntu installed from scratch</td><td><code>vmctl shell pihole-lab</code>: <code>pihole status</code>; <code>vmctl attach lubuntu22-lab</code>: desktop with autologin</td><td class="ok">verified on 6 September 2026: Pi-hole 6.4.3, FTL active, DHCP on; Lubuntu boot 7.3 s, shared folder mounted</td></tr>
+  <tr><td>Pi-hole and Lubuntu installed from scratch</td><td><code>vmctl shell pihole-lab</code>: <code>pihole status</code>; <code>vmctl attach lubuntu-lab</code>: desktop with autologin</td><td class="ok">verified on 6 September 2026: Pi-hole 6.4.3, FTL active, DHCP on; Lubuntu boot 7.3 s, shared folder mounted</td></tr>
   <tr><td>DNS and exit from the client</td><td><code>resolvectl query pfsense.qlan</code> → .1; <code>curl -sI https://example.org</code> → 200</td><td class="ok">verified: CNAME resolved by Pi-hole, HTTP/2 200 through the pfSense NAT</td></tr>
   <tr><td>Forwards to the members</td><td><code>http://127.0.0.1:8081/admin/</code>, <code>ssh -p 2238</code>, <code>ssh -p 2239</code> with pfSense up</td><td class="ok">verified: <code>vmctl lab check</code> all green on plain QEMU</td></tr>
   <tr><td>libvirt road</td><td><code>vmctl lab libvirt-test</code>: GUIs and SSH at 192.168.0.1 / .10 / .100 from the host</td><td class="ok">verified: export, virsh start, five probes ok on the LAN, shutdown and unexport</td></tr>

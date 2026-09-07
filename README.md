@@ -84,7 +84,7 @@ accepts `--dry-run` in front of it.
 | read one profile as `vmctl` sees it                   | `vmctl show <vm>` (`--json` for scripts)                 |
 | install a distro by hand (ISO, disk, installer)       | `vmctl provision <vm>` then click through the installer  |
 | install Ubuntu with zero clicks, ready with SSH       | `vmctl bootstrap-unattended <vm>`                        |
-| install Omarchy with zero clicks, ready with NVIDIA   | `vmctl bootstrap-omarchy arch-omarchy-nvidia-local`      |
+| install Omarchy with zero clicks, ready with NVIDIA   | `vmctl bootstrap-omarchy arch-omarchy-nvidia`      |
 | same for Debian / AlmaLinux / Fedora / Arch / Alpine  | `vmctl bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-archinstall`, `bootstrap-alpine <vm>` |
 | install Windows 11 with zero clicks, ready with OpenSSH | `vmctl bootstrap-windows windows11-unattended` (your ISO in `isos/`) |
 | boot a VM I already installed                         | `vmctl start <vm>` (`--headless --background` to detach) |
@@ -110,14 +110,14 @@ prints them all; the table shows what each family offers.
 
 | Family | Profiles | Highlights | Unattended |
 |--------|----------|------------|------------|
-| Arch | `archlinux`, `endeavouros`, `cachyos`, `cachyos-local`, `cachyos-nvidia-local`, `arch-noctalia-local`, `arch-dms-local`, `arch-dms-nvidia-local`, `arch-omarchy-nvidia-local` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes | `bootstrap-archinstall`, `bootstrap-omarchy` |
-| Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop`, `ubuntu-server`, `ubuntu-server-headless`, `ubuntu-niri`, `ubuntu-niri-local`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
+| Arch | `arch`, `endeavouros`, `cachyos-live`, `cachyos-desktop`, `cachyos-nvidia`, `arch-noctalia`, `arch-dms`, `arch-dms-nvidia`, `arch-omarchy-nvidia` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes | `bootstrap-archinstall`, `bootstrap-omarchy` |
+| Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop-live`, `ubuntu-server-live`, `ubuntu-server-ci`, `ubuntu-niri`, `ubuntu-niri-gl`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
 | Ubuntu desktop flavors | `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `ubuntu-budgie-24.04` | LXQt, Plasma, Xfce, MATE and Budgie on the 24.04 LTS server ISO, display-manager autologin (kvm-lab's flavor family) | `bootstrap-unattended` |
-| Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms-local`, `fedora-silverblue`, `almalinux-minimal`, `almalinux-server`, `rocky9` | Fedora 42/44, niri + DankMaterialShell on Fedora, immutable Silverblue (ostree), AlmaLinux 10.1, Rocky Linux 9 | `bootstrap-kickstart` |
+| Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms`, `fedora-silverblue`, `almalinux-minimal`, `almalinux-server`, `rocky-9` | Fedora 42/44, niri + DankMaterialShell on Fedora, immutable Silverblue (ostree), AlmaLinux 10.1, Rocky Linux 9 | `bootstrap-kickstart` |
 | openSUSE / NixOS / Void | `opensuse-tumbleweed-autoyast`, `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros, Tumbleweed GNOME installed unattended with AutoYaST | `bootstrap-autoyast`, interactive |
-| Alpine / BSD / Kali | `alpine-ci`, `alpine-installed-ci`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.23 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
+| Alpine / BSD / Kali | `alpine-ci`, `alpine-ci-installed`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.23 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
 | Windows | `windows11-unattended`, `windows10-unattended`, `windows7-unattended`, `windows10-template`, `windows11-template` | unattended Windows 11 and 10 (autounattend.xml, virtio drivers, OpenSSH), Windows 7 Ultimate (BIOS/MBR, install only), import targets for physical disks (`vmctl import-device`) | `bootstrap-windows` |
-| Network lab | `pfsense-lab`, `pihole-lab`, `lubuntu22-lab` | pfSense CE 2.7.2 router + Pi-hole v6 + Lubuntu client on an isolated LAN segment (kvm-lab's network lab on plain QEMU; libvirt network after export) | `vmctl lab install`, `bootstrap-pfsense`, `bootstrap-unattended` |
+| Network lab | `pfsense-lab`, `pihole-lab`, `lubuntu-lab` | pfSense CE 2.7.2 router + Pi-hole v6 + Lubuntu client on an isolated LAN segment (kvm-lab's network lab on plain QEMU; libvirt network after export) | `vmctl lab install`, `bootstrap-pfsense`, `bootstrap-unattended` |
 
 Profiles ending in `-local` are full desktop recipes with SSH provisioning,
 meant to be personalised through `local.json`. Profiles named `*-ci` are tiny
@@ -131,15 +131,15 @@ installer, waits for a completion token, starts the installed VM in the
 background and runs the profile's SSH provisioning.
 
 ```bash
-vmctl bootstrap-unattended ubuntu-niri-local          # Ubuntu autoinstall + cloud-init
+vmctl bootstrap-unattended ubuntu-niri-gl          # Ubuntu autoinstall + cloud-init
 vmctl bootstrap-preseed debian-server                 # Debian preseed
 vmctl bootstrap-kickstart almalinux-server            # AlmaLinux / RHEL kickstart from the ISO
-vmctl bootstrap-kickstart fedora-niri-dms-local       # Fedora kickstart from the netinst + online repo
+vmctl bootstrap-kickstart fedora-niri-dms       # Fedora kickstart from the netinst + online repo
 vmctl bootstrap-kickstart fedora-silverblue           # Fedora Silverblue: ostreesetup instead of %packages
 vmctl bootstrap-autoyast opensuse-tumbleweed-autoyast # openSUSE Tumbleweed: AutoYaST profile on a seed CD
 vmctl bootstrap-alpine alpine-niri                    # Alpine: setup-alpine answer file + chroot steps
-vmctl bootstrap-archinstall arch-dms-local            # Arch: pacstrap script on the live ISO
-vmctl bootstrap-omarchy arch-omarchy-nvidia-local     # Omarchy: official cidata mechanism
+vmctl bootstrap-archinstall arch-dms            # Arch: pacstrap script on the live ISO
+vmctl bootstrap-omarchy arch-omarchy-nvidia     # Omarchy: official cidata mechanism
 vmctl bootstrap-windows windows11-unattended          # Windows 11: autounattend.xml on a seed CD, prompt-free ISO
 vmctl bootstrap-pfsense pfsense-lab                   # pfSense CE: scripted bsdinstall, rendered config.xml (network lab)
 vmctl lab install                                     # the whole network lab: router -> Pi-hole -> client
@@ -229,3 +229,5 @@ subcommand. Tests never touch the host: no QEMU, no ISOs, no personal
 ├── artifacts/      per-VM disks, firmware vars, seeds, logs (git-ignored)
 └── legacy/         the original CachyOS bash prototypes, kept for reference
 ```
+
+`vmctl list` shows each profile's status (`manual`, `unattended`, `experimental`) and last recorded live PASS date. These describe the recipe and its history; they do not certify a new change. The HTML validation report keeps this metadata separate from the current run result. See [profile status and backlog](docs/PROFILE_TODO.md).

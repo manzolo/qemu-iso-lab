@@ -1,7 +1,7 @@
 {
   "_comment": "Git-ignored personal overrides. Tracked profiles use the guest user 'lab' (password 'lab'); override the identity fields below and every {{user}} in paths/commands follows.",
   "vms": {
-    "cachyos-local": {
+    "cachyos-desktop": {
       "name": "CachyOS (Local)",
       "ssh_provision": {
         "user": "YOUR_USER",
@@ -12,7 +12,7 @@
         "password": "YOUR_PASSWORD"
       }
     },
-    "ubuntu-niri-local": {
+    "ubuntu-niri-gl": {
       "name": "Ubuntu 26.04 Niri (Local)",
       "autoinstall": {
         "username": "YOUR_USER",
@@ -35,7 +35,7 @@
         ]
       }
     },
-    "arch-noctalia-local": {
+    "arch-noctalia": {
       "name": "Arch Linux + Noctalia 5 (Local)",
       "archinstall_config": {
         "username": "YOUR_USER",
@@ -45,7 +45,7 @@
         "user": "YOUR_USER"
       }
     },
-    "arch-dms-local": {
+    "arch-dms": {
       "name": "Arch Linux + niri + DankMaterialShell (Local)",
       "archinstall_config": {
         "username": "YOUR_USER",
@@ -65,7 +65,7 @@
         ]
       }
     },
-    "arch-dms-nvidia-local": {
+    "arch-dms-nvidia": {
       "name": "Arch Linux + niri + DMS + NVIDIA (Local)",
       "archinstall_config": {
         "username": "YOUR_USER",

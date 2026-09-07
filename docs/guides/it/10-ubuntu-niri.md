@@ -1,6 +1,6 @@
 # Ubuntu 26.04 con niri via autoinstall
 
-Profili: `ubuntu-niri` (SSH 2222) e `ubuntu-niri-local` (personalizzabile). Flusso
+Profili: `ubuntu-niri` (SSH 2222) e `ubuntu-niri-gl` (personalizzabile). Flusso
 `bootstrap-unattended`: autoinstall di subiquity più cloud-init per il primo avvio.
 Tempo: 15-25 minuti.
 

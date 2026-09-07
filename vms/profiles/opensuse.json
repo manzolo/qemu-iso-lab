@@ -6,7 +6,8 @@
         "slug": "opensuse-tumbleweed",
         "family": "opensuse",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "manual"
       },
       "iso": "isos/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
       "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
@@ -52,7 +53,8 @@
         "slug": "opensuse-tumbleweed",
         "family": "opensuse",
         "role": "installer",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "manual"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
@@ -98,7 +100,9 @@
         "slug": "opensuse",
         "family": "suse",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
@@ -192,8 +196,15 @@
         "ssh_key": null,
         "post_install_run": [
           "cat /etc/os-release",
-          "systemctl get-default",
-          "systemctl is-active sshd"
+          "systemctl is-active sshd",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager rpm --package gnome-shell"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       }
     }

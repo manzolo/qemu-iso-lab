@@ -216,6 +216,23 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("?", output)
         self.assertNotIn("Failed to get shared", output)
 
+    def test_cmd_list_displays_profile_status_and_historical_date(self):
+        self.vm_config["meta"] = {"status": "experimental", "verified": "2026-09-07"}
+        self.write_config_dir()
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            self.assertEqual(self.vmctl.cmd_list(argparse.Namespace()), 0)
+        self.assertIn("experimental", stdout.getvalue())
+        self.assertIn("2026-09-07", stdout.getvalue())
+        self.assertIn("LAST LIVE PASS", stdout.getvalue())
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            self.vmctl.cmd_list(argparse.Namespace(json=True))
+        row = json.loads(stdout.getvalue())[0]
+        self.assertEqual(row["status"], "experimental")
+        self.assertEqual(row["verified"], "2026-09-07")
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            self.vmctl.cmd_list(argparse.Namespace(names=True))
+        self.assertEqual(stdout.getvalue(), self.vm_name + "\n")
+
     def test_cmd_list_emits_json_when_flag_set(self):
         with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             exit_code = self.vmctl.cmd_list(argparse.Namespace(json=True))

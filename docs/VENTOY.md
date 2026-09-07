@@ -10,4 +10,4 @@ matter for the Ventoy multi-boot scenario.
 | `bin/ventoy-copy <target> <file.vhd>` | as root **on the host** | copies a `.vhd` to a Ventoy partition or mountpoint, appending the `.vtoy` suffix Ventoy requires |
 
 Profiles meant for this use `"format": "vhd"` in their `disk` section
-([PROFILES.md](PROFILES.md#disk)), for example `cachyos`.
+([PROFILES.md](PROFILES.md#disk)), for example `cachyos-live`.

@@ -6,7 +6,8 @@
         "slug": "linux-mint",
         "family": "mint",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/linuxmint-22.3-cinnamon-64bit.iso",
       "iso_url": "https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
@@ -44,7 +45,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4"
     },
     "almalinux-minimal": {
       "name": "AlmaLinux 10.1 Minimal",
@@ -52,10 +54,11 @@
         "slug": "almalinux",
         "family": "rhel",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
-      "iso_url": "https://repo.almalinux.org/almalinux/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
+      "iso_url": "https://repo.almalinux.org/vault/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
       "disk": {
         "path": "artifacts/almalinux-minimal/disk.qcow2",
         "size": "24G",
@@ -90,7 +93,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "049efd183a5a841dd432b3427eb6faa7deb3bf6c6bf2c63cbffa024b9c651725"
     },
     "almalinux-server": {
       "name": "AlmaLinux 10.1 Server (Kickstart)",
@@ -98,10 +102,11 @@
         "slug": "almalinux",
         "family": "rhel",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended"
       },
       "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
-      "iso_url": "https://repo.almalinux.org/almalinux/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
+      "iso_url": "https://repo.almalinux.org/vault/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
       "disk": {
         "path": "artifacts/almalinux-server/disk.qcow2",
         "size": "24G",
@@ -160,7 +165,8 @@
         "user": "lab",
         "ssh_host_port": 2229,
         "ssh_key": null
-      }
+      },
+      "iso_sha256": "049efd183a5a841dd432b3427eb6faa7deb3bf6c6bf2c63cbffa024b9c651725"
     },
     "kali-live": {
       "name": "Kali Linux 2026.1 Live",
@@ -168,7 +174,8 @@
         "slug": "kali-linux",
         "family": "kali",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "manual"
       },
       "iso": "isos/kali-linux-2026.1-live-amd64.iso",
       "iso_url": "https://cdimage.kali.org/kali-2026.1/kali-linux-2026.1-live-amd64.iso",
@@ -206,20 +213,23 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "c2096dc2194c915cf94c273b907a84043ea6adfcba18509f15a8c1d1bbfb211c"
     },
-    "rocky9": {
+    "rocky-9": {
       "name": "Rocky Linux 9.8 (Kickstart)",
       "meta": {
         "slug": "rocky",
         "family": "rhel",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/Rocky-9.8-x86_64-minimal.iso",
       "iso_url": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-minimal.iso",
       "disk": {
-        "path": "artifacts/rocky9/disk.qcow2",
+        "path": "artifacts/rocky-9/disk.qcow2",
         "size": "24G",
         "format": "qcow2",
         "interface": "virtio"
@@ -228,7 +238,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/rocky9/OVMF_VARS.fd"
+        "vars_path": "artifacts/rocky-9/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 2048,
@@ -255,7 +265,7 @@
       },
       "notes": "Rocky Linux 9 minimal via kickstart, the RHEL twin of almalinux-server: same flow, install source on the ISO (inst.repo=cdrom), SSH on 2245.",
       "kickstart_config": {
-        "hostname": "rocky9",
+        "hostname": "rocky-9",
         "username": "lab",
         "fullname": "Lab User",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
@@ -282,7 +292,8 @@
           "systemctl is-active sshd",
           "getenforce"
         ]
-      }
+      },
+      "iso_sha256": "d338032cd1cdd41c67139f2f71b4c832c8e4a21943106519db9c7137df7a63d4"
     }
   }
 }

@@ -1,5 +1,4 @@
-// Reproducible Niri config for the arch-dms-local profile.
-// DankMaterialShell is started by the dms.service user unit (graphical-session.target), not from here.
+// Reproducible Niri config for the arch-noctalia profile.
 // Keep this file self-contained: do not depend on host dotfiles.
 
 environment {
@@ -29,6 +28,7 @@ input {
 spawn-at-startup "foot" "--server"
 spawn-at-startup "xwayland-satellite"
 spawn-at-startup "udiskie" "--tray"
+spawn-at-startup "sh" "-c" "exec \"$HOME/bin/start-noctalia\""
 
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 prefer-no-csd

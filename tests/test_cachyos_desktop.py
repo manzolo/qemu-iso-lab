@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPT = ROOT / "vms/profile-files/cachyos-local/bin/cachyos-post-install"
+SCRIPT = ROOT / "vms/profile-files/cachyos-desktop/bin/cachyos-post-install"
 
 
 class CachyosDesktopTests(unittest.TestCase):
@@ -105,7 +105,7 @@ esac
 
     def test_bootstrap_leaves_the_power_key_to_logind(self):
         profiles = json.loads((ROOT / "vms/profiles/arch.json").read_text())["vms"]
-        for name in ("cachyos-local", "cachyos-nvidia-local"):
+        for name in ("cachyos-desktop", "cachyos-nvidia"):
             with self.subTest(profile=name):
                 commands = profiles[name]["archinstall_config"]["bootstrap_chroot_commands"]
                 matching = [c for c in commands if "disable-power-key-handling" in c]
@@ -114,7 +114,7 @@ esac
                 self.assertIn("include \"./cfg/vm-power.kdl\"", matching[0])
 
     def test_shipped_niri_configs_leave_the_power_key_to_logind(self):
-        for profile in ("arch-noctalia-local", "arch-dms-local", "alpine-niri"):
+        for profile in ("arch-noctalia", "arch-dms", "alpine-niri"):
             with self.subTest(profile=profile):
                 config = (ROOT / "vms/profile-files" / profile / "niri/config.kdl").read_text()
                 input_block = config[config.index("input {"):]
@@ -123,7 +123,7 @@ esac
 
     def test_both_profiles_deliver_and_run_desktop_check(self):
         profiles = json.loads((ROOT / "vms/profiles/arch.json").read_text())["vms"]
-        for name in ("cachyos-local", "cachyos-nvidia-local"):
+        for name in ("cachyos-desktop", "cachyos-nvidia"):
             with self.subTest(profile=name):
                 self.assertEqual(profiles[name]["video"]["headless"], [
                     "-device", "virtio-vga-gl", "-display", "egl-headless",
@@ -133,16 +133,15 @@ esac
                     entry["source"] == str(SCRIPT.relative_to(ROOT))
                     for entry in provision["copy_from_host"]
                 ))
-                command = provision["post_install_run"][-1]
-                if name == "cachyos-nvidia-local":
-                    nvidia_script = ROOT / "vms/profile-files/cachyos-nvidia-local/bin/cachyos-nvidia-post-install"
+                if name == "cachyos-nvidia":
+                    nvidia_script = ROOT / "vms/profile-files/cachyos-nvidia/bin/cachyos-nvidia-post-install"
                     self.assertIn('bash "$HOME/bin/cachyos-post-install"', nvidia_script.read_text())
                 else:
-                    self.assertEqual(command, "~/bin/cachyos-post-install")
+                    self.assertIn("~/bin/cachyos-post-install", provision["post_install_run"])
 
     def test_example_keeps_cachyos_desktop_defaults(self):
         example = json.loads((ROOT / "vms/profiles/local.json.example").read_text())
-        self.assertNotIn("copy_from_host", example["vms"]["cachyos-local"]["ssh_provision"])
+        self.assertNotIn("copy_from_host", example["vms"]["cachyos-desktop"]["ssh_provision"])
 
 
 if __name__ == "__main__":

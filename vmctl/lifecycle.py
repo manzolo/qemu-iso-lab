@@ -814,6 +814,8 @@ def cmd_list(args: argparse.Namespace) -> int:
                 "firmware": vm.get("firmware", {}).get("type"),
                 "memory_mb": vm.get("memory_mb"),
                 "cpus": vm.get("cpus"),
+                "status": vm.get("meta", {}).get("status", "manual"),
+                "verified": vm.get("meta", {}).get("verified"),
             })
         print(json.dumps(out, indent=2))
         return 0
@@ -823,24 +825,28 @@ def cmd_list(args: argparse.Namespace) -> int:
         firmware = vm.get("firmware", {}).get("type", "?").upper()
         memory = vm.get("memory_mb", "?")
         cpus = vm.get("cpus", "?")
-        rows.append((name, vm.get("name", name), firmware, str(memory), str(cpus)))
+        meta = vm.get("meta", {})
+        rows.append((name, vm.get("name", name), firmware, str(memory), str(cpus),
+                     str(meta.get("status", "manual")), str(meta.get("verified") or "-")))
 
     name_width = max(len("PROFILE"), max(len(row[0]) for row in rows))
     label_width = max(len("NAME"), max(len(row[1]) for row in rows))
     firmware_width = max(len("FW"), max(len(row[2]) for row in rows))
     memory_width = max(len("RAM"), max(len(f"{row[3]}M") for row in rows))
     cpu_width = max(len("CPU"), max(len(row[4]) for row in rows))
+    status_width = max(len("STATUS"), max(len(row[5]) for row in rows))
     print(f"{ui.style('PROFILE', ui.BOLD, ui.CYAN):<{name_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
           f"{ui.style('NAME', ui.BOLD, ui.CYAN):<{label_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
           f"{ui.style('FW', ui.BOLD, ui.CYAN):>{firmware_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
           f"{ui.style('RAM', ui.BOLD, ui.CYAN):>{memory_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
-          f"{ui.style('CPU', ui.BOLD, ui.CYAN):>{cpu_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}")
-    for name, label, firmware, memory, cpus in rows:
+          f"{ui.style('CPU', ui.BOLD, ui.CYAN):>{cpu_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
+          f"{'STATUS':<{status_width}}  LAST LIVE PASS")
+    for name, label, firmware, memory, cpus, status, verified in rows:
         print(f"{ui.style(name, ui.BOLD):<{name_width + len(ui.BOLD) + len(ui.RESET)}}  "
               f"{label:<{label_width}}  "
               f"{firmware:>{firmware_width}}  "
               f"{f'{memory}M':>{memory_width}}  "
-              f"{cpus:>{cpu_width}}")
+              f"{cpus:>{cpu_width}}  {status:<{status_width}}  {verified}")
     return 0
 
 

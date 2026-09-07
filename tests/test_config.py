@@ -12,6 +12,37 @@ from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
 class ConfigTests(BaseVmctlTestCase):
+    def test_rejects_invalid_profile_status_and_verification_date(self):
+        from vmctl import config
+        for meta in (None, {"status": "passed"}, {"status": []}, {"verified": "2026-02-30"},
+                     {"verified": "20260907"}, {"verified": True}):
+            with self.subTest(meta=meta):
+                self.assertTrue(config.validate_vm_profile("test", self.vm_config | {"meta": meta}))
+        self.assertEqual(config.validate_vm_profile("test", self.vm_config | {
+            "meta": {"status": "unattended", "verified": "2026-09-07"}}), [])
+
+    def test_deprecated_profile_resolves_with_one_stderr_warning(self):
+        from vmctl import config
+        cfg = {"vms": {"arch-dms": self.vm_config}}
+        with mock.patch("sys.stderr") as stderr:
+            self.assertIs(config.get_vm(cfg, "arch-dms-local"), self.vm_config)
+        message = "".join(call.args[0] for call in stderr.write.call_args_list)
+        self.assertEqual(message, "warning: profile 'arch-dms-local' is deprecated; use 'arch-dms'\n")
+
+    def test_legacy_local_override_merges_into_canonical_profile(self):
+        from vmctl import config
+        self.vm_name = "arch-dms"
+        self.write_config_dir()
+        local = self.root / "vms/profiles/local.json"
+        local.write_text(json.dumps({"vms": {"arch-dms-local": {"memory_mb": 1234}}}))
+        with mock.patch("sys.stderr"):
+            cfg = config.load_config()
+        self.assertEqual(cfg["vms"]["arch-dms"]["memory_mb"], 1234)
+        self.assertNotIn("arch-dms-local", cfg["vms"])
+        local.write_text(json.dumps({"vms": {"arch-dms-local": {}, "arch-dms": {}}}))
+        with mock.patch("sys.stderr"), self.assertRaisesRegex(self.vmctl.VMError, "Conflicting local overrides"):
+            config.load_config()
+
     def test_load_config_reads_profiles_from_config_dir(self):
         config = self.vmctl.load_config()
 
