@@ -149,8 +149,10 @@ Same command (`vmctl bootstrap-windows windows7-unattended`), same technique as 
   agent service, runs `setup_commands`, writes `==> Windows installation complete!` on COM1 and shuts down. **No
   OpenSSH** on Windows 7, hence no SSH post-install: `check-vms` counts the install alone and
   `vmctl shell` is not available. Other virtio/SPICE guest tools remain a manual
-  step with packages compatible with Windows 7; no virtiofs shared folder (there is no WinFSP
-  for 7).
+  step with packages compatible with Windows 7; no virtiofs shared folder: virtio-win ships the
+  `viofs` driver from Windows 8 on (`w8`, `w8.1`, `w10`, `w11` and the servers, no `w7`), so
+  installing WinFSP would not be enough. To hand files to a Windows 7 guest, use QEMU's built-in
+  SMB server (`-netdev user,smb=<dir>`, share `\\10.0.2.4\qemu`), which needs `smbd` on the host.
 - **ISO**: `isos/windows7.iso` or the path in `local.json`; the prompt-free ISO is rebuilt once
   as for 10 and 11, with two differences the Windows 7 BIOS loader imposes: `boot/bootfix.bin` is
   deleted, not emptied (`etfsboot.com` hangs at "Booting from DVD/CD..." on an empty file), and

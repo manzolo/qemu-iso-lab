@@ -150,8 +150,11 @@ di kvm-lab, con le differenze che Windows 7 impone:
   dell'agente, esegue i `setup_commands`, scrive `==> Windows installation complete!` su COM1 e spegne. **Niente
   OpenSSH** su Windows 7, quindi nessun post-install SSH: `check-vms` considera passata la sola
   installazione, e `vmctl shell` non è disponibile. Gli altri guest tools virtio/SPICE restano un
-  passo manuale con pacchetti compatibili con Windows 7; niente cartella condivisa virtiofs
-  (WinFSP non esiste per 7).
+  passo manuale con pacchetti compatibili con Windows 7; niente cartella condivisa virtiofs: la ISO
+  virtio-win porta il driver `viofs` da Windows 8 in poi (`w8`, `w8.1`, `w10`, `w11` e i server,
+  nessun `w7`), quindi installare WinFSP non basterebbe. Per passare file a un guest Windows 7 si
+  usa il server SMB integrato in QEMU (`-netdev user,smb=<dir>`, condivisione `\\10.0.2.4\qemu`),
+  che richiede `smbd` sull'host.
 - **ISO**: `isos/windows7.iso` o il percorso in `local.json`; la ISO senza prompt viene
   ricostruita una volta come per 10 e 11, con due differenze imposte dal loader BIOS di Windows 7:
   `boot/bootfix.bin` viene cancellato, non svuotato (`etfsboot.com` si blocca su "Booting from
