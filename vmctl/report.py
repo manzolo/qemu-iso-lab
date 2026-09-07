@@ -9,6 +9,7 @@ import html
 import json
 from pathlib import Path
 import platform
+import socket
 import struct
 import subprocess
 import threading
@@ -58,6 +59,7 @@ def ppm_to_png(data: bytes) -> bytes:
 
 
 CONSOLE_WAKE_DELAY_SEC = 2.0
+DESKTOP_SIZE_ENCODING = -223
 BLANK_RETRIES = 3
 BLANK_PIXEL_RATIO = 0.001
 
@@ -88,6 +90,96 @@ def looks_blank(ppm_bytes: bytes) -> bool:
     return lit <= max(1, int(len(body) / 3 * BLANK_PIXEL_RATIO))
 
 
+def _rfb_read(sock: socket.socket, count: int) -> bytes:
+    chunks = []
+    remaining = count
+    while remaining > 0:
+        chunk = sock.recv(min(remaining, 1 << 16))
+        if not chunk:
+            raise OSError("VNC connection closed early")
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def capture_via_vnc(vm: dict[str, Any], timeout: float = 15.0) -> bytes:
+    """Grab the framebuffer over the VM's own VNC socket and return it as a PNG.
+
+    QMP ``screendump`` fails on the accelerated displays (``virtio-vga-gl``), so those rows
+    used to reach the report with no image at all. The VNC server QEMU already exposes on
+    ``artifacts/<vm>/runtime/vnc.sock`` renders the same screen; RFB 3.8 with RAW encoding is
+    a few dozen lines and needs no dependency.
+    """
+    path = qemu.vnc_socket_path(vm)
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.settimeout(timeout)
+        sock.connect(str(path))
+        version = _rfb_read(sock, 12)
+        if not version.startswith(b"RFB "):
+            raise OSError(f"Unexpected VNC greeting: {version!r}")
+        sock.sendall(b"RFB 003.008\n")
+        count = _rfb_read(sock, 1)[0]
+        if count == 0:
+            reason_length = struct.unpack("!I", _rfb_read(sock, 4))[0]
+            raise OSError(f"VNC refused the connection: {_rfb_read(sock, reason_length)!r}")
+        types = _rfb_read(sock, count)
+        if 1 not in types:
+            raise OSError("VNC server requires authentication")
+        sock.sendall(bytes([1]))
+        if struct.unpack("!I", _rfb_read(sock, 4))[0] != 0:
+            raise OSError("VNC authentication failed")
+        sock.sendall(bytes([1]))  # share the session, do not disconnect other viewers
+        width, height = struct.unpack("!HH", _rfb_read(sock, 4))
+        _rfb_read(sock, 16)  # server pixel format (16 bytes), replaced below
+        name_length = struct.unpack("!I", _rfb_read(sock, 4))[0]
+        _rfb_read(sock, name_length)
+        if width == 0 or height == 0:
+            raise OSError("VNC reported an empty framebuffer")
+        # 32bpp true colour, big-endian, so a pixel is 0x00RRGGBB in wire order.
+        pixel_format = struct.pack("!BBBBHHHBBBxxx", 32, 24, 1, 1, 255, 255, 255, 16, 8, 0)
+        sock.sendall(b"\x00\x00\x00\x00" + pixel_format)
+        # RAW plus DesktopSize: a guest that switches video mode after boot resizes the
+        # framebuffer, and the size from ServerInit would no longer describe the rectangles.
+        sock.sendall(struct.pack("!BBH", 2, 0, 2) + struct.pack("!ii", 0, DESKTOP_SIZE_ENCODING))
+        sock.sendall(struct.pack("!BBHHHH", 3, 0, 0, 0, width, height))
+        rows = [bytearray(width * 3) for _ in range(height)]
+        painted = 0
+        deadline = time.monotonic() + timeout
+        while painted < width * height and time.monotonic() < deadline:
+            message = _rfb_read(sock, 1)[0]
+            if message != 0:  # only framebuffer updates are requested
+                continue
+            _rfb_read(sock, 1)
+            rectangles = struct.unpack("!H", _rfb_read(sock, 2))[0]
+            resized = False
+            for _ in range(rectangles):
+                rx, ry, rw, rh, encoding = struct.unpack("!HHHHi", _rfb_read(sock, 12))
+                if encoding == DESKTOP_SIZE_ENCODING:
+                    # Pseudo-encoding: no pixel data follows, so keep reading this message.
+                    width, height = rw, rh
+                    rows = [bytearray(width * 3) for _ in range(height)]
+                    painted = 0
+                    resized = True
+                    continue
+                if encoding != 0:
+                    raise OSError(f"Unsupported VNC encoding: {encoding}")
+                data = _rfb_read(sock, rw * rh * 4)
+                if rx + rw > width or ry + rh > height:
+                    raise OSError("VNC sent a rectangle outside the framebuffer")
+                for row in range(rh):
+                    target = rows[ry + row]
+                    base = row * rw * 4
+                    for column in range(rw):
+                        pixel = base + column * 4
+                        offset = (rx + column) * 3
+                        target[offset:offset + 3] = data[pixel + 1:pixel + 4]
+                painted += rw * rh
+            if resized:
+                sock.sendall(struct.pack("!BBHHHH", 3, 0, 0, 0, width, height))
+        raster = b"".join(bytes(row) for row in rows)
+        return ppm_to_png(f"P6 {width} {height} 255\n".encode() + raster)
+
+
 def capture_screenshot(vm_name: str, vm: dict[str, Any], directory: Path, wake: bool = True) -> str | None:
     ppm = directory / "screens" / f"{vm_name}.ppm"
     png = ppm.with_suffix(".png")
@@ -98,7 +190,12 @@ def capture_screenshot(vm_name: str, vm: dict[str, Any], directory: Path, wake: 
             if wake:
                 wake_console(vm)
             if not qemu.qmp_command(qemu.qmp_socket_path(vm), "screendump", arguments={"filename": str(ppm.resolve())}):
-                return "Screenshot unavailable: QMP screendump did not succeed"
+                # Accelerated displays refuse screendump: read the same screen over VNC.
+                try:
+                    png.write_bytes(capture_via_vnc(vm))
+                    return None
+                except (OSError, ValueError, struct.error) as exc:
+                    return f"Screenshot unavailable: QMP screendump did not succeed and VNC capture failed ({exc})"
             raw = ppm.read_bytes()
             png.write_bytes(ppm_to_png(raw))
             # A guest that is genuinely dark stays dark: give it a few tries, then keep what

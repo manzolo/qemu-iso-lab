@@ -112,6 +112,30 @@ class ReportTests(BaseVmctlTestCase):
         self.assertTrue(report.looks_blank(b"P6 2 1 255\n" + b"\x00" * 6))
         self.assertFalse(report.looks_blank(b"P6 2 1 255\n" + b"\xff" * 6))
 
+    def test_vnc_fallback_when_screendump_is_refused(self):
+        # virtio-vga-gl refuses QMP screendump, so those rows used to reach the report with
+        # no image at all; the VM's own VNC socket shows the same screen.
+        calls = []
+
+        def fake_qmp(socket_path, command, arguments=None):
+            calls.append(command)
+            return command != "screendump"
+
+        png = report.ppm_to_png(b"P6 2 1 255\n" + b"\xff" * 6)
+        with mock.patch.object(qemu, "qmp_command", side_effect=fake_qmp), \
+             mock.patch.object(report, "capture_via_vnc", return_value=png) as vnc, \
+             mock.patch.object(report.time, "sleep"):
+            self.assertIsNone(report.capture_screenshot("vm", self.vm_config, self.root))
+        vnc.assert_called_once()
+        self.assertEqual((self.root / "screens/vm.png").read_bytes(), png)
+
+        with mock.patch.object(qemu, "qmp_command", side_effect=fake_qmp), \
+             mock.patch.object(report, "capture_via_vnc", side_effect=OSError("no socket")), \
+             mock.patch.object(report.time, "sleep"):
+            error = report.capture_screenshot("vm", self.vm_config, self.root)
+        self.assertIn("screendump did not succeed", error)
+        self.assertIn("no socket", error)
+
     def test_capture_qmp_arguments(self):
         def qmp_call(path, command, **kwargs):
             self.assertIn(command, ("send-key", "screendump"))
