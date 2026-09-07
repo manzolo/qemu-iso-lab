@@ -122,18 +122,36 @@ di kvm-lab, con le differenze che Windows 7 impone:
   Reserved" (100 MB, attiva) + Windows; nessun bypass TPM/CPU (`LabConfig`) perché non serve.
 - **Driver**: `viostor` iniettato in WinPE dal CD virtio-win (`driver_flavor: w7`); la rete è
   `e1000e`, nativa su Windows 7, quindi NetKVM non è necessario. Il certificato Red Hat dei
-  driver viene importato nel pass specialize (come SYSTEM) da `vmctl-cert.cmd` sul seed:
-  è l'unico comando in specialize e termina sempre con esito 0.
+  driver viene importato nel pass specialize (come SYSTEM) da `vmctl-cert.cmd` sul seed, che
+  termina sempre con esito 0 (un comando specialize non a zero bloccherebbe Setup con una dialog).
+- **Guest agent**: il profilo mantiene `guest_agent: true`. vmctl inietta `vioserial` in
+  WinPE e scarica sull'host l'[MSI Fedora dell'agente 101.1.0](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-qemu-ga/qemu-ga-win-101.1.0-1.el7ev/),
+  fissato da `windows_config.guest_agent_msi` (`path`, `url`, `sha256`). Il seed lo contiene
+  come `vmctl-qga.msi`. Il comando Order 2 in specialize chiama `vmctl-qga.cmd stage`, che
+  copia script e MSI in `C:\Windows\Setup\Scripts` ed esce sempre 0.
+  `SetupComplete.cmd` lo installa come SYSTEM con `msiexec /i /qn /norestart` a Setup finito,
+  quando WMI è disponibile. Il primo logon controlla l'esito MSI e il servizio avviato prima
+  del token di completamento; anche gli errori portano allo spegnimento naturale. L'agente è
+  l'unico canale remoto su 7 perché SSH non è disponibile. Log: `C:\vmctl-qga.log`,
+  `C:\vmctl-qga-msi.log`, `C:\vmctl-qga-exit.txt` e `C:\vmctl\setup.log`.
+  La diagnosi dal vivo su Windows 7 RTM (7600, senza SP1) ha mostrato che l'agente 110.0.2 di
+  virtio-win 0.1.285 si ferma nel loader per l'assenza di `api-ms-win-core-path-l1-1-0.dll`,
+  prima di scrivere il log console o aprire il canale. Il figlio `VIOSerialPort` non richiede
+  un INF separato: è un dispositivo raw. `QueryDosDevice` ha trovato
+  `\\.\Global\org.qemu.guest_agent.0`, `CreateFile` lo ha aperto senza errori e 101.1.0 ha
+  risposto a ping, informazioni OS e indirizzi con lo stesso driver. L'MSI in specialize
+  fallisce comunque nella registrazione WMI/VSS: va usato SetupComplete. Questo pacchetto
+  serve solo a Windows 7; Windows 10/11 conservano il flusso attuale.
 - **Edizione**: `image_index: 4` (Ultimate sul media multi-edizione standard) e chiave KMS
   generica `33PXH-7Y6KF-2VJC9-XBBR8-HVTHH`; installa, non attiva.
 - **OOBE**: `SkipMachineOOBE`/`SkipUserOOBE` (qui funzionano), `NetworkLocation=Work`,
   autologon.
-- **Primo logon**: PowerShell 2.0, non elevato (UAC resta attivo): lo script esegue solo i
-  `setup_commands`, scrive `==> Windows installation complete!` su COM1 e spegne. **Niente
+- **Primo logon**: PowerShell 2.0, non elevato (UAC resta attivo): lo script controlla il servizio
+  dell'agente, esegue i `setup_commands`, scrive `==> Windows installation complete!` su COM1 e spegne. **Niente
   OpenSSH** su Windows 7, quindi nessun post-install SSH: `check-vms` considera passata la sola
-  installazione, e `vmctl shell` non è disponibile. Guest tools virtio/SPICE restano un passo
-  manuale (`virtio-win-guest-tools.exe` dal CD virtio-win, come in kvm-lab); niente cartella
-  condivisa virtiofs (WinFSP non esiste per 7).
+  installazione, e `vmctl shell` non è disponibile. Gli altri guest tools virtio/SPICE restano un
+  passo manuale con pacchetti compatibili con Windows 7; niente cartella condivisa virtiofs
+  (WinFSP non esiste per 7).
 - **ISO**: `isos/windows7.iso` o il percorso in `local.json`; la ISO senza prompt viene
   ricostruita una volta come per 10 e 11, con due differenze imposte dal loader BIOS di Windows 7:
   `boot/bootfix.bin` viene cancellato, non svuotato (`etfsboot.com` si blocca su "Booting from
@@ -141,3 +159,22 @@ di kvm-lab, con le differenze che Windows 7 impone:
   cerca `BOOTMGR`, non `BOOTMGR.;1`). Entrambe verificate dal vivo; il timbro della cache cambia
   con loro.
 
+Una nuova installazione è stata verificata con il pacchetto fissato su Windows 7 RTM:
+l'MSI da SetupComplete è uscito con 0, `QEMU-GA` era avviato prima del token di completamento
+e ping, informazioni OS e indirizzi funzionavano dopo l'avvio del disco installato.
+Per ripetere la verifica (il primo comando elimina il guest Windows 7 esistente):
+
+```sh
+./bin/vmctl clean windows7-unattended
+./bin/vmctl bootstrap-windows windows7-unattended --timeout 3600
+./bin/vmctl start windows7-unattended --headless --background
+# Attendere l'avvio di Windows, poi:
+./bin/vmctl agent windows7-unattended ping
+./bin/vmctl agent windows7-unattended
+./bin/vmctl stop windows7-unattended
+```
+
+Il clean è necessario: un disco già installato precede il CD nel boot, quindi bootstrap su
+un Windows esistente non riesegue Setup. L'avviso sul driver USB xHCI (`VEN_1B36&DEV_000D`)
+è separato dall'agente. Questa prova non stabilisce la compatibilità delle firme SHA-2 dei
+driver su altri media Windows 7.

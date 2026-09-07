@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import shutil
 import sys
 import unittest
@@ -485,6 +486,107 @@ class Windows7RenderTests(BaseVmctlTestCase):
             with mock.patch.object(vmctl.runtime, "run") as cached_run:
                 vmctl.windows.ensure_noprompt_iso(iso, legacy=self.legacy)
             cached_run.assert_not_called()
+
+    def _agent_package(self):
+        self._win7()
+        self.vm_config["guest_agent"] = True
+        payload = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1\x00\xffMSI fixture\r\n"
+        package = {"path": "isos/legacy-agent.msi", "url": "https://example.invalid/legacy-agent.msi",
+                   "sha256": hashlib.sha256(payload).hexdigest()}
+        self.vm_config["windows_config"]["guest_agent_msi"] = package
+        return package, payload
+
+    def test_legacy_agent_stages_in_specialize_and_installs_after_setup(self):
+        self._agent_package()
+        xml = vmctl.windows.render_autounattend(self.vm_name, self.vm_config)
+        ns = {"u": "urn:schemas-microsoft-com:unattend"}
+        root = ET.fromstring(xml)
+        commands = root.findall("u:settings[@pass='specialize']//u:RunSynchronousCommand", ns)
+        self.assertEqual([c.find('u:Order', ns).text for c in commands], ['1', '2'])
+        self.assertIn('vmctl-cert.cmd', commands[0].find('u:Path', ns).text)
+        self.assertIn('vmctl-qga.cmd stage', commands[1].find('u:Path', ns).text)
+        for letter in vmctl.windows.DRIVER_CD_LETTERS:
+            self.assertIn(f"{letter}:\\vioserial\\w7\\amd64", xml)
+        script = vmctl.windows.render_qga_script()
+        install, stage = script.split('\r\n:stage\r\n')
+        self.assertIn('if /i "%~1"=="stage" goto stage', install)
+        self.assertIn('msiexec /i "%~dp0vmctl-qga.msi" /qn /norestart', install)
+        self.assertIn('> "C:\\vmctl-qga-exit.txt" echo %RESULT%', install)
+        self.assertNotIn('msiexec', stage)
+        self.assertIn('copy /y "%~dp0vmctl-qga.msi"', stage)
+        self.assertIn('copy /y "%~f0" "C:\\Windows\\Setup\\Scripts\\SetupComplete.cmd"', stage)
+        for branch in (install, stage):
+            self.assertTrue(branch.rstrip().endswith('exit /b 0'))
+        self.assertNotIn('msiexec /a', script)
+        self.assertNotIn('sc create', script)
+        self.assertNotIn('guest-agent\\', script)  # never fall back to the incompatible current ISO MSI
+        logon = vmctl.windows.render_legacy_setup_script(self.vm_name, self.vm_config)
+        check = logon.index("Invoke-Step 'QEMU guest agent'")
+        self.assertIn("Get-Content 'C:\\vmctl-qga-exit.txt' -ErrorAction Stop", logon)
+        self.assertIn("Get-Service QEMU-GA -ErrorAction Stop", logon)
+        self.assertLess(check, logon.index("if ($script:Failures.Count -eq 0)"))
+        self.assertIn(vmctl.windows.BOOTSTRAP_FAILED_TOKEN, logon)
+        self.assertLess(logon.index(vmctl.windows.BOOTSTRAP_COMPLETE_TOKEN), logon.index('shutdown.exe /s'))
+
+    def test_legacy_seed_preserves_pinned_msi_bytes_without_external_tools(self):
+        package, payload = self._agent_package()
+        msi = self.root / package['path']
+        msi.parent.mkdir(parents=True)
+        msi.write_bytes(payload)
+        with mock.patch.object(vmctl.runtime, 'run') as run_cmd, \
+             mock.patch.object(shutil, 'which', return_value='/fake/tool'), \
+             mock.patch.object(vmctl.iso, 'download_file') as download:
+            seed = vmctl.windows.create_windows_seed_iso(self.vm_name, self.vm_config)
+        download.assert_not_called()
+        self.assertEqual((seed.parent / 'vmctl-qga.msi').read_bytes(), payload)
+        self.assertIn(str(seed.parent / 'vmctl-qga.msi'), run_cmd.call_args.args[0])
+
+    def test_legacy_seed_dry_run_needs_no_msi_or_download(self):
+        self._agent_package()
+        with mock.patch.object(vmctl.runtime, 'run'), \
+             mock.patch.object(shutil, 'which', return_value='/fake/tool'), \
+             mock.patch('urllib.request.urlopen') as urlopen:
+            seed = vmctl.windows.create_windows_seed_iso(self.vm_name, self.vm_config, dry_run=True)
+        urlopen.assert_not_called()
+        self.assertFalse((seed.parent / 'vmctl-qga.msi').exists())
+        self.assertFalse(seed.exists())
+
+    def test_legacy_agent_rejects_missing_pin_and_redownloads_corrupt_cache(self):
+        self._win7()
+        with self.assertRaisesRegex(vmctl.errors.VMError, 'guest_agent_msi'):
+            vmctl.windows.ensure_guest_agent_msi(self.vm_config)
+        package, payload = self._agent_package()
+        package['sha256'] = 'invalid'
+        with self.assertRaisesRegex(vmctl.errors.VMError, 'SHA-256'):
+            vmctl.windows.ensure_guest_agent_msi(self.vm_config)
+        package['sha256'] = hashlib.sha256(payload).hexdigest()
+        msi = self.root / package['path']
+        msi.parent.mkdir(parents=True)
+        msi.write_bytes(b'wrong package')
+        def download(url, destination, **kwargs):
+            self.assertEqual(url, package['url'])
+            self.assertEqual(kwargs['vm']['iso_sha256'], package['sha256'])
+            self.assertFalse(destination.exists())
+            destination.write_bytes(payload)
+        with mock.patch.object(vmctl.iso, 'download_file', side_effect=download) as fetch:
+            self.assertEqual(vmctl.windows.ensure_guest_agent_msi(self.vm_config), msi)
+        fetch.assert_called_once()
+        self.assertEqual(msi.read_bytes(), payload)
+
+    def test_windows_10_and_11_agent_flags_leave_answer_and_seed_unchanged(self):
+        for edition in ('Windows 10 Pro', 'Windows 11 Pro'):
+            with self.subTest(edition=edition):
+                self.vm_config['windows_config'] = {'username': 'lab', 'password': 'lab', 'edition': edition}
+                self.vm_config['guest_agent'] = False
+                without_agent = vmctl.windows.render_autounattend(self.vm_name, self.vm_config)
+                self.vm_config['guest_agent'] = True
+                self.assertFalse(vmctl.windows.installs_guest_agent(self.vm_config))
+                self.assertEqual(vmctl.windows.render_autounattend(self.vm_name, self.vm_config), without_agent)
+                with mock.patch.object(vmctl.windows, 'ensure_guest_agent_msi') as msi, \
+                     mock.patch.object(vmctl.cloud_init, 'create_iso_with_files') as create:
+                    vmctl.windows.create_windows_seed_iso(self.vm_name, self.vm_config)
+                msi.assert_not_called()
+                self.assertEqual(sorted(create.call_args.args[1]), ['autounattend.xml', 'vmctl-setup.ps1'])
 
     def test_cert_script_and_seed_contents(self):
         cert = vmctl.windows.render_cert_script()

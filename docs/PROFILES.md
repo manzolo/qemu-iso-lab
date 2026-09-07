@@ -70,7 +70,24 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 Set `"guest_agent": true` in a profile or its `local.json` override, then restart
 the VM to attach the channel. The guest must have `qemu-guest-agent` installed
 and running; Windows also needs the virtio serial driver. Enabling the channel
-does not install guest software. The socket is `runtime/qga.sock` beside the disk.
+does not install guest software, with one exception: on Windows 7 vmctl injects
+`vioserial` in WinPE and installs a compatible agent as SYSTEM from
+`SetupComplete.cmd`. Specialize only stages the script and MSI, and always exits
+0. First logon checks the MSI result and service state before reporting success.
+Windows 10/11 get both from `virtio-win-guest-tools.exe` at first logon.
+The socket is `runtime/qga.sock` beside the disk.
+
+Windows 7 with `guest_agent: true` also requires
+`windows_config.guest_agent_msi`, an object containing `path` (host cache), `url`
+and `sha256`. The tracked profile pins
+[`qemu-ga-win-101.1.0-1.el7ev` (2020)](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-qemu-ga/qemu-ga-win-101.1.0-1.el7ev/).
+The host validates the cached/downloaded MSI and puts it on the seed CD; the guest
+needs no network download. The SHA-256 in the profile was measured from that
+archive's HTTPS download (2,228,736 bytes), rather than a vendor checksum file.
+This package is separate from `virtio_iso`: the agent 110.0.2 on virtio-win 0.1.285
+cannot load on Windows 7 because `api-ms-win-core-path-l1-1-0.dll` is absent.
+The existing `vioserial` driver and raw child port worked in the live RTM test.
+See the [Windows guide](guides/en/60-windows.md) for logs and verification.
 
 ```sh
 bin/vmctl agent <vm>           # OS information and addresses

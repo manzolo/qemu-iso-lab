@@ -69,6 +69,12 @@ GENERIC_PRODUCT_KEYS = {
     "Windows 7 Professional": "FJ82H-XT6CR-J8D7P-XQJJ2-GPDD4",
 }
 CERT_SCRIPT_NAME = "vmctl-cert.cmd"
+QGA_SCRIPT_NAME = "vmctl-qga.cmd"
+# A pinned Windows 7-compatible MSI is downloaded by the host and carried on the seed CD.
+QGA_MSI_NAME = "vmctl-qga.msi"
+SETUP_COMPLETE_DIR = "C:\\Windows\\Setup\\Scripts"
+QGA_SERVICE_NAME = "QEMU-GA"
+QGA_EXIT_FILE = "C:\\vmctl-qga-exit.txt"
 
 DEFAULT_WINFSP_URL = "https://github.com/winfsp/winfsp/releases/download/v2.1/winfsp-2.1.25156.msi"
 DEFAULT_VIRTIO_ISO = "isos/virtio-win.iso"
@@ -78,6 +84,10 @@ DEFAULT_VIRTIO_ISO_URL = "https://fedorapeople.org/groups/virt/virtio-win/direct
 # file lists every combination so the driver injection never depends on enumeration order.
 DRIVER_CD_LETTERS = ("D", "E", "F", "G")
 DRIVER_DIRS = ("viostor", "NetKVM")
+# The virtio-serial driver the guest agent talks through. Windows 10/11 get it from the guest
+# tools installer at the first logon; Windows 7 installs no guest tools, so a profile that
+# declares `guest_agent` has it injected in WinPE like viostor and NetKVM.
+GUEST_AGENT_DRIVER_DIR = "vioserial"
 
 _COMPONENT_ATTRS = (
     'processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" '
@@ -177,6 +187,12 @@ def _resolve_ssh_pubkey(vm: dict[str, Any], dry_run: bool = False) -> str | None
     return pubkey.read_text(encoding="utf-8").strip()
 
 
+def installs_guest_agent(vm: dict[str, Any]) -> bool:
+    """True when vmctl itself must put ``qemu-ga`` in the guest: a legacy Windows profile that
+    declares ``guest_agent``. On Windows 10/11 the virtio guest tools installer does it."""
+    return vm.get("guest_agent") is True and is_legacy_windows(windows_config(vm) or {})
+
+
 def install_openssh(vm: dict[str, Any]) -> bool:
     cfg = windows_config(vm) or {}
     if is_legacy_windows(cfg):
@@ -187,10 +203,17 @@ def install_openssh(vm: dict[str, Any]) -> bool:
     return bool(value)
 
 
-def _driver_paths_xml(flavor: str) -> str:
+def _seed_cmd_loop(script_name: str, argument: str = "") -> str:
+    """Call a seed ``.cmd`` from whichever drive letter WinPE gave the seed CD."""
+    letters = " ".join(DRIVER_CD_LETTERS)
+    suffix = f" {argument}" if argument else ""
+    return f"cmd.exe /c for %d in ({letters}) do if exist %d:\\{script_name} call %d:\\{script_name}{suffix}"
+
+
+def _driver_paths_xml(flavor: str, directories: tuple[str, ...] = DRIVER_DIRS) -> str:
     lines: list[str] = []
     key = 1
-    for directory in DRIVER_DIRS:
+    for directory in directories:
         for letter in DRIVER_CD_LETTERS:
             lines.append(
                 f'        <PathAndCredentials wcm:action="add" wcm:keyValue="{key}">\n'
@@ -370,9 +393,10 @@ def render_autounattend(vm_name: str, vm: dict[str, Any]) -> str:
 {_bypass_xml() if bypass else ""}
     </component>"""
 
+    driver_dirs = DRIVER_DIRS + ((GUEST_AGENT_DRIVER_DIR,) if installs_guest_agent(vm) else ())
     drivers_pe = f"""    <component name="Microsoft-Windows-PnpCustomizationsWinPE" {_COMPONENT_ATTRS}>
       <DriverPaths>
-{_driver_paths_xml(flavor)}
+{_driver_paths_xml(flavor, driver_dirs)}
       </DriverPaths>
     </component>"""
 
@@ -396,15 +420,26 @@ def render_autounattend(vm_name: str, vm: dict[str, Any]) -> str:
         # Hat driver certificate (needed by the later virtio driver installs) is imported here as
         # SYSTEM. The command loops over the CD letters and always exits 0: a failure in
         # specialize would otherwise block Setup with a dialog. Verified approach in kvm-lab.
-        cert_cmd = f"cmd.exe /c for %d in ({' '.join(DRIVER_CD_LETTERS)}) do if exist %d:\\{CERT_SCRIPT_NAME} call %d:\\{CERT_SCRIPT_NAME}"
-        specialize += f"""
-    <component name="Microsoft-Windows-Deployment" {_COMPONENT_ATTRS}>
-      <RunSynchronous>
-        <RunSynchronousCommand wcm:action="add">
+        cert_cmd = _seed_cmd_loop(CERT_SCRIPT_NAME)
+        run_synchronous = f"""        <RunSynchronousCommand wcm:action="add">
           <Order>1</Order>
           <Path>{_x(cert_cmd)}</Path>
           <Description>vmctl: import the Red Hat VirtIO certificate</Description>
-        </RunSynchronousCommand>
+        </RunSynchronousCommand>"""
+        if installs_guest_agent(vm):
+            # Order 2, after the certificate. This only *stages* the installer as
+            # SetupComplete.cmd: msiexec needs elevation (so not the first logon) but also a
+            # working WMI (so not specialize either) — see render_qga_script.
+            run_synchronous += f"""
+        <RunSynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <Path>{_x(_seed_cmd_loop(QGA_SCRIPT_NAME, "stage"))}</Path>
+          <Description>vmctl: stage the QEMU guest agent install</Description>
+        </RunSynchronousCommand>"""
+        specialize += f"""
+    <component name="Microsoft-Windows-Deployment" {_COMPONENT_ATTRS}>
+      <RunSynchronous>
+{run_synchronous}
       </RunSynchronous>
     </component>"""
 
@@ -512,12 +547,60 @@ def render_cert_script() -> str:
     )
 
 
+def ensure_guest_agent_msi(vm: dict[str, Any], dry_run: bool = False) -> Path:
+    """Fetch the profile's pinned legacy agent separately from the current virtio drivers."""
+    package = (windows_config(vm) or {}).get("guest_agent_msi")
+    if not isinstance(package, dict) or not all(package.get(key) for key in ("path", "url", "sha256")):
+        raise VMError("Windows 7 guest_agent requires windows_config.guest_agent_msi with path, url and sha256")
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", str(package["sha256"])):
+        raise VMError("windows_config.guest_agent_msi.sha256 must be a SHA-256 digest")
+    # The shared downloader also validates cached files and replaces corrupt/incomplete downloads.
+    return iso.ensure_iso({
+        "iso": str(package["path"]),
+        "iso_url": str(package["url"]),
+        "iso_sha256": str(package["sha256"]),
+    }, dry_run=dry_run)
+
+
+def render_qga_script() -> str:
+    """Stage a compatible MSI in specialize; install it as SYSTEM from SetupComplete.cmd.
+
+    WMI/VSS registration fails in specialize, so installation waits until Setup is finished.
+    The recent virtio-win MSI cannot load on Windows 7 (api-ms-win-core-path-l1-1-0.dll is
+    missing); the profile pins a compatible MSI instead. The vioserial child is a raw device
+    and needs no separate INF. Both the channel and the older MSI were verified on 7 RTM.
+
+    Always exit 0 to avoid a modal Setup failure. The first-logon script checks the recorded
+    MSI result and service state before emitting the existing success/failure completion token.
+    """
+    return (
+        "@echo off\r\n"
+        "setlocal EnableExtensions\r\n"
+        'set "LOG=C:\\vmctl-qga.log"\r\n'
+        'if /i "%~1"=="stage" goto stage\r\n'
+        'echo ==== vmctl-qga install %DATE% %TIME% ==== >> "%LOG%"\r\n'
+        f'start /wait msiexec /i "%~dp0{QGA_MSI_NAME}" /qn /norestart /L*v C:\\vmctl-qga-msi.log\r\n'
+        'set "RESULT=%ERRORLEVEL%"\r\n'
+        f'> "{QGA_EXIT_FILE}" echo %RESULT%\r\n'
+        'echo msiexec exit code: %RESULT% >> "%LOG%"\r\n'
+        f'sc query {QGA_SERVICE_NAME} >> "%LOG%" 2>&1\r\n'
+        "exit /b 0\r\n"
+        ":stage\r\n"
+        'echo ==== vmctl-qga stage %DATE% %TIME% ==== > "%LOG%"\r\n'
+        f'if not exist "{SETUP_COMPLETE_DIR}" md "{SETUP_COMPLETE_DIR}"\r\n'
+        f'copy /y "%~dp0{QGA_MSI_NAME}" "{SETUP_COMPLETE_DIR}\\{QGA_MSI_NAME}" >> "%LOG%" 2>&1\r\n'
+        f'copy /y "%~f0" "{SETUP_COMPLETE_DIR}\\SetupComplete.cmd" >> "%LOG%" 2>&1\r\n'
+        "exit /b 0\r\n"
+    )
+
+
 def render_legacy_setup_script(vm_name: str, vm: dict[str, Any]) -> str:
     """``vmctl-setup.ps1`` for Windows 7: PowerShell 2.0, not elevated (UAC stays on), no OpenSSH.
 
-    It only runs the profile's ``setup_commands``, writes the completion token on COM1 and shuts
-    down: driver certificate trust happened in specialize (``vmctl-cert.cmd``), guest tools stay a
-    manual step (see the guide), there is no post-install because there is no SSH server.
+    It checks the agent install, runs ``setup_commands``, writes the token on COM1 and shuts
+    down: certificate trust happened in specialize, and SetupComplete installed ``qemu-ga`` as
+    SYSTEM for ``guest_agent`` profiles. The other guest tools stay a manual step, and
+    there is no post-install because there is no SSH server.
     """
     cfg = windows_config(vm)
     if cfg is None:
@@ -535,6 +618,15 @@ def render_legacy_setup_script(vm_name: str, vm: dict[str, Any]) -> str:
             "}"
         )
     commands_block = "\n".join(command_blocks) if command_blocks else "# (no setup_commands in the profile)"
+    agent_check = ""
+    if installs_guest_agent(vm):
+        agent_check = f"""Invoke-Step 'QEMU guest agent' {{
+    $result = (Get-Content {_ps_sq(QGA_EXIT_FILE)} -ErrorAction Stop | Out-String).Trim()
+    if (@('0', '3010') -notcontains $result) {{ throw "guest agent MSI exited with code $result (see C:\\vmctl-qga-msi.log)" }}
+    if ((Get-Service {QGA_SERVICE_NAME} -ErrorAction Stop).Status -ne 'Running') {{ throw 'QEMU guest agent service is not running' }}
+    Log 'QEMU guest agent service is running'
+}}
+"""
     return f"""# Windows 7 first-logon setup generated by vmctl for {vm_name} (PowerShell 2.0 compatible)
 # Launched from the VMCTLSEED CD-ROM by FirstLogonCommands as the autologon user (not elevated: UAC is on).
 $ErrorActionPreference = 'Stop'
@@ -569,6 +661,7 @@ function Invoke-Step([string]$Name, [scriptblock]$Body) {{
 }}
 
 Log "Setup script started on $env:COMPUTERNAME as $env:USERNAME (Windows 7, PowerShell $($PSVersionTable.PSVersion))"
+{agent_check}
 {commands_block}
 
 if ($script:Failures.Count -eq 0) {{
@@ -772,12 +865,16 @@ shutdown.exe /s /t 10 /f
 
 def create_windows_seed_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
     """Pack autounattend.xml + the setup script into the VMCTLSEED ISO (root of a CD-ROM)."""
-    files = {
+    files: dict[str, str | bytes] = {
         "autounattend.xml": render_autounattend(vm_name, vm),
         SETUP_SCRIPT_NAME: render_setup_script(vm_name, vm, dry_run=dry_run),
     }
     if is_legacy_windows(windows_config(vm) or {}):
         files[CERT_SCRIPT_NAME] = render_cert_script()
+    if installs_guest_agent(vm):
+        files[QGA_SCRIPT_NAME] = render_qga_script()
+        msi = ensure_guest_agent_msi(vm, dry_run=dry_run)
+        files[QGA_MSI_NAME] = b"" if dry_run else msi.read_bytes()
     return cloud_init.create_iso_with_files(
         windows_artifact_dir(vm),
         files,

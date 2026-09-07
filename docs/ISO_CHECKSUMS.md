@@ -47,6 +47,19 @@ python3 tools/verify_profile_isos.py --iso-root /path/to/checkout
 
 Missing files are reported without downloading anything; mismatches print expected and actual digests and produce exit status 1. Files are never modified or removed. The former Alpine `latest-stable` cache filename is also checked against the newly pinned CI release when present.
 
+## Pinned packages that are not ISOs
+
+| Profile | File | Pin |
+|---|---|---|
+| `windows7-unattended` | `qemu-ga-win-101.1.0-1.el7ev-x86_64.msi` (`windows_config.guest_agent_msi`) | `157f71a5f118883666ba068dd1dc140a8a3f0261c66151f5e1044396c6ea89e6` |
+
+This one is different in kind from every row above, and the difference matters. The
+[archive directory](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-qemu-ga/qemu-ga-win-101.1.0-1.el7ev/)
+publishes the two MSIs and no checksum manifest, so the hash was measured from the HTTPS download
+on 2026-09-07 (2,228,736 bytes): it is a repository content pin against later drift or a truncated
+download, not a vendor-verified checksum. The rule for the ISO rows still holds — a mismatch there
+is never resolved by writing the local hash into the profile.
+
 ## Local cache audit, 2026-09-07
 
 The audit found 14 matching files, 2 mismatches and 5 missing paths (the pinned Alpine file is missing but its legacy cache name matches). No local media was changed.

@@ -324,7 +324,7 @@
       "usb_tablet": true,
       "guest_agent": true,
       "acpi_poweroff_grace_sec": 300,
-      "notes": "Unattended Windows 7 Ultimate via bootstrap-windows, ported from kvm-lab's Windows7U: BIOS/MBR answer file (System Reserved + Windows), viostor injected in WinPE from the virtio-win CD (w7 drivers, network e1000e so no NetKVM needed), the Red Hat driver certificate imported in specialize from the seed CD (vmctl-cert.cmd), Skip*OOBE + NetworkLocation, autologon. No OpenSSH on Windows 7 and PowerShell 2.0 in the guest: the first-logon script only runs setup_commands, prints the completion token on COM1 and shuts down; there is no SSH post-install and check-vms reports the install alone. Guest tools (virtio-win, SPICE) stay a manual step; no virtiofs (no WinFSP for 7). Put the retail ISO at isos/windows7.iso or point 'iso' at it in local.json; image_index 4 = Ultimate on the standard multi-edition media. Retail media without the SHA-2 updates cannot verify newer drivers: the same virtio-win 0.1.285 viostor worked on this ISO in kvm-lab.",
+      "notes": "Unattended Windows 7 Ultimate via bootstrap-windows, ported from kvm-lab's Windows7U: BIOS/MBR answer file (System Reserved + Windows), viostor injected in WinPE from the virtio-win CD (w7 drivers, network e1000e so no NetKVM needed), the Red Hat driver certificate imported in specialize from the seed CD (vmctl-cert.cmd), Skip*OOBE + NetworkLocation, autologon. No OpenSSH on Windows 7 and PowerShell 2.0 in the guest: the first-logon script checks the guest agent service, runs setup_commands, prints the completion token on COM1 and shuts down; there is no SSH post-install and check-vms reports the install alone. The QEMU guest agent is installed as SYSTEM by SetupComplete.cmd from the separately pinned Windows 7-compatible MSI (windows_config.guest_agent_msi); vioserial is injected in WinPE. Current ISO agents cannot load on Windows 7 (missing api-ms-win-core-path-l1-1-0.dll). Other guest tools (virtio-win, SPICE) stay a manual step; no virtiofs (no WinFSP for 7). Put the retail ISO at isos/windows7.iso or point 'iso' at it in local.json; image_index 4 = Ultimate on the standard multi-edition media. Retail media without the SHA-2 updates cannot verify newer drivers: the same virtio-win 0.1.285 viostor worked on this ISO in kvm-lab.",
       "windows_config": {
         "username": "lab",
         "password": "lab",
@@ -339,6 +339,11 @@
         "driver_flavor": "w7",
         "virtio_iso": "isos/virtio-win.iso",
         "virtio_iso_url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso",
+        "guest_agent_msi": {
+          "path": "isos/qemu-ga-win-101.1.0-1.el7ev-x86_64.msi",
+          "url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-qemu-ga/qemu-ga-win-101.1.0-1.el7ev/qemu-ga-x86_64.msi",
+          "sha256": "157f71a5f118883666ba068dd1dc140a8a3f0261c66151f5e1044396c6ea89e6"
+        },
         "bypass_requirements": false,
         "install_guest_tools": false,
         "install_openssh": false,

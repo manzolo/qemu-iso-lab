@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
 
 from typing import Any
@@ -146,7 +147,7 @@ def create_seed_image(artifact_dir: Path, user_data: str, meta_data: str, dry_ru
 
 def create_iso_with_files(
     artifact_dir: Path,
-    files: dict[str, str],
+    files: Mapping[str, str | bytes],
     *,
     dry_run: bool = False,
     volume_id: str,
@@ -162,7 +163,10 @@ def create_iso_with_files(
         materialized_paths.append(path)
         runtime.ensure_parent(path)
         if not dry_run:
-            path.write_text(content, encoding="utf-8")
+            if isinstance(content, bytes):
+                path.write_bytes(content)
+            else:
+                path.write_text(content, encoding="utf-8")
     if prefer_cloud_localds and set(files) == {"user-data", "meta-data"} and shutil.which("cloud-localds"):
         cmd = ["cloud-localds", str(seed_path), str(user_data_path), str(meta_data_path)]
     elif shutil.which("genisoimage"):
