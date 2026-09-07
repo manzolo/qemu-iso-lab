@@ -56,7 +56,7 @@ stdio, so `console` is for installed VMs.
 ## Ubuntu: autoinstall
 
 ```bash
-vmctl bootstrap-unattended ubuntu-niri-gl
+vmctl bootstrap-unattended ubuntu-niri
 ```
 
 Generates the cloud-init seed and the `autoinstall` seed, extracts
@@ -65,10 +65,10 @@ waits for the installer to exit, then starts the installed VM and runs
 `cloud_init.post_install_run` / `ssh_provision`. Step by step:
 
 ```bash
-vmctl prep ubuntu-niri-gl
-vmctl install-unattended ubuntu-niri-gl
-vmctl start ubuntu-niri-gl --headless --background
-vmctl post-install ubuntu-niri-gl
+vmctl prep ubuntu-niri
+vmctl install-unattended ubuntu-niri
+vmctl start ubuntu-niri --headless --background
+vmctl post-install ubuntu-niri
 ```
 
 ## Debian: preseed

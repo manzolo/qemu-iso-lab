@@ -32,7 +32,6 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `ubuntu-desktop-live` | `ubuntu-26.04-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
 | `ubuntu-mate-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `ubuntu-niri` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
-| `ubuntu-niri-gl` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
 | `ubuntu-server-ci` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
 | `ubuntu-server-live` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
 | `void-xfce` | `void-live-x86_64-20250202-xfce.iso` | [Manifest](https://repo-default.voidlinux.org/live/current/sha256sum.txt) |

@@ -111,7 +111,7 @@ prints them all; the table shows what each family offers.
 | Family | Profiles | Highlights | Unattended |
 |--------|----------|------------|------------|
 | Arch | `arch`, `endeavouros`, `cachyos-live`, `cachyos-desktop`, `cachyos-nvidia`, `arch-noctalia`, `arch-dms`, `arch-dms-nvidia`, `arch-omarchy-nvidia` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes | `bootstrap-archinstall`, `bootstrap-omarchy` |
-| Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop-live`, `ubuntu-server-live`, `ubuntu-server-ci`, `ubuntu-niri`, `ubuntu-niri-gl`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
+| Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop-live`, `ubuntu-server-live`, `ubuntu-server-ci`, `ubuntu-niri`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
 | Ubuntu desktop flavors | `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `ubuntu-budgie-24.04` | LXQt, Plasma, Xfce, MATE and Budgie on the 24.04 LTS server ISO, display-manager autologin (kvm-lab's flavor family) | `bootstrap-unattended` |
 | Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms`, `fedora-silverblue`, `almalinux-minimal`, `almalinux-server`, `rocky-9` | Fedora 42/44, niri + DankMaterialShell on Fedora, immutable Silverblue (ostree), AlmaLinux 10.1, Rocky Linux 9 | `bootstrap-kickstart` |
 | openSUSE / NixOS / Void | `opensuse-tumbleweed-autoyast`, `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros, Tumbleweed GNOME installed unattended with AutoYaST | `bootstrap-autoyast`, interactive |
@@ -131,7 +131,7 @@ installer, waits for a completion token, starts the installed VM in the
 background and runs the profile's SSH provisioning.
 
 ```bash
-vmctl bootstrap-unattended ubuntu-niri-gl          # Ubuntu autoinstall + cloud-init
+vmctl bootstrap-unattended ubuntu-niri          # Ubuntu autoinstall + cloud-init
 vmctl bootstrap-preseed debian-server                 # Debian preseed
 vmctl bootstrap-kickstart almalinux-server            # AlmaLinux / RHEL kickstart from the ISO
 vmctl bootstrap-kickstart fedora-niri-dms       # Fedora kickstart from the netinst + online repo

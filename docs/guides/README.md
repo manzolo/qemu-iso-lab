@@ -12,7 +12,7 @@ Reproducible cheat sheets of the main VMs of the lab, in two languages: `it/` (I
 |---|---|---|---|---|
 | 00 | [00-comune.md](it/00-comune.md) | [00-common.md](en/00-common.md) | tutti / all | prerequisiti host, `vmctl`, `local.json`, uso quotidiano |
 | 05 | [05-interagire.md](it/05-interagire.md) | [05-interacting.md](en/05-interacting.md) | tutti / all | `vmctl shell`, `vmctl console` (seriale), `vmctl attach`; comandi tipici Linux, Windows (PowerShell via SSH), pfSense |
-| 10 | [10-ubuntu-niri.md](it/10-ubuntu-niri.md) | [10-ubuntu-niri.md](en/10-ubuntu-niri.md) | `ubuntu-niri`, `ubuntu-niri-gl` | `vmctl bootstrap-unattended` |
+| 10 | [10-ubuntu-niri.md](it/10-ubuntu-niri.md) | [10-ubuntu-niri.md](en/10-ubuntu-niri.md) | `ubuntu-niri` | `vmctl bootstrap-unattended` |
 | 15 | [15-ubuntu-flavors.md](it/15-ubuntu-flavors.md) | [15-ubuntu-flavors.md](en/15-ubuntu-flavors.md) | `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `ubuntu-budgie-24.04` | `vmctl bootstrap-unattended` |
 | 20 | [20-debian-server.md](it/20-debian-server.md) | [20-debian-server.md](en/20-debian-server.md) | `debian-server` | `vmctl bootstrap-preseed` |
 | 30 | [30-almalinux-fedora.md](it/30-almalinux-fedora.md) | [30-almalinux-fedora.md](en/30-almalinux-fedora.md) | `almalinux-server`, `rocky-9`, `fedora-niri-dms`, `fedora-silverblue` | `vmctl bootstrap-kickstart` |

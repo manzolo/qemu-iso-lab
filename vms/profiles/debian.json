@@ -483,13 +483,13 @@
       "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
     },
     "ubuntu-niri": {
-      "name": "Ubuntu 26.04 Niri",
+      "name": "Ubuntu 26.04 Niri + DankMaterialShell",
       "meta": {
-        "slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "experimental"
+        "status": "experimental",
+        "slug": "ubuntu"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -533,119 +533,6 @@
             "-vga",
             "std",
             "-display",
-            "gtk"
-          ],
-          "virtio-gl": [
-            "-device",
-            "virtio-vga-gl",
-            "-display",
-            "gtk,gl=on"
-          ]
-        }
-      },
-      "usb_tablet": true,
-      "autoinstall": {
-        "hostname": "ubuntu-niri",
-        "username": "vmuser",
-        "realname": "VM User",
-        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
-        "timezone": "UTC",
-        "keyboard_layout": "us",
-        "storage_layout": "direct",
-        "install_ssh": true
-      },
-      "cloud_init": {
-        "hostname": "ubuntu-niri",
-        "user": "vmuser",
-        "ssh_host_port": 2222,
-        "packages": [
-          "software-properties-common",
-          "foot"
-        ],
-        "runcmd": [
-          "mkdir -p /home/vmuser/.config/niri",
-          "chown -R vmuser:vmuser /home/vmuser/.config"
-        ],
-        "write_files": [
-          {
-            "path": "/etc/sudoers.d/90-vmuser-nopasswd",
-            "permissions": "0440",
-            "content": "vmuser ALL=(ALL) NOPASSWD:ALL\n"
-          }
-        ],
-        "copy_from_host": [
-          {
-            "source": "vms/profile-files/ubuntu-niri/bin/ubuntu-niri-post-install",
-            "dest": "/home/vmuser/bin/ubuntu-niri-post-install",
-            "dest_mode": "755"
-          },
-          {
-            "source": "vms/profile-files/common/bin/verify-desktop",
-            "dest": "/home/{{user}}/bin/verify-desktop",
-            "dest_mode": "755"
-          }
-        ],
-        "post_install_run": [
-          "~/bin/ubuntu-niri-post-install",
-          "test \"$(dpkg-query -W -f='${Status}' niri)\" = \"install ok installed\" && test \"$(dpkg-query -W -f='${Status}' dms)\" = \"install ok installed\""
-        ],
-        "verify_after_reboot": [
-          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager dpkg --package niri --compositor niri"
-        ]
-      },
-      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
-    },
-    "ubuntu-niri-gl": {
-      "name": "Ubuntu 26.04 Niri",
-      "meta": {
-        "catalog_slug": "ubuntu",
-        "family": "debian",
-        "role": "desktop",
-        "release_model": "lts",
-        "status": "experimental"
-      },
-      "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
-      "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
-      "disk": {
-        "path": "artifacts/ubuntu-niri-gl/disk.qcow2",
-        "size": "32G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-niri-gl/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 4,
-      "network": "user",
-      "audio": true,
-      "video": {
-        "default": "virtio-gl",
-        "headless": [
-          "-device",
-          "virtio-vga-gl",
-          "-display",
-          "egl-headless"
-        ],
-        "installer_order": [
-          "std",
-          "safe"
-        ],
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
             "gtk",
             "-serial",
             "mon:stdio"
@@ -660,7 +547,7 @@
       },
       "usb_tablet": true,
       "autoinstall": {
-        "hostname": "ubuntu-niri-gl",
+        "hostname": "ubuntu-niri",
         "username": "lab",
         "realname": "{{user}}",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
@@ -670,9 +557,9 @@
         "install_ssh": true
       },
       "cloud_init": {
-        "hostname": "ubuntu-niri-gl",
+        "hostname": "ubuntu-niri",
         "user": "lab",
-        "ssh_host_port": 2227,
+        "ssh_host_port": 2222,
         "packages": [
           "software-properties-common",
           "foot"
@@ -690,8 +577,8 @@
         ],
         "copy_from_host": [
           {
-            "source": "vms/profile-files/ubuntu-niri-gl/bin/ubuntu-niri-gl-post-install",
-            "dest": "/home/{{user}}/bin/ubuntu-niri-gl-post-install",
+            "source": "vms/profile-files/ubuntu-niri/bin/ubuntu-niri-post-install",
+            "dest": "/home/{{user}}/bin/ubuntu-niri-post-install",
             "dest_mode": "755"
           },
           {
@@ -701,14 +588,15 @@
           }
         ],
         "post_install_run": [
-          "~/bin/ubuntu-niri-gl-post-install",
+          "~/bin/ubuntu-niri-post-install",
           "test \"$(dpkg-query -W -f='${Status}' niri)\" = \"install ok installed\" && test \"$(dpkg-query -W -f='${Status}' dms)\" = \"install ok installed\""
         ],
         "verify_after_reboot": [
           "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager dpkg --package niri --compositor niri"
         ]
       },
-      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9",
+      "notes": "Ubuntu 26.04 with niri and DankMaterialShell, installed unattended from the server ISO. greetd logs the user straight into niri-session on the vt the packaged unit owns (tty7 on Debian and Ubuntu), waybar stays disabled because dms brings its own bar, and the compositor needs the virtio GPU: with the standard VGA there is no render node and niri runs with no output at all. The desktop is asserted after a reboot, which is also how you meet the VM."
     }
   }
 }
