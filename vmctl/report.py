@@ -12,6 +12,7 @@ import platform
 import struct
 import subprocess
 import threading
+import time
 from typing import Any, Iterator
 import zlib
 
@@ -56,14 +57,54 @@ def ppm_to_png(data: bytes) -> bytes:
             + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 
 
-def capture_screenshot(vm_name: str, vm: dict[str, Any], directory: Path) -> str | None:
+CONSOLE_WAKE_DELAY_SEC = 2.0
+BLANK_RETRIES = 3
+BLANK_PIXEL_RATIO = 0.001
+
+
+def wake_console(vm: dict[str, Any]) -> None:
+    """Make the guest paint its console right before a screendump.
+
+    A text-mode guest paints tty1 only when it has something to say, and the screenshot can
+    land in the gap between "VM started" and "login prompt printed": the capture is then an
+    all-black rectangle that says nothing about the install (seen in the report for the Rocky
+    row). Enter costs nothing on a login prompt (agetty prints it again) and also brings back
+    a console the kernel has blanked after ten idle minutes.
+    """
+    qemu.qmp_command(
+        qemu.qmp_socket_path(vm),
+        "send-key",
+        arguments={"keys": [{"type": "qcode", "data": "ret"}]},
+    )
+    time.sleep(CONSOLE_WAKE_DELAY_SEC)
+
+
+def looks_blank(ppm_bytes: bytes) -> bool:
+    """True when almost every pixel is black: a screenshot with nothing to show."""
+    body = ppm_bytes[ppm_bytes.find(b"255\n") + 4:] if b"255\n" in ppm_bytes else ppm_bytes
+    if not body:
+        return True
+    lit = sum(1 for index in range(0, len(body) - 2, 3) if body[index] or body[index + 1] or body[index + 2])
+    return lit <= max(1, int(len(body) / 3 * BLANK_PIXEL_RATIO))
+
+
+def capture_screenshot(vm_name: str, vm: dict[str, Any], directory: Path, wake: bool = True) -> str | None:
     ppm = directory / "screens" / f"{vm_name}.ppm"
     png = ppm.with_suffix(".png")
+    attempts = BLANK_RETRIES if wake else 1
     try:
         ppm.parent.mkdir(parents=True, exist_ok=True)
-        if not qemu.qmp_command(qemu.qmp_socket_path(vm), "screendump", arguments={"filename": str(ppm.resolve())}):
-            return "Screenshot unavailable: QMP screendump did not succeed"
-        png.write_bytes(ppm_to_png(ppm.read_bytes()))
+        for attempt in range(attempts):
+            if wake:
+                wake_console(vm)
+            if not qemu.qmp_command(qemu.qmp_socket_path(vm), "screendump", arguments={"filename": str(ppm.resolve())}):
+                return "Screenshot unavailable: QMP screendump did not succeed"
+            raw = ppm.read_bytes()
+            png.write_bytes(ppm_to_png(raw))
+            # A guest that is genuinely dark stays dark: give it a few tries, then keep what
+            # it showed rather than failing the row over a screenshot.
+            if not looks_blank(raw) or attempt == attempts - 1:
+                return None
         return None
     except (OSError, ValueError) as exc:
         return f"Screenshot unavailable: {exc}"
@@ -79,11 +120,11 @@ def phase(args: argparse.Namespace, name: str) -> None:
     parent._report_phase = name
 
 
-def capture(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> None:
+def capture(vm_name: str, vm: dict[str, Any], args: argparse.Namespace, wake: bool = True) -> None:
     directory = getattr(args, "_report_dir", None)
     if not directory or args.dry_run:
         return
-    error = capture_screenshot(vm_name, vm, Path(directory))
+    error = capture_screenshot(vm_name, vm, Path(directory), wake=wake)
     args._screenshot_error = error
 
 
@@ -94,7 +135,8 @@ def watch_boot(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> It
 
     def watch() -> None:
         while not stop.is_set():
-            capture(vm_name, vm, args)
+            # No wake-up here: this loop runs while the installer is driving the guest.
+            capture(vm_name, vm, args, wake=False)
             stop.wait(0.5)
 
     thread = threading.Thread(target=watch, daemon=True)

@@ -2,6 +2,7 @@ import argparse
 import json
 import struct
 import zlib
+from pathlib import Path
 from unittest import mock
 
 from _common import BaseVmctlTestCase
@@ -52,11 +53,53 @@ class ReportTests(BaseVmctlTestCase):
         self.assertIn("function setStatus(value)", html_text)
         self.assertIn(".metric[data-status], .badge[data-status]", html_text)
 
+    def test_final_capture_wakes_a_blanked_console_but_the_watcher_does_not(self):
+        # A server guest reaches the screenshot minutes after boot, past console blanking:
+        # without the nudge the capture is a black rectangle (seen in the Rocky report row).
+        calls = []
+
+        def fake_qmp(socket_path, command, arguments=None):
+            calls.append(command)
+            if command == "screendump":
+                Path(arguments["filename"]).write_bytes(b"P6 2 1 255\n" + b"\xff" * 6)
+            return True
+
+        with mock.patch.object(qemu, "qmp_command", side_effect=fake_qmp), \
+             mock.patch.object(report.time, "sleep") as sleep:
+            self.assertIsNone(report.capture_screenshot("vm", self.vm_config, self.root))
+        self.assertEqual(calls, ["send-key", "screendump"])  # a lit screen is kept at once
+        sleep.assert_called_once_with(report.CONSOLE_WAKE_DELAY_SEC)
+
+        calls.clear()
+        with mock.patch.object(qemu, "qmp_command", side_effect=fake_qmp):
+            self.assertIsNone(report.capture_screenshot("vm", self.vm_config, self.root, wake=False))
+        self.assertEqual(calls, ["screendump"])  # the install-time watcher must not type
+
+    def test_all_black_capture_is_retried_then_kept(self):
+        calls = []
+
+        def fake_qmp(socket_path, command, arguments=None):
+            calls.append(command)
+            if command == "screendump":
+                Path(arguments["filename"]).write_bytes(b"P6 2 1 255\n" + b"\x00" * 6)
+            return True
+
+        with mock.patch.object(qemu, "qmp_command", side_effect=fake_qmp), \
+             mock.patch.object(report.time, "sleep"):
+            self.assertIsNone(report.capture_screenshot("vm", self.vm_config, self.root))
+        # A guest that paints its console late gets a few tries; a genuinely dark screen is
+        # kept as it is instead of failing the row.
+        self.assertEqual(calls.count("screendump"), report.BLANK_RETRIES)
+        self.assertTrue((self.root / "screens/vm.png").exists())
+        self.assertTrue(report.looks_blank(b"P6 2 1 255\n" + b"\x00" * 6))
+        self.assertFalse(report.looks_blank(b"P6 2 1 255\n" + b"\xff" * 6))
+
     def test_capture_qmp_arguments(self):
         def qmp_call(path, command, **kwargs):
-            self.assertEqual(command, "screendump")
-            from pathlib import Path
-            Path(kwargs["arguments"]["filename"]).write_bytes(b"P6 1 1 255\nabc")
+            self.assertIn(command, ("send-key", "screendump"))
+            if command == "screendump":
+                from pathlib import Path
+                Path(kwargs["arguments"]["filename"]).write_bytes(b"P6 1 1 255\nabc")
             return True
         with mock.patch.object(qemu, "qmp_command", side_effect=qmp_call):
             self.assertIsNone(report.capture_screenshot("testvm", self.vm_config, self.root))
@@ -66,7 +109,7 @@ class ReportTests(BaseVmctlTestCase):
     def test_matrix_report_capture_before_stop_and_restore(self):
         args = cli.build_parser().parse_args(["check-vms", "testvm", "--restore", "--report"])
         events = []
-        def capture(name, vm, directory):
+        def capture(name, vm, directory, wake=True):
             events.append("capture")
             (directory / "screens/testvm.png").write_bytes(report.ppm_to_png(b"P6 1 1 255\nabc"))
             return None

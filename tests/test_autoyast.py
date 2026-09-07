@@ -46,6 +46,9 @@ class AutoyastRenderTests(BaseVmctlTestCase):
         self.assertIn("<service>sshd</service>", xml)
         # the installer must not ask anything and must not reboot into a second stage
         self.assertIn("<confirm config:type=\"boolean\">false</confirm>", xml)
+        # No YaST2 second stage: the first boot must land on the desktop, not on a blue
+        # installer screen (it did, and the report screenshot showed it).
+        self.assertIn("<second_stage config:type=\"boolean\">false</second_stage>", xml)
         self.assertIn("<service>YaST2-Second-Stage</service>", xml)
         self.assertIn("echo custom-step", xml)
 
@@ -64,6 +67,9 @@ class AutoyastRenderTests(BaseVmctlTestCase):
         # openSUSE's firewalld opens dhcpv6-client only: without this the forwarded SSH port
         # accepts the connection and then hangs at the banner (verified live).
         self.assertIn("firewall-offline-cmd --add-service=ssh", script)
+        # the second stage is skipped, so the chroot script owns the services and the target
+        self.assertIn("systemctl enable NetworkManager.service", script)
+        self.assertIn("systemctl set-default graphical.target", script)
         firewall_at = script.index("firewall-offline-cmd")
         self.assertLess(firewall_at, sync_at)
 

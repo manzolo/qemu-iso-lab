@@ -153,6 +153,16 @@ repository and stops halfway through the package install on `Insert 'cd-<id>'
 profile uses the NET image, which carries no packages, plus the online `oss`
 repository: a 250 MB download instead of the 4.7 GB DVD.
 
+`second_stage` is false by default. The YaST second stage runs on tty1 at first
+boot and, because the host ends the install at the guest's reboot, it decides the
+previous installation failed and asks whether to continue it: the first thing the
+user sees is a blue installer dialog. With it disabled the chroot script owns
+what the second stage would have done, service by service: `enable_services`,
+the default target, the display manager, and `firewall-offline-cmd
+--add-service` for `open_firewall_services`. openSUSE's firewalld opens only
+`dhcpv6-client`, so without that last one sshd listens, the forwarded port
+connects and the session hangs at the banner exchange.
+
 The profile drives partitioning (GPT, 512 MB EFI + btrfs root), patterns
 (`enhanced_base`, `gnome`, `kvm_server` by default) and services, and its chroot
 script creates the user and group, the passwordless sudo drop-in, the SSH

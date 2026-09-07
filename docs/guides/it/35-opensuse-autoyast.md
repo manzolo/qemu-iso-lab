@@ -32,9 +32,19 @@ vmctl attach opensuse-tumbleweed-autoyast          # per guardare l'installer
 3. **Installazione**: YaST partiziona il disco (GPT, 512 MB EFI + root btrfs), installa i
    pattern (`enhanced_base`, `gnome`, `kvm_server`) e i pacchetti del profilo.
 4. **Script chroot**: dentro il sistema installato crea l'utente e il suo gruppo, il file di
-   sudo senza password, la chiave SSH autorizzata, l'autologin di GDM, abilita `sshd` e un
-   getty su `ttyS0`. Poi `sync`, `blockdev --flushbufs`, e solo a quel punto il token di
-   completamento `==> AutoYaST install complete!` sulla seriale.
+   sudo senza password, la chiave SSH autorizzata, l'autologin di GDM, abilita i servizi
+   (`NetworkManager`, `sshd`, il guest agent, il display manager), imposta il target
+   grafico, mette un getty su `ttyS0` e apre SSH in firewalld. Poi `sync`,
+   `blockdev --flushbufs`, e solo a quel punto il token di completamento
+   `==> AutoYaST install complete!` sulla seriale.
+
+   Due di questi passi esistono per quello che succede senza di loro. Il firewalld di
+   openSUSE apre solo `dhcpv6-client`, quindi sshd ascolta, la porta inoltrata si connette e
+   la sessione muore allo scambio del banner. E il profilo disattiva la **seconda fase di
+   YaST** (`second_stage: false`): girerebbe su tty1 al primo avvio e, poiché l'host chiude
+   l'installazione al riavvio del guest, annuncerebbe "The previous installation has failed.
+   Would you like it to continue?" a chi apre la VM. Disattivata, è lo script qui sopra a
+   configurare il sistema e il primo avvio va diretto a GNOME.
 5. **Riavvio**: YaST riavvia, QEMU è stato lanciato con `-no-reboot` ed esce da solo. L'host
    riavvia la VM installata headless e fa il post-install via SSH.
 

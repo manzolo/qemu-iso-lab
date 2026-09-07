@@ -85,6 +85,8 @@ def chroot_script(vm_name: str, vm: dict[str, Any]) -> str:
     disk_device = str(cfg.get("disk_device") or "vda").strip()
     autologin = bool(cfg.get("autologin", True))
     firewall_services: list[str] = list(cfg.get("open_firewall_services") or ["ssh"])
+    enable_services: list[str] = list(cfg.get("enable_services") or ["NetworkManager", "sshd", "qemu-guest-agent"])
+    default_target = str(cfg.get("default_target") or "graphical").strip()
     extra_commands: list[str] = list(cfg.get("chroot_commands") or [])
     pubkey = _resolve_ssh_pubkey(vm)
 
@@ -100,6 +102,11 @@ def chroot_script(vm_name: str, vm: dict[str, Any]) -> str:
         "systemctl enable sshd.service || true",
         "systemctl enable serial-getty@ttyS0.service || true",
     ]
+    # With the second stage skipped, services-manager never runs: enable them here.
+    for service in enable_services:
+        lines.append(f"systemctl enable {service}.service || true")
+    lines.append(f"systemctl set-default {default_target}.target || true")
+    lines.append("systemctl enable display-manager.service || true")
     # openSUSE installs firewalld with only dhcpv6-client open: sshd listens and the host's
     # forwarded port still hangs at the SSH banner (verified live on the running guest).
     for service in firewall_services:
@@ -159,6 +166,10 @@ def render_autoyast(vm_name: str, vm: dict[str, Any]) -> str:
     enable_services: list[str] = list(cfg.get("enable_services") or ["NetworkManager", "sshd", "qemu-guest-agent"])
     default_target = str(cfg.get("default_target") or "graphical").strip()
     final_reboot = "true" if cfg.get("final_reboot", True) else "false"
+    # Without this the installed system runs "YaST2 Second Stage" on tty1 at first boot: the
+    # user (and the report screenshot) sees a blue installer screen instead of the desktop.
+    # Everything the second stage would do is already in the chroot script below.
+    second_stage = "true" if cfg.get("second_stage", False) else "false"
     script = chroot_script(vm_name, vm)
 
     return f"""<?xml version="1.0"?>
@@ -167,6 +178,7 @@ def render_autoyast(vm_name: str, vm: dict[str, Any]) -> str:
   <general>
     <mode>
       <confirm config:type="boolean">false</confirm>
+      <second_stage config:type="boolean">{second_stage}</second_stage>
       <final_reboot config:type="boolean">{final_reboot}</final_reboot>
     </mode>
   </general>
