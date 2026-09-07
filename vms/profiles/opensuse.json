@@ -124,6 +124,7 @@
       "network": "user",
       "audio": true,
       "usb_tablet": true,
+      "guest_agent": true,
       "clipboard": true,
       "installer_boot": {
         "kernel": "boot/x86_64/loader/linux",

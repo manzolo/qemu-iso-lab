@@ -447,6 +447,7 @@
       "network": "user",
       "audio": true,
       "usb_tablet": true,
+      "guest_agent": true,
       "clipboard": true,
       "video": {
         "default": "std",

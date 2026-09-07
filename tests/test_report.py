@@ -148,6 +148,34 @@ class ReportTests(BaseVmctlTestCase):
         self.assertIn("screendump did not succeed", error)
         self.assertIn("no socket", error)
 
+    def test_row_records_whether_the_declared_agent_answers(self):
+        args = argparse.Namespace(dry_run=False, _report_dir=str(self.root), report=str(self.root))
+        (self.root / "screens").mkdir(parents=True, exist_ok=True)
+        (self.root / "screens/vm.png").write_bytes(report.ppm_to_png(b"P6 2 1 255\n" + b"\xff" * 6))
+        self.vm_config["guest_agent"] = True
+
+        # A profile that declares the channel and stays silent is a defect worth seeing.
+        with mock.patch.object(report.guest_agent, "responds", return_value=False):
+            report.probe_guest_agent(self.vm_config, args)
+        report.record("vm", self.vm_config, args, "passed", "installed", 1.0, "flow")
+        row = json.loads((self.root / "results/vm.json").read_text())
+        self.assertEqual(row["status"], "WARN")
+        self.assertIn("guest agent silent", row["detail"])
+
+        with mock.patch.object(report.guest_agent, "responds", return_value=True):
+            report.probe_guest_agent(self.vm_config, args)
+        report.record("vm", self.vm_config, args, "passed", "installed", 1.0, "flow")
+        row = json.loads((self.root / "results/vm.json").read_text())
+        self.assertEqual(row["status"], "PASS")
+        self.assertIn("guest agent answers", row["detail"])
+
+        # A profile without the channel is not probed and not annotated.
+        self.vm_config.pop("guest_agent")
+        args._guest_agent_state = None
+        with mock.patch.object(report.guest_agent, "responds") as responds:
+            report.probe_guest_agent(self.vm_config, args)
+        responds.assert_not_called()
+
     def test_capture_qmp_arguments(self):
         def qmp_call(path, command, **kwargs):
             self.assertIn(command, ("send-key", "screendump"))

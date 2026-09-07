@@ -17,7 +17,7 @@ import time
 from typing import Any, Iterator
 import zlib
 
-from vmctl import qemu, runtime, state, ui
+from vmctl import guest_agent, qemu, runtime, state, ui
 from vmctl.errors import VMError
 
 
@@ -217,12 +217,26 @@ def phase(args: argparse.Namespace, name: str) -> None:
     parent._report_phase = name
 
 
+def probe_guest_agent(vm: dict[str, Any], args: argparse.Namespace) -> None:
+    """Record whether the guest agent answers, while the VM is still up.
+
+    A profile that declares the channel and cannot answer on it is a defect worth seeing in
+    the report: the socket only exists while QEMU runs, so the question has to be asked
+    before the row stops the VM.
+    """
+    if not guest_agent.enabled(vm):
+        return
+    args._guest_agent_state = "guest agent answers" if guest_agent.responds(vm) else "guest agent silent"
+
+
 def capture(vm_name: str, vm: dict[str, Any], args: argparse.Namespace, wake: bool = True) -> None:
     directory = getattr(args, "_report_dir", None)
     if not directory or args.dry_run:
         return
     error = capture_screenshot(vm_name, vm, Path(directory), wake=wake)
     args._screenshot_error = error
+    if wake:  # the final evidence pass, not the installer watcher
+        probe_guest_agent(vm, args)
 
 
 @contextmanager
@@ -279,6 +293,11 @@ def record(vm_name: str, vm: dict[str, Any], args: argparse.Namespace, status: s
         outcome = "WARN"
     if not screenshot.exists():
         detail += "; " + (error or "Screenshot unavailable: no live framebuffer captured")
+    agent_state = getattr(args, "_guest_agent_state", None)
+    if agent_state:
+        detail += f"; {agent_state}"
+        if agent_state.endswith("silent") and outcome == "PASS":
+            outcome = "WARN"
     result = {"id": vm_name, "name": vm.get("name", vm_name), "flow": flow,
               "profile_status": vm.get("meta", {}).get("status", "manual"),
               "profile_verified": vm.get("meta", {}).get("verified"),

@@ -147,6 +147,7 @@
       ],
       "audio": false,
       "usb_tablet": false,
+      "guest_agent": true,
       "video": {
         "default": "safe",
         "installer_order": [
@@ -273,6 +274,7 @@
       ],
       "audio": true,
       "usb_tablet": true,
+      "guest_agent": true,
       "clipboard": true,
       "shared_dir": {
         "source": "shared",

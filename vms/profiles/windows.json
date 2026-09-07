@@ -47,6 +47,7 @@
         }
       },
       "usb_tablet": true,
+      "guest_agent": true,
       "notes": "Unattended Windows 10 via autounattend.xml (bootstrap-windows), same flow as windows11-unattended: put the retail ISO at isos/windows10.iso (or point 'iso' at it in local.json), it is rebuilt once as isos/windows10-noprompt.iso. Multi-edition ISOs carry several images: 'edition' must name one of them ('Windows 10 Pro' here). No TPM/Secure Boot bypass needed. OpenSSH Server is an optional capability on 1809+.",
       "windows_config": {
         "username": "lab",
@@ -134,6 +135,7 @@
         }
       },
       "usb_tablet": true,
+      "guest_agent": true,
       "notes": "Unattended Windows 11 via autounattend.xml (bootstrap-windows). Microsoft publishes no stable download URL: put the retail ISO at isos/windows11.iso (or point 'iso' at it in local.json). The ISO is rebuilt once as isos/windows11-noprompt.iso (UEFI efisys_noprompt.bin, no 'Press any key' wait); the answer file rides on a VMCTLSEED CD, the virtio-win ISO (downloaded from fedorapeople) supplies viostor/NetKVM in WinPE and the guest tools at first logon. TPM/Secure Boot/CPU/RAM checks are bypassed through the LabConfig registry keys (no swtpm needed). Edition/language must exist in the ISO ('Windows 11 Pro', en-US on the multi-edition English ISO; it-IT on the Italian one). Post-install runs over Windows OpenSSH with cmd.exe semantics.",
       "windows_config": {
         "username": "lab",
@@ -320,6 +322,7 @@
         }
       },
       "usb_tablet": true,
+      "guest_agent": true,
       "acpi_poweroff_grace_sec": 300,
       "notes": "Unattended Windows 7 Ultimate via bootstrap-windows, ported from kvm-lab's Windows7U: BIOS/MBR answer file (System Reserved + Windows), viostor injected in WinPE from the virtio-win CD (w7 drivers, network e1000e so no NetKVM needed), the Red Hat driver certificate imported in specialize from the seed CD (vmctl-cert.cmd), Skip*OOBE + NetworkLocation, autologon. No OpenSSH on Windows 7 and PowerShell 2.0 in the guest: the first-logon script only runs setup_commands, prints the completion token on COM1 and shuts down; there is no SSH post-install and check-vms reports the install alone. Guest tools (virtio-win, SPICE) stay a manual step; no virtiofs (no WinFSP for 7). Put the retail ISO at isos/windows7.iso or point 'iso' at it in local.json; image_index 4 = Ultimate on the standard multi-edition media. Retail media without the SHA-2 updates cannot verify newer drivers: the same virtio-win 0.1.285 viostor worked on this ISO in kvm-lab.",
       "windows_config": {
