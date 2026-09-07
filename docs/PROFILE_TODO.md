@@ -21,7 +21,7 @@ New profiles should add at least one new coverage axis instead of being only
 
 These are the first five profiles to implement.
 
-1. `alpine-installed-ci` - implemented
+1. `alpine-ci-installed` - implemented
    Minimal installed-on-disk follow-up to `alpine-ci`.
    Coverage added: unattended-ish CI path, disk boot after install, stronger CI smoke test.
 
@@ -53,7 +53,7 @@ These are useful after the first wave.
   Automated AlmaLinux kickstart server profile with SSH post-install.
   Coverage added: enterprise-style unattended install path, RHEL-family provisioning, serial token completion flow.
 
-- `ubuntu-server-headless`
+- `ubuntu-server-ci`
   Headless, SSH-oriented server baseline for shell and post-install workflows.
 
 - `windows11-installer`

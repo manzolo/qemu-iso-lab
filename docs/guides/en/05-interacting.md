@@ -2,7 +2,7 @@
 
 How to get into a lab VM without a graphical window: SSH, serial console, VNC screen, and the
 typical commands to run inside Linux, Windows and pfSense. It applies to every profile; the
-examples use the network lab (`pfsense-lab`, `pihole-lab`, `lubuntu22-lab`) and the
+examples use the network lab (`pfsense-lab`, `pihole-lab`, `lubuntu-lab`) and the
 unattended Windows VMs.
 
 ## 1. The three doors
@@ -15,8 +15,8 @@ unattended Windows VMs.
 
 Who answers on the serial:
 
-- **Linux**: a getty on `ttyS0` is needed. The lab profiles (`pihole-lab`, `lubuntu22-lab`)
-  and `ubuntu-server-headless` enable it; on another VM run once
+- **Linux**: a getty on `ttyS0` is needed. The lab profiles (`pihole-lab`, `lubuntu-lab`)
+  and `ubuntu-server-ci` enable it; on another VM run once
   `sudo systemctl enable --now serial-getty@ttyS0.service` (through `vmctl shell`).
 - **pfSense**: the serial console is enabled by the generated `config.xml`: after the boot the
   numbered menu appears (0 logout, 8 shell, 5 reboot, 6 halt...).
@@ -27,7 +27,7 @@ To run one command without opening a session, `vmctl shell` takes no arguments: 
 directly with the same key and port, which is also what the profiles' `post_install_run` does:
 
 ```bash
-ssh -i artifacts/lubuntu22-lab/ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=no \
+ssh -i artifacts/lubuntu-lab/ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null -p 2239 lab@127.0.0.1 'ip -br addr'
 ```
 
@@ -37,7 +37,7 @@ slirp forwards). On libvirt, after `vmctl lab export`, use the real IP: `ssh lab
 
 ## 2. Linux: typical checks
 
-From the Lubuntu client (`vmctl shell lubuntu22-lab`):
+From the Lubuntu client (`vmctl shell lubuntu-lab`):
 
 ```bash
 ip -br addr                              # the NIC (enp0s4 on the client, enp0s2 on Pi-hole): 192.168.0.100/24

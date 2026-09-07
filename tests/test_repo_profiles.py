@@ -37,28 +37,28 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                 vmctl.state.CONFIG_DIR = original_config_dir
 
         for profile in (
-            "alpine-installed-ci",
+            "alpine-ci-installed",
             "debian-efi",
             "debian-bios",
-            "ubuntu-server-headless",
+            "ubuntu-server-ci",
             "fedora-server-efi",
             "freebsd",
-            "arch-omarchy-nvidia-local",
-            "fedora-niri-dms-local",
+            "arch-omarchy-nvidia",
+            "fedora-niri-dms",
             "alpine-niri",
-            "cachyos-nvidia-local",
+            "cachyos-nvidia",
             "windows11-unattended",
             "windows10-unattended",
             "pfsense-lab",
             "pihole-lab",
-            "lubuntu22-lab",
+            "lubuntu-lab",
             "windows7-unattended",
             "lubuntu-24.04",
             "kubuntu-24.04",
             "xubuntu-24.04",
             "ubuntu-mate-24.04",
             "ubuntu-budgie-24.04",
-            "rocky9",
+            "rocky-9",
             "fedora-silverblue",
             "opensuse-tumbleweed-autoyast",
         ):
@@ -125,14 +125,14 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         top = vmctl.netlab.topology(cfg, "pfsense-lab")
         self.assertEqual(top["lan"]["name"], "lab-lan")
         self.assertEqual(top["dns_ip"], "192.168.0.10")
-        self.assertEqual([m["name"] for m in top["members"]], ["lubuntu22-lab", "pihole-lab"])
-        self.assertEqual(vmctl.netlab.lab_vm_names(cfg, "pfsense-lab"), ["pfsense-lab", "pihole-lab", "lubuntu22-lab"])
-        for member in ("pihole-lab", "lubuntu22-lab"):
+        self.assertEqual([m["name"] for m in top["members"]], ["lubuntu-lab", "pihole-lab"])
+        self.assertEqual(vmctl.netlab.lab_vm_names(cfg, "pfsense-lab"), ["pfsense-lab", "pihole-lab", "lubuntu-lab"])
+        for member in ("pihole-lab", "lubuntu-lab"):
             vm = cfg["vms"][member]
             self.assertEqual(vm["autoinstall"]["username"], "lab")
             self.assertTrue(vm["iso_url"].startswith("https://releases.ubuntu.com/22.04.5/"))
             self.assertEqual([n["phase"] for n in vm["networks"]], ["install", "runtime"])
-        self.assertEqual(cfg["vms"]["lubuntu22-lab"]["shared_dir"], {"source": "shared", "tag": "shared"})
+        self.assertEqual(cfg["vms"]["lubuntu-lab"]["shared_dir"], {"source": "shared", "tag": "shared"})
 
         # Windows rides bootstrap-windows: generic identity, virtio disk (viostor is injected
         # in WinPE), OpenSSH post-install, no download URL (Microsoft publishes none).
@@ -154,7 +154,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
 
         # CachyOS rides the Arch pacstrap flow on its own archiso: kernel paths,
         # serial prompts and the live pacman.conf must all be declared.
-        for profile in ("cachyos-local", "cachyos-nvidia-local"):
+        for profile in ("cachyos-desktop", "cachyos-nvidia"):
             vm = cfg["vms"][profile]
             self.assertEqual(vm["installer_boot"]["kernel"], "arch/boot/x86_64/vmlinuz-linux-cachyos")
             arch_cfg = vm["archinstall_config"]

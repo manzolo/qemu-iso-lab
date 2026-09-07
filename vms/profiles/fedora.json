@@ -234,7 +234,7 @@
       },
       "usb_tablet": true
     },
-    "fedora-niri-dms-local": {
+    "fedora-niri-dms": {
       "name": "Fedora 44 + niri + DankMaterialShell (Local)",
       "meta": {
         "slug": "fedora",
@@ -251,7 +251,7 @@
       },
       "iso_url": "https://fedora.mirror.garr.it/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
       "disk": {
-        "path": "artifacts/fedora-niri-dms-local/disk.qcow2",
+        "path": "artifacts/fedora-niri-dms/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -260,7 +260,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/fedora-niri-dms-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/fedora-niri-dms/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 8192,
@@ -295,9 +295,9 @@
         }
       },
       "usb_tablet": true,
-      "notes": "Same niri + DankMaterialShell desktop as arch-dms-local, on Fedora 44: kickstart from the Everything netinst (inst_repo points at the online repository), niri/quickshell from Fedora, DMS from the avengemedia COPRs in post-install. SELinux stays permissive because greetd is not covered by the Fedora policy.",
+      "notes": "Same niri + DankMaterialShell desktop as arch-dms, on Fedora 44: kickstart from the Everything netinst (inst_repo points at the online repository), niri/quickshell from Fedora, DMS from the avengemedia COPRs in post-install. SELinux stays permissive because greetd is not covered by the Fedora policy.",
       "kickstart_config": {
-        "hostname": "fedora-niri-dms-local",
+        "hostname": "fedora-niri-dms",
         "username": "lab",
         "fullname": "Lab",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
@@ -367,17 +367,17 @@
         "firewall": "enabled"
       },
       "ssh_provision": {
-        "hostname": "fedora-niri-dms-local",
+        "hostname": "fedora-niri-dms",
         "user": "lab",
         "ssh_host_port": 2233,
         "copy_from_host": [
           {
-            "source": "vms/profile-files/fedora-niri-dms-local/bin/fedora-dms-post-install",
+            "source": "vms/profile-files/fedora-niri-dms/bin/fedora-dms-post-install",
             "dest": "/home/{{user}}/bin/fedora-dms-post-install",
             "dest_mode": "755"
           },
           {
-            "source": "vms/profile-files/arch-dms-local/niri/config.kdl",
+            "source": "vms/profile-files/arch-dms/niri/config.kdl",
             "dest": "/home/{{user}}/.config/niri/config.kdl",
             "dest_mode": "644"
           }

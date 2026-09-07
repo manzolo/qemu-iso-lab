@@ -30,3 +30,6 @@ vms/remotes.json
 shared/
 # rendered guides (make guides)
 docs/guides/pdf/
+
+# Private backups made by the profile migration tool.
+vms/profiles/local.json.backup-*

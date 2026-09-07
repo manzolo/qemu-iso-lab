@@ -56,7 +56,7 @@ Esempio: cambiare utente, chiave SSH e cartella condivisa di un profilo.
 ```json
 {
   "vms": {
-    "arch-dms-local": {
+    "arch-dms": {
       "archinstall_config": { "username": "TUO_UTENTE", "password": "TUA_PASSWORD" },
       "ssh_provision": { "user": "TUO_UTENTE", "ssh_key": "~/.ssh/id_ed25519" },
       "shared_dir": { "source": "~/Workspaces/qemu/storage/shared", "tag": "shared" }
@@ -114,3 +114,7 @@ Regola d'oro di tutti i flussi: il token di completamento viene stampato **dopo*
 `blockdev --flushbufs`, e l'host aspetta che il guest si spenga da solo. Se un'installazione
 sembra riuscita ma al primo avvio finisce in `grub rescue>`, è quasi sempre questa sequenza
 che è stata violata.
+
+## Migrazione dei nomi dei profili
+
+I vecchi nomi restano accettati con un avviso di deprecazione. Visualizza la migrazione delle cartelle dei dischi con `python3 tools/migrate_profile_names.py --root /path/to/checkout`; arresta le VM interessate e passa quel checkout al catalogo rinominato prima di aggiungere `--apply`. `--local-config /path/to/local.json` salva una copia di sicurezza e aggiorna gli override personali. Le porte SSH non cambiano.

@@ -1,6 +1,6 @@
 # Arch Linux with niri (DankMaterialShell or Noctalia) and CachyOS
 
-Profiles: `arch-dms-local` (SSH 2230), `arch-noctalia-local` (2226), `cachyos-local` (2223).
+Profiles: `arch-dms` (SSH 2230), `arch-noctalia` (2226), `cachyos-desktop` (2223).
 Flow `bootstrap-archinstall`: a self-contained `pacstrap` script on the live ISO, without
 `archinstall`. Typical time: 15-30 minutes, depending on the mirrors.
 
@@ -16,8 +16,8 @@ Flow `bootstrap-archinstall`: a self-contained `pacstrap` script on the live ISO
 ## 2. The command
 
 ```bash
-vmctl bootstrap-archinstall arch-dms-local       # --timeout 1800 by default
-vmctl attach arch-dms-local                      # optional
+vmctl bootstrap-archinstall arch-dms       # --timeout 1800 by default
+vmctl attach arch-dms                      # optional
 ```
 
 ## 3. What happens
@@ -64,12 +64,12 @@ grey.
 ## 5. Check and use
 
 ```bash
-vmctl shell arch-dms-local
+vmctl shell arch-dms
 niri --version && systemctl --user status dms 2>/dev/null | head -3
 ls ~/shared ~/Desktop/shared      # shared folder, if configured
 ```
 
-`vmctl start arch-dms-local` opens the graphical session with `virtio-vga-gl`; the NVIDIA
+`vmctl start arch-dms` opens the graphical session with `virtio-vga-gl`; the NVIDIA
 profiles need the GPU passed to the guest and are not covered by this guide.
 
 ## 6. Notes

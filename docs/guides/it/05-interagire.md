@@ -2,7 +2,7 @@
 
 Come si entra in una VM del lab senza finestra grafica: SSH, console seriale, schermo VNC, e
 i comandi tipici da lanciare dentro Linux, Windows e pfSense. Vale per ogni profilo; gli
-esempi usano il laboratorio di rete (`pfsense-lab`, `pihole-lab`, `lubuntu22-lab`) e le VM
+esempi usano il laboratorio di rete (`pfsense-lab`, `pihole-lab`, `lubuntu-lab`) e le VM
 Windows non presidiate.
 
 ## 1. Le tre porte d'ingresso
@@ -15,8 +15,8 @@ Windows non presidiate.
 
 Chi risponde sulla seriale:
 
-- **Linux**: serve un getty su `ttyS0`. I profili del lab (`pihole-lab`, `lubuntu22-lab`) e
-  `ubuntu-server-headless` lo abilitano; su un'altra VM basta una volta
+- **Linux**: serve un getty su `ttyS0`. I profili del lab (`pihole-lab`, `lubuntu-lab`) e
+  `ubuntu-server-ci` lo abilitano; su un'altra VM basta una volta
   `sudo systemctl enable --now serial-getty@ttyS0.service` (via `vmctl shell`).
 - **pfSense**: la console seriale è abilitata dal `config.xml` generato: dopo il boot compare il
   menu numerato (0 logout, 8 shell, 5 reboot, 6 halt...).
@@ -28,7 +28,7 @@ usa `ssh` direttamente con la stessa chiave e porta, che è anche quello che fa 
 `post_install_run` dei profili:
 
 ```bash
-ssh -i artifacts/lubuntu22-lab/ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=no \
+ssh -i artifacts/lubuntu-lab/ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null -p 2239 lab@127.0.0.1 'ip -br addr'
 ```
 
@@ -38,7 +38,7 @@ diretti). Su libvirt, dopo `vmctl lab export`, si usa l'IP vero: `ssh lab@192.16
 
 ## 2. Linux: controlli tipici
 
-Dal client Lubuntu (`vmctl shell lubuntu22-lab`):
+Dal client Lubuntu (`vmctl shell lubuntu-lab`):
 
 ```bash
 ip -br addr                              # la NIC (enp0s4 sul client, enp0s2 su Pi-hole): 192.168.0.100/24

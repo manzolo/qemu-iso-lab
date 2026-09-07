@@ -208,7 +208,7 @@
       },
       "usb_tablet": true
     },
-    "rocky9": {
+    "rocky-9": {
       "name": "Rocky Linux 9.8 (Kickstart)",
       "meta": {
         "slug": "rocky",
@@ -219,7 +219,7 @@
       "iso": "isos/Rocky-9.8-x86_64-minimal.iso",
       "iso_url": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-minimal.iso",
       "disk": {
-        "path": "artifacts/rocky9/disk.qcow2",
+        "path": "artifacts/rocky-9/disk.qcow2",
         "size": "24G",
         "format": "qcow2",
         "interface": "virtio"
@@ -228,7 +228,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/rocky9/OVMF_VARS.fd"
+        "vars_path": "artifacts/rocky-9/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 2048,
@@ -255,7 +255,7 @@
       },
       "notes": "Rocky Linux 9 minimal via kickstart, the RHEL twin of almalinux-server: same flow, install source on the ISO (inst.repo=cdrom), SSH on 2245.",
       "kickstart_config": {
-        "hostname": "rocky9",
+        "hostname": "rocky-9",
         "username": "lab",
         "fullname": "Lab User",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",

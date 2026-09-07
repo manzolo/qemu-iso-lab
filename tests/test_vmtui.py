@@ -188,7 +188,7 @@ class VmtuiTests(unittest.TestCase):
         result = self.run_bash("source bin/vmtui; load_vm_facts test-ssh; recommended_action")
         self.assertEqual(result.stdout.strip(), "Boot Desktop")
         # state-independent: the flow's main install action for an Arch profile
-        result = self.run_bash("source bin/vmtui; load_vm_facts arch-noctalia-local; primary_install_action")
+        result = self.run_bash("source bin/vmtui; load_vm_facts arch-noctalia; primary_install_action")
         self.assertEqual(result.stdout.strip(), "Arch Bootstrap")
 
     def test_vm_facts_exposes_flags(self):
@@ -301,8 +301,8 @@ class VmtuiTests(unittest.TestCase):
 
     def test_unified_menu_for_arch_bootstrap_vm(self):
         # SSH Console is offered only once the disk holds an OS
-        self.mark_installed("arch-noctalia-local")
-        output = self._unified_menu("arch-noctalia-local")
+        self.mark_installed("arch-noctalia")
+        output = self._unified_menu("arch-noctalia")
         self.assertIn("Arch Bootstrap", output)
         self.assertIn("Arch Install (Interactive)", output)
         self.assertIn("SSH Console", output)
@@ -325,8 +325,8 @@ class VmtuiTests(unittest.TestCase):
         self.assertIn("VNC viewer", self._description_of(output, "Attach Display"))
 
     def test_unified_menu_for_omarchy_bootstrap_vm(self):
-        self.mark_installed("arch-omarchy-nvidia-local")
-        output = self._unified_menu("arch-omarchy-nvidia-local")
+        self.mark_installed("arch-omarchy-nvidia")
+        output = self._unified_menu("arch-omarchy-nvidia")
         self.assertIn("Omarchy Bootstrap", output)
         self.assertIn("Omarchy Unattended Install", output)
         self.assertIn("SSH Console", output)
@@ -383,7 +383,7 @@ class VmtuiTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), "Alpine Bootstrap")
 
     def test_unified_menu_for_fedora_dms_vm_uses_kickstart(self):
-        output = self._unified_menu("fedora-niri-dms-local")
+        output = self._unified_menu("fedora-niri-dms")
         self.assertIn("Kickstart Bootstrap", output)
         self.assertNotIn("Alpine Bootstrap", output)
 
@@ -539,7 +539,7 @@ class VmtuiTests(unittest.TestCase):
         tags = output[::2]
         self.assertIn("alpine-ci", tags)
         self.assertIn("ubuntu-niri", tags)
-        self.assertIn("arch-noctalia-local", tags)
+        self.assertIn("arch-noctalia", tags)
 
 
 if __name__ == "__main__":

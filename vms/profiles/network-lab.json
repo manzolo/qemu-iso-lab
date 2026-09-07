@@ -225,7 +225,7 @@
         ]
       }
     },
-    "lubuntu22-lab": {
+    "lubuntu-lab": {
       "name": "Lubuntu 22.04 (network lab client)",
       "meta": {
         "slug": "lubuntu",
@@ -236,7 +236,7 @@
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/lubuntu22-lab/disk.qcow2",
+        "path": "artifacts/lubuntu-lab/disk.qcow2",
         "size": "30G",
         "format": "qcow2",
         "interface": "virtio"
@@ -245,7 +245,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/lubuntu22-lab/OVMF_VARS.fd"
+        "vars_path": "artifacts/lubuntu-lab/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,

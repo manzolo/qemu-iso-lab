@@ -16,7 +16,7 @@ A useful CI boot test should:
 
 ## Why A Dedicated CI Guest Exists
 
-The main `cachyos` profile is a real desktop-oriented guest. It is the right profile for local usage, but it is not a good fit for lightweight CI smoke tests because:
+The main `cachyos-live` profile is a real desktop-oriented guest. It is the right profile for local usage, but it is not a good fit for lightweight CI smoke tests because:
 
 - the ISO is large;
 - graphical boot is harder to validate in automation;

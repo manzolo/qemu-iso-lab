@@ -12,15 +12,15 @@ Reproducible cheat sheets of the main VMs of the lab, in two languages: `it/` (I
 |---|---|---|---|---|
 | 00 | [00-comune.md](it/00-comune.md) | [00-common.md](en/00-common.md) | tutti / all | prerequisiti host, `vmctl`, `local.json`, uso quotidiano |
 | 05 | [05-interagire.md](it/05-interagire.md) | [05-interacting.md](en/05-interacting.md) | tutti / all | `vmctl shell`, `vmctl console` (seriale), `vmctl attach`; comandi tipici Linux, Windows (PowerShell via SSH), pfSense |
-| 10 | [10-ubuntu-niri.md](it/10-ubuntu-niri.md) | [10-ubuntu-niri.md](en/10-ubuntu-niri.md) | `ubuntu-niri`, `ubuntu-niri-local` | `vmctl bootstrap-unattended` |
+| 10 | [10-ubuntu-niri.md](it/10-ubuntu-niri.md) | [10-ubuntu-niri.md](en/10-ubuntu-niri.md) | `ubuntu-niri`, `ubuntu-niri-gl` | `vmctl bootstrap-unattended` |
 | 15 | [15-ubuntu-flavors.md](it/15-ubuntu-flavors.md) | [15-ubuntu-flavors.md](en/15-ubuntu-flavors.md) | `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `ubuntu-budgie-24.04` | `vmctl bootstrap-unattended` |
 | 20 | [20-debian-server.md](it/20-debian-server.md) | [20-debian-server.md](en/20-debian-server.md) | `debian-server` | `vmctl bootstrap-preseed` |
-| 30 | [30-almalinux-fedora.md](it/30-almalinux-fedora.md) | [30-almalinux-fedora.md](en/30-almalinux-fedora.md) | `almalinux-server`, `rocky9`, `fedora-niri-dms-local`, `fedora-silverblue` | `vmctl bootstrap-kickstart` |
+| 30 | [30-almalinux-fedora.md](it/30-almalinux-fedora.md) | [30-almalinux-fedora.md](en/30-almalinux-fedora.md) | `almalinux-server`, `rocky-9`, `fedora-niri-dms`, `fedora-silverblue` | `vmctl bootstrap-kickstart` |
 | 35 | [35-opensuse-autoyast.md](it/35-opensuse-autoyast.md) | [35-opensuse-autoyast.md](en/35-opensuse-autoyast.md) | `opensuse-tumbleweed-autoyast` | `vmctl bootstrap-autoyast` |
-| 40 | [40-arch-niri.md](it/40-arch-niri.md) | [40-arch-niri.md](en/40-arch-niri.md) | `arch-dms-local`, `arch-noctalia-local`, `cachyos-local` | `vmctl bootstrap-archinstall` |
+| 40 | [40-arch-niri.md](it/40-arch-niri.md) | [40-arch-niri.md](en/40-arch-niri.md) | `arch-dms`, `arch-noctalia`, `cachyos-desktop` | `vmctl bootstrap-archinstall` |
 | 50 | [50-alpine-niri.md](it/50-alpine-niri.md) | [50-alpine-niri.md](en/50-alpine-niri.md) | `alpine-niri` | `vmctl bootstrap-alpine` |
 | 60 | [60-windows.md](it/60-windows.md) | [60-windows.md](en/60-windows.md) | `windows11-unattended`, `windows10-unattended` | `vmctl bootstrap-windows` |
-| 70 | [70-network-lab.html](it/70-network-lab.html) | [70-network-lab.html](en/70-network-lab.html) | `pfsense-lab`, `pihole-lab`, `lubuntu22-lab` | `vmctl lab install`, `vmctl bootstrap-pfsense` (pagina curata con lo schema SVG / curated page with the SVG topology) |
+| 70 | [70-network-lab.html](it/70-network-lab.html) | [70-network-lab.html](en/70-network-lab.html) | `pfsense-lab`, `pihole-lab`, `lubuntu-lab` | `vmctl lab install`, `vmctl bootstrap-pfsense` (pagina curata con lo schema SVG / curated page with the SVG topology) |
 | 80 | [80-virsh-cheatsheet.html](it/80-virsh-cheatsheet.html) | [80-virsh-cheatsheet.html](en/80-virsh-cheatsheet.html) | VM esportate con `vmctl export-libvirt` / VMs exported with `vmctl export-libvirt` | `virsh ...` (bignami a schede / card cheat sheet) |
 
 ## PDF

@@ -122,7 +122,7 @@ replace. A minimal override looks like this:
 ```json
 {
   "vms": {
-    "arch-dms-local": {
+    "arch-dms": {
       "archinstall_config": { "username": "andrea", "password": "..." },
       "ssh_provision": {
         "user": "andrea",

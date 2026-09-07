@@ -57,7 +57,7 @@
         "timeout_sec": 180
       }
     },
-    "alpine-installed-ci": {
+    "alpine-ci-installed": {
       "name": "Alpine Linux Virt Installed CI",
       "meta": {
         "slug": "alpine-linux",
@@ -74,7 +74,7 @@
       },
       "iso_url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
       "disk": {
-        "path": "artifacts/alpine-installed-ci/disk.qcow2",
+        "path": "artifacts/alpine-ci-installed/disk.qcow2",
         "size": "2G",
         "format": "qcow2",
         "interface": "virtio"

@@ -49,7 +49,7 @@ init-local-profile: ## Create vms/profiles/local.json from the example
 	else \
 		cp vms/profiles/local.json.example vms/profiles/local.json; \
 		printf "  [ok] created vms/profiles/local.json from the template\n"; \
-		printf "  edit YOUR_USER, the password/hash and the SSH/dotfile paths before using the *-local profiles\n"; \
+		printf "  edit YOUR_USER, the password/hash and the SSH/dotfile paths before using personal profile overrides\n"; \
 	fi
 
 validate-vms: ## Local-only full matrix: reinstall every unattended profile from scratch, restore the installed disks, write the HTML report (hours; VMS="a b" PARALLEL=2 to narrow/speed up)

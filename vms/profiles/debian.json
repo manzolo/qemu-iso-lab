@@ -248,8 +248,16 @@
         "country": "US",
         "mirror_hostname": "deb.debian.org",
         "mirror_directory": "/debian",
-        "tasks": ["standard"],
-        "packages": ["openssh-server", "sudo", "curl", "ca-certificates", "locales"],
+        "tasks": [
+          "standard"
+        ],
+        "packages": [
+          "openssh-server",
+          "sudo",
+          "curl",
+          "ca-certificates",
+          "locales"
+        ],
         "late_commands": [
           "sed -i 's/^# *it_IT.UTF-8 UTF-8/it_IT.UTF-8 UTF-8/' /etc/locale.gen",
           "locale-gen",
@@ -263,7 +271,7 @@
         "ssh_key": null
       }
     },
-    "ubuntu-desktop": {
+    "ubuntu-desktop-live": {
       "name": "Ubuntu 26.04 Desktop",
       "meta": {
         "slug": "ubuntu",
@@ -274,7 +282,7 @@
       "iso": "isos/ubuntu-26.04-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-desktop-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-desktop/disk.qcow2",
+        "path": "artifacts/ubuntu-desktop-live/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -283,7 +291,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-desktop/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-desktop-live/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -313,7 +321,7 @@
       },
       "usb_tablet": true
     },
-    "ubuntu-server": {
+    "ubuntu-server-live": {
       "name": "Ubuntu 26.04 Server",
       "meta": {
         "slug": "ubuntu",
@@ -324,7 +332,7 @@
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-server/disk.qcow2",
+        "path": "artifacts/ubuntu-server-live/disk.qcow2",
         "size": "20G",
         "format": "qcow2",
         "interface": "virtio"
@@ -333,7 +341,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-server/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-server-live/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 2048,
@@ -363,7 +371,7 @@
       },
       "usb_tablet": true
     },
-    "ubuntu-server-headless": {
+    "ubuntu-server-ci": {
       "name": "Ubuntu 26.04 Server Headless CI",
       "meta": {
         "slug": "ubuntu",
@@ -374,7 +382,7 @@
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-server-headless/disk.qcow2",
+        "path": "artifacts/ubuntu-server-ci/disk.qcow2",
         "size": "16G",
         "format": "qcow2",
         "interface": "virtio"
@@ -383,7 +391,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-server-headless/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-server-ci/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 2048,
@@ -413,7 +421,7 @@
       },
       "usb_tablet": true,
       "autoinstall": {
-        "hostname": "ubuntu-server-headless",
+        "hostname": "ubuntu-server-ci",
         "username": "lab",
         "realname": "Lab User",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
@@ -423,7 +431,7 @@
         "install_ssh": true
       },
       "cloud_init": {
-        "hostname": "ubuntu-server-headless",
+        "hostname": "ubuntu-server-ci",
         "user": "lab",
         "ssh_host_port": 2290,
         "write_files": [
@@ -555,7 +563,7 @@
         ]
       }
     },
-    "ubuntu-niri-local": {
+    "ubuntu-niri-gl": {
       "name": "Ubuntu 26.04 Niri",
       "meta": {
         "catalog_slug": "ubuntu",
@@ -566,7 +574,7 @@
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-niri-local/disk.qcow2",
+        "path": "artifacts/ubuntu-niri-gl/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -575,7 +583,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-niri-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-niri-gl/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -613,7 +621,7 @@
       },
       "usb_tablet": true,
       "autoinstall": {
-        "hostname": "ubuntu-niri-local",
+        "hostname": "ubuntu-niri-gl",
         "username": "lab",
         "realname": "{{user}}",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
@@ -623,7 +631,7 @@
         "install_ssh": true
       },
       "cloud_init": {
-        "hostname": "ubuntu-niri-local",
+        "hostname": "ubuntu-niri-gl",
         "user": "lab",
         "ssh_host_port": 2227,
         "packages": [
@@ -643,13 +651,13 @@
         ],
         "copy_from_host": [
           {
-            "source": "vms/profile-files/ubuntu-niri-local/bin/ubuntu-niri-local-post-install",
-            "dest": "/home/{{user}}/bin/ubuntu-niri-local-post-install",
+            "source": "vms/profile-files/ubuntu-niri-gl/bin/ubuntu-niri-gl-post-install",
+            "dest": "/home/{{user}}/bin/ubuntu-niri-gl-post-install",
             "dest_mode": "755"
           }
         ],
         "post_install_run": [
-          "~/bin/ubuntu-niri-local-post-install"
+          "~/bin/ubuntu-niri-gl-post-install"
         ]
       }
     }

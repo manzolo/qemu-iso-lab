@@ -239,3 +239,16 @@ To make it install unattended, add the matching config section and read
 `ssh_provision` and read [PROVISIONING.md](PROVISIONING.md). A test in
 `tests/test_repo_profiles.py` loads the whole tracked catalog, so `make check`
 catches a broken profile.
+
+## Canonical names and compatibility
+
+Profile names follow `<distro>[-<version>][-<variant>]`; a version distinguishes coexisting versions. The exact legacy aliases live in `vmctl/config.py`. Old CLI names still work with a one-line warning, including the unchanged CI workflow references. `local.json` keys are canonicalized before merging; defining both aliases of one profile in that file is rejected to avoid ambiguous overrides.
+
+Stop affected VMs before migrating installed disks. From the renamed checkout:
+
+```bash
+python3 tools/migrate_profile_names.py --root /path/to/checkout
+python3 tools/migrate_profile_names.py --root /path/to/checkout --apply --local-config /path/to/checkout/vms/profiles/local.json
+```
+
+The script never merges or replaces artifact directories. Repeating it after success is harmless. It saves a private backup before editing local overrides. Do not commit local overrides or backups. Switch the checkout that owns the artifacts to the renamed catalog before resuming VM commands.

@@ -1,6 +1,6 @@
 {
   "vms": {
-    "archlinux": {
+    "arch": {
       "name": "Arch Linux",
       "meta": {
         "slug": "archlinux",
@@ -17,7 +17,7 @@
       },
       "iso_url": "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-2026.09.01-x86_64.iso",
       "disk": {
-        "path": "artifacts/archlinux/disk.qcow2",
+        "path": "artifacts/arch/disk.qcow2",
         "size": "24G",
         "format": "qcow2",
         "interface": "virtio"
@@ -26,7 +26,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/archlinux/OVMF_VARS.fd"
+        "vars_path": "artifacts/arch/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 2048,
@@ -52,7 +52,7 @@
       },
       "usb_tablet": true
     },
-    "cachyos": {
+    "cachyos-live": {
       "name": "CachyOS",
       "meta": {
         "slug": "cachyos",
@@ -70,7 +70,7 @@
       },
       "iso_url": "https://mirror.cachyos.org/ISO/desktop/260809/cachyos-desktop-linux-260809.iso",
       "disk": {
-        "path": "artifacts/cachyos/disk.vhd",
+        "path": "artifacts/cachyos-live/disk.vhd",
         "size": "30G",
         "format": "vpc",
         "subformat": "fixed",
@@ -80,7 +80,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/cachyos/OVMF_VARS.fd"
+        "vars_path": "artifacts/cachyos-live/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -112,7 +112,7 @@
       },
       "usb_tablet": true
     },
-    "cachyos-local": {
+    "cachyos-desktop": {
       "name": "CachyOS + niri + Noctalia",
       "meta": {
         "catalog_slug": "cachyos",
@@ -134,7 +134,7 @@
         "initrd": "arch/boot/x86_64/initramfs-linux-cachyos.img"
       },
       "disk": {
-        "path": "artifacts/cachyos-local/disk.qcow2",
+        "path": "artifacts/cachyos-desktop/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -143,7 +143,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/cachyos-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/cachyos-desktop/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -183,7 +183,7 @@
       },
       "usb_tablet": true,
       "archinstall_config": {
-        "hostname": "cachyos-local",
+        "hostname": "cachyos-desktop",
         "username": "lab",
         "password": "lab",
         "timezone": "Europe/Rome",
@@ -261,12 +261,12 @@
         ]
       },
       "ssh_provision": {
-        "hostname": "cachyos-local",
+        "hostname": "cachyos-desktop",
         "user": "lab",
         "ssh_host_port": 2223,
         "copy_from_host": [
           {
-            "source": "vms/profile-files/cachyos-local/bin/cachyos-post-install",
+            "source": "vms/profile-files/cachyos-desktop/bin/cachyos-post-install",
             "dest": "/home/{{user}}/bin/cachyos-post-install",
             "dest_mode": "755"
           }
@@ -277,7 +277,7 @@
       },
       "notes": "CachyOS installed unattended by bootstrap-archinstall: the desktop ISO is an archiso, so the pacstrap flow runs on it (installer_boot kernel, CachyOS serial prompts, live pacman.conf inherited by the target so the [cachyos] repository and linux-cachyos survive the first boot). The package set mirrors what Calamares installs for its 'Niri' desktop choice: cachyos-niri-noctalia (niri + Noctalia shell, CachyOS defaults) with SDDM autologin, plus the CachyOS base groups. Calamares itself remains available for a manual install (vmctl install)."
     },
-    "cachyos-nvidia-local": {
+    "cachyos-nvidia": {
       "name": "CachyOS + niri + Noctalia + NVIDIA open",
       "meta": {
         "catalog_slug": "cachyos",
@@ -299,7 +299,7 @@
         "initrd": "arch/boot/x86_64/initramfs-linux-cachyos.img"
       },
       "disk": {
-        "path": "artifacts/cachyos-nvidia-local/disk.qcow2",
+        "path": "artifacts/cachyos-nvidia/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -308,7 +308,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/cachyos-nvidia-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/cachyos-nvidia/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -348,7 +348,7 @@
       },
       "usb_tablet": true,
       "archinstall_config": {
-        "hostname": "cachyos-nvidia-local",
+        "hostname": "cachyos-nvidia",
         "username": "lab",
         "password": "lab",
         "timezone": "Europe/Rome",
@@ -426,17 +426,17 @@
         ]
       },
       "ssh_provision": {
-        "hostname": "cachyos-nvidia-local",
+        "hostname": "cachyos-nvidia",
         "user": "lab",
         "ssh_host_port": 2224,
         "copy_from_host": [
           {
-            "source": "vms/profile-files/cachyos-local/bin/cachyos-post-install",
+            "source": "vms/profile-files/cachyos-desktop/bin/cachyos-post-install",
             "dest": "/home/{{user}}/bin/cachyos-post-install",
             "dest_mode": "755"
           },
           {
-            "source": "vms/profile-files/cachyos-nvidia-local/bin/cachyos-nvidia-post-install",
+            "source": "vms/profile-files/cachyos-nvidia/bin/cachyos-nvidia-post-install",
             "dest": "/home/{{user}}/bin/cachyos-nvidia-post-install",
             "dest_mode": "755"
           }
@@ -447,7 +447,7 @@
       },
       "notes": "CachyOS installed unattended by bootstrap-archinstall on the CachyOS archiso (installer_boot kernel, CachyOS serial prompts, live pacman.conf inherited by the target). Same desktop as Calamares' 'Niri' choice: cachyos-niri-noctalia (niri + Noctalia) with SDDM autologin and the CachyOS base groups. The SSH post-install adds the mainline NVIDIA open kernel modules (nvidia-open-dkms + nvidia-utils, 610 series at the time of writing) built against the installed linux-cachyos headers. Previously pinned to the legacy 580xx branch and installed interactively."
     },
-    "arch-noctalia-local": {
+    "arch-noctalia": {
       "name": "Arch Linux + Noctalia 5",
       "meta": {
         "slug": "archlinux",
@@ -464,7 +464,7 @@
       },
       "iso_url": "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-2026.09.01-x86_64.iso",
       "disk": {
-        "path": "artifacts/arch-noctalia-local/disk.qcow2",
+        "path": "artifacts/arch-noctalia/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -473,7 +473,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/arch-noctalia-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/arch-noctalia/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 8192,
@@ -505,7 +505,7 @@
       },
       "usb_tablet": true,
       "archinstall_config": {
-        "hostname": "arch-noctalia-local",
+        "hostname": "arch-noctalia",
         "username": "lab",
         "password": "lab",
         "timezone": "Europe/Rome",
@@ -608,22 +608,22 @@
         ]
       },
       "ssh_provision": {
-        "hostname": "arch-noctalia-local",
+        "hostname": "arch-noctalia",
         "user": "lab",
         "ssh_host_port": 2226,
         "copy_from_host": [
           {
-            "source": "vms/profile-files/arch-noctalia-local/bin/start-noctalia",
+            "source": "vms/profile-files/arch-noctalia/bin/start-noctalia",
             "dest": "/home/{{user}}/bin/start-noctalia",
             "dest_mode": "755"
           },
           {
-            "source": "vms/profile-files/arch-noctalia-local/bin/arch-noctalia-post-install",
+            "source": "vms/profile-files/arch-noctalia/bin/arch-noctalia-post-install",
             "dest": "/home/{{user}}/bin/arch-noctalia-post-install",
             "dest_mode": "755"
           },
           {
-            "source": "vms/profile-files/arch-noctalia-local/niri/config.kdl",
+            "source": "vms/profile-files/arch-noctalia/niri/config.kdl",
             "dest": "/home/{{user}}/.config/niri/config.kdl",
             "dest_mode": "644"
           }
@@ -635,7 +635,7 @@
         ]
       }
     },
-    "arch-dms-local": {
+    "arch-dms": {
       "name": "Arch Linux + niri + DankMaterialShell",
       "meta": {
         "slug": "archlinux",
@@ -652,7 +652,7 @@
       },
       "iso_url": "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-2026.09.01-x86_64.iso",
       "disk": {
-        "path": "artifacts/arch-dms-local/disk.qcow2",
+        "path": "artifacts/arch-dms/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -661,7 +661,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/arch-dms-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/arch-dms/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 8192,
@@ -693,7 +693,7 @@
       },
       "usb_tablet": true,
       "archinstall_config": {
-        "hostname": "arch-dms-local",
+        "hostname": "arch-dms",
         "username": "lab",
         "password": "lab",
         "timezone": "Europe/Rome",
@@ -806,17 +806,17 @@
         ]
       },
       "ssh_provision": {
-        "hostname": "arch-dms-local",
+        "hostname": "arch-dms",
         "user": "lab",
         "ssh_host_port": 2230,
         "copy_from_host": [
           {
-            "source": "vms/profile-files/arch-dms-local/bin/arch-dms-post-install",
+            "source": "vms/profile-files/arch-dms/bin/arch-dms-post-install",
             "dest": "/home/{{user}}/bin/arch-dms-post-install",
             "dest_mode": "755"
           },
           {
-            "source": "vms/profile-files/arch-dms-local/niri/config.kdl",
+            "source": "vms/profile-files/arch-dms/niri/config.kdl",
             "dest": "/home/{{user}}/.config/niri/config.kdl",
             "dest_mode": "644"
           }
@@ -828,7 +828,7 @@
         ]
       }
     },
-    "arch-dms-nvidia-local": {
+    "arch-dms-nvidia": {
       "name": "Arch Linux + niri + DMS + NVIDIA open (recipe for bare metal)",
       "meta": {
         "slug": "archlinux",
@@ -845,7 +845,7 @@
       },
       "iso_url": "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-2026.09.01-x86_64.iso",
       "disk": {
-        "path": "artifacts/arch-dms-nvidia-local/disk.qcow2",
+        "path": "artifacts/arch-dms-nvidia/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -854,7 +854,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/arch-dms-nvidia-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/arch-dms-nvidia/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 8192,
@@ -886,7 +886,7 @@
       },
       "usb_tablet": true,
       "archinstall_config": {
-        "hostname": "arch-dms-nvidia-local",
+        "hostname": "arch-dms-nvidia",
         "username": "lab",
         "password": "lab",
         "timezone": "Europe/Rome",
@@ -1013,17 +1013,17 @@
         ]
       },
       "ssh_provision": {
-        "hostname": "arch-dms-nvidia-local",
+        "hostname": "arch-dms-nvidia",
         "user": "lab",
         "ssh_host_port": 2231,
         "copy_from_host": [
           {
-            "source": "vms/profile-files/arch-dms-nvidia-local/bin/arch-dms-nvidia-post-install",
+            "source": "vms/profile-files/arch-dms-nvidia/bin/arch-dms-nvidia-post-install",
             "dest": "/home/{{user}}/bin/arch-dms-nvidia-post-install",
             "dest_mode": "755"
           },
           {
-            "source": "vms/profile-files/arch-dms-local/niri/config.kdl",
+            "source": "vms/profile-files/arch-dms/niri/config.kdl",
             "dest": "/home/{{user}}/.config/niri/config.kdl",
             "dest_mode": "644"
           }
@@ -1037,7 +1037,7 @@
         ]
       }
     },
-    "arch-omarchy-nvidia-local": {
+    "arch-omarchy-nvidia": {
       "name": "Omarchy 4 + Hyprland + NVIDIA open (recipe for bare metal)",
       "meta": {
         "slug": "omarchy",
@@ -1049,7 +1049,7 @@
       "iso_url": "https://iso.omarchy.org/omarchy-4.0.2.iso",
       "iso_sha256": "2ef8e624aa1bec7e277e28056b8535a6c9373ba48d7ede3f1a01cb6d2373cfb8",
       "disk": {
-        "path": "artifacts/arch-omarchy-nvidia-local/disk.qcow2",
+        "path": "artifacts/arch-omarchy-nvidia/disk.qcow2",
         "size": "64G",
         "format": "qcow2",
         "interface": "virtio"
@@ -1058,7 +1058,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/arch-omarchy-nvidia-local/OVMF_VARS.fd"
+        "vars_path": "artifacts/arch-omarchy-nvidia/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 8192,
@@ -1094,7 +1094,7 @@
       },
       "usb_tablet": true,
       "omarchy_config": {
-        "hostname": "arch-omarchy-nvidia-local",
+        "hostname": "arch-omarchy-nvidia",
         "username": "lab",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "full_name": "Lab User",
@@ -1106,13 +1106,13 @@
         "encrypt": false
       },
       "ssh_provision": {
-        "hostname": "arch-omarchy-nvidia-local",
+        "hostname": "arch-omarchy-nvidia",
         "user": "lab",
         "sudo_password": "lab",
         "ssh_host_port": 2232,
         "copy_from_host": [
           {
-            "source": "vms/profile-files/arch-omarchy-nvidia-local/bin/arch-omarchy-nvidia-post-install",
+            "source": "vms/profile-files/arch-omarchy-nvidia/bin/arch-omarchy-nvidia-post-install",
             "dest": "/home/{{user}}/bin/arch-omarchy-nvidia-post-install",
             "dest_mode": "755"
           }
