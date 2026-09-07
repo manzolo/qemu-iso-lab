@@ -512,6 +512,12 @@
       "audio": true,
       "video": {
         "default": "safe",
+        "headless": [
+          "-device",
+          "virtio-vga-gl",
+          "-display",
+          "egl-headless"
+        ],
         "installer_order": [
           "std",
           "safe"
@@ -573,11 +579,19 @@
             "source": "vms/profile-files/ubuntu-niri/bin/ubuntu-niri-post-install",
             "dest": "/home/vmuser/bin/ubuntu-niri-post-install",
             "dest_mode": "755"
+          },
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
           }
         ],
         "post_install_run": [
           "~/bin/ubuntu-niri-post-install",
           "test \"$(dpkg-query -W -f='${Status}' niri)\" = \"install ok installed\" && test \"$(dpkg-query -W -f='${Status}' dms)\" = \"install ok installed\""
+        ],
+        "verify_after_reboot": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager dpkg --package niri --compositor niri"
         ]
       },
       "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
@@ -612,6 +626,12 @@
       "audio": true,
       "video": {
         "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga-gl",
+          "-display",
+          "egl-headless"
+        ],
         "installer_order": [
           "std",
           "safe"
@@ -674,11 +694,19 @@
             "source": "vms/profile-files/ubuntu-niri-gl/bin/ubuntu-niri-gl-post-install",
             "dest": "/home/{{user}}/bin/ubuntu-niri-gl-post-install",
             "dest_mode": "755"
+          },
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
           }
         ],
         "post_install_run": [
           "~/bin/ubuntu-niri-gl-post-install",
           "test \"$(dpkg-query -W -f='${Status}' niri)\" = \"install ok installed\" && test \"$(dpkg-query -W -f='${Status}' dms)\" = \"install ok installed\""
+        ],
+        "verify_after_reboot": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager dpkg --package niri --compositor niri"
         ]
       },
       "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"

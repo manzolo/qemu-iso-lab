@@ -503,6 +503,12 @@
       "audio": true,
       "video": {
         "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga-gl",
+          "-display",
+          "egl-headless"
+        ],
         "variants": {
           "std": [
             "-vga",
@@ -700,6 +706,12 @@
       "audio": true,
       "video": {
         "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga-gl",
+          "-display",
+          "egl-headless"
+        ],
         "variants": {
           "std": [
             "-vga",
@@ -902,6 +914,12 @@
       "audio": true,
       "video": {
         "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga-gl",
+          "-display",
+          "egl-headless"
+        ],
         "variants": {
           "std": [
             "-vga",
@@ -1115,6 +1133,12 @@
       "audio": true,
       "video": {
         "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga-gl",
+          "-display",
+          "egl-headless"
+        ],
         "installer_order": [
           "std",
           "safe"
