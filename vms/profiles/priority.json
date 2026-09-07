@@ -44,7 +44,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4"
     },
     "almalinux-minimal": {
       "name": "AlmaLinux 10.1 Minimal",
@@ -55,7 +56,7 @@
         "release_model": "stable"
       },
       "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
-      "iso_url": "https://repo.almalinux.org/almalinux/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
+      "iso_url": "https://repo.almalinux.org/vault/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
       "disk": {
         "path": "artifacts/almalinux-minimal/disk.qcow2",
         "size": "24G",
@@ -90,7 +91,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "049efd183a5a841dd432b3427eb6faa7deb3bf6c6bf2c63cbffa024b9c651725"
     },
     "almalinux-server": {
       "name": "AlmaLinux 10.1 Server (Kickstart)",
@@ -101,7 +103,7 @@
         "release_model": "stable"
       },
       "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
-      "iso_url": "https://repo.almalinux.org/almalinux/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
+      "iso_url": "https://repo.almalinux.org/vault/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
       "disk": {
         "path": "artifacts/almalinux-server/disk.qcow2",
         "size": "24G",
@@ -160,7 +162,8 @@
         "user": "lab",
         "ssh_host_port": 2229,
         "ssh_key": null
-      }
+      },
+      "iso_sha256": "049efd183a5a841dd432b3427eb6faa7deb3bf6c6bf2c63cbffa024b9c651725"
     },
     "kali-live": {
       "name": "Kali Linux 2026.1 Live",
@@ -206,7 +209,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "c2096dc2194c915cf94c273b907a84043ea6adfcba18509f15a8c1d1bbfb211c"
     },
     "rocky-9": {
       "name": "Rocky Linux 9.8 (Kickstart)",
@@ -282,7 +286,8 @@
           "systemctl is-active sshd",
           "getenforce"
         ]
-      }
+      },
+      "iso_sha256": "d338032cd1cdd41c67139f2f71b4c832c8e4a21943106519db9c7137df7a63d4"
     }
   }
 }

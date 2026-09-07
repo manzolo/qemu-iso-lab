@@ -9,7 +9,7 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
       "disk": {
         "path": "artifacts/fedora-cinnamon/disk.qcow2",
         "size": "32G",
@@ -44,7 +44,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "673e96e3c8defa8245df35fd722bab207df74011c4fc32b71578294a33e979ba"
     },
     "fedora-server": {
       "name": "Fedora Server 42 Netinst",
@@ -55,7 +56,7 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "disk": {
         "path": "artifacts/fedora-server/disk.qcow2",
         "size": "20G",
@@ -90,7 +91,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "231f3e0d1dc8f565c01a9f641b3d16c49cae44530074bc2047fe2373a721c82f"
     },
     "fedora-server-efi": {
       "name": "Fedora Server 42 EFI Baseline",
@@ -101,7 +103,7 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "disk": {
         "path": "artifacts/fedora-server-efi/disk.qcow2",
         "size": "20G",
@@ -140,7 +142,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "231f3e0d1dc8f565c01a9f641b3d16c49cae44530074bc2047fe2373a721c82f"
     },
     "fedora-workstation": {
       "name": "Fedora Workstation 42",
@@ -151,7 +154,7 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Workstation-Live-42-1.1.x86_64.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
       "disk": {
         "path": "artifacts/fedora-workstation/disk.qcow2",
         "size": "36G",
@@ -186,7 +189,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "98958d80e8a80eabe61275337f969c8e2212adc3a223d9bbdab9411bb1c95cba"
     },
     "fedora-xfce": {
       "name": "Fedora Xfce 42",
@@ -197,7 +201,7 @@
         "release_model": "stable"
       },
       "iso": "isos/Fedora-Xfce-Live-42-1.1.x86_64.iso",
-      "iso_url": "https://mirrors.mit.edu/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
       "disk": {
         "path": "artifacts/fedora-xfce/disk.qcow2",
         "size": "28G",
@@ -232,7 +236,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "c458667014c2e97e026a4bfc94b25899ee8777569734b0559665c50ae267a66d"
     },
     "fedora-niri-dms": {
       "name": "Fedora 44 + niri + DankMaterialShell (Local)",
@@ -478,7 +483,8 @@
           "systemctl get-default",
           "sudo rpm-ostree install --idempotent --allow-inactive qemu-guest-agent spice-vdagent || echo 'layering skipped'"
         ]
-      }
+      },
+      "iso_sha256": "9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682"
     }
   }
 }

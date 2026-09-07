@@ -42,7 +42,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "f564822bc72d420d1e1a6faacb72f6056d828fcf539dfafd52e08503ef5fab68"
     }
   }
 }

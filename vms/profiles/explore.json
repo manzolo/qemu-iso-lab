@@ -51,7 +51,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "ca85fa8515770153dbe254ab93d406a53f2abdf10068da75b8d49018e92a5a51"
     },
     "endeavouros": {
       "name": "EndeavourOS Titan",
@@ -207,7 +208,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "40ff378e6cbc74680b30eb0af0003af0abc750b2589f18d4733f9f30bcc79d5b"
     },
     "opensuse-slowroll": {
       "name": "openSUSE Slowroll DVD",

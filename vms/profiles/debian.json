@@ -9,7 +9,7 @@
         "release_model": "stable"
       },
       "iso": "isos/debian-live-13.4.0-amd64-gnome.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
       "disk": {
         "path": "artifacts/debian-gnome-live/disk.qcow2",
         "size": "28G",
@@ -44,7 +44,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "2c87761c60115c9323f306f386c2253eb4fc21e050187ab2bceede9da64713e3"
     },
     "debian-netinst": {
       "name": "Debian 13 Netinst",
@@ -55,7 +56,7 @@
         "release_model": "stable"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
       "disk": {
         "path": "artifacts/debian-netinst/disk.qcow2",
         "size": "20G",
@@ -87,7 +88,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc"
     },
     "debian-efi": {
       "name": "Debian 13 EFI Baseline",
@@ -98,7 +100,7 @@
         "release_model": "stable"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
       "disk": {
         "path": "artifacts/debian-efi/disk.qcow2",
         "size": "20G",
@@ -137,7 +139,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc"
     },
     "debian-bios": {
       "name": "Debian 13 BIOS Baseline",
@@ -148,7 +151,7 @@
         "release_model": "stable"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
       "disk": {
         "path": "artifacts/debian-bios/disk.qcow2",
         "size": "20G",
@@ -184,7 +187,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc"
     },
     "debian-server": {
       "name": "Debian 13 Server (Preseed)",
@@ -195,7 +199,7 @@
         "release_model": "stable"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
-      "iso_url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
       "disk": {
         "path": "artifacts/debian-server/disk.qcow2",
         "size": "20G",
@@ -269,7 +273,8 @@
         "user": "lab",
         "ssh_host_port": 2228,
         "ssh_key": null
-      }
+      },
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc"
     },
     "ubuntu-desktop-live": {
       "name": "Ubuntu 26.04 Desktop",
@@ -319,7 +324,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "487f87faaf547ea30e0aba4d5b53346292571256b25333a978db1692bcee9dd2"
     },
     "ubuntu-server-live": {
       "name": "Ubuntu 26.04 Server",
@@ -369,7 +375,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
     },
     "ubuntu-server-ci": {
       "name": "Ubuntu 26.04 Server Headless CI",
@@ -464,7 +471,8 @@
         "boot_from": "disk",
         "expect": "__VMCTL_UBUNTU_SERVER_HEADLESS_BOOTED__",
         "timeout_sec": 240
-      }
+      },
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
     },
     "ubuntu-niri": {
       "name": "Ubuntu 26.04 Niri",
@@ -561,7 +569,8 @@
         "post_install_run": [
           "~/bin/ubuntu-niri-post-install"
         ]
-      }
+      },
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
     },
     "ubuntu-niri-gl": {
       "name": "Ubuntu 26.04 Niri",
@@ -659,7 +668,8 @@
         "post_install_run": [
           "~/bin/ubuntu-niri-gl-post-install"
         ]
-      }
+      },
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
     }
   }
 }
