@@ -50,7 +50,7 @@
           ]
         }
       },
-      "notes": "Ubuntu Server 24.04.4 autoinstall + lubuntu-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), sddm gets an autologin drop-in for the Lubuntu session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "notes": "Ubuntu Server 24.04.4 autoinstall + lubuntu-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), sddm gets an autologin drop-in (written for sddm, lightdm and gdm3 alike: the metapackage decides which one lands) for the Lubuntu session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
       "autoinstall": {
         "hostname": "lubuntu",
         "username": "lab",
@@ -79,11 +79,17 @@
             "path": "/etc/sddm.conf.d/vmctl-autologin.conf",
             "permissions": "0644",
             "content": "[Autologin]\nUser={{user}}\nSession=Lubuntu\n"
+          },
+          {
+            "path": "/etc/gdm3/custom.conf",
+            "permissions": "0644",
+            "content": "[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n"
           }
         ],
         "runcmd": [
           "systemctl set-default graphical.target",
-          "systemctl enable sddm",
+          "for dm in sddm gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
+          "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
           "systemctl enable --now serial-getty@ttyS0.service"
         ]
       },
@@ -148,7 +154,7 @@
           ]
         }
       },
-      "notes": "Ubuntu Server 24.04.4 autoinstall + kubuntu-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), sddm gets an autologin drop-in for the plasma session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "notes": "Ubuntu Server 24.04.4 autoinstall + kubuntu-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), sddm gets an autologin drop-in (written for sddm, lightdm and gdm3 alike: the metapackage decides which one lands) for the plasma session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
       "autoinstall": {
         "hostname": "kubuntu",
         "username": "lab",
@@ -177,11 +183,17 @@
             "path": "/etc/sddm.conf.d/vmctl-autologin.conf",
             "permissions": "0644",
             "content": "[Autologin]\nUser={{user}}\nSession=plasma\n"
+          },
+          {
+            "path": "/etc/gdm3/custom.conf",
+            "permissions": "0644",
+            "content": "[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n"
           }
         ],
         "runcmd": [
           "systemctl set-default graphical.target",
-          "systemctl enable sddm",
+          "for dm in sddm gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
+          "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
           "systemctl enable --now serial-getty@ttyS0.service"
         ]
       },
@@ -246,7 +258,7 @@
           ]
         }
       },
-      "notes": "Ubuntu Server 24.04.4 autoinstall + xubuntu-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), lightdm gets an autologin drop-in for the xubuntu session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "notes": "Ubuntu Server 24.04.4 autoinstall + xubuntu-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), lightdm gets an autologin drop-in (written for sddm, lightdm and gdm3 alike: the metapackage decides which one lands) for the xubuntu session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
       "autoinstall": {
         "hostname": "xubuntu",
         "username": "lab",
@@ -275,11 +287,17 @@
             "path": "/etc/lightdm/lightdm.conf.d/vmctl-autologin.conf",
             "permissions": "0644",
             "content": "[Seat:*]\nautologin-user={{user}}\nautologin-user-timeout=0\nautologin-session=xubuntu\n"
+          },
+          {
+            "path": "/etc/gdm3/custom.conf",
+            "permissions": "0644",
+            "content": "[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n"
           }
         ],
         "runcmd": [
           "systemctl set-default graphical.target",
-          "systemctl enable lightdm",
+          "for dm in lightdm gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
+          "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
           "systemctl enable --now serial-getty@ttyS0.service"
         ]
       },
@@ -344,7 +362,7 @@
           ]
         }
       },
-      "notes": "Ubuntu Server 24.04.4 autoinstall + ubuntu-mate-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), lightdm gets an autologin drop-in for the mate session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "notes": "Ubuntu Server 24.04.4 autoinstall + ubuntu-mate-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), lightdm gets an autologin drop-in (written for sddm, lightdm and gdm3 alike: the metapackage decides which one lands) for the mate session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
       "autoinstall": {
         "hostname": "ubuntu-mate",
         "username": "lab",
@@ -373,11 +391,17 @@
             "path": "/etc/lightdm/lightdm.conf.d/vmctl-autologin.conf",
             "permissions": "0644",
             "content": "[Seat:*]\nautologin-user={{user}}\nautologin-user-timeout=0\nautologin-session=mate\n"
+          },
+          {
+            "path": "/etc/gdm3/custom.conf",
+            "permissions": "0644",
+            "content": "[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n"
           }
         ],
         "runcmd": [
           "systemctl set-default graphical.target",
-          "systemctl enable lightdm",
+          "for dm in lightdm gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
+          "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
           "systemctl enable --now serial-getty@ttyS0.service"
         ]
       },
@@ -442,7 +466,7 @@
           ]
         }
       },
-      "notes": "Ubuntu Server 24.04.4 autoinstall + ubuntu-budgie-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), lightdm gets an autologin drop-in for the ubuntu-budgie-desktop session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
+      "notes": "Ubuntu Server 24.04.4 autoinstall + ubuntu-budgie-desktop, the kvm-lab flavor recipe on plain QEMU. The desktop metapackage is installed by the installer itself (autoinstall packages), lightdm gets an autologin drop-in (written for sddm, lightdm and gdm3 alike: the metapackage decides which one lands) for the ubuntu-budgie-desktop session and a getty on ttyS0 makes `vmctl console` a login prompt. Expect 30-40 minutes: the metapackage is downloaded during the install.",
       "autoinstall": {
         "hostname": "ubuntu-budgie",
         "username": "lab",
@@ -471,11 +495,17 @@
             "path": "/etc/lightdm/lightdm.conf.d/vmctl-autologin.conf",
             "permissions": "0644",
             "content": "[Seat:*]\nautologin-user={{user}}\nautologin-user-timeout=0\nautologin-session=ubuntu-budgie-desktop\n"
+          },
+          {
+            "path": "/etc/gdm3/custom.conf",
+            "permissions": "0644",
+            "content": "[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n"
           }
         ],
         "runcmd": [
           "systemctl set-default graphical.target",
-          "systemctl enable lightdm",
+          "for dm in lightdm gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
+          "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
           "systemctl enable --now serial-getty@ttyS0.service"
         ]
       },

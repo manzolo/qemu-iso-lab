@@ -88,7 +88,11 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             self.assertEqual(vm["autoinstall"]["username"], "lab")
             self.assertEqual(vm["ssh_provision"]["user"], "lab")
             self.assertEqual(vm["cloud_init"]["user"], "lab")
-            self.assertIn(dm_file, [f["path"] for f in vm["cloud_init"]["write_files"]])
+            paths = [f["path"] for f in vm["cloud_init"]["write_files"]]
+            self.assertIn(dm_file, paths)
+            # ubuntu-budgie-desktop pulls gdm3 on 24.04 and ignored the lightdm drop-in, so
+            # every flavor now carries the gdm3 autologin file as well (verified live).
+            self.assertIn("/etc/gdm3/custom.conf", paths)
 
         # Fedora Silverblue rides the kickstart flow with an ostree source instead of %packages.
         silverblue = cfg["vms"]["fedora-silverblue"]
