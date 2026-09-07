@@ -40,4 +40,5 @@ Recorded dates:
 - Consider a small Alpine EFI smoke profile alongside the BIOS baseline.
 - Automate a FreeBSD installation to test provisioning assumptions outside Linux.
 - Retrieve matching vendor checksums for discovery-selected Alpine/Fedora images; do not attach a static hash to a changing URL.
-- Replace or investigate the two mismatching local Fedora ISO files listed in `ISO_CHECKSUMS.md`; preserve the official checksums.
+- Resume interrupted ISO downloads with HTTP Range requests: the Fedora archive cut a 2.4 GB
+  transfer at 115 MB and the whole file had to be fetched again.
