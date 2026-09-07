@@ -146,7 +146,7 @@
           ]
         }
       },
-      "notes": "openSUSE Tumbleweed installed unattended with AutoYaST, ported from kvm-lab. The rendered profile travels on a USB stick (autoyast=usb:///autoinst.xml) and the installer ISO is the only CD-ROM: with two CD drives YaST cannot tell which one holds the repository and stops on \"Insert 'cd-<id>' (Disc 1)\" halfway through the package install (seen live). The NET image carries no packages, so install_repo points at the online oss repository, which also keeps the download at ~250 MB instead of the 4.7 GB DVD. The chroot script creates the user, the sudoers drop-in and the SSH key, enables sshd and a getty on ttyS0, then syncs, flushes and prints the completion token. Expect 30-45 minutes, mostly package downloads.",
+      "notes": "openSUSE Tumbleweed installed unattended with AutoYaST, ported from kvm-lab. The rendered profile travels on a USB stick (autoyast=usb:///autoinst.xml) and the installer ISO is the only CD-ROM: with two CD drives YaST cannot tell which one holds the repository and stops on \"Insert 'cd-<id>' (Disc 1)\" halfway through the package install (seen live). The NET image carries no packages, so install_repo points at the online oss repository, which also keeps the download at ~250 MB instead of the 4.7 GB DVD. The chroot script creates the user, the sudoers drop-in and the SSH key, enables sshd and a getty on ttyS0, opens SSH in firewalld (openSUSE opens only dhcpv6-client, so the forwarded port hangs at the banner), then syncs, flushes and prints the completion token. Expect 30-45 minutes, mostly package downloads.",
       "autoyast_config": {
         "hostname": "tumbleweed",
         "username": "lab",
@@ -158,14 +158,16 @@
         "disk_device": "vda",
         "install_repo": "https://download.opensuse.org/tumbleweed/repo/oss/",
         "autologin": true,
+        "open_firewall_services": [
+          "ssh"
+        ],
         "default_target": "graphical",
         "products": [
           "openSUSE"
         ],
         "patterns": [
           "enhanced_base",
-          "gnome",
-          "kvm_server"
+          "gnome"
         ],
         "packages": [
           "openssh",

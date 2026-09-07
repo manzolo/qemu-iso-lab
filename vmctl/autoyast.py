@@ -84,6 +84,7 @@ def chroot_script(vm_name: str, vm: dict[str, Any]) -> str:
     hostname = str(cfg.get("hostname") or vm_name).strip()
     disk_device = str(cfg.get("disk_device") or "vda").strip()
     autologin = bool(cfg.get("autologin", True))
+    firewall_services: list[str] = list(cfg.get("open_firewall_services") or ["ssh"])
     extra_commands: list[str] = list(cfg.get("chroot_commands") or [])
     pubkey = _resolve_ssh_pubkey(vm)
 
@@ -99,6 +100,12 @@ def chroot_script(vm_name: str, vm: dict[str, Any]) -> str:
         "systemctl enable sshd.service || true",
         "systemctl enable serial-getty@ttyS0.service || true",
     ]
+    # openSUSE installs firewalld with only dhcpv6-client open: sshd listens and the host's
+    # forwarded port still hangs at the SSH banner (verified live on the running guest).
+    for service in firewall_services:
+        lines.append(
+            f"command -v firewall-offline-cmd >/dev/null && firewall-offline-cmd --add-service={service} || true"
+        )
     if pubkey:
         lines += [
             f"install -d -m0700 -o {username} -g users /home/{username}/.ssh",

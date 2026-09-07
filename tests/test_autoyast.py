@@ -61,6 +61,11 @@ class AutoyastRenderTests(BaseVmctlTestCase):
         self.assertIn("usermod -p '$6$salt$hash' tester", script)
         self.assertIn("/etc/sudoers.d/tester", script)
         self.assertIn("systemctl enable sshd.service", script)
+        # openSUSE's firewalld opens dhcpv6-client only: without this the forwarded SSH port
+        # accepts the connection and then hangs at the banner (verified live).
+        self.assertIn("firewall-offline-cmd --add-service=ssh", script)
+        firewall_at = script.index("firewall-offline-cmd")
+        self.assertLess(firewall_at, sync_at)
 
     def test_missing_identity_is_rejected(self):
         self.vm_config["autoyast_config"] = {"username": "tester"}
