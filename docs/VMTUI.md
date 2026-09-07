@@ -37,6 +37,11 @@ The header counts profiles, VMs with data and running VMs.
 
 Above the list: `Filter` (all / installed / running / by distro family) and
 `Find` (substring on name or title). Below it: `Tools` (`vmctl status`, remote
+`Ctrl-R` (or `F5`) rebuilds the dashboard in place: rows, the counters in the header and
+the running markers, keeping the cursor where it was. The state moves while the menu is
+open, an install finishes or a VM stops, and a letter could not be used for this because
+letters filter the list. On the `dialog` backend the menu is rebuilt when you reopen it.
+
 hosts, clean all) and `Quit`. Esc or Ctrl-C from anywhere returns to the
 previous screen instead of leaving the TUI.
 

@@ -330,3 +330,39 @@ class PostInstallTests(BaseVmctlTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VerifyAfterRebootTests(BaseVmctlTestCase):
+    """A desktop layered during the post-install can only be asserted after a reboot."""
+
+    def test_reboot_then_run_the_verification_commands(self):
+        cfg = {"user": "lab", "ssh_host_port": 2299,
+               "post_install_run": ["install-desktop"],
+               "verify_after_reboot": ["verify-desktop --user lab"]}
+        self.vm_config["ssh_provision"] = cfg
+        calls = []
+        with mock.patch.object(vmctl.ssh, "reboot_guest", side_effect=lambda *a, **k: calls.append("reboot")), \
+             mock.patch.object(vmctl.ssh, "wait_for_ssh", side_effect=lambda *a, **k: calls.append("wait")), \
+             mock.patch.object(vmctl.ssh, "post_install_run", side_effect=lambda vm, command, **k: calls.append(command)), \
+             mock.patch.object(vmctl.lifecycle.time, "sleep"):
+            vmctl.lifecycle.run_verify_after_reboot("vm", self.vm_config, cfg, 300)
+        # The order is the point: reboot, wait for SSH, only then assert.
+        self.assertEqual(calls, ["reboot", "wait", "verify-desktop --user lab"])
+
+    def test_no_reboot_without_verification_commands(self):
+        cfg = {"user": "lab", "ssh_host_port": 2299}
+        with mock.patch.object(vmctl.ssh, "reboot_guest") as reboot, \
+             mock.patch.object(vmctl.ssh, "wait_for_ssh") as wait:
+            vmctl.lifecycle.run_verify_after_reboot("vm", self.vm_config, cfg, 300)
+        reboot.assert_not_called()
+        wait.assert_not_called()
+
+    def test_reboot_tolerates_the_dropped_connection_but_not_other_failures(self):
+        self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2299}
+        completed = mock.Mock(returncode=255, stdout="", stderr="Connection closed")
+        with mock.patch.object(vmctl.ssh.subprocess, "run", return_value=completed):
+            vmctl.ssh.reboot_guest(self.vm_config)  # closed connection: expected
+        completed = mock.Mock(returncode=1, stdout="", stderr="sudo: a password is required")
+        with mock.patch.object(vmctl.ssh.subprocess, "run", return_value=completed), \
+             self.assertRaises(vmctl.errors.VMError):
+            vmctl.ssh.reboot_guest(self.vm_config)

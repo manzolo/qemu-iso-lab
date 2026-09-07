@@ -24,6 +24,7 @@ from vmctl.errors import VMError
 # --- background-VM tracking ----------------------------------------------------
 
 ACPI_POWEROFF_GRACE_SEC = 60
+REBOOT_SETTLE_SEC = 10
 
 
 def bootstrap_pid_path(name: str) -> Path:
@@ -2000,6 +2001,42 @@ def run_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int, dry_run
 
     for command in ssh_cfg.get("post_install_run", []):
         ssh.post_install_run(vm, str(command), dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+
+    run_verify_after_reboot(vm_name, vm, ssh_cfg, timeout_sec, dry_run=dry_run,
+                            stdout_log=stdout_log, stderr_log=stderr_log)
+
+
+def run_verify_after_reboot(
+    vm_name: str,
+    vm: dict[str, Any],
+    ssh_cfg: dict[str, Any],
+    timeout_sec: int,
+    dry_run: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+) -> None:
+    """Reboot the guest, wait for SSH again, then run ``verify_after_reboot``.
+
+    A profile that installs its desktop *during* the post-install cannot be checked in the
+    same session: on the Arch and CachyOS recipes greetd is enabled and restarted while the
+    install is still running, the initial niri session does not survive it and tty1 falls
+    back to a text login (seen live, screenshot in the report), while the very same disk
+    brings up niri and an active session on the next boot. So the assertions that describe
+    the finished system belong after a reboot, which is also how the user will meet the VM.
+    """
+    commands = [str(command) for command in ssh_cfg.get("verify_after_reboot", [])]
+    if not commands:
+        return
+    ui.print_note(f"Rebooting VM '{vm_name}' before the final checks")
+    ssh.reboot_guest(vm, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    if not dry_run:
+        # Let the guest go down before probing, or the first SSH attempt reconnects to the
+        # session that is on its way out.
+        time.sleep(REBOOT_SETTLE_SEC)
+    ssh.wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
+    ui.print_status("ok", f"VM '{vm_name}' is back after the reboot")
+    for command in commands:
+        ssh.post_install_run(vm, command, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
 
 
 def cmd_post_install(args: argparse.Namespace) -> int:

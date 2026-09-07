@@ -401,7 +401,9 @@
         "post_install_run": [
           "~/bin/fedora-dms-post-install",
           "command -v dms >/dev/null && dms version",
-          "niri --version",
+          "niri --version"
+        ],
+        "verify_after_reboot": [
           "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager rpm --package niri --compositor niri"
         ]
       }

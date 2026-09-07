@@ -92,6 +92,10 @@ clamp() {
 # ---- fzf backend -----------------------------------------------------------
 
 # fzf_pick TITLE HEADER DEFAULT_TAG TAG DESC [TAG DESC ...] → selected TAG
+MENU_REFRESH_KEYS="ctrl-r,f5"
+MENU_REFRESH_TAG="__refresh"
+MENU_HIGHLIGHTED=""
+
 # Items are "tag<TAB>description"; only the description is shown and searched.
 fzf_pick() {
     local title="$1"
@@ -138,8 +142,26 @@ fzf_pick() {
     if (( default_pos > 0 )); then
         args+=(--sync --bind "start:pos($default_pos)")
     fi
-    local selected
-    selected=$(printf '%s\n' "${lines[@]}" | fzf "${args[@]}") || return 1
+    # MENU_REFRESH=1 asks fzf to report Ctrl-R / F5 instead of swallowing them, so the
+    # caller can rebuild the list. A plain letter would be wrong here: the picker uses
+    # letters to filter and to jump between VMs.
+    if [[ "${MENU_REFRESH:-0}" == "1" ]]; then
+        args+=(--expect="$MENU_REFRESH_KEYS")
+    fi
+    local output
+    output=$(printf '%s\n' "${lines[@]}" | fzf "${args[@]}") || return 1
+    local selected="$output"
+    if [[ "${MENU_REFRESH:-0}" == "1" ]]; then
+        # With --expect the first line is the key that closed the picker (empty for Enter)
+        # and the second is the highlighted row.
+        local key="${output%%$'\n'*}"
+        selected="${output#*$'\n'}"
+        if [[ -n "$key" ]]; then
+            MENU_HIGHLIGHTED="${selected%%$'\t'*}"
+            printf '%s\n' "$MENU_REFRESH_TAG"
+            return 0
+        fi
+    fi
     printf '%s\n' "${selected%%$'\t'*}"
 }
 
@@ -1737,6 +1759,7 @@ choose_find() {
 }
 
 dashboard_loop() {
+    local dash_cursor=""
     while true; do
         local -a rows=()
         mapfile -t rows < <(list_dashboard_items "$dash_mode" "$dash_value")
@@ -1762,20 +1785,31 @@ dashboard_loop() {
         )
 
         local default
-        default=$(state_get last-vm)
+        # After a refresh the cursor stays where it was, not on the remembered VM.
+        default="$dash_cursor"
+        [[ -z "$default" ]] && default=$(state_get last-vm)
         [[ -z "$default" ]] && default="__filter"
 
+        local refresh_hint="Ctrl-R = refresh"
+        [[ "$UI_BACKEND" == "fzf" ]] || refresh_hint="reopen to refresh"
         local selected
         selected=$(MENU_NO_TAGS=1 MENU_DEFAULT_ITEM="$default" MENU_CANCEL_LABEL="Quit" MENU_OK_LABEL="Open" MENU_WIDTH=100 \
+            MENU_REFRESH=1 \
             menu_choose_fit \
             "QEMU ISO Lab" \
-            "$total profiles · $installed with data · $running running     ● running  ■ disk has data  □ empty disk  ○ no disk\nEnter = open the highlighted VM · type a letter to jump · Esc/Quit = exit" \
+            "$total profiles · $installed with data · $running running     ● running  ■ disk has data  □ empty disk  ○ no disk\nEnter = open the highlighted VM · type a letter to jump · $refresh_hint · Esc/Quit = exit" \
             "${items[@]}") || {
                 clear
                 exit 0
             }
+        dash_cursor=""
 
         case "$selected" in
+            "$MENU_REFRESH_TAG")
+                # State moves while the dashboard is open (an install finishes, a VM stops):
+                # loop again to rebuild both the rows and the counters in the header.
+                dash_cursor="$MENU_HIGHLIGHTED"
+                ;;
             __filter) choose_filter ;;
             __find) choose_find ;;
             __tools) tools_menu_loop ;;

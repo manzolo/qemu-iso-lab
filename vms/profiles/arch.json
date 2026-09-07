@@ -280,7 +280,9 @@
           }
         ],
         "post_install_run": [
-          "~/bin/cachyos-post-install",
+          "~/bin/cachyos-post-install"
+        ],
+        "verify_after_reboot": [
           "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager pacman --package cachyos-niri-noctalia"
         ]
       },
@@ -457,7 +459,9 @@
           }
         ],
         "post_install_run": [
-          "~/bin/cachyos-nvidia-post-install",
+          "~/bin/cachyos-nvidia-post-install"
+        ],
+        "verify_after_reboot": [
           "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager pacman --package cachyos-niri-noctalia"
         ]
       },
@@ -653,7 +657,9 @@
         "post_install_run": [
           "~/bin/arch-noctalia-post-install",
           "command -v noctalia >/dev/null && noctalia --version",
-          "command -v niri >/dev/null && niri --version",
+          "command -v niri >/dev/null && niri --version"
+        ],
+        "verify_after_reboot": [
           "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager pacman --package niri --compositor niri"
         ]
       }
@@ -853,7 +859,9 @@
         "post_install_run": [
           "~/bin/arch-dms-post-install",
           "command -v dms >/dev/null && dms version",
-          "command -v niri >/dev/null && niri --version",
+          "command -v niri >/dev/null && niri --version"
+        ],
+        "verify_after_reboot": [
           "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager pacman --package niri --compositor niri"
         ]
       }
@@ -1069,7 +1077,9 @@
           "command -v dms >/dev/null && dms version",
           "command -v niri >/dev/null && niri --version",
           "pacman -Q nvidia-open-dkms nvidia-utils && dkms status",
-          "nvidia-smi 2>/dev/null || echo 'nvidia-smi: no NVIDIA GPU in this VM (expected; the driver is here for bare metal)'",
+          "nvidia-smi 2>/dev/null || echo 'nvidia-smi: no NVIDIA GPU in this VM (expected; the driver is here for bare metal)'"
+        ],
+        "verify_after_reboot": [
           "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager pacman --package niri --compositor niri"
         ]
       }

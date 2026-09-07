@@ -71,6 +71,13 @@ Profiles that add `cloud_init`, `ssh_provision`, `autoinstall`, `archinstall_con
 provisioning flows described in [UNATTENDED.md](UNATTENDED.md) and
 [PROVISIONING.md](PROVISIONING.md).
 
+`ssh_provision.verify_after_reboot` holds commands that describe the finished system:
+vmctl reboots the guest, waits for SSH again and runs them last. Use it whenever the
+desktop is installed by the post-install itself (the Arch, CachyOS and Fedora niri
+recipes): greetd is enabled and restarted while the install is still running, the initial
+session does not survive that, and tty1 falls back to a text login even though the same
+disk brings up the desktop on the next boot.
+
 `network_lab` (role `pfsense` with the LAN topology, or `pihole`/`client` with
 `gateway_vm` and `ip`) and `pfsense_config` (`username`, `password`, `timezone`
 of the router; the account is created by the installer, `admin` gets the same

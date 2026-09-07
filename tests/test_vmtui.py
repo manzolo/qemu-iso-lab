@@ -260,6 +260,45 @@ class VmtuiTests(unittest.TestCase):
         self.assertTrue(result.stdout.startswith("■ stopped, disk has data"))
         self.assertIn("SSH port 2293", result.stdout)
 
+    def test_dashboard_refresh_key_is_reported_not_swallowed(self):
+        # A letter would collide with the filter, so the refresh lives on Ctrl-R / F5 and
+        # fzf must report it instead of consuming it.
+        fake = self.bindir / "fzf"
+        fake.write_text(
+            "#!/usr/bin/env sh\n"
+            "case \"$1\" in --version) echo '0.67.0 (debian)'; exit 0 ;; esac\n"
+            "for arg in \"$@\"; do case \"$arg\" in --expect=*) echo \"${arg#--expect=}\" >&2 ;; esac; done\n"
+            "cat >/dev/null\n"
+            "printf 'ctrl-r\\n__filter\\tFilter row\\n'\n",
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        env = dict(self.env, VMTUI_UI="fzf")
+        result = subprocess.run(
+            ["bash", "-lc", "source bin/vmtui; MENU_REFRESH=1 fzf_pick title header '' tag desc; echo \"highlighted=$MENU_HIGHLIGHTED\""],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=True,
+        )
+        self.assertIn("ctrl-r,f5", result.stderr)  # the keys fzf was asked to report
+        self.assertIn("__refresh", result.stdout)  # the sentinel the dashboard loops on
+        self.assertIn("highlighted=__filter", result.stdout)  # cursor position survives
+
+    def test_dashboard_selection_still_returns_the_tag_with_refresh_enabled(self):
+        fake = self.bindir / "fzf"
+        fake.write_text(
+            "#!/usr/bin/env sh\n"
+            "case \"$1\" in --version) echo '0.67.0 (debian)'; exit 0 ;; esac\n"
+            "cat >/dev/null\nprintf '\\ntest-ssh\\tTest row\\n'\n",
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        env = dict(self.env, VMTUI_UI="fzf")
+        result = subprocess.run(
+            ["bash", "-lc", "source bin/vmtui; MENU_REFRESH=1 fzf_pick title header '' tag desc"],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=True,
+        )
+        # Enter leaves the key line empty: the selected tag must still come back alone.
+        self.assertEqual(result.stdout.strip(), "test-ssh")
+
     def test_dashboard_summary_and_rows(self):
         self.mark_installed("test-ssh")
         result = self.run_bash("source bin/vmtui; list_dashboard_items all ''")

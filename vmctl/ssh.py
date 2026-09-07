@@ -408,6 +408,28 @@ def post_install_run(
     )
 
 
+def reboot_guest(
+    vm: dict[str, Any],
+    dry_run: bool = False,
+    stdout_log: Path | None = None,
+    stderr_log: Path | None = None,
+) -> None:
+    """Ask the guest to reboot over SSH, tolerating the connection it drops on the way down."""
+    command = ssh_base_cmd(vm, dry_run=dry_run) + ["sudo systemctl reboot"]
+    ui.print_command(command)
+    if dry_run:
+        return
+    result = subprocess.run(command, capture_output=True, text=True)
+    for path, text in ((stdout_log, result.stdout), (stderr_log, result.stderr)):
+        if path is not None and text:
+            runtime.ensure_parent(path)
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write(text)
+    # A closed connection is the expected outcome; anything else is worth seeing.
+    if result.returncode not in (0, 255):
+        raise VMError(f"Reboot request failed with exit status {result.returncode}: {result.stderr.strip()}")
+
+
 def post_install_run_raw(
     vm: dict[str, Any],
     command: str,
