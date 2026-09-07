@@ -98,9 +98,14 @@
         "user": "lab",
         "ssh_host_port": 2240,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled sddm",
-          "dpkg-query -W -f='${Status}\\n' lubuntu-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package lubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       },
       "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
@@ -203,9 +208,14 @@
         "user": "lab",
         "ssh_host_port": 2241,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled sddm",
-          "dpkg-query -W -f='${Status}\\n' kubuntu-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package kubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       },
       "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
@@ -308,9 +318,14 @@
         "user": "lab",
         "ssh_host_port": 2242,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled lightdm",
-          "dpkg-query -W -f='${Status}\\n' xubuntu-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package xubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       },
       "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
@@ -413,9 +428,14 @@
         "user": "lab",
         "ssh_host_port": 2243,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled lightdm",
-          "dpkg-query -W -f='${Status}\\n' ubuntu-mate-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package ubuntu-mate-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       },
       "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"
@@ -518,9 +538,14 @@
         "user": "lab",
         "ssh_host_port": 2244,
         "post_install_run": [
-          "systemctl get-default",
-          "systemctl is-enabled lightdm",
-          "dpkg-query -W -f='${Status}\\n' ubuntu-budgie-desktop"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package ubuntu-budgie-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       },
       "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433"

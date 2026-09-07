@@ -336,9 +336,16 @@
         "user": "lab",
         "ssh_host_port": 2239,
         "post_install_run": [
-          "systemctl get-default",
           "sudo cat /etc/netplan/01-vmctl-lab.yaml",
-          "systemctl is-enabled systemd-networkd-wait-online.service || true"
+          "systemctl is-enabled systemd-networkd-wait-online.service || true",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package lubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       },
       "network_lab": {

@@ -385,12 +385,18 @@
             "source": "vms/profile-files/arch-dms/niri/config.kdl",
             "dest": "/home/{{user}}/.config/niri/config.kdl",
             "dest_mode": "644"
+          },
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
           }
         ],
         "post_install_run": [
           "~/bin/fedora-dms-post-install",
-          "command -v dms >/dev/null && dms version || true",
-          "niri --version"
+          "command -v dms >/dev/null && dms version",
+          "niri --version",
+          "~/bin/verify-desktop --user \"{{user}}\" --service greetd.service --package-manager rpm --package niri --compositor niri"
         ]
       }
     },
@@ -480,8 +486,15 @@
         "ssh_key": null,
         "post_install_run": [
           "rpm-ostree status",
-          "systemctl get-default",
-          "sudo rpm-ostree install --idempotent --allow-inactive qemu-guest-agent spice-vdagent || echo 'layering skipped'"
+          "sudo rpm-ostree install --idempotent --allow-inactive qemu-guest-agent spice-vdagent || echo 'layering skipped'",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager rpm --package gnome-shell"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       },
       "iso_sha256": "9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682"

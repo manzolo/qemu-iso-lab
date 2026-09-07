@@ -138,3 +138,9 @@ replace. A minimal override looks like this:
 
 Never commit a real user name, password or hash into a tracked profile: the
 repository is public.
+
+## Desktop readiness checks
+
+The Ubuntu flavors and network-lab client, CachyOS, Arch niri sessions, Fedora niri/Silverblue and openSUSE AutoYaST copy `vms/profile-files/common/bin/verify-desktop` into the guest. The read-only check requires `graphical.target`, installed desktop packages, an active display manager and an active local graphical session belonging to the configured user. A greeter, another user, an SSH session or an inactive session does not count as autologin. The helper retries service/session readiness for up to roughly two minutes because SSH can become ready before the desktop. For greetd, a local tty session also needs the expected compositor running under that user.
+
+Alpine uses OpenRC service and user-owned compositor checks. Ubuntu niri's package-only recipes do not configure autologin, so they assert package installation without claiming a graphical session. CachyOS retains its stronger existing Noctalia/bar readiness check. Omarchy and Windows keep their existing platform-specific flows. No check alters the installer flush, completion token or shutdown sequence. A live validation must still confirm the desktop is usable; these checks cannot prove visual correctness.

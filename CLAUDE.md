@@ -200,3 +200,5 @@ Names follow `<distro>[-<version>][-<variant>]`. Include a version only when ver
 Alpine CI media is pinned to Virt 3.24.1 (`core.json`, versioned URL and SHA-256, no discovery). Updating it is an explicit maintenance change; keep both CI profiles on the same verified ISO.
 
 Pinned ISO SHA-256 provenance is in `docs/ISO_CHECKSUMS.md`. `tools/verify_profile_isos.py --iso-root PATH` audits existing cache files without downloading, changing or deleting them; mismatches must never be resolved by replacing vendor hashes with local hashes. Dynamic discovery profiles need a matching per-release checksum mechanism before static hashes can safely be added.
+
+Desktop post-install checks use the shared guest script `vms/profile-files/common/bin/verify-desktop`. Never accept an enabled display manager as proof of autologin: require a local, active, non-greeter graphical session for the expected user and installed packages, with bounded startup retries. OpenRC Alpine checks greetd plus the user-owned niri process. The package-only Ubuntu niri recipes do not promise autologin.

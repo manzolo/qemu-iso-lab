@@ -1,0 +1,66 @@
+#!/bin/sh
+# Assert desktop readiness after provisioning, without changing guest state.
+set -eu
+user=
+service=display-manager.service
+manager=
+packages=
+compositor=
+attempts=60
+interval=2
+while [ "$#" -gt 0 ]; do
+    [ "$#" -ge 2 ] || { echo 'Missing option value' >&2; exit 2; }
+    case "$1" in
+        --user) user=$2 ;;
+        --service) service=$2 ;;
+        --package-manager) manager=$2 ;;
+        --package) packages="$packages $2" ;;
+        --compositor) compositor=$2 ;;
+        --attempts) attempts=$2 ;;
+        --interval) interval=$2 ;;
+        *) echo "Unknown option: $1" >&2; exit 2 ;;
+    esac
+    shift 2
+done
+fail() { printf 'Desktop verification failed: %s\n' "$*" >&2; exit 1; }
+[ -n "$user" ] || fail 'missing expected user'
+case "$attempts" in ''|*[!0-9]*|0) fail 'attempts must be positive' ;; esac
+case "$interval" in ''|*[!0-9]*) fail 'interval must be nonnegative' ;; esac
+[ "$(systemctl get-default)" = graphical.target ] || fail 'default target is not graphical.target'
+for package in $packages; do
+    case "$manager" in
+        dpkg) [ "$(dpkg-query -W -f='${Status}' "$package")" = 'install ok installed' ] || fail "package not installed: $package" ;;
+        rpm) rpm -q "$package" >/dev/null || fail "package not installed: $package" ;;
+        pacman) pacman -Q "$package" >/dev/null || fail "package not installed: $package" ;;
+        *) fail "unsupported package manager: $manager" ;;
+    esac
+done
+session_matches() {
+    properties=$(loginctl show-session "$1" -p Name -p Active -p Remote -p Type -p Class 2>/dev/null) || return 1
+    printf '%s\n' "$properties" | grep -Fxq "Name=$user" || return 1
+    printf '%s\n' "$properties" | grep -Fxq 'Active=yes' || return 1
+    printf '%s\n' "$properties" | grep -Fxq 'Remote=no' || return 1
+    printf '%s\n' "$properties" | grep -Fxq 'Class=user' || return 1
+    if printf '%s\n' "$properties" | grep -Eq '^Type=(wayland|x11)$'; then
+        return 0
+    fi
+    # greetd can register its PAM session as tty; require the user's compositor.
+    [ -n "$compositor" ] &&
+        printf '%s\n' "$properties" | grep -Fxq 'Type=tty' &&
+        pgrep -u "$user" -x "$compositor" >/dev/null
+}
+attempt=1
+while [ "$attempt" -le "$attempts" ]; do
+    if systemctl is-active --quiet "$service"; then
+        sessions=$(loginctl list-sessions --no-legend --no-pager 2>/dev/null) || sessions=
+        for session in $(printf '%s\n' "$sessions" | awk '{print $1}'); do
+            if session_matches "$session"; then
+                printf 'Desktop ready: %s has an active local graphical session (%s)\n' "$user" "$session"
+                exit 0
+            fi
+        done
+    fi
+    [ "$attempt" -eq "$attempts" ] || sleep "$interval"
+    attempt=$((attempt + 1))
+done
+fail "$service or the active local graphical session for $user is missing; inspect loginctl and the display manager journal"

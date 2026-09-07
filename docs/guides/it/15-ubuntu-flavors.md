@@ -65,3 +65,5 @@ Copia un profilo e cambia tre campi: `iso`/`iso_url` (una qualsiasi
 funzionano allo stesso modo; kvm-lab tiene tutte e tre le versioni dei cinque flavor, qui
 seguiamo la LTS corrente per non allungare troppo la matrice di validazione. Le varianti
 personali vanno in `local.json`, mai in un profilo tracciato.
+
+Il post-install ora fallisce se graphical.target non è il target predefinito, il metapacchetto desktop non è installato, il display manager non è attivo o manca una sessione grafica locale attiva dell’utente configurato. La sola schermata di login non dimostra che l’accesso automatico sia riuscito. Il controllo attende circa due minuti per l’avvio della sessione; questa modifica non è stata verificata dal vivo.

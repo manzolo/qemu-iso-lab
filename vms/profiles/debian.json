@@ -567,7 +567,8 @@
           }
         ],
         "post_install_run": [
-          "~/bin/ubuntu-niri-post-install"
+          "~/bin/ubuntu-niri-post-install",
+          "test \"$(dpkg-query -W -f='${Status}' niri)\" = \"install ok installed\" && test \"$(dpkg-query -W -f='${Status}' dms)\" = \"install ok installed\""
         ]
       },
       "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"
@@ -666,7 +667,8 @@
           }
         ],
         "post_install_run": [
-          "~/bin/ubuntu-niri-gl-post-install"
+          "~/bin/ubuntu-niri-gl-post-install",
+          "test \"$(dpkg-query -W -f='${Status}' niri)\" = \"install ok installed\" && test \"$(dpkg-query -W -f='${Status}' dms)\" = \"install ok installed\""
         ]
       },
       "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9"

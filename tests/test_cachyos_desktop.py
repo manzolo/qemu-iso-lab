@@ -133,12 +133,11 @@ esac
                     entry["source"] == str(SCRIPT.relative_to(ROOT))
                     for entry in provision["copy_from_host"]
                 ))
-                command = provision["post_install_run"][-1]
                 if name == "cachyos-nvidia":
                     nvidia_script = ROOT / "vms/profile-files/cachyos-nvidia/bin/cachyos-nvidia-post-install"
                     self.assertIn('bash "$HOME/bin/cachyos-post-install"', nvidia_script.read_text())
                 else:
-                    self.assertEqual(command, "~/bin/cachyos-post-install")
+                    self.assertIn("~/bin/cachyos-post-install", provision["post_install_run"])
 
     def test_example_keeps_cachyos_desktop_defaults(self):
         example = json.loads((ROOT / "vms/profiles/local.json.example").read_text())

@@ -192,8 +192,15 @@
         "ssh_key": null,
         "post_install_run": [
           "cat /etc/os-release",
-          "systemctl get-default",
-          "systemctl is-active sshd"
+          "systemctl is-active sshd",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager rpm --package gnome-shell"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
         ]
       }
     }

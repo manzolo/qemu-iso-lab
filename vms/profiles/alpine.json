@@ -135,7 +135,8 @@
           "niri validate",
           "niri --version",
           "rc-status default",
-          "pgrep -x niri >/dev/null && echo 'niri session is running' || { echo 'niri session NOT running'; exit 1; }"
+          "rc-service greetd status",
+          "pgrep -u \"{{user}}\" -x niri >/dev/null || { echo \"Desktop verification failed: no niri compositor for {{user}}\" >&2; exit 1; }"
         ]
       }
     }
