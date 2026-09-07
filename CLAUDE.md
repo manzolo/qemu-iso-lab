@@ -66,7 +66,7 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 | `windows.py` | Windows 10/11: `autounattend.xml` + first-logon `vmctl-setup.ps1` in a `VMCTLSEED` CD, prompt-free ISO rebuild (`7z` + `xorriso`), virtio-win ISO, SATA CD-ROM args. |
 | `kickstart.py` / `preseed.py` | AlmaLinux/Rocky/Fedora kickstart and Debian preseed rendering; `kickstart.install_repo()` picks `cdrom` or a netinst URL; `kickstart.ostree_config()`/`resolve_ostree_ref()` switch the flow to `ostreesetup` for Silverblue. |
 | `libvirt.py` | Render persistent libvirt XML and define/undefine existing disks; `export-libvirt` / `unexport-libvirt` handlers in lifecycle enforce running-VM checks. |
-| `report.py` | `check-vms --report [DIR] --open`: self-contained HTML, per-worker JSON and QMP P6→PNG screenshots before stop, outside restored artifacts. `wake_console()` sends one `send-key` before the final screendump, or a server guest past the console-blanking timeout is captured as a black rectangle; the install-time watcher captures with `wake=False` so nothing types into a running installer. |
+| `report.py` | `check-vms --report [DIR] --open`: self-contained HTML with profile status and historical live verification, per-worker JSON and QMP P6→PNG screenshots before stop, outside restored artifacts. `wake_console()` sends one `send-key` before the final screendump, or a server guest past the console-blanking timeout is captured as a black rectangle; the install-time watcher captures with `wake=False` so nothing types into a running installer. |
 | `netlab.py` | Network lab: `network_lab` topology resolution/validation, netplan + `pihole.toml` + guest `setup.sh` rendering, SSH post-install hook (`provision_guest`), libvirt segment network XML, `vmctl lab` helpers. |
 | `pfsense.py` | pfSense CE 2.7.2 scripted install: `config.xml` render (bcrypt users, WAN admin rules, NAT forwards), per-VM ISO rebuild (`xorriso` extract + `growisofs -M` graft), `rc.local`/`installerconfig`, CD-ROM args, profile checks. |
 | `ssh.py` | SSH/SCP helpers, `wait_for_ssh`, `post_install_copy`, `post_install_run`. |
@@ -187,7 +187,7 @@ artifacts/<vm>/
 
 ### CI
 
-GitHub Actions runs three jobs: `test` (unittest), `boot-smoke` (`boot-check alpine-ci` under TCG/QEMU, no KVM), and `ubuntu-niri-dry-run` (`--dry-run` of the full bootstrap). The `alpine-ci` profile is the stable CI guest — keep it small and TCG-capable.
+GitHub Actions includes these baseline jobs: `test` (unittest), `boot-smoke` (`boot-check alpine-ci` under TCG/QEMU, no KVM), and `ubuntu-niri-dry-run` (`--dry-run` of the full bootstrap). The `alpine-ci` profile is the stable CI guest — keep it small and TCG-capable.
 
 CI is a confirmation step, not the first feedback loop. If you modify workflow files, bootstrap handlers, or unattended install helpers, make the corresponding local `unittest` and dry-run checks pass before pushing.
 
@@ -202,3 +202,7 @@ Alpine CI media is pinned to Virt 3.24.1 (`core.json`, versioned URL and SHA-256
 Pinned ISO SHA-256 provenance is in `docs/ISO_CHECKSUMS.md`. `tools/verify_profile_isos.py --iso-root PATH` audits existing cache files without downloading, changing or deleting them; mismatches must never be resolved by replacing vendor hashes with local hashes. Dynamic discovery profiles need a matching per-release checksum mechanism before static hashes can safely be added.
 
 Desktop post-install checks use the shared guest script `vms/profile-files/common/bin/verify-desktop`. Never accept an enabled display manager as proof of autologin: require a local, active, non-greeter graphical session for the expected user and installed packages, with bounded startup retries. OpenRC Alpine checks greetd plus the user-owned niri process. The package-only Ubuntu niri recipes do not promise autologin.
+
+### Profile status and live verification
+
+Every tracked profile declares `meta.status` (`manual`, `unattended`, `experimental`). `meta.verified`, when present, is the last maintainer-supplied live PASS date, not the date of the last edit or unit test. The canonical list and JSON output expose status/verified; the HTML report stores profile_status/profile_verified separately from each run's status. Do not promote experimental profiles or advance dates from a dry run. See `docs/PROFILE_TODO.md` for definitions, historical dates and remaining work.

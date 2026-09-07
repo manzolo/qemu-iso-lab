@@ -11,6 +11,24 @@ from vmctl.errors import VMError
 
 
 class ReportTests(BaseVmctlTestCase):
+    def test_profile_history_is_preserved_separately_from_failed_run(self):
+        self.vm_config["meta"] = {"status": "unattended", "verified": "2026-09-07"}
+        args = argparse.Namespace(dry_run=False, _report_dir=str(self.root / "report"))
+        report.record("testvm", self.vm_config, args, "failed", "desktop session missing", 1.0, "bootstrap-unattended")
+        result = json.loads((self.root / "report/results/testvm.json").read_text())
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(result["profile_status"], "unattended")
+        self.assertEqual(result["profile_verified"], "2026-09-07")
+        page = report.render_html([result], {}, self.root)
+        self.assertIn("Profile status: unattended", page)
+        self.assertIn("Last live PASS: 2026-09-07", page)
+        self.assertIn("FAIL: 1", page)
+        result["profile_status"] = "<script>"
+        result["profile_verified"] = '<img src=x onerror="bad">'
+        page = report.render_html([result], {}, self.root)
+        self.assertIn("Profile status: &lt;script&gt;", page)
+        self.assertNotIn('<img src=x', page)
+
     def test_ppm_png_2x2(self):
         pixels = bytes([10, 32, 35, 255, 0, 0, 0, 255, 0, 0, 0, 255])
         png = report.ppm_to_png(b"P6\n# comment\n2 2\n255\n" + pixels)

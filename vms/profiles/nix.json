@@ -6,7 +6,8 @@
         "slug": "nixos",
         "family": "nix",
         "role": "desktop",
-        "release_model": "channel-based"
+        "release_model": "channel-based",
+        "status": "manual"
       },
       "iso": "isos/latest-nixos-graphical-x86_64-linux.iso",
       "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-graphical-x86_64-linux.iso",
@@ -52,7 +53,8 @@
         "slug": "nixos",
         "family": "nix",
         "role": "minimal",
-        "release_model": "channel-based"
+        "release_model": "channel-based",
+        "status": "manual"
       },
       "iso": "isos/latest-nixos-minimal-x86_64-linux.iso",
       "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-minimal-x86_64-linux.iso",

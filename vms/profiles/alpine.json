@@ -6,7 +6,8 @@
         "slug": "alpine-linux",
         "family": "alpine",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended"
       },
       "iso": "isos/alpine-standard-3.23-x86_64.iso",
       "iso_discovery": {

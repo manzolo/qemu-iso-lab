@@ -121,3 +121,5 @@ sequence that was broken.
 ## Profile name migration
 
 Old profile names remain accepted with a deprecation warning. Preview disk-directory migration with `python3 tools/migrate_profile_names.py --root /path/to/checkout`; stop affected VMs and switch that checkout to the renamed catalog before adding `--apply`. `--local-config /path/to/local.json` backs up and updates personal overrides. SSH ports are unchanged.
+
+`vmctl list` shows `manual`, `unattended` or `experimental` and the last recorded live PASS date. An absent date means no date is recorded. Historical verification is separate from the current HTML report result; unit tests and dry runs never advance it.

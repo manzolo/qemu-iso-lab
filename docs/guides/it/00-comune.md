@@ -118,3 +118,5 @@ che è stata violata.
 ## Migrazione dei nomi dei profili
 
 I vecchi nomi restano accettati con un avviso di deprecazione. Visualizza la migrazione delle cartelle dei dischi con `python3 tools/migrate_profile_names.py --root /path/to/checkout`; arresta le VM interessate e passa quel checkout al catalogo rinominato prima di aggiungere `--apply`. `--local-config /path/to/local.json` salva una copia di sicurezza e aggiorna gli override personali. Le porte SSH non cambiano.
+
+`vmctl list` mostra lo stato `manual`, `unattended` o `experimental` e la data dell’ultimo PASS dal vivo registrato. Una data assente indica che non è stata registrata. La verifica storica è separata dall’esito corrente nel report HTML; test automatici e dry-run non la aggiornano.

@@ -229,3 +229,5 @@ subcommand. Tests never touch the host: no QEMU, no ISOs, no personal
 ├── artifacts/      per-VM disks, firmware vars, seeds, logs (git-ignored)
 └── legacy/         the original CachyOS bash prototypes, kept for reference
 ```
+
+`vmctl list` shows each profile's status (`manual`, `unattended`, `experimental`) and last recorded live PASS date. These describe the recipe and its history; they do not certify a new change. The HTML validation report keeps this metadata separate from the current run result. See [profile status and backlog](docs/PROFILE_TODO.md).

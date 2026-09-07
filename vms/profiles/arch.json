@@ -6,7 +6,8 @@
         "slug": "archlinux",
         "family": "arch",
         "role": "baseline",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "manual"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -58,7 +59,8 @@
         "slug": "cachyos",
         "family": "arch",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "manual"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {
@@ -118,7 +120,8 @@
         "catalog_slug": "cachyos",
         "family": "arch",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "unattended"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {
@@ -289,7 +292,8 @@
         "catalog_slug": "cachyos",
         "family": "arch",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "unattended"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {
@@ -465,7 +469,8 @@
         "slug": "archlinux",
         "family": "arch",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "unattended"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -659,7 +664,8 @@
         "slug": "archlinux",
         "family": "arch",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "unattended"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -858,7 +864,8 @@
         "slug": "archlinux",
         "family": "arch",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "unattended"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -1073,7 +1080,8 @@
         "slug": "omarchy",
         "family": "arch",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "experimental"
       },
       "iso": "isos/omarchy-4.0.2.iso",
       "iso_url": "https://iso.omarchy.org/omarchy-4.0.2.iso",

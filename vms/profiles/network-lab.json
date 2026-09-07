@@ -7,7 +7,9 @@
         "slug": "pfsense",
         "family": "bsd",
         "role": "router",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended",
+        "verified": "2026-09-06"
       },
       "iso": "isos/pfSense-CE-2.7.2-RELEASE-amd64.iso",
       "disk": {
@@ -108,7 +110,9 @@
         "slug": "pihole",
         "family": "debian",
         "role": "server",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-06"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
@@ -232,7 +236,9 @@
         "slug": "lubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-06"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",

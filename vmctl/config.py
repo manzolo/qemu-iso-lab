@@ -3,12 +3,30 @@ from __future__ import annotations
 
 import copy
 import sys
+from datetime import date
 from typing import Any, cast
 
 from vmctl import state, runtime
 from vmctl.errors import VMError
 
-PROFILE_ALIASES: dict[str, str] = {'arch-dms-local': 'arch-dms', 'arch-dms-nvidia-local': 'arch-dms-nvidia', 'arch-noctalia-local': 'arch-noctalia', 'arch-omarchy-nvidia-local': 'arch-omarchy-nvidia', 'cachyos-local': 'cachyos-desktop', 'cachyos-nvidia-local': 'cachyos-nvidia', 'fedora-niri-dms-local': 'fedora-niri-dms', 'ubuntu-niri-local': 'ubuntu-niri-gl', 'archlinux': 'arch', 'cachyos': 'cachyos-live', 'ubuntu-desktop': 'ubuntu-desktop-live', 'ubuntu-server': 'ubuntu-server-live', 'ubuntu-server-headless': 'ubuntu-server-ci', 'rocky9': 'rocky-9', 'lubuntu22-lab': 'lubuntu-lab', 'alpine-installed-ci': 'alpine-ci-installed'}
+PROFILE_ALIASES: dict[str, str] = {
+    "arch-dms-local": "arch-dms",
+    "arch-dms-nvidia-local": "arch-dms-nvidia",
+    "arch-noctalia-local": "arch-noctalia",
+    "arch-omarchy-nvidia-local": "arch-omarchy-nvidia",
+    "cachyos-local": "cachyos-desktop",
+    "cachyos-nvidia-local": "cachyos-nvidia",
+    "fedora-niri-dms-local": "fedora-niri-dms",
+    "ubuntu-niri-local": "ubuntu-niri-gl",
+    "archlinux": "arch",
+    "cachyos": "cachyos-live",
+    "ubuntu-desktop": "ubuntu-desktop-live",
+    "ubuntu-server": "ubuntu-server-live",
+    "ubuntu-server-headless": "ubuntu-server-ci",
+    "rocky9": "rocky-9",
+    "lubuntu22-lab": "lubuntu-lab",
+    "alpine-installed-ci": "alpine-ci-installed"
+}
 
 
 def canonical_vm_name(name: str, *, warn: bool = True) -> str:
@@ -118,6 +136,21 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
         err("memory_mb must be an integer")
     if "cpus" in vm and not isinstance(vm["cpus"], int):
         err("cpus must be an integer")
+
+    meta = vm.get("meta")
+    if "meta" in vm:
+        if not isinstance(meta, dict):
+            err("meta must be an object")
+        else:
+            if "status" in meta and meta["status"] not in ("manual", "unattended", "experimental"):
+                err("meta.status must be manual, unattended or experimental")
+            if "verified" in meta:
+                verified = meta["verified"]
+                try:
+                    if not isinstance(verified, str) or date.fromisoformat(verified).isoformat() != verified:
+                        raise ValueError
+                except ValueError:
+                    err("meta.verified must be a valid YYYY-MM-DD date")
 
     disk = vm.get("disk")
     if isinstance(disk, dict):

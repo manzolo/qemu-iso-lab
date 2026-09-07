@@ -6,7 +6,8 @@
         "slug": "fedora-workstation",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
       "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
@@ -53,7 +54,8 @@
         "slug": "fedora-workstation",
         "family": "fedora",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
@@ -100,7 +102,8 @@
         "slug": "fedora-server",
         "family": "fedora",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
@@ -151,7 +154,8 @@
         "slug": "fedora-workstation",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Workstation-Live-42-1.1.x86_64.iso",
       "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
@@ -198,7 +202,8 @@
         "slug": "fedora-workstation",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/Fedora-Xfce-Live-42-1.1.x86_64.iso",
       "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
@@ -245,7 +250,8 @@
         "slug": "fedora",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended"
       },
       "iso": "isos/Fedora-Everything-netinst-x86_64-44.iso",
       "iso_discovery": {
@@ -406,7 +412,9 @@
         "slug": "silverblue",
         "family": "fedora",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/Fedora-Silverblue-ostree-x86_64-44-1.7.iso",
       "iso_urls": [

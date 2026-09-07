@@ -6,7 +6,9 @@
         "slug": "lubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -116,7 +118,9 @@
         "slug": "kubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -226,7 +230,9 @@
         "slug": "xubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -336,7 +342,9 @@
         "slug": "ubuntu-mate",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-07"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -446,7 +454,8 @@
         "slug": "ubuntu-budgie",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "experimental"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",

@@ -6,7 +6,8 @@
         "slug": "debian",
         "family": "debian",
         "role": "desktop",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/debian-live-13.4.0-amd64-gnome.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
@@ -53,7 +54,8 @@
         "slug": "debian",
         "family": "debian",
         "role": "installer",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -97,7 +99,8 @@
         "slug": "debian",
         "family": "debian",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -148,7 +151,8 @@
         "slug": "debian",
         "family": "debian",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "manual"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -196,7 +200,8 @@
         "slug": "debian",
         "family": "debian",
         "role": "server",
-        "release_model": "stable"
+        "release_model": "stable",
+        "status": "unattended"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -282,7 +287,8 @@
         "slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "manual"
       },
       "iso": "isos/ubuntu-26.04-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-desktop-amd64.iso",
@@ -333,7 +339,8 @@
         "slug": "ubuntu",
         "family": "debian",
         "role": "server",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "manual"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -384,7 +391,8 @@
         "slug": "ubuntu",
         "family": "debian",
         "role": "ci-installed",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "unattended"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -480,7 +488,8 @@
         "slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "experimental"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -579,7 +588,8 @@
         "catalog_slug": "ubuntu",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "experimental"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",

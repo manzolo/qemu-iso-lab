@@ -6,7 +6,8 @@
         "slug": "popos",
         "family": "debian",
         "role": "desktop",
-        "release_model": "lts"
+        "release_model": "lts",
+        "status": "manual"
       },
       "iso": "isos/pop-os_24.04_amd64_generic_22.iso",
       "iso_url": "https://iso.pop-os.org/24.04/amd64/generic/22/pop-os_24.04_amd64_generic_22.iso",
@@ -60,7 +61,8 @@
         "slug": "endeavouros",
         "family": "arch",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "manual"
       },
       "iso": "isos/EndeavourOS_Titan-2026.03.06.iso",
       "iso_urls": [
@@ -116,7 +118,8 @@
         "slug": "kde-neon",
         "family": "debian",
         "role": "desktop",
-        "release_model": "rolling-desktop"
+        "release_model": "rolling-desktop",
+        "status": "manual"
       },
       "iso": "isos/neon-user-current.iso",
       "iso_url": "https://files.kde.org/neon/images/user/current/neon-user-current.iso",
@@ -169,7 +172,8 @@
         "slug": "void-linux",
         "family": "void",
         "role": "desktop",
-        "release_model": "rolling"
+        "release_model": "rolling",
+        "status": "manual"
       },
       "iso": "isos/void-live-x86_64-20250202-xfce.iso",
       "iso_url": "https://repo-default.voidlinux.org/live/current/void-live-x86_64-20250202-xfce.iso",
@@ -217,7 +221,8 @@
         "slug": "opensuse-slowroll",
         "family": "opensuse",
         "role": "desktop",
-        "release_model": "slow-rolling"
+        "release_model": "slow-rolling",
+        "status": "manual"
       },
       "iso": "isos/openSUSE-Slowroll-DVD-x86_64-Media.iso",
       "iso_url": "https://download.opensuse.org/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",

@@ -12,6 +12,15 @@ from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
 class ConfigTests(BaseVmctlTestCase):
+    def test_rejects_invalid_profile_status_and_verification_date(self):
+        from vmctl import config
+        for meta in (None, {"status": "passed"}, {"status": []}, {"verified": "2026-02-30"},
+                     {"verified": "20260907"}, {"verified": True}):
+            with self.subTest(meta=meta):
+                self.assertTrue(config.validate_vm_profile("test", self.vm_config | {"meta": meta}))
+        self.assertEqual(config.validate_vm_profile("test", self.vm_config | {
+            "meta": {"status": "unattended", "verified": "2026-09-07"}}), [])
+
     def test_deprecated_profile_resolves_with_one_stderr_warning(self):
         from vmctl import config
         cfg = {"vms": {"arch-dms": self.vm_config}}
