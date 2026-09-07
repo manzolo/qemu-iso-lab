@@ -87,7 +87,7 @@ VMs, a personal `local.json`) and in the bare CI runner (with none of them).
 |-----|--------------|
 | `test` | `python -m unittest discover -s tests -v` on a bare runner (no QEMU) |
 | `boot-smoke` | installs QEMU, `vmctl prep alpine-ci`, `vmctl boot-check alpine-ci` under TCG |
-| `ubuntu-server-headless-install-boot` | headless Ubuntu autoinstall boot check |
+| `ubuntu-server-ci-install-boot` | headless Ubuntu autoinstall boot check |
 | `ubuntu-niri-dry-run`, `debian-server-dry-run`, `almalinux-server-dry-run`, `network-lab-dry-run`, `opensuse-autoyast-dry-run` | `--dry-run` of the full bootstrap flows (the last one also covers the Silverblue ostree kickstart) |
 
 The `alpine-ci` profile is the stable CI guest: keep it small and TCG-capable

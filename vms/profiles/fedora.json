@@ -245,7 +245,7 @@
       "iso_sha256": "c458667014c2e97e026a4bfc94b25899ee8777569734b0559665c50ae267a66d"
     },
     "fedora-niri-dms": {
-      "name": "Fedora 44 + niri + DankMaterialShell (Local)",
+      "name": "Fedora 44 + niri + DankMaterialShell",
       "meta": {
         "slug": "fedora",
         "family": "fedora",

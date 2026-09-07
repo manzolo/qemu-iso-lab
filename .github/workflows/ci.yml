@@ -71,7 +71,7 @@ jobs:
       - name: Prepare ubuntu-niri post-install dry-run
         run: ./bin/vmctl --dry-run post-install ubuntu-niri
 
-  ubuntu-server-headless-install-boot:
+  ubuntu-server-ci-install-boot:
     needs: test
     runs-on: ubuntu-latest
 
@@ -89,14 +89,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-system-x86 qemu-utils xorriso genisoimage ovmf
 
-      - name: Bootstrap ubuntu-server-headless
-        run: ./bin/vmctl bootstrap-unattended ubuntu-server-headless --timeout 2400
+      - name: Bootstrap ubuntu-server-ci
+        run: ./bin/vmctl bootstrap-unattended ubuntu-server-ci --timeout 2400
 
-      - name: Stop installed ubuntu-server-headless background VM
-        run: ./bin/vmctl stop ubuntu-server-headless
+      - name: Stop installed ubuntu-server-ci background VM
+        run: ./bin/vmctl stop ubuntu-server-ci
 
-      - name: Boot ubuntu-server-headless from disk
-        run: ./bin/vmctl boot-check ubuntu-server-headless
+      - name: Boot ubuntu-server-ci from disk
+        run: ./bin/vmctl boot-check ubuntu-server-ci
 
   debian-server-dry-run:
     needs: test
