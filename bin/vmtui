@@ -125,6 +125,9 @@ fzf_pick() {
         else
             display="$2"
         fi
+        if [[ "${MENU_STYLED:-0}" == "1" && "$1" == __sep_* ]]; then
+            display=$'\e[90m'"${display//━/─}"$'\e[0m'
+        fi
         lines+=("$1"$'\t'"$display")
         if [[ -n "$default_tag" && "$1" == "$default_tag" ]]; then
             default_pos=$index
@@ -136,9 +139,16 @@ fzf_pick() {
         --delimiter=$'\t' --with-nth=2
         --border=rounded --border-label=" $title " --prompt="filter> "
         --header="$(printf '%b' "$header")"
-        --color="header:italic"
+        --ansi --pointer="▸" --color="header:regular,header:cyan,border:8,pointer:cyan,prompt:cyan,hl:yellow,hl+:yellow"
         --bind="home:first,end:last,ctrl-home:first,ctrl-end:last"
     )
+    if [[ -n "${MENU_COLUMN_HEADER:-}" ]]; then
+        lines=("__columns"$'\t'"$MENU_COLUMN_HEADER" "${lines[@]}")
+        args+=(--header-lines=1)
+    fi
+    if [[ "${MENU_STYLED:-0}" == "1" ]]; then
+        args+=(--color="header:-1" --prompt="Search › " --info=hidden)
+    fi
     if (( default_pos > 0 )); then
         args+=(--sync --bind "start:pos($default_pos)")
     fi
@@ -158,7 +168,10 @@ fzf_pick() {
         selected="${output#*$'\n'}"
         if [[ -n "$key" ]]; then
             MENU_HIGHLIGHTED="${selected%%$'\t'*}"
-            printf '%s\n' "$MENU_REFRESH_TAG"
+            [[ "$selected" == *$'\t'* ]] || MENU_HIGHLIGHTED=""
+            # Return the cursor with the result: callers run us in $(...),
+            # where assignments to MENU_HIGHLIGHTED cannot reach the parent.
+            printf '%s\t%s\n' "$MENU_REFRESH_TAG" "$MENU_HIGHLIGHTED"
             return 0
         fi
     fi
@@ -170,6 +183,14 @@ fzf_menu() {
     local prompt="$2"
     shift 2
     local hint="Enter = ${MENU_OK_LABEL:-select} · Esc = ${MENU_CANCEL_LABEL:-cancel} · type to filter"
+    if [[ "${MENU_REFRESH:-0}" == "1" ]]; then
+        hint="Enter = ${MENU_OK_LABEL:-select} · Ctrl-R / F5 = refresh · Esc = ${MENU_CANCEL_LABEL:-cancel}"
+    fi
+    if [[ "${MENU_STYLED:-0}" == "1" ]]; then
+        local ok_label="${MENU_OK_LABEL:-select}" cancel_label="${MENU_CANCEL_LABEL:-cancel}"
+        printf -v hint '  \e[1mEnter\e[0m %s    \e[1mCtrl-R / F5\e[0m refresh    \e[1mEsc\e[0m %s\n' \
+            "${ok_label,,}" "${cancel_label,,}"
+    fi
     fzf_pick "$title" "$prompt\n$hint" "${MENU_DEFAULT_ITEM:-}" "$@"
 }
 
@@ -578,6 +599,28 @@ list_dashboard_items() {
 $(cat <<'PY'
 mode = sys.argv[3]
 value = sys.argv[4].lower()
+width = max(32, int(sys.argv[5]) - 8)
+color = sys.argv[6] == "fzf"
+if not color:
+    width = min(width, 92)  # The dialog dashboard is capped at 100 columns.
+
+def format_row(marker, name, label, resources, ssh, status):
+    # Keep operational details visible; use extra space for names and titles.
+    if width >= 72:
+        name_width = min(32, max(23, (width - 39) // 2))
+        label_width = width - 39 - name_width
+        columns = [f"{marker} {ellipsize(name, name_width):<{name_width}}",
+                   f"{ellipsize(label, label_width):<{label_width}}"]
+    else:
+        name_width = max(8, width - 37)
+        columns = [f"{marker} {ellipsize(name, name_width):<{name_width}}"]
+    columns += [f"{resources:>7}", f"{ssh:>6}", ellipsize(status, 16)]
+    return ellipsize("  ".join(columns), width)
+
+if mode == "__header":
+    print(format_row(" ", "PROFILE", "DESCRIPTION", "RAM/CPU", "SSH", "STATE / DISK"))
+    raise SystemExit(0)
+
 rows = [facts(name, vm) for name, vm in VMS.items()]
 total = len(rows)
 installed = sum(1 for f in rows if f["installed"] or f["running"])
@@ -606,19 +649,15 @@ for f in rows:
     else:
         status = "iso ready" if f["iso_ready"] else "no iso"
     ssh = f":{f['ssh_port']}" if f["ssh_port"] else ""
-    line = "  ".join(
-        [
-            f"{glyph(f)} {ellipsize(f['name'], 26):<26}",
-            f"{ellipsize(f['label'], 30):<30}",
-            f"{memory_label(f['memory_mb']):>4}/{f['cpus']!s:<2}",
-            f"{ssh:>5}",
-            status,
-        ]
-    )
+    line = format_row(glyph(f), f["name"], f["label"],
+                      f"{memory_label(f['memory_mb'])}/{f['cpus']}", ssh, status)
+    if color:
+        tone = 32 if f["running"] else 36 if f["installed"] else 33 if f["prepared"] else 90
+        line = f"\x1b[{tone}m{line[0]}\x1b[0m{line[1:]}"
     print(f["name"])
     print(line)
 PY
-)" "$ROOT_DIR" "$CONFIG_DIR" "$1" "${2:-}"
+)" "$ROOT_DIR" "$CONFIG_DIR" "$1" "${2:-}" "$(term_cols)" "$UI_BACKEND"
 }
 
 # list_family_menu_items → tag/description pairs (family, count)
@@ -896,6 +935,48 @@ vm_status_header() {
         printf ' · %s' "$part"
     done
     printf '\n'
+}
+
+vm_workspace_header() {
+    if [[ "$UI_BACKEND" != "fzf" ]]; then
+        vm_status_header
+        printf '▶ = suggested next step\n'
+        return
+    fi
+    local marker='○' status='Not installed' tone=90 disk='Not prepared' disk_label='DISK'
+    local iso='Missing' iso_tone=33 ssh="${FACTS[ssh_port]:-—}"
+    if [[ "${FACTS[running]:-0}" == "1" ]]; then
+        marker='●'; status='Running'; tone=32
+    elif [[ "${FACTS[installed]:-0}" == "1" ]]; then
+        marker='■'; status='Stopped'; tone=36
+    elif [[ "${FACTS[prepared]:-0}" == "1" ]]; then
+        marker='□'; status='Empty disk'; tone=33
+    fi
+    if [[ "${FACTS[prepared]:-0}" == "1" ]]; then
+        disk="${FACTS[disk_actual]:-?} / ${FACTS[disk_virtual]:-?}"
+    fi
+    [[ "${FACTS[installed]:-0}" == "1" ]] && disk_label='DISK WITH DATA'
+    if [[ "${FACTS[iso_ready]:-0}" == "1" ]]; then
+        iso='Ready'; iso_tone=36
+    fi
+    # Pad only ASCII text: Bash printf counts the UTF-8 marker in bytes,
+    # although it occupies just one terminal column.
+    if (( $(term_cols) >= 88 )); then
+        printf '\n  \e[90m%-18s  %-26s  %-12s  %s\e[0m\n' STATE "$disk_label" ISO 'SSH PORT'
+        printf '  \e[1;%sm%s %-16s\e[0m  \e[1m%-26s\e[0m  \e[1;%sm%-12s\e[0m  \e[1m%s\e[0m\n\n' \
+            "$tone" "$marker" "$status" "$disk" "$iso_tone" "$iso" "$ssh"
+    else
+        printf '\n  \e[90m%-18s  %s\e[0m\n' STATE "$disk_label"
+        printf '  \e[1;%sm%s %-16s\e[0m  \e[1m%s\e[0m\n' "$tone" "$marker" "$status" "$disk"
+        printf '  \e[90m%-18s  %s\e[0m\n' ISO 'SSH PORT'
+        printf '  \e[1;%sm%-18s\e[0m  \e[1m%s\e[0m\n\n' "$iso_tone" "$iso" "$ssh"
+    fi
+    if [[ "${FACTS[running]:-0}" == "1" ]]; then
+        local summary
+        summary=$(vm_status_header)
+        printf '  \e[90m%s\e[0m\n' "${summary%% ·*}"
+    fi
+    printf '  \e[36m▶\e[0m Suggested: \e[1m%s\e[0m\n' "$RECOMMENDED"
 }
 
 # list_vm_menu_items_unified NAME → tag/description pairs for the workspace.
@@ -1583,20 +1664,32 @@ run_action() {
 }
 
 vm_menu_loop() {
+    local vm_cursor=""
     while true; do
         load_vm_facts "$current_vm"
         RECOMMENDED=$(recommended_action)
         local -a menu_items=()
         mapfile -t menu_items < <(build_vm_menu_items)
+        # Actions can disappear after a shutdown or an external start.
+        local found=0 i
+        for (( i=0; i<${#menu_items[@]}; i+=2 )); do
+            [[ "${menu_items[i]}" == "$vm_cursor" ]] && found=1
+        done
+        (( found )) || vm_cursor="$RECOMMENDED"
         local header
-        header=$(vm_status_header)
+        header=$(vm_workspace_header)
         local selected
-        selected=$(MENU_NO_TAGS=1 MENU_DEFAULT_ITEM="$RECOMMENDED" MENU_CANCEL_LABEL="Back" MENU_WIDTH=96 \
+        selected=$(MENU_NO_TAGS=1 MENU_REFRESH=1 MENU_STYLED=1 MENU_DEFAULT_ITEM="${vm_cursor:-$RECOMMENDED}" MENU_CANCEL_LABEL="Back" MENU_WIDTH=96 \
             menu_choose_fit \
             "$current_vm — ${FACTS[label]:-}" \
-            "$header\n▶ = suggested next step (cursor starts there) · Esc/Back = VM list" \
+            "$header" \
             "${menu_items[@]}") || return 0
+        vm_cursor=""
         case "$selected" in
+            "$MENU_REFRESH_TAG"$'\t'*)
+                vm_cursor="${selected#*$'\t'}"
+                continue
+                ;;
             __sep_*)
                 continue
                 ;;
@@ -1758,6 +1851,20 @@ choose_find() {
     fi
 }
 
+dashboard_header() {
+    local total="$1" installed="$2" running="$3"
+    if [[ "$UI_BACKEND" != "fzf" ]]; then
+        printf '%s profiles · %s with data · %s running\n' "$total" "$installed" "$running"
+        printf '● Running   ■ Disk with data   □ Empty disk   ○ No disk\n'
+        return
+    fi
+    # Neutral labels and bright counters give the summary a clear hierarchy.
+    # Match the status colors in the VM rows; leave the background to the terminal.
+    printf '\n  \e[90m%-18s  %-18s  %s\e[0m\n' 'PROFILES' 'DISK WITH DATA' 'RUNNING'
+    printf '  \e[1m%-18s\e[0m  \e[1;36m%-18s\e[0m  \e[1;32m● %s\e[0m\n\n' "$total" "$installed" "$running"
+    printf '  \e[32m●\e[0m Running   \e[36m■\e[0m With data   \e[33m□\e[0m Empty   \e[90m○\e[0m No disk\n'
+}
+
 dashboard_loop() {
     local dash_cursor=""
     while true; do
@@ -1790,14 +1897,17 @@ dashboard_loop() {
         [[ -z "$default" ]] && default=$(state_get last-vm)
         [[ -z "$default" ]] && default="__filter"
 
-        local refresh_hint="Ctrl-R = refresh"
-        [[ "$UI_BACKEND" == "fzf" ]] || refresh_hint="reopen to refresh"
+        local columns="" header
+        if [[ "$UI_BACKEND" == "fzf" ]]; then
+            columns=$'\e[1;36m'"$(list_dashboard_items __header '')"$'\e[0m'
+        fi
+        header=$(dashboard_header "$total" "$installed" "$running")
         local selected
         selected=$(MENU_NO_TAGS=1 MENU_DEFAULT_ITEM="$default" MENU_CANCEL_LABEL="Quit" MENU_OK_LABEL="Open" MENU_WIDTH=100 \
-            MENU_REFRESH=1 \
+            MENU_REFRESH=1 MENU_STYLED=1 MENU_COLUMN_HEADER="$columns" \
             menu_choose_fit \
             "QEMU ISO Lab" \
-            "$total profiles · $installed with data · $running running     ● running  ■ disk has data  □ empty disk  ○ no disk\nEnter = open the highlighted VM · type a letter to jump · $refresh_hint · Esc/Quit = exit" \
+            "$header" \
             "${items[@]}") || {
                 clear
                 exit 0
@@ -1805,10 +1915,10 @@ dashboard_loop() {
         dash_cursor=""
 
         case "$selected" in
-            "$MENU_REFRESH_TAG")
+            "$MENU_REFRESH_TAG"$'\t'*)
                 # State moves while the dashboard is open (an install finishes, a VM stops):
                 # loop again to rebuild both the rows and the counters in the header.
-                dash_cursor="$MENU_HIGHLIGHTED"
+                dash_cursor="${selected#*$'\t'}"
                 ;;
             __filter) choose_filter ;;
             __find) choose_find ;;

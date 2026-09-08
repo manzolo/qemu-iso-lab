@@ -299,6 +299,95 @@ class VmtuiTests(unittest.TestCase):
         # Enter leaves the key line empty: the selected tag must still come back alone.
         self.assertEqual(result.stdout.strip(), "test-ssh")
 
+    def test_vm_refresh_reloads_state_and_preserves_cursor_for_both_keys(self):
+        fake = self.bindir / "fzf"
+        fake.write_text(
+            f"#!{sys.executable}\n"
+            "import json, os, sys\n"
+            "from pathlib import Path\n"
+            "if sys.argv[1:] == ['--version']:\n"
+            "    print('0.36.0'); raise SystemExit\n"
+            "root = Path(os.environ['VMTUI_ROOT_DIR'])\n"
+            "log = root / 'picker.jsonl'\n"
+            "rows = sys.stdin.read().splitlines()\n"
+            "first = not log.exists()\n"
+            "with log.open('a') as out:\n"
+            "    out.write(json.dumps({'args': sys.argv[1:], 'rows': rows}) + '\\n')\n"
+            "if first:\n"
+            "    disk = root / 'artifacts/test-ssh/disk.qcow2'\n"
+            "    disk.parent.mkdir(parents=True, exist_ok=True)\n"
+            "    disk.write_bytes(b'x' * (24 * 1024 * 1024))\n"
+            "    print(os.environ['TEST_REFRESH_KEY'])\n"
+            "    print('Profile Details\\tProfile Details')\n"
+            "else:\n"
+            "    print('\\nBack\\tBack')\n",
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        for key in ("ctrl-r", "f5"):
+            with self.subTest(key=key):
+                log = self.bindir / "picker.jsonl"
+                log.unlink(missing_ok=True)
+                (self.bindir / "artifacts/test-ssh/disk.qcow2").unlink(missing_ok=True)
+                result = subprocess.run(
+                    ["bash", "-lc", "source bin/vmtui; current_vm=test-ssh; "
+                     "run_action() { echo unexpected-action; }; vm_menu_loop"],
+                    cwd=ROOT, env=dict(self.env, VMTUI_UI="fzf", TEST_REFRESH_KEY=key),
+                    capture_output=True, text=True, check=True, timeout=15,
+                )
+                self.assertEqual(result.stdout, "")
+                first, second = [json.loads(line) for line in log.read_text().splitlines()]
+                self.assertIn("--expect=ctrl-r,f5", first["args"])
+                self.assertFalse(any(row.startswith("Boot Desktop\t") for row in first["rows"]))
+                self.assertTrue(any(row.startswith("Boot Desktop\t") for row in second["rows"]))
+                header = next(arg for arg in second["args"] if arg.startswith("--header="))
+                self.assertIn("DISK WITH DATA", header)
+                self.assertIn("Ctrl-R / F5", header)
+                position = next(i for i, row in enumerate(second["rows"], 1)
+                                if row.startswith("Profile Details\t"))
+                self.assertIn(f"start:pos({position})", second["args"])
+
+    def test_vm_refresh_falls_back_when_highlighted_action_disappears(self):
+        result = self.run_bash(
+            "source bin/vmtui; current_vm=test-ssh; "
+            "load_vm_facts() { FACTS[label]=Test; }; "
+            "recommended_action() { echo 'SSH Console'; }; "
+            "build_vm_menu_items() { printf 'SSH Console\\nOpen shell\\nBack\\nBack\\n'; }; "
+            "vm_status_header() { echo running; }; "
+            "menu_choose_fit() { "
+            "if [[ ! -e $VMTUI_ROOT_DIR/refreshed ]]; then "
+            "touch \"$VMTUI_ROOT_DIR/refreshed\"; printf '__refresh\\tBoot Desktop\\n'; "
+            "else echo \"cursor=$MENU_DEFAULT_ITEM\" >&2; echo Back; fi; }; "
+            "run_action() { echo unexpected-action; }; vm_menu_loop"
+        )
+        self.assertEqual(result.stdout, "")
+        self.assertIn("cursor=SSH Console", result.stderr)
+
+    def test_dashboard_refresh_preserves_cursor_across_command_substitution(self):
+        result = self.run_bash(
+            "source bin/vmtui; "
+            "list_dashboard_items() { printf '__summary\\t1\\t0\\t0\\t1\\ntest-ssh\\nTest SSH\\n'; }; "
+            "catalog_has_network_lab() { return 1; }; clear() { :; }; "
+            "menu_choose_fit() { "
+            "if [[ ! -e $VMTUI_ROOT_DIR/refreshed ]]; then "
+            "touch \"$VMTUI_ROOT_DIR/refreshed\"; printf '__refresh\\ttest-ssh\\n'; "
+            "else echo \"cursor=$MENU_DEFAULT_ITEM\" >&2; echo __quit; fi; }; dashboard_loop"
+        )
+        self.assertIn("cursor=test-ssh", result.stderr)
+
+    def test_dashboard_columns_fit_terminal_width(self):
+        for width in (60, 80, 100, 140):
+            with self.subTest(width=width):
+                result = self.run_bash(
+                    f"source bin/vmtui; term_cols() {{ echo {width}; }}; "
+                    "list_dashboard_items __header ''; list_dashboard_items all ''"
+                )
+                lines = result.stdout.splitlines()
+                self.assertIn("RAM/CPU", lines[0])
+                self.assertIn("SSH", lines[0])
+                for row in [lines[0], *lines[3::2]]:
+                    self.assertLessEqual(len(row), width - 8)
+
     def test_dashboard_summary_and_rows(self):
         self.mark_installed("test-ssh")
         result = self.run_bash("source bin/vmtui; list_dashboard_items all ''")

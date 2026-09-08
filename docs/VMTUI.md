@@ -32,26 +32,36 @@ The main screen lists every profile with live state:
 | `○` | no disk |
 
 Each row also shows RAM/CPU, the SSH host port and the disk size or ISO state.
+With fzf, column headings stay visible while scrolling, status markers are colored,
+and column widths adapt to the terminal (narrow screens omit the description).
 Installed VMs are listed first and the cursor starts on the VM you opened last.
 The header counts profiles, VMs with data and running VMs.
 
 Above the list: `Filter` (all / installed / running / by distro family) and
 `Find` (substring on name or title). Below it: `Tools` (`vmctl status`, remote
+hosts, clean all) and `Quit`.
+
 `Ctrl-R` (or `F5`) rebuilds the dashboard in place: rows, the counters in the header and
 the running markers, keeping the cursor where it was. The state moves while the menu is
 open, an install finishes or a VM stops, and a letter could not be used for this because
 letters filter the list. On the `dialog` backend the menu is rebuilt when you reopen it.
 
-hosts, clean all) and `Quit`. Esc or Ctrl-C from anywhere returns to the
-previous screen instead of leaving the TUI.
+Esc or Ctrl-C returns to the previous screen; from the dashboard it exits the TUI.
 
 ## The VM menu
 
+With fzf, `Ctrl-R` or `F5` also refreshes the VM menu: the state summary and
+available actions are rebuilt without returning to the dashboard. The highlighted
+action stays selected if it is still available; otherwise the cursor moves to the
+new suggested action. With `dialog`, reopen the menu to refresh it.
+
 ![VM menu](screenshots/vmtui-vm-menu.png)
 
-Opening a VM shows a one-line state summary
-(`■ stopped, disk has data · disk 16.0 GiB / 32.0 GiB · ISO ready · SSH port 2224`)
-and a single contextual menu. Only actions that make sense for the VM right now
+Opening a VM shows the state, disk usage, ISO availability and SSH port above
+a single contextual menu. With fzf, the summary uses the same muted labels,
+bold values, status colors and highlighted shortcut keys as the dashboard;
+narrow terminals split the summary into two rows. The dialog backend uses a
+compact text summary. Only actions that make sense for the VM right now
 are listed, and the suggested next step is marked `▶` and preselected, so Enter
 does the obvious thing: install when there is no disk, boot when it is stopped,
 SSH when it is running.
