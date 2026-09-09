@@ -1,8 +1,8 @@
 # vmtui
 
 `vmtui` is a terminal dashboard over `vmctl`. It runs the same commands, echoes
-each one before executing it, and never holds state the CLI does not have
-(except the per-VM video preference described below).
+each one before executing it or records it in the background installation log.
+It remembers per-VM video preferences and tracks its background commands.
 
 ![Dashboard](screenshots/vmtui-dashboard.png)
 
@@ -86,8 +86,20 @@ entry itself.
 
 ## After an installer
 
-After an installer that does not auto-boot the VM (`Unattended Install`,
-`Guided Provision`, `Cloud-Init Flow`, `Arch Install (Interactive)`,
+All `Bootstrap` actions, `Unattended Install` and `Omarchy Unattended Install`
+run in the background. After the launch notice, the TUI returns to the VM menu;
+closing the TUI or its terminal leaves the entire command running, including
+post-install steps for bootstrap commands. `Installation Log` follows output
+and errors; Ctrl-C returns to the menu without stopping the installation.
+Logs are saved in `artifacts/<vm>/runtime/tui-job/output.log`.
+The dashboard and VM menu show the command's status (running, completed,
+failed or interrupted); refresh or reopen the menu to update it.
+While installation runs, the VM menu offers monitoring actions and hides
+conflicting operations. `Attach Display` becomes available once QEMU is running.
+For install-only commands, use the boot actions after completion.
+
+After an interactive installer that does not auto-boot the VM
+(`Guided Provision`, `Cloud-Init Flow`, `Arch Install (Interactive)`,
 `Installer Only`, `Seeded Installer`) the TUI offers
 `Start headless + SSH post-install` / `Start with display` / `Done`, so the
 install, boot and post-install chain finishes without navigating back through

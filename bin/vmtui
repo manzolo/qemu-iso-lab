@@ -460,7 +460,7 @@ from pathlib import Path
 
 sys.path.insert(0, sys.argv[1])
 
-from vmctl import cloud_init, config, lifecycle, runtime, state
+from vmctl import cloud_init, config, lifecycle, runtime, state, tui_jobs
 
 # A disk image with less than this allocated is "prepared" (created by prep or
 # an install that stopped early) and has no data on it; a fresh qcow2 allocates
@@ -519,6 +519,7 @@ def facts(name, vm):
         memory_mb = 0
     return {
         "name": name,
+        "job_status": tui_jobs.status(tui_jobs.job_dir(state.ROOT, name)),
         "label": str(vm.get("name", name)),
         "family": str(meta.get("family", "")),
         "role": str(meta.get("role", "")),
@@ -648,6 +649,9 @@ for f in rows:
         status = "empty disk"
     else:
         status = "iso ready" if f["iso_ready"] else "no iso"
+    # A finished install must not mask the live status; a pending problem must.
+    if f["job_status"] and f["job_status"] != "completed":
+        status = "installing" if f["job_status"] == "running" else f["job_status"]
     ssh = f":{f['ssh_port']}" if f["ssh_port"] else ""
     line = format_row(glyph(f), f["name"], f["label"],
                       f"{memory_label(f['memory_mb'])}/{f['cpus']}", ssh, status)
@@ -875,7 +879,9 @@ primary_install_action() {
 
 # Requires FACTS to be loaded.
 recommended_action() {
-    if [[ "${FACTS[running]:-0}" == "1" ]]; then
+    if [[ -n "${FACTS[job_status]:-}" && "${FACTS[job_status]}" != "completed" ]]; then
+        printf '%s\n' "Installation Log"
+    elif [[ "${FACTS[running]:-0}" == "1" ]]; then
         if [[ "${FACTS[has_ssh]:-0}" == "1" ]]; then
             printf '%s\n' "SSH Console"
         else
@@ -911,12 +917,17 @@ vm_status_header() {
             running:*) how="running (pid ${FACTS[runtime]#running:})" ;;
         esac
         parts+=("● $how")
+    elif [[ "${FACTS[job_status]:-}" == "running" ]]; then
+        parts+=("preparing or provisioning")
     elif [[ "${FACTS[installed]:-0}" == "1" ]]; then
         parts+=("■ stopped, disk has data")
     elif [[ "${FACTS[prepared]:-0}" == "1" ]]; then
         parts+=("□ disk prepared but empty — pick an INSTALL action")
     else
         parts+=("○ not installed — pick an INSTALL action")
+    fi
+    if [[ -n "${FACTS[job_status]:-}" ]]; then
+        parts+=("Installation: ${FACTS[job_status]}")
     fi
     if [[ "${FACTS[prepared]:-0}" == "1" ]]; then
         parts+=("disk ${FACTS[disk_actual]:-?} / ${FACTS[disk_virtual]:-?}")
@@ -952,6 +963,9 @@ vm_workspace_header() {
     elif [[ "${FACTS[prepared]:-0}" == "1" ]]; then
         marker='□'; status='Empty disk'; tone=33
     fi
+    if [[ "${FACTS[job_status]:-}" == "running" ]]; then
+        marker='●'; status='Installing'; tone=33
+    fi
     if [[ "${FACTS[prepared]:-0}" == "1" ]]; then
         disk="${FACTS[disk_actual]:-?} / ${FACTS[disk_virtual]:-?}"
     fi
@@ -976,6 +990,9 @@ vm_workspace_header() {
         summary=$(vm_status_header)
         printf '  \e[90m%s\e[0m\n' "${summary%% ·*}"
     fi
+    if [[ -n "${FACTS[job_status]:-}" ]]; then
+        printf '  Installation: %s\n' "${FACTS[job_status]}"
+    fi
     printf '  \e[36m▶\e[0m Suggested: \e[1m%s\e[0m\n' "$RECOMMENDED"
 }
 
@@ -996,6 +1013,17 @@ build_vm_menu_items() {
     local has_cloud_init="${FACTS[has_cloud_init]:-0}"
 
     emit_section "INSTALL"
+    if [[ -n "${FACTS[job_status]:-}" ]]; then
+        emit_action "Installation Log" "${FACTS[job_status]} — view progress and errors"
+    fi
+    if [[ "${FACTS[job_status]:-}" == "running" ]]; then
+        if [[ $running == "1" ]]; then
+            emit_action "Attach Display" "Watch the installer in a VNC viewer"
+        fi
+        emit_action "Profile Details" "Review this VM configuration"
+        emit_action "Back" "Return to the VM list; installation continues"
+        return
+    fi
     if [[ "${FACTS[has_omarchy]:-0}" == "1" ]]; then
         emit_action "Omarchy Bootstrap" "Official cidata install + NVIDIA post-install"
         emit_action "Omarchy Unattended Install" "Install from the official ISO and stop after reboot"
@@ -1179,7 +1207,46 @@ PY
 # Running vmctl
 # ---------------------------------------------------------------------------
 
+is_detached_install() {
+    case "$1" in
+        bootstrap-*|install-unattended|install-omarchy) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+run_vmctl_background() {
+    local log_path
+    if log_path=$(python3 - "$ROOT_DIR" "$current_vm" "$VMCTL" "$@" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from vmctl import tui_jobs
+try:
+    print(tui_jobs.start(Path(sys.argv[1]), sys.argv[2], sys.argv[3:]))
+except (OSError, RuntimeError, ValueError) as exc:
+    print(str(exc))
+    raise SystemExit(1)
+PY
+    ); then
+        msg_box "Installation Started" "'$current_vm' is installing in the background.\n\nYou can close the TUI; the full command continues.\nUse Installation Log for progress/errors and Attach Display once the VM is running.\n\nLog: $log_path"
+    else
+        msg_box "Installation Not Started" "$log_path"
+        return 1
+    fi
+}
+
+show_installation_log() {
+    local log_path="$ROOT_DIR/artifacts/$current_vm/runtime/tui-job/output.log"
+    clear
+    printf 'Installation log: %s\nCtrl-C returns to the menu; installation continues.\n\n' "$log_path"
+    tail -n 80 -f -- "$log_path" || true
+}
+
 run_vmctl() {
+    if is_detached_install "$1"; then
+        run_vmctl_background "$@"
+        return $?
+    fi
     clear
     printf 'Selected VM: %s\n' "$current_vm"
     printf '$ %q' "$VMCTL"
@@ -1348,6 +1415,7 @@ resolve_action() {
         "Prepare VM") printf '%s\n' prep ;;
         "Installer Only") printf '%s\n' install ;;
         "Unattended Install") printf '%s\n' full-auto-install ;;
+        "Installation Log") printf '%s\n' installation-log ;;
         "Cloud-Init Flow") printf '%s\n' cloud-init-install ;;
         "Seeded Installer") printf '%s\n' install-cloud-init ;;
         "Stop VM") printf '%s\n' stop ;;
@@ -1377,6 +1445,7 @@ run_installer_flow() {
     shift 2
     if confirm_box "$title" "$message"; then
         if run_vmctl_video "$@"; then
+            is_detached_install "$1" && return 0
             load_vm_facts "$current_vm"
             prompt_post_install "$current_vm" "$title"
         fi
@@ -1411,6 +1480,9 @@ run_action() {
     local action
     action=$(resolve_action "$1")
     case "$action" in
+        installation-log)
+            show_installation_log
+            ;;
         noop)
             return 0
             ;;

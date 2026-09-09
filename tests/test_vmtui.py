@@ -123,6 +123,43 @@ class VmtuiTests(unittest.TestCase):
         result = self.run_bash(f"source bin/vmtui; list_vm_menu_items_unified {vm_name}")
         return result.stdout.splitlines()
 
+    def test_all_automatic_install_commands_detach(self):
+        commands = [
+            "bootstrap-windows", "bootstrap-alpine", "bootstrap-archinstall",
+            "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart",
+            "bootstrap-autoyast", "bootstrap-pfsense", "bootstrap-unattended",
+            "install-unattended", "install-omarchy",
+        ]
+        script = (
+            "source bin/vmtui; current_vm=test-ssh; "
+            "run_vmctl_background() { printf 'detached %s\\n' \"$*\"; }; "
+            + "; ".join(f"run_vmctl {command} test-ssh" for command in commands)
+        )
+        self.assertEqual(self.run_bash(script).stdout.splitlines(),
+                         [f"detached {command} test-ssh" for command in commands])
+
+    def test_detached_installer_does_not_prompt_for_premature_first_boot(self):
+        result = self.run_bash(
+            "source bin/vmtui; current_vm=test-ssh; "
+            "confirm_box() { return 0; }; run_vmctl_video() { return 0; }; "
+            "prompt_post_install() { echo premature; }; "
+            "run_installer_flow title message install-unattended test-ssh"
+        )
+        self.assertNotIn("premature", result.stdout)
+
+    def test_installing_vm_menu_offers_monitoring_without_conflicting_actions(self):
+        result = self.run_bash(
+            "source bin/vmtui; current_vm=test-ssh; load_vm_facts test-ssh; "
+            "FACTS[job_status]=running; FACTS[running]=1; "
+            "RECOMMENDED=$(recommended_action); echo \"$RECOMMENDED\"; build_vm_menu_items"
+        )
+        lines = result.stdout.splitlines()
+        self.assertEqual(lines[0], "Installation Log")
+        self.assertIn("Attach Display", lines)
+        self.assertIn("Back", lines)
+        for action in ("Clean VM", "Stop VM", "Boot Desktop", "Guided Provision", "Post-Install"):
+            self.assertNotIn(action, lines)
+
     def _description_of(self, output: list[str], tag: str) -> str:
         for i, line in enumerate(output):
             if line == tag and i + 1 < len(output):
@@ -406,6 +443,19 @@ class VmtuiTests(unittest.TestCase):
         # installed VMs sort before the rest: no ○ row may precede a ■ row
         glyphs = [lines[1:][i + 1][0] for i, tag in enumerate(lines[1:]) if tag in tags and i % 2 == 0]
         self.assertGreater(glyphs.index("○") if "○" in glyphs else len(glyphs), glyphs.index("■"))
+
+    def test_dashboard_job_status_shows_problems_but_never_masks_a_finished_install(self):
+        self.mark_installed("test-ssh")
+        job = self.bindir / "artifacts" / "test-ssh" / "runtime" / "tui-job"
+        job.mkdir(parents=True, exist_ok=True)
+        (job / "lock").touch()
+        for recorded, expected in [("running\n", "interrupted"), ("failed (1)\n", "failed (1)"),
+                                   ("completed\n", "disk ")]:
+            with self.subTest(recorded=recorded):
+                (job / "status").write_text(recorded, encoding="utf-8")
+                result = self.run_bash("source bin/vmtui; list_dashboard_items all ''")
+                row = self._description_of(result.stdout.splitlines()[1:], "test-ssh")
+                self.assertIn(expected, row)
 
     def test_dashboard_filters(self):
         result = self.run_bash("source bin/vmtui; list_dashboard_items find niri")
