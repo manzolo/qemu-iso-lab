@@ -19,6 +19,7 @@ from typing import Any
 
 from vmctl import alpine, archinstall, autoyast, cloud_init, config, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, report, runtime, ssh, state, ui, windows
 from vmctl.errors import VMError
+from vmctl import tui_jobs
 
 
 # --- background-VM tracking ----------------------------------------------------
@@ -2211,6 +2212,30 @@ def ssh_poweroff_command(vm: dict[str, Any]) -> list[str] | None:
     if windows.windows_config(vm) is not None:
         return base + ["shutdown /s /t 0 /f"]
     return base + ["sudo", "systemctl", "poweroff"]
+
+
+def cmd_cancel_install(args: argparse.Namespace) -> int:
+    vm = config.get_vm(config.load_config(), args.vm)
+    ui.print_header(f"Cancel installation: {args.vm}")
+    if args.dry_run:
+        ui.print_status("ok", "Would cancel the TUI installation and stop its VM, preserving disk and logs")
+        return 0
+
+    def stop_vm() -> None:
+        pid = running_qemu_pid(args.vm, vm)
+        if pid is not None:
+            stop_qemu_process(
+                pid, f"Stop installer VM: {args.vm}", f"VM '{args.vm}'",
+                pid_path=bootstrap_pid_path(args.vm),
+            )
+
+    try:
+        cancelled = tui_jobs.cancel(state.ROOT, args.vm, stop_vm)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise VMError(str(exc)) from exc
+    ui.print_status("ok", "Installation cancelled; disk and logs preserved" if cancelled
+                    else "No active TUI installation to cancel")
+    return 0
 
 
 def cmd_stop(args: argparse.Namespace) -> int:

@@ -74,7 +74,7 @@ SSH when it is running.
 | ADVANCED | `Clean VM`, `Delete ISO`, `Flash Empty Disk`, `Force Flash`, `Import Disk` |
 | | `Back` (or Esc) returns to the dashboard |
 
-Destructive actions (`Stop VM`, `Clean VM`, `Delete ISO`, flash and import) ask
+Destructive actions (`Cancel Installation`, `Stop VM`, `Clean VM`, `Delete ISO`, flash and import) ask
 for confirmation; flash and import also require typing the device path.
 
 ## Video profiles
@@ -93,9 +93,23 @@ post-install steps for bootstrap commands. `Installation Log` follows output
 and errors; Ctrl-C returns to the menu without stopping the installation.
 Logs are saved in `artifacts/<vm>/runtime/tui-job/output.log`.
 The dashboard and VM menu show the command's status (running, completed,
-failed or interrupted); refresh or reopen the menu to update it.
+failed, cancelled or interrupted); refresh or reopen the menu to update it.
 While installation runs, the VM menu offers monitoring actions and hides
-conflicting operations. `Attach Display` becomes available once QEMU is running.
+conflicting operations. `Attach Display` is visible throughout preparation and
+opens the viewer once QEMU is running.
+
+`Cancel Installation` asks for confirmation, then stops the background installation
+and its child processes, followed by any VM still running for that profile. It works
+during ISO preparation, installation and post-install, including jobs started before
+the TUI was reopened. Processes that ignore termination are killed. The disk, ISO
+and logs are preserved, but unsaved guest changes may be lost. The same action is
+available from another terminal as `vmctl cancel-install <vm>`; it applies to jobs
+launched by the TUI. Closing a viewer or leaving the TUI does not cancel the job.
+
+To reinstall from scratch after cancellation, choose `Clean VM` (this deletes the
+VM disk and generated artifacts), then the profile's install action. The cached
+ISO is reused.
+
 For install-only commands, use the boot actions after completion.
 
 After an interactive installer that does not auto-boot the VM

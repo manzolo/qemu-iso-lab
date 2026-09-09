@@ -32,6 +32,40 @@ import vmctl.state  # noqa: E402
 from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
+class CancelInstallTests(BaseVmctlTestCase):
+    def test_cancel_stops_remaining_qemu_without_deleting_disk(self):
+        disk = self.create_disk()
+
+        def cancel(root, name, stop_vm):
+            self.assertEqual(root, self.root)
+            self.assertEqual(name, self.vm_name)
+            stop_vm()
+            return True
+
+        with mock.patch.object(vmctl.lifecycle.tui_jobs, "cancel", side_effect=cancel), \
+             mock.patch.object(vmctl.lifecycle, "running_qemu_pid", return_value=1234), \
+             mock.patch.object(vmctl.lifecycle, "stop_qemu_process", return_value=0) as stop:
+            self.assertEqual(vmctl.lifecycle.cmd_cancel_install(
+                argparse.Namespace(vm=self.vm_name, dry_run=False)), 0)
+        self.assertEqual(stop.call_args.args[0], 1234)
+        self.assertIsNone(stop.call_args.kwargs.get("agent_vm"))
+        self.assertIsNone(stop.call_args.kwargs.get("qmp_socket"))
+        self.assertEqual(disk.read_text(), "disk")
+
+    def test_cancel_dry_run_does_not_signal_or_stop_processes(self):
+        with mock.patch.object(vmctl.lifecycle.tui_jobs, "cancel") as cancel, \
+             mock.patch.object(vmctl.lifecycle, "running_qemu_pid") as find:
+            self.assertEqual(vmctl.lifecycle.cmd_cancel_install(
+                argparse.Namespace(vm=self.vm_name, dry_run=True)), 0)
+        cancel.assert_not_called()
+        find.assert_not_called()
+
+    def test_cancel_failure_is_reported_as_vm_error(self):
+        with mock.patch.object(vmctl.lifecycle.tui_jobs, "cancel", side_effect=RuntimeError("cannot stop")):
+            with self.assertRaisesRegex(vmctl.errors.VMError, "cannot stop"):
+                vmctl.lifecycle.cmd_cancel_install(argparse.Namespace(vm=self.vm_name, dry_run=False))
+
+
 class BootCheckMatrixDiskTests(BaseVmctlTestCase):
     def test_iso_boot_check_in_the_matrix_prepares_the_empty_disk(self):
         self.vm_config["ci"] = {"expect": "READY", "accel": "tcg", "headless": True}

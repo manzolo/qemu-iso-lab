@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "post-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "agent", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -224,6 +224,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.set_defaults(func=lifecycle.cmd_stop)
 
+    p = _add(subparsers, "cancel-install", help="cancel a TUI background installation and stop its VM, preserving disk and logs")
+    p.add_argument("vm", help=VM_HELP)
+    p.set_defaults(func=lifecycle.cmd_cancel_install)
+
     for command, handler in (("export-libvirt", lifecycle.cmd_export_libvirt), ("unexport-libvirt", lifecycle.cmd_unexport_libvirt)):
         p = _add(subparsers, command, help="define an installed VM in libvirt" if command == "export-libvirt" else "remove a libvirt definition, preserving the disk")
         p.add_argument("vm", help=VM_HELP)
@@ -341,7 +345,7 @@ _vmctl() {{
   fi
   case $words[2] in
     completion) _values 'shell' bash zsh ;;
-    export-libvirt|unexport-libvirt|lab|check-vms|clean|clean-stale|delete-iso|fetch-iso|prep|provision|install*|bootstrap-*|start|stop|shell|console|attach|show|post-install|boot-check|flash|import-device)
+    export-libvirt|unexport-libvirt|lab|check-vms|clean|clean-stale|delete-iso|fetch-iso|prep|provision|install*|bootstrap-*|cancel-install|start|stop|shell|console|attach|show|post-install|boot-check|flash|import-device)
       vms=(${{(f)"$(vmctl list --names 2>/dev/null)"}})
       _alternative 'vms:VM profile:compadd -a vms' 'options:option:_default' ;;
     *) _default ;;

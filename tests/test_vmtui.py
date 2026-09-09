@@ -148,17 +148,48 @@ class VmtuiTests(unittest.TestCase):
         self.assertNotIn("premature", result.stdout)
 
     def test_installing_vm_menu_offers_monitoring_without_conflicting_actions(self):
-        result = self.run_bash(
-            "source bin/vmtui; current_vm=test-ssh; load_vm_facts test-ssh; "
-            "FACTS[job_status]=running; FACTS[running]=1; "
-            "RECOMMENDED=$(recommended_action); echo \"$RECOMMENDED\"; build_vm_menu_items"
-        )
-        lines = result.stdout.splitlines()
-        self.assertEqual(lines[0], "Installation Log")
-        self.assertIn("Attach Display", lines)
-        self.assertIn("Back", lines)
-        for action in ("Clean VM", "Stop VM", "Boot Desktop", "Guided Provision", "Post-Install"):
-            self.assertNotIn(action, lines)
+        for running in (0, 1):
+            with self.subTest(running=running):
+                result = self.run_bash(
+                    "source bin/vmtui; current_vm=test-ssh; load_vm_facts test-ssh; "
+                    f"FACTS[job_status]=running; FACTS[running]={running}; "
+                    "RECOMMENDED=$(recommended_action); echo \"$RECOMMENDED\"; build_vm_menu_items"
+                )
+                lines = result.stdout.splitlines()
+                self.assertEqual(lines[0], "Installation Log")
+                self.assertIn("Attach Display", lines)
+                self.assertIn("Cancel Installation", lines)
+                self.assertIn("Back", lines)
+                for action in ("Clean VM", "Stop VM", "Boot Desktop", "Guided Provision", "Post-Install"):
+                    self.assertNotIn(action, lines)
+
+    def test_cancel_installation_requires_confirmation_and_uses_cli(self):
+        for confirmed in (False, True):
+            with self.subTest(confirmed=confirmed):
+                result = self.run_bash(
+                    "source bin/vmtui; current_vm=test-ssh; "
+                    f"confirm_box() {{ return {0 if confirmed else 1}; }}; "
+                    "run_vmctl() { printf '%s\\n' \"$*\"; }; "
+                    "run_action 'Cancel Installation'"
+                )
+                self.assertEqual(result.stdout.strip(), "cancel-install test-ssh" if confirmed else "")
+        self.assertNotIn("Cancel Installation", self._unified_menu("test-ssh"))
+
+    def test_install_attach_checks_current_vm_state_before_opening_viewer(self):
+        for running in (0, 1):
+            with self.subTest(running=running):
+                result = self.run_bash(
+                    "source bin/vmtui; current_vm=test-ssh; "
+                    f"FACTS[running]={1 - running}; "
+                    "load_vm_facts() { FACTS[job_status]=running; "
+                    f"FACTS[running]={running}; "
+                    "}; msg_box() { printf 'message: %s\\n' \"$1\"; }; "
+                    "run_vmctl() { printf 'command: %s\\n' \"$*\"; }; "
+                    "run_action 'Attach Display'"
+                )
+                expected = ("command: attach test-ssh" if running
+                            else "message: Display Not Ready")
+                self.assertEqual(result.stdout.strip(), expected)
 
     def _description_of(self, output: list[str], tag: str) -> str:
         for i, line in enumerate(output):

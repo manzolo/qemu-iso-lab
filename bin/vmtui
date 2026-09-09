@@ -1019,7 +1019,10 @@ build_vm_menu_items() {
     if [[ "${FACTS[job_status]:-}" == "running" ]]; then
         if [[ $running == "1" ]]; then
             emit_action "Attach Display" "Watch the installer in a VNC viewer"
+        else
+            emit_action "Attach Display" "Available when the installer VM starts"
         fi
+        emit_action "Cancel Installation" "Stop the installation and VM; keep disk and logs"
         emit_action "Profile Details" "Review this VM configuration"
         emit_action "Back" "Return to the VM list; installation continues"
         return
@@ -1416,6 +1419,7 @@ resolve_action() {
         "Installer Only") printf '%s\n' install ;;
         "Unattended Install") printf '%s\n' full-auto-install ;;
         "Installation Log") printf '%s\n' installation-log ;;
+        "Cancel Installation") printf '%s\n' cancel-install ;;
         "Cloud-Init Flow") printf '%s\n' cloud-init-install ;;
         "Seeded Installer") printf '%s\n' install-cloud-init ;;
         "Stop VM") printf '%s\n' stop ;;
@@ -1482,6 +1486,11 @@ run_action() {
     case "$action" in
         installation-log)
             show_installation_log
+            ;;
+        cancel-install)
+            if confirm_box "Cancel Installation" "Force-stop the installation and VM '$current_vm'?\n\nUnsaved guest changes may be lost. The disk, ISO and logs are kept.\n\nTo reinstall from scratch afterward, use Clean VM, then the install action."; then
+                run_vmctl cancel-install "$current_vm" || true
+            fi
             ;;
         noop)
             return 0
@@ -1632,7 +1641,12 @@ run_action() {
             run_vmctl shell "$current_vm" || true
             ;;
         attach)
-            run_vmctl attach "$current_vm" || true
+            load_vm_facts "$current_vm"
+            if [[ "${FACTS[job_status]:-}" == "running" && "${FACTS[running]:-0}" != "1" ]]; then
+                msg_box "Display Not Ready" "The installation job is running, but the VM has not started yet.\n\nCheck Installation Log for progress, then try Attach Display again."
+            else
+                run_vmctl attach "$current_vm" || true
+            fi
             ;;
         console)
             run_vmctl console "$current_vm" || true
