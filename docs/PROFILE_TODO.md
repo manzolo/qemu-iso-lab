@@ -22,7 +22,7 @@ Every tracked profile has `meta.status`:
 
 - `manual`: interactive installation, live media or an import template; automation may still boot or inspect it.
 - `unattended`: an automated installation/provisioning recipe exists; this is not a claim that this revision passed a live test.
-- `experimental`: a known incomplete or unsettled flow. Currently Budgie (autologin still needs live verification), the package-only Ubuntu niri recipes and the custom Omarchy/NVIDIA flow.
+- `experimental`: a known incomplete or unsettled flow. Currently the package-only Ubuntu niri recipes and the custom Omarchy/NVIDIA flow.
 
 `meta.verified` is the last live PASS date supplied by the maintainer. It is omitted when no date is recorded, and is never updated by unit tests or dry runs. A historical date does not certify subsequent profile changes. The list and HTML report show both fields separately from the current run's PASS/FAIL result.
 
@@ -34,14 +34,17 @@ Recorded dates:
   (niri-dms and Silverblue), Alpine niri, Tumbleweed AutoYaST, Ubuntu flavor (Budgie and
   GNOME included), network-lab and Windows 7/10/11 profile passed. `arch-omarchy-nvidia`
   failed once on a stalled omarchy mirror and passed the clean retry. The date is also
-  recorded on the experimental profiles (`ubuntu-budgie-24.04`, `ubuntu-niri`,
-  `arch-omarchy-nvidia`): it certifies one live PASS, not a status promotion.
+  recorded on the two remaining experimental profiles (`ubuntu-niri`, `arch-omarchy-nvidia`):
+  there it certifies one live PASS, not a status promotion. `ubuntu-budgie-24.04` was
+  promoted to `unattended` on the strength of this run.
 - 2026-09-07: `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `rocky-9`, `fedora-silverblue`, `opensuse-tumbleweed-autoyast` (superseded above).
 - 2026-09-06: the three network-lab profiles and all Windows profiles (the two Windows templates keep this date).
 
 ## Remaining work
 
-- Budgie passed the live matrix on 2026-09-09 with the session assertions (`verify-desktop`); decide whether one PASS is enough to promote it from `experimental`.
+- Budgie was promoted from `experimental` to `unattended` on 2026-09-09: `verify-desktop`
+  reported `Desktop ready: lab has an active local graphical session` on the live matrix, so
+  the LightDM autologin drop-in is confirmed and the flavor no longer differs from the other four.
 - Revalidate the modified desktop assertions on installed guests, including greetd and OpenRC differences.
 - Add a dedicated live/rescue profile for disk and boot repair.
 - Consider a small Alpine EFI smoke profile alongside the BIOS baseline.

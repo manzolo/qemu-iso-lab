@@ -79,7 +79,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = "2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates else None
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
-        self.assertEqual(cfg["vms"]["ubuntu-budgie-24.04"]["meta"]["status"], "experimental")
+        # Promoted on 2026-09-09: verify-desktop reported an active local graphical session for
+        # the autologin user on the live matrix, which is what the flavor recipe has to prove.
+        self.assertEqual(cfg["vms"]["ubuntu-budgie-24.04"]["meta"]["status"], "unattended")
 
         # CI media must never drift when the upstream latest-stable pointer moves.
         for name in ("alpine-ci", "alpine-ci-installed"):

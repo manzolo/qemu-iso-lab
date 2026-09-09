@@ -459,7 +459,7 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "experimental",
+        "status": "unattended",
         "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
