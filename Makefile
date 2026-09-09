@@ -6,6 +6,8 @@
 
 .DEFAULT_GOAL := help
 PREFIX ?= $(HOME)/.local
+# check-vms defaults to 300 s per phase, enough only for boot checks: a real install takes 10-60 min.
+TIMEOUT ?= 3600
 BIN := $(abspath bin)
 
 .PHONY: help setup install-cli uninstall-cli test lint check ci tui init-local-profile validate-vms guides
@@ -52,8 +54,8 @@ init-local-profile: ## Create vms/profiles/local.json from the example
 		printf "  edit YOUR_USER, the password/hash and the SSH/dotfile paths before using personal profile overrides\n"; \
 	fi
 
-validate-vms: ## Local-only full matrix: reinstall every unattended profile from scratch, restore the installed disks, write the HTML report (hours; VMS="a b" PARALLEL=2 to narrow/speed up)
-	@./bin/vmctl check-vms $(VMS) --restore --no-clean-first --report $(if $(PARALLEL),--parallel $(PARALLEL),) $(if $(TIMEOUT),--timeout $(TIMEOUT),) --open
+validate-vms: ## Local-only full matrix: reinstall every unattended profile from scratch, restore the installed disks, write the HTML report (hours; VMS="a b" PARALLEL=2 to narrow/speed up, TIMEOUT=3600 s per phase)
+	@./bin/vmctl check-vms $(VMS) --restore --no-clean-first --report $(if $(PARALLEL),--parallel $(PARALLEL),) --timeout $(TIMEOUT) --open
 
 guides: ## Render docs/guides/{it,en} into docs/guides/pdf/<lang>/ (one manual + single PDFs; needs python markdown + weasyprint)
 	python3 tools/build_guides.py

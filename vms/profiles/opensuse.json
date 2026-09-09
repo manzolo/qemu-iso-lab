@@ -102,7 +102,7 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
-        "verified": "2026-09-07"
+        "verified": "2026-09-09"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",

@@ -251,7 +251,8 @@
         "family": "fedora",
         "role": "desktop",
         "release_model": "stable",
-        "status": "unattended"
+        "status": "unattended",
+        "verified": "2026-09-09"
       },
       "iso": "isos/Fedora-Everything-netinst-x86_64-44.iso",
       "iso_discovery": {
@@ -422,7 +423,7 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
-        "verified": "2026-09-07"
+        "verified": "2026-09-09"
       },
       "iso": "isos/Fedora-Silverblue-ostree-x86_64-44-1.7.iso",
       "iso_urls": [

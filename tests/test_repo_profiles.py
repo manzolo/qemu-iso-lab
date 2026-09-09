@@ -64,13 +64,20 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         ):
             self.assertIn(profile, cfg["vms"])
 
-        verified_today = {"lubuntu-24.04", "kubuntu-24.04", "xubuntu-24.04", "ubuntu-mate-24.04",
-                          "rocky-9", "fedora-silverblue", "opensuse-tumbleweed-autoyast"}
-        verified_yesterday = {"pfsense-lab", "pihole-lab", "lubuntu-lab", "windows7-unattended",
-                              "windows10-unattended", "windows11-unattended", "windows10-template", "windows11-template"}
+        # Live PASS dates recorded by the maintainer (docs/PROFILE_TODO.md): the whole unattended
+        # matrix on 2026-09-09 (clean reinstall, TIMEOUT=3600), the Windows templates on 2026-09-06.
+        verified_matrix = {
+            "alpine-niri", "cachyos-desktop", "cachyos-nvidia", "arch-noctalia", "arch-dms", "arch-dms-nvidia",
+            "arch-omarchy-nvidia", "debian-server", "ubuntu-niri", "fedora-niri-dms", "fedora-silverblue",
+            "pfsense-lab", "pihole-lab", "lubuntu-lab", "opensuse-tumbleweed-autoyast", "almalinux-server",
+            "rocky-9", "lubuntu-24.04", "kubuntu-24.04", "xubuntu-24.04", "ubuntu-mate-24.04",
+            "ubuntu-budgie-24.04", "ubuntu-gnome-24.04", "windows7-unattended", "windows10-unattended",
+            "windows11-unattended",
+        }
+        verified_templates = {"windows10-template", "windows11-template"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
-            expected_date = "2026-09-07" if name in verified_today else "2026-09-06" if name in verified_yesterday else None
+            expected_date = "2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates else None
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
         self.assertEqual(cfg["vms"]["ubuntu-budgie-24.04"]["meta"]["status"], "experimental")
 

@@ -102,5 +102,8 @@ report (search, PASS/WARN/FAIL/SKIP filter, final screenshots) opens at the end
 under `artifacts/check-vms/<timestamp>/`. It takes hours and needs KVM, the
 local-only ISOs (Windows, pfSense) and the network: profiles whose ISO is
 missing are reported as skipped. Narrow it with `VMS="debian-server alpine-ci"`
-and speed it up with `PARALLEL=2` (`TIMEOUT=` per VM). GitHub Actions only runs
-the dry-runs and the small TCG guests.
+and speed it up with `PARALLEL=2`. `TIMEOUT` (default 3600 s) bounds every phase of
+one VM: the `vmctl check-vms` default of 300 s only fits boot checks, a real install
+takes 10 to 60 minutes depending on the mirror, and a too-short value shows up as
+`Timed out after 300s` on every profile rather than as a real regression. GitHub
+Actions only runs the dry-runs and the small TCG guests.

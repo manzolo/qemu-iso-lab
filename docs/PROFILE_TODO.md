@@ -28,13 +28,20 @@ Every tracked profile has `meta.status`:
 
 Recorded dates:
 
-- 2026-09-07: `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `rocky-9`, `fedora-silverblue`, `opensuse-tumbleweed-autoyast`.
-- 2026-09-06: the three network-lab profiles and all Windows profiles.
-- Budgie has no recorded PASS date.
+- 2026-09-09: the whole unattended matrix, 28 profiles reinstalled from scratch
+  (`check-vms --clean-first --parallel 2 --timeout 3600`, reports under
+  `artifacts/check-vms/20260909-*`): every Arch/CachyOS, Debian, AlmaLinux/Rocky, Fedora
+  (niri-dms and Silverblue), Alpine niri, Tumbleweed AutoYaST, Ubuntu flavor (Budgie and
+  GNOME included), network-lab and Windows 7/10/11 profile passed. `arch-omarchy-nvidia`
+  failed once on a stalled omarchy mirror and passed the clean retry. The date is also
+  recorded on the experimental profiles (`ubuntu-budgie-24.04`, `ubuntu-niri`,
+  `arch-omarchy-nvidia`): it certifies one live PASS, not a status promotion.
+- 2026-09-07: `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `rocky-9`, `fedora-silverblue`, `opensuse-tumbleweed-autoyast` (superseded above).
+- 2026-09-06: the three network-lab profiles and all Windows profiles (the two Windows templates keep this date).
 
 ## Remaining work
 
-- Validate Budgie autologin live with the new session assertions; promote it only after a real PASS.
+- Budgie passed the live matrix on 2026-09-09 with the session assertions (`verify-desktop`); decide whether one PASS is enough to promote it from `experimental`.
 - Revalidate the modified desktop assertions on installed guests, including greetd and OpenRC differences.
 - Add a dedicated live/rescue profile for disk and boot repair.
 - Consider a small Alpine EFI smoke profile alongside the BIOS baseline.

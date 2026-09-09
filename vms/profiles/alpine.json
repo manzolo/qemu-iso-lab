@@ -7,7 +7,8 @@
         "family": "alpine",
         "role": "desktop",
         "release_model": "stable",
-        "status": "unattended"
+        "status": "unattended",
+        "verified": "2026-09-09"
       },
       "iso": "isos/alpine-standard-3.23-x86_64.iso",
       "iso_discovery": {

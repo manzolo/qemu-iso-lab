@@ -9,7 +9,7 @@
         "role": "router",
         "release_model": "stable",
         "status": "unattended",
-        "verified": "2026-09-06"
+        "verified": "2026-09-09"
       },
       "iso": "isos/pfSense-CE-2.7.2-RELEASE-amd64.iso",
       "disk": {
@@ -112,7 +112,7 @@
         "role": "server",
         "release_model": "lts",
         "status": "unattended",
-        "verified": "2026-09-06"
+        "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
@@ -239,7 +239,7 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
-        "verified": "2026-09-06"
+        "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",

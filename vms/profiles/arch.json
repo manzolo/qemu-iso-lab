@@ -121,7 +121,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "unattended"
+        "status": "unattended",
+        "verified": "2026-09-09"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {
@@ -295,7 +296,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "unattended"
+        "status": "unattended",
+        "verified": "2026-09-09"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {
@@ -474,7 +476,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "unattended"
+        "status": "unattended",
+        "verified": "2026-09-09"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -679,7 +682,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "unattended"
+        "status": "unattended",
+        "verified": "2026-09-09"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -887,7 +891,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "unattended"
+        "status": "unattended",
+        "verified": "2026-09-09"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -1111,7 +1116,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "experimental"
+        "status": "experimental",
+        "verified": "2026-09-09"
       },
       "iso": "isos/omarchy-4.0.2.iso",
       "iso_url": "https://iso.omarchy.org/omarchy-4.0.2.iso",

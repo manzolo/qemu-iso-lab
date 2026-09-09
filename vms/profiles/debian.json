@@ -201,7 +201,8 @@
         "family": "debian",
         "role": "server",
         "release_model": "stable",
-        "status": "unattended"
+        "status": "unattended",
+        "verified": "2026-09-09"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -489,7 +490,8 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "experimental",
-        "slug": "ubuntu"
+        "slug": "ubuntu",
+        "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
