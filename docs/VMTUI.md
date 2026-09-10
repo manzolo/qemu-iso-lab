@@ -77,6 +77,11 @@ SSH when it is running.
 Destructive actions (`Cancel Installation`, `Stop VM`, `Clean VM`, `Delete ISO`, flash and import) ask
 for confirmation; flash and import also require typing the device path.
 
+`Force Flash` first asks for the copy mode: **full** writes every sector and
+zeroes free space, **allocated** copies only the blocks the image allocates —
+much faster on a sparse image of a large disk, but free space keeps its previous
+bytes. `Flash Empty Disk` is always a full copy.
+
 Both flash actions run `vmctl flash`: after a successful copy the backup GPT is
 always repaired silently, then, on a terminal with at least 1 GiB free after a
 final NTFS partition, a prompt offers to expand that partition and its filesystem.

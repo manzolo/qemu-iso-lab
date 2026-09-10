@@ -1,4 +1,5 @@
 import argparse
+from contextlib import nullcontext
 import io
 import json
 import os
@@ -14,6 +15,7 @@ if str(ROOT) not in sys.path:
 import vmctl.disk_inspect  # noqa: E402
 import vmctl.cli  # noqa: E402
 import vmctl.flash  # noqa: E402
+import vmctl.flash_allocated  # noqa: E402
 import vmctl.runtime  # noqa: E402
 import vmctl.state  # noqa: E402
 
@@ -374,6 +376,118 @@ class FlashTests(BaseVmctlTestCase):
         self.assertEqual(executed[2], ["sgdisk", "--zap-all", "/dev/sdz"])
         self.assertEqual(executed[3], ["wipefs", "-a", "-f", "/dev/sdz"])
         self.assertEqual(executed[4], ["blockdev", "--rereadpt", "/dev/sdz"])
+
+    def test_allocated_only_reaches_sudo_helper_and_copies_before_gpt_repair(self):
+        self.create_disk()
+        info = {"size": 1024**3, "model": "USB", "children": [], "signatures": []}
+        parser = vmctl.cli.build_parser()
+        argv = ["--dry-run", "flash", self.vm_name, "--device", "/dev/sdz",
+                "--confirm-device", "/dev/sdz", "--force-target", "--allocated-only"]
+
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target", return_value=(info, "gpt", 1024)), \
+             mock.patch.object(vmctl.runtime, "run") as run:
+            self.vmctl.cmd_flash(parser.parse_args(argv))
+
+        self.assertIn("--allocated-only", run.call_args.args[0])
+
+        for expand in (None, False, True):
+            with self.subTest(expand=expand):
+                self.layout_probe.return_value = "gpt"
+                args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz",
+                                          force_target=True, allocated_only=True, expand=expand)
+                events = []
+                prepared = mock.Mock(size=1024)
+                prepared.copy_to.side_effect = lambda device: events.append("copy")
+                def prepare(*args):
+                    events.append("prepare")
+                    return nullcontext(prepared)
+                with mock.patch.object(os, "geteuid", return_value=0), \
+                     mock.patch.object(vmctl.runtime, "require_command"), \
+                     mock.patch.object(vmctl.flash, "validate_flash_target", return_value=(info, "gpt", 1024)) as validate, \
+                     mock.patch.object(vmctl.flash_allocated, "prepare", side_effect=prepare), \
+                     mock.patch.object(vmctl.flash, "grow_flashed_ntfs", side_effect=lambda *a, **kw: events.append("grow")) as grow, \
+                     mock.patch.object(vmctl.runtime, "run", side_effect=lambda cmd, **kw: events.append(cmd)):
+                    self.assertEqual(self.vmctl.cmd_flash_helper(args), 0)
+                self.assertEqual(validate.call_count, 2)
+                prepared.copy_to.assert_called_once_with("/dev/sdz")
+                self.assertLess(events.index("prepare"), events.index(["wipefs", "-a", "-f", "/dev/sdz"]))
+                self.assertLess(events.index(["wipefs", "-a", "-f", "/dev/sdz"]), events.index("copy"))
+                self.assertLess(events.index("copy"), events.index(["sgdisk", "-e", "/dev/sdz"]))
+                self.assertLess(events.index(["sgdisk", "-e", "/dev/sdz"]), events.index("grow"))
+                self.assertIs(grow.call_args.kwargs["expand"], expand)
+                self.assertEqual(events[-1], ["sync"])
+
+    def test_allocated_only_without_force_target_is_refused_before_any_write(self):
+        self.create_disk()
+        info = {"size": 1024**3, "children": [], "signatures": []}
+        parser = vmctl.cli.build_parser()
+        argv = ["--dry-run", "flash", self.vm_name, "--device", "/dev/sdz",
+                "--confirm-device", "/dev/sdz", "--allocated-only"]
+
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target", return_value=(info, "gpt", 1024)), \
+             mock.patch.object(vmctl.runtime, "run") as run:
+            with self.assertRaisesRegex(self.vmctl.VMError, "--force-target"):
+                self.vmctl.cmd_flash(parser.parse_args(argv))
+            run.assert_not_called()
+
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz",
+                                  force_target=False, allocated_only=True)
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target", return_value=(info, "gpt", 1024)), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
+            with self.assertRaisesRegex(self.vmctl.VMError, "--force-target"):
+                self.vmctl.cmd_flash_helper(args)
+            run_cmd.assert_not_called()
+
+    def test_allocated_only_preparation_failure_never_wipes_target(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz",
+                                  force_target=True, allocated_only=True)
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target", return_value=({"size": 1024}, "gpt", 1024)), \
+             mock.patch.object(vmctl.flash_allocated, "prepare", side_effect=self.vmctl.VMError("scan rejected")), \
+             mock.patch.object(vmctl.runtime, "run") as run:
+            with self.assertRaisesRegex(self.vmctl.VMError, "scan rejected"):
+                self.vmctl.cmd_flash_helper(args)
+            run.assert_not_called()
+
+    def test_allocated_only_rechecks_mounts_after_preparation(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz",
+                                  force_target=True, allocated_only=True)
+        prepared = mock.Mock(size=1024)
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target", side_effect=[({"size": 1024}, "gpt", 1024), self.vmctl.VMError("mounted")]), \
+             mock.patch.object(vmctl.flash_allocated, "prepare", return_value=nullcontext(prepared)), \
+             mock.patch.object(vmctl.runtime, "run") as run:
+            with self.assertRaisesRegex(self.vmctl.VMError, "mounted"):
+                self.vmctl.cmd_flash_helper(args)
+            run.assert_not_called()
+            prepared.copy_to.assert_not_called()
+
+    def test_allocated_only_copy_failure_syncs_without_repair_or_expansion(self):
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz",
+                                  force_target=True, allocated_only=True)
+        info = {"size": 1024, "children": [], "signatures": []}
+        prepared = mock.Mock(size=1024)
+        prepared.copy_to.side_effect = self.vmctl.VMError("incomplete")
+        with mock.patch.object(os, "geteuid", return_value=0), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.flash, "validate_flash_target", return_value=(info, "gpt", 1024)), \
+             mock.patch.object(vmctl.flash_allocated, "prepare", return_value=nullcontext(prepared)), \
+             mock.patch.object(vmctl.flash, "grow_flashed_ntfs") as grow, \
+             mock.patch.object(vmctl.runtime, "run") as run:
+            with self.assertRaisesRegex(self.vmctl.VMError, "incomplete"):
+                self.vmctl.cmd_flash_helper(args)
+            grow.assert_not_called()
+            self.assertNotIn(["sgdisk", "-e", "/dev/sdz"], [call.args[0] for call in run.call_args_list])
+            self.assertEqual(run.call_args.args[0], ["sync"])
 
     def test_helper_repairs_inherited_gpt_even_when_image_matches_target_size(self):
         self.create_disk()

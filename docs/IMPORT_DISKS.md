@@ -6,7 +6,8 @@ reads a whole block device into a VM image. Both take the device twice
 (`--device` and `--confirm-device`), refuse the host root disk and mounted
 targets, and support `--dry-run`. In `vmtui` they are **Flash Empty Disk**,
 **Force Flash** and **Import Disk** in the ADVANCED group; both TUI flash entries
-run the same `vmctl flash` and therefore show the same end-of-copy prompt.
+run the same `vmctl flash` and therefore show the same end-of-copy prompt, and
+**Force Flash** asks for the copy mode described below.
 
 ## Flash a VM disk to a physical device
 
@@ -20,6 +21,49 @@ vmctl flash my-vm --device /dev/sdX --confirm-device /dev/sdX
 An empty target is required by default. For a target with existing partitions
 or signatures, add `--force-target`; this authorizes overwriting the target and
 does not imply consent to expansion.
+
+### Copy mode: every sector, or allocated filesystem blocks only
+
+By default the whole virtual size of the image is written, including the ranges
+it does not allocate. A block device cannot be sparse and does not advertise
+zero-initialized content, so `qemu-img` materializes those ranges as real zero
+writes. On a sparse image of a large disk that dominates the copy: an image with
+a 477 GiB virtual size holding 15 GiB of data writes 477 GiB, about 2.5 hours on
+a USB SSD instead of 5 minutes, and it stops near 99.9% because the trailing hole
+is one single `write_zeroes`.
+
+`--allocated-only` copies only the blocks the guest filesystems allocate, with
+the same machinery as the allocated import:
+
+```bash
+vmctl flash my-vm --device /dev/sdX --confirm-device /dev/sdX --force-target --allocated-only
+```
+
+1. The image is converted to a temporary sparse RAW copy in a private
+   `artifacts/<vm>/.allocated-flash-*/` directory (local space for the allocated
+   data is needed; the VM must be stopped so the source cannot change).
+2. Each partition of that copy is exposed read-only through a loop device and
+   mapped with `partclone.<fs>` (ext2/3/4, NTFS, FAT, exFAT). Unknown or
+   encrypted filesystems, the gaps between partitions and both partition tables
+   are copied in full. A mapping failure (typically an unclean or hibernated
+   NTFS) stops here, before any write to the target.
+3. The target is revalidated and wiped, then `ddrescue` writes exactly the mapped
+   blocks and the run is accepted only if the rescue map covers the whole source.
+
+Skipping the free space is what makes it fast, and the same fact is the caveat:
+every range the guest filesystems do not allocate keeps whatever the target held,
+so the flag requires `--force-target` (the wipe of the old partition table and
+signatures is explicit) and needs a target with 512-byte logical sectors. Use the
+default full copy when those leftovers matter (a disk to hand over, or one that
+held someone else's data) or when the image is not sparse. GPT repair and
+expansion run unchanged afterwards.
+
+Why not `qemu-img convert --target-is-zero`: that option skips every zero run
+`qemu-img` detects in the *source*, including zeros inside allocated files and
+clusters the guest explicitly zeroed, so on a used target those ranges would keep
+stale bytes and the guest data would be corrupt (`tests/test_flash_allocated.py`
+reproduces it). The filesystem map has no such blind spot: allocated blocks are
+copied whatever they contain.
 
 ### GPT repair (always)
 
@@ -68,6 +112,9 @@ GPT handling needs `sgdisk` (gdisk), `sfdisk` (fdisk/util-linux), `blkid` and
 `blockdev`; they are checked before copying a GPT or container image so a missing
 tool cannot strand the copy. Expansion also needs `ntfsresize` from `ntfs-3g`;
 when it is missing, free space is left unallocated with a warning.
+`--allocated-only` also needs `ddrescue`, `ddrescuelog`, `losetup` and the
+`partclone.<fs>` binary of each filesystem to map (`partclone`), all checked
+before the wipe.
 
 ```bash
 # Debian / Ubuntu

@@ -98,11 +98,20 @@ accepts `--dry-run` in front of it.
 | prove a VM still boots (CI-style)                     | `vmctl boot-check <vm>`, `vmctl check-vms`               |
 | write a VM to a real USB disk, or import one          | `vmctl flash`, `vmctl import-device` (destructive, sudo; [guide](docs/IMPORT_DISKS.md)) |
 | import only allocated filesystem blocks, with resume | `vmctl import-device <vm> --device /dev/sdX --confirm-device /dev/sdX --allocated-only` ([guide](docs/IMPORT_DISKS.md)) |
+| flash only the blocks the image allocates (fast)      | `vmctl flash <vm> --device /dev/sdX --confirm-device /dev/sdX --force-target --allocated-only` ([guide](docs/IMPORT_DISKS.md)) |
 | free disk space                                       | `vmctl clean <vm>`, `vmctl clean --all`, `vmctl delete-iso <vm>` |
 | see what a command would do without doing it          | `vmctl --dry-run <command> <vm>`                         |
 | add my own user, key and dotfiles to the VMs          | edit `vms/profiles/local.json` ([Make it yours](#make-it-yours)) |
 | add a new VM                                          | add a profile to `vms/profiles/*.json` ([docs/PROFILES.md](docs/PROFILES.md#adding-a-new-vm)) |
 | hack on `vmctl` itself                                | `make check`, then [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+
+By default `vmctl flash` writes every sector of the image's virtual size, so a
+sparse image of a large disk spends most of its time zeroing free space (a 477
+GiB image holding 15 GiB of data writes 477 GiB). `--allocated-only` copies just
+the blocks the guest filesystems allocate, mapped with partclone and written with
+ddrescue like the allocated import; it requires `--force-target`, a stopped VM
+and temporary space in `artifacts/<vm>/`, and leaves the bytes already on the
+target wherever the guest has free space.
 
 `vmctl flash` always repairs GPT silently after copying. Expansion is optional:
 with at least 1 GiB of trailing free space, a terminal prompt offers to expand a

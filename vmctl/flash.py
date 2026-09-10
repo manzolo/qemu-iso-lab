@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
 import json
 import os
 import re
@@ -60,6 +61,20 @@ def add_expansion_options(parser: argparse.ArgumentParser) -> None:
                        help="expand a supported final NTFS partition after copying, without asking")
     group.add_argument("--no-expand", dest="expand", action="store_false",
                        help="preserve partition/filesystem sizes after copying, without asking")
+
+
+def add_copy_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--allocated-only", action="store_true",
+        help="copy allocated filesystem blocks using partclone and ddrescue; "
+             "free filesystem space keeps its previous bytes (requires --force-target)",
+    )
+
+
+def require_allocated_only(force_target: bool) -> None:
+    from vmctl import flash_allocated
+
+    flash_allocated.require_tools(force_target)
 
 
 def _require_unmounted_flash_target(device: str) -> None:
@@ -306,6 +321,10 @@ def cmd_flash(args: argparse.Namespace) -> int:
     runtime.require_command("findmnt")
     runtime.require_command("sudo")
 
+    allocated_only = bool(getattr(args, "allocated_only", False))
+    if allocated_only:
+        require_allocated_only(args.force_target)
+
     helper_will_recheck = False
     try:
         info, source_layout, virtual_size = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
@@ -337,10 +356,13 @@ def cmd_flash(args: argparse.Namespace) -> int:
     ui.print_kv("target", args.device)
     ui.print_kv("size", runtime.format_bytes(info["size"]))
     ui.print_kv("model", info["model"] or "-")
+    ui.print_kv("mode", "allocated filesystem blocks (partclone + ddrescue)" if allocated_only else "every sector")
     if source_layout is None and qemu.is_container_disk_format(str(disk.get("format", "")).lower()):
         ui.print_status("warn", "Guest partition layout is hidden inside the disk container; proceeding with caution", ok=False)
     if args.force_target:
         ui.print_status("warn", "Force mode enabled: existing partition table/signatures will be wiped", ok=False)
+    if allocated_only:
+        ui.print_status("warn", "Allocated-only copy: free filesystem blocks keep their previous bytes; a temporary sparse RAW copy needs local disk space", ok=False)
     if helper_will_recheck:
         ui.print_status("warn", "Full target validation will run after sudo elevation", ok=False)
     if vm["firmware"]["type"] == "bios" and source_layout == "gpt":
@@ -359,6 +381,8 @@ def cmd_flash(args: argparse.Namespace) -> int:
     ]
     if args.force_target:
         helper_cmd.append("--force-target")
+    if allocated_only:
+        helper_cmd.append("--allocated-only")
     expand = getattr(args, "expand", None)
     # sudo may allocate a PTY even when the caller has piped stdin. Preserve the
     # caller's noninteractive default instead of asking inside that new PTY.
@@ -392,55 +416,60 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
     runtime.require_command("wipefs")
     runtime.require_command("findmnt")
 
+    allocated_only = bool(getattr(args, "allocated_only", False))
+    # Check before wipefs/sgdisk: an unusable option must not strand a wiped target.
+    if allocated_only:
+        require_allocated_only(args.force_target)
+
     info, source_layout, _ = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
     # Container images hide their partition table until conversion. Check GPT
     # tooling before writing so a missing utility cannot strand the copy.
     if source_layout != "dos":
         for command in ("sgdisk", "sfdisk", "blkid", "blockdev"):
             runtime.require_command(command)
-    if args.force_target:
-        if _device_has_gpt_metadata(info):
-            runtime.require_command("sgdisk")
-        for child in info["children"]:
-            child_path = child.get("path")
-            if child_path:
-                runtime.run(["wipefs", "-a", "-f", child_path], dry_run=False, quiet=True)
-        if _device_has_gpt_metadata(info):
-            runtime.run(["sgdisk", "--zap-all", args.device], dry_run=False, quiet=True)
-        runtime.run(["wipefs", "-a", "-f", args.device], dry_run=False, quiet=True)
-        runtime.reread_partition_table(args.device, dry_run=False)
-    runtime.run(
-        [
-            "qemu-img",
-            "convert",
-            "-n",
-            "-p",
-            "-f",
-            disk["format"],
-            "-O",
-            "raw",
-            str(disk_path),
-            args.device,
-        ],
-        dry_run=False,
-    )
-    try:
-        runtime.reread_partition_table(args.device, dry_run=False)
-        # Probe the bytes just written, not lsblk/udev's cached pre-flash type.
-        # Also repair an image whose GPT was already misplaced internally,
-        # even if image virtual size and target size happen to be equal.
-        if disk_inspect.partition_layout(Path(args.device)) == "gpt":
-            runtime.require_command("sgdisk")
-            runtime.run(["sgdisk", "-e", args.device], dry_run=False, quiet=True, show_command=False)
-            for command in ("sfdisk", "blkid", "blockdev"):
-                runtime.require_command(command)
-            grow_flashed_ntfs(args.device, disk_path.parent / "flash-partitions.sfdisk", expand=getattr(args, "expand", None))
-        else:
-            ui.print_status("warn", "Partition expansion supports GPT/NTFS only; other layouts are copied as-is", ok=False)
-    except (VMError, subprocess.CalledProcessError, ValueError, KeyError, OSError) as exc:
-        raise VMError(f"Disk image copied to {args.device}, but post-flash repair/expansion did not complete: {exc}") from exc
-    finally:
-        runtime.run(["sync"], dry_run=False, quiet=True)
+    with ExitStack() as cleanup:
+        prepared = None
+        if allocated_only:
+            from vmctl import flash_allocated
+
+            prepared = cleanup.enter_context(flash_allocated.prepare(args.vm, vm, disk_path, info))
+            # Scanning may take minutes. Revalidate the actual target before wiping.
+            info, _, _ = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
+            if prepared.size > info["size"]:
+                raise VMError("Prepared image exceeds the flash target")
+        try:
+            if args.force_target:
+                if _device_has_gpt_metadata(info):
+                    runtime.require_command("sgdisk")
+                for child in info["children"]:
+                    child_path = child.get("path")
+                    if child_path:
+                        runtime.run(["wipefs", "-a", "-f", child_path], dry_run=False, quiet=True)
+                if _device_has_gpt_metadata(info):
+                    runtime.run(["sgdisk", "--zap-all", args.device], dry_run=False, quiet=True)
+                runtime.run(["wipefs", "-a", "-f", args.device], dry_run=False, quiet=True)
+                runtime.reread_partition_table(args.device, dry_run=False)
+            if prepared is not None:
+                prepared.copy_to(args.device)
+            else:
+                runtime.run(["qemu-img", "convert", "-n", "-p", "-f", disk["format"],
+                             "-O", "raw", str(disk_path), args.device], dry_run=False)
+            try:
+                runtime.reread_partition_table(args.device, dry_run=False)
+                # Probe the written bytes rather than lsblk/udev's cached table.
+                if disk_inspect.partition_layout(Path(args.device)) == "gpt":
+                    runtime.require_command("sgdisk")
+                    runtime.run(["sgdisk", "-e", args.device], dry_run=False, quiet=True, show_command=False)
+                    for command in ("sfdisk", "blkid", "blockdev"):
+                        runtime.require_command(command)
+                    grow_flashed_ntfs(args.device, disk_path.parent / "flash-partitions.sfdisk", expand=getattr(args, "expand", None))
+                else:
+                    ui.print_status("warn", "Partition expansion supports GPT/NTFS only; other layouts are copied as-is", ok=False)
+            except (VMError, subprocess.CalledProcessError, ValueError, KeyError, OSError) as exc:
+                raise VMError(f"Disk image copied to {args.device}, but post-flash repair/expansion did not complete: {exc}") from exc
+        finally:
+            runtime.run(["sync"], dry_run=False, quiet=True)
+
     return 0
 
 

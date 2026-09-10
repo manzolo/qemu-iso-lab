@@ -1701,7 +1701,16 @@ run_action() {
             fi
             confirm_device_path "$selected_device" || return 0
             if [[ $force -eq 1 ]]; then
-                run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$selected_device" --force-target || true
+                # --allocated-only needs the wipe, so it is offered on this path only.
+                local copy_mode
+                copy_mode=$(menu_choose_fit "$title" "Copy mode for '$current_vm' -> $selected_device" \
+                    "full" "Write every sector, zeroing free space (slow on large images)" \
+                    "allocated" "Copy allocated blocks only; free space keeps its previous bytes (much faster)") || return 0
+                if [[ "$copy_mode" == "allocated" ]]; then
+                    run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$selected_device" --force-target --allocated-only || true
+                else
+                    run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$selected_device" --force-target || true
+                fi
             else
                 run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$selected_device" || true
             fi

@@ -296,6 +296,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--device", required=True, help="target block device, e.g. /dev/sdb")
     p.add_argument("--confirm-device", required=True, help="repeat --device exactly to confirm")
     p.add_argument("--force-target", action="store_true", help="wipe an existing partition table on the target before flashing")
+    flash.add_copy_options(p)
     flash.add_expansion_options(p)
     p.set_defaults(func=flash.cmd_flash)
 
@@ -389,6 +390,7 @@ def dispatch_internal(mode: str, argv: list[str]) -> int:
         p.add_argument("--device", required=True)
         p.add_argument("--confirm-device", required=True)
         p.add_argument("--force-target", action="store_true")
+        flash.add_copy_options(p)
         flash.add_expansion_options(p)
         return flash.cmd_flash_helper(p.parse_args(argv))
     if mode == "import-helper":
