@@ -212,6 +212,17 @@ class IsoTests(BaseVmctlTestCase):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.cmd_prep(args)
 
+    def test_missing_local_only_iso_includes_profile_notes(self):
+        self.vm_config.pop("iso_url")
+        self.vm_config["notes"] = "Put this vendor ISO under isos/example.iso."
+
+        with self.assertRaises(self.vmctl.VMError) as ctx:
+            self.vmctl.ensure_iso(self.vm_config)
+
+        message = str(ctx.exception)
+        self.assertIn("no ISO download source configured", message)
+        self.assertIn("Profile notes: Put this vendor ISO under isos/example.iso.", message)
+
 
 class ArchIsoBootArtifactTests(BaseVmctlTestCase):
     def _extract(self) -> list[list[str]]:

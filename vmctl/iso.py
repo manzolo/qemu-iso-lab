@@ -210,7 +210,11 @@ def ensure_iso(vm: dict[str, Any], dry_run: bool = False) -> Path:
 
     candidates = iso_url_candidates(vm, allow_discovery=not dry_run)
     if not candidates:
-        raise VMError(f"ISO not found and no ISO download source configured: {iso_path}")
+        message = f"ISO not found and no ISO download source configured: {iso_path}"
+        notes = str(vm.get("notes") or "").strip()
+        if notes:
+            message += f"\n\nProfile notes: {notes}"
+        raise VMError(message)
 
     failures: list[str] = []
     for url in candidates:

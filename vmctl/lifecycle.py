@@ -2400,7 +2400,8 @@ def cmd_console(args: argparse.Namespace) -> int:
             "(the serial is the automation's stdio there), or by an older vmctl. Its log may still be in artifacts/{args.vm}/logs/."
         )
     ui.print_kv("pid", str(pid))
-    ui.print_note("Attached to COM1/ttyS0. Linux guests need a getty on ttyS0 (the lab profiles enable it); pfSense shows its console menu. Detach with Ctrl-].")
+    ui.print_kv("detach", ui.style("Ctrl-]", ui.BOLD, ui.YELLOW))
+    ui.print_note("Attached to COM1/ttyS0. Linux guests need a getty on ttyS0 (the lab profiles enable it); pfSense shows its console menu.")
     qemu.serial_console(sock_path)
     return 0
 
