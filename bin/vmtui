@@ -1695,12 +1695,13 @@ run_action() {
             if [[ $force -eq 1 ]]; then
                 warning="WIPE $selected_device and write the VM disk image to it?\n\nALL DATA ON THE DEVICE WILL BE LOST."
             fi
+            warning+="\n\nAfter copying, repair GPT and expand a supported final NTFS partition into free space."
             if ! confirm_box "$title" "$warning"; then
                 return 0
             fi
             confirm_device_path "$selected_device" || return 0
             if [[ $force -eq 1 ]]; then
-                run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$selected_device" --force || true
+                run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$selected_device" --force-target || true
             else
                 run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$selected_device" || true
             fi

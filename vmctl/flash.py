@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import re
+import shutil
+import subprocess
 from pathlib import Path
 
 from typing import Any
@@ -10,6 +14,126 @@ from typing import Any
 from vmctl import config, disk_inspect, qemu, runtime, ui
 from vmctl import state
 from vmctl.errors import VMError
+
+
+def _require_unmounted_flash_target(device: str) -> None:
+    info = disk_inspect.inspect_block_device_basic(device)
+    if info["is_root_disk"]:
+        raise VMError(f"Refusing to resize the host root disk: {device}")
+    if info["mountpoints"]:
+        mounts = ", ".join(info["mountpoints"])
+        raise VMError(
+            f"Refusing to resize mounted target {device} ({mounts}). "
+            "Desktop automount may have mounted the copied partitions. "
+            "Close files on the target, unmount its partitions with udisksctl unmount -b <partition> "
+            "or sudo umount <mountpoint>, and disable desktop automount before retrying."
+        )
+
+
+def _partition_geometry(table: dict[str, Any]) -> list[tuple[str, int, int, str, str]]:
+    """Compare partition identity and extents, allowing cosmetic sfdisk changes."""
+    return sorted(
+        (str(part["node"]), int(part["start"]), int(part["size"]),
+         str(part["type"]).lower(), str(part["uuid"]).lower())
+        for part in table["partitions"]
+    )
+
+
+def _restore_flash_partition_table(
+    device: str, backup: str, original: dict[str, Any], expanded: dict[str, Any],
+) -> None:
+    """Restore only before any filesystem write, with known, unmounted geometry."""
+    _require_unmounted_flash_target(device)
+    current = json.loads(runtime.run_output(["sfdisk", "--json", device]))["partitiontable"]
+    if _partition_geometry(current) == _partition_geometry(original):
+        return
+    if _partition_geometry(current) != _partition_geometry(expanded):
+        raise VMError("Partition geometry changed unexpectedly; automatic restore refused")
+    runtime.run(["sfdisk", "--wipe", "never", "--wipe-partitions", "never", device], stdin_text=backup)
+    restored = json.loads(runtime.run_output(["sfdisk", "--json", device]))["partitiontable"]
+    if _partition_geometry(restored) != _partition_geometry(original):
+        raise VMError("Partition table restore could not be verified")
+    runtime.run(["blockdev", "--rereadpt", device], quiet=True)
+
+
+def grow_flashed_ntfs(device: str, backup_path: Path) -> None:
+    """Grow only a final GPT Microsoft basic-data partition containing NTFS."""
+    # Unlike the best-effort refresh used by flashing, resizing must not use
+    # stale kernel partition nodes after a failed reread.
+    runtime.run(["blockdev", "--rereadpt", device], quiet=True)
+    _require_unmounted_flash_target(device)
+    table = json.loads(runtime.run_output(["sfdisk", "--json", device]))["partitiontable"]
+    partitions = table.get("partitions", [])
+    if table.get("label") != "gpt" or not partitions:
+        ui.print_status("warn", "No GPT data partition to expand", ok=False)
+        return
+    last = max(partitions, key=lambda part: int(part["start"]) + int(part["size"]))
+    new_size = int(table["lastlba"]) - int(last["start"]) + 1
+    if new_size <= int(last["size"]):
+        ui.print_status("ok", "Last partition already uses the available disk space")
+        return
+    if str(last.get("type", "")).lower() != "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7":
+        ui.print_status("warn", "Free space left unallocated: the last partition is not Microsoft basic data (recovery/Linux/other layout)", ok=False)
+        return
+    node = str(last["node"])
+    match = re.fullmatch(re.escape(device) + r"p?([1-9][0-9]*)", node)
+    if not match:
+        raise VMError(f"Unexpected partition path for {device}: {node}")
+    fstype = runtime.run_output(["blkid", "-p", "-s", "TYPE", "-o", "value", node]).strip().lower()
+    if fstype != "ntfs":
+        ui.print_status("warn", f"Free space left unallocated: {node} uses {fstype or 'an unknown filesystem'}; automatic growth supports NTFS only", ok=False)
+        return
+    if shutil.which("ntfsresize") is None:
+        ui.print_status("warn", "Free space left unallocated: install ntfs-3g (ntfsresize) for automatic NTFS growth", ok=False)
+        return
+
+    # Check the original filesystem before changing its partition. Never force
+    # a dirty, hibernated or otherwise unsafe Windows volume through checks.
+    runtime.run(["ntfsresize", "--check", node])
+    runtime.ensure_parent(backup_path)
+    backup = runtime.run_output(["sfdisk", "--dump", device])
+    backup_path.write_text(backup, encoding="utf-8")
+    maybe_restore_sudo_owner(backup_path)
+    maybe_restore_sudo_owner_tree(backup_path.parent)
+    ui.print_kv("partition table backup", ui.pretty_path(backup_path))
+    expanded = dict(table, partitions=[dict(part, size=new_size) if part == last else part for part in partitions])
+    filesystem_write_started = False
+    # Recheck after the potentially long filesystem check and backup: a desktop
+    # may have mounted the target since the first inspection.
+    _require_unmounted_flash_target(device)
+    try:
+        runtime.run(
+            ["sfdisk", "--wipe", "never", "--wipe-partitions", "never", "-N", match[1], device],
+            stdin_text=f"size={new_size}\n",
+        )
+        runtime.run(["blockdev", "--rereadpt", device], quiet=True)
+        resized = json.loads(runtime.run_output(["sfdisk", "--json", device]))["partitiontable"]
+        if _partition_geometry(resized) != _partition_geometry(expanded):
+            raise VMError("Unexpected partition geometry after expansion; filesystem resize stopped")
+        actual_bytes = int(runtime.run_output(["blockdev", "--getsize64", node]).strip())
+        if actual_bytes != new_size * int(table["sectorsize"]):
+            raise VMError(f"Kernel partition size is stale for {node}; filesystem resize stopped")
+        _require_unmounted_flash_target(device)
+        runtime.run(["ntfsresize", "--no-action", node])
+        _require_unmounted_flash_target(device)
+        filesystem_write_started = True
+        runtime.run(["ntfsresize", node], stdin_text="y\n")
+    except (VMError, subprocess.CalledProcessError, ValueError, KeyError, OSError) as exc:
+        if filesystem_write_started:
+            raise VMError(
+                f"NTFS resize failed: {exc}. The filesystem may have been modified; "
+                "the expanded partition was retained. Do not restore the smaller partition table; "
+                "inspect/repair the filesystem before retrying its resize."
+            ) from exc
+        try:
+            _restore_flash_partition_table(device, backup, table, expanded)
+        except (VMError, subprocess.CalledProcessError, ValueError, KeyError, OSError) as restore_exc:
+            raise VMError(
+                f"Expansion stopped: {exc}. Automatic partition restore did not complete: {restore_exc}. "
+                f"No NTFS resize writes were started; partition table backup: {backup_path}"
+            ) from exc
+        raise VMError(f"Expansion stopped: {exc}. Original partition geometry restored; NTFS was not modified.") from exc
+    ui.print_status("ok", f"Expanded {node} and its NTFS filesystem to use the remaining disk space")
 
 
 def _device_has_gpt_metadata(info: dict[str, Any]) -> bool:
@@ -183,7 +307,12 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
     runtime.require_command("wipefs")
     runtime.require_command("findmnt")
 
-    info, _, virtual_size = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
+    info, source_layout, _ = validate_flash_target(vm, disk_path, args.device, force_target=args.force_target)
+    # Container images hide their partition table until conversion. Check GPT
+    # tooling before writing so a missing utility cannot strand the copy.
+    if source_layout != "dos":
+        for command in ("sgdisk", "sfdisk", "blkid", "blockdev"):
+            runtime.require_command(command)
     if args.force_target:
         if _device_has_gpt_metadata(info):
             runtime.require_command("sgdisk")
@@ -210,14 +339,24 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
         ],
         dry_run=False,
     )
-    if virtual_size and info["size"] > virtual_size:
+    try:
         runtime.reread_partition_table(args.device, dry_run=False)
-        flashed_info = disk_inspect.inspect_block_device_basic(args.device)
-        if str(flashed_info.get("pttype") or "").lower() == "gpt":
+        # Probe the bytes just written, not lsblk/udev's cached pre-flash type.
+        # Also repair an image whose GPT was already misplaced internally,
+        # even if image virtual size and target size happen to be equal.
+        if disk_inspect.partition_layout(Path(args.device)) == "gpt":
             runtime.require_command("sgdisk")
             runtime.run(["sgdisk", "-e", args.device], dry_run=False, quiet=True)
-            runtime.reread_partition_table(args.device, dry_run=False)
-    runtime.run(["sync"], dry_run=False, quiet=True)
+            ui.print_status("ok", "Backup GPT relocated to the end of the target disk")
+            for command in ("sfdisk", "blkid", "blockdev"):
+                runtime.require_command(command)
+            grow_flashed_ntfs(args.device, disk_path.parent / "flash-partitions.sfdisk")
+        else:
+            ui.print_status("warn", "Automatic partition growth supports GPT/NTFS only; other layouts are copied as-is", ok=False)
+    except (VMError, subprocess.CalledProcessError, ValueError, KeyError, OSError) as exc:
+        raise VMError(f"Disk image copied to {args.device}, but post-flash repair/expansion did not complete: {exc}") from exc
+    finally:
+        runtime.run(["sync"], dry_run=False, quiet=True)
     return 0
 
 

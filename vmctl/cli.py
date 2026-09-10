@@ -291,7 +291,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--report-dir", dest="_report_dir", help=argparse.SUPPRESS)
     p.set_defaults(func=lifecycle.cmd_check_vm)
 
-    p = _add(subparsers, "flash", help="copy a VM disk to a physical block device (DESTRUCTIVE; requires sudo)")
+    p = _add(subparsers, "flash", help="copy a VM disk, repair GPT and grow a final NTFS partition (DESTRUCTIVE; requires sudo)")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--device", required=True, help="target block device, e.g. /dev/sdb")
     p.add_argument("--confirm-device", required=True, help="repeat --device exactly to confirm")
