@@ -302,6 +302,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--device", required=True, help="source block device, e.g. /dev/sdb")
     p.add_argument("--confirm-device", required=True, help="repeat --device exactly to confirm")
+    import_dev.add_import_options(p)
     p.set_defaults(func=import_dev.cmd_import_device)
 
     p = _add(subparsers, "setup", help="verify host prerequisites")
@@ -393,6 +394,7 @@ def dispatch_internal(mode: str, argv: list[str]) -> int:
         p.add_argument("--vm", required=True)
         p.add_argument("--device", required=True)
         p.add_argument("--confirm-device", required=True)
+        import_dev.add_import_options(p)
         return import_dev.cmd_import_helper(p.parse_args(argv))
     raise VMError(f"unknown internal mode: {mode}")
 

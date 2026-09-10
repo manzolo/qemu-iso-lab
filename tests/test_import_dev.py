@@ -20,6 +20,35 @@ from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
 class ImportDevTests(BaseVmctlTestCase):
+    def test_allocated_dry_run_forwards_mode_and_resume_without_writes(self):
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz",
+                                  dry_run=True, allocated_only=True, resume=True)
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+                mock.patch.object(vmctl.import_dev, "validate_import_source", return_value={
+                    "path": "/dev/sdz", "size": 1024**3, "model": "USB", "pttype": "gpt",
+                }), mock.patch.object(vmctl.runtime, "run") as run:
+            self.assertEqual(self.vmctl.cmd_import_device(args), 0)
+        command = run.call_args.args[0]
+        self.assertEqual(command[-2:], ["--allocated-only", "--resume"])
+        self.assertTrue(run.call_args.kwargs["dry_run"])
+        self.assertFalse((self.root / "artifacts").exists())
+
+    def test_allocated_helper_preserves_existing_state_and_bypasses_full_import(self):
+        args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz",
+                                  allocated_only=True, resume=True)
+        info = {"size": 1024**3}
+        with mock.patch.object(os, "geteuid", return_value=0), \
+                mock.patch.object(vmctl.runtime, "require_command"), \
+                mock.patch.object(vmctl.import_dev, "validate_import_source", return_value=info), \
+                mock.patch.object(vmctl.import_dev, "_cleanup_stale_import_dirs") as cleanup, \
+                mock.patch.object(vmctl.import_dev.import_allocated, "import_disk") as importer, \
+                mock.patch.object(vmctl.flash, "maybe_restore_sudo_owner"), \
+                mock.patch.object(vmctl.flash, "maybe_restore_sudo_owner_tree"):
+            self.assertEqual(self.vmctl.cmd_import_helper(args), 0)
+        cleanup.assert_not_called()
+        self.assertEqual(importer.call_args.args[0], args)
+        self.assertEqual(importer.call_args.args[3], info)
+
     def test_cmd_import_device_requires_matching_confirmation(self):
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdy", dry_run=True)
 

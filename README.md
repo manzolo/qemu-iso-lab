@@ -41,8 +41,8 @@ driven by a single CLI (`vmctl`) or a dashboard TUI (`vmtui`).
 Host packages (Arch or Debian/Ubuntu shown):
 
 ```bash
-sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk
-sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk ddrescue partclone util-linux
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk gddrescue partclone fdisk
 ```
 
 Clone, put the two commands on your `PATH`, check the host:
@@ -97,6 +97,7 @@ accepts `--dry-run` in front of it.
 | re-run the SSH provisioning steps of a profile        | `vmctl post-install <vm>`                                |
 | prove a VM still boots (CI-style)                     | `vmctl boot-check <vm>`, `vmctl check-vms`               |
 | write a VM to a real USB disk, or import one          | `vmctl flash`, `vmctl import-device` (destructive, sudo) |
+| import only allocated filesystem blocks, with resume | `vmctl import-device <vm> --device /dev/sdX --confirm-device /dev/sdX --allocated-only` ([guide](docs/IMPORT_DISKS.md)) |
 | free disk space                                       | `vmctl clean <vm>`, `vmctl clean --all`, `vmctl delete-iso <vm>` |
 | see what a command would do without doing it          | `vmctl --dry-run <command> <vm>`                         |
 | add my own user, key and dotfiles to the VMs          | edit `vms/profiles/local.json` ([Make it yours](#make-it-yours)) |

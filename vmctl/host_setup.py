@@ -29,6 +29,7 @@ def host_install_hints() -> list[str]:
         "Install QEMU, Python 3, make, OVMF/edk2 firmware, OpenSSH client tools, and libvirt/virsh with your distro package manager.",
         "Optional: dialog/fzf for the TUI, virt-viewer for vmctl attach, virtiofsd for shared_dir profiles.",
         "Optional: cloud-localds/genisoimage/xorriso for seed ISOs, 7z (p7zip) for bootstrap-windows, growisofs (dvd+rw-tools) + python bcrypt for bootstrap-pfsense, swtpm for Windows on libvirt, sgdisk (gdisk) for flash/import GPT repair.",
+        "Optional: GNU ddrescue (gddrescue on Debian/Ubuntu), partclone, and sfdisk for allocated-block disk imports.",
     ]
 
 
@@ -64,6 +65,9 @@ def host_install_commands() -> list[list[str]] | None:
             "python-bcrypt",
             "swtpm",
             "gdisk",
+            "ddrescue",
+            "partclone",
+            "util-linux",
         ]]
     if {"debian", "ubuntu"} & distro_tokens:
         return [
@@ -92,6 +96,9 @@ def host_install_commands() -> list[list[str]] | None:
                 "python3-bcrypt",
                 "swtpm",
                 "gdisk",
+                "gddrescue",
+                "partclone",
+                "fdisk",
             ],
         ]
     return None

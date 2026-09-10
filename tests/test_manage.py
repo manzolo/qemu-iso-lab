@@ -372,7 +372,7 @@ class ManageTests(BaseVmctlTestCase):
         self.assertEqual(executed[0], ["sudo", "apt", "update"])
         self.assertEqual(
             executed[1],
-            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "openssh-client", "libvirt-clients", "libvirt-daemon-system", "make", "dialog", "fzf", "cloud-image-utils", "xorriso", "virtiofsd", "virt-viewer", "p7zip-full", "dvd+rw-tools", "python3-bcrypt", "swtpm", "gdisk"],
+            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "openssh-client", "libvirt-clients", "libvirt-daemon-system", "make", "dialog", "fzf", "cloud-image-utils", "xorriso", "virtiofsd", "virt-viewer", "p7zip-full", "dvd+rw-tools", "python3-bcrypt", "swtpm", "gdisk", "gddrescue", "partclone", "fdisk"],
         )
 
     def test_cmd_setup_passes_when_requirements_and_firmware_are_available(self):

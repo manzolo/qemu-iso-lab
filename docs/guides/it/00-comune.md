@@ -7,9 +7,9 @@ rimandano qui per i passi ripetuti.
 
 ```bash
 # Ubuntu / Debian
-sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk gddrescue partclone fdisk
 # Arch / CachyOS
-sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk ddrescue partclone util-linux
 
 git clone git@github.com:manzolo/qemu-iso-lab.git && cd qemu-iso-lab
 make install-cli          # symlink di vmctl e vmtui in ~/.local/bin
@@ -21,6 +21,8 @@ vmctl setup               # controlla qemu, qemu-img, OVMF e i tool opzionali
 `virtiofsd` per le cartelle condivise, `virt-viewer` per `vmctl attach`, `virsh` per
 l'export libvirt, `swtpm` per Windows su libvirt, `growisofs` e il modulo Python `bcrypt`
 per pfSense, `sgdisk` per la riparazione GPT in flash/import, `dialog`/`fzf` per la TUI.
+`ddrescue`, `ddrescuelog`, `partclone` e `sfdisk` abilitano
+l'[import dei blocchi allocati](../../IMPORT_DISKS.md).
 
 ## 2. Come funziona un bootstrap non presidiato
 

@@ -1714,11 +1714,23 @@ run_action() {
             fi
             local selected_device
             selected_device=$(menu_choose_fit "Import Disk" "Select the source device to import into '$current_vm'" "${device_items[@]}") || return 0
+            local import_mode
+            local -a import_flags=()
+            import_mode=$(menu_choose_fit "Import Mode" "Import $selected_device into '$current_vm'" \
+                "full" "Full partitions (existing import)" \
+                "allocated" "Allocated blocks (partclone + ddrescue)" \
+                "resume" "Resume allocated import (source unchanged)") || return 0
+            case "$import_mode" in
+                full) ;;
+                allocated) import_flags=(--allocated-only) ;;
+                resume) import_flags=(--allocated-only --resume) ;;
+                *) return 0 ;;
+            esac
             if ! confirm_box "Import Disk" "Read $selected_device into the disk image of '$current_vm'?\n\nThe current VM disk image will be REPLACED."; then
                 return 0
             fi
             confirm_device_path "$selected_device" || return 0
-            run_vmctl import-device "$current_vm" --device "$selected_device" --confirm-device "$selected_device" || true
+            run_vmctl import-device "$current_vm" --device "$selected_device" --confirm-device "$selected_device" "${import_flags[@]}" || true
             ;;
         clean-all)
             if confirm_box "Confirm Clean All" "Remove artifacts for ALL configured VMs?\n\nEvery disk image under artifacts/ is deleted. Cached ISOs are kept."; then

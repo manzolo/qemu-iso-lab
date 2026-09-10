@@ -716,6 +716,29 @@ class VmtuiTests(unittest.TestCase):
             result = self.run_bash(f"source bin/vmtui; resolve_action {entry!r}")
             self.assertEqual(result.stdout.strip(), expected, f"{entry!r} did not resolve to {expected}")
 
+    def test_import_modes_forward_the_selected_flags(self):
+        for mode, flags in (("full", []), ("allocated", ["--allocated-only"]),
+                            ("resume", ["--allocated-only", "--resume"])):
+            with self.subTest(mode=mode):
+                script = """
+source bin/vmtui
+current_vm=test-ssh
+list_target_device_menu_items() { printf '%s\\n' /dev/fake 'Test disk'; }
+menu_choose_fit() {
+    if [[ $1 == 'Import Disk' ]]; then printf '%s\\n' /dev/fake;
+    else printf '%s\\n' "$IMPORT_TEST_MODE"; fi
+}
+confirm_box() { return 0; }
+confirm_device_path() { return 0; }
+run_vmctl() { printf '%s\\n' "$@"; }
+run_action 'Import Disk'
+"""
+                result = subprocess.run(["bash", "-c", script], cwd=ROOT,
+                                        env={**self.env, "IMPORT_TEST_MODE": mode}, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.splitlines(), ["import-device", "test-ssh", "--device", "/dev/fake",
+                                                               "--confirm-device", "/dev/fake", *flags])
+
     def test_list_remote_menu_items_reads_remotes_json(self):
         result = self.run_bash("source bin/vmtui; list_remote_menu_items")
         output = result.stdout.splitlines()

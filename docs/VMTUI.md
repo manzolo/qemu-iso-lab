@@ -77,6 +77,10 @@ SSH when it is running.
 Destructive actions (`Cancel Installation`, `Stop VM`, `Clean VM`, `Delete ISO`, flash and import) ask
 for confirmation; flash and import also require typing the device path.
 
+`Import Disk` offers full-partition import, allocated-block import using Partclone
+and GNU ddrescue, and resume of an allocated import. See [Physical Disk Imports](IMPORT_DISKS.md)
+for supported layouts, dependencies and resume requirements.
+
 ## Video profiles
 
 `Video Profile` picks the `video.variants` entry used by every start and install

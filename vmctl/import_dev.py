@@ -10,9 +10,21 @@ from pathlib import Path
 
 from typing import Any
 
-from vmctl import config, disk_inspect, flash, runtime, ui
+from vmctl import config, disk_inspect, flash, import_allocated, runtime, ui
 from vmctl import state
 from vmctl.errors import VMError
+
+
+def add_import_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--allocated-only", action="store_true", help="copy allocated filesystem blocks using partclone and ddrescue (raw/qcow2 targets)")
+    parser.add_argument("--resume", action="store_true", help="resume --allocated-only; the source must have remained unmounted and unchanged")
+
+
+def allocated_mode(args: argparse.Namespace) -> bool:
+    allocated = bool(getattr(args, "allocated_only", False))
+    if getattr(args, "resume", False) and not allocated:
+        raise VMError("--resume requires --allocated-only")
+    return allocated
 
 
 def validate_import_source(device: str) -> dict[str, Any]:
@@ -54,14 +66,18 @@ def cmd_import_device(args: argparse.Namespace) -> int:
     if args.confirm_device != args.device:
         raise VMError("import-device requires --confirm-device to exactly match --device")
 
+    allocated = allocated_mode(args)
     runtime.require_command("qemu-img")
-    runtime.require_command("dd")
+    if allocated:
+        import_allocated.require_tools(disk)
+    else:
+        runtime.require_command("dd")
     runtime.require_command("lsblk")
     runtime.require_command("findmnt")
     runtime.require_command("sudo")
 
     info = validate_import_source(args.device)
-    import_bytes, is_compacted = suggested_import_bytes(info)
+    import_bytes, is_compacted = (int(info["size"]), False) if allocated else suggested_import_bytes(info)
     layout = str(info.get("pttype") or "").lower()
     if is_compacted and layout == "gpt":
         runtime.require_command("sgdisk")
@@ -72,6 +88,9 @@ def cmd_import_device(args: argparse.Namespace) -> int:
     ui.print_kv("model", info["model"] or "-")
     ui.print_kv("target", ui.pretty_path(disk_path))
     ui.print_kv("format", disk["format"])
+    if allocated:
+        ui.print_kv("mode", "allocated blocks (partclone + ddrescue)")
+        ui.print_note("Keep the source unmounted and unchanged until import completes. Disk size is preserved; unknown filesystems and partition gaps are copied in full.")
     ui.print_kv("import", runtime.format_bytes(import_bytes))
     if disk_path.exists():
         ui.print_status("warn", f"Existing VM disk will be overwritten: {ui.pretty_path(disk_path)}", ok=False)
@@ -92,6 +111,10 @@ def cmd_import_device(args: argparse.Namespace) -> int:
         "--confirm-device",
         args.confirm_device,
     ]
+    if allocated:
+        helper_cmd.append("--allocated-only")
+    if getattr(args, "resume", False):
+        helper_cmd.append("--resume")
     runtime.run(helper_cmd, dry_run=args.dry_run)
     if args.dry_run:
         ui.print_status("ok", f"Would import {args.device} into {ui.pretty_path(disk_path)} via sudo helper")
@@ -121,6 +144,7 @@ def cmd_import_helper(args: argparse.Namespace) -> int:
     if args.confirm_device != args.device:
         raise VMError("import-helper requires --confirm-device to exactly match --device")
 
+    allocated = allocated_mode(args)
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
     disk = vm["disk"]
@@ -128,6 +152,14 @@ def cmd_import_helper(args: argparse.Namespace) -> int:
     runtime.ensure_parent(disk_path)
 
     runtime.require_command("qemu-img")
+    if allocated:
+        import_allocated.require_tools(disk)
+        info = validate_import_source(args.device)
+        import_allocated.import_disk(args, vm, disk_path, info)
+        flash.maybe_restore_sudo_owner(disk_path)
+        flash.maybe_restore_sudo_owner_tree(disk_path.parent)
+        ui.print_status("ok", f"Imported {args.device} into {ui.pretty_path(disk_path)}")
+        return 0
     runtime.require_command("dd")
     runtime.require_command("lsblk")
     runtime.require_command("findmnt")
