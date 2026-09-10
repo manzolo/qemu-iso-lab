@@ -873,10 +873,26 @@ class FlashExpansionTests(BaseVmctlTestCase):
         self.assertNotIn(["ntfsresize", self.node], self.commands())
 
     def test_skips_recovery_partition_at_end(self):
-        self.table["partitions"][0]["type"] = "DE94BBA4-06D1-4D40-A16A-BFD50179D6AC"
-        self.grow()
-        self.assertEqual(self.commands(), [])
-        self.assertFalse(self.backup.exists())
+        for partition_type, reason in (
+            ("DE94BBA4-06D1-4D40-A16A-BFD50179D6AC", "is a Windows recovery partition"),
+            ("de94bba4-06d1-4d40-a16a-bfd50179d6ac", "is a Windows recovery partition"),
+            ("unsupported-type", "is not a supported Windows data partition"),
+        ):
+            for expand, tty in ((None, True), (None, False), (True, False), (False, True)):
+                with self.subTest(partition_type=partition_type, expand=expand, tty=tty), \
+                     mock.patch.object(vmctl.flash.sys.stdin, "isatty", return_value=tty), \
+                     mock.patch("builtins.input") as prompt, \
+                     mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                    self.table["partitions"][0]["type"] = partition_type
+                    self.grow(expand=expand)
+                    prompt.assert_not_called()
+                    self.assertEqual(self.commands(), [])
+                    self.assertFalse(self.backup.exists())
+                    output = stdout.getvalue()
+                    self.assertIn(f"Automatic expansion skipped: the last partition {self.node} (4.0 MiB) {reason}.", output)
+                    self.assertIn("4.0 GiB (partition sizes preserved)", output)
+                    self.assertIn("no need to flash again", output)
+                    self.assertNotIn("recovery/Linux/other layout", output)
 
     def test_skips_bitlocker_and_unsupported_filesystems(self):
         for fstype in ("BitLocker", "ext4", ""):

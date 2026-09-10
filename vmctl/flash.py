@@ -131,8 +131,21 @@ def grow_flashed_ntfs(device: str, backup_path: Path, expand: bool | None = None
         return
     free_bytes = (new_size - int(last["size"])) * int(table["sectorsize"])
     free_space = runtime.format_bytes(free_bytes)
-    if str(last.get("type", "")).lower() != "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7":
-        ui.print_status("warn", f"{free_space} left unallocated: the last partition is not Microsoft basic data (recovery/Linux/other layout)", ok=False)
+    partition_type = str(last.get("type", "")).lower()
+    if partition_type != "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7":
+        reason = (
+            "is a Windows recovery partition"
+            if partition_type == "de94bba4-06d1-4d40-a16a-bfd50179d6ac"
+            else "is not a supported Windows data partition"
+        )
+        size = runtime.format_bytes(int(last["size"]) * int(table["sectorsize"]))
+        ui.print_status(
+            "warn",
+            f"Automatic expansion skipped: the last partition {last['node']} ({size}) {reason}.",
+            ok=False,
+        )
+        ui.print_kv("unallocated", f"{free_space} (partition sizes preserved)")
+        ui.print_note("To use this space, review the copied disk's layout with a partition editor; no need to flash again.")
         return
     node = str(last["node"])
     match = re.fullmatch(re.escape(device) + r"p?([1-9][0-9]*)", node)
@@ -358,7 +371,7 @@ def cmd_flash(args: argparse.Namespace) -> int:
     ui.print_kv("model", info["model"] or "-")
     ui.print_kv("mode", "allocated filesystem blocks (partclone + ddrescue)" if allocated_only else "every sector")
     if source_layout is None and qemu.is_container_disk_format(str(disk.get("format", "")).lower()):
-        ui.print_status("warn", "Guest partition layout is hidden inside the disk container; proceeding with caution", ok=False)
+        ui.print_note("Guest partition layout will be detected on the target disk after copying the image.")
     if args.force_target:
         ui.print_status("warn", "Force mode enabled: existing partition table/signatures will be wiped", ok=False)
     if allocated_only:
