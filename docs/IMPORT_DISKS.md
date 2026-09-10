@@ -89,11 +89,16 @@ with "device is too small".
    image (replaced by the next expansion). Mounts are checked again: if the
    desktop automounted the USB partitions, the error lists the mountpoints and
    how to unmount them; nothing is unmounted forcibly.
-3. The last partition is enlarged with `sfdisk -N` and wiping disabled. Start,
+3. Every kernel reread in these steps first waits for udev (`udevadm settle`)
+   and retries a busy device up to five times: right after a table write, udev
+   and udisks probe the new partitions and hold them open for a moment, so a
+   `blockdev --rereadpt` one second after `sgdisk -e` fails with EBUSY (seen
+   live). A partition that is really mounted stops with its mountpoints instead.
+4. The last partition is enlarged with `sfdisk -N` and wiping disabled. Start,
    type, UUID and the other partitions are preserved; the geometry is verified
    on nodes, starts, sizes, types and UUIDs, and the kernel must see the new
    size.
-4. A second `ntfsresize --no-action` on the enlarged partition must pass. Only
+5. A second `ntfsresize --no-action` on the enlarged partition must pass. Only
    then does the real `ntfsresize` run.
 
 If anything fails before the filesystem write, the original table is restored

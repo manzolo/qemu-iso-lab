@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from typing import Any
@@ -18,6 +19,39 @@ from vmctl.errors import VMError
 
 
 MIN_EXPANSION_PROMPT_BYTES = 1024**3
+REREAD_ATTEMPTS = 5
+
+
+def _settle_udev() -> None:
+    if shutil.which("udevadm") is None:
+        return
+    try:
+        runtime.run(["udevadm", "settle", "--timeout=15"], quiet=True, show_command=False)
+    except subprocess.CalledProcessError:
+        return  # a settle timeout is not fatal: the reread below decides
+
+
+def _reread_partitions(device: str) -> None:
+    """Strict partition-table reread for the resize steps.
+
+    Right after a table write (sgdisk -e, sfdisk) udev and udisks probe the new
+    partitions and hold them open for a moment; BLKRRPART then fails with EBUSY
+    (seen live: the second reread one second after sgdisk -e). Wait for udev,
+    retry a few times, and turn a real mount into the explicit unmount message.
+    """
+    for attempt in range(1, REREAD_ATTEMPTS + 1):
+        _settle_udev()
+        try:
+            runtime.run(["blockdev", "--rereadpt", device], quiet=True, show_command=attempt == 1)
+            return
+        except subprocess.CalledProcessError:
+            _require_unmounted_flash_target(device)
+            if attempt == REREAD_ATTEMPTS:
+                raise VMError(
+                    f"Kernel did not reread the partition table for {device} after {attempt} attempts: "
+                    "a partition is still held open (udev/udisks probe or another process)"
+                )
+            time.sleep(1)
 
 
 def add_expansion_options(parser: argparse.ArgumentParser) -> None:
@@ -65,7 +99,7 @@ def _restore_flash_partition_table(
     restored = json.loads(runtime.run_output(["sfdisk", "--json", device]))["partitiontable"]
     if _partition_geometry(restored) != _partition_geometry(original):
         raise VMError("Partition table restore could not be verified")
-    runtime.run(["blockdev", "--rereadpt", device], quiet=True)
+    _reread_partitions(device)
 
 
 def grow_flashed_ntfs(device: str, backup_path: Path, expand: bool | None = None) -> None:
@@ -106,7 +140,7 @@ def grow_flashed_ntfs(device: str, backup_path: Path, expand: bool | None = None
         return
     # Unlike the best-effort refresh used by flashing, resizing must not use
     # stale kernel partition nodes after a failed reread.
-    runtime.run(["blockdev", "--rereadpt", device], quiet=True)
+    _reread_partitions(device)
     _require_unmounted_flash_target(device)
     if shutil.which("ntfsresize") is None:
         ui.print_status("warn", f"{free_space} left unallocated: install ntfs-3g (ntfsresize) for NTFS expansion", ok=False)
@@ -150,7 +184,7 @@ def grow_flashed_ntfs(device: str, backup_path: Path, expand: bool | None = None
             ["sfdisk", "--wipe", "never", "--wipe-partitions", "never", "-N", match[1], device],
             stdin_text=f"size={new_size}\n",
         )
-        runtime.run(["blockdev", "--rereadpt", device], quiet=True)
+        _reread_partitions(device)
         resized = json.loads(runtime.run_output(["sfdisk", "--json", device]))["partitiontable"]
         if _partition_geometry(resized) != _partition_geometry(expanded):
             raise VMError("Unexpected partition geometry after expansion; filesystem resize stopped")

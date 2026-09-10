@@ -563,6 +563,7 @@ class FlashExpansionTests(BaseVmctlTestCase):
             (vmctl.runtime, "run_output", {"side_effect": output}),
             (vmctl.disk_inspect, "inspect_block_device_basic", {"return_value": self.info}),
             (vmctl.flash.shutil, "which", {"return_value": "/usr/bin/ntfsresize"}),
+            (vmctl.flash.time, "sleep", {}),
         ):
             patcher = mock.patch.object(target, name, **kwargs)
             setattr(self, name, patcher.start())
@@ -579,7 +580,10 @@ class FlashExpansionTests(BaseVmctlTestCase):
         return ["sfdisk", "--wipe", "never", "--wipe-partitions", "never", self.device]
 
     def commands(self):
-        return [call.args[0] for call in self.run.call_args_list]
+        return [call.args[0] for call in self.run.call_args_list if call.args[0][0] != "udevadm"]
+
+    def settles(self):
+        return [call.args[0] for call in self.run.call_args_list if call.args[0][0] == "udevadm"]
 
     def test_expands_last_by_position_preserving_other_partition_metadata(self):
         self.grow()
@@ -787,9 +791,50 @@ class FlashExpansionTests(BaseVmctlTestCase):
 
     def test_failed_initial_reread_stops_before_inspection(self):
         self.run.side_effect = vmctl.flash.subprocess.CalledProcessError(1, "blockdev")
-        with self.assertRaises(vmctl.flash.subprocess.CalledProcessError):
+        with self.assertRaisesRegex(self.vmctl.VMError, "did not reread.*5 attempts"):
             self.grow()
         self.assertEqual(self.run_output.call_count, 2)
+        rereads = [cmd for cmd in self.commands() if cmd[0] == "blockdev"]
+        self.assertEqual(len(rereads), 5)
+        self.assertEqual(len(self.settles()), 5)
+        self.assertEqual(self.sleep.call_count, 4)
+        self.assertFalse(any(cmd[0] == "sfdisk" for cmd in self.commands()))
+
+    def test_busy_reread_is_retried_after_udev_settle(self):
+        # Live case: udev/udisks probe the partitions right after sgdisk -e and
+        # the second BLKRRPART returns EBUSY for about a second.
+        failures = {"left": 1}
+        def run(cmd, **kwargs):
+            self.execute(cmd, **kwargs)
+            if cmd[0] == "blockdev" and failures["left"]:
+                failures["left"] -= 1
+                raise vmctl.flash.subprocess.CalledProcessError(1, cmd)
+        self.run.side_effect = run
+        self.grow()
+        commands = self.commands()
+        self.assertIn(["ntfsresize", self.node], commands)
+        self.assertEqual(self.settles()[0], ["udevadm", "settle", "--timeout=15"])
+        self.assertEqual(commands.index(["blockdev", "--rereadpt", self.device]) + 1,
+                         commands.index(["blockdev", "--rereadpt", self.device], 1))
+        self.sleep.assert_called_once_with(1)
+
+    def test_busy_reread_with_automounted_partition_names_the_mount(self):
+        def run(cmd, **kwargs):
+            self.execute(cmd, **kwargs)
+            if cmd[0] == "blockdev":
+                self.info["mountpoints"] = ["/media/lab/Windows"]
+                raise vmctl.flash.subprocess.CalledProcessError(1, cmd)
+        self.run.side_effect = run
+        with self.assertRaisesRegex(self.vmctl.VMError, "mounted.*/media/lab/Windows.*udisksctl"):
+            self.grow()
+        self.sleep.assert_not_called()
+        self.assertFalse(any(cmd[0] == "sfdisk" for cmd in self.commands()))
+
+    def test_missing_udevadm_skips_settle(self):
+        self.which.side_effect = lambda name: None if name == "udevadm" else "/usr/bin/" + name
+        self.grow()
+        self.assertEqual(self.settles(), [])
+        self.assertIn(["ntfsresize", self.node], self.commands())
 
     def test_dirty_ntfs_stops_before_partition_write(self):
         def run(cmd, **kwargs):
@@ -828,7 +873,7 @@ class FlashExpansionTests(BaseVmctlTestCase):
             self.execute(cmd, **kwargs)
             if cmd[0] == "blockdev":
                 rereads += 1
-                if rereads == 2:
+                if self.partition_expanded:  # every retry fails until the table is restored
                     raise vmctl.flash.subprocess.CalledProcessError(1, cmd)
         self.run.side_effect = run
         with self.assertRaisesRegex(self.vmctl.VMError, "Original partition geometry restored"):
