@@ -65,6 +65,17 @@ def require_command(name: str) -> None:
         raise VMError(f"Missing command: {name}")
 
 
+def confirm_default_no(prompt: str) -> bool:
+    """Never read a pipe or treat missing input as consent."""
+    if not sys.stdin.isatty():
+        return False
+    try:
+        answer = input(f"{prompt} [y/N] ").strip().casefold()
+    except (EOFError, OSError, KeyboardInterrupt):
+        return False
+    return answer in {"s", "si", "sì", "y", "yes"}
+
+
 def _stream_pipe(pipe: Any, stream: Any, log_fh: Any) -> None:
     try:
         for chunk in iter(pipe.readline, ""):
@@ -88,17 +99,20 @@ def run(
     stderr_log: Path | None = None,
     append: bool = False,
     stdin_text: str | None = None,
+    show_command: bool = True,
+    capture_error_output: bool = False,
 ) -> None:
-    ui.print_command(cmd)
+    if show_command:
+        ui.print_command(cmd)
     if not dry_run:
         if quiet and stdout_log is None and stderr_log is None:
             subprocess.run(
                 cmd,
                 check=True,
                 input=stdin_text,
-                text=stdin_text is not None,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                text=stdin_text is not None or capture_error_output,
+                stdout=subprocess.PIPE if capture_error_output else subprocess.DEVNULL,
+                stderr=subprocess.PIPE if capture_error_output else subprocess.DEVNULL,
             )
             return
         if stdout_log is None and stderr_log is None:

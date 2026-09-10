@@ -291,11 +291,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--report-dir", dest="_report_dir", help=argparse.SUPPRESS)
     p.set_defaults(func=lifecycle.cmd_check_vm)
 
-    p = _add(subparsers, "flash", help="copy a VM disk, repair GPT and grow a final NTFS partition (DESTRUCTIVE; requires sudo)")
+    p = _add(subparsers, "flash", help="copy a VM disk, repair GPT and offer optional NTFS expansion (DESTRUCTIVE; requires sudo)")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--device", required=True, help="target block device, e.g. /dev/sdb")
     p.add_argument("--confirm-device", required=True, help="repeat --device exactly to confirm")
     p.add_argument("--force-target", action="store_true", help="wipe an existing partition table on the target before flashing")
+    flash.add_expansion_options(p)
     p.set_defaults(func=flash.cmd_flash)
 
     p = _add(subparsers, "import-device", help="import a physical block device as a VM disk (DESTRUCTIVE; requires sudo)")
@@ -388,6 +389,7 @@ def dispatch_internal(mode: str, argv: list[str]) -> int:
         p.add_argument("--device", required=True)
         p.add_argument("--confirm-device", required=True)
         p.add_argument("--force-target", action="store_true")
+        flash.add_expansion_options(p)
         return flash.cmd_flash_helper(p.parse_args(argv))
     if mode == "import-helper":
         p = argparse.ArgumentParser(prog="vmctl import-helper")

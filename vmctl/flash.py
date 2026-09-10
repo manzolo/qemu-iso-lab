@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from typing import Any
@@ -14,6 +15,17 @@ from typing import Any
 from vmctl import config, disk_inspect, qemu, runtime, ui
 from vmctl import state
 from vmctl.errors import VMError
+
+
+MIN_EXPANSION_PROMPT_BYTES = 1024**3
+
+
+def add_expansion_options(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--expand", dest="expand", action="store_true", default=None,
+                       help="expand a supported final NTFS partition after copying, without asking")
+    group.add_argument("--no-expand", dest="expand", action="store_false",
+                       help="preserve partition/filesystem sizes after copying, without asking")
 
 
 def _require_unmounted_flash_target(device: str) -> None:
@@ -56,12 +68,8 @@ def _restore_flash_partition_table(
     runtime.run(["blockdev", "--rereadpt", device], quiet=True)
 
 
-def grow_flashed_ntfs(device: str, backup_path: Path) -> None:
-    """Grow only a final GPT Microsoft basic-data partition containing NTFS."""
-    # Unlike the best-effort refresh used by flashing, resizing must not use
-    # stale kernel partition nodes after a failed reread.
-    runtime.run(["blockdev", "--rereadpt", device], quiet=True)
-    _require_unmounted_flash_target(device)
+def grow_flashed_ntfs(device: str, backup_path: Path, expand: bool | None = None) -> None:
+    """Offer optional NTFS growth after GPT repair; no consent means no resize."""
     table = json.loads(runtime.run_output(["sfdisk", "--json", device]))["partitiontable"]
     partitions = table.get("partitions", [])
     if table.get("label") != "gpt" or not partitions:
@@ -72,24 +80,57 @@ def grow_flashed_ntfs(device: str, backup_path: Path) -> None:
     if new_size <= int(last["size"]):
         ui.print_status("ok", "Last partition already uses the available disk space")
         return
+    free_bytes = (new_size - int(last["size"])) * int(table["sectorsize"])
+    free_space = runtime.format_bytes(free_bytes)
     if str(last.get("type", "")).lower() != "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7":
-        ui.print_status("warn", "Free space left unallocated: the last partition is not Microsoft basic data (recovery/Linux/other layout)", ok=False)
+        ui.print_status("warn", f"{free_space} left unallocated: the last partition is not Microsoft basic data (recovery/Linux/other layout)", ok=False)
         return
     node = str(last["node"])
     match = re.fullmatch(re.escape(device) + r"p?([1-9][0-9]*)", node)
     if not match:
         raise VMError(f"Unexpected partition path for {device}: {node}")
-    fstype = runtime.run_output(["blkid", "-p", "-s", "TYPE", "-o", "value", node]).strip().lower()
+    try:
+        fstype = runtime.run_output(["blkid", "-p", "-s", "TYPE", "-o", "value", node]).strip().lower()
+    except subprocess.CalledProcessError as exc:
+        if exc.returncode != 2:  # blkid found no recognizable filesystem.
+            raise
+        fstype = ""
     if fstype != "ntfs":
-        ui.print_status("warn", f"Free space left unallocated: {node} uses {fstype or 'an unknown filesystem'}; automatic growth supports NTFS only", ok=False)
+        ui.print_status("warn", f"{free_space} left unallocated: {node} uses {fstype or 'an unknown filesystem'}; expansion supports NTFS only", ok=False)
         return
+    if expand is False or (expand is None and not sys.stdin.isatty()):
+        ui.print_status("ok", f"{free_space} left unallocated; partition sizes preserved. To expand this copy later, enlarge the partition with a partition editor, then run ntfsresize (dry-run first).")
+        return
+    if expand is None and free_bytes < MIN_EXPANSION_PROMPT_BYTES:
+        ui.print_status("ok", f"{free_space} left unallocated (below the 1 GiB prompt threshold); partition sizes preserved")
+        return
+    # Unlike the best-effort refresh used by flashing, resizing must not use
+    # stale kernel partition nodes after a failed reread.
+    runtime.run(["blockdev", "--rereadpt", device], quiet=True)
+    _require_unmounted_flash_target(device)
     if shutil.which("ntfsresize") is None:
-        ui.print_status("warn", "Free space left unallocated: install ntfs-3g (ntfsresize) for automatic NTFS growth", ok=False)
+        ui.print_status("warn", f"{free_space} left unallocated: install ntfs-3g (ntfsresize) for NTFS expansion", ok=False)
         return
 
     # Check the original filesystem before changing its partition. Never force
     # a dirty, hibernated or otherwise unsafe Windows volume through checks.
-    runtime.run(["ntfsresize", "--check", node])
+    try:
+        runtime.run(["ntfsresize", "--check", node], quiet=True, show_command=False, capture_error_output=True)
+        runtime.run(["ntfsresize", "--no-action", node], quiet=True, show_command=False, capture_error_output=True)
+    except subprocess.CalledProcessError as exc:
+        detail = " ".join(str(exc.stderr or exc.stdout or exc).split())
+        ui.print_status("warn", f"{free_space} left unallocated: ntfsresize rejected {node}; no expansion offered. {detail}", ok=False)
+        return
+    if expand is None:
+        free_gib = f"{free_bytes / 1024**3:.1f}"
+        size_gib = f"{int(last['size']) * int(table['sectorsize']) / 1024**3:.1f}"
+        if not runtime.confirm_default_no(
+            f"The disk has {free_gib} GiB unallocated after the last partition "
+            f"({Path(node).name}, NTFS {size_gib} GiB).\n"
+            "Expand the partition and filesystem to use the entire disk?"
+        ):
+            ui.print_status("ok", f"{free_space} left unallocated; partition and filesystem sizes preserved")
+            return
     runtime.ensure_parent(backup_path)
     backup = runtime.run_output(["sfdisk", "--dump", device])
     backup_path.write_text(backup, encoding="utf-8")
@@ -101,6 +142,9 @@ def grow_flashed_ntfs(device: str, backup_path: Path) -> None:
     # Recheck after the potentially long filesystem check and backup: a desktop
     # may have mounted the target since the first inspection.
     _require_unmounted_flash_target(device)
+    current = json.loads(runtime.run_output(["sfdisk", "--json", device]))["partitiontable"]
+    if _partition_geometry(current) != _partition_geometry(table):
+        raise VMError("Partition geometry changed while waiting; expansion stopped")
     try:
         runtime.run(
             ["sfdisk", "--wipe", "never", "--wipe-partitions", "never", "-N", match[1], device],
@@ -281,6 +325,13 @@ def cmd_flash(args: argparse.Namespace) -> int:
     ]
     if args.force_target:
         helper_cmd.append("--force-target")
+    expand = getattr(args, "expand", None)
+    # sudo may allocate a PTY even when the caller has piped stdin. Preserve the
+    # caller's noninteractive default instead of asking inside that new PTY.
+    if expand is None and not sys.stdin.isatty():
+        expand = False
+    if expand is not None:
+        helper_cmd.append("--expand" if expand else "--no-expand")
     runtime.run(helper_cmd, dry_run=args.dry_run)
     if args.dry_run:
         ui.print_status("ok", f"Would flash {ui.pretty_path(disk_path)} to {args.device} via sudo helper")
@@ -346,13 +397,12 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
         # even if image virtual size and target size happen to be equal.
         if disk_inspect.partition_layout(Path(args.device)) == "gpt":
             runtime.require_command("sgdisk")
-            runtime.run(["sgdisk", "-e", args.device], dry_run=False, quiet=True)
-            ui.print_status("ok", "Backup GPT relocated to the end of the target disk")
+            runtime.run(["sgdisk", "-e", args.device], dry_run=False, quiet=True, show_command=False)
             for command in ("sfdisk", "blkid", "blockdev"):
                 runtime.require_command(command)
-            grow_flashed_ntfs(args.device, disk_path.parent / "flash-partitions.sfdisk")
+            grow_flashed_ntfs(args.device, disk_path.parent / "flash-partitions.sfdisk", expand=getattr(args, "expand", None))
         else:
-            ui.print_status("warn", "Automatic partition growth supports GPT/NTFS only; other layouts are copied as-is", ok=False)
+            ui.print_status("warn", "Partition expansion supports GPT/NTFS only; other layouts are copied as-is", ok=False)
     except (VMError, subprocess.CalledProcessError, ValueError, KeyError, OSError) as exc:
         raise VMError(f"Disk image copied to {args.device}, but post-flash repair/expansion did not complete: {exc}") from exc
     finally:

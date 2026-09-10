@@ -1695,7 +1695,7 @@ run_action() {
             if [[ $force -eq 1 ]]; then
                 warning="WIPE $selected_device and write the VM disk image to it?\n\nALL DATA ON THE DEVICE WILL BE LOST."
             fi
-            warning+="\n\nAfter copying, repair GPT and expand a supported final NTFS partition into free space."
+            warning+="\n\nAfter copying, you may choose to expand a supported final NTFS partition. The default is No."
             if ! confirm_box "$title" "$warning"; then
                 return 0
             fi

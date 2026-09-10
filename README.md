@@ -96,13 +96,21 @@ accepts `--dry-run` in front of it.
 | test every unattended flow without losing my VMs      | `vmctl check-vms --restore` (stashes disks, runs, restores) |
 | re-run the SSH provisioning steps of a profile        | `vmctl post-install <vm>`                                |
 | prove a VM still boots (CI-style)                     | `vmctl boot-check <vm>`, `vmctl check-vms`               |
-| write a VM to a real USB disk, or import one          | `vmctl flash`, `vmctl import-device` (destructive, sudo) |
+| write a VM to a real USB disk, or import one          | `vmctl flash`, `vmctl import-device` (destructive, sudo; [guide](docs/IMPORT_DISKS.md)) |
 | import only allocated filesystem blocks, with resume | `vmctl import-device <vm> --device /dev/sdX --confirm-device /dev/sdX --allocated-only` ([guide](docs/IMPORT_DISKS.md)) |
 | free disk space                                       | `vmctl clean <vm>`, `vmctl clean --all`, `vmctl delete-iso <vm>` |
 | see what a command would do without doing it          | `vmctl --dry-run <command> <vm>`                         |
 | add my own user, key and dotfiles to the VMs          | edit `vms/profiles/local.json` ([Make it yours](#make-it-yours)) |
 | add a new VM                                          | add a profile to `vms/profiles/*.json` ([docs/PROFILES.md](docs/PROFILES.md#adding-a-new-vm)) |
 | hack on `vmctl` itself                                | `make check`, then [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+
+`vmctl flash` always repairs GPT silently after copying. Expansion is optional:
+with at least 1 GiB of trailing free space, a terminal prompt offers to expand a
+supported final NTFS partition (default **No**). Use `--expand` to accept without
+asking or `--no-expand` to preserve partition/filesystem sizes. With non-TTY
+stdin and neither flag, it preserves sizes and reports the unused space.
+Recovery, BitLocker and unsupported filesystems are left unchanged.
+See [docs/IMPORT_DISKS.md](docs/IMPORT_DISKS.md) for checks, dependencies and failure handling.
 
 ## The catalog
 

@@ -77,37 +77,12 @@ SSH when it is running.
 Destructive actions (`Cancel Installation`, `Stop VM`, `Clean VM`, `Delete ISO`, flash and import) ask
 for confirmation; flash and import also require typing the device path.
 
-Both flash actions repair the backup GPT at the end of the destination after a
-successful copy, including images that already contain a misplaced backup GPT.
-They also expand the last partition and its NTFS filesystem into trailing free
-space when it is a GPT Microsoft basic-data partition. GPT handling requires
-`sgdisk` (gdisk), `sfdisk` (fdisk/util-linux), `blkid` and `blockdev`; NTFS growth
-also needs `ntfsresize` (ntfs-3g). GPT tools are checked before copying GPT or
-container images. Missing `ntfsresize` leaves free space unallocated with a warning.
-Recovery partitions, BitLocker, Linux filesystems and MBR layouts are not expanded
-automatically. No partitions are moved. A dirty or hibernated NTFS volume, or a
-failed kernel partition refresh, stops expansion with an explicit error stating
-that the image was copied but post-processing did not complete.
-If the desktop automounts the USB partitions, the error lists their mountpoints
-and explains how to unmount them and disable automount before retrying. Mounts
-are checked again before changing the partition and before writing NTFS; the
-flash command does not forcibly unmount filesystems in use.
-
-Before expansion, the partition table is saved as `flash-partitions.sfdisk` beside
-the VM image (replaced by the next expansion). The partition start, type, UUID and
-other partitions are preserved. Geometry verification compares partition nodes,
-starts, sizes, types and UUIDs, allowing changes in JSON ordering, GUID casing and
-descriptive fields. If a check fails before the filesystem write starts, the
-original table is restored automatically only while the target is unmounted and
-its geometry still matches the original or expected expanded layout. Restore
-failures report both errors and the backup location.
-
-Once the actual NTFS resize has started, a failure retains the expanded partition:
-the filesystem may already have grown, so restoring the smaller partition could
-truncate it. Inspect/repair the filesystem before retrying its resize. Windows may
-run a consistency check on first boot
-after a successful NTFS resize. Already running flash processes keep their loaded
-code; these steps apply when starting a new flash.
+Both flash actions run `vmctl flash`: after a successful copy the backup GPT is
+always repaired silently, then, on a terminal with at least 1 GiB free after a
+final NTFS partition, a prompt offers to expand that partition and its filesystem.
+The default is **No** (Enter, EOF or `n` keeps the image sizes). Checks,
+dependencies, write order and failure handling are in
+[Physical Disks: Flash and Import](IMPORT_DISKS.md#flash-a-vm-disk-to-a-physical-device).
 
 `Import Disk` offers full-partition import, allocated-block import using Partclone
 and GNU ddrescue, and resume of an allocated import. See [Physical Disk Imports](IMPORT_DISKS.md)

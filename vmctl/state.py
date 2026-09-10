@@ -30,7 +30,7 @@ OPTIONAL_COMMANDS.update({
     "partclone.fat": "allocated-block imports of FAT (partclone package)",
     "partclone.exfat": "allocated-block imports of exFAT (partclone package)",
     "sfdisk": "partition geometry for allocated-block imports and NTFS growth after flash (fdisk on Debian/Ubuntu, util-linux on Arch)",
-    "ntfsresize": "automatic NTFS growth after flash (ntfs-3g package)",
+    "ntfsresize": "optional NTFS expansion after flash (ntfs-3g package)",
 })
 
 COMMON_OVMF_PAIRS = [
