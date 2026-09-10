@@ -26,9 +26,9 @@ def host_install_hints() -> list[str]:
     if commands is not None:
         return [runtime.shell_join(cmd) for cmd in commands]
     return [
-        "Install QEMU, Python 3, make, and OVMF/edk2 firmware with your distro package manager.",
-        "Optional: install dialog if you want to use make tui.",
-        "Optional: virtiofsd for shared_dir profiles, 7z (p7zip) for bootstrap-windows, growisofs (dvd+rw-tools) + python bcrypt for bootstrap-pfsense.",
+        "Install QEMU, Python 3, make, OVMF/edk2 firmware, OpenSSH client tools, and libvirt/virsh with your distro package manager.",
+        "Optional: dialog/fzf for the TUI, virt-viewer for vmctl attach, virtiofsd for shared_dir profiles.",
+        "Optional: cloud-localds/genisoimage/xorriso for seed ISOs, 7z (p7zip) for bootstrap-windows, growisofs (dvd+rw-tools) + python bcrypt for bootstrap-pfsense, swtpm for Windows on libvirt, sgdisk (gdisk) for flash/import GPT repair.",
     ]
 
 
@@ -50,14 +50,20 @@ def host_install_commands() -> list[list[str]] | None:
             "qemu-base",
             "edk2-ovmf",
             "python",
+            "openssh",
+            "libvirt",
             "dialog",
             "make",
+            "fzf",
             "cloud-image-utils",
             "xorriso",
             "virtiofsd",
+            "virt-viewer",
             "p7zip",
             "dvd+rw-tools",
             "python-bcrypt",
+            "swtpm",
+            "gdisk",
         ]]
     if {"debian", "ubuntu"} & distro_tokens:
         return [
@@ -71,14 +77,21 @@ def host_install_commands() -> list[list[str]] | None:
                 "qemu-utils",
                 "ovmf",
                 "python3",
+                "openssh-client",
+                "libvirt-clients",
+                "libvirt-daemon-system",
                 "make",
                 "dialog",
+                "fzf",
                 "cloud-image-utils",
                 "xorriso",
                 "virtiofsd",
+                "virt-viewer",
                 "p7zip-full",
                 "dvd+rw-tools",
                 "python3-bcrypt",
+                "swtpm",
+                "gdisk",
             ],
         ]
     return None

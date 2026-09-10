@@ -21,7 +21,7 @@ CONFIG_DIR: Path = _ORIGINAL_CONFIG_DIR
 HTTP_USER_AGENT: str = "vmctl/1.0 (+https://github.com/manzolo/qemu-iso-lab)"
 
 REQUIRED_COMMANDS = ["qemu-system-x86_64", "qemu-img", "python3"]
-OPTIONAL_COMMANDS = {"dialog": "required only for the TUI", "7z": "required only by bootstrap-windows (unpacks the UDF Windows ISO)", "xorriso": "seed ISOs and the prompt-free Windows ISO", "virtiofsd": "required only by profiles with shared_dir (host folder shared with the guest)", "growisofs": "required only by bootstrap-pfsense (dvd+rw-tools, updates the pfSense ISO in place)"}
+OPTIONAL_COMMANDS = {"ssh": "guest shell and SSH provisioning", "scp": "copying files during SSH provisioning", "ssh-keygen": "project-generated SSH keys", "dialog": "required only for the TUI fallback", "fzf": "preferred TUI picker", "remote-viewer": "required only by vmctl attach (virt-viewer package)", "virsh": "required only by export-libvirt and the libvirt network lab", "swtpm": "required only by Windows guests exported to libvirt", "sgdisk": "required only by flash/import GPT repair (gdisk package)", "7z": "required only by bootstrap-windows (unpacks the UDF Windows ISO)", "xorriso": "seed ISOs, ISO extraction, prompt-free Windows ISO, pfSense ISO patching", "cloud-localds": "preferred cloud-init seed builder (cloud-image-utils package)", "virtiofsd": "required only by profiles with shared_dir (host folder shared with the guest)", "growisofs": "required only by bootstrap-pfsense (dvd+rw-tools, updates the pfSense ISO in place)"}
 COMMON_OVMF_PAIRS = [
     ("/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd"),
     ("/usr/share/OVMF/OVMF_CODE.fd", "/usr/share/OVMF/OVMF_VARS.fd"),

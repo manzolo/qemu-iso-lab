@@ -7,9 +7,9 @@ here for the repeated steps.
 
 ```bash
 # Ubuntu / Debian
-sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 fzf xorriso virtiofsd p7zip-full
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk
 # Arch / CachyOS
-sudo pacman -S qemu-desktop qemu-base edk2-ovmf python fzf xorriso virtiofsd p7zip
+sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk
 
 git clone git@github.com:manzolo/qemu-iso-lab.git && cd qemu-iso-lab
 make install-cli          # symlinks vmctl and vmtui into ~/.local/bin
@@ -17,9 +17,10 @@ vmctl setup               # checks qemu, qemu-img, OVMF and the optional tools
 ```
 
 `vmctl setup` must end with `Setup check passed`. The optional tools serve specific flows:
-`xorriso` for the seed ISOs, `7z` for the Windows ISO (UDF file system), `virtiofsd` for
-shared folders, `growisofs` and the Python `bcrypt` module for pfSense, `dialog`/`fzf` for
-the TUI.
+`xorriso`/`cloud-localds` for seed ISOs, `7z` for the Windows ISO (UDF file system),
+`virtiofsd` for shared folders, `virt-viewer` for `vmctl attach`, `virsh` for libvirt
+export, `swtpm` for Windows on libvirt, `growisofs` and the Python `bcrypt` module for
+pfSense, `sgdisk` for GPT repair during flash/import, `dialog`/`fzf` for the TUI.
 
 ## 2. How an unattended bootstrap works
 
