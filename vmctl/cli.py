@@ -408,6 +408,9 @@ def main() -> int:
         except VMError as exc:
             print(ui.style(f"error: {exc}", ui.RED, ui.BOLD), file=sys.stderr)
             return 1
+        except subprocess.CalledProcessError as exc:
+            print(ui.style(f"error: command failed with exit code {exc.returncode}", ui.RED, ui.BOLD), file=sys.stderr)
+            return exc.returncode
 
     parser = build_parser()
     args = parser.parse_args()

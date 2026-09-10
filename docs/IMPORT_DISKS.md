@@ -171,6 +171,14 @@ between attempts. Filesystem check failures stop the import; checks are not forc
 or bypassed. In particular, cleanly shut down Windows rather than importing a
 hibernated NTFS volume.
 
+If Partclone reports that NTFS is scheduled for a check or was shut down uncleanly,
+the allocated import stops before starting the disk copy for that attempt. Check
+the volume in Windows and perform a full shutdown before trying again. This changes
+the source: move the `.allocated-import` state directory aside and start a fresh
+import without `--resume`. The existing VM image remains untouched. Failed scans
+retain their `scan-*/partition-*.log` files inside the state directory for diagnosis;
+the error message identifies the relevant log.
+
 ### Interruption and Resume
 
 State is kept next to the destination, for example

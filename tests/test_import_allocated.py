@@ -169,12 +169,51 @@ class AllocatedImportTests(unittest.TestCase):
         run.assert_not_called()
 
     def test_partclone_failure_never_starts_ddrescue(self):
-        with self.patches(), mock.patch.object(allocated, "build_domain", side_effect=subprocess.CalledProcessError(1, "partclone")), \
-                mock.patch.object(runtime, "run") as run:
-            with self.assertRaises(subprocess.CalledProcessError):
+        build_domain = allocated.build_domain
+        for fstype in ("ntfs", "ext4"):
+            with self.subTest(fstype=fstype):
+                self.part["fstype"] = fstype
+                scans = []
+
+                def rejected(cmd, **kwargs):
+                    self.assertEqual(cmd[0], allocated.PARTCLONE[fstype])
+                    log = Path(cmd[cmd.index("--logfile") + 1])
+                    log.write_text("Volume is scheduled for a check or was shutdown uncleanly")
+                    scans.append(log)
+                    raise subprocess.CalledProcessError(1, cmd)
+
+                with self.patches(), mock.patch.object(allocated, "build_domain", side_effect=build_domain), \
+                        mock.patch.object(runtime, "run", side_effect=rejected) as run, \
+                        mock.patch.object(runtime, "run_progress") as convert:
+                    with self.assertRaisesRegex(VMError, "could not map allocated blocks") as caught:
+                        self.do_import()
+                self.assertEqual(run.call_count, 1)
+                convert.assert_not_called()
+                message = str(caught.exception)
+                self.assertIn(self.part["path"], message)
+                self.assertIn(str(scans[-1]), message)
+                self.assertIn("do not use --resume", message)
+                if fstype == "ntfs":
+                    self.assertIn("check the volume in Windows", message)
+                self.assertIn("shutdown uncleanly", scans[-1].read_text())
+                self.assertEqual(self.target.read_bytes(), b"original VM disk")
+                self.assertFalse((self.work / "source.raw").exists())
+                self.assertFalse((self.work / "manifest.json").exists())
+                # A failed scan can be retried while the source remains unchanged.
+                self.args.resume = True
+
+    def test_resume_after_failed_scan_with_unchanged_source(self):
+        with self.patches(), mock.patch.object(allocated, "build_domain", side_effect=VMError("scan failed")):
+            with self.assertRaisesRegex(VMError, "scan failed"):
                 self.do_import()
-        run.assert_not_called()
-        self.assertEqual(self.target.read_bytes(), b"original VM disk")
+        self.assertTrue(list(self.work.glob("scan-*")))
+        self.assertFalse((self.work / "manifest.json").exists())
+        self.args.resume = True
+        with self.patches(), mock.patch.object(runtime, "run", side_effect=self.fake_run), \
+                mock.patch.object(runtime, "run_progress", side_effect=self.fake_convert):
+            self.do_import()
+        self.assertFalse(self.work.exists())
+        self.assertEqual(self.target.read_bytes(), b"B" * 512 + b"A" * 512 + b"\0" * 512 + b"T" * 512)
 
     def test_concurrent_import_is_rejected(self):
         self.interrupt_import()

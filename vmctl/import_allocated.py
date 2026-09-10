@@ -136,8 +136,20 @@ def build_domain(plan: list[dict[str, Any]], size: int, scratch: Path) -> list[B
             runtime.require_command(command)
             ui.print_note(f"{part['path']}: mapping allocated {part['fstype']} blocks")
             domain = scratch / f"partition-{index}.map"
-            runtime.run([command, "--domain", "--source", part["path"], "--output", str(domain),
-                         "--logfile", str(scratch / f"partition-{index}.log")])
+            log = scratch / f"partition-{index}.log"
+            try:
+                runtime.run([command, "--domain", "--source", part["path"], "--output", str(domain),
+                             "--logfile", str(log)])
+            except subprocess.CalledProcessError as exc:
+                guidance = (
+                    " If NTFS is unclean or hibernated, check the volume in Windows and shut it down fully."
+                    if part["fstype"] == "ntfs" else " Check the filesystem before retrying."
+                )
+                raise VMError(
+                    f"{command} could not map allocated blocks on {part['path']} (exit code {exc.returncode})."
+                    f" No disk copy was started in this attempt. Partclone log: {log}.{guidance}"
+                    " After changing the source, move the import state directory aside and start a fresh import; do not use --resume."
+                ) from exc
             mapped = read_map(domain, length, "?+")
             if not any(block.status == "+" for block in mapped):
                 raise VMError(f"No allocated filesystem metadata in {domain}")
@@ -237,8 +249,14 @@ def _import_locked(args: argparse.Namespace, vm: dict[str, Any], disk_path: Path
     for path in (raw, domain, rescue, manifest, staged):
         if path.is_symlink() or (path.exists() and not path.is_file()):
             raise VMError(f"Invalid import state file: {path}")
-    with tempfile.TemporaryDirectory(dir=work, prefix="scan-") as scratch:
-        blocks = build_domain(plan, size, Path(scratch))
+    scratch = Path(tempfile.mkdtemp(dir=work, prefix="scan-"))
+    try:
+        blocks = build_domain(plan, size, scratch)
+    except BaseException:
+        ui.print_note(f"Partition scan diagnostics kept at: {scratch}")
+        raise
+    else:
+        shutil.rmtree(scratch)
     content = map_text(blocks)
     identity = {
         "version": 1, "source": str(Path(args.device).resolve()),

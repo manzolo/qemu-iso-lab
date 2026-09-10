@@ -5,6 +5,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -16,6 +17,19 @@ from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
 class CliSmokeTests(unittest.TestCase):
+    def test_internal_command_failure_reports_exit_code_without_traceback(self):
+        from vmctl import cli
+
+        for mode in sorted(cli.INTERNAL_MODES):
+            with self.subTest(mode=mode):
+                err = io.StringIO()
+                with mock.patch.object(sys, "argv", ["vmctl", mode]), \
+                        mock.patch.object(cli, "dispatch_internal", side_effect=subprocess.CalledProcessError(7, "external-tool")), \
+                        contextlib.redirect_stderr(err):
+                    self.assertEqual(cli.main(), 7)
+                self.assertIn("command failed with exit code 7", err.getvalue())
+                self.assertNotIn("Traceback", err.getvalue())
+
     def test_bin_shim_runs_help(self):
         result = subprocess.run(
             [sys.executable, str(vmctl.state.ROOT / "bin" / "vmctl"), "--help"],
