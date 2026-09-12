@@ -801,6 +801,26 @@ class VmctlTests(BaseVmctlTestCase):
             [("boot:", "\r"), ("boot:", "\n")],
         )
 
+    def test_cmd_boot_check_dry_run_tolerates_the_not_yet_created_disk(self):
+        # check-vms creates the empty disk of a live boot-check profile right before calling
+        # cmd_boot_check; on a dry run that creation is only printed, so the image is missing
+        # here. It used to raise "Disk image not found" and made alpine-ci the single [fail]
+        # of an otherwise clean `check-vms --dry-run`.
+        self.vm_config["ci"] = {"accel": "tcg", "headless": True, "expect": "login:"}
+        self.write_config_dir()
+        disk_path = self.root / self.vm_config["disk"]["path"]
+        self.assertFalse(disk_path.exists())
+        args = argparse.Namespace(vm=self.vm_name, expect=None, timeout=None, dry_run=True)
+
+        with mock.patch.object(vmctl.iso, "download_file"), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.qemu, "run_and_expect") as run_and_expect:
+            exit_code = self.vmctl.cmd_boot_check(args)
+
+        self.assertEqual(exit_code, 0)
+        qemu_cmd = run_and_expect.call_args.args[0]
+        self.assertTrue(any(str(disk_path) in arg for arg in qemu_cmd))
+
     def test_cmd_boot_check_disk_mode_skips_cdrom_and_uses_existing_disk(self):
         self.create_disk()
         self.vm_config["ci"] = {

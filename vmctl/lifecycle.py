@@ -2526,6 +2526,11 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
     boot_from = ci.get("boot_from", "cdrom")
     auto_inputs = [(item["match"], item["send"]) for item in ci.get("auto_input", [])]
 
+    # A live boot-check still attaches the profile disk, which check-vms creates just before
+    # calling us: on a dry run that creation is only printed, so the image is legitimately
+    # missing here and must not fail the preview the way every other handler already allows.
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+
     qemu_args = qemu.common_args(
         vm,
         variant=None,
@@ -2534,6 +2539,7 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
         headless=headless,
         serial_stdio=True,
         no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
     )
 
     if boot_from == "cdrom":
