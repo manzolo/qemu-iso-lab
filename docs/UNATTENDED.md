@@ -591,7 +591,14 @@ vmctl check-vms ubuntu-niri arch-noctalia --timeout 600
 vmctl check-vms --parallel 4 --clean-first
 ```
 
-`--parallel` controls how many VMs run concurrently; `--clean-first` cleans
+`--parallel N` runs a fixed number of VMs concurrently; `--parallel auto` (what
+`make validate-vms` uses) packs them by the host's resources instead: every VM
+costs its guest RAM plus 512 MB of QEMU overhead and its vCPUs, the budget is
+the memory available at the start minus a 2 GB reserve for the host and the
+CPUs with a 2x oversubscription, and the next pending VM starts as soon as it
+fits, so four old Ubuntus run together while a 4 GB Windows waits for room
+(a profile that does not fit even an idle host still runs, alone). The plan and
+each start are printed; `peak concurrency` closes the run. `--clean-first` cleans
 unattended/bootstrap profiles before the run without asking. `--restore` is the
 non-destructive alternative: it stashes each installed VM's `artifacts/<vm>`
 directory aside, runs the matrix on a virgin state, then removes what the test

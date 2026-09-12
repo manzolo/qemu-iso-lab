@@ -66,6 +66,11 @@ class CliHelpLayoutTests(unittest.TestCase):
             names.add(name)
         return names
 
+    def test_check_vms_parallel_accepts_a_count_or_auto(self):
+        self.assertEqual(self.cli.build_parser().parse_args(["check-vms", "--parallel", "auto"]).parallel, "auto")
+        self.assertEqual(self.cli.build_parser().parse_args(["check-vms", "--parallel", "3"]).parallel, "3")
+        self.assertEqual(self.cli.build_parser().parse_args(["check-vms"]).parallel, "1")
+
     def test_every_public_subcommand_is_in_exactly_one_group(self):
         grouped = self.cli.public_commands()
         self.assertEqual(len(grouped), len(set(grouped)), "a command is listed in two groups")

@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, runtime, ssh, state, ui, windows
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, runtime, scheduler, ssh, state, ui, windows
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -2619,12 +2619,20 @@ def cmd_test_local(args: argparse.Namespace) -> int:
     args.vms = selected_names
     report_directory = report.init(args)
     results: list[tuple[str, str, str]] = []
-    parallel = max(1, int(getattr(args, "parallel", 1)))
+    try:
+        parallel = scheduler.parse_parallel(getattr(args, "parallel", 1))
+    except ValueError as exc:
+        raise VMError(str(exc)) from exc
+    dynamic: scheduler.DynamicScheduler | None = None
+    if parallel is None:
+        dynamic = scheduler.DynamicScheduler(scheduler.host_resources(), max_workers=min(scheduler.DEFAULT_MAX_WORKERS, max(1, len(selected_names))))
 
     restore = getattr(args, "restore", False)
     ui.print_header("Local VM test matrix")
     ui.print_kv("timeout", f"{args.timeout}s")
-    ui.print_kv("parallel", str(parallel))
+    ui.print_kv("parallel", "auto (resource-aware)" if dynamic is not None else str(parallel))
+    if dynamic is not None:
+        scheduler.print_plan(dynamic, [(name, scheduler.vm_cost(config.get_vm(cfg, name))) for name in selected_names])
     ui.print_kv("mode", "restore (stash + revert)" if restore else "in place")
 
     stashed: dict[str, str] = {}
@@ -2645,6 +2653,25 @@ def cmd_test_local(args: argparse.Namespace) -> int:
                 vm = config.get_vm(cfg, vm_name)
                 status, detail = run_local_test_once(vm_name, vm, args)
                 results.append((vm_name, status, detail))
+        elif dynamic is not None:
+            for vm_name in selected_names:
+                ui.print_note(f"{vm_name} logs: {ui.pretty_path(check_vm_stdout_log_path(vm_name))} | {ui.pretty_path(check_vm_stderr_log_path(vm_name))}")
+            jobs = [(vm_name, scheduler.vm_cost(config.get_vm(cfg, vm_name))) for vm_name in selected_names]
+
+            def on_start(vm_name: str, cost: scheduler.VmCost, running_now: int) -> None:
+                ui.print_note(f"starting {vm_name} ({cost.mem_mb} MB, {cost.cpus} vCPU): {running_now} VM(s) running")
+
+            for vm_name, outcome in dynamic.run(jobs, lambda name: run_local_test_vm_subprocess(name, args), on_start=on_start):
+                if isinstance(outcome, BaseException):
+                    results.append((vm_name, "failed", str(outcome)))
+                    ui.print_header(f"Test VM: {vm_name}")
+                    ui.print_status("fail", f"{vm_name}: {outcome}", ok=False)
+                    continue
+                status, detail, output = outcome
+                if output:
+                    print(output, end="" if output.endswith("\n") else "\n")
+                results.append((vm_name, status, detail))
+            ui.print_kv("peak concurrency", str(dynamic.peak_running))
         else:
             with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
                 future_map = {

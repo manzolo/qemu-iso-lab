@@ -14,7 +14,7 @@ make ci                                        # python -m unittest discover -s 
 make lint                                      # python -m mypy vmctl/ --strict (enforced)
 make install-cli                               # symlink vmctl + vmtui into ~/.local/bin
 make guides                                    # docs/guides/{it,en} -> pdf/<lang>/qemu-iso-lab-guide.pdf (manual) + pdf/<lang>/single|singole/ (markdown + weasyprint); keep both languages in sync
-make validate-vms                              # LOCAL ONLY (hours): check-vms --restore --report over every unattended profile, opens the HTML report
+make validate-vms                              # LOCAL ONLY (hours): check-vms --restore --report --parallel auto (packs VMs by free RAM/CPUs; PARALLEL=N fixes it) over every unattended profile, opens the HTML report
 # Slash commands for this checkout live in .claude/commands/: /vm-status, /vm-desktop, /vm-unattended, /vm-ssh, /vm-shot, /vm-stop
 
 # VM lifecycle: ONE front door, the vmctl CLI (./bin/vmctl if not installed).
@@ -69,6 +69,7 @@ Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always a
 | `kickstart.py` / `preseed.py` | AlmaLinux/Rocky/Fedora kickstart and Debian preseed rendering; `kickstart.install_repo()` picks `cdrom` or a netinst URL; `kickstart.ostree_config()`/`resolve_ostree_ref()` switch the flow to `ostreesetup` for Silverblue. |
 | `libvirt.py` | Render persistent libvirt XML and define/undefine existing disks; `export-libvirt` / `unexport-libvirt` handlers in lifecycle enforce running-VM checks. |
 | `ssh.py` (cont.) | `reboot_guest()` asks the guest to reboot and tolerates the dropped connection (exit 255); `lifecycle.run_verify_after_reboot()` then waits for SSH and runs `ssh_provision.verify_after_reboot`. Assertions about a desktop installed *by* the post-install belong there: greetd restarted mid-install does not keep its session (verified live). |
+| `scheduler.py` | `check-vms --parallel auto`: host RAM/CPUs from /proc/meminfo, per-VM cost (memory_mb + 512 MB overhead, vCPUs), `DynamicScheduler.run` starts the next pending VM whenever it fits the budget (available RAM minus a 2 GB reserve, CPUs x2); an oversized VM runs alone. |
 | `report.py` | `check-vms --report [DIR] --open`: self-contained HTML with profile status and historical live verification, per-worker JSON and QMP P6→PNG screenshots before stop, outside restored artifacts. `wake_console()` sends one `send-key` before the final screendump, or a server guest past the console-blanking timeout is captured as a black rectangle; the install-time watcher captures with `wake=False` so nothing types into a running installer. |
 | `netlab.py` | Network lab: `network_lab` topology resolution/validation, netplan + `pihole.toml` + guest `setup.sh` rendering, SSH post-install hook (`provision_guest`), libvirt segment network XML, `vmctl lab` helpers. |
 | `reactos.py` | ReactOS: `unattend.inf` render (both Setup stages, `[GuiRunOnce]` ending in the guest's shutdown), per-VM BootCD rebuild with xorriso (`-boot_image any replay`, answer file under `/i386` and `/reactos`, `freeldr.ini` defaulting to Setup), IDE CD-ROM args, profile checks. |

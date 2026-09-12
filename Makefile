@@ -54,8 +54,8 @@ init-local-profile: ## Create vms/profiles/local.json from the example
 		printf "  edit YOUR_USER, the password/hash and the SSH/dotfile paths before using personal profile overrides\n"; \
 	fi
 
-validate-vms: ## Local-only full matrix: reinstall every unattended profile from scratch, restore the installed disks, write the HTML report (hours; VMS="a b" PARALLEL=2 to narrow/speed up, TIMEOUT=3600 s per phase)
-	@./bin/vmctl check-vms $(VMS) --restore --no-clean-first --report $(if $(PARALLEL),--parallel $(PARALLEL),) --timeout $(TIMEOUT) --open
+validate-vms: ## Local-only full matrix: reinstall every unattended profile from scratch, restore the installed disks, write the HTML report (hours; VMS="a b" to narrow, PARALLEL=auto (default) packs VMs by free RAM/CPUs or PARALLEL=N fixes the count, TIMEOUT=3600 s per phase)
+	@./bin/vmctl check-vms $(VMS) --restore --no-clean-first --report --parallel $(or $(PARALLEL),auto) --timeout $(TIMEOUT) --open
 
 guides: ## Render docs/guides/{it,en} into docs/guides/pdf/<lang>/ (one manual + single PDFs; needs python markdown + weasyprint)
 	python3 tools/build_guides.py

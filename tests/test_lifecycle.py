@@ -24,6 +24,7 @@ import vmctl.errors  # noqa: E402
 import vmctl.iso  # noqa: E402
 import vmctl.lifecycle  # noqa: E402
 import vmctl.runtime  # noqa: E402
+import vmctl.scheduler  # noqa: E402
 import vmctl.ssh  # noqa: E402
 import vmctl.host_setup  # noqa: E402
 import vmctl.qemu  # noqa: E402
@@ -1113,6 +1114,33 @@ class VmctlTests(BaseVmctlTestCase):
         stderr_log = self.root / "artifacts/alpha/logs/check-vms.stderr.log"
         self.assertEqual(stdout_log.read_text(encoding="utf-8"), completed.stdout)
         self.assertEqual(stderr_log.read_text(encoding="utf-8"), completed.stderr)
+
+    def test_cmd_test_local_parallel_auto_packs_by_host_resources(self):
+        self.write_extra_profile(
+            "parallel.json",
+            {"vms": {"alpha": json.loads(json.dumps(self.vm_config)), "beta": json.loads(json.dumps(self.vm_config))}},
+        )
+        args = argparse.Namespace(vms=["alpha", "beta"], timeout=300, parallel="auto", dry_run=True, clean_first=False, no_clean_first=False)
+        completed = [
+            subprocess.CompletedProcess(args=["vmctl", "_check-vm", name], returncode=0,
+                                        stdout=f"==> Test VM: {name}\n__VMCTL_CHECK_VM_RESULT__{{\"vm\": \"{name}\", \"status\": \"passed\", \"detail\": \"ok\"}}\n")
+            for name in ("alpha", "beta")
+        ]
+        resources = vmctl.scheduler.HostResources(mem_total_mb=32000, mem_available_mb=20000, cpus=16)
+        with mock.patch.object(vmctl.host_setup, "prompt_yes_no_default_yes", return_value=False), \
+             mock.patch.object(vmctl.scheduler, "host_resources", return_value=resources), \
+             mock.patch.object(vmctl.lifecycle.subprocess, "run", side_effect=completed) as run_cmd, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            exit_code = self.vmctl.cmd_test_local(args)
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(run_cmd.call_count, 2)
+        output = stdout.getvalue()
+        self.assertIn("auto (resource-aware)", output)
+        self.assertIn("20000 MB available", output)
+        self.assertIn("peak concurrency", output)
+        args.parallel = "many"
+        with self.assertRaises(vmctl.errors.VMError):
+            self.vmctl.cmd_test_local(args)
 
     def test_cmd_test_local_parallel_runs_workers_and_summarizes_results(self):
         self.write_extra_profile(
