@@ -1,0 +1,877 @@
+{
+  "vms": {
+    "ubuntu-8.04-desktop": {
+      "name": "Ubuntu 8.04.4 Desktop",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "manual"
+      },
+      "iso": "isos/ubuntu-8.04.4-desktop-amd64.iso",
+      "iso_url": "https://old-releases.ubuntu.com/releases/8.04.4/ubuntu-8.04.4-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-8.04-desktop/disk.qcow2",
+        "size": "16G",
+        "format": "qcow2",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 1024,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "e1000",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "95f8e95ad745a2cf0ad956674113897a479f34f9ef3c63d4fb3a525144f32f29"
+    },
+    "ubuntu-10.04-desktop": {
+      "name": "Ubuntu 10.04.4 Desktop",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "manual"
+      },
+      "iso": "isos/ubuntu-10.04.4-desktop-amd64.iso",
+      "iso_url": "https://old-releases.ubuntu.com/releases/10.04.4/ubuntu-10.04.4-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-10.04-desktop/disk.qcow2",
+        "size": "16G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 1536,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "837a6ec168913951bf6371a6df6837217790f4210045c9f991eab641533726fe"
+    },
+    "ubuntu-12.04-desktop": {
+      "name": "Ubuntu 12.04.5 Desktop",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "manual"
+      },
+      "iso": "isos/ubuntu-12.04.5-desktop-amd64.iso",
+      "iso_url": "https://old-releases.ubuntu.com/releases/12.04.5/ubuntu-12.04.5-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-12.04-desktop/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "d1f10ea7ca59266567fa8d2522ad800e1aa063f139630f925d2484d8e169b4c2"
+    },
+    "ubuntu-14.04-desktop": {
+      "name": "Ubuntu 14.04.6 Desktop",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "manual"
+      },
+      "iso": "isos/ubuntu-14.04.6-desktop-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/14.04/ubuntu-14.04.6-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-14.04-desktop/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-14.04-desktop/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "bcc02554c37d438545658be7964e1bc05bdb11289ae16bfbf94626b80d42656f"
+    },
+    "ubuntu-16.04-desktop": {
+      "name": "Ubuntu 16.04.7 Desktop",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "manual"
+      },
+      "iso": "isos/ubuntu-16.04.7-desktop-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/16.04/ubuntu-16.04.7-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-16.04-desktop/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-16.04-desktop/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "8ba7e2687fb8a2152504475e92e489aace543059fd4ba7ffe10111c42394853b"
+    },
+    "ubuntu-18.04-desktop": {
+      "name": "Ubuntu 18.04.6 Desktop",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "manual"
+      },
+      "iso": "isos/ubuntu-18.04.6-desktop-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/18.04/ubuntu-18.04.6-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-18.04-desktop/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-18.04-desktop/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "f730be589aa1ba923ebe6eca573fa66d09ba14c4c104da2c329df652d42aff11"
+    },
+    "ubuntu-20.04-desktop": {
+      "name": "Ubuntu 20.04.6 Desktop",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "manual"
+      },
+      "iso": "isos/ubuntu-20.04.6-desktop-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/20.04/ubuntu-20.04.6-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-20.04-desktop/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-20.04-desktop/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "510ce77afcb9537f198bc7daa0e5b503b6e67aaed68146943c231baeaab94df1"
+    },
+    "ubuntu-22.04-desktop": {
+      "name": "Ubuntu 22.04.5 Desktop",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "manual"
+      },
+      "iso": "isos/ubuntu-22.04.5-desktop-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-22.04-desktop/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-22.04-desktop/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "bfd1cee02bc4f35db939e69b934ba49a39a378797ce9aee20f6e3e3e728fefbf"
+    },
+    "ubuntu-24.04-desktop": {
+      "name": "Ubuntu 24.04.4 Desktop",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "manual"
+      },
+      "iso": "isos/ubuntu-24.04.4-desktop-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/24.04/ubuntu-24.04.4-desktop-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-24.04-desktop/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-24.04-desktop/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "3a4c9877b483ab46d7c3fbe165a0db275e1ae3cfe56a5657e5a47c2f99a99d1e"
+    },
+    "ubuntu-8.04-unattended": {
+      "name": "Ubuntu 8.04.4 Desktop (unattended, d-i alternate)",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-12"
+      },
+      "iso": "isos/ubuntu-8.04.4-alternate-amd64.iso",
+      "iso_url": "https://old-releases.ubuntu.com/releases/8.04.4/ubuntu-8.04.4-alternate-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-8.04-unattended/disk.qcow2",
+        "size": "16G",
+        "format": "qcow2",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 1024,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "e1000",
+      "audio": true,
+      "usb_tablet": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "iso_sha256": "2a4d687fe8824db5c541c8ac40a42e71e8524cbce497a39a7346b92be5d85b6b",
+      "installer_boot": {
+        "kernel": "install/vmlinuz",
+        "initrd": "install/initrd.gz"
+      },
+      "preseed_config": {
+        "hostname": "ubuntu-804",
+        "domain": "local",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "keyboard_layout": "us",
+        "mirror_hostname": "old-releases.ubuntu.com",
+        "mirror_directory": "/ubuntu",
+        "tasks": [
+          "ubuntu-desktop"
+        ],
+        "packages": [
+          "openssh-server",
+          "sudo"
+        ],
+        "upgrade": "none",
+        "disk_device": "auto",
+        "extra": [
+          "d-i apt-setup/services-select multiselect",
+          "d-i pkgsel/update-policy select none",
+          "d-i pkgsel/install-language-support boolean false"
+        ],
+        "late_commands": [
+          "printf '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\nTimedLoginEnable=false\\n' > /etc/gdm/gdm.conf-custom",
+          "printf 'start on runlevel 2\\nstart on runlevel 3\\nstart on runlevel 4\\nstart on runlevel 5\\nstop on runlevel 0\\nstop on runlevel 1\\nstop on runlevel 6\\nrespawn\\nexec /sbin/getty -L 115200 ttyS0 vt102\\n' > /etc/event.d/ttyS0",
+          "sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades",
+          "for k in /apps/gnome-screensaver/lock_enabled /apps/gnome-screensaver/idle_activation_enabled; do gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.mandatory --type bool --set $k false; done",
+          "printf '%s\\n' 'APT::Periodic::Enable \"0\";' 'APT::Periodic::Update-Package-Lists \"0\";' 'APT::Periodic::Download-Upgradeable-Packages \"0\";' > /etc/apt/apt.conf.d/10periodic"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-804",
+        "user": "lab",
+        "ssh_host_port": 2252,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
+        ],
+        "key_type": "rsa",
+        "ssh_options": [
+          "HostKeyAlgorithms=+ssh-rsa",
+          "PubkeyAcceptedAlgorithms=+ssh-rsa",
+          "KexAlgorithms=+diffie-hellman-group-exchange-sha256"
+        ]
+      },
+      "notes": "OpenSSH 4.7 in the guest: RSA key, SHA-1 signatures and DH group exchange (ssh_options)."
+    },
+    "ubuntu-10.04-unattended": {
+      "name": "Ubuntu 10.04.4 Desktop (unattended, d-i alternate)",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-12"
+      },
+      "iso": "isos/ubuntu-10.04.4-alternate-amd64.iso",
+      "iso_url": "https://old-releases.ubuntu.com/releases/10.04.4/ubuntu-10.04.4-alternate-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-10.04-unattended/disk.qcow2",
+        "size": "16G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 1536,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "iso_sha256": "2cd07fd3c2786df06d8e3ddcf6ff5752550d04c08bd45b4f69e1d2789d908328",
+      "installer_boot": {
+        "kernel": "install/vmlinuz",
+        "initrd": "install/initrd.gz"
+      },
+      "preseed_config": {
+        "hostname": "ubuntu-1004",
+        "domain": "local",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "keyboard_layout": "us",
+        "mirror_hostname": "old-releases.ubuntu.com",
+        "mirror_directory": "/ubuntu",
+        "tasks": [
+          "ubuntu-desktop"
+        ],
+        "packages": [
+          "openssh-server",
+          "sudo"
+        ],
+        "upgrade": "none",
+        "disk_device": "/dev/vda",
+        "extra": [
+          "d-i apt-setup/services-select multiselect",
+          "d-i pkgsel/update-policy select none",
+          "d-i pkgsel/install-language-support boolean false"
+        ],
+        "late_commands": [
+          "printf '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\nTimedLoginEnable=false\\n' > /etc/gdm/custom.conf",
+          "printf 'start on stopped rc RUNLEVEL=[2345]\\nstop on runlevel [!2345]\\nrespawn\\nexec /sbin/getty -L 115200 ttyS0 vt102\\n' > /etc/init/ttyS0.conf",
+          "sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades",
+          "for k in /apps/gnome-screensaver/lock_enabled /apps/gnome-screensaver/idle_activation_enabled; do gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.mandatory --type bool --set $k false; done",
+          "printf '%s\\n' 'APT::Periodic::Enable \"0\";' 'APT::Periodic::Update-Package-Lists \"0\";' 'APT::Periodic::Download-Upgradeable-Packages \"0\";' > /etc/apt/apt.conf.d/10periodic"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-1004",
+        "user": "lab",
+        "ssh_host_port": 2253,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
+        ],
+        "key_type": "rsa",
+        "ssh_options": [
+          "HostKeyAlgorithms=+ssh-rsa",
+          "PubkeyAcceptedAlgorithms=+ssh-rsa",
+          "KexAlgorithms=+diffie-hellman-group-exchange-sha256"
+        ]
+      },
+      "notes": "OpenSSH 5.3 in the guest: RSA key, SHA-1 signatures and DH group exchange (ssh_options)."
+    },
+    "ubuntu-12.04-unattended": {
+      "name": "Ubuntu 12.04.5 Desktop (unattended, d-i alternate)",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-12"
+      },
+      "iso": "isos/ubuntu-12.04.5-alternate-amd64.iso",
+      "iso_url": "https://old-releases.ubuntu.com/releases/12.04.5/ubuntu-12.04.5-alternate-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-12.04-unattended/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "iso_sha256": "4d5faa527e1660f0d84b801e47d9cec3181d0c77560825d7100746430e7bab70",
+      "installer_boot": {
+        "kernel": "install/vmlinuz",
+        "initrd": "install/initrd.gz"
+      },
+      "preseed_config": {
+        "hostname": "ubuntu-1204",
+        "domain": "local",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "keyboard_layout": "us",
+        "mirror_hostname": "old-releases.ubuntu.com",
+        "mirror_directory": "/ubuntu",
+        "tasks": [
+          "ubuntu-desktop"
+        ],
+        "packages": [
+          "openssh-server",
+          "sudo"
+        ],
+        "upgrade": "none",
+        "disk_device": "/dev/vda",
+        "extra": [
+          "d-i apt-setup/services-select multiselect",
+          "d-i pkgsel/update-policy select none",
+          "d-i pkgsel/install-language-support boolean false"
+        ],
+        "late_commands": [
+          "printf '[SeatDefaults]\\nautologin-user={{user}}\\nautologin-user-timeout=0\\n' > /etc/lightdm/lightdm.conf",
+          "printf 'start on stopped rc RUNLEVEL=[2345]\\nstop on runlevel [!2345]\\nrespawn\\nexec /sbin/getty -L 115200 ttyS0 vt102\\n' > /etc/init/ttyS0.conf",
+          "sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades",
+          "printf '[org.gnome.desktop.screensaver]\\nlock-enabled=false\\nidle-activation-enabled=false\\n[org.gnome.desktop.session]\\nidle-delay=uint32 0\\n' > /usr/share/glib-2.0/schemas/90_vmctl-lab.gschema.override && glib-compile-schemas /usr/share/glib-2.0/schemas",
+          "printf '%s\\n' 'APT::Periodic::Enable \"0\";' 'APT::Periodic::Update-Package-Lists \"0\";' 'APT::Periodic::Download-Upgradeable-Packages \"0\";' > /etc/apt/apt.conf.d/10periodic"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-1204",
+        "user": "lab",
+        "ssh_host_port": 2254,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
+        ],
+        "key_type": "rsa",
+        "ssh_options": [
+          "HostKeyAlgorithms=+ssh-rsa",
+          "PubkeyAcceptedAlgorithms=+ssh-rsa",
+          "KexAlgorithms=+diffie-hellman-group-exchange-sha256"
+        ]
+      },
+      "notes": "OpenSSH 5.9 in the guest: RSA key and SHA-1 signatures (ssh_options)."
+    },
+    "ubuntu-14.04-unattended": {
+      "name": "Ubuntu 14.04.6 Desktop (unattended, d-i server)",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-12"
+      },
+      "iso": "isos/ubuntu-14.04.6-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/14.04/ubuntu-14.04.6-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-14.04-unattended/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-14.04-unattended/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "iso_sha256": "b17d7c1e9d0321ad5810ba77b69aef43f0f29a5422b08120e6ee0576c4527c0e",
+      "installer_boot": {
+        "kernel": "install/vmlinuz",
+        "initrd": "install/initrd.gz"
+      },
+      "preseed_config": {
+        "hostname": "ubuntu-1404",
+        "domain": "local",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "keyboard_layout": "us",
+        "mirror_hostname": "archive.ubuntu.com",
+        "mirror_directory": "/ubuntu",
+        "tasks": [
+          "standard"
+        ],
+        "packages": [
+          "ubuntu-desktop",
+          "openssh-server",
+          "sudo"
+        ],
+        "upgrade": "none",
+        "disk_device": "/dev/vda",
+        "extra": [
+          "d-i pkgsel/update-policy select none"
+        ],
+        "late_commands": [
+          "printf '[SeatDefaults]\\nautologin-user={{user}}\\nautologin-user-timeout=0\\n' > /etc/lightdm/lightdm.conf",
+          "printf 'start on stopped rc RUNLEVEL=[2345]\\nstop on runlevel [!2345]\\nrespawn\\nexec /sbin/getty -L 115200 ttyS0 vt102\\n' > /etc/init/ttyS0.conf",
+          "sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades",
+          "printf '[org.gnome.desktop.screensaver]\\nlock-enabled=false\\nidle-activation-enabled=false\\n[org.gnome.desktop.session]\\nidle-delay=uint32 0\\n' > /usr/share/glib-2.0/schemas/90_vmctl-lab.gschema.override && glib-compile-schemas /usr/share/glib-2.0/schemas",
+          "printf '%s\\n' 'APT::Periodic::Enable \"0\";' 'APT::Periodic::Update-Package-Lists \"0\";' 'APT::Periodic::Download-Upgradeable-Packages \"0\";' > /etc/apt/apt.conf.d/10periodic"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-1404",
+        "user": "lab",
+        "ssh_host_port": 2255,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
+        ]
+      },
+      "notes": "Server ISO (d-i): the ubuntu-desktop task is not installed by pkgsel from this medium (verified live), so the metapackage comes through pkgsel/include from archive.ubuntu.com; OpenSSH 6.6 accepts the ed25519 key."
+    }
+  }
+}

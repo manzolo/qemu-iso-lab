@@ -707,6 +707,32 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn(f"id=disk0,file={disk_path},format=qcow2,if=none", qemu_cmd)
         self.assertIn("ide-hd,drive=disk0,bus=ahci0.0", qemu_cmd)
 
+    def test_common_args_supports_ide_disk_interface(self):
+        disk_path = self.create_disk()
+        self.vm_config["disk"]["interface"] = "ide"
+
+        with mock.patch.object(vmctl.runtime, "require_command"):
+            qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
+
+        self.assertIn(f"file={disk_path},format=qcow2,if=ide,index=0", qemu_cmd)
+        self.assertNotIn("ich9-ahci,id=ahci0", qemu_cmd)
+        # bootindex pins the disk on the primary channel, leaving the -cdrom on the secondary one.
+        pinned = vmctl.qemu.disk_args(self.vm_config, bootindex=1)
+        self.assertIn("ide-hd,drive=disk0,bus=ide.0,unit=0,bootindex=1", pinned)
+
+    def test_common_args_audio_device_defaults_to_hda_and_accepts_ac97(self):
+        self.create_disk()
+        self.vm_config["audio"] = True
+        with mock.patch.object(vmctl.runtime, "require_command"):
+            self.assertIn("hda-duplex", self.vmctl.common_args(self.vm_config, variant=None, dry_run=True))
+            self.vm_config["audio_device"] = "ac97"
+            qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
+            self.assertIn("AC97", qemu_cmd)
+            self.assertNotIn("hda-duplex", qemu_cmd)
+            self.vm_config["audio_device"] = "sb16"
+            with self.assertRaises(vmctl.errors.VMError):
+                self.vmctl.common_args(self.vm_config, variant=None, dry_run=True)
+
     def test_common_args_enables_clipboard_agent_for_graphical_vm(self):
         self.create_disk()
         self.vm_config["clipboard"] = True

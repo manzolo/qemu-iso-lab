@@ -39,7 +39,7 @@ order. Output goes to `artifacts/<vm>/logs/post-install.*.log`.
 | Section | Fields |
 |---------|--------|
 | `cloud_init` | `hostname`, `user`, `ssh_authorized_keys`, `ssh_authorized_keys_file`, `ssh_key`, `ssh_host_port`, `packages`, `runcmd`, `write_files`, `copy_from_host`, `post_install_run` |
-| `ssh_provision` | `hostname`, `user`, `ssh_key`, `ssh_host_port`, `sudo_password`, `copy_from_host`, `post_install_run` |
+| `ssh_provision` | `hostname`, `user`, `ssh_key`, `key_type`, `ssh_options`, `ssh_host_port`, `sudo_password`, `copy_from_host`, `post_install_run` |
 | `autoinstall` (Ubuntu) | `hostname`, `username`, `realname`, `password_hash`, `timezone`, `keyboard_layout`, `storage_layout`, `install_ssh` |
 | `archinstall_config` (Arch, CachyOS) | `hostname`, `username`, `password`, `timezone`, `keyboard_layout`, `locale_lang`, `locale_enc`, `bootloader`, `kernels`, `audio`, `packages`, `bootstrap_chroot_commands`, `inherit_live_pacman_conf`, `live_login_prompt`, `live_shell_prompt`, `live_kernel_append` (derivatives; see [UNATTENDED.md](UNATTENDED.md#cachyos-on-the-same-flow)) |
 | `preseed_config` (Debian) | `hostname`, `domain`, `username`, `fullname`, `password_hash` or `password`, `timezone`, `keyboard_layout`, `locale`, `language`, `country`, `mirror_hostname`, `mirror_directory`, `tasks`, `packages`, `late_commands`, `disk_device` |
@@ -47,6 +47,13 @@ order. Output goes to `artifacts/<vm>/logs/post-install.*.log`.
 | `alpine_config` (Alpine) | `hostname`, `username`, `password_hash`, `timezone`, `keyboard_layout`, `keyboard_variant`, `user_groups`, `ntp`, `disk_device`, `kernel_flavor` (`lts` or `virt`), `kernel_opts`, `packages`, `optional_packages`, `chroot_commands` |
 | `omarchy_config` | `hostname`, `username`, `password_hash`, `timezone`, `keyboard_layout`, `locale`, `disk_device`, `encrypt` |
 | `windows_config` (Windows 10/11) | `username`, `password` (plain text), `realname`, `computer_name`, `organization`, `edition` or `image_index`, `product_key`, `language`, `input_locale`, `timezone`, `driver_flavor`, `bypass_requirements`, `auto_logon`, `install_guest_tools`, `install_openssh`, `virtio_iso`, `virtio_iso_url`, `setup_commands` (PowerShell). With `ssh_provision`, `post_install_run` runs in cmd.exe and `copy_from_host` is a plain `scp -r` (no `sudo`/`dest_mode`) |
+
+`key_type` (`ed25519`, the default, or `rsa`) selects the generated key: an sshd older than
+OpenSSH 6.5 (Ubuntu 12.04 and earlier) does not know ed25519. `ssh_options` is a list of
+extra `-o Keyword=value` settings for every ssh/scp call; the Ubuntu 8.04-12.04 profiles use
+`HostKeyAlgorithms=+ssh-rsa`, `PubkeyAcceptedAlgorithms=+ssh-rsa` and
+`KexAlgorithms=+diffie-hellman-group-exchange-sha256`, which a current OpenSSH client has
+disabled by default and those servers require (SHA-1 signatures, no ECDH).
 
 `ssh_key` may be `null`: `vmctl` then generates a key pair under
 `artifacts/<vm>/ssh/` and injects the public half through the answer file.

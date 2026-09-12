@@ -14,8 +14,21 @@ from vmctl import cloud_init, flash, qemu, runtime, ui
 from vmctl.errors import VMError
 
 
+SSH_KEY_TYPES = ("ed25519", "rsa")
+
+
+def ssh_key_type(vm: dict[str, Any]) -> str:
+    """``ssh_provision.key_type``: ``ed25519`` (default) or ``rsa`` for guests whose sshd predates
+    ed25519 (OpenSSH < 6.5, i.e. Ubuntu 12.04 and older); see also ``ssh_options``."""
+    cfg = vm.get("ssh_provision") if isinstance(vm.get("ssh_provision"), dict) else None
+    key_type = str((cfg or {}).get("key_type") or "ed25519")
+    if key_type not in SSH_KEY_TYPES:
+        raise VMError(f"Unsupported ssh_provision.key_type '{key_type}'. Choices: {', '.join(SSH_KEY_TYPES)}")
+    return key_type
+
+
 def generated_ssh_key_path(vm: dict[str, Any]) -> Path:
-    return runtime.resolve_path(vm["disk"]["path"]).parent / "ssh" / "id_ed25519"
+    return runtime.resolve_path(vm["disk"]["path"]).parent / "ssh" / f"id_{ssh_key_type(vm)}"
 
 
 def _configured_ssh_key(cfg: dict[str, Any]) -> Path | None:
@@ -41,7 +54,9 @@ def ensure_generated_ssh_keypair(vm: dict[str, Any], dry_run: bool = False) -> P
         return private
     runtime.require_command("ssh-keygen")
     comment = str(vm.get("name") or vm.get("archinstall_config", {}).get("hostname") or "vmctl")
-    runtime.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", f"vmctl {comment}", "-f", str(private)])
+    key_type = ssh_key_type(vm)
+    bits = ["-b", "3072"] if key_type == "rsa" else []
+    runtime.run(["ssh-keygen", "-q", "-t", key_type, *bits, "-N", "", "-C", f"vmctl {comment}", "-f", str(private)])
     return private
 
 
@@ -105,6 +120,13 @@ def ssh_target(vm: dict[str, Any]) -> tuple[str, int, str]:
 
 def _ssh_common_opts(cfg: dict[str, Any], dry_run: bool = False) -> list[str]:
     opts = ["-F", "/dev/null", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
+    # ``ssh_options``: extra ``-o`` settings for legacy guests, e.g. ``HostKeyAlgorithms=+ssh-rsa`` and
+    # ``PubkeyAcceptedAlgorithms=+ssh-rsa`` for an sshd that only signs with SHA-1 (OpenSSH < 7.2).
+    for option in cfg.get("ssh_options") or []:
+        text = str(option).strip()
+        if not text or "=" not in text:
+            raise VMError(f"Invalid ssh_options entry {option!r}: expected 'Keyword=value'")
+        opts += ["-o", text]
     return opts
 
 
@@ -156,7 +178,9 @@ def wait_for_ssh(vm: dict[str, Any], timeout_sec: int, dry_run: bool = False, pr
                 check=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                timeout=5,
+                # A closed port fails instantly; the timeout only bites on an sshd that is up but
+                # slow to answer (a legacy guest doing a reverse lookup took 5 s, verified live).
+                timeout=15,
             )
             if result.returncode == 0:
                 return
@@ -235,8 +259,11 @@ def wait_for_guest_post_install_ready(
     )
 
     ui.print_note("Waiting for package manager activity to settle")
+    # ``apt`` by command line, not by process name: on Ubuntu <= 12.04 the daily cron script is
+    # ``/bin/sh /etc/cron.daily/apt``, whose comm is "apt" and which sleeps up to 30 minutes before
+    # running (verified live: the wait sat on it for the whole random delay).
     package_wait = (
-        "while pgrep -x apt >/dev/null || "
+        "while pgrep -f '^(/usr/bin/)?apt( |$)' >/dev/null || "
         "pgrep -x apt-get >/dev/null || "
         "pgrep -x dpkg >/dev/null; do "
         "sleep 2; "

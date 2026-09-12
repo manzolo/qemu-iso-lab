@@ -62,6 +62,33 @@ class PostInstallTests(BaseVmctlTestCase):
         self.assertIn("-i", cmd)
         self.assertIn(str(self.root / "artifacts/testvm/ssh/id_ed25519"), cmd)
 
+    def test_ssh_provision_key_type_and_ssh_options_for_legacy_sshd(self):
+        self.vm_config["ssh_provision"] = {
+            "user": "tester",
+            "ssh_host_port": 2223,
+            "key_type": "rsa",
+            "ssh_options": ["HostKeyAlgorithms=+ssh-rsa", "PubkeyAcceptedAlgorithms=+ssh-rsa"],
+        }
+
+        cmd = self.vmctl.ssh_base_cmd(self.vm_config, dry_run=True)
+        self.assertIn(str(self.root / "artifacts/testvm/ssh/id_rsa"), cmd)
+        self.assertEqual(cmd.count("-o"), 5)
+        self.assertIn("HostKeyAlgorithms=+ssh-rsa", cmd)
+        self.assertIn("PubkeyAcceptedAlgorithms=+ssh-rsa", cmd)
+        self.assertIn("PubkeyAcceptedAlgorithms=+ssh-rsa", self.vmctl.scp_base_cmd(self.vm_config, dry_run=True))
+
+        with mock.patch.object(vmctl.runtime, "run") as run, mock.patch.object(vmctl.runtime, "require_command"):
+            self.vmctl.ensure_generated_ssh_keypair(self.vm_config)
+        keygen = run.call_args[0][0]
+        self.assertEqual(keygen[:5], ["ssh-keygen", "-q", "-t", "rsa", "-b"])
+
+        self.vm_config["ssh_provision"]["ssh_options"] = ["no-equals-sign"]
+        with self.assertRaises(self.vmctl.VMError):
+            self.vmctl.ssh_base_cmd(self.vm_config, dry_run=True)
+        self.vm_config["ssh_provision"].update(ssh_options=[], key_type="dsa")
+        with self.assertRaises(self.vmctl.VMError):
+            self.vmctl.ssh_base_cmd(self.vm_config, dry_run=True)
+
     def test_ssh_shell_cmd_omits_batch_mode(self):
         self.vm_config["cloud_init"] = {
             "user": "tester",

@@ -320,7 +320,20 @@ input_box() {
 }
 
 pause_box() {
-    read -r -p "Press Enter to continue..." _ || true
+    # Enter or Esc both dismiss the pause; other keys are ignored. An escape sequence (arrow keys)
+    # starts with Esc too, so its trailing bytes are drained instead of leaking into the next menu.
+    local key
+    printf 'Press Enter or Esc to continue...'
+    while IFS= read -r -s -n1 key; do
+        if [[ -z $key ]]; then
+            break
+        fi
+        if [[ $key == $'\e' ]]; then
+            read -r -s -t 0.1 -n 16 _ || true
+            break
+        fi
+    done
+    printf '\n'
 }
 
 # ---------------------------------------------------------------------------

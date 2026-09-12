@@ -57,7 +57,7 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | `memory_mb`, `cpus` | Guest RAM and vCPUs |
 | `network` | `user` (slirp with optional SSH port forward) |
 | `networks` | Optional list of NICs replacing the single slirp one: `{"type": "user", "hostfwd": [{"host_port": 8080, "guest_port": 80}]}` (slirp; the first user NIC carries the `ssh_host_port` forward unless `"ssh": false`) or `{"type": "segment", "name": "lab-lan"}` (a host-local L2 segment shared by every VM naming it: multicast socket on plain QEMU, libvirt network after export). `phase` = `install`, `runtime` or `both` (default): install NICs exist only during a bootstrap and its SSH post-install, runtime NICs afterwards; a NIC keeps its slot and MAC (`mac`, or derived from disk path + slot) across phases. See [NETWORK-LAB.md](NETWORK-LAB.md). |
-| `audio` | Attach an audio device |
+| `audio`, `audio_device` | Attach an audio device: `hda` (Intel HD Audio, default) or `ac97` for guests without an HDA driver (ReactOS, Windows XP and older) |
 | `usb_tablet` | Absolute pointer for graphical guests |
 | `guest_agent` | Optional boolean (default `false`). Adds a QEMU guest agent channel; see [Guest agent](#guest-agent). |
 | `shared_dir` | Host folder shared with the guest over virtiofs: `{"source": "shared", "tag": "shared"}`. `source` is `~`-expanded, relative paths live under the repository (the default `shared/` is git-ignored). Needs `virtiofsd` on the host; every QEMU launch starts one per VM and the guest RAM becomes a shared memfd backend. On Linux guests the SSH post-install adds `/mnt/<tag>` to fstab (systemd automount), mounts it and links it as `~/<tag>` and on the desktop (`xdg-user-dir DESKTOP`, `Desktop` or `Scrivania`), like kvm-lab; Windows profiles get WinFSP + `VirtioFsSvc` at first logon, the share appears as a drive letter and a `<tag>.lnk` shortcut lands on the desktop. |
@@ -183,7 +183,7 @@ disk instead of booting an installer.
 | `path` | Relative to the repository root, conventionally `artifacts/<vm>/disk.qcow2` |
 | `size` | `qemu-img` size string, e.g. `32G` |
 | `format` | `qcow2` (default) or `vhd` for disks meant to travel to Ventoy or another hypervisor |
-| `interface` | `virtio` for Linux guests, `sata` when the guest has no virtio driver at first boot (Windows) |
+| `interface` | `virtio` for Linux guests, `sata` (AHCI) when the guest has no virtio driver at first boot (Windows), `ide` (PATA on the `pc` machine's own controller) for guests older than both, e.g. Ubuntu 8.04 or ReactOS |
 
 `vmctl prep` creates the disk without booting anything; `vmctl clean` stops the
 VM first and then removes it together with the other artifacts.

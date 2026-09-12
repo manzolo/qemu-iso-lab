@@ -12,6 +12,7 @@ import vmctl.autoyast  # noqa: E402
 import vmctl.config  # noqa: E402
 import vmctl.kickstart  # noqa: E402
 import vmctl.netlab  # noqa: E402
+import vmctl.preseed  # noqa: E402
 import vmctl.state  # noqa: E402
 import vmctl.windows  # noqa: E402
 
@@ -61,6 +62,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "rocky-9",
             "fedora-silverblue",
             "opensuse-tumbleweed-autoyast",
+            "ubuntu-8.04-desktop",
+            "ubuntu-24.04-desktop",
+            "reactos",
         ):
             self.assertIn(profile, cfg["vms"])
 
@@ -75,9 +79,12 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "windows11-unattended",
         }
         verified_templates = {"windows10-template", "windows11-template"}
+        # The Ubuntu desktop history: clean reinstall of each with the final recipe on 2026-09-12.
+        verified_history = {f"ubuntu-{v}-unattended" for v in ("8.04", "10.04", "12.04", "14.04")}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
-            expected_date = "2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates else None
+            expected_date = ("2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
+                             else "2026-09-12" if name in verified_history else None)
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
         # Promoted on 2026-09-09: verify-desktop reported an active local graphical session for
         # the autologin user on the live matrix, which is what the flavor recipe has to prove.
@@ -132,6 +139,47 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         self.assertEqual(tumbleweed["autoyast_config"]["username"], "lab")
         self.assertEqual(tumbleweed["installer_boot"]["kernel"], "boot/x86_64/loader/linux")
         self.assertIn("<pattern>gnome</pattern>", vmctl.autoyast.render_autoyast("opensuse-tumbleweed-autoyast", tumbleweed))
+
+        # Ubuntu desktop LTS history: one manual profile per LTS from 8.04 to 24.04, every ISO
+        # pinned to the vendor SHA256SUMS (old-releases for the EOL ones, see docs/ISO_CHECKSUMS.md).
+        lts = ("8.04", "10.04", "12.04", "14.04", "16.04", "18.04", "20.04", "22.04", "24.04")
+        for version in lts:
+            vm = cfg["vms"][f"ubuntu-{version}-desktop"]
+            self.assertEqual(vm["meta"]["status"], "manual")
+            self.assertRegex(vm["iso_sha256"], r"^[0-9a-f]{64}$")
+            self.assertEqual(Path(vm["iso"]).name, vm["iso_url"].rsplit("/", 1)[1])
+            self.assertIn(f"ubuntu-{version}", vm["iso_url"])
+            self.assertIn("old-releases.ubuntu.com" if version < "14.04" else "releases.ubuntu.com", vm["iso_url"])
+        # Kernel 2.6.24 has no virtio drivers: PATA disk and e1000 on a BIOS pc machine.
+        hardy = cfg["vms"]["ubuntu-8.04-desktop"]
+        self.assertEqual((hardy["disk"]["interface"], hardy["network_device"], hardy["firmware"]["type"], hardy["machine"]), ("ide", "e1000", "bios", "pc"))
+        self.assertEqual(cfg["vms"]["ubuntu-10.04-desktop"]["disk"]["interface"], "virtio")
+
+        # The unattended counterparts ride bootstrap-preseed on the d-i media (alternate CDs, the
+        # 14.04 server ISO): desktop task, EOL mirror, and legacy SSH for the pre-6.5 sshd guests.
+        for version, port, legacy in (("8.04", 2252, True), ("10.04", 2253, True), ("12.04", 2254, True), ("14.04", 2255, False)):
+            vm = cfg["vms"][f"ubuntu-{version}-unattended"]
+            self.assertEqual(vm["meta"]["status"], "unattended")
+            self.assertEqual(vm["ssh_provision"]["ssh_host_port"], port)
+            desktop = vm["preseed_config"]["tasks"] + vm["preseed_config"]["packages"]
+            self.assertIn("ubuntu-desktop", desktop)
+            # pgrep -x sees the 15-character comm, so the 8.04 session manager is "x-session-manag".
+            self.assertIn("x-session-manag(er)?", vm["ssh_provision"]["post_install_run"][0])
+            self.assertEqual(vm["preseed_config"]["username"], "lab")
+            self.assertEqual(vm["installer_boot"], {"kernel": "install/vmlinuz", "initrd": "install/initrd.gz"})
+            self.assertEqual(vm["preseed_config"]["mirror_hostname"], "archive.ubuntu.com" if version == "14.04" else "old-releases.ubuntu.com")
+            self.assertEqual(vm["ssh_provision"].get("key_type"), "rsa" if legacy else None)
+            self.assertEqual("ssh_options" in vm["ssh_provision"], legacy)
+            self.assertIn("lab", vmctl.preseed.render_preseed(f"ubuntu-{version}-unattended", vm))
+        self.assertEqual(cfg["vms"]["ubuntu-8.04-unattended"]["preseed_config"]["disk_device"], "auto")
+        self.assertEqual(cfg["vms"]["ubuntu-8.04-unattended"]["disk"]["interface"], "ide")
+
+        # ReactOS: no virtio storage driver, no UEFI, no SMP in the release; user-supplied ISO
+        # (SourceForge ships it zipped), sha256 is a repository pin.
+        reactos = cfg["vms"]["reactos"]
+        self.assertEqual((reactos["disk"]["interface"], reactos["network_device"], reactos["firmware"]["type"], reactos["cpus"]), ("ide", "e1000", "bios", 1))
+        self.assertEqual((reactos["audio"], reactos["audio_device"]), (True, "ac97"))
+        self.assertNotIn("iso_url", reactos)
 
         # Windows 7: BIOS, e1000e (no NetKVM needed), no SSH (no OpenSSH on 7), generic identity.
         w7 = cfg["vms"]["windows7-unattended"]

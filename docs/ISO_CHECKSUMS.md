@@ -29,6 +29,19 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `popos-cosmic` | `pop-os_24.04_amd64_generic_22.iso` | [Manifest](https://iso.pop-os.org/24.04/amd64/generic/22/SHA256SUMS) |
 | `rocky-9` | `Rocky-9.8-x86_64-minimal.iso` | [Manifest](https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-minimal.iso.CHECKSUM) |
 | `ubuntu-budgie-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
+| `ubuntu-8.04-desktop` | `ubuntu-8.04.4-desktop-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/8.04.4/SHA256SUMS) |
+| `ubuntu-10.04-desktop` | `ubuntu-10.04.4-desktop-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/10.04.4/SHA256SUMS) |
+| `ubuntu-12.04-desktop` | `ubuntu-12.04.5-desktop-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/12.04.5/SHA256SUMS) |
+| `ubuntu-14.04-desktop` | `ubuntu-14.04.6-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/14.04/SHA256SUMS) |
+| `ubuntu-16.04-desktop` | `ubuntu-16.04.7-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/16.04/SHA256SUMS) |
+| `ubuntu-18.04-desktop` | `ubuntu-18.04.6-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/18.04/SHA256SUMS) |
+| `ubuntu-20.04-desktop` | `ubuntu-20.04.6-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/20.04/SHA256SUMS) |
+| `ubuntu-22.04-desktop` | `ubuntu-22.04.5-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04/SHA256SUMS) |
+| `ubuntu-24.04-desktop` | `ubuntu-24.04.4-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04/SHA256SUMS) |
+| `ubuntu-8.04-unattended` | `ubuntu-8.04.4-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/8.04.4/SHA256SUMS) |
+| `ubuntu-10.04-unattended` | `ubuntu-10.04.4-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/10.04.4/SHA256SUMS) |
+| `ubuntu-12.04-unattended` | `ubuntu-12.04.5-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/12.04.5/SHA256SUMS) |
+| `ubuntu-14.04-unattended` | `ubuntu-14.04.6-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/14.04/SHA256SUMS) |
 | `ubuntu-desktop-live` | `ubuntu-26.04-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
 | `ubuntu-mate-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `ubuntu-niri` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
@@ -37,7 +50,11 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `void-xfce` | `void-live-x86_64-20250202-xfce.iso` | [Manifest](https://repo-default.voidlinux.org/live/current/sha256sum.txt) |
 | `xubuntu-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 
-Discovery remains enabled for `alpine-niri` and `fedora-niri-dms`; neither is a pinned image even though its fallback URL contains a version. They intentionally have no static checksum. Rolling/current images (Arch, CachyOS, openSUSE, KDE neon and NixOS) are unchanged. Windows and pfSense use user-supplied media without a vendor checksum source in the catalog. EndeavourOS is also supplied locally. Omarchy retains its existing pinned checksum.
+Discovery remains enabled for `alpine-niri` and `fedora-niri-dms`; neither is a pinned image even though its fallback URL contains a version. They intentionally have no static checksum. Rolling/current images (Arch, CachyOS, openSUSE, KDE neon and NixOS) are unchanged. The `ubuntu-*-desktop` and `ubuntu-*-unattended` history profiles were pinned on 2026-09-12 from the same vendor manifests (old-releases.ubuntu.com for the EOL releases).
+
+`reactos` is user-supplied media: SourceForge ships `ReactOS-0.4.16-i386.zip` (unzip it into `isos/`) and publishes no SHA-256 for the ISO inside. Its `iso_sha256` (`6f15ca6e…6855` for the 406,847,488-byte ISO, zip `e5851510…4ce2a`) was measured from that download on 2026-09-12: a repository content pin, not a vendor checksum.
+
+Windows and pfSense use user-supplied media without a vendor checksum source in the catalog. EndeavourOS is also supplied locally. Omarchy retains its existing pinned checksum.
 
 Run the read-only cache audit against the checkout that owns the ISOs:
 

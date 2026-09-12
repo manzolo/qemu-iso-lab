@@ -128,7 +128,34 @@ def disk_args(vm: dict[str, Any], allow_missing: bool = False, bootindex: int | 
         return ["-drive", f"id=disk0,file={disk_path},format={disk['format']},if=none", "-device", f"virtio-blk-pci,drive=disk0{boot}"]
     if interface == "sata":
         return ["-device", "ich9-ahci,id=ahci0", "-drive", f"id=disk0,file={disk_path},format={disk['format']},if=none", "-device", f"ide-hd,drive=disk0,bus=ahci0.0{boot}"]
+    if interface == "ide":
+        # Parallel ATA on the machine's own controller (PIIX3 on ``pc``): guests older than virtio and
+        # AHCI, such as Ubuntu 8.04 (kernel 2.6.24) or ReactOS. The installer CD (``-cdrom``) lands on
+        # the secondary channel, so the disk always takes primary master.
+        if bootindex is None:
+            return ["-drive", f"file={disk_path},format={disk['format']},if=ide,index=0"]
+        return ["-drive", f"id=disk0,file={disk_path},format={disk['format']},if=none", "-device", f"ide-hd,drive=disk0,bus=ide.0,unit=0{boot}"]
     raise VMError(f"Unsupported disk interface: {interface}")
+
+
+AUDIO_DEVICES: dict[str, list[str]] = {
+    # Intel HD Audio: every Linux guest since 2.6.x and Windows Vista+.
+    "hda": ["-device", "ich9-intel-hda", "-device", "hda-duplex"],
+    # AC'97: guests without an HDA driver (ReactOS, Windows XP and older).
+    "ac97": ["-device", "AC97"],
+}
+
+
+def audio_device(vm: dict[str, Any]) -> str:
+    """The profile's ``audio_device`` (``hda`` by default), validated against AUDIO_DEVICES."""
+    device = str(vm.get("audio_device") or "hda")
+    if device not in AUDIO_DEVICES:
+        raise VMError(f"Unsupported audio_device '{device}'. Choices: {', '.join(sorted(AUDIO_DEVICES))}")
+    return device
+
+
+def audio_args(vm: dict[str, Any]) -> list[str]:
+    return list(AUDIO_DEVICES[audio_device(vm)])
 
 
 def video_args(vm: dict[str, Any], variant: str | None) -> list[str]:
@@ -631,7 +658,7 @@ def common_args(
     if vm.get("usb_tablet"):
         args += ["-usb", "-device", "qemu-xhci", "-device", "usb-tablet"]
     if vm.get("audio"):
-        args += ["-device", "ich9-intel-hda", "-device", "hda-duplex"]
+        args += audio_args(vm)
     if enable_clipboard and vm.get("clipboard") and not headless and spice_port is None:
         args += ["-device", "virtio-serial-pci", "-chardev", "qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on",
                  "-device", "virtserialport,chardev=vdagent0,name=com.redhat.spice.0"]

@@ -1,0 +1,54 @@
+{
+  "vms": {
+    "reactos": {
+      "name": "ReactOS 0.4.16",
+      "meta": {
+        "slug": "reactos",
+        "family": "reactos",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "manual"
+      },
+      "iso": "isos/ReactOS-0.4.16-i386.iso",
+      "disk": {
+        "path": "artifacts/reactos/disk.qcow2",
+        "size": "8G",
+        "format": "qcow2",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 1024,
+      "cpus": 1,
+      "network": "user",
+      "network_device": "e1000",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": false,
+      "iso_sha256": "6f15ca6e1edf5527b8489958d16c54f0da0e7948c305d7c89e74687c6cbf6855",
+      "audio_device": "ac97"
+    }
+  }
+}

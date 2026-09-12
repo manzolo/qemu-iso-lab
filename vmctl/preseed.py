@@ -110,13 +110,24 @@ log "Sudoers setup..."
 # directly so this works regardless of distro group conventions.
 echo '{username} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/nopasswd-{username} || log "WARN: sudoers write failed"
 chmod 0440 /etc/sudoers.d/nopasswd-{username} || true
+# The drop-in alone is not enough everywhere: Ubuntu 8.04's sudo 1.6.9 has no #includedir, and
+# Ubuntu 10.04 lists '%admin ALL=(ALL) ALL' *after* the includedir, so the last matching rule
+# asks for a password again (verified live). The same rule as the last line of /etc/sudoers wins.
+grep -qxF '{username} ALL=(ALL) NOPASSWD: ALL' /etc/sudoers || echo '{username} ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers || log "WARN: sudoers append failed"
 usermod -aG sudo {username} || log "WARN: usermod sudo failed"
+
+# Old sshd (Ubuntu <= 12.04) defaults to UseDNS yes and spends 5 s on a reverse lookup of the slirp
+# host address before every authentication (verified live), longer than the host's SSH probe.
+if [ -f /etc/ssh/sshd_config ]; then
+    grep -q '^UseDNS' /etc/ssh/sshd_config || echo 'UseDNS no' >> /etc/ssh/sshd_config || log "WARN: sshd_config append failed"
+fi
 
 {custom_commands_block}
 
 log "Syncing and flushing buffers..."
 sync
 blockdev --flushbufs /dev/vda /dev/vda1 /dev/vda2 || true
+for dev in /dev/[hs]d[a-z] /dev/[hs]d[a-z][0-9]*; do [ -b "$dev" ] && blockdev --flushbufs "$dev"; done 2>/dev/null || true
 log "DONE"
 echo "{BOOTSTRAP_COMPLETE_TOKEN}" > /dev/console 2>&1 || true
 echo "{BOOTSTRAP_COMPLETE_TOKEN}"
@@ -144,11 +155,25 @@ def render_preseed(vm_name: str, vm: dict[str, Any]) -> str:
     tasks = " ".join(cfg.get("tasks") or ["standard"])
     packages = " ".join(cfg.get("packages") or ["openssh-server", "sudo", "curl", "ca-certificates"])
     disk_device = str(cfg.get("disk_device") or "/dev/vda").strip()
+    upgrade = str(cfg.get("upgrade") or "full-upgrade").strip()
+    extra_lines = [str(line) for line in (cfg.get("extra") or [])]
 
     if not username:
         raise VMError("preseed_config.username is required")
     if not password_hash and not password:
         raise VMError("preseed_config.password_hash or password is required")
+    if upgrade not in ("none", "safe-upgrade", "full-upgrade"):
+        raise VMError(f"preseed_config.upgrade must be none, safe-upgrade or full-upgrade, not '{upgrade}'")
+
+    # disk_device "auto": let partman pick the only disk itself (the name depends on the guest's
+    # kernel: /dev/hda on the old IDE drivers, /dev/sda on libata) and point grub at (hd0).
+    if disk_device == "auto":
+        partman_disk = ""
+        grub_bootdev = str(cfg.get("grub_bootdev") or "(hd0)").strip()
+    else:
+        partman_disk = f"d-i partman-auto/disk string {disk_device}\n"
+        grub_bootdev = str(cfg.get("grub_bootdev") or disk_device).strip()
+    extra_block = ("\n# preseed_config.extra\n" + "\n".join(extra_lines) + "\n") if extra_lines else ""
 
     pw_directive = ""
     if password_hash:
@@ -163,6 +188,8 @@ d-i debian-installer/locale string {locale}
 d-i debian-installer/language string {language}
 d-i debian-installer/country string {country}
 d-i keyboard-configuration/xkb-keymap select {kb_layout}
+d-i console-setup/layoutcode string {kb_layout}
+d-i console-setup/ask_detect boolean false
 d-i debconf/priority string critical
 
 d-i netcfg/choose_interface select auto
@@ -178,13 +205,14 @@ d-i passwd/root-login boolean false
 d-i passwd/user-fullname string {fullname}
 d-i passwd/username string {username}
 {pw_directive}
+d-i user-setup/encrypt-home boolean false
+d-i user-setup/allow-password-weak boolean true
 
 d-i clock-setup/utc boolean true
 d-i time/zone string {timezone}
 d-i clock-setup/ntp boolean true
 
-d-i partman-auto/disk string {disk_device}
-d-i partman-auto/method string regular
+{partman_disk}d-i partman-auto/method string regular
 d-i partman-auto/choose_recipe select atomic
 d-i partman-partitioning/confirm_write_new_label boolean true
 d-i partman/choose_partition select finish
@@ -194,17 +222,17 @@ d-i partman/confirm_nooverwrite boolean true
 d-i apt-setup/cdrom/set-first boolean false
 tasksel tasksel/first multiselect {tasks}
 d-i pkgsel/include string {packages}
-d-i pkgsel/upgrade select full-upgrade
+d-i pkgsel/upgrade select {upgrade}
 
 d-i grub-installer/only_debian boolean true
 d-i grub-installer/with_other_os boolean true
-d-i grub-installer/bootdev  string {disk_device}
+d-i grub-installer/bootdev  string {grub_bootdev}
 
 d-i preseed/late_command string cp /late_command.sh /target/tmp/late_command.sh; chmod +x /target/tmp/late_command.sh; in-target /tmp/late_command.sh
 
 d-i finish-install/reboot_in_progress note
 d-i debian-installer/exit/poweroff boolean true
-"""
+{extra_block}"""
 
 
 def _inject_files_into_initrd(initrd_path: Path, files: dict[str, str]) -> None:

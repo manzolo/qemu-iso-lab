@@ -31,6 +31,18 @@ class LibvirtTests(BaseVmctlTestCase):
         self.assertEqual(xml.find("devices/interface/model").get("type"), "e1000e")
         self.assertEqual(xml.find("devices/disk/source").get("file"), str(self.root / self.vm_config["disk"]["path"]))
 
+    def test_bios_ide_xml(self):
+        self.vm_config["disk"].update(interface="ide")
+        self.vm_config["network_device"] = "e1000"
+        xml = ET.fromstring(libvirt.render_domain_xml("retro", self.vm_config))
+        self.assertEqual(xml.find("devices/disk/target").get("bus"), "ide")
+        self.assertEqual(xml.find("devices/disk/target").get("dev"), "hda")
+        self.assertEqual(xml.find("devices/interface/model").get("type"), "e1000")
+        self.assertIsNone(xml.find("devices/sound"))
+        self.vm_config.update(audio=True, audio_device="ac97")
+        xml = ET.fromstring(libvirt.render_domain_xml("retro", self.vm_config))
+        self.assertEqual(xml.find("devices/sound").get("model"), "ac97")
+
     def test_efi_shared_windows_xml(self):
         code, template, nvram = [self.root / name for name in ("code.fd", "template.fd", "vars.fd")]
         self.vm_config.update(firmware={"type": "efi"}, shared_dir={"source": "share & files", "tag": "shared"},

@@ -47,12 +47,12 @@ def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
     disk = vm["disk"]
     fmt = str(disk["format"])
     bus = str(disk.get("interface", "virtio"))
-    if bus not in ("virtio", "sata") or fmt not in ("qcow2", "vhd", "vpc", "raw"):
+    if bus not in ("virtio", "sata", "ide") or fmt not in ("qcow2", "vhd", "vpc", "raw"):
         raise VMError(f"Unsupported libvirt disk format/interface: {fmt}/{bus}")
     node = ET.SubElement(devices, "disk", type="file", device="disk")
     ET.SubElement(node, "driver", name="qemu", type="vpc" if fmt == "vhd" else fmt)
     ET.SubElement(node, "source", file=str(runtime.resolve_path(disk["path"]).resolve()))
-    ET.SubElement(node, "target", dev="vda" if bus == "virtio" else "sda", bus=bus)
+    ET.SubElement(node, "target", dev={"virtio": "vda", "sata": "sda", "ide": "hda"}[bus], bus=bus)
     for spec in qemu.network_specs(vm, "runtime"):
         # slirp NICs land on libvirt's default NAT network; segment NICs on the libvirt network of
         # the same name (created by export when missing, see ensure_segment_networks).
@@ -67,7 +67,7 @@ def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
     video = ET.SubElement(devices, "video")
     ET.SubElement(video, "model", type="virtio" if vm.get("video", {}).get("default") == "virtio-gl" else "qxl")
     if vm.get("audio"):
-        ET.SubElement(devices, "sound", model="ich9")
+        ET.SubElement(devices, "sound", model={"hda": "ich9", "ac97": "ac97"}[qemu.audio_device(vm)])
     if vm.get("usb_tablet"):
         ET.SubElement(devices, "controller", type="usb", model="qemu-xhci")
         ET.SubElement(devices, "input", type="tablet", bus="usb")

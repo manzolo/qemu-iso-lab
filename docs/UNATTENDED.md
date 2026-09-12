@@ -81,6 +81,30 @@ Renders `preseed.cfg` into a `PRESEED_CFG` seed ISO, extracts `vmlinuz` and
 `initrd.gz`, boots the Debian installer with the preseed kernel arguments and
 waits for `==> Debian preseed install complete!` on the serial console.
 
+The same flow installs the Ubuntu desktop history profiles (`ubuntu-8.04-unattended` to
+`ubuntu-14.04-unattended`) from the d-i media, the alternate CDs and the 14.04 server ISO
+(`installer_boot` = `install/vmlinuz` + `install/initrd.gz`), with the `ubuntu-desktop` task.
+`preseed_config` knobs added for them: `upgrade` (`none`, `safe-upgrade`, `full-upgrade`),
+`extra` (raw preseed lines, e.g. an empty `apt-setup/services-select` because the EOL
+archives on old-releases.ubuntu.com have no security pocket on the vendor host), and
+`disk_device: "auto"` for a guest whose disk name the profile cannot predict (the 8.04
+installer carries both the old IDE drivers and libata): partman then picks the only disk
+and GRUB goes to `(hd0)` (`grub_bootdev` overrides it). The late command flushes the named
+disk and every `/dev/[hs]d*` it finds before the completion token. Autologin (GDM 2.x or
+LightDM) and the `ttyS0` getty come from `late_commands`. The late command writes the
+NOPASSWD rule both as a `sudoers.d` drop-in and as the last line of `/etc/sudoers`: 8.04 has no
+`#includedir` and 10.04 lists `%admin` after it, so the drop-in alone still asked for a password.
+The 14.04 server medium does not install the `ubuntu-desktop` *task*; the metapackage goes
+through `pkgsel/include` instead. The desktop check accepts `x-session-manager`, the name the
+8.04 session runs under, spelled as the 15-character comm `x-session-manag` that `pgrep -x` compares against.
+The late command also appends `UseDNS no` to `sshd_config`: the old sshd spent 5 s on a reverse
+lookup of the slirp host before each login and the host's SSH probe gave up first (verified
+live). The screensaver lock is disabled (gconf mandatory keys on GNOME 2, a gschema override
+on Unity) so the autologin session stays visible. APT's periodic cron job is disabled too: on these releases it is a shell script named `apt`
+that sleeps up to 30 minutes before `apt-get update`, and the post-install wait for package
+manager activity used to sit on it (it now matches `apt` by command line). `release-upgrades` is set to `Prompt=never`, or update-manager greets the first login of an EOL
+release with an upgrade offer and an "is not supported anymore" dialog (verified on 12.04).
+
 ## AlmaLinux / RHEL / Fedora: kickstart
 
 ```bash

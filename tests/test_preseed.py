@@ -50,6 +50,36 @@ class PreseedConfigTests(BaseVmctlTestCase):
         rendered = vmctl.preseed.render_preseed(self.vm_name, self.vm_config)
         self.assertIn("d-i pkgsel/include string openssh-server sudo curl ca-certificates", rendered)
 
+    def test_render_preseed_upgrade_extra_and_auto_disk(self):
+        self._preseed_vm()
+        cfg = self.vm_config["preseed_config"]
+        rendered = vmctl.preseed.render_preseed(self.vm_name, self.vm_config)
+        self.assertIn("d-i partman-auto/disk string /dev/vda", rendered)
+        self.assertIn("d-i grub-installer/bootdev  string /dev/vda", rendered)
+        self.assertIn("d-i pkgsel/upgrade select full-upgrade", rendered)
+        # Ubuntu d-i (alternate/server ISOs): no fixed disk name, no security pocket on EOL archives.
+        cfg.update(disk_device="auto", upgrade="none", extra=["d-i apt-setup/services-select multiselect"])
+        rendered = vmctl.preseed.render_preseed(self.vm_name, self.vm_config)
+        self.assertNotIn("partman-auto/disk", rendered)
+        self.assertIn("d-i grub-installer/bootdev  string (hd0)", rendered)
+        self.assertIn("d-i pkgsel/upgrade select none", rendered)
+        self.assertIn("\nd-i apt-setup/services-select multiselect\n", rendered)
+        self.assertIn("d-i console-setup/layoutcode string it", rendered)
+        self.assertIn("d-i user-setup/encrypt-home boolean false", rendered)
+        cfg["upgrade"] = "dist-upgrade"
+        with self.assertRaises(vmctl.preseed.VMError):
+            vmctl.preseed.render_preseed(self.vm_name, self.vm_config)
+
+    def test_late_command_flushes_named_and_detected_disks_before_the_token(self):
+        self._preseed_vm()
+        rendered = vmctl.preseed.render_late_command_script(self.vm_name, self.vm_config)
+        flush = rendered.index("blockdev --flushbufs /dev/vda")
+        detected = rendered.index("/dev/[hs]d[a-z]")
+        token = rendered.index(vmctl.preseed.BOOTSTRAP_COMPLETE_TOKEN)
+        self.assertLess(rendered.index("\nsync\n"), flush)
+        self.assertLess(flush, detected)
+        self.assertLess(detected, token)
+
     def test_render_preseed_raises_without_username(self):
         self._preseed_vm()
         del self.vm_config["preseed_config"]["username"]
@@ -66,6 +96,8 @@ class PreseedConfigTests(BaseVmctlTestCase):
         self._preseed_vm()
         rendered = vmctl.preseed.render_late_command_script(self.vm_name, self.vm_config)
         self.assertIn("echo 'tester ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/nopasswd-tester", rendered)
+        self.assertIn("echo 'tester ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers", rendered)
+        self.assertIn("echo 'UseDNS no' >> /etc/ssh/sshd_config", rendered)
         self.assertIn("usermod -aG sudo tester", rendered)
 
     def test_render_late_command_script_custom_commands(self):
