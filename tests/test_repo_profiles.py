@@ -80,7 +80,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         }
         verified_templates = {"windows10-template", "windows11-template"}
         # The Ubuntu desktop history: clean reinstall of each with the final recipe on 2026-09-12.
-        verified_history = {f"ubuntu-{v}-unattended" for v in ("8.04", "10.04", "12.04", "14.04")}
+        verified_history = {f"ubuntu-{v}-unattended" for v in ("8.04", "10.04", "12.04", "14.04", "16.04", "18.04")}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = ("2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
@@ -149,28 +149,35 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             self.assertRegex(vm["iso_sha256"], r"^[0-9a-f]{64}$")
             self.assertEqual(Path(vm["iso"]).name, vm["iso_url"].rsplit("/", 1)[1])
             self.assertIn(f"ubuntu-{version}", vm["iso_url"])
-            self.assertIn("old-releases.ubuntu.com" if version < "14.04" else "releases.ubuntu.com", vm["iso_url"])
+            self.assertIn("old-releases.ubuntu.com" if float(version) < 14 else "releases.ubuntu.com", vm["iso_url"])
         # Kernel 2.6.24 has no virtio drivers: PATA disk and e1000 on a BIOS pc machine.
         hardy = cfg["vms"]["ubuntu-8.04-desktop"]
         self.assertEqual((hardy["disk"]["interface"], hardy["network_device"], hardy["firmware"]["type"], hardy["machine"]), ("ide", "e1000", "bios", "pc"))
         self.assertEqual(cfg["vms"]["ubuntu-10.04-desktop"]["disk"]["interface"], "virtio")
+        # vmmouse-era guests: no VMware port, or the pointer never reaches the USB tablet (verified on 14.04).
+        self.assertIs(cfg["vms"]["ubuntu-14.04-desktop"].get("vmport"), False)
+        self.assertIs(cfg["vms"]["ubuntu-14.04-unattended"].get("vmport"), False)
+        self.assertNotIn("vmport", cfg["vms"]["ubuntu-12.04-desktop"])
 
         # The unattended counterparts ride bootstrap-preseed on the d-i media (alternate CDs, the
         # 14.04 server ISO): desktop task, EOL mirror, and legacy SSH for the pre-6.5 sshd guests.
-        for version, port, legacy in (("8.04", 2252, True), ("10.04", 2253, True), ("12.04", 2254, True), ("14.04", 2255, False)):
+        for version, port, legacy in (("8.04", 2252, True), ("10.04", 2253, True), ("12.04", 2254, True), ("14.04", 2255, False),
+                                      ("16.04", 2256, False), ("18.04", 2257, False)):
             vm = cfg["vms"][f"ubuntu-{version}-unattended"]
             self.assertEqual(vm["meta"]["status"], "unattended")
             self.assertEqual(vm["ssh_provision"]["ssh_host_port"], port)
             desktop = vm["preseed_config"]["tasks"] + vm["preseed_config"]["packages"]
             self.assertIn("ubuntu-desktop", desktop)
             # pgrep -x sees the 15-character comm, so the 8.04 session manager is "x-session-manag".
-            self.assertIn("x-session-manag(er)?", vm["ssh_provision"]["post_install_run"][0])
             self.assertEqual(vm["preseed_config"]["username"], "lab")
             self.assertEqual(vm["installer_boot"], {"kernel": "install/vmlinuz", "initrd": "install/initrd.gz"})
-            self.assertEqual(vm["preseed_config"]["mirror_hostname"], "archive.ubuntu.com" if version == "14.04" else "old-releases.ubuntu.com")
+            self.assertEqual(vm["preseed_config"]["mirror_hostname"], "old-releases.ubuntu.com" if float(version) < 14 else "archive.ubuntu.com")
             self.assertEqual(vm["ssh_provision"].get("key_type"), "rsa" if legacy else None)
             self.assertEqual("ssh_options" in vm["ssh_provision"], legacy)
             self.assertIn("lab", vmctl.preseed.render_preseed(f"ubuntu-{version}-unattended", vm))
+            # systemd guests (16.04+) run the shared verify-desktop; upstart ones a pgrep on the session.
+            check = vm["ssh_provision"]["post_install_run"][0]
+            self.assertIn("verify-desktop" if float(version) >= 16 else "x-session-manag(er)?", check)
         self.assertEqual(cfg["vms"]["ubuntu-8.04-unattended"]["preseed_config"]["disk_device"], "auto")
         self.assertEqual(cfg["vms"]["ubuntu-8.04-unattended"]["disk"]["interface"], "ide")
 

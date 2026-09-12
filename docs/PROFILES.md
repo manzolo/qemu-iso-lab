@@ -54,6 +54,7 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | `disk` | See [Disk](#disk) |
 | `firmware` | `efi` or `bios`, see [Firmware](#firmware) |
 | `machine` | QEMU machine type, `q35` for modern guests, `pc` for old ones |
+| `vmport` | `false` adds `vmport=off` to the machine: guests whose X server ships the vmmouse driver (Ubuntu 14.04 to 16.04) otherwise switch the PS/2 mouse to the VMware protocol and QEMU routes the absolute pointer to it instead of the USB tablet, leaving the desktop pointer stuck |
 | `memory_mb`, `cpus` | Guest RAM and vCPUs |
 | `network` | `user` (slirp with optional SSH port forward) |
 | `networks` | Optional list of NICs replacing the single slirp one: `{"type": "user", "hostfwd": [{"host_port": 8080, "guest_port": 80}]}` (slirp; the first user NIC carries the `ssh_host_port` forward unless `"ssh": false`) or `{"type": "segment", "name": "lab-lan"}` (a host-local L2 segment shared by every VM naming it: multicast socket on plain QEMU, libvirt network after export). `phase` = `install`, `runtime` or `both` (default): install NICs exist only during a bootstrap and its SSH post-install, runtime NICs afterwards; a NIC keeps its slot and MAC (`mac`, or derived from disk path + slot) across phases. See [NETWORK-LAB.md](NETWORK-LAB.md). |

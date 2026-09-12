@@ -42,6 +42,10 @@ class LibvirtTests(BaseVmctlTestCase):
         self.vm_config.update(audio=True, audio_device="ac97")
         xml = ET.fromstring(libvirt.render_domain_xml("retro", self.vm_config))
         self.assertEqual(xml.find("devices/sound").get("model"), "ac97")
+        self.assertIsNone(xml.find("features/vmport"))
+        self.vm_config["vmport"] = False
+        xml = ET.fromstring(libvirt.render_domain_xml("retro", self.vm_config))
+        self.assertEqual(xml.find("features/vmport").get("state"), "off")
 
     def test_efi_shared_windows_xml(self):
         code, template, nvram = [self.root / name for name in ("code.fd", "template.fd", "vars.fd")]

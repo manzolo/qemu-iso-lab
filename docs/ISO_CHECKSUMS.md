@@ -42,6 +42,8 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `ubuntu-10.04-unattended` | `ubuntu-10.04.4-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/10.04.4/SHA256SUMS) |
 | `ubuntu-12.04-unattended` | `ubuntu-12.04.5-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/12.04.5/SHA256SUMS) |
 | `ubuntu-14.04-unattended` | `ubuntu-14.04.6-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/14.04/SHA256SUMS) |
+| `ubuntu-16.04-unattended` | `ubuntu-16.04.7-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/16.04/SHA256SUMS) |
+| `ubuntu-18.04-unattended` | `ubuntu-18.04.6-server-amd64.iso` | [Manifest](https://cdimage.ubuntu.com/releases/18.04/release/SHA256SUMS) |
 | `ubuntu-desktop-live` | `ubuntu-26.04-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
 | `ubuntu-mate-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `ubuntu-niri` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |

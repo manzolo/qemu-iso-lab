@@ -37,6 +37,8 @@ def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
     features = ET.SubElement(domain, "features")
     ET.SubElement(features, "acpi")
     ET.SubElement(features, "apic")
+    if vm.get("vmport") is False:
+        ET.SubElement(features, "vmport", state="off")
     ET.SubElement(domain, "cpu", mode="host-passthrough")
     shared = qemu.shared_dir_config(vm)
     if shared:

@@ -94,7 +94,12 @@ def firmware_status(vm: dict[str, Any]) -> tuple[str, str]:
 def machine_arg(vm: dict[str, Any], accel: str | None = None) -> str:
     machine = str(vm["machine"])
     if accel:
-        return f"{machine},accel={accel}"
+        machine = f"{machine},accel={accel}"
+    if vm.get("vmport") is False:
+        # Without the VMware port the guest's psmouse never switches to the "VMware VMMouse"
+        # protocol: on Ubuntu 14.04 QEMU then routed every absolute pointer event to that vmmouse
+        # instead of the USB tablet and the desktop pointer stood still (query-mice, verified live).
+        machine += ",vmport=off"
     return machine
 
 

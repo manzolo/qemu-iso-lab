@@ -82,7 +82,7 @@ Renders `preseed.cfg` into a `PRESEED_CFG` seed ISO, extracts `vmlinuz` and
 waits for `==> Debian preseed install complete!` on the serial console.
 
 The same flow installs the Ubuntu desktop history profiles (`ubuntu-8.04-unattended` to
-`ubuntu-14.04-unattended`) from the d-i media, the alternate CDs and the 14.04 server ISO
+`ubuntu-18.04-unattended`) from the d-i media, the alternate CDs and the 14.04-18.04 server ISOs
 (`installer_boot` = `install/vmlinuz` + `install/initrd.gz`), with the `ubuntu-desktop` task.
 `preseed_config` knobs added for them: `upgrade` (`none`, `safe-upgrade`, `full-upgrade`),
 `extra` (raw preseed lines, e.g. an empty `apt-setup/services-select` because the EOL
@@ -94,8 +94,9 @@ disk and every `/dev/[hs]d*` it finds before the completion token. Autologin (GD
 LightDM) and the `ttyS0` getty come from `late_commands`. The late command writes the
 NOPASSWD rule both as a `sudoers.d` drop-in and as the last line of `/etc/sudoers`: 8.04 has no
 `#includedir` and 10.04 lists `%admin` after it, so the drop-in alone still asked for a password.
-The 14.04 server medium does not install the `ubuntu-desktop` *task*; the metapackage goes
-through `pkgsel/include` instead. The desktop check accepts `x-session-manager`, the name the
+The server media do not install the `ubuntu-desktop` *task*; the metapackage goes
+through `pkgsel/include` instead. From 16.04 the guests run systemd, so the shared `verify-desktop` check applies and the
+`ttyS0` getty is `serial-getty@ttyS0.service`; 18.04 autologs in through GDM3. The desktop check accepts `x-session-manager`, the name the
 8.04 session runs under, spelled as the 15-character comm `x-session-manag` that `pgrep -x` compares against.
 The late command also appends `UseDNS no` to `sshd_config`: the old sshd spent 5 s on a reverse
 lookup of the slirp host before each login and the host's SSH probe gave up first (verified

@@ -14,7 +14,7 @@ Add profiles that cover a new axis: firmware, installation flow, operating syste
 - Ubuntu desktop flavors: five autoinstall recipes with explicit package, display-manager and graphical-session checks.
 - Network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab`.
 - Non-Linux manual coverage: `freebsd`, `reactos`.
-- Ubuntu desktop history: nine manual profiles, one per LTS from 8.04 to 24.04, on the official desktop ISOs (`ubuntu-lts.json`). `ubuntu-8.04-unattended` to `ubuntu-14.04-unattended` install them with `bootstrap-preseed` on the d-i alternate/server media (live PASS 2026-09-12, see below); 20.04+ would be autoinstall + `ubuntu-desktop`.
+- Ubuntu desktop history: nine manual profiles, one per LTS from 8.04 to 24.04, on the official desktop ISOs (`ubuntu-lts.json`). `ubuntu-8.04-unattended` to `ubuntu-18.04-unattended` install them with `bootstrap-preseed` on the d-i alternate/server media (live PASS 2026-09-12, see below; 16.04 and 18.04 use the shared `verify-desktop`); 20.04+ would be autoinstall + `ubuntu-desktop`.
 - Canonical names with legacy aliases, safe host-directory migration and pinned CI media with vendor checksums.
 
 ## Status semantics
@@ -29,7 +29,7 @@ Every tracked profile has `meta.status`:
 
 Recorded dates:
 
-- 2026-09-12: `ubuntu-8.04-unattended`, `ubuntu-10.04-unattended`, `ubuntu-12.04-unattended`, `ubuntu-14.04-unattended`, each reinstalled from a clean disk with the final recipe (autologin session, passwordless sudo, legacy SSH verified in-guest).
+- 2026-09-12: `ubuntu-8.04-unattended`, `ubuntu-10.04-unattended`, `ubuntu-12.04-unattended`, `ubuntu-14.04-unattended`, `ubuntu-16.04-unattended`, `ubuntu-18.04-unattended`, each reinstalled from a clean disk with the final recipe (autologin session, passwordless sudo, legacy SSH verified in-guest).
 - 2026-09-09: the whole unattended matrix, 28 profiles reinstalled from scratch
   (`check-vms --clean-first --parallel 2 --timeout 3600`, reports under
   `artifacts/check-vms/20260909-*`): every Arch/CachyOS, Debian, AlmaLinux/Rocky, Fedora

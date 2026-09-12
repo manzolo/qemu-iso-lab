@@ -198,7 +198,8 @@
         }
       },
       "usb_tablet": true,
-      "iso_sha256": "bcc02554c37d438545658be7964e1bc05bdb11289ae16bfbf94626b80d42656f"
+      "iso_sha256": "bcc02554c37d438545658be7964e1bc05bdb11289ae16bfbf94626b80d42656f",
+      "vmport": false
     },
     "ubuntu-16.04-desktop": {
       "name": "Ubuntu 16.04.7 Desktop",
@@ -250,7 +251,8 @@
         }
       },
       "usb_tablet": true,
-      "iso_sha256": "8ba7e2687fb8a2152504475e92e489aace543059fd4ba7ffe10111c42394853b"
+      "iso_sha256": "8ba7e2687fb8a2152504475e92e489aace543059fd4ba7ffe10111c42394853b",
+      "vmport": false
     },
     "ubuntu-18.04-desktop": {
       "name": "Ubuntu 18.04.6 Desktop",
@@ -302,7 +304,8 @@
         }
       },
       "usb_tablet": true,
-      "iso_sha256": "f730be589aa1ba923ebe6eca573fa66d09ba14c4c104da2c329df652d42aff11"
+      "iso_sha256": "f730be589aa1ba923ebe6eca573fa66d09ba14c4c104da2c329df652d42aff11",
+      "vmport": false
     },
     "ubuntu-20.04-desktop": {
       "name": "Ubuntu 20.04.6 Desktop",
@@ -354,7 +357,8 @@
         }
       },
       "usb_tablet": true,
-      "iso_sha256": "510ce77afcb9537f198bc7daa0e5b503b6e67aaed68146943c231baeaab94df1"
+      "iso_sha256": "510ce77afcb9537f198bc7daa0e5b503b6e67aaed68146943c231baeaab94df1",
+      "vmport": false
     },
     "ubuntu-22.04-desktop": {
       "name": "Ubuntu 22.04.5 Desktop",
@@ -406,7 +410,8 @@
         }
       },
       "usb_tablet": true,
-      "iso_sha256": "bfd1cee02bc4f35db939e69b934ba49a39a378797ce9aee20f6e3e3e728fefbf"
+      "iso_sha256": "bfd1cee02bc4f35db939e69b934ba49a39a378797ce9aee20f6e3e3e728fefbf",
+      "vmport": false
     },
     "ubuntu-24.04-desktop": {
       "name": "Ubuntu 24.04.4 Desktop",
@@ -458,7 +463,8 @@
         }
       },
       "usb_tablet": true,
-      "iso_sha256": "3a4c9877b483ab46d7c3fbe165a0db275e1ae3cfe56a5657e5a47c2f99a99d1e"
+      "iso_sha256": "3a4c9877b483ab46d7c3fbe165a0db275e1ae3cfe56a5657e5a47c2f99a99d1e",
+      "vmport": false
     },
     "ubuntu-8.04-unattended": {
       "name": "Ubuntu 8.04.4 Desktop (unattended, d-i alternate)",
@@ -871,7 +877,224 @@
           "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
         ]
       },
-      "notes": "Server ISO (d-i): the ubuntu-desktop task is not installed by pkgsel from this medium (verified live), so the metapackage comes through pkgsel/include from archive.ubuntu.com; OpenSSH 6.6 accepts the ed25519 key."
+      "notes": "Server ISO (d-i): the ubuntu-desktop task is not installed by pkgsel from this medium (verified live), so the metapackage comes through pkgsel/include from archive.ubuntu.com; OpenSSH 6.6 accepts the ed25519 key.",
+      "vmport": false
+    },
+    "ubuntu-16.04-unattended": {
+      "name": "Ubuntu 16.04.7 Desktop (unattended, d-i server)",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-12"
+      },
+      "iso": "isos/ubuntu-16.04.7-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/16.04/ubuntu-16.04.7-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-16.04-unattended/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-16.04-unattended/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "iso_sha256": "b23488689e16cad7a269eb2d3a3bf725d3457ee6b0868e00c8762d3816e25848",
+      "installer_boot": {
+        "kernel": "install/vmlinuz",
+        "initrd": "install/initrd.gz"
+      },
+      "preseed_config": {
+        "hostname": "ubuntu-1604",
+        "domain": "local",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "keyboard_layout": "us",
+        "mirror_hostname": "archive.ubuntu.com",
+        "mirror_directory": "/ubuntu",
+        "tasks": [
+          "standard"
+        ],
+        "packages": [
+          "ubuntu-desktop",
+          "openssh-server",
+          "sudo"
+        ],
+        "upgrade": "none",
+        "disk_device": "/dev/vda",
+        "extra": [
+          "d-i pkgsel/update-policy select none"
+        ],
+        "late_commands": [
+          "printf '[SeatDefaults]\\nautologin-user={{user}}\\nautologin-user-timeout=0\\n' > /etc/lightdm/lightdm.conf",
+          "systemctl enable serial-getty@ttyS0.service",
+          "sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades",
+          "printf '[org.gnome.desktop.screensaver]\\nlock-enabled=false\\nidle-activation-enabled=false\\n[org.gnome.desktop.session]\\nidle-delay=uint32 0\\n' > /usr/share/glib-2.0/schemas/90_vmctl-lab.gschema.override && glib-compile-schemas /usr/share/glib-2.0/schemas",
+          "printf '%s\\n' 'APT::Periodic::Enable \"0\";' 'APT::Periodic::Update-Package-Lists \"0\";' 'APT::Periodic::Download-Upgradeable-Packages \"0\";' > /etc/apt/apt.conf.d/10periodic"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-1604",
+        "user": "lab",
+        "ssh_host_port": 2256,
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package ubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ]
+      },
+      "notes": "Server ISO (d-i) + the ubuntu-desktop metapackage from archive.ubuntu.com (pkgsel/include); Unity 7 on LightDM, systemd, so verify-desktop applies.",
+      "vmport": false
+    },
+    "ubuntu-18.04-unattended": {
+      "name": "Ubuntu 18.04.6 Desktop (unattended, d-i server)",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "unattended",
+        "verified": "2026-09-12"
+      },
+      "iso": "isos/ubuntu-18.04.6-server-amd64.iso",
+      "iso_url": "https://cdimage.ubuntu.com/releases/18.04/release/ubuntu-18.04.6-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-18.04-unattended/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-18.04-unattended/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "iso_sha256": "f5cbb8104348f0097a8e513b10173a07dbc6684595e331cb06f93f385d0aecf6",
+      "installer_boot": {
+        "kernel": "install/vmlinuz",
+        "initrd": "install/initrd.gz"
+      },
+      "preseed_config": {
+        "hostname": "ubuntu-1804",
+        "domain": "local",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "keyboard_layout": "us",
+        "mirror_hostname": "archive.ubuntu.com",
+        "mirror_directory": "/ubuntu",
+        "tasks": [
+          "standard"
+        ],
+        "packages": [
+          "ubuntu-desktop",
+          "openssh-server",
+          "sudo"
+        ],
+        "upgrade": "none",
+        "disk_device": "/dev/vda",
+        "extra": [
+          "d-i pkgsel/update-policy select none"
+        ],
+        "late_commands": [
+          "printf '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\n' > /etc/gdm3/custom.conf",
+          "systemctl enable serial-getty@ttyS0.service",
+          "sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades",
+          "printf '[org.gnome.desktop.screensaver]\\nlock-enabled=false\\nidle-activation-enabled=false\\n[org.gnome.desktop.session]\\nidle-delay=uint32 0\\n' > /usr/share/glib-2.0/schemas/90_vmctl-lab.gschema.override && glib-compile-schemas /usr/share/glib-2.0/schemas",
+          "printf '%s\\n' 'APT::Periodic::Enable \"0\";' 'APT::Periodic::Update-Package-Lists \"0\";' 'APT::Periodic::Download-Upgradeable-Packages \"0\";' > /etc/apt/apt.conf.d/10periodic"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-1804",
+        "user": "lab",
+        "ssh_host_port": 2257,
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package ubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ]
+      },
+      "notes": "Server ISO (d-i, only on cdimage.ubuntu.com) + the ubuntu-desktop metapackage from archive.ubuntu.com; GNOME Shell on GDM3, systemd, so verify-desktop applies.",
+      "vmport": false
     }
   }
 }

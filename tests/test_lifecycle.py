@@ -720,6 +720,14 @@ class VmctlTests(BaseVmctlTestCase):
         pinned = vmctl.qemu.disk_args(self.vm_config, bootindex=1)
         self.assertIn("ide-hd,drive=disk0,bus=ide.0,unit=0,bootindex=1", pinned)
 
+    def test_common_args_vmport_off(self):
+        self.create_disk()
+        with mock.patch.object(vmctl.runtime, "require_command"):
+            self.assertIn("pc,accel=kvm", self.vmctl.common_args(self.vm_config, variant=None, dry_run=True, accel="kvm"))
+            self.vm_config["vmport"] = False
+            qemu_cmd = self.vmctl.common_args(self.vm_config, variant=None, dry_run=True, accel="kvm")
+        self.assertIn("pc,accel=kvm,vmport=off", qemu_cmd)
+
     def test_common_args_audio_device_defaults_to_hda_and_accepts_ac97(self):
         self.create_disk()
         self.vm_config["audio"] = True
