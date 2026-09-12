@@ -547,10 +547,13 @@ class VmtuiTests(unittest.TestCase):
             vm.pop("ci", None); vms[name] = vm
         (self.config_dir / "profiles" / "history.json").write_text(json.dumps({"vms": vms}), encoding="utf-8")
         result = self.run_bash("source bin/vmtui; list_dashboard_items all '' | cut -f1; echo ==; list_vm_menu_items")
-        rows = [line.split("\t")[0] for line in result.stdout.split("==")[0].splitlines()[1:]]
-        names = [row.split()[1] for row in rows if "retro-" in row]
+        # after the __summary line the dashboard alternates tag (the VM name) and description
+        tags = result.stdout.split("==")[0].splitlines()[1::2]
+        names = [tag for tag in tags if tag.startswith("retro-")]
         self.assertEqual(names, ["retro-8.04", "retro-10.04", "retro-24.04"])
-        catalog = [line for line in result.stdout.split("==")[1].splitlines() if line.startswith("retro-")]
+        # the flat catalog alternates tag and description too; the description starts with the name
+        catalog_lines = [line for line in result.stdout.split("==")[1].splitlines() if line]
+        catalog = [tag for tag in catalog_lines[0::2] if tag.startswith("retro-")]
         self.assertEqual(catalog, ["retro-8.04", "retro-10.04", "retro-24.04"])
 
     def test_dashboard_columns_fit_terminal_width(self):
