@@ -7,6 +7,12 @@ on:
 permissions:
   contents: read
 
+# A new push supersedes the previous run of the same ref: the hour-long TCG bootstrap
+# of an outdated commit is cancelled instead of running to the end alongside its successor.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
