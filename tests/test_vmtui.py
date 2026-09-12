@@ -456,8 +456,9 @@ class VmtuiTests(unittest.TestCase):
         for key in ("ctrl-r", "f5", "alt-d", "alt-u", "alt-s", "alt-a", "alt-c", "alt-x", "alt-p", "alt-enter"):
             self.assertIn(key, expect)
         header = next(arg for arg in first["args"] if arg.startswith("--header="))
-        self.assertIn("Alt-D", header)
-        self.assertIn("Alt-U", header)
+        self.assertIn("Alt", header)
+        self.assertIn("desktop", header)
+        self.assertIn("install", header)
         # Alt-X while the VM is not running: "Stop VM" is not in the menu, so the shortcut
         # only redraws it (cursor kept) and the next pick is honoured.
         log.unlink()
@@ -501,6 +502,42 @@ class VmtuiTests(unittest.TestCase):
             "else echo \"cursor=$MENU_DEFAULT_ITEM\" >&2; echo __quit; fi; }; dashboard_loop"
         )
         self.assertIn("cursor=test-ssh", result.stderr)
+
+    def test_dashboard_alt_shortcut_runs_the_action_on_the_highlighted_vm(self):
+        # fzf reports the key and the highlighted row: the dashboard runs that VM's action
+        # without opening its menu, skips non-VM rows, and explains an action not offered.
+        disk = self.bindir / "artifacts/test-ssh/disk.qcow2"
+        disk.parent.mkdir(parents=True, exist_ok=True)
+        disk.write_bytes(b"x" * (24 * 1024 * 1024))
+        result = self.run_bash(
+            "source bin/vmtui; "
+            "list_dashboard_items() { printf '__summary\\t1\\t1\\t0\\t1\\ntest-ssh\\nTest SSH\\n'; }; "
+            "catalog_has_network_lab() { return 1; }; clear() { :; }; "
+            "is_na_action() { return 1; }; run_action() { echo \"action=$1 vm=$current_vm\"; }; "
+            "msg_box() { echo \"msg=$2\"; }; "
+            "menu_choose_fit() { "
+            "echo \"hotkeys=$MENU_HOTKEYS_RAW\" >&2; "
+            "n=$(cat $VMTUI_ROOT_DIR/step 2>/dev/null || echo 0); echo $((n + 1)) > $VMTUI_ROOT_DIR/step; "
+            "case $n in "
+            "0) printf '__hotkey\\talt-d\\ttest-ssh\\n' ;; "
+            "1) printf '__hotkey\\talt-x\\ttest-ssh\\n' ;; "
+            "2) printf '__hotkey\\talt-d\\t__filter\\n' ;; "
+            "*) echo \"cursor=$MENU_DEFAULT_ITEM\" >&2; echo __quit ;; esac; }; dashboard_loop"
+        )
+        self.assertEqual(result.stdout.splitlines(), [
+            "action=Boot Desktop vm=test-ssh",
+            "msg='Stop VM' is not available for this VM right now (Test SSH VM).",
+        ])
+        self.assertIn("hotkeys=alt-d,alt-u,alt-s,alt-a,alt-c,alt-x,alt-p", result.stderr)
+        self.assertIn("cursor=__filter", result.stderr)
+
+    def test_fzf_pick_reports_raw_hotkeys_with_the_highlighted_row(self):
+        result = self.run_bash(
+            "source bin/vmtui; "
+            "fzf() { printf 'alt-d\\ntest-ssh\\tTest SSH\\n'; }; "
+            "MENU_HOTKEYS_RAW=alt-d,alt-x MENU_REFRESH=1 fzf_pick T H '' test-ssh 'Test SSH' __quit Quit"
+        )
+        self.assertEqual(result.stdout, "__hotkey\talt-d\ttest-ssh\n")
 
     def test_dashboard_columns_fit_terminal_width(self):
         for width in (60, 80, 100, 140):

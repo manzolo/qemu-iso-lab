@@ -46,6 +46,14 @@ the running markers, keeping the cursor where it was. The state moves while the 
 open, an install finishes or a VM stops, and a letter could not be used for this because
 letters filter the list. On the `dialog` backend the menu is rebuilt when you reopen it.
 
+With fzf the same Alt shortcuts as the VM menu work from the dashboard on the
+highlighted VM, without opening its menu: `Alt-D` Boot Desktop, `Alt-U` its unattended
+install, `Alt-S` SSH Console, `Alt-A` Attach Display, `Alt-C` Serial Console, `Alt-X`
+Stop VM, `Alt-P` Post-Install. An action the VM does not offer right now (stopping a VM
+that is not running) gets a one-line note instead. Alt-letter must reach the terminal:
+some emulators keep it for their own menus, in which case the VM menu still has every
+action a keystroke away.
+
 Esc or Ctrl-C returns to the previous screen; from the dashboard it exits the TUI.
 
 ## The VM menu

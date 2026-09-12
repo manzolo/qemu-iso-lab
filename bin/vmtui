@@ -94,6 +94,7 @@ clamp() {
 # fzf_pick TITLE HEADER DEFAULT_TAG TAG DESC [TAG DESC ...] → selected TAG
 MENU_REFRESH_KEYS="ctrl-r,f5"
 MENU_REFRESH_TAG="__refresh"
+MENU_HOTKEY_TAG="__hotkey"
 MENU_HIGHLIGHTED=""
 
 # Items are "tag<TAB>description"; only the description is shown and searched.
@@ -170,6 +171,16 @@ fzf_pick() {
             expect_keys+=("${entry%%=*}")
         done <<< "$MENU_HOTKEYS"
     fi
+    # MENU_HOTKEYS_RAW (comma-separated keys) reports the key together with the highlighted
+    # row instead of picking a tag: the dashboard uses it to act on the VM under the cursor.
+    local -A raw_hotkeys=()
+    if [[ -n "${MENU_HOTKEYS_RAW:-}" ]]; then
+        local raw_key
+        for raw_key in ${MENU_HOTKEYS_RAW//,/ }; do
+            raw_hotkeys["$raw_key"]=1
+            expect_keys+=("$raw_key")
+        done
+    fi
     if (( ${#expect_keys[@]} )); then
         local IFS=,
         args+=(--expect="${expect_keys[*]}")
@@ -186,6 +197,10 @@ fzf_pick() {
         if [[ -n "$key" ]]; then
             MENU_HIGHLIGHTED="${selected%%$'\t'*}"
             [[ "$selected" == *$'\t'* ]] || MENU_HIGHLIGHTED=""
+            if [[ -n "${raw_hotkeys[$key]:-}" ]]; then
+                printf '%s\t%s\t%s\n' "$MENU_HOTKEY_TAG" "$key" "$MENU_HIGHLIGHTED"
+                return 0
+            fi
             if [[ -n "${hotkey_tags[$key]:-}" ]]; then
                 # A shortcut selects its tag when the menu offers it right now; otherwise
                 # it is a no-op that redraws the menu with the cursor where it was.
@@ -1841,7 +1856,7 @@ vm_menu_hotkeys() {
 }
 
 vm_menu_hotkey_hint() {
-    printf '  \e[1mAlt-D\e[0m desktop  \e[1mAlt-U\e[0m unattended install  \e[1mAlt-S\e[0m ssh  \e[1mAlt-A\e[0m display  \e[1mAlt-C\e[0m serial  \e[1mAlt-X\e[0m stop  \e[1mAlt-P\e[0m post-install  \e[1mAlt-Enter\e[0m suggested\n'
+    printf '  \e[1mAlt\e[0m+ \e[1mD\e[0m desktop · \e[1mU\e[0m install · \e[1mS\e[0m ssh · \e[1mA\e[0m screen · \e[1mC\e[0m serial · \e[1mX\e[0m stop · \e[1mP\e[0m post-install · \e[1mEnter\e[0m suggested\n'
 }
 
 vm_menu_loop() {
@@ -2093,6 +2108,7 @@ dashboard_loop() {
         local selected
         selected=$(MENU_NO_TAGS=1 MENU_DEFAULT_ITEM="$default" MENU_CANCEL_LABEL="Quit" MENU_OK_LABEL="Open" MENU_WIDTH=100 \
             MENU_REFRESH=1 MENU_STYLED=1 MENU_COLUMN_HEADER="$columns" \
+            MENU_HOTKEYS_RAW="$DASHBOARD_HOTKEYS" MENU_HOTKEY_HINT="$(dashboard_hotkey_hint)" \
             menu_choose_fit \
             "QEMU ISO Lab" \
             "$header" \
@@ -2108,6 +2124,18 @@ dashboard_loop() {
                 # loop again to rebuild both the rows and the counters in the header.
                 dash_cursor="${selected#*$'\t'}"
                 ;;
+            "$MENU_HOTKEY_TAG"$'\t'*)
+                # Alt shortcut on the highlighted row: run that action for the VM under the
+                # cursor without opening its menu, then come back with the cursor kept.
+                local hotkey="${selected#*$'\t'}"
+                local target="${hotkey#*$'\t'}"
+                hotkey="${hotkey%%$'\t'*}"
+                dash_cursor="$target"
+                case "$target" in
+                    __*|"") ;;
+                    *) run_dashboard_hotkey "$hotkey" "$target" ;;
+                esac
+                ;;
             __filter) choose_filter ;;
             __find) choose_find ;;
             __tools) tools_menu_loop ;;
@@ -2121,6 +2149,44 @@ dashboard_loop() {
                 ;;
         esac
     done
+}
+
+# The dashboard shortcuts are the VM menu ones minus Alt-Enter: without the menu open
+# there is no highlighted suggestion to run.
+DASHBOARD_HOTKEYS="alt-d,alt-u,alt-s,alt-a,alt-c,alt-x,alt-p"
+
+dashboard_hotkey_hint() {
+    printf '  \e[1mAlt\e[0m+ \e[1mD\e[0m desktop · \e[1mU\e[0m install · \e[1mS\e[0m ssh · \e[1mA\e[0m screen · \e[1mC\e[0m serial · \e[1mX\e[0m stop · \e[1mP\e[0m post-install  \e[90m(highlighted VM)\e[0m\n'
+}
+
+# run_dashboard_hotkey KEY VM → the VM menu action bound to KEY, run for VM if the menu
+# would offer it right now; otherwise a one-line note and back to the list.
+run_dashboard_hotkey() {
+    local key="$1" vm="$2"
+    current_vm="$vm"
+    state_set last-vm "$current_vm"
+    load_vm_facts "$current_vm"
+    RECOMMENDED=$(recommended_action)
+    local action="" entry
+    while IFS= read -r entry; do
+        [[ "${entry%%=*}" == "$key" ]] && action="${entry#*=}"
+    done < <(vm_menu_hotkeys)
+    [[ -n "$action" ]] || return 0
+    local -a menu_items=()
+    mapfile -t menu_items < <(build_vm_menu_items)
+    local offered=0 i
+    for (( i=0; i<${#menu_items[@]}; i+=2 )); do
+        [[ "${menu_items[i]}" == "$action" ]] && offered=1
+    done
+    if (( ! offered )); then
+        msg_box "$vm" "'$action' is not available for this VM right now (${FACTS[label]:-})."
+        return 0
+    fi
+    if is_na_action "$action" "$current_vm"; then
+        msg_na_action "$action" "$current_vm"
+        return 0
+    fi
+    run_action "$action" || true
 }
 
 # Kept for scripting compatibility: flat picker without state.
