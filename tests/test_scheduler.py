@@ -77,6 +77,7 @@ class SchedulerTests(unittest.TestCase):
         time.sleep(0.2)
         self.assertEqual(len(starts), 4, "windows11 must wait: 4 x 1536 + 4608 > 8192")
         release["ubuntu-8.04"].set()
+        deadline = time.time() + 5  # its own budget: on a loaded host the first wait can eat the previous one
         while time.time() < deadline and len(starts) < 5:
             time.sleep(0.02)
         self.assertEqual(starts[-1][0], "windows11")
