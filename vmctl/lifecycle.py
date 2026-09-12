@@ -840,13 +840,13 @@ def cmd_list(args: argparse.Namespace) -> int:
     cfg = config.load_config()
 
     if getattr(args, "names", False):
-        for name in sorted(cfg["vms"]):
+        for name in config.sorted_vm_names(cfg):
             print(name)
         return 0
 
     if getattr(args, "json", False):
         out = []
-        for name, vm in sorted(cfg["vms"].items()):
+        for name, vm in config.sorted_vm_items(cfg):
             out.append({
                 "profile": name,
                 "name": vm.get("name", name),
@@ -860,7 +860,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         return 0
 
     rows = []
-    for name, vm in sorted(cfg["vms"].items()):
+    for name, vm in config.sorted_vm_items(cfg):
         firmware = vm.get("firmware", {}).get("type", "?").upper()
         memory = vm.get("memory_mb", "?")
         cpus = vm.get("cpus", "?")
@@ -963,7 +963,7 @@ def style_status_cell(value: str, width: int, align: str = "<") -> str:
 def cmd_status(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     rows = []
-    for name, vm in sorted(cfg["vms"].items()):
+    for name, vm in config.sorted_vm_items(cfg):
         if not args.all and not vm_has_local_state(vm):
             continue
         disk, actual, virtual = disk_status(vm)
@@ -2381,7 +2381,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
 
 def cmd_clean_stale(args: argparse.Namespace) -> int:
     cfg = config.load_config()
-    selected_names = [args.vm] if getattr(args, "vm", None) else sorted(cfg["vms"])
+    selected_names = [args.vm] if getattr(args, "vm", None) else config.sorted_vm_names(cfg)
     removed = 0
 
     ui.print_header("Clean stale runtime state")
@@ -2612,7 +2612,7 @@ def restore_local_test_artifacts(stashed: dict[str, str], dry_run: bool = False)
 
 def cmd_test_local(args: argparse.Namespace) -> int:
     cfg = config.load_config()
-    selected_names = list(args.vms) if getattr(args, "vms", None) else sorted(cfg["vms"])
+    selected_names = list(args.vms) if getattr(args, "vms", None) else config.sorted_vm_names(cfg)
     selected_names = list(dict.fromkeys(selected_names))
     for vm_name in selected_names:
         config.get_vm(cfg, vm_name)
@@ -2722,7 +2722,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
         ui.print_status(marker, f"{name} ({note})", ok=present)
 
     ui.print_header("Firmware check")
-    efi_vms = [(name, vm) for name, vm in sorted(cfg["vms"].items()) if vm["firmware"]["type"] == "efi"]
+    efi_vms = [(name, vm) for name, vm in config.sorted_vm_items(cfg) if vm["firmware"]["type"] == "efi"]
     if not efi_vms:
         ui.print_status("ok", "No EFI profiles configured")
     else:
@@ -2796,7 +2796,7 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
 def cmd_clean(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     if args.all:
-        for name, vm in sorted(cfg["vms"].items()):
+        for name, vm in config.sorted_vm_items(cfg):
             cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
             clean_vm(name, vm, dry_run=args.dry_run)
         return 0

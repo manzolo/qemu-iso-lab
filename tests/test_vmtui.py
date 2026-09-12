@@ -539,6 +539,20 @@ class VmtuiTests(unittest.TestCase):
         )
         self.assertEqual(result.stdout, "__hotkey\talt-d\ttest-ssh\n")
 
+    def test_dashboard_and_catalog_order_versions_naturally(self):
+        base = json.loads((ROOT / "vms/profiles/core.json").read_text())["vms"]["alpine-ci"]
+        vms = {}
+        for name in ("retro-10.04", "retro-8.04", "retro-24.04"):
+            vm = json.loads(json.dumps(base)); vm["disk"]["path"] = f"artifacts/{name}/disk.qcow2"; vm["name"] = name
+            vm.pop("ci", None); vms[name] = vm
+        (self.config_dir / "profiles" / "history.json").write_text(json.dumps({"vms": vms}), encoding="utf-8")
+        result = self.run_bash("source bin/vmtui; list_dashboard_items all '' | cut -f1; echo ==; list_vm_menu_items")
+        rows = [line.split("\t")[0] for line in result.stdout.split("==")[0].splitlines()[1:]]
+        names = [row.split()[1] for row in rows if "retro-" in row]
+        self.assertEqual(names, ["retro-8.04", "retro-10.04", "retro-24.04"])
+        catalog = [line for line in result.stdout.split("==")[1].splitlines() if line.startswith("retro-")]
+        self.assertEqual(catalog, ["retro-8.04", "retro-10.04", "retro-24.04"])
+
     def test_dashboard_columns_fit_terminal_width(self):
         for width in (60, 80, 100, 140):
             with self.subTest(width=width):

@@ -515,6 +515,10 @@ ensure_optional_command() {
 
 read -r -d '' PY_COMMON <<'PY' || true
 import sys
+import re as _re
+def natural_key(name):
+    # embedded numbers by value: ubuntu-8.04 before ubuntu-10.04 (mirrors vmctl.config.natural_key)
+    return tuple((1, int(c)) if i % 2 else (0, c) for i, c in enumerate(_re.split(r"(\d+)", name.lower())))
 from pathlib import Path
 
 sys.path.insert(0, sys.argv[1])
@@ -696,7 +700,7 @@ elif mode == "family":
 elif mode == "find":
     rows = [f for f in rows if value in f["name"].lower() or value in f["label"].lower()]
 
-rows.sort(key=lambda f: (0 if f["running"] else 1 if f["installed"] else 2 if f["prepared"] else 3, f["name"]))
+rows.sort(key=lambda f: (0 if f["running"] else 1 if f["installed"] else 2 if f["prepared"] else 3, natural_key(f["name"])))
 print(f"__summary\t{total}\t{installed}\t{running}\t{len(rows)}")
 for f in rows:
     if f["running"]:
@@ -742,7 +746,7 @@ PY
 list_vm_menu_items() {
     python3 -c "$PY_COMMON
 $(cat <<'PY'
-for name, vm in sorted(VMS.items()):
+for name, vm in sorted(VMS.items(), key=lambda kv: natural_key(kv[0])):
     label = vm.get("name", name)
     firmware = str((vm.get("firmware") or {}).get("type", "?")).upper()
     memory = f"{vm.get('memory_mb', '?')} MB"

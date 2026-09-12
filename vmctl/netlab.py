@@ -119,7 +119,7 @@ def topology(cfg: dict[str, Any], vm_name: str) -> dict[str, Any]:
     }
 
     members: list[dict[str, Any]] = []
-    for name, vm in sorted(cfg["vms"].items()):
+    for name, vm in config.sorted_vm_items(cfg):
         lab = lab_config(vm)
         if lab is None or lab["role"] == "pfsense":
             continue

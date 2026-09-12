@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import re
 import sys
 from datetime import date
 from typing import Any, cast
@@ -28,6 +29,25 @@ PROFILE_ALIASES: dict[str, str] = {
     "lubuntu22-lab": "lubuntu-lab",
     "alpine-installed-ci": "alpine-ci-installed"
 }
+
+
+_NATURAL_SPLIT = re.compile(r"(\d+)")
+
+
+def natural_key(name: str) -> tuple[Any, ...]:
+    """Sort key that orders embedded numbers by value: ubuntu-8.04 before ubuntu-10.04."""
+    parts: list[Any] = []
+    for i, chunk in enumerate(_NATURAL_SPLIT.split(name.lower())):
+        parts.append((1, int(chunk)) if i % 2 else (0, chunk))
+    return tuple(parts)
+
+
+def sorted_vm_names(cfg: dict[str, Any]) -> list[str]:
+    return sorted(cfg["vms"], key=natural_key)
+
+
+def sorted_vm_items(cfg: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    return [(name, cfg["vms"][name]) for name in sorted_vm_names(cfg)]
 
 
 def canonical_vm_name(name: str, *, warn: bool = True) -> str:

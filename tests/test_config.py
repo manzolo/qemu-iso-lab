@@ -272,3 +272,14 @@ class UserPlaceholderTests(BaseVmctlTestCase):
             self.vmctl.load_config()
 
         self.assertIn("cannot itself contain", str(ctx.exception))
+
+
+class NaturalOrderTests(unittest.TestCase):
+    def test_natural_key_orders_embedded_numbers_by_value(self):
+        import vmctl.config
+        names = ["ubuntu-10.04-desktop", "ubuntu-8.04-desktop", "ubuntu-24.04-desktop", "reactos", "ubuntu-8.04-unattended", "Windows7-unattended", "windows10-unattended"]
+        ordered = sorted(names, key=vmctl.config.natural_key)
+        self.assertEqual(ordered, ["reactos", "ubuntu-8.04-desktop", "ubuntu-8.04-unattended", "ubuntu-10.04-desktop", "ubuntu-24.04-desktop", "Windows7-unattended", "windows10-unattended"])
+        cfg = {"vms": {n: {"i": i} for i, n in enumerate(names)}}
+        self.assertEqual(vmctl.config.sorted_vm_names(cfg), ordered)
+        self.assertEqual([n for n, _ in vmctl.config.sorted_vm_items(cfg)], ordered)
