@@ -15,6 +15,7 @@ make lint                                      # python -m mypy vmctl/ --strict 
 make install-cli                               # symlink vmctl + vmtui into ~/.local/bin
 make guides                                    # docs/guides/{it,en} -> pdf/<lang>/qemu-iso-lab-guide.pdf (manual) + pdf/<lang>/single|singole/ (markdown + weasyprint); keep both languages in sync
 make validate-vms                              # LOCAL ONLY (hours): check-vms --restore --report over every unattended profile, opens the HTML report
+# Slash commands for this checkout live in .claude/commands/: /vm-status, /vm-desktop, /vm-unattended, /vm-ssh, /vm-shot, /vm-stop
 
 # VM lifecycle: ONE front door, the vmctl CLI (./bin/vmctl if not installed).
 vmctl --help                       # commands grouped by task + typical flows: read this first

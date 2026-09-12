@@ -201,6 +201,15 @@ commands for anything else. `local.json` is deep-merged over the tracked
 profiles, so you only write what differs. See
 [docs/PROVISIONING.md](docs/PROVISIONING.md).
 
+## Claude Code slash commands
+
+`.claude/commands/` gives a Claude Code session in this checkout six shortcuts for the
+everyday operations, each a short brief that wraps `vmctl` the way the maintainer runs it:
+`/vm-status [vm]`, `/vm-desktop <vm>`, `/vm-unattended <vm> [--clean]` (picks the bootstrap
+flow from the profile, runs it in the background, watches the log), `/vm-ssh <vm> <cmd>`
+(project key, `BatchMode`, the legacy `ssh_options`), `/vm-shot <vm>` (a QMP screenshot,
+also of a running installer) and `/vm-stop <vm>`.
+
 ## Documentation
 
 [docs/README.md](docs/README.md) is the map: what to read, in which order, for
