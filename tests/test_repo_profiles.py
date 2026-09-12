@@ -13,6 +13,7 @@ import vmctl.config  # noqa: E402
 import vmctl.kickstart  # noqa: E402
 import vmctl.netlab  # noqa: E402
 import vmctl.preseed  # noqa: E402
+import vmctl.reactos  # noqa: E402
 import vmctl.state  # noqa: E402
 import vmctl.windows  # noqa: E402
 
@@ -80,7 +81,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         }
         verified_templates = {"windows10-template", "windows11-template"}
         # The Ubuntu desktop history: clean reinstall of each with the final recipe on 2026-09-12.
-        verified_history = {f"ubuntu-{v}-unattended" for v in ("8.04", "10.04", "12.04", "14.04", "16.04", "18.04")}
+        verified_history = {f"ubuntu-{v}-unattended" for v in ("8.04", "10.04", "12.04", "14.04", "16.04", "18.04", "20.04", "22.04")} | {"reactos"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = ("2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
@@ -179,6 +180,19 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             check = vm["ssh_provision"]["post_install_run"][0]
             self.assertIn("verify-desktop" if float(version) >= 16 else "x-session-manag(er)?", check)
         self.assertEqual(cfg["vms"]["ubuntu-8.04-unattended"]["preseed_config"]["disk_device"], "auto")
+        # 20.04 and 22.04 ride the autoinstall recipe of ubuntu-gnome-24.04, which is the 24.04 entry.
+        for version, port in (("20.04", 2258), ("22.04", 2259)):
+            vm = cfg["vms"][f"ubuntu-{version}-unattended"]
+            # 22.04 installs the metapackage as an autoinstall package; 20.04's subiquity 22.07 sees only
+            # the CD pool at that point, so the desktop goes through a late-command (verified live).
+            desktop_sources = vm["autoinstall"].get("packages", []) + vm["autoinstall"].get("late_commands", [])
+            self.assertTrue(any("ubuntu-desktop" in entry for entry in desktop_sources), version)
+            self.assertEqual(vm["ssh_provision"]["ssh_host_port"], port)
+            self.assertEqual(vm["autoinstall"]["username"], "lab")
+            self.assertIn("/etc/gdm3/custom.conf", [f["path"] for f in vm["cloud_init"]["write_files"]])
+            self.assertIs(vm.get("vmport"), False)
+            self.assertEqual(Path(vm["iso"]).name, vm["iso_url"].rsplit("/", 1)[1])
+            self.assertEqual(vm["meta"]["status"], "unattended")
         self.assertEqual(cfg["vms"]["ubuntu-8.04-unattended"]["disk"]["interface"], "ide")
 
         # ReactOS: no virtio storage driver, no UEFI, no SMP in the release; user-supplied ISO
@@ -186,6 +200,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         reactos = cfg["vms"]["reactos"]
         self.assertEqual((reactos["disk"]["interface"], reactos["network_device"], reactos["firmware"]["type"], reactos["cpus"]), ("ide", "e1000", "bios", 1))
         self.assertEqual((reactos["audio"], reactos["audio_device"]), (True, "ac97"))
+        self.assertEqual(reactos["meta"]["status"], "unattended")
+        self.assertEqual(reactos["reactos_config"]["password"], "lab")
+        self.assertIn("UnattendSetupEnabled = yes", vmctl.reactos.render_unattend("reactos", reactos))
         self.assertNotIn("iso_url", reactos)
 
         # Windows 7: BIOS, e1000e (no NetKVM needed), no SSH (no OpenSSH on 7), generic identity.

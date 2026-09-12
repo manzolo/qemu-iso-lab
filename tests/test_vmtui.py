@@ -405,7 +405,7 @@ class VmtuiTests(unittest.TestCase):
                 )
                 self.assertEqual(result.stdout, "")
                 first, second = [json.loads(line) for line in log.read_text().splitlines()]
-                self.assertIn("--expect=ctrl-r,f5", first["args"])
+                self.assertTrue(any(arg.startswith("--expect=ctrl-r,f5") for arg in first["args"]), first["args"])
                 self.assertFalse(any(row.startswith("Boot Desktop\t") for row in first["rows"]))
                 self.assertTrue(any(row.startswith("Boot Desktop\t") for row in second["rows"]))
                 header = next(arg for arg in second["args"] if arg.startswith("--header="))
@@ -414,6 +414,65 @@ class VmtuiTests(unittest.TestCase):
                 position = next(i for i, row in enumerate(second["rows"], 1)
                                 if row.startswith("Profile Details\t"))
                 self.assertIn(f"start:pos({position})", second["args"])
+
+    def test_vm_menu_alt_shortcuts_pick_their_action_or_redraw(self):
+        fake = self.bindir / "fzf"
+        fake.write_text(
+            f"#!{sys.executable}\n"
+            "import json, os, sys\n"
+            "from pathlib import Path\n"
+            "if sys.argv[1:] == ['--version']:\n"
+            "    print('0.36.0'); raise SystemExit\n"
+            "root = Path(os.environ['VMTUI_ROOT_DIR'])\n"
+            "log = root / 'picker.jsonl'\n"
+            "rows = sys.stdin.read().splitlines()\n"
+            "calls = len(log.read_text().splitlines()) if log.exists() else 0\n"
+            "with log.open('a') as out:\n"
+            "    out.write(json.dumps({'args': sys.argv[1:], 'rows': rows}) + '\\n')\n"
+            "if calls == 0:\n"
+            "    print(os.environ['TEST_HOTKEY'])\n"
+            "    print('Profile Details\\tProfile Details')\n"
+            "elif calls == 1 and os.environ.get('TEST_SECOND_HOTKEY'):\n"
+            "    print(os.environ['TEST_SECOND_HOTKEY'])\n"
+            "    print('Profile Details\\tProfile Details')\n"
+            "else:\n"
+            "    print('\\nBack\\tBack')\n",
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        log = self.bindir / "picker.jsonl"
+        # Alt-D on a VM whose menu offers "Boot Desktop": the action runs.
+        (self.bindir / "artifacts/test-ssh/disk.qcow2").parent.mkdir(parents=True, exist_ok=True)
+        (self.bindir / "artifacts/test-ssh/disk.qcow2").write_bytes(b"x" * (24 * 1024 * 1024))
+        result = subprocess.run(
+            ["bash", "-lc", "source bin/vmtui; current_vm=test-ssh; "
+             "is_na_action() { return 1; }; run_action() { echo \"action=$1\"; }; vm_menu_loop"],
+            cwd=ROOT, env=dict(self.env, VMTUI_UI="fzf", TEST_HOTKEY="alt-d"),
+            capture_output=True, text=True, check=True, timeout=15,
+        )
+        self.assertEqual(result.stdout.strip(), "action=Boot Desktop")
+        first = json.loads(log.read_text().splitlines()[0])
+        expect = next(arg for arg in first["args"] if arg.startswith("--expect="))
+        for key in ("ctrl-r", "f5", "alt-d", "alt-u", "alt-s", "alt-a", "alt-c", "alt-x", "alt-p", "alt-enter"):
+            self.assertIn(key, expect)
+        header = next(arg for arg in first["args"] if arg.startswith("--header="))
+        self.assertIn("Alt-D", header)
+        self.assertIn("Alt-U", header)
+        # Alt-X while the VM is not running: "Stop VM" is not in the menu, so the shortcut
+        # only redraws it (cursor kept) and the next pick is honoured.
+        log.unlink()
+        result = subprocess.run(
+            ["bash", "-lc", "source bin/vmtui; current_vm=test-ssh; "
+             "is_na_action() { return 1; }; run_action() { echo \"action=$1\"; }; vm_menu_loop"],
+            cwd=ROOT, env=dict(self.env, VMTUI_UI="fzf", TEST_HOTKEY="alt-x", TEST_SECOND_HOTKEY="alt-p"),
+            capture_output=True, text=True, check=True, timeout=15,
+        )
+        self.assertEqual(result.stdout.strip(), "action=Post-Install")
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        self.assertEqual(len(calls), 3)  # redraw after Alt-X, the Alt-P pick, then the menu again after the action
+        self.assertFalse(any(row.startswith("Stop VM\t") for row in calls[0]["rows"]))
+        position = next(i for i, row in enumerate(calls[1]["rows"], 1) if row.startswith("Profile Details\t"))
+        self.assertIn(f"start:pos({position})", calls[1]["args"])
 
     def test_vm_refresh_falls_back_when_highlighted_action_disappears(self):
         result = self.run_bash(

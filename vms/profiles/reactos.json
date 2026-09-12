@@ -7,7 +7,8 @@
         "family": "reactos",
         "role": "desktop",
         "release_model": "stable",
-        "status": "manual"
+        "status": "unattended",
+        "verified": "2026-09-12"
       },
       "iso": "isos/ReactOS-0.4.16-i386.iso",
       "disk": {
@@ -48,7 +49,23 @@
       },
       "usb_tablet": false,
       "iso_sha256": "6f15ca6e1edf5527b8489958d16c54f0da0e7948c305d7c89e74687c6cbf6855",
-      "audio_device": "ac97"
+      "audio_device": "ac97",
+      "reactos_config": {
+        "fullname": "Lab User",
+        "computer_name": "REACTOS-LAB",
+        "password": "lab",
+        "locale_id": "409",
+        "timezone_index": 85,
+        "installation_type": "workstation",
+        "fs_type": "fat",
+        "display": {
+          "XResolution": 1024,
+          "YResolution": 768,
+          "BitsPerPel": 32
+        },
+        "run_once": []
+      },
+      "notes": "ReactOS 0.4.16 BootCD from the SourceForge zip (unzip it into isos/). bootstrap-reactos rebuilds it with unattend.inf (both Setup stages answered, AutoPartition + FAT format, Administrator password 'lab') and Setup as the default boot entry, then waits for the GuiRunOnce token on COM1 and the guest's shutdown. Install only: no SSH server exists for ReactOS. vmctl install still boots the plain ISO (LiveCD by default, Setup in the boot menu)."
     }
   }
 }

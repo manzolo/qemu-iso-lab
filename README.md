@@ -123,7 +123,7 @@ See [docs/IMPORT_DISKS.md](docs/IMPORT_DISKS.md) for checks, dependencies and fa
 
 ## The catalog
 
-70 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
+72 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
 prints them all; the table shows what each family offers.
 
 | Family | Profiles | Highlights | Unattended |
@@ -131,11 +131,11 @@ prints them all; the table shows what each family offers.
 | Arch | `arch`, `endeavouros`, `cachyos-live`, `cachyos-desktop`, `cachyos-nvidia`, `arch-noctalia`, `arch-dms`, `arch-dms-nvidia`, `arch-omarchy-nvidia` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes | `bootstrap-archinstall`, `bootstrap-omarchy` |
 | Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop-live`, `ubuntu-server-live`, `ubuntu-server-ci`, `ubuntu-niri`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
 | Ubuntu desktop flavors | `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `ubuntu-budgie-24.04` | LXQt, Plasma, Xfce, MATE and Budgie on the 24.04 LTS server ISO, display-manager autologin (kvm-lab's flavor family) | `bootstrap-unattended` |
-| Ubuntu desktop history | `ubuntu-8.04-desktop`, `ubuntu-10.04-desktop`, `ubuntu-12.04-desktop`, `ubuntu-14.04-desktop`, `ubuntu-16.04-desktop`, `ubuntu-18.04-desktop`, `ubuntu-20.04-desktop`, `ubuntu-22.04-desktop`, `ubuntu-24.04-desktop` | every Ubuntu desktop LTS from Hardy to Noble on the official desktop ISO (vendor checksums from old-releases / releases), BIOS + PATA + e1000 for 8.04, UEFI from 14.04 on; `ubuntu-8.04-unattended`, `ubuntu-10.04-unattended`, `ubuntu-12.04-unattended`, `ubuntu-14.04-unattended`, `ubuntu-16.04-unattended`, `ubuntu-18.04-unattended` install the same desktops from the d-i alternate/server media with autologin and legacy-SSH provisioning | `bootstrap-preseed` |
+| Ubuntu desktop history | `ubuntu-8.04-desktop`, `ubuntu-10.04-desktop`, `ubuntu-12.04-desktop`, `ubuntu-14.04-desktop`, `ubuntu-16.04-desktop`, `ubuntu-18.04-desktop`, `ubuntu-20.04-desktop`, `ubuntu-22.04-desktop`, `ubuntu-24.04-desktop` | every Ubuntu desktop LTS from Hardy to Noble on the official desktop ISO (vendor checksums from old-releases / releases), BIOS + PATA + e1000 for 8.04, UEFI from 14.04 on; `ubuntu-8.04-unattended`, `ubuntu-10.04-unattended`, `ubuntu-12.04-unattended`, `ubuntu-14.04-unattended`, `ubuntu-16.04-unattended`, `ubuntu-18.04-unattended` install the same desktops from the d-i alternate/server media with autologin and legacy-SSH provisioning; `ubuntu-20.04-unattended`, `ubuntu-22.04-unattended` and `ubuntu-gnome-24.04` do it with autoinstall + `ubuntu-desktop` | `bootstrap-preseed`, `bootstrap-unattended` |
 | Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms`, `fedora-silverblue`, `almalinux-minimal`, `almalinux-server`, `rocky-9` | Fedora 42/44, niri + DankMaterialShell on Fedora, immutable Silverblue (ostree), AlmaLinux 10.1, Rocky Linux 9 | `bootstrap-kickstart` |
 | openSUSE / NixOS / Void | `opensuse-tumbleweed-autoyast`, `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros, Tumbleweed GNOME installed unattended with AutoYaST | `bootstrap-autoyast`, interactive |
 | Alpine / BSD / Kali | `alpine-ci`, `alpine-ci-installed`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.23 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
-| ReactOS | `reactos` | ReactOS 0.4.16 (BIOS, PATA disk, e1000, one CPU) from the SourceForge zip, unpacked by hand into `isos/` | manual |
+| ReactOS | `reactos` | ReactOS 0.4.16 (BIOS, PATA disk, e1000, AC97, one CPU) from the SourceForge zip unpacked by hand into `isos/`; unattended install through `unattend.inf` on a rebuilt BootCD, install only (no SSH server) | `bootstrap-reactos` |
 | Windows | `windows11-unattended`, `windows10-unattended`, `windows7-unattended`, `windows10-template`, `windows11-template` | unattended Windows 11 and 10 (autounattend.xml, virtio drivers, OpenSSH), Windows 7 Ultimate (BIOS/MBR, install only), import targets for physical disks (`vmctl import-device`) | `bootstrap-windows` |
 | Network lab | `pfsense-lab`, `pihole-lab`, `lubuntu-lab` | pfSense CE 2.7.2 router + Pi-hole v6 + Lubuntu client on an isolated LAN segment (kvm-lab's network lab on plain QEMU; libvirt network after export) | `vmctl lab install`, `bootstrap-pfsense`, `bootstrap-unattended` |
 
@@ -162,6 +162,7 @@ vmctl bootstrap-archinstall arch-dms            # Arch: pacstrap script on the l
 vmctl bootstrap-omarchy arch-omarchy-nvidia     # Omarchy: official cidata mechanism
 vmctl bootstrap-windows windows11-unattended          # Windows 11: autounattend.xml on a seed CD, prompt-free ISO
 vmctl bootstrap-pfsense pfsense-lab                   # pfSense CE: scripted bsdinstall, rendered config.xml (network lab)
+vmctl bootstrap-reactos reactos                       # ReactOS: unattend.inf on a rebuilt BootCD, both Setup stages, install only
 vmctl lab install                                     # the whole network lab: router -> Pi-hole -> client
 ```
 

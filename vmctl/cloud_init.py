@@ -237,6 +237,14 @@ def render_autoinstall_user_data(vm_name: str, vm: dict[str, Any], dry_run: bool
     }
     if config.get("packages"):
         autoinstall_section["packages"] = list(config["packages"])
+    # ``late_commands``: subiquity late-commands, run on the live system after the install with the
+    # target's final apt sources restored. Subiquity 22.07 (the 20.04.6 ISO) installs ``packages``
+    # with only the CD pool in the target's sources.list (the mirror sits in
+    # sources.list.curtin.old until the end), so anything not on the live-server CD ends in
+    # "Unable to locate package" there and has to go through ``curtin in-target`` here (verified live).
+    late_commands = [str(command) for command in (config.get("late_commands") or [])]
+    if late_commands:
+        autoinstall_section["late-commands"] = late_commands
     if ci is not None:
         autoinstall_section["user-data"] = render_cloud_init_payload(ci, dry_run=dry_run, include_user=False)
     return "#cloud-config\n" + json.dumps(payload, indent=2) + "\n"

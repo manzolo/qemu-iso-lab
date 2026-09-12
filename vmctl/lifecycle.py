@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, report, runtime, ssh, state, ui, windows
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, runtime, ssh, state, ui, windows
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -370,6 +370,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         return ("skip", "alpine_config without SSH post-install")
     if pfsense.pfsense_config(vm) is not None:
         return ("bootstrap-pfsense", "pfSense scripted install (network lab router)")
+    if reactos.reactos_config(vm) is not None:
+        return ("bootstrap-reactos", "unattend.inf install only (no SSH server on ReactOS)")
     if windows.windows_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-windows", "autounattend + post-install")
@@ -474,7 +476,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-reactos"}:
             candidates.append(vm_name)
     return candidates
 
@@ -691,6 +693,25 @@ def run_local_test_vm(
     if mode == "bootstrap-pfsense":
         try:
             cmd_bootstrap_pfsense(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
+            boot_for_report_screenshot(vm_name, prepared_vm, args)
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-reactos":
+        try:
+            cmd_bootstrap_reactos(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -1455,6 +1476,70 @@ def cmd_bootstrap_pfsense(args: argparse.Namespace) -> int:
         scheme = "https" if guest_port == 443 else "http"
         ui.print_note(f"Web GUI once started: {scheme}://127.0.0.1:{host_port}/  (user {router_user} or admin)")
     ui.print_note(f"Start it with: vmctl start {args.vm} --headless --background   (or: vmctl lab up)")
+    return 0
+
+
+def reactos_source_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
+    """The ReactOS BootCD: SourceForge ships it inside a zip, so it is a local file unzipped into isos/."""
+    iso_path = runtime.resolve_path(vm["iso"])
+    if iso_path.is_file():
+        return iso.ensure_iso(vm, dry_run=dry_run)
+    if iso.iso_url_candidates(vm, allow_discovery=False):
+        return iso.ensure_iso(vm, dry_run=dry_run)
+    if dry_run:
+        ui.print_status("warn", f"ISO {ui.pretty_path(iso_path)} is missing: dry-run continues with the path", ok=False)
+        return iso_path
+    raise VMError(
+        f"ReactOS ISO not found: {iso_path}. Download the release zip from https://reactos.org/download/, "
+        f"unzip the .iso there or set \"iso\" for '{vm_name}' in vms/profiles/local.json"
+    )
+
+
+def cmd_bootstrap_reactos(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if reactos.reactos_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define reactos_config")
+    reactos.check_profile(args.vm, vm)
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap ReactOS (unattend.inf): {args.vm}")
+
+    source_iso = reactos_source_iso(args.vm, vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    unattend = reactos.render_unattend(args.vm, vm)
+    install_iso = reactos.ensure_install_iso(args.vm, vm, source_iso, unattend, dry_run=args.dry_run)
+
+    # No -no-reboot: Setup reboots after the text stage and after the GUI stage; the disk carries
+    # bootindex=1, so once it is bootable it wins over the CD, like the Windows flow.
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+        disk_bootindex=1,
+        network_phase="install",
+    )
+    install_qemu_args += reactos.install_media_args(install_iso)
+
+    ui.print_note("Booting ReactOS Setup — waiting for the completion token on COM1 (text stage, GUI stage, first logon)...")
+    ui.print_note(f"Watch the screen with: vmctl attach {args.vm}")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    qemu.run_and_expect(
+        install_qemu_args,
+        expected_text=reactos.BOOTSTRAP_COMPLETE_TOKEN,
+        timeout_sec=getattr(args, "timeout", 1800),
+        dry_run=args.dry_run,
+        log_path=serial_log,
+        exit_grace_sec=reactos.SHUTDOWN_GRACE_SEC,
+    )
+    ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
+    ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: ReactOS ships no server, the desktop autologs in as Administrator)")
     return 0
 
 

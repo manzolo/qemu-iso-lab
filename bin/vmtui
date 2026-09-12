@@ -154,14 +154,31 @@ fzf_pick() {
     fi
     # MENU_REFRESH=1 asks fzf to report Ctrl-R / F5 instead of swallowing them, so the
     # caller can rebuild the list. A plain letter would be wrong here: the picker uses
-    # letters to filter and to jump between VMs.
+    # letters to filter and to jump between VMs. MENU_HOTKEYS ("key=Tag" lines, e.g.
+    # "alt-d=Boot Desktop") adds shortcuts that pick a tag directly, for the same reason
+    # on Alt rather than on a bare letter.
+    local -a expect_keys=()
+    local -A hotkey_tags=()
     if [[ "${MENU_REFRESH:-0}" == "1" ]]; then
-        args+=(--expect="$MENU_REFRESH_KEYS")
+        expect_keys+=("$MENU_REFRESH_KEYS")
+    fi
+    if [[ -n "${MENU_HOTKEYS:-}" ]]; then
+        local entry
+        while IFS= read -r entry; do
+            [[ "$entry" == *=* ]] || continue
+            hotkey_tags["${entry%%=*}"]="${entry#*=}"
+            expect_keys+=("${entry%%=*}")
+        done <<< "$MENU_HOTKEYS"
+    fi
+    if (( ${#expect_keys[@]} )); then
+        local IFS=,
+        args+=(--expect="${expect_keys[*]}")
+        unset IFS
     fi
     local output
     output=$(printf '%s\n' "${lines[@]}" | fzf "${args[@]}") || return 1
     local selected="$output"
-    if [[ "${MENU_REFRESH:-0}" == "1" ]]; then
+    if (( ${#expect_keys[@]} )); then
         # With --expect the first line is the key that closed the picker (empty for Enter)
         # and the second is the highlighted row.
         local key="${output%%$'\n'*}"
@@ -169,6 +186,17 @@ fzf_pick() {
         if [[ -n "$key" ]]; then
             MENU_HIGHLIGHTED="${selected%%$'\t'*}"
             [[ "$selected" == *$'\t'* ]] || MENU_HIGHLIGHTED=""
+            if [[ -n "${hotkey_tags[$key]:-}" ]]; then
+                # A shortcut selects its tag when the menu offers it right now; otherwise
+                # it is a no-op that redraws the menu with the cursor where it was.
+                local wanted="${hotkey_tags[$key]}" line
+                for line in "${lines[@]}"; do
+                    if [[ "${line%%$'\t'*}" == "$wanted" ]]; then
+                        printf '%s\n' "$wanted"
+                        return 0
+                    fi
+                done
+            fi
             # Return the cursor with the result: callers run us in $(...),
             # where assignments to MENU_HIGHLIGHTED cannot reach the parent.
             printf '%s\t%s\n' "$MENU_REFRESH_TAG" "$MENU_HIGHLIGHTED"
@@ -190,6 +218,9 @@ fzf_menu() {
         local ok_label="${MENU_OK_LABEL:-select}" cancel_label="${MENU_CANCEL_LABEL:-cancel}"
         printf -v hint '  \e[1mEnter\e[0m %s    \e[1mCtrl-R / F5\e[0m refresh    \e[1mEsc\e[0m %s\n' \
             "${ok_label,,}" "${cancel_label,,}"
+    fi
+    if [[ -n "${MENU_HOTKEY_HINT:-}" ]]; then
+        hint="$hint"$'\n'"$MENU_HOTKEY_HINT"
     fi
     fzf_pick "$title" "$prompt\n$hint" "${MENU_DEFAULT_ITEM:-}" "$@"
 }
@@ -558,6 +589,7 @@ def facts(name, vm):
         "has_alpine": has_section(vm, "alpine_config"),
         "has_windows": has_section(vm, "windows_config"),
         "has_pfsense": has_section(vm, "pfsense_config"),
+        "has_reactos": has_section(vm, "reactos_config"),
         "has_netlab": has_section(vm, "network_lab"),
         "has_cloud_init": has_section(vm, "cloud_init"),
         "video_default": str(video.get("default", "")),
@@ -877,6 +909,8 @@ primary_install_action() {
         printf '%s\n' "Alpine Bootstrap"
     elif [[ "${FACTS[has_pfsense]:-0}" == "1" ]]; then
         printf '%s\n' "pfSense Bootstrap"
+    elif [[ "${FACTS[has_reactos]:-0}" == "1" ]]; then
+        printf '%s\n' "ReactOS Bootstrap"
     elif [[ "${FACTS[has_windows]:-0}" == "1" ]]; then
         printf '%s\n' "Windows Bootstrap"
     elif [[ "${FACTS[has_autoinstall]:-0}" == "1" && "${FACTS[has_ssh]:-0}" == "1" ]]; then
@@ -1061,6 +1095,9 @@ build_vm_menu_items() {
     elif [[ "${FACTS[has_pfsense]:-0}" == "1" ]]; then
         emit_action "pfSense Bootstrap" "Scripted pfSense install for the network lab router (rendered config.xml)"
         emit_action "Network Lab Plan" "Topology, forwards and install order of the lab"
+    elif [[ "${FACTS[has_reactos]:-0}" == "1" ]]; then
+        emit_action "ReactOS Bootstrap" "Fully automated ReactOS install (unattend.inf, install only)"
+        emit_action "Guided Provision" "Prepare artifacts, boot the ReactOS BootCD by hand"
     elif [[ "${FACTS[has_windows]:-0}" == "1" ]]; then
         emit_action "Windows Bootstrap" "Fully automated autounattend install + OpenSSH post-install"
         emit_action "Guided Provision" "Prepare artifacts, boot the Windows installer by hand"
@@ -1418,6 +1455,7 @@ resolve_action() {
         "Alpine Bootstrap") printf '%s\n' bootstrap-alpine ;;
         "Windows Bootstrap") printf '%s\n' bootstrap-windows ;;
         "pfSense Bootstrap") printf '%s\n' bootstrap-pfsense ;;
+        "ReactOS Bootstrap") printf '%s\n' bootstrap-reactos ;;
         "Network Lab Plan") printf '%s\n' lab-plan ;;
         "Full Bootstrap") printf '%s\n' bootstrap-unattended ;;
         "Guided Install"|"Guided Provision") printf '%s\n' provision ;;
@@ -1582,6 +1620,11 @@ run_action() {
         bootstrap-pfsense)
             if confirm_box "pfSense Bootstrap" "Run the scripted pfSense install for VM '$current_vm'?\n\nThis will:\n- render config.xml from the network_lab topology (WAN slirp, LAN segment, NAT forwards)\n- build a per-VM unattended ISO from the local pfSense CE 2.7.2 ISO (xorriso + growisofs)\n- boot the installer headless (BIOS, ZFS on vtbd0) and wait for the completion token\n\nExpected time: ~5-10 min. Then: vmctl lab up"; then
                 run_vmctl bootstrap-pfsense "$current_vm" || true
+            fi
+            ;;
+        bootstrap-reactos)
+            if confirm_box "ReactOS Bootstrap" "Run the unattended ReactOS install for VM '$current_vm'?\n\nThis will:\n- rebuild the BootCD once per profile with unattend.inf and Setup as the default boot entry (xorriso)\n- create the disk\n- boot Setup headless: text stage, GUI stage, first logon (watch it with Attach Display)\n- wait for the completion token on COM1 and the guest's own shutdown\n\nExpected time: ~5-10 min. No SSH post-install: ReactOS ships no server."; then
+                run_vmctl bootstrap-reactos "$current_vm" || true
             fi
             ;;
         lab-plan)
@@ -1784,6 +1827,23 @@ run_action() {
     esac
 }
 
+# vm_menu_hotkeys → "key=Tag" lines for the VM menu (FACTS and RECOMMENDED already loaded).
+vm_menu_hotkeys() {
+    printf '%s\n' \
+        "alt-d=Boot Desktop" \
+        "alt-u=$(primary_install_action)" \
+        "alt-s=SSH Console" \
+        "alt-a=Attach Display" \
+        "alt-c=Serial Console" \
+        "alt-x=Stop VM" \
+        "alt-p=Post-Install" \
+        "alt-enter=${RECOMMENDED:-}"
+}
+
+vm_menu_hotkey_hint() {
+    printf '  \e[1mAlt-D\e[0m desktop  \e[1mAlt-U\e[0m unattended install  \e[1mAlt-S\e[0m ssh  \e[1mAlt-A\e[0m display  \e[1mAlt-C\e[0m serial  \e[1mAlt-X\e[0m stop  \e[1mAlt-P\e[0m post-install  \e[1mAlt-Enter\e[0m suggested\n'
+}
+
 vm_menu_loop() {
     local vm_cursor=""
     while true; do
@@ -1799,8 +1859,15 @@ vm_menu_loop() {
         (( found )) || vm_cursor="$RECOMMENDED"
         local header
         header=$(vm_workspace_header)
+        # Alt shortcuts for the everyday actions (fzf only): each picks its entry when the
+        # menu offers it right now and is a no-op otherwise. Alt-U is this profile's
+        # unattended install, Alt-Enter the suggested action.
+        local hotkeys hotkey_hint
+        hotkeys=$(vm_menu_hotkeys)
+        hotkey_hint=$(vm_menu_hotkey_hint)
         local selected
-        selected=$(MENU_NO_TAGS=1 MENU_REFRESH=1 MENU_STYLED=1 MENU_DEFAULT_ITEM="${vm_cursor:-$RECOMMENDED}" MENU_CANCEL_LABEL="Back" MENU_WIDTH=96 \
+        selected=$(MENU_NO_TAGS=1 MENU_REFRESH=1 MENU_STYLED=1 MENU_HOTKEYS="$hotkeys" MENU_HOTKEY_HINT="$hotkey_hint" \
+            MENU_DEFAULT_ITEM="${vm_cursor:-$RECOMMENDED}" MENU_CANCEL_LABEL="Back" MENU_WIDTH=96 \
             menu_choose_fit \
             "$current_vm — ${FACTS[label]:-}" \
             "$header" \

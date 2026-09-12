@@ -96,7 +96,10 @@ NOPASSWD rule both as a `sudoers.d` drop-in and as the last line of `/etc/sudoer
 `#includedir` and 10.04 lists `%admin` after it, so the drop-in alone still asked for a password.
 The server media do not install the `ubuntu-desktop` *task*; the metapackage goes
 through `pkgsel/include` instead. From 16.04 the guests run systemd, so the shared `verify-desktop` check applies and the
-`ttyS0` getty is `serial-getty@ttyS0.service`; 18.04 autologs in through GDM3. The desktop check accepts `x-session-manager`, the name the
+`ttyS0` getty is `serial-getty@ttyS0.service`; 18.04 autologs in through GDM3.
+20.04 and 22.04 (`ubuntu-20.04-unattended`, `ubuntu-22.04-unattended`) leave d-i behind: they are
+`bootstrap-unattended` copies of `ubuntu-gnome-24.04` (live-server autoinstall + `ubuntu-desktop`),
+which stands for 24.04 in the series. The desktop check accepts `x-session-manager`, the name the
 8.04 session runs under, spelled as the 15-character comm `x-session-manag` that `pgrep -x` compares against.
 The late command also appends `UseDNS no` to `sshd_config`: the old sshd spent 5 s on a reverse
 lookup of the slirp host before each login and the host's SSH probe gave up first (verified
@@ -509,6 +512,41 @@ There is no SSH post-install: the account (`pfsense_config.username`, bcrypt
 hash of the password, the project's public key) and every rule are in the
 config.xml. The Linux members of the lab ride `bootstrap-unattended` with the
 `network_lab` post-install hook.
+
+## ReactOS: unattend.inf
+
+```bash
+vmctl bootstrap-reactos reactos            # needs isos/ReactOS-0.4.16-i386.iso (unzip the SourceForge release zip)
+```
+
+ReactOS Setup reads `unattend.inf` from its source root, `\I386` on the BootCD
+(the copy under `\reactos` belongs to the LiveCD and is replaced too). With
+`UnattendSetupEnabled = yes` the text-mode stage (AutoPartition + format of the
+empty disk, file copy, boot loader on the MBR) and the GUI stage (owner,
+computer name, Administrator password, time zone, locale) run without a
+prompt, and `[GuiRunOnce]` runs commands at the first desktop logon.
+`reactos.py` renders the answer file from `reactos_config` (`fullname`,
+`computer_name`, `password` in plain text, `locale_id`, `timezone_index`,
+`installation_type`, `fs_type` fat/btrfs, `display`, `run_once`) and builds a
+per-VM ISO (`artifacts/<vm>/reactos/install.iso`, `.source` stamp of ISO +
+answers): one `xorriso -indev ... -outdev ... -boot_image any replay` pass
+grafts `unattend.inf` (CRLF) into both places and a `freeldr.ini` whose default
+entry is `Setup` with a 2 s timeout, because the release BootCD boots the Live
+environment by default. No extraction, no 7z.
+
+QEMU boots the `pc` machine in BIOS mode with the PATA disk at `bootindex=1`
+and the CD as `ide-cd` on `ide.1` at `bootindex=2`, **without** `-no-reboot`:
+Setup reboots after each stage and the disk, once bootable, wins over the CD
+like the Windows flow. The completion signal is not a token of ours: the
+release kernel prints its debug log on COM1 whatever `freeldr.ini` says and
+that port belongs to the kernel debugger, so an `echo > COM1` from GuiRunOnce
+never reaches the host (verified live). The host waits for the kernel's own
+ACPI line `Entering sleep state S5`, printed exactly once when the
+`shutdown.exe /s /f /t 5` scheduled as the last GuiRunOnce command runs; the two
+Setup reboots are resets and never print it, a stuck Setup times out. The
+whole install takes about 90 s under KVM. Install only: ReactOS ships no SSH
+server, the desktop autologs in as Administrator. `check-vms` treats the
+profile like pfSense: install, boot for the report screenshot, stop.
 
 ## The completion-token rule
 

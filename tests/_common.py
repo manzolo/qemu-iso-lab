@@ -23,6 +23,7 @@ import vmctl.alpine  # noqa: E402
 import vmctl.autoyast  # noqa: E402
 import vmctl.archinstall  # noqa: E402
 import vmctl.preseed  # noqa: E402
+import vmctl.reactos  # noqa: E402
 import vmctl.kickstart  # noqa: E402
 import vmctl.cloud_init  # noqa: E402
 import vmctl.config  # noqa: E402
@@ -61,7 +62,7 @@ class _VmctlFacade:
         "REQUIRED_COMMANDS", "OPTIONAL_COMMANDS", "COMMON_OVMF_PAIRS",
     )
     _SEARCH_ORDER = (
-        vmctl.lifecycle, vmctl.libvirt, vmctl.pfsense, vmctl.netlab, vmctl.report, vmctl.ssh, vmctl.host_setup, vmctl.flash, vmctl.flash_allocated, vmctl.import_dev, vmctl.disk_inspect,
+        vmctl.lifecycle, vmctl.libvirt, vmctl.pfsense, vmctl.reactos, vmctl.netlab, vmctl.report, vmctl.ssh, vmctl.host_setup, vmctl.flash, vmctl.flash_allocated, vmctl.import_dev, vmctl.disk_inspect,
         vmctl.iso, vmctl.alpine, vmctl.autoyast, vmctl.windows, vmctl.archinstall, vmctl.omarchy, vmctl.preseed, vmctl.kickstart, vmctl.cloud_init, vmctl.qemu, vmctl.config,
         vmctl.runtime, vmctl.ui, vmctl.state, vmctl.errors,
     )

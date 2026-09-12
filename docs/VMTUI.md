@@ -55,6 +55,15 @@ available actions are rebuilt without returning to the dashboard. The highlighte
 action stays selected if it is still available; otherwise the cursor moves to the
 new suggested action. With `dialog`, reopen the menu to refresh it.
 
+With fzf the everyday actions also have Alt shortcuts, listed under the state
+summary: `Alt-D` Boot Desktop, `Alt-U` this profile's unattended install (Full
+Bootstrap, Debian Preseed Bootstrap, Windows Bootstrap, ReactOS Bootstrap...),
+`Alt-S` SSH Console, `Alt-A` Attach Display, `Alt-C` Serial Console, `Alt-X`
+Stop VM, `Alt-P` Post-Install and `Alt-Enter` the suggested action. A shortcut
+picks its entry only when the menu offers it right now (Alt-X on a stopped VM
+does nothing but redraw). Bare letters stay what they are in fzf, the filter;
+the dialog backend has no shortcuts.
+
 ![VM menu](screenshots/vmtui-vm-menu.png)
 
 Opening a VM shows the state, disk usage, ISO availability and SSH port above

@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "post-install", "cancel-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-reactos", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "agent", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -53,6 +53,7 @@ typical flows:
   vmctl bootstrap-omarchy <vm>          Omarchy: cidata install + NVIDIA post-install
   vmctl bootstrap-preseed <vm>          same for Debian  (kickstart: AlmaLinux/Fedora, archinstall: Arch, alpine: Alpine)
   vmctl bootstrap-windows <vm>          Windows 10/11: autounattend.xml install + OpenSSH post-install
+  vmctl bootstrap-reactos <vm>          ReactOS: unattend.inf install (text + GUI stage), install only
   vmctl lab install                     network lab: pfSense + Pi-hole + client, then `vmctl lab up`
   vmctl clean <vm>                      remove its disk and generated artifacts
   vmctl <command> --help                all options of one command
@@ -168,6 +169,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_pfsense)
+
+    p = _add(subparsers, "bootstrap-reactos", help="fully automated ReactOS install (unattend.inf on a rebuilt BootCD, install only: no SSH server)")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_reactos)
 
     p = _add(subparsers, "lab", help="network lab: plan, install [--export] (router -> Pi-hole -> clients), up/down/status/check on plain QEMU, export/unexport/libvirt-test for the libvirt road, clean (disks + artifacts), attach a VM to the LAN")
     p.add_argument("action", choices=["plan", "install", "up", "down", "status", "check", "export", "unexport", "libvirt-test", "clean", "attach"], help="what to do with the lab")

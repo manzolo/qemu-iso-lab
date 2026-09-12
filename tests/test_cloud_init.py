@@ -137,6 +137,15 @@ class CloudInitTests(BaseVmctlTestCase):
         self.assertIn('"authorized-keys": [', rendered)
         self.assertIn('"ssh-ed25519 AAAA generated"', rendered)
 
+    def test_render_autoinstall_user_data_passes_late_commands_through(self):
+        self.vm_config["autoinstall"] = {"username": "lab", "password_hash": "$6$x",
+                                         "late_commands": ["curtin in-target --target=/target -- apt-get install -y ubuntu-desktop"]}
+        rendered = json.loads(vmctl.cloud_init.render_autoinstall_user_data(self.vm_name, self.vm_config, dry_run=True).split("\n", 1)[1])
+        self.assertEqual(rendered["autoinstall"]["late-commands"], ["curtin in-target --target=/target -- apt-get install -y ubuntu-desktop"])
+        del self.vm_config["autoinstall"]["late_commands"]
+        rendered = json.loads(vmctl.cloud_init.render_autoinstall_user_data(self.vm_name, self.vm_config, dry_run=True).split("\n", 1)[1])
+        self.assertNotIn("late-commands", rendered["autoinstall"])
+
     def test_render_autoinstall_user_data_rejects_invalid_updates_value(self):
         self.vm_config["autoinstall"] = {
             "hostname": "testvm",
