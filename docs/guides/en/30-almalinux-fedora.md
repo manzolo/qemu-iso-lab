@@ -97,3 +97,13 @@ vmctl shell fedora-silverblue
 rpm-ostree status
 systemctl get-default
 ```
+
+## Fedora 44 KDE Plasma
+
+Profile `fedora-kde`, SSH 2260, `bootstrap-kickstart`. Plasma 6 Wayland with SDDM autologin; verifies an active local session, plasma-desktop, plasmashell and user-owned kwin_wayland. Compare kubuntu-24.04: Plasma 5.27 X11. Everything netinst uses the Fedora 44 online installation repository. Guest identity: `lab` / `lab`.
+
+```bash
+vmctl check-vms fedora-kde --clean-first --report --timeout 3600
+```
+
+Experimental until a clean live PASS; consult `vmctl list` for status and last verification.

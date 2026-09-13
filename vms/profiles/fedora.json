@@ -516,6 +516,109 @@
         ]
       },
       "iso_sha256": "9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682"
+    },
+    "fedora-kde": {
+      "name": "Fedora 44 KDE Plasma",
+      "meta": {
+        "slug": "fedora",
+        "family": "fedora",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "experimental"
+      },
+      "iso": "isos/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+      "disk": {
+        "path": "artifacts/fedora-kde/disk.qcow2",
+        "size": "40G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/fedora-kde/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "guest_agent": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Plasma 6 Wayland with SDDM autologin; verifies an active local session, plasma-desktop, plasmashell and user-owned kwin_wayland. Compare kubuntu-24.04: Plasma 5.27 X11. Everything netinst uses the Fedora 44 online installation repository. Experimental pending clean live validation.",
+      "kickstart_config": {
+        "hostname": "fedora-kde",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "locale": "en_US.UTF-8",
+        "bootloader_options": "--timeout=2",
+        "post_commands": [
+          "install -d -m0755 /etc/sddm.conf.d\ncat > /etc/sddm.conf.d/autologin.conf <<'SDDMEOF'\n[Autologin]\nUser={{user}}\nSession=plasma.desktop\nSDDMEOF",
+          "systemctl set-default graphical.target",
+          "systemctl enable sddm.service sshd.service serial-getty@ttyS0.service"
+        ],
+        "disk_device": "vda",
+        "selinux": "enforcing",
+        "firewall": "enabled",
+        "inst_repo": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/",
+        "packages": [
+          "@core",
+          "@kde-desktop",
+          "plasma-desktop",
+          "plasma-workspace",
+          "kwin",
+          "sddm",
+          "openssh-server",
+          "sudo",
+          "NetworkManager",
+          "qemu-guest-agent",
+          "spice-vdagent"
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2260,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service sddm.service --package-manager rpm --package plasma-desktop --process plasmashell",
+          "pgrep -u \"{{user}}\" -x kwin_wayland",
+          "rpm -q --qf '%{VERSION}\\n' plasma-desktop | grep -E '^6[.]'"
+        ]
+      },
+      "iso_sha256": "bd285201494dd0ba09b54d05ac707de1401668b8512a573edb5922dcf9d7067e"
     }
   }
 }

@@ -680,3 +680,7 @@ without a result is reported at phase `worker` with unavailable duration (0).
 ### Edubuntu 24.04 LTS
 
 `vmctl bootstrap-unattended edubuntu-24.04 --timeout 3600` (SSH 2268). Ubuntu Server 24.04.4 autoinstall with edubuntu-desktop, gdm3 autologin and a serial getty. The 60G disk leaves room for desktop packages; verification requires an active local graphical session and gnome-shell. Experimental until a clean live PASS.
+
+### Fedora 44 KDE Plasma
+
+`vmctl bootstrap-kickstart fedora-kde --timeout 3600` (SSH 2260). Plasma 6 Wayland with SDDM autologin; verifies an active local session, plasma-desktop, plasmashell and user-owned kwin_wayland. Compare kubuntu-24.04: Plasma 5.27 X11. Everything netinst uses the Fedora 44 online installation repository. Experimental until a clean live PASS.
