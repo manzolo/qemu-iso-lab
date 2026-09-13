@@ -45,7 +45,13 @@ def kernel_append(vm: dict[str, Any]) -> str:
     extra = str(cfg.get("kernel_append") or "").strip()
     repo = str(cfg.get("install_repo") or "").strip()
     append = (
-        "autoyast=usb:///autoinst.xml ifcfg=*=dhcp netsetup=dhcp textmode=1 "
+        # A cached NET image drifts behind the rolling repository within days. linuxrc then
+        # stops on "To use the selected repository a matching boot image is needed. Download
+        # it now and restart?" — a dialog drawn on the graphical console only, so the serial
+        # stays silent and the flow dies at its timeout with no evidence (verified live on
+        # 2026-09-13, six days of drift). kexec answers it without a user: linuxrc fetches
+        # the matching kernel/initrd and restarts itself, adding kexec=0 so it cannot loop.
+        "autoyast=usb:///autoinst.xml ifcfg=*=dhcp netsetup=dhcp textmode=1 instsyscomplain=0 "
         "console=ttyS0,115200 console=tty0"
     )
     if repo:

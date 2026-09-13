@@ -92,6 +92,15 @@ class AutoyastRenderTests(BaseVmctlTestCase):
         vm["autoyast_config"]["kernel_append"] = "vga=off"
         self.assertTrue(vmctl.autoyast.kernel_append(vm).endswith("vga=off"))
 
+    def test_kernel_append_silences_the_instsys_mismatch_prompt(self):
+        # A cached NET image ages behind the rolling repository: linuxrc compares its InitrdID
+        # with the repo and, at InstsysComplain 2 (the ISO default), opens "a matching boot
+        # image is needed. Download it now and restart?" on the graphical console only. The
+        # serial sees nothing and bootstrap-autoyast dies at its timeout. Verified live on
+        # 2026-09-13 with a six-day-old ISO: with instsyscomplain=0 the same media installed
+        # from the current repo and passed verify-desktop; kexec=2 did not silence it.
+        self.assertIn("instsyscomplain=0", vmctl.autoyast.kernel_append(self._vm()))
+
     def test_only_the_install_medium_is_a_cdrom_and_the_seed_is_usb(self):
         args = vmctl.autoyast.install_media_args(Path("/tmp/install.iso"), Path("/tmp/seed.iso"))
         joined = " ".join(args)
