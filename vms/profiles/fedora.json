@@ -582,7 +582,7 @@
         "post_commands": [
           "install -d -m0755 /etc/sddm.conf.d\ncat > /etc/sddm.conf.d/autologin.conf <<'SDDMEOF'\n[Autologin]\nUser={{user}}\nSession=plasma.desktop\nSDDMEOF",
           "systemctl set-default graphical.target",
-          "systemctl enable sddm.service sshd.service serial-getty@ttyS0.service"
+          "systemctl enable --force sddm.service sshd.service serial-getty@ttyS0.service"
         ],
         "disk_device": "vda",
         "selinux": "enforcing",
