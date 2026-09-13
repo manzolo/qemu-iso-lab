@@ -78,3 +78,13 @@ vmctl check-vms debian-gnome --clean-first --report --timeout 3600
 ```
 
 Experimental until a clean live PASS; consult `vmctl list` for status and last verification.
+
+## Kali Linux Xfce (Preseed)
+
+Profile `kali`, SSH 2269, `bootstrap-preseed`. Kali netinst preseed uses the vendor Xfce task selection and kali-rolling mirror, LightDM autologin and serial getty. Verification requires kali-desktop-xfce, an active local session and xfce4-session. Guest identity: `lab` / `lab`.
+
+```bash
+vmctl check-vms kali --clean-first --report --timeout 3600
+```
+
+Experimental until a clean live PASS; consult `vmctl list` for status and last verification.

@@ -909,6 +909,116 @@
       "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc",
       "guest_agent": true,
       "notes": "Debian 13 netinst with gnome-desktop, gdm3 autologin and ttyS0 getty. Requires an active local graphical session for {{user}}, gnome-shell and gnome-shell. Experimental pending clean live validation."
+    },
+    "kali": {
+      "name": "Kali Linux Xfce (Preseed)",
+      "meta": {
+        "slug": "kali",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "rolling",
+        "status": "experimental"
+      },
+      "iso": "isos/kali-linux-2026.2-installer-netinst-amd64.iso",
+      "iso_url": "https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-installer-netinst-amd64.iso",
+      "disk": {
+        "path": "artifacts/kali/disk.qcow2",
+        "size": "50G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/kali/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "preseed_config": {
+        "hostname": "kali",
+        "domain": "local",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "mirror_hostname": "http.kali.org",
+        "mirror_directory": "/kali",
+        "tasks": [
+          "standard,core,desktop-xfce,meta-default"
+        ],
+        "packages": [
+          "openssh-server",
+          "sudo",
+          "curl",
+          "ca-certificates",
+          "locales",
+          "qemu-guest-agent",
+          "spice-vdagent",
+          "kali-desktop-xfce"
+        ],
+        "late_commands": [
+          "install -d /etc/lightdm/lightdm.conf.d",
+          "printf '[Seat:*]\\nautologin-user={{user}}\\nautologin-user-timeout=0\\nautologin-session=xfce\\n' > /etc/lightdm/lightdm.conf.d/vmctl-autologin.conf",
+          "systemctl enable lightdm.service serial-getty@ttyS0.service",
+          "systemctl set-default graphical.target",
+          "systemctl enable ssh.service"
+        ],
+        "disk_device": "/dev/vda",
+        "extra": [
+          "d-i mirror/suite string kali-rolling",
+          "d-i apt-setup/services-select multiselect",
+          "d-i apt-setup/non-free boolean true",
+          "d-i apt-setup/contrib boolean true",
+          "d-i apt-setup/non-free-firmware boolean true"
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2269,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package kali-desktop-xfce --process xfce4-session"
+        ]
+      },
+      "iso_sha256": "d32f929dacc48134a31461a09f2160d13ad1d26b820cee920446813ca979b39b",
+      "guest_agent": true,
+      "notes": "Kali netinst preseed uses the vendor Xfce task selection and kali-rolling mirror, LightDM autologin and serial getty. Verification requires kali-desktop-xfce, an active local session and xfce4-session. Experimental until a clean live PASS; repository or mirror failures must be recorded, never bypassed."
     }
   }
 }
