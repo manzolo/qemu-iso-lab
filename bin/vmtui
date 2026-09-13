@@ -741,6 +741,10 @@ for f in rows:
     if context_hints:
         flags = [f["running"], f["installed"], f["has_ssh"], f["job_status"] == "running"]
         line += "\t" + " ".join(str(int(flag)) for flag in flags)
+        # Let the shared shell helper name the install flow without probing
+        # the VM again or duplicating the bootstrap selection rules here.
+        line += "".join(f" {key}=1" for key, enabled in f.items()
+                        if key.startswith("has_") and enabled)
     print(f["name"])
     print(line)
 PY
@@ -1881,7 +1885,7 @@ vm_shortcut_keys() {
         [[ "${FACTS[has_ssh]:-0}" == "1" ]] && printf '%s\n' s p
         printf '%s\n' u
     else
-        printf '%s\n' u
+        printf '%s\n' u f r
     fi
     return 0
 }
@@ -1893,6 +1897,8 @@ vm_menu_hotkeys() {
             d) action="Boot Desktop" ;;
             h) action="Boot Headless" ;;
             u) action=$(primary_install_action) ;;
+            f) action="Fetch ISO" ;;
+            r) action="Prepare VM" ;;
             s) action="SSH Console" ;;
             a) action="Attach Display" ;;
             c) action="Serial Console" ;;
@@ -1916,9 +1922,11 @@ vm_menu_hotkey_hint() {
             d) label=desktop ;;
             h) label=headless ;;
             u)
-                label=install
-                [[ "${FACTS[installed]:-0}" == "1" ]] && label=reinstall
+                label=$(primary_install_action)
+                [[ "${FACTS[installed]:-0}" == "1" ]] && label="reinstall: $label"
                 ;;
+            f) label='fetch ISO' ;;
+            r) label=prepare ;;
             s) label=ssh ;;
             a) label=screen ;;
             c) label=serial ;;
@@ -2233,17 +2241,20 @@ dashboard_loop() {
 
 # The dashboard shortcuts are the VM menu ones minus Alt-Enter: without the menu open
 # there is no highlighted suggestion to run.
-DASHBOARD_HOTKEYS="alt-d,alt-u,alt-s,alt-a,alt-c,alt-x,alt-p,alt-h,alt-l"
+DASHBOARD_HOTKEYS="alt-d,alt-u,alt-s,alt-a,alt-c,alt-x,alt-p,alt-h,alt-l,alt-f,alt-r"
 
 dashboard_hotkey_hint() {
-    if [[ ! "${1:-}" =~ ^[01]\ [01]\ [01]\ [01]$ ]]; then
+    if [[ ! "${1:-}" =~ ^[01]\ [01]\ [01]\ [01](\ has_[a-z_]+=1)*$ ]]; then
         printf '  Select a VM to see its shortcuts\n'
         return
     fi
     local -A FACTS=()
-    local installing
-    read -r 'FACTS[running]' 'FACTS[installed]' 'FACTS[has_ssh]' installing <<< "$1"
+    local installing capabilities capability
+    read -r 'FACTS[running]' 'FACTS[installed]' 'FACTS[has_ssh]' installing capabilities <<< "$1"
     [[ "$installing" == "1" ]] && FACTS[job_status]=running
+    for capability in $capabilities; do
+        FACTS["${capability%=1}"]=1
+    done
     vm_menu_hotkey_hint dashboard
 }
 

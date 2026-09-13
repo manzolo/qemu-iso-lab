@@ -53,9 +53,15 @@ The keys keep their meaning, and only relevant shortcuts are shown:
   `Alt-P` post-install. SSH, serial and post-install require SSH configuration.
 - Stopped with disk data: `Alt-D` desktop, `Alt-H` headless, `Alt-S` SSH,
   `Alt-P` post-install and `Alt-U` reinstall. SSH and post-install require SSH configuration.
-- Empty or missing disk: `Alt-U` install, using the profile's install flow.
+- Empty or missing disk: `Alt-U` the profile's install flow, `Alt-F` fetch ISO,
+  `Alt-R` prepare disk and firmware.
 - Installation in progress: `Alt-L` log and `Alt-X` cancel installation;
   `Alt-A` screen appears once the installer VM starts.
+
+`Alt-U` displays the actual flow name, such as Alpine Bootstrap, Debian Preseed
+Bootstrap or Windows Bootstrap; profiles without automation show Guided Provision.
+For a stopped VM with disk data, the label starts with `reinstall:` followed by
+the flow name. The same labels and shortcuts appear in the VM menu.
 
 Unavailable shortcuts do nothing. The state is checked again before a dashboard
 shortcut runs; `Ctrl-R` / `F5` refreshes the displayed snapshot. Alt-letter must reach the terminal:

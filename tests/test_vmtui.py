@@ -540,8 +540,9 @@ class VmtuiTests(unittest.TestCase):
 
     def test_shortcuts_and_hints_follow_vm_state(self):
         cases = [
-            ("0 0 0 0", ["u"], ["install"], ["screen", "ssh", "stop", "desktop"]),
-            ("0 0 1 0", ["u"], ["install"], ["ssh", "post-install"]),
+            ("0 0 0 0", ["u", "f", "r"], ["Guided Provision", "fetch ISO", "prepare"],
+             ["screen", "ssh", "stop", "desktop"]),
+            ("0 0 1 0", ["u", "f", "r"], ["Guided Provision"], ["ssh", "post-install"]),
             ("0 1 1 0", ["d", "h", "s", "p", "u"],
              ["desktop", "headless", "ssh", "reinstall"], ["screen", "serial", "stop"]),
             ("1 1 1 0", ["a", "s", "c", "x", "p"],
@@ -588,7 +589,7 @@ class VmtuiTests(unittest.TestCase):
         result = self.run_bash(
             "source bin/vmtui; MENU_CONTEXT_HINTS=1 list_dashboard_items find test-ssh"
         )
-        self.assertTrue(result.stdout.splitlines()[-1].endswith("\t0 1 1 0"))
+        self.assertTrue(result.stdout.splitlines()[-1].endswith("\t0 1 1 0 has_ssh=1"))
 
     def test_fzf_dashboard_focus_uses_hidden_context_hint(self):
         result = self.run_bash("""
@@ -610,8 +611,47 @@ MENU_NO_TAGS=1 MENU_CONTEXT_HINTS=1 MENU_REFRESH=1 fzf_pick T Header test-ssh \
         self.assertIn("Select a VM", rows["__filter"][2])
         self.assertIn("screen", rows["test-ssh"][2])
         self.assertNotIn("desktop", rows["test-ssh"][2])
-        self.assertIn("install", rows["empty"][2])
+        self.assertIn("Guided Provision", rows["empty"][2])
         self.assertNotIn("screen", rows["empty"][2])
+
+    def test_dashboard_names_the_bootstrap_bound_to_install_shortcut(self):
+        for vm, action in (("alpine-niri", "Alpine Bootstrap"),
+                           ("debian-server", "Debian Preseed Bootstrap"),
+                           ("windows11-unattended", "Windows Bootstrap"),
+                           ("arch-noctalia", "Arch Bootstrap"),
+                           ("alpine-ci", "Guided Provision")):
+            for installed in (False, True):
+                with self.subTest(vm=vm, installed=installed):
+                    if installed:
+                        self.mark_installed(vm)
+                    result = self.run_bash(f"""
+source bin/vmtui
+mapfile -t rows < <(MENU_CONTEXT_HINTS=1 list_dashboard_items find {vm})
+dashboard_hotkey_hint "${{rows[2]#*$'\\t'}}"
+load_vm_facts {vm}
+vm_menu_hotkey_hint dashboard
+run_action() {{ printf 'action=%s\\n' "$1"; }}
+run_dashboard_hotkey alt-u {vm}
+""")
+                    dashboard_hint, workspace_hint, invoked = result.stdout.splitlines()
+                    self.assertEqual(dashboard_hint, workspace_hint)
+                    self.assertIn(f"reinstall: {action}" if installed else action, dashboard_hint)
+                    self.assertEqual(invoked, f"action={action}")
+                    if not installed:
+                        self.assertNotIn("reinstall:", dashboard_hint)
+                        self.assertIn("fetch ISO", dashboard_hint)
+                        self.assertIn("prepare", dashboard_hint)
+
+    def test_fresh_and_empty_vm_shortcuts_dispatch_preparation_commands(self):
+        for prepared in (False, True):
+            with self.subTest(prepared=prepared):
+                if prepared:
+                    self.mark_prepared("test-ssh")
+                result = self.run_bash(
+                    "source bin/vmtui; run_vmctl() { printf '%s\\n' \"$*\"; }; "
+                    "run_dashboard_hotkey alt-f test-ssh; run_dashboard_hotkey alt-r test-ssh"
+                )
+                self.assertEqual(result.stdout.splitlines(), ["fetch-iso test-ssh", "prep test-ssh"])
 
     def test_dashboard_and_catalog_order_versions_naturally(self):
         base = json.loads((ROOT / "vms/profiles/core.json").read_text())["vms"]["alpine-ci"]
