@@ -62,3 +62,5 @@ Recorded dates:
 - `debian-kde` (SSH 2262): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Debian 13 kde-desktop task with sddm autologin, serial getty and active-session/package/process checks.
 
 - `debian-gnome` (SSH 2264): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Debian 13 gnome-desktop task with gdm3 autologin, serial getty and active-session/package/process checks.
+
+- `ubuntu-unity-24.04` (SSH 2265): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Ubuntu Server 24.04.4 autoinstall with ubuntu-unity-desktop, lightdm autologin and a serial getty. The 40G disk leaves room for desktop packages; verification requires an active local graphical session and compiz.

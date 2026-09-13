@@ -66,3 +66,13 @@ versions of all five flavors, this repo tracks the current LTS to keep the valid
 short. Personal variants belong in `local.json`, never in a tracked profile.
 
 Post-install now fails unless graphical.target is the default, the desktop metapackage is installed, the display manager is active and the configured user has an active local graphical session. An active greeter alone is not a successful autologin. The check waits up to roughly two minutes for session startup; no live verification was performed for this change.
+
+## Ubuntu Unity 24.04 LTS
+
+Profile `ubuntu-unity-24.04`, SSH 2265, `bootstrap-unattended`. Ubuntu Server 24.04.4 autoinstall with ubuntu-unity-desktop, lightdm autologin and a serial getty. The 40G disk leaves room for desktop packages; verification requires an active local graphical session and compiz. Guest identity: `lab` / `lab`.
+
+```bash
+vmctl check-vms ubuntu-unity-24.04 --clean-first --report --timeout 3600
+```
+
+Experimental until a clean live PASS; consult `vmctl list` for status and last verification.

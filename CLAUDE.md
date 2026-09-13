@@ -226,3 +226,5 @@ Every tracked profile declares `meta.status` (`manual`, `unattended`, `experimen
 `debian-kde` reuses `bootstrap-preseed`. Debian 13 kde-desktop task with sddm autologin, serial getty and active-session/package/process checks. SSH 2262; experimental pending clean live validation.
 
 `debian-gnome` reuses `bootstrap-preseed`. Debian 13 gnome-desktop task with gdm3 autologin, serial getty and active-session/package/process checks. SSH 2264; experimental pending clean live validation.
+
+`ubuntu-unity-24.04` reuses `bootstrap-unattended`. Ubuntu Server 24.04.4 autoinstall with ubuntu-unity-desktop, lightdm autologin and a serial getty. The 40G disk leaves room for desktop packages; verification requires an active local graphical session and compiz. SSH 2265; experimental pending clean live validation.

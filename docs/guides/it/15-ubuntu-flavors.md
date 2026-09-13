@@ -67,3 +67,13 @@ seguiamo la LTS corrente per non allungare troppo la matrice di validazione. Le 
 personali vanno in `local.json`, mai in un profilo tracciato.
 
 Il post-install ora fallisce se graphical.target non è il target predefinito, il metapacchetto desktop non è installato, il display manager non è attivo o manca una sessione grafica locale attiva dell’utente configurato. La sola schermata di login non dimostra che l’accesso automatico sia riuscito. Il controllo attende circa due minuti per l’avvio della sessione; questa modifica non è stata verificata dal vivo.
+
+## Ubuntu Unity 24.04 LTS
+
+Profilo `ubuntu-unity-24.04`, SSH 2265, `bootstrap-unattended`. Autoinstall sulla Server 24.04.4 con ubuntu-unity-desktop, autologin lightdm e getty seriale. Disco 40G; la verifica richiede una sessione grafica locale attiva e il processo compiz. Identità guest: `lab` / `lab`.
+
+```bash
+vmctl check-vms ubuntu-unity-24.04 --clean-first --report --timeout 3600
+```
+
+Experimental fino a un PASS dal vivo da disco pulito; `vmctl list` mostra stato e ultima verifica.
