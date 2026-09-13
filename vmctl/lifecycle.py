@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import copy
 
 import json
@@ -2629,16 +2628,22 @@ def cmd_test_local(args: argparse.Namespace) -> int:
         parallel = scheduler.parse_parallel(getattr(args, "parallel", 1))
     except ValueError as exc:
         raise VMError(str(exc)) from exc
-    dynamic: scheduler.DynamicScheduler | None = None
-    if parallel is None:
-        dynamic = scheduler.DynamicScheduler(scheduler.host_resources(), max_workers=min(scheduler.DEFAULT_MAX_WORKERS, max(1, len(selected_names))))
+    matrix_scheduler: scheduler.DynamicScheduler | None = None
+    if parallel != 1:
+        # `parallel is None` inline, not through `automatic`: mypy narrows the Optional only here.
+        automatic = parallel is None
+        resources = scheduler.host_resources() if parallel is None else scheduler.HostResources(0, 0, 1)
+        max_workers = scheduler.DEFAULT_MAX_WORKERS if parallel is None else parallel
+        matrix_scheduler = scheduler.DynamicScheduler(
+            resources, max_workers=min(max_workers, max(1, len(selected_names))), resource_budgets=automatic,
+        )
 
     restore = getattr(args, "restore", False)
     ui.print_header("Local VM test matrix")
     ui.print_kv("timeout", f"{args.timeout}s")
-    ui.print_kv("parallel", "auto (resource-aware)" if dynamic is not None else str(parallel))
-    if dynamic is not None:
-        scheduler.print_plan(dynamic, [(name, scheduler.vm_cost(config.get_vm(cfg, name))) for name in selected_names])
+    ui.print_kv("parallel", "auto (resource-aware)" if parallel is None else str(parallel))
+    if matrix_scheduler is not None:
+        scheduler.print_plan(matrix_scheduler, [(name, scheduler.vm_cost(config.get_vm(cfg, name))) for name in selected_names])
     ui.print_kv("mode", "restore (stash + revert)" if restore else "in place")
 
     stashed: dict[str, str] = {}
@@ -2659,15 +2664,16 @@ def cmd_test_local(args: argparse.Namespace) -> int:
                 vm = config.get_vm(cfg, vm_name)
                 status, detail = run_local_test_once(vm_name, vm, args)
                 results.append((vm_name, status, detail))
-        elif dynamic is not None:
+        elif matrix_scheduler is not None:
             for vm_name in selected_names:
                 ui.print_note(f"{vm_name} logs: {ui.pretty_path(check_vm_stdout_log_path(vm_name))} | {ui.pretty_path(check_vm_stderr_log_path(vm_name))}")
+                ui.print_note(f"tail -f {ui.pretty_path(check_vm_stdout_log_path(vm_name))}")
             jobs = [(vm_name, scheduler.vm_cost(config.get_vm(cfg, vm_name))) for vm_name in selected_names]
 
             def on_start(vm_name: str, cost: scheduler.VmCost, running_now: int) -> None:
                 ui.print_note(f"starting {vm_name} ({cost.mem_mb} MB, {cost.cpus} vCPU): {running_now} VM(s) running")
 
-            for vm_name, outcome in dynamic.run(jobs, lambda name: run_local_test_vm_subprocess(name, args), on_start=on_start):
+            for vm_name, outcome in matrix_scheduler.run(jobs, lambda name: run_local_test_vm_subprocess(name, args), on_start=on_start):
                 if isinstance(outcome, BaseException):
                     results.append((vm_name, "failed", str(outcome)))
                     ui.print_header(f"Test VM: {vm_name}")
@@ -2677,34 +2683,7 @@ def cmd_test_local(args: argparse.Namespace) -> int:
                 if output:
                     print(output, end="" if output.endswith("\n") else "\n")
                 results.append((vm_name, status, detail))
-            ui.print_kv("peak concurrency", str(dynamic.peak_running))
-        else:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
-                future_map = {
-                    executor.submit(run_local_test_vm_subprocess, vm_name, args): vm_name
-                    for vm_name in selected_names
-                }
-                for vm_name in selected_names:
-                    stdout_log = check_vm_stdout_log_path(vm_name)
-                    stderr_log = check_vm_stderr_log_path(vm_name)
-                    ui.print_note(
-                        f"{vm_name} logs: {ui.pretty_path(stdout_log)} | {ui.pretty_path(stderr_log)}"
-                    )
-                    ui.print_note(
-                        f"tail -f {ui.pretty_path(stdout_log)}"
-                    )
-                for future in concurrent.futures.as_completed(future_map):
-                    vm_name = future_map[future]
-                    try:
-                        status, detail, output = future.result()
-                    except Exception as exc:
-                        results.append((vm_name, "failed", str(exc)))
-                        ui.print_header(f"Test VM: {vm_name}")
-                        ui.print_status("fail", f"{vm_name}: {exc}", ok=False)
-                        continue
-                    if output:
-                        print(output, end="" if output.endswith("\n") else "\n")
-                    results.append((vm_name, status, detail))
+            ui.print_kv("peak concurrency", str(matrix_scheduler.peak_running))
     finally:
         if stashed:
             ui.print_header("Restore stashed artifacts")

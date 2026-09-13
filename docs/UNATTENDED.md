@@ -591,7 +591,7 @@ vmctl check-vms ubuntu-niri arch-noctalia --timeout 600
 vmctl check-vms --parallel 4 --clean-first
 ```
 
-`--parallel N` runs a fixed number of VMs concurrently; `--parallel auto` (what
+`--parallel N` runs up to N VMs concurrently; `--parallel auto` (what
 `make validate-vms` uses) packs them by the host's resources instead: every VM
 costs its guest RAM plus 512 MB of QEMU overhead and its vCPUs, the budget is
 the memory available at the start minus a 2 GB reserve for the host and the
@@ -605,6 +605,13 @@ directory aside, runs the matrix on a virgin state, then removes what the test
 created and moves the originals back, so validating every unattended flow does
 not cost you the VMs you already have installed. A stash is kept under
 `artifacts/.check-vms-restore/` only for the duration of the run.
+
+Both parallel modes keep VMs sharing host TCP ports from running together,
+including forwards used only during installation. For example, pfSense's WAN
+forwards overlap with Pi-hole and Lubuntu's installer SSH ports (2238/2239),
+so these jobs wait for pfSense to finish; unrelated VMs can still run alongside it.
+The waiting message lists the conflicting ports. This coordination applies to
+jobs in the same `check-vms` invocation.
 
 ### HTML reports and screenshots
 

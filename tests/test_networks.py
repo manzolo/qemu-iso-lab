@@ -25,6 +25,7 @@ class NetworkSpecTests(BaseVmctlTestCase):
         self.assertEqual(vmctl.qemu.network_args(self.vm_config),
                          ["-netdev", "user,id=n1,hostfwd=tcp:127.0.0.1:2299-:22", "-device", "virtio-net-pci,netdev=n1"])
         self.assertEqual(vmctl.qemu.network_args(self.vm_config, "install"), vmctl.qemu.network_args(self.vm_config, "runtime"))
+        self.assertEqual(vmctl.qemu.host_ports(self.vm_config), frozenset({2299}))
         self.vm_config["network"] = "bridge"
         with self.assertRaises(vmctl.errors.VMError):
             vmctl.qemu.network_args(self.vm_config)
@@ -57,6 +58,9 @@ class NetworkSpecTests(BaseVmctlTestCase):
         runtime_args = vmctl.qemu.network_args(self.vm_config, "runtime")
         self.assertTrue(runtime_args[1].startswith("socket,id=lan,mcast=239."))
         self.assertNotIn("hostfwd", runtime_args[1])
+        self.assertEqual(vmctl.qemu.host_ports(self.vm_config, "install"), frozenset({2238}))
+        self.assertEqual(vmctl.qemu.host_ports(self.vm_config, "runtime"), frozenset())
+        self.assertEqual(vmctl.qemu.host_ports(self.vm_config), frozenset({2238}))
 
     def test_default_mac_is_stable_per_disk_and_slot(self):
         first = vmctl.qemu.default_nic_mac(self.vm_config, 0)
@@ -86,6 +90,22 @@ class NetworkSpecTests(BaseVmctlTestCase):
             args = vmctl.qemu.network_args(self.vm_config, phase)
             self.assertEqual(args[1], "user,id=wan,hostfwd=tcp:127.0.0.1:2237-:22,hostfwd=tcp:127.0.0.1:8080-:80")
             self.assertEqual(args[7], "virtio-net-pci,netdev=lan,mac=52:54:00:aa:bb:cc")
+        self.assertEqual(vmctl.qemu.host_ports(self.vm_config), frozenset({2237, 8080}))
+
+    def test_host_ports_include_phase_specific_forwards_and_honor_disabled_ssh(self):
+        self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2250}
+        self.vm_config["networks"] = [
+            {"type": "user", "phase": "install", "ssh": False,
+             "hostfwd": [{"host_port": 8080, "guest_port": 80}]},
+            {"type": "user", "phase": "runtime", "ssh": False,
+             "hostfwd": [{"host_port": 8443, "guest_port": 443}]},
+        ]
+        self.assertEqual(vmctl.qemu.host_ports(self.vm_config, "install"), frozenset({8080}))
+        self.assertEqual(vmctl.qemu.host_ports(self.vm_config, "runtime"), frozenset({8443}))
+        self.assertEqual(vmctl.qemu.host_ports(self.vm_config), frozenset({8080, 8443}))
+        self.vm_config.pop("networks")
+        self.vm_config.pop("ssh_provision")
+        self.assertEqual(vmctl.qemu.host_ports(self.vm_config), frozenset())
 
     def test_only_the_first_user_nic_gets_the_ssh_forward_unless_told_otherwise(self):
         self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2250}

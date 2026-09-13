@@ -6,6 +6,8 @@ the next pending VM whenever the host budget still has room for it: four old Ubu
 together, a Windows waits until enough memory is back. The memory budget follows live
 availability, reserving unresident RAM during startup while keeping the initial static cap.
 CPUs allow mild oversubscription (installers sleep on I/O far more than they compute).
+Both modes serialize jobs sharing host TCP ports; fixed parallelism disables only the
+RAM and CPU budgets.
 """
 from __future__ import annotations
 
@@ -17,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
 
-from vmctl import ui
+from vmctl import qemu, ui
 
 T = TypeVar("T")
 
@@ -44,6 +46,10 @@ class HostResources:
 class VmCost:
     mem_mb: int
     cpus: int
+    # Host TCP ports the VM forwards. Unlike RAM and CPUs these are not a budget but a
+    # traffic light: QEMU refuses to start on a port another guest already holds, so two
+    # VMs sharing one can only run one at a time, however much memory is free.
+    ports: frozenset[int] = frozenset()
 
 
 def host_resources(meminfo: Path = Path("/proc/meminfo")) -> HostResources:
@@ -64,7 +70,8 @@ def host_resources(meminfo: Path = Path("/proc/meminfo")) -> HostResources:
 
 
 def vm_cost(vm: dict[str, Any]) -> VmCost:
-    return VmCost(mem_mb=int(vm.get("memory_mb", 1024)) + QEMU_OVERHEAD_MB, cpus=max(1, int(vm.get("cpus", 1))))
+    return VmCost(mem_mb=int(vm.get("memory_mb", 1024)) + QEMU_OVERHEAD_MB, cpus=max(1, int(vm.get("cpus", 1))),
+                  ports=qemu.host_ports(vm))
 
 
 def parse_parallel(value: Any) -> int | None:
@@ -87,8 +94,10 @@ class DynamicScheduler:
     def __init__(self, resources: HostResources, *, reserve_mb: int = HOST_RESERVE_MB,
                  cpu_oversubscription: float = CPU_OVERSUBSCRIPTION, max_workers: int = DEFAULT_MAX_WORKERS,
                  memory_source: Callable[[], int] | None = None,
-                 time_source: Callable[[], float] | None = None) -> None:
+                 time_source: Callable[[], float] | None = None,
+                 resource_budgets: bool = True) -> None:
         self.resources = resources
+        self.resource_budgets = resource_budgets
         self.reserve_mb = reserve_mb
         self.mem_available_mb = resources.mem_available_mb
         self.initial_mem_budget_mb = max(0, resources.mem_available_mb - reserve_mb)
@@ -115,6 +124,8 @@ class DynamicScheduler:
         self.mem_budget_mb = max(0, used_mem + room)
 
     def describe(self) -> list[str]:
+        if not self.resource_budgets:
+            return [f"at most {self.max_workers} VMs at once; VMs sharing host TCP ports run one at a time"]
         return [
             f"host: {self.resources.mem_total_mb} MB RAM, {self.mem_available_mb} MB available, {self.resources.cpus} CPUs",
             f"budget: {self.mem_budget_mb} MB for guests (+{QEMU_OVERHEAD_MB} MB QEMU overhead each), "
@@ -126,9 +137,21 @@ class DynamicScheduler:
 
     def fits(self, running: Iterable[VmCost], candidate: VmCost) -> bool:
         """Use the current decision snapshot without resampling between candidates."""
-        used_mem = sum(cost.mem_mb for cost in running)
-        used_cpu = sum(cost.cpus for cost in running)
+        active = list(running)
+        if not self.ports_free(active, candidate):
+            return False
+        if not self.resource_budgets:
+            return True
+        used_mem = sum(cost.mem_mb for cost in active)
+        used_cpu = sum(cost.cpus for cost in active)
         return used_mem + candidate.mem_mb <= self.mem_budget_mb and used_cpu + candidate.cpus <= self.cpu_budget
+
+    @staticmethod
+    def ports_free(running: Iterable[VmCost], candidate: VmCost) -> bool:
+        """No host port of *candidate* is held by a running VM."""
+        if not candidate.ports:
+            return True
+        return all(candidate.ports.isdisjoint(cost.ports) for cost in running)
 
     def run(self, jobs: list[tuple[str, VmCost]], worker: Callable[[str], T],
             on_start: Callable[[str, VmCost, int], None] | None = None) -> list[tuple[str, T | BaseException]]:
@@ -147,7 +170,8 @@ class DynamicScheduler:
                 if pending and len(running) < self.max_workers:
                     # All candidates in this scan share one snapshot, so a later candidate
                     # cannot win merely because MemAvailable oscillates between reads.
-                    self._refresh_memory_budget([(cost, started_at) for _, cost, started_at in running.values()])
+                    if self.resource_budgets:
+                        self._refresh_memory_budget([(cost, started_at) for _, cost, started_at in running.values()])
                     active = [cost for _, cost, _ in running.values()]
                     used_mem = sum(cost.mem_mb for cost in active)
                     used_cpu = sum(cost.cpus for cost in active)
@@ -171,12 +195,15 @@ class DynamicScheduler:
                         if index != 0:
                             continue
                         reasons = []
-                        if used_mem + cost.mem_mb > self.mem_budget_mb:
+                        busy_ports = sorted(cost.ports.intersection(port for other in active for port in other.ports))
+                        if busy_ports:
+                            reasons.append(f"host TCP ports in use: {', '.join(map(str, busy_ports))}")
+                        if self.resource_budgets and used_mem + cost.mem_mb > self.mem_budget_mb:
                             reasons.append(f"memory: live available {self.mem_available_mb} MB, reserve {self.reserve_mb} MB, "
                                            f"initial cap {self.initial_mem_budget_mb} MB, budget {self.mem_budget_mb} MB, "
                                            f"committed {used_mem} MB ({self._recent_mem_mb} MB younger than {GRACE_SEC}s), "
                                            f"room {max(0, self.mem_budget_mb - used_mem)} MB")
-                        if used_cpu + cost.cpus > self.cpu_budget:
+                        if self.resource_budgets and used_cpu + cost.cpus > self.cpu_budget:
                             reasons.append(f"CPU: committed {used_cpu} vCPU, budget {self.cpu_budget:g} vCPU")
                         ui.print_note(f"waiting {name} (requested {cost.mem_mb} MB, {cost.cpus} vCPU): {'; '.join(reasons)}")
                 if started:

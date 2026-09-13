@@ -64,6 +64,49 @@ class SchedulerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 scheduler.parse_parallel(bad)
 
+    def test_shared_ports_wait_while_unrelated_jobs_run_and_release_after_failure(self):
+        for budgets in (True, False):
+            for fail_router in (False, True):
+                with self.subTest(resource_budgets=budgets, fail_router=fail_router):
+                    resources = scheduler.HostResources(16000, 12000, 8) if budgets else scheduler.HostResources(0, 0, 1)
+                    memory_source = mock.Mock(return_value=12000)
+                    sched = scheduler.DynamicScheduler(resources, max_workers=3, resource_budgets=budgets,
+                                                       memory_source=memory_source)
+                    jobs = [("router", scheduler.VmCost(1000, 2, frozenset({2238, 2239}))),
+                            ("dns", scheduler.VmCost(1000, 2, frozenset({2238}))),
+                            ("desktop", scheduler.VmCost(1000, 2, frozenset({2239}))),
+                            ("other", scheduler.VmCost(1000, 2))]
+
+                    def worker(name):
+                        if name == "router" and fail_router:
+                            raise RuntimeError("installer failed")
+                        return name
+
+                    results, _, output = self.run_controlled(sched, jobs, [
+                        (["router", "other"], "router"),
+                        (["router", "other", "dns", "desktop"], "dns"),
+                        (["router", "other", "dns", "desktop"], "desktop"),
+                        (["router", "other", "dns", "desktop"], "other"),
+                    ], worker=worker)
+                    self.assertEqual(sched.peak_running, 3)
+                    self.assertEqual([name for name, _ in results], ["router", "dns", "desktop", "other"])
+                    self.assertEqual(isinstance(results[0][1], RuntimeError), fail_router)
+                    self.assertIn("host TCP ports in use: 2238", output)
+                    if not budgets:
+                        memory_source.assert_not_called()
+                        self.assertNotIn("memory:", output)
+                        self.assertNotIn("CPU:", output)
+                        self.assertNotIn("despite budget", output)
+
+    def test_fixed_parallelism_still_limits_workers_without_resource_budgets(self):
+        sched = scheduler.DynamicScheduler(scheduler.HostResources(0, 0, 1), max_workers=2,
+                                           resource_budgets=False)
+        jobs = [(name, scheduler.VmCost(9000, 8)) for name in ("a", "b", "c")]
+        self.run_controlled(sched, jobs, [(["a", "b"], "a"),
+                                          (["a", "b", "c"], "b"),
+                                          (["a", "b", "c"], "c")])
+        self.assertEqual(sched.peak_running, 2)
+
     def test_host_resources_reads_meminfo(self):
         meminfo = Path(self.enterContext(__import__("tempfile").TemporaryDirectory())) / "meminfo"
         meminfo.write_text("MemTotal:       31717732 kB\nMemFree:        10855868 kB\nMemAvailable:   21177144 kB\n")

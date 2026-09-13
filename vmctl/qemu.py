@@ -412,6 +412,28 @@ def segment_endpoint(name: str, override: Any = None) -> str:
     return f"239.{digest[0]}.{digest[1]}.{digest[2]}:{port}"
 
 
+def host_ports(vm: dict[str, Any], phase: str | None = None) -> frozenset[int]:
+    """Host TCP ports the slirp NICs of *vm* bind, for one phase or for both.
+
+    QEMU refuses to start when a forward is already taken, so two VMs sharing a port can
+    never run at the same time: ``pfsense-lab`` publishes the members' SSH ports (2238,
+    2239) as WAN forwards, and starting ``pihole-lab`` beside it died on "Could not set up
+    host forwarding rule" (verified live in the 2026-09-13 matrix). The scheduler uses this
+    as an exclusive resource, so it needs the ports of every phase the run may use.
+    """
+    phases = NETWORK_PHASES if phase is None else (phase,)
+    ssh_cfg = cloud_init.ssh_access_config(vm)
+    ports: set[int] = set()
+    for one in phases:
+        for spec in network_specs(vm, one):
+            if spec["type"] != "user":
+                continue
+            if spec["ssh"] and ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
+                ports.add(int(ssh_cfg["ssh_host_port"]))
+            ports.update(int(fwd["host_port"]) for fwd in spec["hostfwd"])
+    return frozenset(ports)
+
+
 def network_args(vm: dict[str, Any], phase: str = "runtime") -> list[str]:
     args: list[str] = []
     ssh_cfg = cloud_init.ssh_access_config(vm)

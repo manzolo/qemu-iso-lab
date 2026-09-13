@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 import contextlib
 import io
 import json
@@ -1202,6 +1203,58 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("beta", output)
         self.assertIn("tail -f artifacts/alpha/logs/check-vms.stdout.log", output)
         self.assertIn("tail -f artifacts/beta/logs/check-vms.stdout.log", output)
+
+    def test_cmd_test_local_serializes_conflicting_profiles_in_both_parallel_modes(self):
+        profiles = {name: json.loads(json.dumps(self.vm_config)) for name in ("router", "member", "other")}
+        for name, vm in profiles.items():
+            vm["disk"]["path"] = f"artifacts/{name}/disk.qcow2"
+        profiles["router"]["networks"] = [
+            {"type": "user", "hostfwd": [{"host_port": 2238, "guest_port": 2238}]},
+        ]
+        profiles["member"]["ssh_provision"] = {"user": "lab", "ssh_host_port": 2238}
+        profiles["member"]["networks"] = [
+            {"type": "user", "phase": "install"},
+            {"type": "segment", "name": "lab-lan", "phase": "runtime"},
+        ]
+        self.write_extra_profile("parallel-ports.json", {"vms": profiles})
+
+        for parallel in (2, "auto"):
+            with self.subTest(parallel=parallel):
+                submitted = {}
+                checkpoints = iter([(["router", "other"], "router"),
+                                    (["router", "other", "member"], "member"),
+                                    (["router", "other", "member"], "other")])
+
+                def submit(fn, name):
+                    future = concurrent.futures.Future()
+                    submitted[name] = (future, fn)
+                    return future
+
+                def wait(active, *, return_when):
+                    expected, name = next(checkpoints)
+                    self.assertEqual(list(submitted), expected)
+                    future, fn = submitted[name]
+                    self.assertIn(future, active)
+                    future.set_result(fn(name))
+                    return {future}, set(active) - {future}
+
+                args = argparse.Namespace(vms=list(profiles), timeout=300, parallel=parallel, dry_run=True,
+                                          clean_first=False, no_clean_first=True)
+                resources = vmctl.scheduler.HostResources(32000, 20000, 16)
+                with mock.patch.object(vmctl.lifecycle, "maybe_clean_local_test_candidates"), \
+                     mock.patch.object(vmctl.scheduler, "host_resources", return_value=resources) as probe, \
+                     mock.patch.object(vmctl.lifecycle, "run_local_test_vm_subprocess", return_value=("passed", "ok", "")) as worker, \
+                     mock.patch.object(concurrent.futures, "ThreadPoolExecutor") as executor, \
+                     mock.patch.object(concurrent.futures, "wait", side_effect=wait), \
+                     mock.patch.object(concurrent.futures, "as_completed", side_effect=AssertionError("bypassed scheduler")), \
+                     mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                    executor.return_value.__enter__.return_value.submit.side_effect = submit
+                    self.assertEqual(self.vmctl.cmd_test_local(args), 0)
+                self.assertIsNone(next(checkpoints, None))
+                self.assertEqual([call.args[0] for call in worker.call_args_list], ["router", "member", "other"])
+                self.assertIn("host TCP ports in use: 2238", stdout.getvalue())
+                if parallel == 2:
+                    probe.assert_not_called()
 
     def test_cmd_test_local_returns_nonzero_on_failure(self):
         failing_vm = json.loads(json.dumps(self.vm_config))
