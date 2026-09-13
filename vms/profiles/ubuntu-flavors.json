@@ -884,6 +884,112 @@
       },
       "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433",
       "guest_agent": true
+    },
+    "ubuntustudio-24.04": {
+      "name": "Ubuntu Studio 24.04 LTS",
+      "meta": {
+        "slug": "ubuntustudio",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "experimental"
+      },
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntustudio-24.04/disk.qcow2",
+        "size": "80G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntustudio-24.04/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Ubuntu Server 24.04.4 autoinstall with ubuntustudio-desktop, sddm autologin and a serial getty. The 80G disk leaves room for desktop packages; verification requires an active local graphical session and plasmashell. Experimental pending clean live validation.",
+      "autoinstall": {
+        "hostname": "ubuntustudio-24.04",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true,
+        "packages": [
+          "ubuntustudio-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "ubuntustudio-24.04",
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          },
+          {
+            "path": "/etc/sddm.conf.d/vmctl-autologin.conf",
+            "permissions": "0644",
+            "content": "[Autologin]\nUser={{user}}\nSession=plasma.desktop\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl set-default graphical.target",
+          "systemctl enable sddm.service",
+          "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}}",
+          "systemctl enable --now serial-getty@ttyS0.service"
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2267,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service sddm.service --package-manager dpkg --package ubuntustudio-desktop --process plasmashell"
+        ]
+      },
+      "iso_sha256": "e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433",
+      "guest_agent": true
     }
   }
 }

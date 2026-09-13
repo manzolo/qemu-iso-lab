@@ -86,3 +86,13 @@ vmctl check-vms ubuntu-cinnamon-24.04 --clean-first --report --timeout 3600
 ```
 
 Experimental until a clean live PASS; consult `vmctl list` for status and last verification.
+
+## Ubuntu Studio 24.04 LTS
+
+Profile `ubuntustudio-24.04`, SSH 2267, `bootstrap-unattended`. Ubuntu Server 24.04.4 autoinstall with ubuntustudio-desktop, sddm autologin and a serial getty. The 80G disk leaves room for desktop packages; verification requires an active local graphical session and plasmashell. Guest identity: `lab` / `lab`.
+
+```bash
+vmctl check-vms ubuntustudio-24.04 --clean-first --report --timeout 3600
+```
+
+Experimental until a clean live PASS; consult `vmctl list` for status and last verification.
