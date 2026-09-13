@@ -122,3 +122,5 @@ MISSING void-live-x86_64-20250202-xfce.iso
 - `debian-gnome`: `debian-13.4.0-amd64-netinst.iso`, SHA-256 `0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc`. Reuses the Debian 13.4.0 [vendor manifest](https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/SHA256SUMS), checked 2026-09-13; display manager from [task dependencies](https://packages.debian.org/trixie/task-gnome-desktop).
 
 - `ubuntu-unity-24.04`: `ubuntu-24.04.4-live-server-amd64.iso`, SHA-256 `e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433`. Reuses the [Ubuntu 24.04.4 vendor manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS). [Metapackage dependencies](https://packages.ubuntu.com/noble/ubuntu-unity-desktop) checked 2026-09-13. 
+
+- `ubuntu-cinnamon-24.04`: `ubuntu-24.04.4-live-server-amd64.iso`, SHA-256 `e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433`. Reuses the [Ubuntu 24.04.4 vendor manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS). [Metapackage dependencies](https://packages.ubuntu.com/noble/ubuntucinnamon-desktop) checked 2026-09-13. 

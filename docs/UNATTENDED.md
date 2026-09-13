@@ -668,3 +668,7 @@ without a result is reported at phase `worker` with unavailable duration (0).
 ### Ubuntu Unity 24.04 LTS
 
 `vmctl bootstrap-unattended ubuntu-unity-24.04 --timeout 3600` (SSH 2265). Ubuntu Server 24.04.4 autoinstall with ubuntu-unity-desktop, lightdm autologin and a serial getty. The 40G disk leaves room for desktop packages; verification requires an active local graphical session and compiz. Experimental until a clean live PASS.
+
+### Ubuntu Cinnamon 24.04 LTS
+
+`vmctl bootstrap-unattended ubuntu-cinnamon-24.04 --timeout 3600` (SSH 2266). Ubuntu Server 24.04.4 autoinstall with ubuntucinnamon-desktop, lightdm autologin and a serial getty. The 40G disk leaves room for desktop packages; verification requires an active local graphical session and cinnamon. Experimental until a clean live PASS.

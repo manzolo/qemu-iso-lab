@@ -77,3 +77,13 @@ vmctl check-vms ubuntu-unity-24.04 --clean-first --report --timeout 3600
 ```
 
 Experimental fino a un PASS dal vivo da disco pulito; `vmctl list` mostra stato e ultima verifica.
+
+## Ubuntu Cinnamon 24.04 LTS
+
+Profilo `ubuntu-cinnamon-24.04`, SSH 2266, `bootstrap-unattended`. Autoinstall sulla Server 24.04.4 con ubuntucinnamon-desktop, autologin lightdm e getty seriale. Disco 40G; la verifica richiede una sessione grafica locale attiva e il processo cinnamon. Identità guest: `lab` / `lab`.
+
+```bash
+vmctl check-vms ubuntu-cinnamon-24.04 --clean-first --report --timeout 3600
+```
+
+Experimental fino a un PASS dal vivo da disco pulito; `vmctl list` mostra stato e ultima verifica.
