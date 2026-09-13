@@ -48,3 +48,13 @@ Con la ISO netinst e il `preseed.cfg` generato: al menu di boot premi `e` (o `Ta
 aggiungi la riga kernel sopra (senza `console=` se hai lo schermo) e fornisci il file, ad
 esempio su una chiavetta con `preseed/file=/hd-media/preseed.cfg`, oppure via HTTP con
 `preseed/url=`.
+
+## Desktop Xfce
+
+`debian-xfce` usa la stessa netinst Debian 13 e il flusso preseed, con 4 GB di RAM, disco da 30 GB e SSH sulla porta 2263. LightDM esegue l’autologin di `lab` (password `lab`); `vmctl console debian-xfce` accede al getty seriale.
+
+```bash
+vmctl check-vms debian-xfce --clean-first --report --timeout 3600
+```
+
+Il post-install verifica la sessione grafica locale attiva, `xfce4` e `xfce4-session`. Il profilo nasce experimental; solo un PASS dal vivo consente la promozione.

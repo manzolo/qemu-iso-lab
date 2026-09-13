@@ -48,3 +48,13 @@ With the netinst ISO and the generated `preseed.cfg`: at the boot menu press `e`
 in BIOS), add the kernel line above (without `console=` if you have a screen) and provide
 the file, for instance on a USB key with `preseed/file=/hd-media/preseed.cfg`, or over HTTP
 with `preseed/url=`.
+
+## Xfce desktop
+
+`debian-xfce` uses the same Debian 13 netinst and preseed flow, with 4 GB RAM, a 30 GB disk and SSH port 2263. LightDM autologs in `lab` (password `lab`); `vmctl console debian-xfce` reaches the serial getty.
+
+```bash
+vmctl check-vms debian-xfce --clean-first --report --timeout 3600
+```
+
+The post-install checks the active local graphical session, `xfce4` and `xfce4-session`. The profile starts experimental; only a live PASS can promote it.

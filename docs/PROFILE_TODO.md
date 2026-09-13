@@ -54,3 +54,7 @@ Recorded dates:
 - Retrieve matching vendor checksums for discovery-selected Alpine/Fedora images; do not attach a static hash to a changing URL.
 - Resume interrupted ISO downloads with HTTP Range requests: the Fedora archive cut a 2.4 GB
   transfer at 115 MB and the whole file had to be fetched again.
+
+## New profiles: batch A (2026-09-13)
+
+- `debian-xfce` (SSH 2263): experimental; bootstrap and matrix dry-runs pass. Live validation deferred on 2026-09-13 because the existing host check-vms matrix (PID 1038972) is running. Reuses preseed without changing the existing flow; no live duration or verified date yet.

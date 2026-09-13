@@ -652,3 +652,7 @@ exit status (nonzero for validation failures). During installation the phase ide
 it changes to `post-install` before SSH provisioning, including when that
 provisioning fails. Durations include capture and shutdown. A worker that exits
 without a result is reported at phase `worker` with unavailable duration (0).
+
+### Debian Xfce
+
+`vmctl bootstrap-preseed debian-xfce --timeout 3600` installs the Debian 13 Xfce task with LightDM autologin and a ttyS0 getty. SSH uses port 2263; `verify-desktop` requires an active local session, the `xfce4` package and `xfce4-session`. Check current status with `vmctl list`.

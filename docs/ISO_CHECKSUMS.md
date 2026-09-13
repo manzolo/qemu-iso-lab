@@ -112,3 +112,7 @@ PASS ubuntu-26.04-desktop-amd64.iso: 487f87faaf547ea30e0aba4d5b53346292571256b25
 PASS ubuntu-26.04-live-server-amd64.iso: dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9
 MISSING void-live-x86_64-20250202-xfce.iso
 ```
+
+## Batch A additions (2026-09-13)
+
+- `debian-xfce` reuses `debian-13.4.0-amd64-netinst.iso`, SHA-256 `0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc`, rechecked against the [Debian vendor manifest](https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/SHA256SUMS). The [installer manual](https://www.debian.org/releases/trixie/amd64/apbs04.en.html) documents task selection; [task-xfce-desktop](https://packages.debian.org/trixie/task-xfce-desktop) depends on LightDM.
