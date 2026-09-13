@@ -1861,6 +1861,69 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual((self.root / "artifacts/testvm/runtime/bootstrap-start.pid").read_text(encoding="utf-8"), "4321\n")
         run_post_install.assert_called_once_with(self.vm_name, self.vm_config, 45, dry_run=False)
 
+    def test_cmd_bootstrap_archinstall_explains_the_scripts_own_failure_report(self):
+        self.create_disk()
+        self.vm_config["archinstall_config"] = {"hostname": "arch-test", "username": "tester", "password": "s3cret"}
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=False)
+        failure = vmctl.errors.VMError(
+            "QEMU exited before emitting '==> Arch Linux installation complete!'. Captured output:\n"
+            "error: failed retrieving file 'linux-firmware.sig' from fastly.mirror.pkgbuild.com : Operation too slow\n"
+            f"{vmctl.archinstall.BOOTSTRAP_FAILED_TOKEN}: line 61: pacstrap -K /mnt base linux\n"
+        )
+        with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.lifecycle, "ensure_vm_disk"), \
+             mock.patch.object(vmctl.lifecycle, "reset_vm_nvram"), \
+             mock.patch.object(vmctl.archinstall, "create_bootstrap_iso", return_value=self.root / "artifacts/testvm/archinstall/bootstrap.iso"), \
+             mock.patch.object(vmctl.iso, "extract_arch_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.archinstall, "arch_iso_label", return_value="ARCH_202609"), \
+             mock.patch.object(vmctl.qemu, "common_args", return_value=["qemu-system-x86_64"]), \
+             mock.patch.object(vmctl.qemu, "run_and_expect", side_effect=failure), \
+             mock.patch.object(vmctl.runtime, "run_background") as run_background:
+            with self.assertRaises(vmctl.errors.VMError) as ctx:
+                self.vmctl.cmd_bootstrap_archinstall(args)
+        message = str(ctx.exception)
+        self.assertIn("Arch install script reported a failure", message)
+        self.assertIn("line 61: pacstrap -K /mnt base linux", message)
+        self.assertIn("bootstrap-serial.log", message)
+        run_background.assert_not_called()
+
+        # Any other VMError (a real timeout, QEMU refusing to start) passes through untouched.
+        plain = vmctl.errors.VMError("Timed out after 45s waiting for '==> Arch Linux installation complete!'")
+        with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.lifecycle, "ensure_vm_disk"), \
+             mock.patch.object(vmctl.lifecycle, "reset_vm_nvram"), \
+             mock.patch.object(vmctl.archinstall, "create_bootstrap_iso", return_value=self.root / "artifacts/testvm/archinstall/bootstrap.iso"), \
+             mock.patch.object(vmctl.iso, "extract_arch_installer_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.archinstall, "arch_iso_label", return_value="ARCH_202609"), \
+             mock.patch.object(vmctl.qemu, "common_args", return_value=["qemu-system-x86_64"]), \
+             mock.patch.object(vmctl.qemu, "run_and_expect", side_effect=plain):
+            with self.assertRaises(vmctl.errors.VMError) as ctx:
+                self.vmctl.cmd_bootstrap_archinstall(args)
+        self.assertIs(ctx.exception, plain)
+
+    def test_cmd_bootstrap_alpine_explains_the_scripts_own_failure_report(self):
+        self.create_disk()
+        self.vm_config["alpine_config"] = {"hostname": "alpine-test", "username": "tester", "password_hash": "$6$x$y"}
+        self.write_config_dir()
+        args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=False)
+        failure = vmctl.errors.VMError(
+            "QEMU exited before emitting '==> Alpine Linux installation complete!'. Captured output:\n"
+            f"{vmctl.alpine.BOOTSTRAP_FAILED_TOKEN}: exit status 1\n"
+        )
+        with mock.patch.object(vmctl.iso, "ensure_iso", return_value=self.root / self.vm_config["iso"]), \
+             mock.patch.object(vmctl.lifecycle, "ensure_vm_disk"), \
+             mock.patch.object(vmctl.lifecycle, "reset_vm_nvram"), \
+             mock.patch.object(vmctl.alpine, "create_alpine_seed_iso", return_value=self.root / "artifacts/testvm/alpine/seed.iso"), \
+             mock.patch.object(vmctl.alpine, "extract_alpine_boot_artifacts", return_value=(self.root / "artifacts/testvm/installer/vmlinuz", self.root / "artifacts/testvm/installer/initrd")), \
+             mock.patch.object(vmctl.qemu, "common_args", return_value=["qemu-system-x86_64"]), \
+             mock.patch.object(vmctl.qemu, "run_and_expect", side_effect=failure), \
+             mock.patch.object(vmctl.runtime, "run_background") as run_background:
+            with self.assertRaises(vmctl.errors.VMError) as ctx:
+                self.vmctl.cmd_bootstrap_alpine(args)
+        self.assertIn("Alpine install script reported a failure: ==> Alpine Linux installation FAILED: exit status 1", str(ctx.exception))
+        run_background.assert_not_called()
+
     def test_cmd_bootstrap_alpine_requires_alpine_config(self):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, timeout=45, dry_run=True)

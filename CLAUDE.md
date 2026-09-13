@@ -97,7 +97,7 @@ SSH-provisioned ports in use: `cachyos-desktop` → 2223, `cachyos-nvidia` → 2
 2. Extracts `arch/boot/x86_64/vmlinuz-linux` + `initramfs-linux.img` from the Arch live ISO.
 3. Boots headless with serial stdio (`console=ttyS0,115200`) and `archisobasedir=arch archisolabel=ARCH_YYYYMM`.
 4. Uses `run_and_expect` + `auto_inputs` to wait for `root@archiso` on the serial console, then sends the mount + run trigger automatically.
-5. Waits for `"==> Arch Linux installation complete!"`, then repeats step 3–4 of the Ubuntu flow.
+5. Waits for `"==> Arch Linux installation complete!"`, then repeats step 3–4 of the Ubuntu flow. The script runs under `set -Eeuo pipefail` with an `ERR` trap that prints `==> Arch Linux installation FAILED: line N: <command>` and powers off: without it a pacstrap killed by a stalled mirror after 54 s left the live system at its prompt and the host reported a bare "Timed out" 60 minutes later (2026-09-13). `lifecycle.explain_failed_bootstrap()` turns that line into the VMError; the Alpine script does the same through an `EXIT` trap (busybox sh has no `ERR`). Windows and pfSense already had their own FAILED tokens.
 
 CachyOS (`cachyos-desktop`, `cachyos-nvidia`) rides the same handler on the CachyOS archiso: `installer_boot` selects `vmlinuz-linux-cachyos`/`initramfs-linux-cachyos.img`, `archinstall_config.live_login_prompt`/`live_shell_prompt` (`CachyOS login:` / `root@CachyOS`) replace the archiso prompts, `live_kernel_append` adds `systemd.unit=multi-user.target`, and `inherit_live_pacman_conf` copies the live `pacman.conf` + mirrorlists into the target after pacstrap (the `[cachyos]` repo would otherwise be lost). `archinstall.live_prompts()` / `live_kernel_append()` are the only places reading these fields.
 

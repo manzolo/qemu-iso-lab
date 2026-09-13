@@ -38,6 +38,8 @@ archinstall \\
 
 # Sentinel printed at end of bootstrap install — run_and_expect waits for this.
 BOOTSTRAP_COMPLETE_TOKEN = "==> Arch Linux installation complete!"
+# Printed by the install script's ERR trap right before it powers the live system off.
+BOOTSTRAP_FAILED_TOKEN = "==> Arch Linux installation FAILED"
 
 # Login prompt on the serial console (autologin is only on tty1, not ttyS0).
 ARCH_SERIAL_LOGIN_PROMPT = "archiso login:"
@@ -288,7 +290,14 @@ arch-chroot /mnt pacman-key --populate || true
 
     return f"""\
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+
+# A failed step must not leave the live system sitting at its prompt: the host would learn
+# of it only from its own timeout, an hour later, as a bare "Timed out" instead of the real
+# error (a mirror stall killed pacstrap after 54 s and cost 60 minutes on 2026-09-13). Say
+# what broke and power off; nothing to flush, the install did not finish. The success path
+# below keeps its own order: sync -> flushbufs -> token -> poweroff.
+trap 'echo "{BOOTSTRAP_FAILED_TOKEN}: line $LINENO: $BASH_COMMAND"; sleep 1; poweroff -f' ERR
 
 echo "==> Waiting for the live network and pacman keyring..."
 # The serial login prompt comes up before archiso's pacman-init finished

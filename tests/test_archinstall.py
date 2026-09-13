@@ -214,6 +214,23 @@ class ArchinstallBootstrapTests(BaseVmctlTestCase):
         self.assertIn(vmctl.archinstall.BOOTSTRAP_COMPLETE_TOKEN, script)
         self.assertIn("poweroff", script)
 
+    def test_render_bootstrap_script_reports_failures_and_powers_off(self):
+        # Without this, a pacstrap that dies after a minute (a stalled mirror, 2026-09-13) left
+        # the live system at its prompt and the host learned of it from its own timeout, an hour
+        # later, as a bare "Timed out".
+        self._arch_vm()
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        self.assertIn("set -Eeuo pipefail", script)
+        trap_line = next(line for line in script.splitlines() if line.startswith("trap "))
+        self.assertIn(vmctl.archinstall.BOOTSTRAP_FAILED_TOKEN, trap_line)
+        self.assertIn("$BASH_COMMAND", trap_line)
+        self.assertIn("poweroff -f", trap_line)
+        self.assertTrue(trap_line.endswith("' ERR"))
+        # The trap is armed before any step that can fail, and the tokens never mistake each other.
+        self.assertLess(script.index("trap "), script.index("\npacstrap "))  # the command, not the comment naming it
+        self.assertNotIn(vmctl.archinstall.BOOTSTRAP_COMPLETE_TOKEN, vmctl.archinstall.BOOTSTRAP_FAILED_TOKEN)
+        self.assertNotIn(vmctl.archinstall.BOOTSTRAP_FAILED_TOKEN, vmctl.archinstall.BOOTSTRAP_COMPLETE_TOKEN)
+
     def test_serial_login_prompt_constant_is_non_empty(self):
         self.assertTrue(vmctl.archinstall.ARCH_SERIAL_LOGIN_PROMPT)
 

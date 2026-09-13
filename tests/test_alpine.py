@@ -76,11 +76,26 @@ class AlpineRenderTests(BaseVmctlTestCase):
         sync_at = script.rindex("\nsync\n")
         flush_at = script.index("blockdev --flushbufs")
         token_at = script.index(vmctl.alpine.BOOTSTRAP_COMPLETE_TOKEN)
-        poweroff_at = script.index("poweroff -f")
+        # The last poweroff is the success path's; the EXIT trap above it has its own.
+        poweroff_at = script.rindex("poweroff -f")
         self.assertLess(sync_at, flush_at)
         self.assertLess(flush_at, token_at)
         self.assertLess(token_at, poweroff_at)
         self.assertTrue(script.rstrip().endswith("poweroff -f"))
+
+    def test_install_script_reports_failures_on_exit_and_powers_off(self):
+        # busybox sh has no ERR trap: the EXIT trap checks the status and, when it is not 0,
+        # prints the FAILED token and powers off instead of leaving the live prompt up until
+        # the host's timeout.
+        self._alpine_vm()
+        script = vmctl.alpine.render_install_script(self.vm_name, self.vm_config)
+        self.assertIn("trap on_exit EXIT", script)
+        body = script[script.index("on_exit() {"):script.index("trap on_exit EXIT")]
+        self.assertIn(vmctl.alpine.BOOTSTRAP_FAILED_TOKEN, body)
+        self.assertIn("poweroff -f", body)
+        self.assertIn('[ "$status" -eq 0 ] && return 0', body)
+        self.assertLess(script.index("trap on_exit EXIT"), script.index("setup-alpine"))
+        self.assertNotIn(vmctl.alpine.BOOTSTRAP_COMPLETE_TOKEN, vmctl.alpine.BOOTSTRAP_FAILED_TOKEN)
 
     def test_render_requires_username_and_password_hash(self):
         self._alpine_vm(username="")

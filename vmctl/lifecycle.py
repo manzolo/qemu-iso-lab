@@ -1130,6 +1130,21 @@ def cmd_install(args: argparse.Namespace) -> int:
     return 0
 
 
+def explain_failed_bootstrap(exc: VMError, failed_token: str, flow: str, serial_log: Path) -> VMError:
+    """The install script's own failure report, when it is in the captured serial output.
+
+    A live-system install script that fails now prints ``failed_token`` and powers off, so
+    QEMU exits without the success token and ``run_and_expect`` raises with the output. Turn
+    that into the guest's own line rather than a bare "exited before emitting": the mirror
+    stall that broke pacstrap is the useful part.
+    """
+    if failed_token not in str(exc):
+        return exc
+    failed_line = next((line for line in str(exc).splitlines() if failed_token in line), "")
+    return VMError(f"{flow} install script reported a failure: {failed_line.strip()} "
+                   f"(full serial output in {ui.pretty_path(serial_log)})")
+
+
 def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = resolved_vm(args, cfg)
@@ -1172,17 +1187,20 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
     trigger = "mkdir -p /tmp/archconf && mount /dev/vdb /tmp/archconf && bash /tmp/archconf/run.sh"
     ui.print_note("Booting the live ISO — waiting for shell, then triggering automated install...")
     serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
-    qemu.run_and_expect(
-        install_qemu_args,
-        expected_text=archinstall.BOOTSTRAP_COMPLETE_TOKEN,
-        timeout_sec=getattr(args, "timeout", 1800),
-        auto_inputs=[
-            (login_prompt, "root\n"),
-            (shell_prompt, f"\n{trigger}\n"),
-        ],
-        dry_run=args.dry_run,
-        log_path=serial_log,
-    )
+    try:
+        qemu.run_and_expect(
+            install_qemu_args,
+            expected_text=archinstall.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=getattr(args, "timeout", 1800),
+            auto_inputs=[
+                (login_prompt, "root\n"),
+                (shell_prompt, f"\n{trigger}\n"),
+            ],
+            dry_run=args.dry_run,
+            log_path=serial_log,
+        )
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, archinstall.BOOTSTRAP_FAILED_TOKEN, "Arch", serial_log) from exc
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
@@ -1249,17 +1267,20 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
 
     ui.print_note("Booting Alpine live ISO — waiting for the root prompt, then running setup-alpine...")
     serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
-    qemu.run_and_expect(
-        install_qemu_args,
-        expected_text=alpine.BOOTSTRAP_COMPLETE_TOKEN,
-        timeout_sec=getattr(args, "timeout", 1800),
-        auto_inputs=[
-            (alpine.ALPINE_SERIAL_LOGIN_PROMPT, "root\n"),
-            (alpine.ALPINE_LIVE_PROMPT, f"\n{alpine.live_trigger_command()}\n"),
-        ],
-        dry_run=args.dry_run,
-        log_path=serial_log,
-    )
+    try:
+        qemu.run_and_expect(
+            install_qemu_args,
+            expected_text=alpine.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=getattr(args, "timeout", 1800),
+            auto_inputs=[
+                (alpine.ALPINE_SERIAL_LOGIN_PROMPT, "root\n"),
+                (alpine.ALPINE_LIVE_PROMPT, f"\n{alpine.live_trigger_command()}\n"),
+            ],
+            dry_run=args.dry_run,
+            log_path=serial_log,
+        )
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, alpine.BOOTSTRAP_FAILED_TOKEN, "Alpine", serial_log) from exc
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
