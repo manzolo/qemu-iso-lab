@@ -660,3 +660,7 @@ without a result is reported at phase `worker` with unavailable duration (0).
 ### Debian 13 KDE (Preseed)
 
 `vmctl bootstrap-preseed debian-kde --timeout 3600` (SSH 2262). Debian 13 kde-desktop task with sddm autologin, serial getty and active-session/package/process checks. Experimental until a clean live PASS.
+
+### Debian 13 GNOME (Preseed)
+
+`vmctl bootstrap-preseed debian-gnome --timeout 3600` (SSH 2264). Debian 13 gnome-desktop task with gdm3 autologin, serial getty and active-session/package/process checks. Experimental until a clean live PASS.

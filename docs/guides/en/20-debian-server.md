@@ -68,3 +68,13 @@ vmctl check-vms debian-kde --clean-first --report --timeout 3600
 ```
 
 Experimental until a clean live PASS; consult `vmctl list` for status and last verification.
+
+## Debian 13 GNOME (Preseed)
+
+Profile `debian-gnome`, SSH 2264, `bootstrap-preseed`. Debian 13 gnome-desktop task with gdm3 autologin, serial getty and active-session/package/process checks. Guest identity: `lab` / `lab`.
+
+```bash
+vmctl check-vms debian-gnome --clean-first --report --timeout 3600
+```
+
+Experimental until a clean live PASS; consult `vmctl list` for status and last verification.

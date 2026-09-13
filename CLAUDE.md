@@ -224,3 +224,5 @@ Desktop post-install checks use the shared guest script `vms/profile-files/commo
 Every tracked profile declares `meta.status` (`manual`, `unattended`, `experimental`). `meta.verified`, when present, is the last maintainer-supplied live PASS date, not the date of the last edit or unit test. The canonical list and JSON output expose status/verified; the HTML report stores profile_status/profile_verified separately from each run's status. Do not promote experimental profiles or advance dates from a dry run. See `docs/PROFILE_TODO.md` for definitions, historical dates and remaining work.
 
 `debian-kde` reuses `bootstrap-preseed`. Debian 13 kde-desktop task with sddm autologin, serial getty and active-session/package/process checks. SSH 2262; experimental pending clean live validation.
+
+`debian-gnome` reuses `bootstrap-preseed`. Debian 13 gnome-desktop task with gdm3 autologin, serial getty and active-session/package/process checks. SSH 2264; experimental pending clean live validation.
