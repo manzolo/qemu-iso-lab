@@ -7,7 +7,8 @@
         "family": "rhel",
         "role": "server",
         "release_model": "rolling",
-        "status": "experimental"
+        "status": "unattended",
+        "verified": "2026-09-13"
       },
       "iso": "isos/CentOS-Stream-10-20260908.0-x86_64-boot.iso",
       "iso_url": "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/CentOS-Stream-10-20260908.0-x86_64-boot.iso",

@@ -524,7 +524,8 @@
         "family": "fedora",
         "role": "desktop",
         "release_model": "stable",
-        "status": "experimental"
+        "status": "unattended",
+        "verified": "2026-09-13"
       },
       "iso": "isos/Fedora-Everything-netinst-x86_64-44-1.7.iso",
       "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
@@ -627,7 +628,8 @@
         "family": "fedora",
         "role": "desktop",
         "release_model": "stable",
-        "status": "experimental"
+        "status": "unattended",
+        "verified": "2026-09-13"
       },
       "iso": "isos/Fedora-Kinoite-ostree-x86_64-44-1.7.iso",
       "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Kinoite/x86_64/iso/Fedora-Kinoite-ostree-x86_64-44-1.7.iso",

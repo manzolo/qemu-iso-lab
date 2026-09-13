@@ -55,31 +55,42 @@ Recorded dates:
 - Resume interrupted ISO downloads with HTTP Range requests: the Fedora archive cut a 2.4 GB
   transfer at 115 MB and the whole file had to be fetched again.
 
-## New profiles: batch A (2026-09-13)
+## New profiles: batch A (2026-09-13) — all 11 verified live
 
-- `debian-xfce` (SSH 2263): experimental; bootstrap and matrix dry-runs pass. Live validation deferred on 2026-09-13 because the existing host check-vms matrix (PID 1038972) is running. Reuses preseed without changing the existing flow; no live duration or verified date yet.
+Every profile below went through `check-vms --clean-first --report` on the host on 2026-09-13/14 and
+passed with the desktop (or SSH) checks of its profile. Times are wall-clock in the run that passed.
 
-- `debian-kde` (SSH 2262): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Debian 13 kde-desktop task with sddm autologin, serial getty and active-session/package/process checks.
+| Profile | Flow | SSH | Verified | Live | Notes |
+|---|---|---|---|---|---|
+| `centos-stream-10` | kickstart | 2270 | 2026-09-13 | 5.8 min | server; x86-64-v3 host CPU |
+| `fedora-kde` | kickstart | 2260 | 2026-09-13 | 11.4 min | Plasma 6 Wayland; SDDM enabled with `--force` (Plasma Login Manager alias) |
+| `fedora-kinoite` | kickstart + ostree | 2261 | 2026-09-13 | 23.9 min | first boot `multi-user`, SDDM layered with `rpm-ostree` over SSH, desktop checked after the reboot |
+| `ubuntu-cinnamon-24.04` | autoinstall | 2266 | 2026-09-13 | 11.5 min | `ubuntucinnamon-desktop` |
+| `ubuntustudio-24.04` | autoinstall | 2267 | 2026-09-13 | 16.9 min | SDDM, 80G |
+| `ubuntu-unity-24.04` | autoinstall | 2265 | 2026-09-13 | 17.4 min | compiz + LightDM |
+| `edubuntu-24.04` | autoinstall | 2268 | 2026-09-13 | 24.0 min | includes the 2 min `wait-online` stall (backlog 5b) |
+| `debian-gnome` | preseed | 2264 | 2026-09-13 | 53.4 min | netinst desktop download, three Debian installs sharing 1.2 MB/s |
+| `debian-xfce` | preseed | 2263 | 2026-09-13 | 58.2 min | same run; 2 minutes under the 3600 s timeout |
+| `debian-kde` | preseed | 2262 | 2026-09-14 | 10.4 min | timed out at 30% in the shared run (bandwidth); alone it downloads at 17 MB/s |
+| `kali` | preseed | 2269 | 2026-09-14 | 21.4 min | two fixes, below |
 
-- `debian-gnome` (SSH 2264): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Debian 13 gnome-desktop task with gdm3 autologin, serial getty and active-session/package/process checks.
+Kali needed two things the official `xfce-default.cfg` example does not show. (1) `http.kali.org`
+redirects apt to HTTPS mirrors and the freshly debootstrapped target has no `ca-certificates`, so
+`pkgsel` died on `certificate verify failed` (error code 100; diagnosed from the installer's syslog
+on tty4 via a QMP screenshot): `d-i base-installer/includes string ca-certificates`. (2) Packages of
+the default task ask debconf questions inside the target (`kismet-capture-common/install-setuid`
+parked the install on a text prompt until the timeout): the 20 answers Kali's own installer ships in
+`live-build-config/kali-config/common/includes.installer/preseed.cfg` are now in
+`preseed_config.extra`, verbatim.
 
-- `ubuntu-unity-24.04` (SSH 2265): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Ubuntu Server 24.04.4 autoinstall with ubuntu-unity-desktop, lightdm autologin and a serial getty. The 40G disk leaves room for desktop packages; verification requires an active local graphical session and compiz.
+Bandwidth is the lesson of the Debian trio: with three netinst desktops downloading at once the
+host line gave ~1.2 MB/s in total and KDE hit the 3600 s timeout at 30%; alone it finished in 10
+minutes. A shared timeout cannot tell a slow mirror from a broken profile: run the netinst desktops
+one at a time, or raise `--timeout` when several run together.
 
-- `ubuntu-cinnamon-24.04` (SSH 2266): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Ubuntu Server 24.04.4 autoinstall with ubuntucinnamon-desktop, lightdm autologin and a serial getty. The 40G disk leaves room for desktop packages; verification requires an active local graphical session and cinnamon.
-
-- `ubuntustudio-24.04` (SSH 2267): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Ubuntu Server 24.04.4 autoinstall with ubuntustudio-desktop, sddm autologin and a serial getty. The 80G disk leaves room for desktop packages; verification requires an active local graphical session and plasmashell.
-
-- `edubuntu-24.04` (SSH 2268): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Ubuntu Server 24.04.4 autoinstall with edubuntu-desktop, gdm3 autologin and a serial getty. The 60G disk leaves room for desktop packages; verification requires an active local graphical session and gnome-shell.
-
-- `fedora-kde` (SSH 2260): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Plasma 6 Wayland with SDDM autologin; verifies an active local session, plasma-desktop, plasmashell and user-owned kwin_wayland. Compare kubuntu-24.04: Plasma 5.27 X11. Everything netinst uses the Fedora 44 online installation repository.
-
-- `fedora-kinoite` (SSH 2261): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Plasma 6 Wayland with SDDM autologin; verifies an active local session, plasma-desktop, plasmashell and user-owned kwin_wayland. Compare kubuntu-24.04: Plasma 5.27 X11. The ostree ref is read from the ISO; %post only configures. Extra packages use rpm-ostree after installation and activate on reboot.
-
-`fedora-kinoite`: Fedora 44 ships Plasma Login Manager. The first installed boot uses multi-user.target; SSH layers SDDM with rpm-ostree and selects its unit for the next deployment. Desktop checks run after the mandatory reboot. [Fedora 44 login-manager change](https://fedoraproject.org/wiki/Changes/PlasmaLoginManager).
-
-- `kali` (SSH 2269): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Kali netinst preseed uses the vendor Xfce task selection and kali-rolling mirror, LightDM autologin and serial getty. Verification requires kali-desktop-xfce, an active local session and xfce4-session.
-
-- `centos-stream-10` (SSH 2270): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Server-only kickstart from the boot ISO and Stream 10 online repository. Requires an x86-64-v3 host CPU with KVM; QEMU uses the host CPU. SSH and ttyS0 getty are enabled.
+Still missing from batch A: `oracle-linux-9` (ISO and SHA-256 verified, profile not written) and
+`windows-server-2025` (public evaluation ISO, no vendor checksum for it, `windows.py` knows no
+"Server" edition family).
 
 ## Backlog (written 2026-09-13 evening, for the next sessions)
 
@@ -112,6 +123,14 @@ Ordered by value over cost. Each item names the evidence behind it.
    plays them on the host's speakers (this is why Ubuntu 8.04's login drums are heard during the
    matrix). Decide whether headless runs should get `-audiodev none`; optionally add a sound-card
    check (`aplay -l`) to `verify-desktop`.
+
+5b. **Ubuntu flavors: the installed system waits 1m59s for `systemd-networkd-wait-online`.** Seen on
+   the first boot of `edubuntu-24.04` and `ubuntu-unity-24.04` (2026-09-13, `bootstrap-start.log`:
+   "Job systemd-networkd-wait-online.service/start running (1min 59s / no limit)"). Ubuntu Server's
+   autoinstall leaves networkd enabled and the desktop metapackage brings NetworkManager, so the wait
+   never sees a managed link. `lubuntu-lab` already disables the unit in its netlab hook
+   (`vmctl/netlab.py`). The fix is a cloud-init `runcmd` line in every flavor profile, but changing a
+   profile means re-verifying it live: do it as its own batch over all flavors, with times before/after.
 
 ### Profiles
 

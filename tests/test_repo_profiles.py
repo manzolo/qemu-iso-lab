@@ -82,10 +82,19 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_templates = {"windows10-template", "windows11-template"}
         # The Ubuntu desktop history: clean reinstall of each with the final recipe on 2026-09-12.
         verified_history = {f"ubuntu-{v}-unattended" for v in ("8.04", "10.04", "12.04", "14.04", "16.04", "18.04", "20.04", "22.04")} | {"reactos"}
+        # Batch A (docs/PROFILE_TODO.md): nine passed live on the evening of 2026-09-13; debian-kde and
+        # kali passed after midnight, alone, once the shared bandwidth and the Kali preseed were sorted.
+        verified_batch_a = {
+            "centos-stream-10", "fedora-kde", "fedora-kinoite", "debian-xfce", "debian-gnome",
+            "ubuntu-unity-24.04", "ubuntu-cinnamon-24.04", "ubuntustudio-24.04", "edubuntu-24.04",
+        }
+        verified_batch_a_retry = {"debian-kde", "kali"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = ("2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
-                             else "2026-09-12" if name in verified_history else None)
+                             else "2026-09-12" if name in verified_history
+                             else "2026-09-13" if name in verified_batch_a
+                             else "2026-09-14" if name in verified_batch_a_retry else None)
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
         # Promoted on 2026-09-09: verify-desktop reported an active local graphical session for
         # the autologin user on the live matrix, which is what the flavor recipe has to prove.
