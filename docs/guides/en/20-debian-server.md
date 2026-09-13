@@ -58,3 +58,13 @@ vmctl check-vms debian-xfce --clean-first --report --timeout 3600
 ```
 
 The post-install checks the active local graphical session, `xfce4` and `xfce4-session`. The profile starts experimental; only a live PASS can promote it.
+
+## Debian 13 KDE (Preseed)
+
+Profile `debian-kde`, SSH 2262, `bootstrap-preseed`. Debian 13 kde-desktop task with sddm autologin, serial getty and active-session/package/process checks. Guest identity: `lab` / `lab`.
+
+```bash
+vmctl check-vms debian-kde --clean-first --report --timeout 3600
+```
+
+Experimental until a clean live PASS; consult `vmctl list` for status and last verification.

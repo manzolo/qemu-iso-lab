@@ -703,6 +703,109 @@
       "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc",
       "guest_agent": true,
       "notes": "Debian 13 netinst with the xfce-desktop task, LightDM autologin and a ttyS0 getty. Verification requires an active local graphical session owned by {{user}}, xfce4 and xfce4-session. Experimental until a clean live check-vms PASS."
+    },
+    "debian-kde": {
+      "name": "Debian 13 KDE (Preseed)",
+      "meta": {
+        "slug": "debian",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "experimental"
+      },
+      "iso": "isos/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "disk": {
+        "path": "artifacts/debian-kde/disk.qcow2",
+        "size": "30G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/debian-kde/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "preseed_config": {
+        "hostname": "debian-kde",
+        "domain": "local",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "mirror_hostname": "deb.debian.org",
+        "mirror_directory": "/debian",
+        "tasks": [
+          "standard",
+          "kde-desktop"
+        ],
+        "packages": [
+          "openssh-server",
+          "sudo",
+          "curl",
+          "ca-certificates",
+          "locales",
+          "qemu-guest-agent",
+          "spice-vdagent",
+          "kde-plasma-desktop"
+        ],
+        "late_commands": [
+          "install -d /etc/sddm.conf.d",
+          "printf %s '[Autologin]\nUser={{user}}\nSession=plasma.desktop\n' > /etc/sddm.conf.d/autologin.conf",
+          "systemctl enable sddm.service serial-getty@ttyS0.service",
+          "systemctl set-default graphical.target"
+        ],
+        "disk_device": "/dev/vda"
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2262,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package kde-plasma-desktop --process plasmashell"
+        ]
+      },
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc",
+      "guest_agent": true,
+      "notes": "Debian 13 netinst with kde-desktop, sddm autologin and ttyS0 getty. Requires an active local graphical session for {{user}}, kde-plasma-desktop and plasmashell. Experimental pending clean live validation."
     }
   }
 }

@@ -656,3 +656,7 @@ without a result is reported at phase `worker` with unavailable duration (0).
 ### Debian Xfce
 
 `vmctl bootstrap-preseed debian-xfce --timeout 3600` installs the Debian 13 Xfce task with LightDM autologin and a ttyS0 getty. SSH uses port 2263; `verify-desktop` requires an active local session, the `xfce4` package and `xfce4-session`. Check current status with `vmctl list`.
+
+### Debian 13 KDE (Preseed)
+
+`vmctl bootstrap-preseed debian-kde --timeout 3600` (SSH 2262). Debian 13 kde-desktop task with sddm autologin, serial getty and active-session/package/process checks. Experimental until a clean live PASS.
