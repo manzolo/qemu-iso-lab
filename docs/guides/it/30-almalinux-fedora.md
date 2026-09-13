@@ -118,3 +118,13 @@ vmctl check-vms fedora-kinoite --clean-first --report --timeout 3600
 Experimental fino a un PASS dal vivo da disco pulito; `vmctl list` mostra stato e ultima verifica.
 
 Fedora 44 include Plasma Login Manager. `fedora-kinoite` avvia inizialmente in multi-user.target: via SSH installa SDDM con rpm-ostree e seleziona la sua unità per il prossimo deployment. Le verifiche desktop avvengono dopo il riavvio obbligatorio. [Modifica ufficiale Fedora](https://fedoraproject.org/wiki/Changes/PlasmaLoginManager).
+
+## CentOS Stream 10 Server (Kickstart)
+
+Profilo `centos-stream-10`, SSH 2270, `bootstrap-kickstart`. Kickstart server senza desktop dalla ISO boot e dal repository online Stream 10. Con KVM serve una CPU host x86-64-v3, esposta al guest da QEMU. SSH e getty ttyS0 abilitati. Identità guest: `lab` / `lab`.
+
+```bash
+vmctl check-vms centos-stream-10 --clean-first --report --timeout 3600
+```
+
+Experimental fino a un PASS dal vivo da disco pulito; `vmctl list` mostra stato e ultima verifica.

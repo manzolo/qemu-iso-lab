@@ -119,3 +119,13 @@ vmctl check-vms fedora-kinoite --clean-first --report --timeout 3600
 Experimental until a clean live PASS; consult `vmctl list` for status and last verification.
 
 `fedora-kinoite`: Fedora 44 ships Plasma Login Manager. The first installed boot uses multi-user.target; SSH layers SDDM with rpm-ostree and selects its unit for the next deployment. Desktop checks run after the mandatory reboot. [Fedora 44 login-manager change](https://fedoraproject.org/wiki/Changes/PlasmaLoginManager).
+
+## CentOS Stream 10 Server (Kickstart)
+
+Profile `centos-stream-10`, SSH 2270, `bootstrap-kickstart`. Server-only kickstart from the boot ISO and Stream 10 online repository. Requires an x86-64-v3 host CPU with KVM; QEMU uses the host CPU. SSH and ttyS0 getty are enabled. Guest identity: `lab` / `lab`.
+
+```bash
+vmctl check-vms centos-stream-10 --clean-first --report --timeout 3600
+```
+
+Experimental until a clean live PASS; consult `vmctl list` for status and last verification.

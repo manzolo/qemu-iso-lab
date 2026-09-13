@@ -694,3 +694,7 @@ without a result is reported at phase `worker` with unavailable duration (0).
 ### Kali Linux Xfce (Preseed)
 
 `vmctl bootstrap-preseed kali --timeout 3600` (SSH 2269). Kali netinst preseed uses the vendor Xfce task selection and kali-rolling mirror, LightDM autologin and serial getty. Verification requires kali-desktop-xfce, an active local session and xfce4-session. Experimental until a clean live PASS.
+
+### CentOS Stream 10 Server (Kickstart)
+
+`vmctl bootstrap-kickstart centos-stream-10 --timeout 3600` (SSH 2270). Server-only kickstart from the boot ISO and Stream 10 online repository. Requires an x86-64-v3 host CPU with KVM; QEMU uses the host CPU. SSH and ttyS0 getty are enabled. Experimental until a clean live PASS.

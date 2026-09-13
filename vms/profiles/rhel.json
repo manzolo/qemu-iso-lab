@@ -1,0 +1,87 @@
+{
+  "vms": {
+    "centos-stream-10": {
+      "name": "CentOS Stream 10 Server (Kickstart)",
+      "meta": {
+        "slug": "centos",
+        "family": "rhel",
+        "role": "server",
+        "release_model": "rolling",
+        "status": "experimental"
+      },
+      "iso": "isos/CentOS-Stream-10-20260908.0-x86_64-boot.iso",
+      "iso_url": "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/CentOS-Stream-10-20260908.0-x86_64-boot.iso",
+      "disk": {
+        "path": "artifacts/centos-stream-10/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/centos-stream-10/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "kickstart_config": {
+        "hostname": "centos-stream-10",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "locale": "en_US.UTF-8",
+        "packages": [
+          "@^minimal-environment",
+          "openssh-server",
+          "sudo",
+          "vim-minimal",
+          "qemu-guest-agent"
+        ],
+        "post_commands": [
+          "systemctl enable sshd.service serial-getty@ttyS0.service",
+          "systemctl set-default multi-user.target"
+        ],
+        "disk_device": "vda",
+        "selinux": "enforcing",
+        "firewall": "enabled",
+        "inst_repo": "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/os/"
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2270,
+        "post_install_run": [
+          "systemctl is-active sshd.service",
+          "sudo -n true",
+          ". /etc/os-release; printf '%s\\n' \"$PRETTY_NAME\""
+        ]
+      },
+      "iso_sha256": "6a3476d08b40095bcf4c61ac6128a9e198e08068274b3df4b4e1a9d0cb73812b",
+      "guest_agent": true,
+      "notes": "Server-only kickstart from the boot ISO and Stream 10 online repository. Requires an x86-64-v3 host CPU with KVM; QEMU uses the host CPU. SSH and ttyS0 getty are enabled. Experimental pending clean live validation."
+    }
+  }
+}
