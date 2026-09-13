@@ -25,9 +25,8 @@ require_command python3
 
 # UI backend: fzf when installed (fuzzy search, type-to-filter), dialog otherwise.
 # Force one with VMTUI_UI=fzf or VMTUI_UI=dialog.
-# Oldest fzf whose options we rely on (--border-label, --header-first, the
-# `start` event and the `pos`/`first`/`last` actions).
-FZF_MIN_VERSION="0.36.0"
+# Contextual headers require the `focus`/`zero` events and `transform-header`.
+FZF_MIN_VERSION="0.40.0"
 
 fzf_is_usable() {
     command -v fzf >/dev/null 2>&1 || return 1
@@ -118,13 +117,17 @@ fzf_pick() {
             (( ${#all[i]} > tag_width )) && tag_width=${#all[i]}
         done
     fi
-    local display
+    local display row_hint
     while (( $# >= 2 )); do
         index=$(( index + 1 ))
         if (( show_tags )); then
             printf -v display '%-*s  %s' "$tag_width" "$1" "$2"
         else
             display="$2"
+        fi
+        if [[ "${MENU_CONTEXT_HINTS:-0}" == "1" ]]; then
+            row_hint=$(dashboard_hotkey_hint "${display#*$'\t'}")
+            display="${display%%$'\t'*}"$'\t'"$row_hint"
         fi
         if [[ "${MENU_STYLED:-0}" == "1" && "$1" == __sep_* ]]; then
             display=$'\e[90m'"${display//━/─}"$'\e[0m'
@@ -153,6 +156,16 @@ fzf_pick() {
     if (( default_pos > 0 )); then
         args+=(--sync --bind "start:pos($default_pos)")
     fi
+    # The hidden third field is computed from the same snapshot as the row.
+    # Moving the cursor only runs printf, never another VM/disk probe.
+    local VMTUI_PICKER_HEADER
+    VMTUI_PICKER_HEADER=$(printf '%b' "$header")
+    export VMTUI_PICKER_HEADER
+    if [[ "${MENU_CONTEXT_HINTS:-0}" == "1" ]]; then
+        local transform='transform-header:printf "%s\n\n%s" "$VMTUI_PICKER_HEADER" {3}'
+        args+=(--bind "focus:$transform"
+            --bind 'zero:transform-header:printf "%s\n\n  No matching VM" "$VMTUI_PICKER_HEADER"')
+    fi
     # MENU_REFRESH=1 asks fzf to report Ctrl-R / F5 instead of swallowing them, so the
     # caller can rebuild the list. A plain letter would be wrong here: the picker uses
     # letters to filter and to jump between VMs. MENU_HOTKEYS ("key=Tag" lines, e.g.
@@ -164,6 +177,8 @@ fzf_pick() {
         expect_keys+=("$MENU_REFRESH_KEYS")
     fi
     if [[ -n "${MENU_HOTKEYS:-}" ]]; then
+        # Unavailable shortcuts still redraw instead of becoming filter input.
+        expect_keys+=("$DASHBOARD_HOTKEYS" "alt-enter")
         local entry
         while IFS= read -r entry; do
             [[ "$entry" == *=* ]] || continue
@@ -666,6 +681,7 @@ mode = sys.argv[3]
 value = sys.argv[4].lower()
 width = max(32, int(sys.argv[5]) - 8)
 color = sys.argv[6] == "fzf"
+context_hints = sys.argv[7] == "1"
 if not color:
     width = min(width, 92)  # The dialog dashboard is capped at 100 columns.
 
@@ -722,10 +738,13 @@ for f in rows:
     if color:
         tone = 32 if f["running"] else 36 if f["installed"] else 33 if f["prepared"] else 90
         line = f"\x1b[{tone}m{line[0]}\x1b[0m{line[1:]}"
+    if context_hints:
+        flags = [f["running"], f["installed"], f["has_ssh"], f["job_status"] == "running"]
+        line += "\t" + " ".join(str(int(flag)) for flag in flags)
     print(f["name"])
     print(line)
 PY
-)" "$ROOT_DIR" "$CONFIG_DIR" "$1" "${2:-}" "$(term_cols)" "$UI_BACKEND"
+)" "$ROOT_DIR" "$CONFIG_DIR" "$1" "${2:-}" "$(term_cols)" "$UI_BACKEND" "${MENU_CONTEXT_HINTS:-0}"
 }
 
 # list_family_menu_items → tag/description pairs (family, count)
@@ -951,7 +970,7 @@ recommended_action() {
         if [[ "${FACTS[has_ssh]:-0}" == "1" ]]; then
             printf '%s\n' "SSH Console"
         else
-            printf '%s\n' "Stop VM"
+            printf '%s\n' "Attach Display"
         fi
     elif [[ "${FACTS[installed]:-0}" == "1" ]]; then
         printf '%s\n' "Boot Desktop"
@@ -1846,21 +1865,76 @@ run_action() {
     esac
 }
 
-# vm_menu_hotkeys → "key=Tag" lines for the VM menu (FACTS and RECOMMENDED already loaded).
+# Shared by the dashboard snapshot and the VM workspace. Keep keys stable,
+# but expose only the everyday actions relevant to the current state.
+vm_shortcut_keys() {
+    if [[ "${FACTS[job_status]:-}" == "running" ]]; then
+        [[ "${FACTS[running]:-0}" == "1" ]] && printf '%s\n' a
+        printf '%s\n' l x
+    elif [[ "${FACTS[running]:-0}" == "1" ]]; then
+        printf '%s\n' a
+        [[ "${FACTS[has_ssh]:-0}" == "1" ]] && printf '%s\n' s c
+        printf '%s\n' x
+        [[ "${FACTS[has_ssh]:-0}" == "1" ]] && printf '%s\n' p
+    elif [[ "${FACTS[installed]:-0}" == "1" ]]; then
+        printf '%s\n' d h
+        [[ "${FACTS[has_ssh]:-0}" == "1" ]] && printf '%s\n' s p
+        printf '%s\n' u
+    else
+        printf '%s\n' u
+    fi
+    return 0
+}
+
 vm_menu_hotkeys() {
-    printf '%s\n' \
-        "alt-d=Boot Desktop" \
-        "alt-u=$(primary_install_action)" \
-        "alt-s=SSH Console" \
-        "alt-a=Attach Display" \
-        "alt-c=Serial Console" \
-        "alt-x=Stop VM" \
-        "alt-p=Post-Install" \
-        "alt-enter=${RECOMMENDED:-}"
+    local key action
+    while read -r key; do
+        case "$key" in
+            d) action="Boot Desktop" ;;
+            h) action="Boot Headless" ;;
+            u) action=$(primary_install_action) ;;
+            s) action="SSH Console" ;;
+            a) action="Attach Display" ;;
+            c) action="Serial Console" ;;
+            x)
+                action="Stop VM"
+                [[ "${FACTS[job_status]:-}" == "running" ]] && action="Cancel Installation"
+                ;;
+            p) action="Post-Install" ;;
+            l) action="Installation Log" ;;
+        esac
+        printf 'alt-%s=%s\n' "$key" "$action"
+    done < <(vm_shortcut_keys)
+    printf 'alt-enter=%s\n' "${RECOMMENDED:-}"
 }
 
 vm_menu_hotkey_hint() {
-    printf '  \e[1mAlt\e[0m+ \e[1mD\e[0m desktop · \e[1mU\e[0m install · \e[1mS\e[0m ssh · \e[1mA\e[0m screen · \e[1mC\e[0m serial · \e[1mX\e[0m stop · \e[1mP\e[0m post-install · \e[1mEnter\e[0m suggested\n'
+    local key label separator=' '
+    printf '  \e[1mAlt\e[0m+'
+    while read -r key; do
+        case "$key" in
+            d) label=desktop ;;
+            h) label=headless ;;
+            u)
+                label=install
+                [[ "${FACTS[installed]:-0}" == "1" ]] && label=reinstall
+                ;;
+            s) label=ssh ;;
+            a) label=screen ;;
+            c) label=serial ;;
+            x)
+                label=stop
+                [[ "${FACTS[job_status]:-}" == "running" ]] && label=cancel ;;
+            p) label=post-install ;;
+            l) label=log ;;
+        esac
+        printf '%s\e[1m%s\e[0m %s' "$separator" "${key^^}" "$label"
+        separator=' · '
+    done < <(vm_shortcut_keys)
+    if [[ "${1:-workspace}" == "workspace" ]]; then
+        printf ' · \e[1mEnter\e[0m suggested'
+    fi
+    printf '\n'
 }
 
 vm_menu_loop() {
@@ -2076,7 +2150,9 @@ dashboard_loop() {
     local dash_cursor=""
     while true; do
         local -a rows=()
-        mapfile -t rows < <(list_dashboard_items "$dash_mode" "$dash_value")
+        local context_hints=0
+        [[ "$UI_BACKEND" == "fzf" ]] && context_hints=1
+        mapfile -t rows < <(MENU_CONTEXT_HINTS="$context_hints" list_dashboard_items "$dash_mode" "$dash_value")
         local total installed running shown
         IFS=$'\t' read -r _ total installed running shown <<<"${rows[0]}"
         rows=("${rows[@]:1}")
@@ -2112,7 +2188,7 @@ dashboard_loop() {
         local selected
         selected=$(MENU_NO_TAGS=1 MENU_DEFAULT_ITEM="$default" MENU_CANCEL_LABEL="Quit" MENU_OK_LABEL="Open" MENU_WIDTH=100 \
             MENU_REFRESH=1 MENU_STYLED=1 MENU_COLUMN_HEADER="$columns" \
-            MENU_HOTKEYS_RAW="$DASHBOARD_HOTKEYS" MENU_HOTKEY_HINT="$(dashboard_hotkey_hint)" \
+            MENU_HOTKEYS_RAW="$DASHBOARD_HOTKEYS" MENU_CONTEXT_HINTS="$context_hints" \
             menu_choose_fit \
             "QEMU ISO Lab" \
             "$header" \
@@ -2157,10 +2233,18 @@ dashboard_loop() {
 
 # The dashboard shortcuts are the VM menu ones minus Alt-Enter: without the menu open
 # there is no highlighted suggestion to run.
-DASHBOARD_HOTKEYS="alt-d,alt-u,alt-s,alt-a,alt-c,alt-x,alt-p"
+DASHBOARD_HOTKEYS="alt-d,alt-u,alt-s,alt-a,alt-c,alt-x,alt-p,alt-h,alt-l"
 
 dashboard_hotkey_hint() {
-    printf '  \e[1mAlt\e[0m+ \e[1mD\e[0m desktop · \e[1mU\e[0m install · \e[1mS\e[0m ssh · \e[1mA\e[0m screen · \e[1mC\e[0m serial · \e[1mX\e[0m stop · \e[1mP\e[0m post-install  \e[90m(highlighted VM)\e[0m\n'
+    if [[ ! "${1:-}" =~ ^[01]\ [01]\ [01]\ [01]$ ]]; then
+        printf '  Select a VM to see its shortcuts\n'
+        return
+    fi
+    local -A FACTS=()
+    local installing
+    read -r 'FACTS[running]' 'FACTS[installed]' 'FACTS[has_ssh]' installing <<< "$1"
+    [[ "$installing" == "1" ]] && FACTS[job_status]=running
+    vm_menu_hotkey_hint dashboard
 }
 
 # run_dashboard_hotkey KEY VM → the VM menu action bound to KEY, run for VM if the menu

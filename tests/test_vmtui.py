@@ -306,21 +306,21 @@ class VmtuiTests(unittest.TestCase):
 
     def test_fzf_is_usable_requires_minimum_version(self):
         fake = self.bindir / "fzf"
-        fake.write_text("#!/usr/bin/env sh\necho '0.44.1 (debian)'\n", encoding="utf-8")
+        fake.write_text("#!/usr/bin/env sh\necho '0.40.0 (debian)'\n", encoding="utf-8")
         fake.chmod(0o755)
         # auto-detection: no VMTUI_UI in the environment
         auto_env = {key: value for key, value in self.env.items() if key != "VMTUI_UI"}
         result = subprocess.run(["bash", "-lc", "source bin/vmtui; echo $UI_BACKEND"], cwd=ROOT, env=auto_env,
                                 capture_output=True, text=True, check=True)
         self.assertEqual(result.stdout.strip(), "fzf")
-        fake.write_text("#!/usr/bin/env sh\necho '0.29.0 (debian)'\n", encoding="utf-8")
+        fake.write_text("#!/usr/bin/env sh\necho '0.39.0 (debian)'\n", encoding="utf-8")
         result = subprocess.run(["bash", "-lc", "source bin/vmtui; echo $UI_BACKEND"], cwd=ROOT, env=auto_env,
                                 capture_output=True, text=True, check=True)
         self.assertEqual(result.stdout.strip(), "dialog")
         env = dict(self.env, VMTUI_UI="fzf")
         result = subprocess.run(["bash", "-lc", "source bin/vmtui"], cwd=ROOT, env=env, capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("0.36.0", result.stderr)
+        self.assertIn("0.40.0", result.stderr)
 
     def test_vm_status_header_installed(self):
         self.mark_installed("test-ssh")
@@ -374,7 +374,7 @@ class VmtuiTests(unittest.TestCase):
             "import json, os, sys\n"
             "from pathlib import Path\n"
             "if sys.argv[1:] == ['--version']:\n"
-            "    print('0.36.0'); raise SystemExit\n"
+            "    print('0.40.0'); raise SystemExit\n"
             "root = Path(os.environ['VMTUI_ROOT_DIR'])\n"
             "log = root / 'picker.jsonl'\n"
             "rows = sys.stdin.read().splitlines()\n"
@@ -422,7 +422,7 @@ class VmtuiTests(unittest.TestCase):
             "import json, os, sys\n"
             "from pathlib import Path\n"
             "if sys.argv[1:] == ['--version']:\n"
-            "    print('0.36.0'); raise SystemExit\n"
+            "    print('0.40.0'); raise SystemExit\n"
             "root = Path(os.environ['VMTUI_ROOT_DIR'])\n"
             "log = root / 'picker.jsonl'\n"
             "rows = sys.stdin.read().splitlines()\n"
@@ -505,7 +505,7 @@ class VmtuiTests(unittest.TestCase):
 
     def test_dashboard_alt_shortcut_runs_the_action_on_the_highlighted_vm(self):
         # fzf reports the key and the highlighted row: the dashboard runs that VM's action
-        # without opening its menu, skips non-VM rows, and explains an action not offered.
+        # without opening its menu, skipping non-VM rows and unavailable shortcuts.
         disk = self.bindir / "artifacts/test-ssh/disk.qcow2"
         disk.parent.mkdir(parents=True, exist_ok=True)
         disk.write_bytes(b"x" * (24 * 1024 * 1024))
@@ -526,7 +526,6 @@ class VmtuiTests(unittest.TestCase):
         )
         self.assertEqual(result.stdout.splitlines(), [
             "action=Boot Desktop vm=test-ssh",
-            "msg='Stop VM' is not available for this VM right now (Test SSH VM).",
         ])
         self.assertIn("hotkeys=alt-d,alt-u,alt-s,alt-a,alt-c,alt-x,alt-p", result.stderr)
         self.assertIn("cursor=__filter", result.stderr)
@@ -538,6 +537,81 @@ class VmtuiTests(unittest.TestCase):
             "MENU_HOTKEYS_RAW=alt-d,alt-x MENU_REFRESH=1 fzf_pick T H '' test-ssh 'Test SSH' __quit Quit"
         )
         self.assertEqual(result.stdout, "__hotkey\talt-d\ttest-ssh\n")
+
+    def test_shortcuts_and_hints_follow_vm_state(self):
+        cases = [
+            ("0 0 0 0", ["u"], ["install"], ["screen", "ssh", "stop", "desktop"]),
+            ("0 0 1 0", ["u"], ["install"], ["ssh", "post-install"]),
+            ("0 1 1 0", ["d", "h", "s", "p", "u"],
+             ["desktop", "headless", "ssh", "reinstall"], ["screen", "serial", "stop"]),
+            ("1 1 1 0", ["a", "s", "c", "x", "p"],
+             ["screen", "ssh", "serial", "stop", "post-install"], ["desktop", "reinstall"]),
+            ("1 0 0 0", ["a", "x"], ["screen", "stop"], ["install", "ssh", "desktop"]),
+            ("0 0 1 1", ["l", "x"], ["log", "cancel"], ["screen", "install", "ssh", "stop"]),
+            ("1 1 1 1", ["a", "l", "x"], ["screen", "log", "cancel"], ["install", "ssh", "stop"]),
+        ]
+        for flags, keys, present, absent in cases:
+            with self.subTest(flags=flags):
+                running, installed, ssh, installing = flags.split()
+                result = self.run_bash(
+                    f"source bin/vmtui; FACTS=([running]={running} [installed]={installed} "
+                    f"[has_ssh]={ssh} [job_status]={'running' if installing == '1' else 'completed'}); "
+                    f"vm_menu_hotkeys; dashboard_hotkey_hint '{flags}'"
+                )
+                bindings = dict(line.split("=", 1) for line in result.stdout.splitlines() if line.startswith("alt-"))
+                self.assertEqual(list(bindings), [*(f"alt-{key}" for key in keys), "alt-enter"])
+                hint = result.stdout.splitlines()[-1]
+                for label in present:
+                    self.assertIn(label, hint)
+                for label in absent:
+                    self.assertNotIn(label, hint)
+                if installing == "1":
+                    self.assertEqual(bindings["alt-x"], "Cancel Installation")
+
+    def test_running_vm_without_ssh_suggests_display(self):
+        result = self.run_bash(
+            "source bin/vmtui; FACTS=([running]=1 [has_ssh]=0); recommended_action"
+        )
+        self.assertEqual(result.stdout.strip(), "Attach Display")
+
+    def test_dashboard_blocks_install_shortcut_after_vm_starts(self):
+        result = self.run_bash(
+            "source bin/vmtui; "
+            "load_vm_facts() { FACTS=([running]=1 [installed]=1 [has_ssh]=1); }; "
+            "run_action() { echo unexpected; }; "
+            "run_dashboard_hotkey alt-u test-ssh; run_dashboard_hotkey alt-d test-ssh"
+        )
+        self.assertEqual(result.stdout, "")
+
+    def test_dashboard_context_metadata_uses_row_snapshot(self):
+        self.mark_installed("test-ssh")
+        result = self.run_bash(
+            "source bin/vmtui; MENU_CONTEXT_HINTS=1 list_dashboard_items find test-ssh"
+        )
+        self.assertTrue(result.stdout.splitlines()[-1].endswith("\t0 1 1 0"))
+
+    def test_fzf_dashboard_focus_uses_hidden_context_hint(self):
+        result = self.run_bash("""
+source bin/vmtui
+fzf() {
+    printf '%s\\n' "$@" >&2
+    cat >&2
+    printf '\\ntest-ssh\\tTest SSH\\tHidden hint\\n'
+}
+MENU_NO_TAGS=1 MENU_CONTEXT_HINTS=1 MENU_REFRESH=1 fzf_pick T Header test-ssh \
+    __filter Filter test-ssh $'Test SSH\\t1 1 1 0' empty $'Empty VM\\t0 0 0 0'
+""")
+        self.assertEqual(result.stdout, "test-ssh\n")
+        self.assertIn("focus:transform-header:", result.stderr)
+        self.assertIn("zero:transform-header:", result.stderr)
+        self.assertIn("--with-nth=2", result.stderr)
+        rows = [line.split("\t") for line in result.stderr.splitlines() if "\t" in line]
+        rows = {row[0]: row for row in rows if len(row) == 3}
+        self.assertIn("Select a VM", rows["__filter"][2])
+        self.assertIn("screen", rows["test-ssh"][2])
+        self.assertNotIn("desktop", rows["test-ssh"][2])
+        self.assertIn("install", rows["empty"][2])
+        self.assertNotIn("screen", rows["empty"][2])
 
     def test_dashboard_and_catalog_order_versions_naturally(self):
         base = json.loads((ROOT / "vms/profiles/core.json").read_text())["vms"]["alpine-ci"]
