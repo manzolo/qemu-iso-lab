@@ -106,3 +106,15 @@ vmctl check-vms fedora-kde --clean-first --report --timeout 3600
 ```
 
 Experimental fino a un PASS dal vivo da disco pulito; `vmctl list` mostra stato e ultima verifica.
+
+## Fedora 44 Kinoite
+
+Profilo `fedora-kinoite`, SSH 2261, `bootstrap-kickstart`. Plasma 6 Wayland con autologin SDDM; verifica sessione locale attiva, plasma-desktop, plasmashell e kwin_wayland dell’utente. Confronto: kubuntu-24.04 usa Plasma 5.27 X11. Il ref ostree viene letto dalla ISO; %post configura soltanto. I pacchetti extra usano rpm-ostree dopo l’installazione e si attivano al riavvio. Identità guest: `lab` / `lab`.
+
+```bash
+vmctl check-vms fedora-kinoite --clean-first --report --timeout 3600
+```
+
+Experimental fino a un PASS dal vivo da disco pulito; `vmctl list` mostra stato e ultima verifica.
+
+Fedora 44 include Plasma Login Manager. `fedora-kinoite` avvia inizialmente in multi-user.target: via SSH installa SDDM con rpm-ostree e seleziona la sua unità per il prossimo deployment. Le verifiche desktop avvengono dopo il riavvio obbligatorio. [Modifica ufficiale Fedora](https://fedoraproject.org/wiki/Changes/PlasmaLoginManager).

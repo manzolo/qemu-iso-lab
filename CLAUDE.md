@@ -236,3 +236,7 @@ Every tracked profile declares `meta.status` (`manual`, `unattended`, `experimen
 `edubuntu-24.04` reuses `bootstrap-unattended`. Ubuntu Server 24.04.4 autoinstall with edubuntu-desktop, gdm3 autologin and a serial getty. The 60G disk leaves room for desktop packages; verification requires an active local graphical session and gnome-shell. SSH 2268; experimental pending clean live validation.
 
 `fedora-kde` reuses `bootstrap-kickstart`. Plasma 6 Wayland with SDDM autologin; verifies an active local session, plasma-desktop, plasmashell and user-owned kwin_wayland. Compare kubuntu-24.04: Plasma 5.27 X11. Everything netinst uses the Fedora 44 online installation repository. SSH 2260; experimental pending clean live validation.
+
+`fedora-kinoite` reuses `bootstrap-kickstart`. Plasma 6 Wayland with SDDM autologin; verifies an active local session, plasma-desktop, plasmashell and user-owned kwin_wayland. Compare kubuntu-24.04: Plasma 5.27 X11. The ostree ref is read from the ISO; %post only configures. Extra packages use rpm-ostree after installation and activate on reboot. SSH 2261; experimental pending clean live validation.
+
+`fedora-kinoite`: Fedora 44 ships Plasma Login Manager. The first installed boot uses multi-user.target; SSH layers SDDM with rpm-ostree and selects its unit for the next deployment. Desktop checks run after the mandatory reboot. [Fedora 44 login-manager change](https://fedoraproject.org/wiki/Changes/PlasmaLoginManager).

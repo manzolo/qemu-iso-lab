@@ -72,3 +72,7 @@ Recorded dates:
 - `edubuntu-24.04` (SSH 2268): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Ubuntu Server 24.04.4 autoinstall with edubuntu-desktop, gdm3 autologin and a serial getty. The 60G disk leaves room for desktop packages; verification requires an active local graphical session and gnome-shell.
 
 - `fedora-kde` (SSH 2260): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Plasma 6 Wayland with SDDM autologin; verifies an active local session, plasma-desktop, plasmashell and user-owned kwin_wayland. Compare kubuntu-24.04: Plasma 5.27 X11. Everything netinst uses the Fedora 44 online installation repository.
+
+- `fedora-kinoite` (SSH 2261): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Plasma 6 Wayland with SDDM autologin; verifies an active local session, plasma-desktop, plasmashell and user-owned kwin_wayland. Compare kubuntu-24.04: Plasma 5.27 X11. The ostree ref is read from the ISO; %post only configures. Extra packages use rpm-ostree after installation and activate on reboot.
+
+`fedora-kinoite`: Fedora 44 ships Plasma Login Manager. The first installed boot uses multi-user.target; SSH layers SDDM with rpm-ostree and selects its unit for the next deployment. Desktop checks run after the mandatory reboot. [Fedora 44 login-manager change](https://fedoraproject.org/wiki/Changes/PlasmaLoginManager).

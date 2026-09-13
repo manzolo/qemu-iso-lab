@@ -130,3 +130,5 @@ MISSING void-live-x86_64-20250202-xfce.iso
 - `edubuntu-24.04`: `ubuntu-24.04.4-live-server-amd64.iso`, SHA-256 `e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433`. Reuses the [Ubuntu 24.04.4 vendor manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS). [Metapackage dependencies](https://packages.ubuntu.com/noble/edubuntu-desktop) checked 2026-09-13.
 
 - `fedora-kde`: `Fedora-Everything-netinst-x86_64-44-1.7.iso`, SHA-256 `bd285201494dd0ba09b54d05ac707de1401668b8512a573edb5922dcf9d7067e`. [Vendor signed CHECKSUM](https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-44-1.7-x86_64-CHECKSUM), retrieved 2026-09-13 (signature supplied by vendor; not independently verified here).
+
+- `fedora-kinoite`: `Fedora-Kinoite-ostree-x86_64-44-1.7.iso`, SHA-256 `4a944312b4e861ab625fd9786957174ef122a8a406bbb54caba7665e0d9f0e92`. [Vendor signed CHECKSUM](https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Kinoite/x86_64/iso/Fedora-Kinoite-44-1.7-x86_64-CHECKSUM), retrieved 2026-09-13 (signature supplied by vendor; not independently verified here).
