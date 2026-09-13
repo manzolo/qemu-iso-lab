@@ -676,3 +676,7 @@ without a result is reported at phase `worker` with unavailable duration (0).
 ### Ubuntu Studio 24.04 LTS
 
 `vmctl bootstrap-unattended ubuntustudio-24.04 --timeout 3600` (SSH 2267). Ubuntu Server 24.04.4 autoinstall with ubuntustudio-desktop, sddm autologin and a serial getty. The 80G disk leaves room for desktop packages; verification requires an active local graphical session and plasmashell. Experimental until a clean live PASS.
+
+### Edubuntu 24.04 LTS
+
+`vmctl bootstrap-unattended edubuntu-24.04 --timeout 3600` (SSH 2268). Ubuntu Server 24.04.4 autoinstall with edubuntu-desktop, gdm3 autologin and a serial getty. The 60G disk leaves room for desktop packages; verification requires an active local graphical session and gnome-shell. Experimental until a clean live PASS.

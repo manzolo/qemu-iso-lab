@@ -232,3 +232,5 @@ Every tracked profile declares `meta.status` (`manual`, `unattended`, `experimen
 `ubuntu-cinnamon-24.04` reuses `bootstrap-unattended`. Ubuntu Server 24.04.4 autoinstall with ubuntucinnamon-desktop, lightdm autologin and a serial getty. The 40G disk leaves room for desktop packages; verification requires an active local graphical session and cinnamon. SSH 2266; experimental pending clean live validation.
 
 `ubuntustudio-24.04` reuses `bootstrap-unattended`. Ubuntu Server 24.04.4 autoinstall with ubuntustudio-desktop, sddm autologin and a serial getty. The 80G disk leaves room for desktop packages; verification requires an active local graphical session and plasmashell. SSH 2267; experimental pending clean live validation.
+
+`edubuntu-24.04` reuses `bootstrap-unattended`. Ubuntu Server 24.04.4 autoinstall with edubuntu-desktop, gdm3 autologin and a serial getty. The 60G disk leaves room for desktop packages; verification requires an active local graphical session and gnome-shell. SSH 2268; experimental pending clean live validation.

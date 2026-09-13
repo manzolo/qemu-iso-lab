@@ -96,3 +96,13 @@ vmctl check-vms ubuntustudio-24.04 --clean-first --report --timeout 3600
 ```
 
 Experimental until a clean live PASS; consult `vmctl list` for status and last verification.
+
+## Edubuntu 24.04 LTS
+
+Profile `edubuntu-24.04`, SSH 2268, `bootstrap-unattended`. Ubuntu Server 24.04.4 autoinstall with edubuntu-desktop, gdm3 autologin and a serial getty. The 60G disk leaves room for desktop packages; verification requires an active local graphical session and gnome-shell. Guest identity: `lab` / `lab`.
+
+```bash
+vmctl check-vms edubuntu-24.04 --clean-first --report --timeout 3600
+```
+
+Experimental until a clean live PASS; consult `vmctl list` for status and last verification.

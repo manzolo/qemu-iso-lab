@@ -126,3 +126,5 @@ MISSING void-live-x86_64-20250202-xfce.iso
 - `ubuntu-cinnamon-24.04`: `ubuntu-24.04.4-live-server-amd64.iso`, SHA-256 `e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433`. Reuses the [Ubuntu 24.04.4 vendor manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS). [Metapackage dependencies](https://packages.ubuntu.com/noble/ubuntucinnamon-desktop) checked 2026-09-13.
 
 - `ubuntustudio-24.04`: `ubuntu-24.04.4-live-server-amd64.iso`, SHA-256 `e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433`. Reuses the [Ubuntu 24.04.4 vendor manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS). [Metapackage dependencies](https://packages.ubuntu.com/noble/ubuntustudio-desktop) checked 2026-09-13. SDDM is pulled by [ubuntustudio-default-settings](https://packages.ubuntu.com/noble/ubuntustudio-default-settings).
+
+- `edubuntu-24.04`: `ubuntu-24.04.4-live-server-amd64.iso`, SHA-256 `e907d92eeec9df64163a7e454cbc8d7755e8ddc7ed42f99dbc80c40f1a138433`. Reuses the [Ubuntu 24.04.4 vendor manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS). [Metapackage dependencies](https://packages.ubuntu.com/noble/edubuntu-desktop) checked 2026-09-13.

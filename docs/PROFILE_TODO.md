@@ -68,3 +68,5 @@ Recorded dates:
 - `ubuntu-cinnamon-24.04` (SSH 2266): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Ubuntu Server 24.04.4 autoinstall with ubuntucinnamon-desktop, lightdm autologin and a serial getty. The 40G disk leaves room for desktop packages; verification requires an active local graphical session and cinnamon.
 
 - `ubuntustudio-24.04` (SSH 2267): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Ubuntu Server 24.04.4 autoinstall with ubuntustudio-desktop, sddm autologin and a serial getty. The 80G disk leaves room for desktop packages; verification requires an active local graphical session and plasmashell.
+
+- `edubuntu-24.04` (SSH 2268): experimental; live validation deferred while the existing host matrix runs (2026-09-13). No live duration or verified date. Ubuntu Server 24.04.4 autoinstall with edubuntu-desktop, gdm3 autologin and a serial getty. The 60G disk leaves room for desktop packages; verification requires an active local graphical session and gnome-shell.
