@@ -166,7 +166,7 @@ Order after the maintainer's update: FreeBSD, Windows XP/98, then Devuan, Proxmo
 
 | Profile | SSH | Status | Verified | Live | Evidence / remaining work |
 |---|---|---|---|---|---|
-| `freebsd-unattended` | 2271 | experimental | — | latest FAIL, 1.4 min | Installation and SSH work; corrected the FreeBSD pgrep ancestor exclusion after live diagnosis. Final clean retry deferred: another session started a debian-xfce matrix. |
+| `freebsd-unattended` | 2271 | unattended | 2026-09-14 | PASS, 1.5 min | `artifacts/check-vms/20260914-130825-835989/`: clean install, natural shutdown, SSH identity, pgrep -a -x sshd, service status, freebsd-version and sudo. BIOS/UFS server only; EFI and desktop untested. |
 
 FreeBSD manual evidence: `artifacts/freebsd-probe/manual/03-script-install.png` shows
 bsdinstall completing the disc1 UFS install; `04-pkg.png` exposed the chroot PATH issue
@@ -192,3 +192,12 @@ CI-like PATH unittest (687 tests, six existing skips), bootstrap dry run and
 `check-vms freebsd-unattended --dry-run` all passed on 2026-09-14. The final clean
 retry was deferred after the outside-sandbox pgrep found another session running
 `check-vms debian-xfce --document`; that matrix was left untouched.
+
+Final FreeBSD clean PASS on 2026-09-14: 87.963 s (1.5 min),
+`artifacts/check-vms/20260914-130825-835989/`, with `--clean-first --timeout 1800
+--report --document`. Ran commit `998bd14` from an isolated source snapshot while
+preserving another session's uncommitted report changes in the main workspace.
+The snapshot shared only the project's ISO cache and artifacts. Installer completed
+in under its 120 s shutdown grace; the disk boot passed lab identity, sshd process
+and service, FreeBSD 14.3-RELEASE and passwordless sudo, then powered off cleanly.
+The report keeps the timeline and English/Italian PDFs. Promoted only after this PASS.
