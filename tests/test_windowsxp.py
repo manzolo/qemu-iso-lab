@@ -61,13 +61,16 @@ class WindowsXpTests(BaseVmctlTestCase):
         self.assertIn("start /wait %VMCTLSP% /quiet /norestart /nobackup", script)
         self.assertIn("if not %VMCTLRC%==0 if not %VMCTLRC%==3010", script)  # 3010: reboot pending
         self.assertIn("echo mine", script)
-        # autologon must survive the first boot: the answer file only covers the GuiRunOnce one
-        self.assertIn("AutoAdminLogon /t REG_SZ /d 1 /f", script)
-        self.assertIn("DefaultUserName /t REG_SZ /d Administrator /f", script)
+        # autologon must survive the first boot: the answer file only covers the GuiRunOnce one,
+        # and it is applied with regedit because reg.exe does not exist on Windows 2000
+        self.assertIn("regedit /s %~d0\\VMCTL\\VMCTL.REG", script)
+        self.assertNotIn("reg query", script)
+        registry = vmctl.windowsxp.render_registry(self.vm_config)
+        self.assertIn('"AutoAdminLogon"="1"', registry)
+        self.assertIn('"DefaultUserName"="Administrator"', registry)
         # Winlogon would otherwise delete those values when its own counter runs out
-        self.assertIn("reg delete", script)
-        self.assertIn("AutoLogonCount /f", script)
-        self.assertIn('reg query "HKLM\\SOFTWARE\\Microsoft\\Windows NT', script)
+        self.assertIn('"AutoLogonCount"=-', registry)
+        self.assertIn('regedit /e "%TEMP%\\vmctl-ver.reg"', script)  # reg.exe is XP and later only
         self.assertTrue(script.rstrip().endswith("shutdown -s -t 5 -f"))
         # every '>' of a token is escaped: in a batch file too, a bare one redirects
         self.assertNotIn("echo ==>", script)
@@ -125,7 +128,11 @@ class WindowsXpTests(BaseVmctlTestCase):
         commands = [call.args[0] for call in run.call_args_list]
         self.assertFalse([c for c in commands if c[0] == "grub-mkimage"], "no GRUB when the CD boots")
         xorriso = [c for c in commands if c[0] == "xorriso"][0]
-        self.assertIn("replay", xorriso)
+        # the original boot image is copied out and handed back as a file: "replay" drops the boot
+        # record of a Windows CD, where it is a hidden extent rather than a file (verified live)
+        self.assertIn(f"bin_path={vmctl.windowsxp.ORIGINAL_BOOT_PATH}", xorriso)
+        self.assertNotIn("replay", xorriso)
+        self.assertIn("omit_version:untranslated_names", xorriso)
 
     def test_the_iso_is_rebuilt_only_when_the_source_or_the_answers_change(self):
         source = iso_with_descriptors(self.root / "xp.iso", (1, 0, 255))

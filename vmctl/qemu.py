@@ -673,7 +673,10 @@ def common_args(
     serial_socket: Path | None = None, serial_log: Path | None = None,
 ) -> list[str]:
     runtime.require_command("qemu-system-x86_64")
-    cpu_model = "host" if accel == "kvm" else vm.get("cpu_model", "max")
+    # KVM normally exposes the host CPU, which is what a modern guest wants. A profile that names a
+    # cpu_model means it: Windows 98 does not survive the feature set of a 2020s processor, and the
+    # model it was written for is the point of the profile.
+    cpu_model = str(vm.get("cpu_model") or ("host" if accel == "kvm" else "max"))
     machine_extra, memory_objects, shared_device = shared_dir_args(vm)
     args = ["qemu-system-x86_64", "-m", str(vm["memory_mb"]), "-cpu", cpu_model, "-smp", str(vm["cpus"]),
             "-machine", machine_arg(vm, accel=accel) + machine_extra, "-boot", "menu=on"]

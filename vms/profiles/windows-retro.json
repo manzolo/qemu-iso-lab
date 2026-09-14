@@ -67,6 +67,129 @@
         "tag": "shared",
         "mode": "vvfat"
       }
+    },
+    "windows98-unattended": {
+      "name": "Windows 98 SE (unattended)",
+      "meta": {
+        "slug": "windows98-unattended",
+        "family": "windows",
+        "role": "desktop",
+        "release_model": "retro",
+        "status": "experimental"
+      },
+      "iso": "isos/windows98.iso",
+      "disk": {
+        "path": "artifacts/windows98-unattended/disk.qcow2",
+        "size": "2G",
+        "format": "qcow2",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 256,
+      "cpus": 1,
+      "cpu_model": "pentium3",
+      "network": "user",
+      "network_device": "rtl8139",
+      "audio": true,
+      "audio_device": "ac97",
+      "usb_tablet": true,
+      "video": {
+        "default": "cirrus",
+        "headless": [
+          "-vga",
+          "cirrus",
+          "-display",
+          "none"
+        ],
+        "variants": {
+          "cirrus": [
+            "-vga",
+            "cirrus",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "windows98_config": {
+        "computer_name": "WIN98-LAB",
+        "full_name": "Lab User",
+        "organization": "qemu-iso-lab",
+        "workgroup": "WORKGROUP",
+        "timezone": "W. Europe",
+        "locale": "L0410",
+        "keyboard": "KEYBOARD_00000410",
+        "install_dir": "c:\\windows"
+      },
+      "usb_controller": "builtin"
+    },
+    "windows2000-unattended": {
+      "name": "Windows 2000 Professional (unattended)",
+      "meta": {
+        "slug": "windows2000-unattended",
+        "family": "windows",
+        "role": "desktop",
+        "release_model": "retro",
+        "status": "unattended",
+        "verified": "2026-09-14"
+      },
+      "iso": "isos/windows2000.iso",
+      "disk": {
+        "path": "artifacts/windows2000-unattended/disk.qcow2",
+        "size": "12G",
+        "format": "qcow2",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 512,
+      "cpus": 1,
+      "network": "user",
+      "network_device": "rtl8139",
+      "audio": true,
+      "audio_device": "ac97",
+      "usb_tablet": true,
+      "usb_controller": "builtin",
+      "video": {
+        "default": "cirrus",
+        "headless": [
+          "-vga",
+          "cirrus",
+          "-display",
+          "none"
+        ],
+        "variants": {
+          "cirrus": [
+            "-vga",
+            "cirrus",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "shared_dir": {
+        "source": "../storage/shared",
+        "tag": "shared",
+        "mode": "vvfat"
+      },
+      "windows2000_config": {
+        "computer_name": "W2K-LAB",
+        "full_name": "Lab User",
+        "organization": "qemu-iso-lab",
+        "admin_password": "lab",
+        "workgroup": "WORKGROUP",
+        "timezone": 110,
+        "target_path": "WINNT",
+        "display": {
+          "BitsPerPel": 16,
+          "XResolution": 1024,
+          "YResolution": 768
+        }
+      }
     }
   }
 }

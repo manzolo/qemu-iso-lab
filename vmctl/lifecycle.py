@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windowsxp
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windows98, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -409,7 +409,10 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
     if reactos.reactos_config(vm) is not None:
         return ("bootstrap-reactos", "unattend.inf install only (no SSH server on ReactOS)")
     if windowsxp.windowsxp_config(vm) is not None:
-        return ("bootstrap-windowsxp", "WINNT.SIF install only (no SSH server on Windows XP)")
+        command = "bootstrap-windows2000" if windowsxp.config_section(vm) == "windows2000_config" else "bootstrap-windowsxp"
+        return (command, f"WINNT.SIF install only (no SSH server on {windowsxp.product_name(vm)})")
+    if windows98.windows98_config(vm) is not None:
+        return ("bootstrap-windows98", "MSBATCH.INF install only (no SSH server on Windows 98)")
     if windows.windows_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-windows", "autounattend + post-install")
@@ -514,7 +517,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -766,7 +769,26 @@ def run_local_test_vm(
         if prep_note is not None:
             detail = f"{detail}; {prep_note}"
         return ("passed", detail)
-    if mode == "bootstrap-windowsxp":
+    if mode == "bootstrap-windows98":
+        try:
+            cmd_bootstrap_windows98(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
+            boot_for_report_screenshot(vm_name, prepared_vm, args)
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode in {"bootstrap-windowsxp", "bootstrap-windows2000"}:
         try:
             cmd_bootstrap_windowsxp(
                 argparse.Namespace(
@@ -1689,11 +1711,11 @@ def cmd_bootstrap_windowsxp(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = resolved_vm(args, cfg)
     if windowsxp.windowsxp_config(vm) is None:
-        raise VMError(f"VM '{args.vm}' does not define windowsxp_config")
+        raise VMError(f"VM '{args.vm}' defines neither windowsxp_config nor windows2000_config")
     windowsxp.check_profile(args.vm, vm)
 
     runtime.ensure_vm_dirs(args.vm)
-    ui.print_header(f"Bootstrap Windows XP (WINNT.SIF): {args.vm}")
+    ui.print_header(f"Bootstrap {windowsxp.product_name(vm)} (WINNT.SIF): {args.vm}")
 
     source_iso = windowsxp_source_iso(args.vm, vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
@@ -1723,14 +1745,69 @@ def cmd_bootstrap_windowsxp(args: argparse.Namespace) -> int:
     serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
     qemu.run_and_expect(
         install_qemu_args,
-        expected_text=windowsxp.BOOTSTRAP_COMPLETE_TOKEN,
+        expected_text=windowsxp.complete_token(vm),
         timeout_sec=getattr(args, "timeout", 3600),
         dry_run=args.dry_run,
         log_path=serial_log,
         exit_grace_sec=windowsxp.SHUTDOWN_GRACE_SEC,
     )
     ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
-    ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: XP ships no server, the desktop autologs in)")
+    ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH on this generation; the desktop autologs in)")
+    return 0
+
+
+cmd_bootstrap_windows2000 = cmd_bootstrap_windowsxp
+
+
+def cmd_bootstrap_windows98(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if windows98.windows98_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define windows98_config")
+    windows98.check_profile(args.vm, vm)
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Windows 98 (MSBATCH.INF): {args.vm}")
+
+    source = runtime.resolve_path(str(vm["iso"]))
+    if not source.is_file() and not args.dry_run:
+        raise VMError(
+            f"Windows 98 ISO not found: {ui.pretty_path(source)}. Microsoft publishes no URL for it; "
+            f"point vms/profiles/local.json at your own copy (see local.json.example)."
+        )
+    # Not ensure_vm_disk: Setup neither partitions nor formats, so the host hands it a disk that is
+    # already a FAT32 volume with boot code that steps aside until Windows owns it.
+    windows98.prepare_disk(vm, dry_run=args.dry_run)
+    answer = windows98.render_msbatch(args.vm, vm)
+    install_iso = windows98.ensure_install_iso(args.vm, vm, source, answer, dry_run=args.dry_run)
+
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        allow_missing_disk=args.dry_run,
+        enable_clipboard=False,
+        disk_bootindex=1,
+        network_phase="install",
+    )
+    install_qemu_args += windows98.install_media_args(install_iso)
+
+    ui.print_note("Booting Windows 98 Setup - waiting for the completion token on COM1 (DOS stage, GUI stage, first logon)...")
+    ui.print_note(f"Watch the screen with: vmctl attach {args.vm}")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    qemu.run_and_expect(
+        install_qemu_args,
+        expected_text=windows98.BOOTSTRAP_COMPLETE_TOKEN,
+        timeout_sec=getattr(args, "timeout", 5400),
+        dry_run=args.dry_run,
+        log_path=serial_log,
+        exit_grace_sec=windows98.SHUTDOWN_GRACE_SEC,
+    )
+    ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
+    ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: Windows 98 ships no server)")
     return 0
 
 

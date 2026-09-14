@@ -89,7 +89,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "ubuntu-unity-24.04", "ubuntu-cinnamon-24.04", "ubuntustudio-24.04", "edubuntu-24.04",
         }
         verified_batch_a_retry = {"debian-kde", "kali"}
-        verified_batch_b_c = {"freebsd-unattended", "windowsxp-unattended"}
+        verified_batch_b_c = {"freebsd-unattended", "windowsxp-unattended", "windows2000-unattended"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = ("2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates

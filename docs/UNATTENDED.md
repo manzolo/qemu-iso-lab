@@ -548,6 +548,45 @@ whole install takes about 90 s under KVM. Install only: ReactOS ships no SSH
 server, the desktop autologs in as Administrator. `check-vms` treats the
 profile like pfSense: install, boot for the report screenshot, stop.
 
+## Windows XP and Windows 2000: WINNT.SIF
+
+```bash
+vmctl bootstrap-windowsxp windowsxp-unattended      # your own ISO + key in local.json
+vmctl bootstrap-windows2000 windows2000-unattended  # the same flow, one section later
+```
+
+One module serves both. A profile says which generation it is by the section it
+carries, `windowsxp_config` or `windows2000_config`, and three things follow
+from that, each of them found the hard way on 2026-09-14:
+
+| | Windows XP | Windows 2000 |
+|---|---|---|
+| licence key in the answer file | `ProductKey` | `ProductID` |
+| how the guest powers itself off | `shutdown -s -t 5 -f` | WMI `Win32Shutdown(12)` from a `.vbs` on the CD |
+| writing the registry | `regedit /s` | `regedit /s` |
+
+Windows 2000 has neither `shutdown.exe` (Resource Kit only) nor SHELL32's
+`SHExitWindowsEx`, which is a Windows 9x export - RUNDLL32 answered "Voce
+mancante" and the guest sat on its desktop until the timeout. It does have
+Windows Script Host and WMI, so the CD carries a four-line `.vbs`. And it has no
+`reg.exe` either ("reg" non e' riconosciuto...), which is why the autologon
+values travel as a `.reg` file applied with `regedit /s`: that one exists on
+both. The same file removes `AutoLogonCount`, which Winlogon otherwise uses to
+delete the very values it was given.
+
+The ISO rebuild needs `-compliance omit_version:untranslated_names`. Without the
+first, Microsoft's CD loader stops at "CDBOOT: Couldn't find NTLDR", because it
+looks up `NTLDR` and not `NTLDR.;1`. Without the second, xorriso rewrites a name
+like `BACHSB~1.RM_` as `BACHSB_1.RM_` - the tilde is not an ISO9660 character -
+and keeps the original only in Rock Ridge, which Windows does not read: Setup
+then stops on "unable to copy" for that file, on Windows 2000 and on Windows NT
+alike. Windows 98 needs the opposite, see its own section.
+
+And the boot image is copied out of the original medium and handed back as a
+file rather than replayed: on a Windows CD it is a hidden extent, not a file of
+the directory tree, so `-boot_image any replay` drops the boot record without a
+word and the rebuilt CD falls through to PXE (verified live).
+
 ## Windows XP: WINNT.SIF
 
 ```bash
@@ -634,6 +673,70 @@ able to corrupt the host directory — which on an IDE disk means `snapshot=on`,
 not `readonly=on`: a read-only block node makes QEMU refuse to start with "Block
 node is read-only". The share is attached at runtime only, never while an
 installer runs: a second disk is a second place Setup could install to.
+
+## Windows 98: MSBATCH.INF
+
+```bash
+vmctl bootstrap-windows98 windows98-unattended   # your own ISO + key in local.json; xorriso, mtools, mkfs.vfat
+```
+
+Nothing here looks like the Windows XP flow. Setup runs from real-mode DOS,
+booted by the 1.44 MB floppy image the CD carries as its El Torito record, and
+it neither partitions nor formats: it expects a C: that already exists. Four
+things had to be solved, each one verified live on 2026-09-14.
+
+**The host prepares the disk.** `windows98.prepare_disk()` writes a partition
+table with one active FAT32 partition, makes the filesystem with
+`mkfs.vfat --offset`, and puts boot code of its own in sector 0
+(`vms/profile-files/windows98/mbr.asm`, 100 bytes, assembled with nasm and
+carried in the module as bytes): it chainloads the active partition when its
+boot sector is bootable and otherwise returns to the BIOS with `int 0x18`, so
+the boot order moves on to the CD. Without it the BIOS stops at "Booting from
+Hard Disk..." on a disk that has a partition table and no boot code. The two
+bytes at offset 0x5A of the fresh FAT32 boot sector — where the jump at its
+start lands — become `int 0x18` for the same reason: dosfstools leaves a stub
+there that prints "this is not a bootable disk" and waits for a key.
+
+**`mkfs.vfat --offset` leaves BPB_HiddSec at zero**, and that field must hold
+the partition's first sector. Windows Setup writes its own boot code over that
+BPB and keeps the wrong value, then looks for IO.SYS at the wrong absolute
+sector: the guest hangs at "Booting from Hard Disk..." after the file-copy
+stage, with the system already on the disk. The flow writes 2048 into the boot
+sector and into the FAT32 backup at sector 6 of the partition.
+
+**The CD has a boot menu before DOS.** Not the one in `CONFIG.SYS`: a 2 KB
+program, `JO.SYS`, shows "1. Avvio dal disco rigido / 2. Avvio dal CD-ROM" and
+defaults to the hard disk, which is why an unattended boot always came back
+where it started. Deleting that one file from the boot image makes DOS start
+directly, and the flow then sets the `CONFIG.SYS` menu timeout to zero and
+replaces `AUTOEXEC.BAT` with one that finds the CD, runs `FDISK /MBR` (the only
+non-interactive thing FDISK does, and what puts Microsoft's boot code on the
+disk for the installed system) and starts Setup with the answer file. Both files
+are written CRLF: DOS obeys nothing in a batch file with Unix line endings — it
+prints `OFF` instead of running `@ECHO OFF`.
+
+**The answer file uses `ProductKey="xxxxx-xxxxx-xxxxx-xxxxx-xxxxx"` in `[Setup]`,**
+as emitted by Microsoft's own `tools/RESKIT/BATCH/BATCH.EXE` on the CD.
+`ProductID` is not the installation-key field: using it leaves Setup without
+the supplied key and can stop at the user-information page even when the name
+and organization are prefilled and `[NameAndOrg] Display=0` is set. The key belongs in
+`vms/profiles/local.json`, never in a tracked profile. The rest of the file
+follows the vendor's own example, which ships on the CD at
+`\tools\SYSREC\MSBATCH.INF`; `[Install] AddReg` is what puts the first-logon
+script in `RunOnce`, where it echoes the completion token to COM1 and calls
+`rundll32.exe user.exe,exitwindows`.
+
+Changes to the answer file invalidate the generated ISO cache on the next
+bootstrap. They do not update an installer that is already running.
+`bootstrap-windows98` prepares a fresh disk, so rerunning it replaces the
+previous installation.
+
+The profile pins `cpu_model: pentium3`: under KVM `common_args` otherwise
+exposes the host CPU, whose feature set Windows 98 does not survive. It is the
+only profile in the catalogue that names a CPU, and naming one is now what it
+takes to override the KVM default.
+
+Install only, like ReactOS and Windows XP: no SSH server exists for this guest.
 
 ## The completion-token rule
 

@@ -1,4 +1,9 @@
-"""Windows XP unattended install: ``WINNT.SIF`` render, per-VM bootable ISO (xorriso), CD-ROM args.
+"""Windows XP and Windows 2000 unattended install: ``WINNT.SIF``, per-VM bootable ISO, CD-ROM args.
+
+Both read the same answer file from ``\\I386\\WINNT.SIF`` and differ in two words: Windows 2000 spells
+the licence key ``ProductID`` where XP spells it ``ProductKey``, and each says its own name in the
+completion token. A profile declares which one it is by the section it carries, ``windowsxp_config``
+or ``windows2000_config``.
 
 Setup reads its answers from ``\\I386\\WINNT.SIF`` on the installation medium: with
 ``UnattendMode=FullUnattended`` the text stage (partition, format, copy) and the GUI stage both run
@@ -25,7 +30,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from vmctl import runtime, ui
+from vmctl import iso as iso_tools, runtime, ui
 from vmctl.errors import VMError
 
 
@@ -39,10 +44,13 @@ ANSWER_FILE_PATH = "/I386/WINNT.SIF"
 SERVICE_PACK_PATH = "/VMCTL/SP.EXE"
 SERVICE_PACK_PATH_WIN = "\\VMCTL\\SP.EXE"
 SETUP_SCRIPT_PATH = "/VMCTL/VMCTL.CMD"
+SHUTDOWN_SCRIPT_PATH = "/VMCTL/VMCTL.VBS"
+REGISTRY_PATH = "/VMCTL/VMCTL.REG"
 SETUP_SCRIPT_PATH_WIN = "\\VMCTL\\VMCTL.CMD"
 BOOTSTRAP_FAILED_TOKEN = "==> Windows XP installation FAILED"
 GRUB_DIR = "/boot/grub"
 GRUB_CORE_PATH = f"{GRUB_DIR}/i386-pc/eltorito.img"
+ORIGINAL_BOOT_PATH = "/VMCTL/BOOT.IMG"
 CD_DRIVE_ID = "xpcd0"
 # What GRUB needs to read this ISO and hand control to the Microsoft loader.
 GRUB_MODULES = ("biosdisk", "iso9660", "ntldr", "part_msdos", "normal", "configfile", "echo")
@@ -59,22 +67,97 @@ GRUB_CONFIG = (
 )
 
 
+# Windows 2000 has neither shutdown.exe (Resource Kit only) nor SHELL32's SHExitWindowsEx, which
+# is a Windows 9x export: RUNDLL32 answered "Voce mancante: SHExitWindowsEx" and the guest stayed on
+# its desktop (verified live). What that generation does have in the box is WMI and Windows Script
+# Host, and Win32Shutdown(12) is shut down + force + power off.
+SHUTDOWN_VBS = (
+    'Set os = GetObject("winmgmts:{impersonationLevel=impersonate,(Shutdown)}!\\\\.\\root\\cimv2")\r\n'
+    'For Each item In os.ExecQuery("select * from Win32_OperatingSystem")\r\n'
+    '    item.Win32Shutdown 12\r\n'
+    'Next\r\n'
+)
+
+
+def render_registry(vm: dict[str, Any]) -> str:
+    """The autologon values, as a .reg file: the one registry editor both generations ship."""
+    cfg = windowsxp_config(vm) or {}
+    user = _sif_value(cfg.get("administrator_name", "Administrator"))
+    password = _sif_value(cfg.get("admin_password", "lab"))
+    return (
+        "REGEDIT4\r\n"
+        "\r\n"
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon]\r\n"
+        '"AutoAdminLogon"="1"\r\n'
+        f'"DefaultUserName"="{user}"\r\n'
+        f'"DefaultPassword"="{password}"\r\n'
+        # Winlogon decrements this at every automatic logon and, when it runs out, deletes the three
+        # values above: removing it is what makes the autologon permanent (verified live on XP).
+        '"AutoLogonCount"=-\r\n'
+    )
+
+
+def needs_shutdown_script(vm: dict[str, Any]) -> bool:
+    return config_section(vm) == "windows2000_config"
+
+
 def _echo(text: str) -> str:
     """A token as `echo` must receive it: cmd reads a bare '>' as a redirection, in a batch file too."""
     return text.replace(">", "^>")
 
 
+# (display name, the answer file's key for the licence, how the guest powers itself off)
+# Windows 2000 has no shutdown.exe - it ships with the Resource Kit, not with the system - so the
+# token arrived and the guest stayed on the desktop until the host's timeout (verified live).
+# SHExitWindowsEx with EWX_SHUTDOWN is what that generation has in the box.
+FAMILIES = {"windowsxp_config": ("Windows XP", "ProductKey", "shutdown -s -t 5 -f"),
+            "windows2000_config": ("Windows 2000", "ProductID",
+                                   "cscript //nologo %~d0\\VMCTL\\VMCTL.VBS")}
+
+
+def config_section(vm: dict[str, Any]) -> str | None:
+    for name in FAMILIES:
+        if vm.get(name) is not None:
+            return name
+    return None
+
+
 def windowsxp_config(vm: dict[str, Any]) -> dict[str, Any] | None:
-    cfg = vm.get("windowsxp_config")
-    if cfg is None:
+    name = config_section(vm)
+    if name is None:
         return None
+    cfg = vm.get(name)
     if not isinstance(cfg, dict):
-        raise VMError("Invalid windowsxp_config: expected object")
+        raise VMError(f"Invalid {name}: expected object")
     return cfg
 
 
+def product_name(vm: dict[str, Any]) -> str:
+    name = config_section(vm)
+    return FAMILIES[name][0] if name else "Windows XP"
+
+
+def product_key_field(vm: dict[str, Any]) -> str:
+    """Windows 2000 reads ProductID where Windows XP reads ProductKey."""
+    name = config_section(vm)
+    return FAMILIES[name][1] if name else "ProductKey"
+
+
+def shutdown_command(vm: dict[str, Any]) -> str:
+    name = config_section(vm)
+    return FAMILIES[name][2] if name else FAMILIES["windowsxp_config"][2]
+
+
+def complete_token(vm: dict[str, Any]) -> str:
+    return f"==> {product_name(vm)} installation complete!"
+
+
+def failed_token(vm: dict[str, Any]) -> str:
+    return f"==> {product_name(vm)} installation FAILED"
+
+
 def artifact_dir(vm: dict[str, Any]) -> Path:
-    return runtime.resolve_path(vm["disk"]["path"]).parent / "windowsxp"
+    return runtime.resolve_path(vm["disk"]["path"]).parent / "install-media"
 
 
 def install_iso_path(vm: dict[str, Any]) -> Path:
@@ -98,7 +181,7 @@ def product_key(vm_name: str, vm: dict[str, Any]) -> str:
     key = str(cfg.get("product_key") or "").strip()
     if not key:
         raise VMError(
-            f"Profile '{vm_name}' has no windowsxp_config.product_key: Windows XP Setup asks for the "
+            f"Profile '{vm_name}' has no {config_section(vm)}.product_key: Setup asks for the "
             f"licence key in its GUI stage and the unattended install would stop there. Put your own "
             f"key in vms/profiles/local.json (gitignored), never in a tracked profile."
         )
@@ -143,7 +226,7 @@ def render_setup_script(vm: dict[str, Any]) -> str:
             "set VMCTLSP=",
             f"for %%d in (D E F G) do if exist %%d:{SERVICE_PACK_PATH_WIN} set VMCTLSP=%%d:{SERVICE_PACK_PATH_WIN}",
             "if not defined VMCTLSP (",
-            f"  echo {_echo(BOOTSTRAP_FAILED_TOKEN)}: service pack not found on the CD",
+            f"  echo {_echo(failed_token(vm))}: service pack not found on the CD",
             "  shutdown -s -t 5 -f",
             "  goto :eof",
             ")",
@@ -155,27 +238,18 @@ def render_setup_script(vm: dict[str, Any]) -> str:
             "echo ==^> vmctl: service pack exit code %VMCTLRC%",
             # 3010 is "success, a reboot is pending", which is exactly our case.
             "if not %VMCTLRC%==0 if not %VMCTLRC%==3010 (",
-            f"  echo {_echo(BOOTSTRAP_FAILED_TOKEN)}: service pack returned %VMCTLRC%",
+            f"  echo {_echo(failed_token(vm))}: service pack returned %VMCTLRC%",
             "  shutdown -s -t 5 -f",
             "  goto :eof",
             ")",
         ]
     # AutoLogonCount in the answer file covers the first logon only, the one GuiRunOnce needs: from
-    # the second boot XP shows the welcome screen and waits (verified live). A lab guest with no SSH
-    # has to reach its desktop by itself, so autologon is made permanent here.
-    winlogon = r'"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"'
-    user = _sif_value(cfg.get("administrator_name", "Administrator"))
-    password = _sif_value(cfg.get("admin_password", "lab"))
-    lines += [
-        f'reg add {winlogon} /v AutoAdminLogon /t REG_SZ /d 1 /f',
-        f'reg add {winlogon} /v DefaultUserName /t REG_SZ /d {user} /f',
-        f'reg add {winlogon} /v DefaultPassword /t REG_SZ /d {password} /f',
-        # Winlogon decrements AutoLogonCount at every automatic logon and, when it runs out, deletes
-        # AutoAdminLogon and DefaultPassword with it - the three values just written. Removing the
-        # counter is what makes the autologon permanent (verified live: without this the second boot
-        # stops at the welcome screen).
-        f'reg delete {winlogon} /v AutoLogonCount /f',
-    ]
+    # the second boot Windows shows the welcome screen and waits (verified live). A lab guest with no
+    # SSH has to reach its desktop by itself, so autologon is made permanent here - through a .reg
+    # file and regedit, because reg.exe does not exist on Windows 2000 ("reg" non e' riconosciuto...,
+    # verified live) while regedit /s works on both.
+    lines.append(f"regedit /s %~d0{REGISTRY_PATH.replace('/', chr(92))}")
+    lines.append(f'echo ==^> vmctl: autologon set for {_sif_value(cfg.get("administrator_name", "Administrator"))}')
     if (vm.get("shared_dir") or {}).get("mode") == "vvfat":
         # The share is a plain FAT disk, so there is nothing to mount: say where it is instead of
         # leaving the user to guess which letter Windows gave it.
@@ -184,9 +258,11 @@ def render_setup_script(vm: dict[str, Any]) -> str:
         lines.append(str(command))
     lines += [
         # The evidence the host keeps: what this guest actually is, in the serial log.
-        r'reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v CSDVersion',
-        f"echo {_echo(BOOTSTRAP_COMPLETE_TOKEN)}",
-        "shutdown -s -t 5 -f",
+        # the service pack level, exported with the tool both generations have
+        r'regedit /e "%TEMP%\vmctl-ver.reg" "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion"',
+        r'find "CSDVersion" < "%TEMP%\vmctl-ver.reg"',
+        f"echo {_echo(complete_token(vm))}",
+        shutdown_command(vm),
     ]
     return "\r\n".join(lines) + "\r\n"
 
@@ -201,7 +277,7 @@ def render_winnt_sif(vm_name: str, vm: dict[str, Any]) -> str:
     """The answer file for a fully unattended install ending in the completion token."""
     cfg = windowsxp_config(vm)
     if cfg is None:
-        raise VMError(f"Profile '{vm_name}' has no windowsxp_config section")
+        raise VMError(f"Profile '{vm_name}' has no windowsxp_config or windows2000_config section")
     # One entry only: the service pack, the checks, the token and the shutdown all live in the
     # script on the CD, which can use quotes and exit codes that an INI value cannot carry.
     run_once = [f'Command0="{first_logon_command()}"']
@@ -238,7 +314,7 @@ def render_winnt_sif(vm_name: str, vm: dict[str, Any]) -> str:
         f"TimeZone={int(cfg.get('timezone', 110))}",
         "",
         "[UserData]",
-        f"ProductKey={product_key(vm_name, vm)}",
+        f"{product_key_field(vm)}={product_key(vm_name, vm)}",
         f'FullName="{_sif_value(cfg.get("full_name", "Lab User"))}"',
         f'OrgName="{_sif_value(cfg.get("organization", "qemu-iso-lab"))}"',
         f"ComputerName={_sif_value(cfg.get('computer_name', 'WINXP-LAB'))}",
@@ -303,14 +379,14 @@ def ensure_install_iso(vm_name: str, vm: dict[str, Any], source_iso: Path, answe
     stamp_path = dest.with_name(dest.name + ".source")
     stamp = _stamp(source_iso, answer, render_setup_script(vm)) if source_iso.is_file() else None
     if dest.is_file() and stamp is not None and stamp_path.is_file() and stamp_path.read_text(encoding="utf-8") == stamp:
-        ui.print_status("ok", f"Unattended Windows XP ISO ready: {ui.pretty_path(dest)}")
+        ui.print_status("ok", f"Unattended {product_name(vm)} ISO ready: {ui.pretty_path(dest)}")
         return dest
     runtime.require_command("xorriso")
     bootable = iso_has_boot_record(source_iso) if source_iso.is_file() else True
-    ui.print_header("Build the unattended Windows XP ISO")
+    ui.print_header(f"Build the unattended {product_name(vm)} ISO")
     ui.print_kv("source", ui.pretty_path(source_iso))
     ui.print_kv("target", ui.pretty_path(dest))
-    ui.print_kv("boot record", "El Torito, replayed" if bootable else "missing: GRUB chainloads SETUPLDR.BIN")
+    ui.print_kv("boot record", "El Torito, carried over" if bootable else "missing: GRUB chainloads SETUPLDR.BIN")
     work = artifact_dir(vm) / "iso-work"
     if work.exists() and not dry_run:
         shutil.rmtree(work)
@@ -322,17 +398,42 @@ def ensure_install_iso(vm_name: str, vm: dict[str, Any], source_iso: Path, answe
     if not dry_run and partial.exists():
         partial.unlink()
     script_path = work / "VMCTL.CMD"
+    shutdown_path = work / "VMCTL.VBS"
     if not dry_run:
         script_path.write_text(render_setup_script(vm), encoding="ascii")
+        if needs_shutdown_script(vm):
+            shutdown_path.write_text(SHUTDOWN_VBS, encoding="ascii")
+        (work / "VMCTL.REG").write_text(render_registry(vm), encoding="ascii")
     command = ["xorriso", "-indev", str(source_iso), "-outdev", str(partial),
+               # Both halves of this were paid for live. Without omit_version the ISO9660 names keep
+               # their ";1" suffix and Microsoft's CD loader stops at "CDBOOT: Couldn't find NTLDR";
+               # without untranslated_names xorriso rewrites a name like BACHSB~1.RM_ as BACHSB_1.RM_
+               # (the tilde is not an ISO9660 character) and keeps the original only in Rock Ridge,
+               # which Windows does not read - Setup then fails to copy that file, on Windows 2000 and
+               # on Windows NT alike.
+               "-compliance", "omit_version:untranslated_names",
                "-map", str(answer_path), ANSWER_FILE_PATH,
-               "-map", str(script_path), SETUP_SCRIPT_PATH]
+               "-map", str(script_path), SETUP_SCRIPT_PATH,
+               "-map", str(work / "VMCTL.REG"), REGISTRY_PATH]
+    if needs_shutdown_script(vm):
+        command += ["-map", str(shutdown_path), SHUTDOWN_SCRIPT_PATH]
     service_pack = service_pack_source(vm)
     if service_pack is not None:
         ui.print_kv("service pack", ui.pretty_path(service_pack))
         command += ["-map", str(service_pack), SERVICE_PACK_PATH]
     if bootable:
-        command += ["-boot_image", "any", "replay"]
+        # Not "-boot_image any replay": on Windows media the boot image is a hidden extent rather
+        # than a file of the directory tree, and replay then drops the boot record without a word -
+        # the rebuilt CD simply does not boot (verified live on Windows 2000, which fell through to
+        # PXE). The image is copied out of the original and handed back as a real file.
+        original_boot = work / "BOOT.IMG"
+        emul, load_sectors = ("no_emulation", 0) if dry_run else iso_tools.extract_el_torito_image(source_iso, original_boot)
+        command += ["-map", str(original_boot), ORIGINAL_BOOT_PATH,
+                    "-boot_image", "any", f"bin_path={ORIGINAL_BOOT_PATH}",
+                    "-boot_image", "any", "cat_path=/boot.cat",
+                    "-boot_image", "any", f"emul_type={emul}"]
+        if emul == "no_emulation":
+            command += ["-boot_image", "any", f"load_size={load_sectors * 512}"]
     else:
         core = work / "eltorito.img"
         config = work / "grub.cfg"
@@ -354,7 +455,7 @@ def ensure_install_iso(vm_name: str, vm: dict[str, Any], source_iso: Path, answe
         shutil.rmtree(work, ignore_errors=True)
         if stamp is not None:
             stamp_path.write_text(stamp, encoding="utf-8")
-    ui.print_status("ok", f"Unattended Windows XP ISO: {ui.pretty_path(dest)}")
+    ui.print_status("ok", f"Unattended {product_name(vm)} ISO: {ui.pretty_path(dest)}")
     return dest
 
 
@@ -375,7 +476,7 @@ def headless_video_args(vm: dict[str, Any]) -> list[str]:
 
 
 def check_profile(vm_name: str, vm: dict[str, Any]) -> None:
-    """What Windows XP can boot: BIOS on the ``pc`` machine, a PATA disk, one CPU, no virtio."""
+    """What this generation can boot: BIOS on the ``pc`` machine, a PATA disk, one CPU, no virtio."""
     problems: list[str] = []
     video = headless_video_args(vm)
     if "cirrus" not in video:
@@ -388,7 +489,7 @@ def check_profile(vm_name: str, vm: dict[str, Any]) -> None:
         problems.append("video.headless must select the Cirrus adapter (\"-vga\", \"cirrus\"): "
                         "with the standard VGA, XP stops at the first-logon display dialog")
     if vm.get("firmware", {}).get("type") != "bios":
-        problems.append("firmware.type must be bios (XP has no UEFI loader)")
+        problems.append("firmware.type must be bios (this generation has no UEFI loader)")
     if str(vm.get("machine")) != "pc":
         problems.append("machine must be pc (Setup drives the PIIX IDE controller)")
     if vm.get("disk", {}).get("interface") != "ide":

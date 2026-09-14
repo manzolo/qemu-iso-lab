@@ -287,3 +287,55 @@ def extract_arch_installer_boot_artifacts(vm: dict[str, Any], iso_path: Path, dr
     extract_iso_member(iso_path, kernel_member, kernel_path, dry_run=dry_run)
     extract_iso_member(iso_path, initrd_member, initrd_path, dry_run=dry_run)
     return kernel_path, initrd_path
+
+
+# El Torito: the boot image of a CD is usually not a file in its directory tree but a hidden extent,
+# which is why `xorriso -boot_image any replay` drops it silently on Windows media (verified live on
+# a Windows 2000 CD: the rebuilt image had no boot record at all and the guest fell through to PXE).
+# Reading the catalogue lets a flow extract that image and hand it back to xorriso as a real file.
+EL_TORITO_MEDIA = {0: ("no_emulation", 0), 1: ("diskette", 1200 * 1024),
+                   2: ("diskette", 1440 * 1024), 3: ("diskette", 2880 * 1024),
+                   4: ("hard_disk", 0)}
+
+
+def el_torito_extent(iso_path: Path) -> tuple[int, int, str, int] | None:
+    """(byte offset, size, xorriso emul_type, load sectors) of the CD's boot image, or None.
+
+    A floppy-emulation entry has the size of the medium it emulates; a no-emulation one carries the
+    number of 512-byte sectors the BIOS loads, which is all there is to copy.
+    """
+    import struct
+    with iso_path.open("rb") as handle:
+        for lba in range(16, 32):
+            handle.seek(lba * 2048)
+            descriptor = handle.read(2048)
+            if len(descriptor) < 2048 or descriptor[1:6] != b"CD001":
+                return None
+            if descriptor[0] == 255:
+                return None
+            if descriptor[0] != 0:
+                continue
+            catalog_lba = struct.unpack("<I", descriptor[0x47:0x4B])[0]
+            handle.seek(catalog_lba * 2048)
+            catalog = handle.read(2048)
+            entry = catalog[32:]
+            media = entry[1] & 0x0F
+            load_sectors = struct.unpack("<H", entry[6:8])[0]
+            image_lba = struct.unpack("<I", entry[8:12])[0]
+            if media not in EL_TORITO_MEDIA:
+                return None
+            emul, size = EL_TORITO_MEDIA[media]
+            return image_lba * 2048, size or load_sectors * 512, emul, load_sectors
+    return None
+
+
+def extract_el_torito_image(iso_path: Path, destination: Path) -> tuple[str, int]:
+    """Copy the CD's boot image out to a file; returns its xorriso emul_type and load sectors."""
+    extent = el_torito_extent(iso_path)
+    if extent is None:
+        raise VMError(f"No El Torito boot image in {ui.pretty_path(iso_path)}")
+    offset, size, emul, load_sectors = extent
+    with iso_path.open("rb") as handle:
+        handle.seek(offset)
+        destination.write_bytes(handle.read(size))
+    return emul, load_sectors
