@@ -200,6 +200,11 @@ def installer_video_variant(vm: dict[str, Any], requested: str | None) -> str | 
 # backend and a vhost-user-fs-pci device carrying the mount tag.
 
 VIRTIOFSD_CANDIDATES = ("virtiofsd", "/usr/libexec/virtiofsd", "/usr/lib/qemu/virtiofsd")
+# "virtiofs" needs a guest driver (Linux, or WinFSP + viofs on Windows 8.1 and later). "vvfat" needs
+# none at all: QEMU exposes the directory as a FAT disk, which is how a guest too old for virtiofs -
+# Windows XP, 98 - can still read the host's files. It is read-only on purpose: QEMU's writable
+# vvfat is documented as able to corrupt the host directory, and a lab share is not worth that.
+SHARED_DIR_MODES = ("virtiofs", "vvfat")
 VIRTIOFSD_SOCKET_WAIT_SEC = 5.0
 _TAG_RE = re.compile(r"^[A-Za-z0-9_.-]{1,36}$")
 
@@ -217,7 +222,10 @@ def shared_dir_config(vm: dict[str, Any]) -> dict[str, str] | None:
     tag = str(cfg.get("tag") or "shared").strip()
     if not _TAG_RE.match(tag):
         raise VMError(f"shared_dir.tag {tag!r} must be 1-36 characters of letters, digits, '_', '.' or '-'")
-    return {"source": source, "tag": tag}
+    mode = str(cfg.get("mode") or "virtiofs").strip()
+    if mode not in SHARED_DIR_MODES:
+        raise VMError(f"shared_dir.mode {mode!r} must be one of {', '.join(sorted(SHARED_DIR_MODES))}")
+    return {"source": source, "tag": tag, "mode": mode}
 
 
 def shared_dir_source(vm: dict[str, Any]) -> Path:
@@ -313,10 +321,29 @@ def ensure_virtiofsd(vm: dict[str, Any], dry_run: bool = False) -> None:
         time.sleep(0.1)
 
 
+def shared_dir_vvfat_args(vm: dict[str, Any], network_phase: str) -> list[str]:
+    """The share as a read-only FAT disk, for guests with no virtiofs driver.
+
+    Never while an installer runs: a second disk in front of Setup is a second place it could
+    install to, and on Windows it also shifts the drive letters the answer file counts on.
+    """
+    cfg = shared_dir_config(vm)
+    if cfg is None or cfg["mode"] != "vvfat" or network_phase == "install":
+        return []
+    source = shared_dir_source(vm)
+    if not source.is_dir():
+        raise VMError(f"shared_dir.source is not a directory: {ui.pretty_path(source)}")
+    # snapshot=on, not readonly=on: an IDE hard disk cannot be a read-only block node (QEMU refuses
+    # it with "Block node is read-only" as the VM starts, verified live). With a snapshot the guest
+    # writes into a throwaway overlay and the host directory is never touched, which is the same
+    # guarantee with a working drive.
+    return ["-drive", f"file=fat:ro:{source},format=raw,if=ide,index=2,media=disk,snapshot=on"]
+
+
 def shared_dir_args(vm: dict[str, Any]) -> tuple[str, list[str], list[str]]:
     """(extra -machine option, memory-backend objects, vhost-user-fs device) for a shared_dir VM."""
     cfg = shared_dir_config(vm)
-    if cfg is None:
+    if cfg is None or cfg["mode"] != "virtiofs":
         return "", [], []
     memory = ["-object", f"memory-backend-memfd,id=mem0,size={int(vm['memory_mb'])}M,share=on"]
     device = [
@@ -683,13 +710,21 @@ def common_args(
         # guest prints on it is still logged.
         args += serial_socket_args(serial_socket, serial_log)
     if vm.get("usb_tablet"):
-        args += ["-usb", "-device", "qemu-xhci", "-device", "usb-tablet"]
+        # The tablet is what makes the pointer absolute (VNC and SPICE send absolute coordinates; a
+        # PS/2 mouse can only report movement, and the guest pointer then drifts away from the
+        # host's). It needs a controller the guest has a driver for: "builtin" is the machine's own
+        # UHCI, which is what Windows XP and older guests can drive - they have no xHCI driver, so
+        # with the default controller the tablet is simply not there (verified live on XP).
+        controller = str(vm.get("usb_controller", "qemu-xhci"))
+        args += ["-usb"] + ([] if controller == "builtin" else ["-device", controller])
+        args += ["-device", "usb-tablet"]
     if vm.get("audio"):
         args += audio_args(vm)
     if enable_clipboard and vm.get("clipboard") and not headless and spice_port is None:
         args += ["-device", "virtio-serial-pci", "-chardev", "qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on",
                  "-device", "virtserialport,chardev=vdagent0,name=com.redhat.spice.0"]
     args += network_args(vm, network_phase)
+    args += shared_dir_vvfat_args(vm, network_phase)
     if shared_device:
         # virtiofsd must be listening before QEMU starts: it is launched here, right before the caller
         # hands these arguments to Popen; it exits by itself when this QEMU goes away.

@@ -548,6 +548,93 @@ whole install takes about 90 s under KVM. Install only: ReactOS ships no SSH
 server, the desktop autologs in as Administrator. `check-vms` treats the
 profile like pfSense: install, boot for the report screenshot, stop.
 
+## Windows XP: WINNT.SIF
+
+```bash
+vmctl bootstrap-windowsxp windowsxp-unattended   # your own ISO + key in local.json; xorriso, and grub-mkimage if the medium does not boot
+```
+
+Setup reads `\I386\WINNT.SIF` from the installation medium: with
+`UnattendMode=FullUnattended` the text stage (AutoPartition, format, file copy)
+and the GUI stage run without a prompt, and `[GuiRunOnce]` runs one command at
+the first logon. That command is the script `\VMCTL\VMCTL.CMD`, also carried on
+the CD, whose whole output is redirected to COM1: it installs the optional
+service pack, makes the autologon permanent, prints the guest's own version and
+finally the completion token, then shuts the guest down. Everything lives in the
+script because a `[GuiRunOnce]` value cannot contain a double quote — the INI
+wraps it in one — and `^`-escaped spaces do not survive `cmd /c` parsing.
+
+The profile is install-only: XP ships no SSH server, so `check-vms` treats it
+like ReactOS and photographs the desktop instead of provisioning it.
+
+Six things cost a live run each, on 2026-09-14, and are worth knowing before
+touching this flow.
+
+**The medium may not boot at all.** An OEM ISO can carry no El Torito record
+(volume descriptors going from the primary straight to the terminator): QEMU
+then stops at `Booting from DVD/CD...`. The boot floppy image it was mastered
+from is not in the file, so `windowsxp.py` adds a GRUB core image
+(`grub-mkimage -O i386-pc-eltorito`, which **already contains** `cdboot.img` —
+concatenating it again yields an image the BIOS loads and cannot run) whose
+`grub.cfg` chainloads Microsoft's `/I386/SETUPLDR.BIN` with GRUB's `ntldr`
+command. A medium that does boot keeps its own record, replayed untouched.
+
+**Never remaster the ISO.** `7z` could not read that OEM image completely (one
+open error) and Setup then stopped on `Impossibile copiare il file:
+cyclad-z.inf`. The answer file and the script are grafted into the *original*
+image with `xorriso -indev ... -outdev`, like pfSense and ReactOS.
+
+**The CD must sit behind the disk in the boot order.** Setup reboots twice; with
+the CD first it starts over from the beginning, forever. The disk carries
+`bootindex=1`, the CD `bootindex=2`, and there is no `-no-reboot`.
+
+**`>` is a redirection, in a batch file too.** `echo ==> Windows XP ...> COM1`
+makes cmd take `Windows` for a file name; the host sees `== XP installation
+complete!`, does not recognise its token and times out on a guest that had
+finished. Every token is written `==^>`.
+
+**The standard VGA hangs the install.** XP has no driver for it, stays at
+640x480 and the shell opens a modal "the screen resolution will be adjusted
+automatically" at the first logon that nothing dismisses on a headless guest.
+XP ships a Cirrus GD5446 driver, so the profile selects `-vga cirrus` and
+`check_profile` refuses anything else. For the same family of reasons the USB
+tablet — what makes the pointer absolute, and without which the guest pointer
+drifts away from the host's — needs `usb_controller: "builtin"`: the default
+`qemu-xhci` is USB 3.0, for which XP has no driver either.
+
+**Windows Welcome is not covered by `OemSkipWelcome`.** Without
+`UnattendSwitch="Yes"` in `[Unattended]`, msoobe opens on "Grazie per aver
+acquistato Microsoft Windows XP" and waits for a click that neither a synthetic
+key nor a PS/2 relative pointer can deliver.
+
+`windowsxp_config` keys: `product_key` (**required**, and it belongs in
+`vms/profiles/local.json`, never in a tracked profile: an OEM medium asks for it
+in the GUI stage), `computer_name`, `full_name`, `organization`,
+`admin_password`, `administrator_name`, `workgroup`, `timezone`, `target_path`,
+`file_system`, `display`, `setup_commands` (run inside the CD script, where
+quotes are allowed) and `service_pack`.
+
+The service pack is a local package — Microsoft publishes no URL — grafted onto
+the CD as `\VMCTL\SP.EXE` and installed by the script with `start /wait`,
+because `update.exe` unpacks itself and hands over to a child: without the wait
+the token would reach the host mid-installation. Exit code **3010** means
+"installed, reboot pending", which is why the `CSDVersion` the script prints
+still reads the old level: the service pack finishes applying at the next boot.
+Its language must match the medium's.
+
+Autologon is made permanent by the script, not by the answer file:
+`AutoLogonCount` covers the first logon only, and Winlogon deletes
+`AutoAdminLogon` and `DefaultPassword` when its counter runs out — so the script
+writes the three values and removes the counter.
+
+The host share cannot be virtiofs (WinFSP wants Windows 7, the `viofs` driver
+Windows 8.1), so `shared_dir.mode: "vvfat"` exposes the directory as a FAT disk
+no driver is needed for. It is read-only — QEMU documents its writable vvfat as
+able to corrupt the host directory — which on an IDE disk means `snapshot=on`,
+not `readonly=on`: a read-only block node makes QEMU refuse to start with "Block
+node is read-only". The share is attached at runtime only, never while an
+installer runs: a second disk is a second place Setup could install to.
+
 ## The completion-token rule
 
 Every flow signals success by printing a token on the serial console, and every

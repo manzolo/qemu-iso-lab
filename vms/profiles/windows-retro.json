@@ -1,0 +1,72 @@
+{
+  "vms": {
+    "windowsxp-unattended": {
+      "name": "Windows XP Professional (unattended)",
+      "meta": {
+        "slug": "windowsxp-unattended",
+        "family": "windows",
+        "role": "desktop",
+        "release_model": "retro",
+        "status": "unattended",
+        "verified": "2026-09-14"
+      },
+      "iso": "isos/windowsxp.iso",
+      "disk": {
+        "path": "artifacts/windowsxp-unattended/disk.qcow2",
+        "size": "16G",
+        "format": "qcow2",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 1024,
+      "cpus": 1,
+      "network": "user",
+      "network_device": "rtl8139",
+      "audio": true,
+      "audio_device": "ac97",
+      "usb_tablet": true,
+      "video": {
+        "default": "cirrus",
+        "headless": [
+          "-vga",
+          "cirrus",
+          "-display",
+          "none"
+        ],
+        "variants": {
+          "cirrus": [
+            "-vga",
+            "cirrus",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "windowsxp_config": {
+        "computer_name": "WINXP-LAB",
+        "full_name": "Lab User",
+        "organization": "qemu-iso-lab",
+        "admin_password": "lab",
+        "workgroup": "WORKGROUP",
+        "timezone": 110,
+        "display": {
+          "BitsPerPel": 32,
+          "XResolution": 1024,
+          "YResolution": 768
+        },
+        "run_once_commands": [
+          "cmd /c reg query HKLM\\SOFTWARE\\Microsoft\\Windows^ NT\\CurrentVersion /v CSDVersion> COM1"
+        ]
+      },
+      "usb_controller": "builtin",
+      "shared_dir": {
+        "source": "../storage/shared",
+        "tag": "shared",
+        "mode": "vvfat"
+      }
+    }
+  }
+}

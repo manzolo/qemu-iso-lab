@@ -166,7 +166,21 @@ Order after the maintainer's update: FreeBSD, Windows XP/98, then Devuan, Proxmo
 
 | Profile | SSH | Status | Verified | Live | Evidence / remaining work |
 |---|---|---|---|---|---|
+| `windowsxp-unattended` | - | unattended | 2026-09-14 | PASS, 8.7 min | Install only (no SSH server on XP). Hands-free from a medium with no boot record: GRUB chainloads SETUPLDR.BIN. SP3 ITA installed from the CD, exit 3010 (reboot pending), confirmed as applied by `winver` after the next boot. Autologon permanent, USB tablet active (`query-mice`: absolute), share as a read-only FAT disk. Product key and ISO are the maintainer's, in `local.json`. |
 | `freebsd-unattended` | 2271 | unattended | 2026-09-14 | PASS, 1.5 min | `artifacts/check-vms/20260914-130825-835989/`: clean install, natural shutdown, SSH identity, pgrep -a -x sshd, service status, freebsd-version and sudo. BIOS/UFS server only; EFI and desktop untested. |
+
+Windows XP, what each live run cost (2026-09-14, six runs): the OEM ISO has no El Torito record
+at all, so QEMU could not boot it; `grub-mkimage -O i386-pc-eltorito` already contains `cdboot.img`
+and concatenating it again produced an image that loads and hangs; a remastered tree from `7z`
+(one open error) made Setup stop on a missing `cyclad-z.inf`; `-boot order=dc` restarted Setup for
+ever (the CD must sit behind the disk); the standard VGA left XP at 640x480 and the first-logon
+"adjust the resolution" dialog blocked a headless guest; `OemSkipWelcome` does not cover msoobe,
+only `UnattendSwitch="Yes"` does; `echo ==>` lost its text to cmd's redirection, so the host never
+saw a token the guest had printed; the USB tablet needs the builtin UHCI controller because XP has
+no xHCI driver; a vvfat share needs `snapshot=on`, since an IDE disk cannot be a read-only block
+node; and `AutoLogonCount` makes Winlogon delete the autologon values it was given, so the counter
+is removed. Remaining: `windows98-unattended` (MSBATCH.INF), and XP is untested on media that do
+carry a boot record.
 
 FreeBSD manual evidence: `artifacts/freebsd-probe/manual/03-script-install.png` shows
 bsdinstall completing the disc1 UFS install; `04-pkg.png` exposed the chroot PATH issue

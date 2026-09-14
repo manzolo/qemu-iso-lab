@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -408,6 +408,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         return ("bootstrap-pfsense", "pfSense scripted install (network lab router)")
     if reactos.reactos_config(vm) is not None:
         return ("bootstrap-reactos", "unattend.inf install only (no SSH server on ReactOS)")
+    if windowsxp.windowsxp_config(vm) is not None:
+        return ("bootstrap-windowsxp", "WINNT.SIF install only (no SSH server on Windows XP)")
     if windows.windows_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-windows", "autounattend + post-install")
@@ -512,7 +514,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp"}:
             candidates.append(vm_name)
     return candidates
 
@@ -748,6 +750,25 @@ def run_local_test_vm(
     if mode == "bootstrap-pfsense":
         try:
             cmd_bootstrap_pfsense(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
+            boot_for_report_screenshot(vm_name, prepared_vm, args)
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-windowsxp":
+        try:
+            cmd_bootstrap_windowsxp(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -1650,6 +1671,66 @@ def cmd_bootstrap_reactos(args: argparse.Namespace) -> int:
     )
     ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
     ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: ReactOS ships no server, the desktop autologs in as Administrator)")
+    return 0
+
+
+def windowsxp_source_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
+    """The retail/OEM medium: no public URL, so it is the profile's path or a local.json override."""
+    source = runtime.resolve_path(str(vm["iso"]))
+    if not source.is_file() and not dry_run:
+        raise VMError(
+            f"Windows XP ISO not found: {ui.pretty_path(source)}. Microsoft publishes no URL for it; "
+            f"point vms/profiles/local.json at your own copy (see local.json.example)."
+        )
+    return source
+
+
+def cmd_bootstrap_windowsxp(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if windowsxp.windowsxp_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define windowsxp_config")
+    windowsxp.check_profile(args.vm, vm)
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Windows XP (WINNT.SIF): {args.vm}")
+
+    source_iso = windowsxp_source_iso(args.vm, vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    answer = windowsxp.render_winnt_sif(args.vm, vm)
+    install_iso = windowsxp.ensure_install_iso(args.vm, vm, source_iso, answer, dry_run=args.dry_run)
+
+    # No -no-reboot: Setup reboots after the text stage and again before the first logon. The disk
+    # carries bootindex=1, so once it holds a boot sector it wins over the CD; with the CD ahead of
+    # it the installer starts over from the beginning, forever (verified live).
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+        disk_bootindex=1,
+        network_phase="install",
+    )
+    install_qemu_args += windowsxp.install_media_args(install_iso)
+
+    ui.print_note("Booting Windows XP Setup - waiting for the completion token on COM1 (text stage, GUI stage, first logon)...")
+    ui.print_note(f"Watch the screen with: vmctl attach {args.vm}")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    qemu.run_and_expect(
+        install_qemu_args,
+        expected_text=windowsxp.BOOTSTRAP_COMPLETE_TOKEN,
+        timeout_sec=getattr(args, "timeout", 3600),
+        dry_run=args.dry_run,
+        log_path=serial_log,
+        exit_grace_sec=windowsxp.SHUTDOWN_GRACE_SEC,
+    )
+    ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
+    ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: XP ships no server, the desktop autologs in)")
     return 0
 
 

@@ -112,6 +112,13 @@
         "source": "~/Shared",
         "tag": "shared"
       }
+    },
+    "windowsxp-unattended": {
+      "iso": "/path/to/WindowsXP.iso",
+      "windowsxp_config": {
+        "product_key": "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX",
+        "service_pack": "/path/to/WindowsXP-KB936929-SP3-x86-XXX.exe"
+      }
     }
   }
 }

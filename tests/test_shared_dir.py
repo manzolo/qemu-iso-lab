@@ -21,7 +21,8 @@ class SharedDirConfigTests(BaseVmctlTestCase):
     def test_config_defaults_tag_and_validates(self):
         self.assertIsNone(vmctl.qemu.shared_dir_config(self.vm_config))
         self.vm_config["shared_dir"] = {"source": "shared"}
-        self.assertEqual(vmctl.qemu.shared_dir_config(self.vm_config), {"source": "shared", "tag": "shared"})
+        self.assertEqual(vmctl.qemu.shared_dir_config(self.vm_config),
+                         {"source": "shared", "tag": "shared", "mode": "virtiofs"})
         self.vm_config["shared_dir"] = {"source": "shared", "tag": "bad tag!"}
         with self.assertRaises(vmctl.errors.VMError):
             vmctl.qemu.shared_dir_config(self.vm_config)
@@ -204,3 +205,42 @@ class SharedDirWindowsTests(BaseVmctlTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VvfatShareTests(BaseVmctlTestCase):
+    """A share for guests with no virtiofs driver: Windows XP, 98, anything that old."""
+
+    def setUp(self):
+        super().setUp()
+        self.share = self.root / "share"
+        self.share.mkdir()
+        self.vm_config["shared_dir"] = {"source": str(self.share), "tag": "shared", "mode": "vvfat"}
+
+    def args(self, phase):
+        import vmctl.qemu
+        return vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True,
+                                      allow_missing_disk=True, network_phase=phase)
+
+    def test_the_share_is_a_read_only_fat_disk_and_never_faces_an_installer(self):
+        runtime_args = " ".join(self.args("runtime"))
+        self.assertIn(f"file=fat:ro:{self.share}", runtime_args)
+        self.assertIn("snapshot=on", runtime_args)  # an IDE disk cannot be a read-only block node
+        self.assertNotIn("vhost-user-fs", runtime_args, "vvfat needs no virtiofsd")
+        self.assertNotIn("memory-backend-memfd", runtime_args)
+        # during an install a second disk is a second place Setup could install to
+        self.assertNotIn("fat:", " ".join(self.args("install")))
+
+    def test_virtiofs_stays_the_default_and_an_unknown_mode_is_refused(self):
+        import vmctl.errors
+        import vmctl.qemu
+        self.vm_config["shared_dir"] = {"source": str(self.share), "tag": "shared"}
+        self.assertEqual(vmctl.qemu.shared_dir_config(self.vm_config)["mode"], "virtiofs")
+        self.vm_config["shared_dir"]["mode"] = "nfs"
+        with self.assertRaisesRegex(vmctl.errors.VMError, "shared_dir.mode"):
+            vmctl.qemu.shared_dir_config(self.vm_config)
+
+    def test_a_missing_directory_is_reported_instead_of_a_broken_drive(self):
+        import vmctl.errors
+        self.vm_config["shared_dir"]["source"] = str(self.root / "nope")
+        with self.assertRaisesRegex(vmctl.errors.VMError, "not a directory"):
+            self.args("runtime")
