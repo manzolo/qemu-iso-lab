@@ -622,6 +622,7 @@ def facts(name, vm):
         "has_autoyast": has_section(vm, "autoyast_config"),
         "has_alpine": has_section(vm, "alpine_config"),
         "has_windows": has_section(vm, "windows_config"),
+        "has_freebsd": has_section(vm, "freebsd_config"),
         "has_pfsense": has_section(vm, "pfsense_config"),
         "has_reactos": has_section(vm, "reactos_config"),
         "has_netlab": has_section(vm, "network_lab"),
@@ -949,6 +950,8 @@ primary_install_action() {
         printf '%s\n' "AutoYaST Bootstrap"
     elif [[ "${FACTS[has_alpine]:-0}" == "1" ]]; then
         printf '%s\n' "Alpine Bootstrap"
+    elif [[ "${FACTS[has_freebsd]:-0}" == "1" ]]; then
+        printf '%s\n' "FreeBSD Bootstrap"
     elif [[ "${FACTS[has_pfsense]:-0}" == "1" ]]; then
         printf '%s\n' "pfSense Bootstrap"
     elif [[ "${FACTS[has_reactos]:-0}" == "1" ]]; then
@@ -1134,6 +1137,8 @@ build_vm_menu_items() {
     elif [[ "${FACTS[has_alpine]:-0}" == "1" ]]; then
         emit_action "Alpine Bootstrap" "Fully automated setup-alpine install + post-install"
         emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ "${FACTS[has_freebsd]:-0}" == "1" ]]; then
+        emit_action "FreeBSD Bootstrap" "Scripted FreeBSD disc1 install and SSH verification"
     elif [[ "${FACTS[has_pfsense]:-0}" == "1" ]]; then
         emit_action "pfSense Bootstrap" "Scripted pfSense install for the network lab router (rendered config.xml)"
         emit_action "Network Lab Plan" "Topology, forwards and install order of the lab"
@@ -1496,6 +1501,7 @@ resolve_action() {
         "AutoYaST Bootstrap") printf '%s\n' bootstrap-autoyast ;;
         "Alpine Bootstrap") printf '%s\n' bootstrap-alpine ;;
         "Windows Bootstrap") printf '%s\n' bootstrap-windows ;;
+        "FreeBSD Bootstrap") printf '%s\n' bootstrap-freebsd ;;
         "pfSense Bootstrap") printf '%s\n' bootstrap-pfsense ;;
         "ReactOS Bootstrap") printf '%s\n' bootstrap-reactos ;;
         "Network Lab Plan") printf '%s\n' lab-plan ;;
@@ -1658,6 +1664,9 @@ run_action() {
             if confirm_box "Windows Bootstrap" "Run the fully automated Windows bootstrap for VM '$current_vm'?\n\nThis will:\n- rebuild the Windows ISO once without the 'Press any key' prompt (isos/*-noprompt.iso)\n- download the virtio-win driver ISO if missing\n- create disk and firmware artifacts\n- boot Windows Setup headless with autounattend.xml on a seed CD (watch it with Attach Display)\n- at first logon: virtio guest tools, OpenSSH Server, profile commands, then shutdown\n- start the installed VM and run post-install over SSH\n\nExpected time: ~20-40 min."; then
                 run_vmctl bootstrap-windows "$current_vm" || true
             fi
+            ;;
+        bootstrap-freebsd)
+            run_vmctl bootstrap-freebsd "$current_vm" || true
             ;;
         bootstrap-pfsense)
             if confirm_box "pfSense Bootstrap" "Run the scripted pfSense install for VM '$current_vm'?\n\nThis will:\n- render config.xml from the network_lab topology (WAN slirp, LAN segment, NAT forwards)\n- build a per-VM unattended ISO from the local pfSense CE 2.7.2 ISO (xorriso + growisofs)\n- boot the installer headless (BIOS, ZFS on vtbd0) and wait for the completion token\n\nExpected time: ~5-10 min. Then: vmctl lab up"; then

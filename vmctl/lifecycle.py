@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -367,6 +367,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-alpine", "setup-alpine + post-install")
         return ("skip", "alpine_config without SSH post-install")
+    if freebsd.freebsd_config(vm) is not None:
+        return ("bootstrap-freebsd", "FreeBSD bsdinstall + SSH verification")
     if pfsense.pfsense_config(vm) is not None:
         return ("bootstrap-pfsense", "pfSense scripted install (network lab router)")
     if reactos.reactos_config(vm) is not None:
@@ -475,7 +477,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-reactos"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos"}:
             candidates.append(vm_name)
     return candidates
 
@@ -633,6 +635,25 @@ def run_local_test_vm(
     if mode == "bootstrap-autoyast":
         try:
             cmd_bootstrap_autoyast(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
+            args._report_phase = "post-install"
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-freebsd":
+        try:
+            cmd_bootstrap_freebsd(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -1437,6 +1458,34 @@ def pfsense_source_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) 
         f"pfSense ISO not found: {iso_path}. Download pfSense CE 2.7.2 (amd64, DVD image) from Netgate, "
         f"then put it there or set \"iso\" for '{vm_name}' in vms/profiles/local.json"
     )
+
+
+def cmd_bootstrap_freebsd(args: argparse.Namespace) -> int:
+    vm = resolved_vm(args, config.load_config())
+    freebsd.check_profile(args.vm, vm)
+    runtime.ensure_vm_dirs(args.vm)
+    source = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    media = freebsd.ensure_install_iso(args.vm, vm, source,
+        cloud_init._authorized_keys_for_vm(vm, dry_run=args.dry_run), dry_run=args.dry_run)
+    command = qemu.common_args(vm, None, dry_run=args.dry_run,
+        accel=automation_accel(vm), headless=True, serial_stdio=True,
+        no_reboot=True, allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False, disk_bootindex=1, network_phase="install")
+    command += freebsd.install_media_args(media)
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    report.phase(args, "install")
+    try:
+        qemu.run_and_expect(command, expected_text=freebsd.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=args.timeout, dry_run=args.dry_run, log_path=serial_log,
+            exit_grace_sec=freebsd.SHUTDOWN_GRACE_SEC)
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, freebsd.BOOTSTRAP_FAILED_TOKEN, "FreeBSD", serial_log) from exc
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
+    report.phase(args, "post-install")
+    run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
+    return 0
 
 
 def cmd_bootstrap_pfsense(args: argparse.Namespace) -> int:
@@ -2321,6 +2370,8 @@ def ssh_poweroff_command(vm: dict[str, Any]) -> list[str] | None:
         return None
     if windows.windows_config(vm) is not None:
         return base + ["shutdown /s /t 0 /f"]
+    if freebsd.freebsd_config(vm) is not None:
+        return base + ["sudo", "shutdown", "-p", "now"]
     return base + ["sudo", "systemctl", "poweroff"]
 
 

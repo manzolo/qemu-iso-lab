@@ -159,3 +159,36 @@ Ordered by value over cost. Each item names the evidence behind it.
    session notes; not started.
 10. Ideas not yet planned: the KDE history line (Kubuntu 8.04 → 24.04, KDE 3.5 → Plasma 6) beside the
     GNOME one; sway / i3 / river / labwc as bare compositors; Fedora Sway spin.
+
+## New profiles: batches B/C (2026-09-14)
+
+Order after the maintainer's update: FreeBSD, Windows XP/98, then Devuan, Proxmox, Gentoo.
+
+| Profile | SSH | Status | Verified | Live | Evidence / remaining work |
+|---|---|---|---|---|---|
+| `freebsd-unattended` | 2271 | experimental | — | latest FAIL, 1.4 min | Installation and SSH work; corrected the FreeBSD pgrep ancestor exclusion after live diagnosis. Final clean retry deferred: another session started a debian-xfce matrix. |
+
+FreeBSD manual evidence: `artifacts/freebsd-probe/manual/03-script-install.png` shows
+bsdinstall completing the disc1 UFS install; `04-pkg.png` exposed the chroot PATH issue
+(`/usr/local/bin` is required). `vendor-detection.txt` confirms the unmodified vendor
+startup found an installerconfig graft. The first automated run was continued by hand
+only to diagnose it and shut the live guest down naturally; it remains a FAIL.
+
+The second FreeBSD attempt (`artifacts/check-vms/20260914-082403-210577/`, 0.7 min)
+failed in pkg DNS after DHCP succeeded: bsdinstall recreated BSDINSTALL_TMPETC and
+removed the live resolv.conf symlink target. The preamble now restores the saved
+resolver. FAILED and natural shutdown worked; the token is now after the diagnostic
+tail so lifecycle's captured output retains it.
+
+Third FreeBSD attempt (`artifacts/check-vms/20260914-082841-231082/`, 1.4 min):
+installation and SSH passed; `pgrep -x sshd` falsely failed because FreeBSD excludes
+process ancestors, including the listener above the checking SSH session. Live
+`pgrep -a -x sshd` and `service sshd onestatus` both returned listener PID 744;
+`freebsd-version` returned 14.3-RELEASE and passwordless sudo passed. The profile now
+checks both; the clean documented retry is still required.
+
+Validation before the FreeBSD commit: `make check` (687 tests, 225 subtests),
+CI-like PATH unittest (687 tests, six existing skips), bootstrap dry run and
+`check-vms freebsd-unattended --dry-run` all passed on 2026-09-14. The final clean
+retry was deferred after the outside-sandbox pgrep found another session running
+`check-vms debian-xfce --document`; that matrix was left untouched.

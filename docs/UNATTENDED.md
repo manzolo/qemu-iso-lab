@@ -715,3 +715,39 @@ outcome and duration, the captioned frames, the final screen — plus an `index.
 ### CentOS Stream 10 Server (Kickstart)
 
 `vmctl bootstrap-kickstart centos-stream-10 --timeout 3600` (SSH 2270). Server-only kickstart from the boot ISO and Stream 10 online repository. Requires an x86-64-v3 host CPU with KVM; QEMU uses the host CPU. SSH and ttyS0 getty are enabled. Experimental until a clean live PASS.
+
+## FreeBSD disc1 (`bootstrap-freebsd`)
+
+`freebsd-unattended` uses the vendor FreeBSD 14.3 disc1, BIOS/pc, UFS on `vtbd0`,
+virtio networking (`vtnet0`) and SSH port 2271. The manual `freebsd` profile is separate.
+The [bsdinstall manual](https://man.freebsd.org/cgi/man.cgi?query=bsdinstall&sektion=8&manpath=FreeBSD+14.0-RELEASE+and+Ports)
+documents `/etc/installerconfig`: a partition/distribution preamble and a chroot script.
+On 2026-09-14 the unmodified disc1 installed successfully from its shell; a second ISO
+with only an answer-file graft confirmed that the vendor startup detects that file.
+Screens and the detection transcript are in `artifacts/freebsd-probe/manual/`.
+
+The host needs `xorriso` and `growisofs` (dvd+rw-tools). A per-VM copy is updated with
+`growisofs -M -V <original-label>`, preserving FreeBSD's hidden El Torito extents
+and ISO9660 label (the kernel mounts that label). Serial output uses `/dev/console`,
+not the callout device `/dev/cuau0`, which is busy while ttyu0 owns the console. `rc.local` is replaced
+because the vendor's `startbsdinstall` asks terminal/dialog questions. The wrapper
+configures DHCP, saves the resolver outside BSDINSTALL_TMPETC (which bsdinstall
+recreates; the preamble restores the live resolv.conf symlink target), invokes `bsdinstall` with non-TTY stdin, catches failures with an EXIT
+trap, emits `==> FreeBSD installation FAILED: ...` and requests natural poweroff.
+`run_and_expect` bounds the installer (1800 s by default); lifecycle explains its error.
+
+The chroot installs `lab`/`lab`, the project SSH key and sudo via pkg. Its PATH includes
+`/usr/local/bin`: without it package hooks cannot find `indexinfo` (observed manually).
+The script ends in `sync`, bsdinstall then unmounts UFS (the filesystem flush), and only
+its successful return permits `==> FreeBSD installation complete!` and `shutdown -p now`.
+The host allows 120 s for that natural shutdown. A disk boot verifies the SSH identity,
+`pgrep -a -x sshd`, `service sshd onestatus`, `freebsd-version` and passwordless sudo. No systemd or desktop check is used.
+
+```sh
+vmctl bootstrap-freebsd freebsd-unattended --timeout 1800
+vmctl check-vms freebsd-unattended --clean-first --timeout 1800 --report --document
+```
+
+FreeBSD pgrep excludes ancestors by default: a check executed over SSH must use `-a`
+to include the listener that is its ancestor ([vendor manual](https://man.freebsd.org/cgi/man.cgi?query=pgrep&sektion=1));
+otherwise a healthy daemon produces a false FAIL (confirmed live on 2026-09-14).

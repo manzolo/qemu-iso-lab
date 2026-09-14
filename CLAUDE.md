@@ -49,7 +49,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ```
 errors ← state ← {ui, runtime} ← {config, iso, cloud_init, qemu, archinstall, disk_inspect}
-      ← {alpine, autoyast, preseed, kickstart, omarchy, windows} ← {flash, import_dev, ssh, host_setup, report} ← netlab ← {pfsense, libvirt} ← lifecycle ← cli
+      ← {alpine, autoyast, preseed, kickstart, omarchy, windows} ← {flash, import_dev, ssh, host_setup, report} ← netlab ← {pfsense, freebsd, libvirt} ← lifecycle ← cli
 ```
 
 Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always accessed as `state.ROOT`, never imported directly — a direct import captures a stale binding and breaks tests.
@@ -226,3 +226,5 @@ Desktop post-install checks use the shared guest script `vms/profile-files/commo
 Every tracked profile declares `meta.status` (`manual`, `unattended`, `experimental`). `meta.verified`, when present, is the last maintainer-supplied live PASS date, not the date of the last edit or unit test. The canonical list and JSON output expose status/verified; the HTML report stores profile_status/profile_verified separately from each run's status. Do not promote experimental profiles or advance dates from a dry run. See `docs/PROFILE_TODO.md` for definitions, historical dates and remaining work.
 
 Batch A of 2026-09-13 (`fedora-kde`, `fedora-kinoite`, `debian-kde/xfce/gnome`, `ubuntu-unity/cinnamon/studio/edubuntu-24.04`, `kali`, `centos-stream-10`; SSH 2260–2270) passed live on 2026-09-13/14 (`docs/PROFILE_TODO.md` has the table). Three things there are not obvious. Kali's `http.kali.org` redirects apt to HTTPS mirrors and the debootstrapped target has no `ca-certificates`, so `pkgsel` fails on `certificate verify failed` unless `base-installer/includes` adds it; and the default task's packages ask debconf questions inside the target (`kismet-capture-common/install-setuid` parks the install on a text prompt), so the profile carries the 20 answers from Kali's own `live-build-config` installer preseed — the public `xfce-default.cfg` example shows neither. Fedora 44 KDE ships Plasma Login Manager, so `%post` enables SDDM with `--force` (the `display-manager.service` alias may already exist) and Kinoite, which cannot install in `%post`, boots into `multi-user.target`, layers `sddm` with `rpm-ostree install` over SSH and checks the desktop only in `verify_after_reboot`. Both KDE profiles are Plasma 6 on Wayland (`kwin_wayland`); `kubuntu-24.04` is Plasma 5.27 on X11. The Cinnamon metapackage is `ubuntucinnamon-desktop`, Studio installs on SDDM and wants 80G.
+
+FreeBSD (`bootstrap-freebsd`, `freebsd-unattended`, SSH 2271): disc1 graft with growisofs, bounded bsdinstall + FAILED trap, UFS sync/unmount before token and natural shutdown, then SSH/pgrep/freebsd-version/sudo verification; details in `docs/UNATTENDED.md`.

@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-reactos", "post-install", "cancel-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "agent", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -164,6 +164,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=3600, help="seconds to wait for the install to complete (default: 3600)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_windows)
+
+    p = _add(subparsers, "bootstrap-freebsd", help="FreeBSD disc1 scripted install + SSH verification")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="installer and SSH timeout in seconds (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_freebsd)
 
     p = _add(subparsers, "bootstrap-pfsense", help="fully automated pfSense CE install for the network lab router (scripted bsdinstall, rendered config.xml)")
     p.add_argument("vm", help=VM_HELP)

@@ -1,0 +1,65 @@
+{
+  "vms": {
+    "freebsd-unattended": {
+      "name": "FreeBSD 14.3 unattended",
+      "meta": {
+        "slug": "freebsd-unattended",
+        "family": "bsd",
+        "role": "server",
+        "release_model": "stable",
+        "status": "experimental"
+      },
+      "iso": "isos/FreeBSD-14.3-RELEASE-amd64-disc1.iso",
+      "iso_url": "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/FreeBSD-14.3-RELEASE-amd64-disc1.iso",
+      "disk": {
+        "path": "artifacts/freebsd-unattended/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "virtio-net-pci",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "iso_sha256": "f564822bc72d420d1e1a6faacb72f6056d828fcf539dfafd52e08503ef5fab68",
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2271,
+        "post_install_run": [
+          "test \"$(id -un)\" = \"{{user}}\"",
+          "pgrep -a -x sshd",
+          "service sshd onestatus",
+          "freebsd-version",
+          "sudo -n true"
+        ]
+      },
+      "freebsd_config": {
+        "username": "lab",
+        "password": "lab"
+      }
+    }
+  }
+}
