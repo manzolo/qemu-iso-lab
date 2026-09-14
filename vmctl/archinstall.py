@@ -324,6 +324,18 @@ mount /dev/vda2 /mnt
 mkdir -p /mnt/boot/efi
 mount /dev/vda1 /mnt/boot/efi
 
+# A rolling repository publishes its database and its signature as two files, and for a
+# moment a mirror can serve one of each pair: pacstrap then dies on "signature from ... is
+# invalid" although the key is known. Both CachyOS profiles hit that on 2026-09-14 and passed
+# minutes later on the same ISO. Force a fresh sync first, with retries; "&& break" keeps a
+# failed attempt away from the ERR trap, and pacstrap still does its own sync afterwards.
+echo "==> Refreshing the package databases..."
+for attempt in 1 2 3; do
+    pacman -Syy --noconfirm >/dev/null 2>&1 && break
+    echo "==> Package database sync failed (attempt $attempt of 3), retrying in 20 s..."
+    sleep 20
+done
+
 echo "==> Installing base system (this will take a while)..."
 pacstrap -K /mnt {package_line}
 

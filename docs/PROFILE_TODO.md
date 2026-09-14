@@ -132,6 +132,15 @@ Ordered by value over cost. Each item names the evidence behind it.
    (`vmctl/netlab.py`). The fix is a cloud-init `runcmd` line in every flavor profile, but changing a
    profile means re-verifying it live: do it as its own batch over all flavors, with times before/after.
 
+5c. **Rolling repos publish database and signature as two files.** On 2026-09-14 at 00:30 both
+   CachyOS profiles died in pacstrap on `cachyos: signature from "CachyOS <admin@cachyos.org>" is
+   invalid` (the key was known: the mirror served a database and a signature from two publications,
+   both files carry Last-Modified 22:44 GMT of that night); the same ISO, the latest build `260809`,
+   installed fine at 06:20. The Arch script now runs `pacman -Syy` with three retries before pacstrap.
+   Still open: `check-vms` retries whose install passed left two QEMU processes behind after the
+   worker ended (seen 2026-09-14 00:25, no artifacts directory left, 9 GB of RAM held); find which
+   step of the retry path skips `cmd_stop`.
+
 ### Profiles
 
 6. **Live validation of batch A** (11 profiles, all `experimental`): `vmctl check-vms <names>

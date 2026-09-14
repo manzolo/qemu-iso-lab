@@ -231,6 +231,18 @@ class ArchinstallBootstrapTests(BaseVmctlTestCase):
         self.assertNotIn(vmctl.archinstall.BOOTSTRAP_COMPLETE_TOKEN, vmctl.archinstall.BOOTSTRAP_FAILED_TOKEN)
         self.assertNotIn(vmctl.archinstall.BOOTSTRAP_FAILED_TOKEN, vmctl.archinstall.BOOTSTRAP_COMPLETE_TOKEN)
 
+    def test_render_bootstrap_script_refreshes_databases_with_retries_before_pacstrap(self):
+        # 2026-09-14: both CachyOS profiles died on "cachyos: signature from ... is invalid" while a
+        # mirror served a database and a signature from two different publications; the same ISO
+        # installed minutes later. The sync is retried, and never through the ERR trap.
+        self._arch_vm()
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        refresh = script.index("pacman -Syy --noconfirm")
+        self.assertLess(script.index("trap "), refresh)
+        self.assertLess(refresh, script.index("\npacstrap "))
+        self.assertIn("pacman -Syy --noconfirm >/dev/null 2>&1 && break", script)
+        self.assertIn("for attempt in 1 2 3; do", script)
+
     def test_serial_login_prompt_constant_is_non_empty(self):
         self.assertTrue(vmctl.archinstall.ARCH_SERIAL_LOGIN_PROMPT)
 
