@@ -5,10 +5,12 @@ import argparse
 import base64
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import hashlib
 import html
 import json
 from pathlib import Path
 import platform
+import re
 import socket
 import struct
 import subprocess
@@ -19,6 +21,14 @@ import zlib
 
 from vmctl import guest_agent, qemu, runtime, state, ui
 from vmctl.errors import VMError
+
+# The screenshot timeline: one QMP screendump every TIMELINE_INTERVAL_SEC for the whole life of a
+# check-vms row, kept only when the frame changed and is not black, capped so a PDF stays readable.
+TIMELINE_INTERVAL_SEC = 30.0
+TIMELINE_MAX_FRAMES = 40
+# QMP accepts one client at a time: the timeline thread, the final capture and the installer
+# watcher all go through this lock so none of them makes another one's command fail.
+_QMP_LOCK = threading.Lock()
 
 
 def ppm_to_png(data: bytes) -> bytes:
@@ -189,7 +199,9 @@ def capture_screenshot(vm_name: str, vm: dict[str, Any], directory: Path, wake: 
         for attempt in range(attempts):
             if wake:
                 wake_console(vm)
-            if not qemu.qmp_command(qemu.qmp_socket_path(vm), "screendump", arguments={"filename": str(ppm.resolve())}):
+            with _QMP_LOCK:
+                dumped = qemu.qmp_command(qemu.qmp_socket_path(vm), "screendump", arguments={"filename": str(ppm.resolve())})
+            if not dumped:
                 # Accelerated displays refuse screendump: read the same screen over VNC.
                 try:
                     png.write_bytes(capture_via_vnc(vm))
@@ -237,6 +249,189 @@ def capture(vm_name: str, vm: dict[str, Any], args: argparse.Namespace, wake: bo
     args._screenshot_error = error
     if wake:  # the final evidence pass, not the installer watcher
         probe_guest_agent(vm, args)
+
+
+def capture_frame(vm: dict[str, Any], scratch: Path) -> bytes | None:
+    """One raw PPM frame from the VM's QMP socket, or None when the VM is not up (yet, or any more)."""
+    ppm = scratch / "frame.ppm"
+    try:
+        scratch.mkdir(parents=True, exist_ok=True)
+        with _QMP_LOCK:
+            dumped = qemu.qmp_command(qemu.qmp_socket_path(vm), "screendump", arguments={"filename": str(ppm.resolve())})
+        if not dumped:
+            return None
+        return ppm.read_bytes()
+    except (OSError, ValueError):
+        return None
+    finally:
+        try:
+            ppm.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def timeline_dir(directory: Path, vm_name: str) -> Path:
+    return directory / "screens" / vm_name
+
+
+def load_timeline(directory: Path, vm_name: str) -> list[dict[str, Any]]:
+    path = timeline_dir(directory, vm_name) / "timeline.json"
+    try:
+        frames = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return frames if isinstance(frames, list) else []
+
+
+CONSOLE_TAIL_LINES = 24
+CONSOLE_TAIL_BYTES = 12000
+
+
+def capture_console_text(vm_name: str) -> str | None:
+    """The last lines of the VM's newest serial/installer log, escape sequences stripped.
+
+    Most unattended installers (d-i, anaconda, pacstrap, AutoYaST, setup-alpine) work on the
+    serial console and leave the framebuffer black: what a person would have watched is the text.
+    """
+    logs_dir = runtime.vm_artifact_base(vm_name) / "logs"
+    try:
+        candidates = [p for p in logs_dir.glob("*.log") if not p.name.startswith("check-vms")]
+        if not candidates:
+            return None
+        newest = max(candidates, key=lambda p: p.stat().st_mtime)
+        with newest.open("rb") as handle:
+            handle.seek(0, 2)
+            size = handle.tell()
+            handle.seek(max(0, size - CONSOLE_TAIL_BYTES))
+            raw = handle.read().decode("utf-8", "replace")
+    except OSError:
+        return None
+    text = qemu._strip_ansi(raw).replace("\r", "\n")
+    tail = clean_console_lines(text)[-CONSOLE_TAIL_LINES:]
+    return "\n".join(tail) if tail else None
+
+
+# The d-i/anaconda status bar ("[  0 start  2 shell  (3*shell)  ][ Sep 14  5:38 ]") and the
+# progress-only redraws: a screen-oriented UI repaints them at every step, they say nothing.
+_CONSOLE_NOISE = re.compile(
+    r"^\[[^\]]*\]\s*\[[^\]]*\d:\d\d\s*\]$"   # the whole bar: "[ ... ][ Sep 14  5:38 ]"
+    r"|\(\d\*?\w+\)"                          # a tab marker "(1*installer)", also in a wrapped fragment
+    r"|\]\[\s*\w{3} \d+\s+\d+:\d\d \]"         # the clock half of a wrapped bar
+    r"|^[\W\d%]*$"                              # brackets, dashes and percentages alone
+)
+
+
+def clean_console_lines(text: str) -> list[str]:
+    """Lines worth printing: no repaint noise, no run of identical lines."""
+    lines: list[str] = []
+    for line in text.splitlines():
+        line = line.rstrip()
+        if not line.strip() or _CONSOLE_NOISE.search(line.strip()):  # search: the markers sit mid-line in wrapped bars
+            continue
+        if lines and lines[-1] == line:
+            continue
+        lines.append(line)
+    return lines
+
+
+class Timeline:
+    """Frames of one VM across a check-vms row: only changed, non-black screens are kept."""
+
+    def __init__(self, vm_name: str, vm: dict[str, Any], directory: Path, started: float) -> None:
+        self.vm_name, self.vm, self.directory, self.started = vm_name, vm, directory, started
+        self.frames: list[dict[str, Any]] = []
+        self.last_digest: str | None = None
+        self.truncated = False
+
+    def tick(self, phase: str, now: float | None = None) -> bool:
+        """Capture once; True when a new frame was kept."""
+        if len(self.frames) >= TIMELINE_MAX_FRAMES:
+            self.truncated = True
+            return False
+        target = timeline_dir(self.directory, self.vm_name)
+        elapsed = int(round((now if now is not None else time.monotonic()) - self.started))
+        raw = capture_frame(self.vm, target)
+        if raw is not None and not looks_blank(raw):
+            digest = hashlib.sha256(raw).hexdigest()
+            if digest == self.last_digest:
+                return False
+            name = f"{elapsed:05d}-{phase}.png"
+            try:
+                target.mkdir(parents=True, exist_ok=True)
+                (target / name).write_bytes(ppm_to_png(raw))
+            except (OSError, ValueError):
+                return False
+            self.last_digest = digest
+            self.frames.append({"elapsed": elapsed, "phase": phase, "file": f"screens/{self.vm_name}/{name}"})
+            self.save()
+            return True
+        # Black screen (or no QEMU yet): the serial console is what there is to see.
+        text = capture_console_text(self.vm_name)
+        if not text:
+            return False
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        if digest == self.last_digest:
+            return False
+        name = f"{elapsed:05d}-{phase}.txt"
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            (target / name).write_text(text + "\n", encoding="utf-8")
+        except OSError:
+            return False
+        self.last_digest = digest
+        self.frames.append({"elapsed": elapsed, "phase": phase, "text": f"screens/{self.vm_name}/{name}"})
+        self.save()
+        return True
+
+    def save(self) -> None:
+        target = timeline_dir(self.directory, self.vm_name)
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "timeline.json").write_text(json.dumps(self.frames, indent=2) + "\n", encoding="utf-8")
+        except OSError:
+            pass
+
+
+@contextmanager
+def watch_timeline(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> Iterator[None]:
+    """Record the screenshot timeline of a whole check-vms row, phase by phase.
+
+    The installer's own console is never touched (no wake-up): the frames are what a person
+    watching the screen would have seen at TIMELINE_INTERVAL_SEC steps, deduplicated.
+    """
+    directory = getattr(args, "_report_dir", None)
+    # Opt-in (`check-vms --document`): a plain validation run keeps today's single final screenshot
+    # and no extra QMP traffic.
+    enabled = bool(directory) and not args.dry_run and bool(getattr(args, "document", False))
+    stop = threading.Event()
+    parent = getattr(args, "_report_parent", args)
+    timeline = Timeline(vm_name, vm, Path(directory or "."), time.monotonic())
+
+    def watch() -> None:
+        while not stop.is_set():
+            timeline.tick(str(getattr(parent, "_report_phase", "install")))
+            stop.wait(TIMELINE_INTERVAL_SEC)
+
+    thread = threading.Thread(target=watch, daemon=True)
+    if enabled:
+        thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        if enabled:
+            thread.join()
+            # One last frame with the phase the row ended in, so a short row still has a picture.
+            timeline.tick(str(getattr(parent, "_report_phase", "install")))
+
+
+def latest_report_dir() -> Path:
+    """The newest check-vms report directory that has results."""
+    base = state.ROOT / "artifacts" / "check-vms"
+    candidates = sorted((d for d in base.glob("*") if (d / "results").is_dir()), key=lambda d: d.name)
+    if not candidates:
+        raise VMError(f"No check-vms report with results under {ui.pretty_path(base)}")
+    return candidates[-1]
 
 
 @contextmanager
@@ -303,7 +498,8 @@ def record(vm_name: str, vm: dict[str, Any], args: argparse.Namespace, status: s
               "profile_verified": vm.get("meta", {}).get("verified"),
               "status": outcome, "phase": getattr(args, "_report_phase", "validation"),
               "seconds": round(seconds, 3), "detail": detail,
-              "screenshot": f"screens/{vm_name}.png" if screenshot.exists() else None}
+              "screenshot": f"screens/{vm_name}.png" if screenshot.exists() else None,
+              "timeline": load_timeline(base, vm_name)}
     destination = base / "results" / f"{vm_name}.json"
     runtime.ensure_parent(destination)
     destination.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

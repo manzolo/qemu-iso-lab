@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, runtime, scheduler, ssh, state, ui, windows
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -757,8 +757,11 @@ def run_local_test_once(vm_name: str, vm: dict[str, Any], args: argparse.Namespa
     ui.print_kv("check", note)
     started = time.monotonic()
     args._screenshot_error = None
+    # The phase names the timeline frames until a flow says otherwise ("post-install").
+    report.phase(args, "boot" if mode == "boot-check" else "install")
     try:
-        status, detail = run_local_test_vm(vm_name, vm, args)
+        with report.watch_timeline(vm_name, vm, args):
+            status, detail = run_local_test_vm(vm_name, vm, args)
     except (VMError, OSError, subprocess.CalledProcessError) as exc:
         status = "failed"
         detail = str(exc)
@@ -813,6 +816,8 @@ def run_local_test_vm_subprocess(vm_name: str, args: argparse.Namespace) -> tupl
         cmd.append("--dry-run")
     if getattr(args, "_report_dir", None):
         cmd += ["--report-dir", str(args._report_dir)]
+    if getattr(args, "document", False):
+        cmd.append("--document")
     result = subprocess.run(
         cmd,
         check=False,
@@ -2636,6 +2641,19 @@ def restore_local_test_artifacts(stashed: dict[str, str], dry_run: bool = False)
         backup_base.rmdir()
 
 
+def cmd_report_pdf(args: argparse.Namespace) -> int:
+    """One PDF per profile out of a check-vms report: facts, outcome, screenshot timeline."""
+    requested = getattr(args, "report_dir", None)
+    directory = runtime.resolve_path(requested) if requested else report.latest_report_dir()
+    langs = tuple(part.strip() for part in str(getattr(args, "lang", "en,it")).split(",") if part.strip())
+    ui.print_header("Profile documentation")
+    ui.print_kv("report", ui.pretty_path(directory))
+    ui.print_kv("languages", ", ".join(langs))
+    written = profiledoc.build(directory, langs, dry_run=args.dry_run)
+    ui.print_status("ok", f"{len(written)} files under {ui.pretty_path(directory / 'pdf')}")
+    return 0
+
+
 def cmd_test_local(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     selected_names = list(args.vms) if getattr(args, "vms", None) else config.sorted_vm_names(cfg)
@@ -2644,6 +2662,8 @@ def cmd_test_local(args: argparse.Namespace) -> int:
         config.get_vm(cfg, vm_name)
     args.vms = selected_names
     report_directory = report.init(args)
+    if getattr(args, "document", False) and report_directory is None:
+        raise VMError("--document needs --report: the screenshot timeline and the PDFs live in the report directory")
     results: list[tuple[str, str, str]] = []
     try:
         parallel = scheduler.parse_parallel(getattr(args, "parallel", 1))
@@ -2713,6 +2733,11 @@ def cmd_test_local(args: argparse.Namespace) -> int:
 
     if report_directory is not None:
         report.finish(report_directory, args, results, cfg)
+        if getattr(args, "document", False):
+            # The screenshot timeline is only worth its QMP traffic if someone reads it: --document
+            # keeps the frames and turns the report into one PDF per profile, in both languages.
+            written = profiledoc.build(report_directory, profiledoc.LANGS, dry_run=args.dry_run)
+            ui.print_kv("profile sheets", f"{len(written)} files under {ui.pretty_path(report_directory / 'pdf')}")
 
     passed = sum(1 for _, status, _ in results if status == "passed")
     failed = sum(1 for _, status, _ in results if status == "failed")

@@ -653,6 +653,23 @@ it changes to `post-install` before SSH provisioning, including when that
 provisioning fails. Durations include capture and shutdown. A worker that exits
 without a result is reported at phase `worker` with unavailable duration (0).
 
+
+### Profile sheets (PDF)
+
+```bash
+vmctl check-vms --report --document            # the run keeps a screenshot timeline and ends with the PDFs
+vmctl report-pdf                               # or later, from the newest report; --lang it for one language
+```
+
+`--document` (opt-in, needs `--report`) makes every row keep a timeline: one QMP screenshot every
+30 s while the installer and the post-install run, kept only when the screen changed, at most 40
+per profile. Most unattended installers work on the serial console and leave the screen black:
+those frames are the last lines of the installer log instead, printed in the sheet as text. At the end (or with `vmctl report-pdf <dir>` on any report) each
+profile gets a Markdown page and a PDF per language under `<report>/pdf/<lang>/` — profile facts,
+outcome and duration, the captioned frames, the final screen — plus an `index.pdf`. Without
+`--document` the sheets carry the final screen only. The PDF step needs the `markdown` and
+`weasyprint` packages (the same as `make guides`); the Markdown is written regardless.
+
 ### Debian Xfce
 
 `vmctl bootstrap-preseed debian-xfce --timeout 3600` installs the Debian 13 Xfce task with LightDM autologin and a ttyS0 getty. SSH uses port 2263; `verify-desktop` requires an active local session, the `xfce4` package and `xfce4-session`. Check current status with `vmctl list`.

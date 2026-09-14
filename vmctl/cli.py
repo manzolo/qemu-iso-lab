@@ -34,7 +34,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Network lab", "pfSense router + Pi-hole DNS + clients on an isolated LAN segment",
      ["lab"]),
     ("Verify", "smoke tests and the local validation matrix",
-     ["boot-check", "check-vms"]),
+     ["boot-check", "check-vms", "report-pdf"]),
     ("Physical disks", "DESTRUCTIVE, ask for sudo, require --confirm-device",
      ["flash", "import-device"]),
     ("Maintenance", "",
@@ -290,13 +290,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS, help="preview without running the matrix")
     p.add_argument("--report", nargs="?", const="", metavar="DIR", help="write a self-contained HTML report (default: artifacts/check-vms/<timestamp>)")
     p.add_argument("--open", action="store_true", help="generate and open the report with xdg-open")
+    p.add_argument("--document", action="store_true",
+                   help="with --report: keep a screenshot timeline of every row (one frame every 30 s, changed screens only) "
+                        "and write one PDF per profile, in English and Italian, under <report>/pdf/")
     p.set_defaults(func=lifecycle.cmd_test_local)
+
+    p = _add(subparsers, "report-pdf", help="one PDF per profile (facts, outcome, screenshot timeline) from a check-vms report")
+    p.add_argument("report_dir", nargs="?", help="report directory (default: the newest artifacts/check-vms/<timestamp> with results)")
+    p.add_argument("--lang", default="en,it", help="comma-separated languages: en, it (default: en,it)")
+    p.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS, help="list the files without writing them")
+    p.set_defaults(func=lifecycle.cmd_report_pdf)
 
     p = subparsers.add_parser("_check-vm", help=argparse.SUPPRESS)
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=300, help=argparse.SUPPRESS)
     p.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
     p.add_argument("--report-dir", dest="_report_dir", help=argparse.SUPPRESS)
+    p.add_argument("--document", action="store_true", help=argparse.SUPPRESS)
     p.set_defaults(func=lifecycle.cmd_check_vm)
 
     p = _add(subparsers, "flash", help="copy a VM disk, repair GPT and offer optional NTFS expansion (DESTRUCTIVE; requires sudo)")
