@@ -38,7 +38,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Physical disks", "DESTRUCTIVE, ask for sudo, require --confirm-device",
      ["flash", "import-device"]),
     ("Maintenance", "",
-     ["clean", "clean-stale", "delete-iso", "completion"]),
+     ["clean", "clean-reports", "clean-stale", "delete-iso", "completion"]),
 ]
 
 TYPICAL_FLOWS = """\
@@ -338,6 +338,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", nargs="?", help=VM_HELP)
     p.add_argument("--all", action="store_true", help="clean artifacts for every configured VM")
     p.set_defaults(func=lifecycle.cmd_clean)
+
+    p = _add(subparsers, "clean-reports", help="remove old check-vms report directories, keeping the newest ones")
+    p.add_argument("--keep", type=int, default=5, help="how many of the newest reports to keep (default: 5)")
+    p.add_argument("--older-than", type=int, metavar="DAYS", help="remove only reports older than DAYS days")
+    p.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS, help="list what would be removed without deleting it")
+    p.set_defaults(func=lifecycle.cmd_clean_reports)
 
     p = _add(subparsers, "clean-stale", help="remove stale runtime state such as dead bootstrap PID files")
     p.add_argument("vm", nargs="?", help=VM_HELP)

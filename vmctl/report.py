@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import platform
 import re
+import shutil
 import socket
 import struct
 import subprocess
@@ -434,6 +435,87 @@ def latest_report_dir() -> Path:
     return candidates[-1]
 
 
+# Housekeeping. One full matrix costs 50-80 MB (the HTML embeds every screenshot it shows) and
+# --document adds the timeline frames on top, so a directory of reports grows by a run a day.
+REPORT_ACTIVE_SEC = 600.0
+REPORTS_SIZE_HINT = 1024 ** 3
+
+
+def reports_root(base: Path | None = None) -> Path:
+    return base if base is not None else state.ROOT / "artifacts" / "check-vms"
+
+
+def report_modified(directory: Path) -> float:
+    """When the run last wrote a row into this report."""
+    times = [path.stat().st_mtime for path in (directory / "results").glob("*.json")]
+    return max(times) if times else directory.stat().st_mtime
+
+
+def report_size(directory: Path) -> int:
+    return sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())
+
+
+def discover_reports(base: Path | None = None) -> list[Path]:
+    """Every check-vms report directory, oldest first.
+
+    A report is a directory holding `results/`. They are normally one level under
+    artifacts/check-vms, but documenting profiles one at a time nests a directory per profile
+    under a common parent, so the search goes deeper than latest_report_dir's glob.
+    """
+    root = reports_root(base)
+    if not root.is_dir():
+        return []
+    found: list[Path] = []
+    stack = [root]
+    while stack:
+        directory = stack.pop()
+        if (directory / "results").is_dir():
+            found.append(directory)  # a report's own subdirectories are never separate reports
+            continue
+        stack.extend(child for child in directory.iterdir() if child.is_dir())
+    return sorted(found, key=lambda directory: (report_modified(directory), str(directory)))
+
+
+def prune_reports(keep: int, older_than_days: float | None = None, *, base: Path | None = None,
+                  now: float | None = None, dry_run: bool = False) -> tuple[list[tuple[Path, int]], list[Path]]:
+    """Remove old reports, keeping the newest `keep` of them and anything still being written."""
+    root = reports_root(base)
+    reports = discover_reports(base)
+    moment = time.time() if now is None else now
+    protected = set(reports[len(reports) - keep:]) if keep > 0 else set()
+    removed: list[tuple[Path, int]] = []
+    active: list[Path] = []
+    for directory in reports:
+        if directory in protected:
+            continue
+        age = moment - report_modified(directory)
+        if age < REPORT_ACTIVE_SEC:
+            active.append(directory)  # a check-vms run may still be writing into it
+            continue
+        if older_than_days is not None and age < older_than_days * 86400:
+            continue
+        removed.append((directory, report_size(directory)))
+        if dry_run:
+            continue
+        shutil.rmtree(directory)
+        parent = directory.parent
+        if parent != root and parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+    return removed, active
+
+
+def warn_reports_size(base: Path | None = None, limit: int = REPORTS_SIZE_HINT) -> int:
+    """Point at the housekeeping command once the reports are worth cleaning, never delete anything."""
+    root = reports_root(base)
+    if not root.is_dir():
+        return 0
+    total = report_size(root)
+    if total >= limit:
+        ui.print_note(f"{ui.pretty_path(root)} holds {runtime.format_bytes(total)} of reports; "
+                      f"'vmctl clean-reports --dry-run' lists what can go")
+    return total
+
+
 @contextmanager
 def watch_boot(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> Iterator[None]:
     """Keep the latest live framebuffer without changing token/poweroff handling."""
@@ -741,5 +823,6 @@ def finish(directory: Path, args: argparse.Namespace, results: list[tuple[str, s
         metadata = {"host": platform.node(), "date": datetime.now(timezone.utc).isoformat(), "commit": commit}
         destination.write_text(render_html(collected, metadata, directory), encoding="utf-8")
         ui.print_kv("report", str(destination))
+        warn_reports_size()
     if getattr(args, "open", False):
         runtime.run(["xdg-open", str(destination)], dry_run=args.dry_run)

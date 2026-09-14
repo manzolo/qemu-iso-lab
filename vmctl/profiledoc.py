@@ -195,12 +195,20 @@ def to_pdf(markdown_text: str, base_url: Path, destination: Path) -> None:
     HTML(string=page, base_url=str(base_url)).write_pdf(str(destination))
 
 
-def build(directory: Path, langs: tuple[str, ...] = LANGS, dry_run: bool = False) -> list[Path]:
-    """Write `pdf/<lang>/<vm>.md` + `.pdf` for every result and an index per language."""
+def build(directory: Path, langs: tuple[str, ...] = LANGS, dry_run: bool = False,
+          only: str | None = None) -> list[Path]:
+    """Write `pdf/<lang>/<vm>.md` + `.pdf` for every result and an index per language.
+
+    `only` restricts the run to one profile and skips the index: a check-vms row writes its own
+    sheet as soon as it ends, and parallel rows must not write the shared index at the same time.
+    The index is written once, by the build that closes the run.
+    """
     unknown = [lang for lang in langs if lang not in LABELS]
     if unknown:
         raise VMError(f"Unknown language(s) {', '.join(unknown)}; choose from {', '.join(LABELS)}")
     results = load_results(directory)
+    if only is not None:
+        results = [result for result in results if str(result["id"]) == only]
     cfg = config.load_config()
     written: list[Path] = []
     for lang in langs:
@@ -219,6 +227,8 @@ def build(directory: Path, langs: tuple[str, ...] = LANGS, dry_run: bool = False
                 md_path.write_text(text, encoding="utf-8")
                 to_pdf(text, directory, pdf_path)
             written += [md_path, pdf_path]
+        if only is not None:
+            continue
         index_text = render_index_markdown(results, directory, lang)
         md_path, pdf_path = out / "index.md", out / "index.pdf"
         if not dry_run:

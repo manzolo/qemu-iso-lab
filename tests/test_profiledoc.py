@@ -144,6 +144,37 @@ class ProfiledocTests(BaseVmctlTestCase):
         self.assertIn('href="testvm.pdf"', index)
         self.assertIn("PASS 1", index)
 
+    def test_only_writes_one_sheet_and_leaves_the_shared_index_alone(self):
+        with mock.patch.object(vmctl.profiledoc, "to_pdf") as to_pdf:
+            written = vmctl.profiledoc.build(self.report_dir, ("en", "it"), only="testvm")
+        names = sorted(str(p.relative_to(self.report_dir)) for p in written)
+        self.assertEqual(names, ["pdf/en/testvm.md", "pdf/en/testvm.pdf", "pdf/it/testvm.md", "pdf/it/testvm.pdf"])
+        self.assertEqual(to_pdf.call_count, 2)
+        self.assertFalse((self.report_dir / "pdf" / "en" / "index.md").exists(),
+                         "parallel rows must not race on the index; the closing build writes it")
+        with mock.patch.object(vmctl.profiledoc, "to_pdf"):
+            self.assertEqual(vmctl.profiledoc.build(self.report_dir, ("en",), only="absent"), [])
+
+    def test_a_finished_row_writes_its_own_sheet_only_with_document(self):
+        args = argparse.Namespace(dry_run=False, document=True, _report_dir=str(self.report_dir))
+        with mock.patch.object(vmctl.profiledoc, "build") as build:
+            vmctl.lifecycle.write_profile_sheet("testvm", args)
+        build.assert_called_once()
+        self.assertEqual(build.call_args.kwargs["only"], "testvm")
+        for missing in (argparse.Namespace(dry_run=False, document=False, _report_dir=str(self.report_dir)),
+                        argparse.Namespace(dry_run=True, document=True, _report_dir=str(self.report_dir)),
+                        argparse.Namespace(dry_run=False, document=True, _report_dir=None)):
+            with mock.patch.object(vmctl.profiledoc, "build") as build:
+                vmctl.lifecycle.write_profile_sheet("testvm", missing)
+            build.assert_not_called()
+
+    def test_a_missing_pdf_toolchain_does_not_fail_the_row(self):
+        args = argparse.Namespace(dry_run=False, document=True, _report_dir=str(self.report_dir))
+        with mock.patch.object(vmctl.profiledoc, "build", side_effect=vmctl.errors.VMError("weasyprint missing")):
+            with mock.patch.object(vmctl.lifecycle.ui, "print_note") as note:
+                vmctl.lifecycle.write_profile_sheet("testvm", args)
+        self.assertIn("weasyprint missing", note.call_args.args[0])
+
     def test_build_rejects_unknown_languages_and_non_report_directories(self):
         with self.assertRaisesRegex(vmctl.errors.VMError, "Unknown language"):
             vmctl.profiledoc.build(self.report_dir, ("de",))

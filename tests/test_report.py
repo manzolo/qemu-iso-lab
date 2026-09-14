@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import struct
 import zlib
 from pathlib import Path
@@ -276,3 +277,90 @@ class ReportTests(BaseVmctlTestCase):
             status, _ = lifecycle.run_local_test_once("testvm", self.vm_config, args)
         self.assertEqual(status, "failed")
         self.assertEqual(args._report_phase, "post-install")
+
+
+class ReportHousekeepingTests(BaseVmctlTestCase):
+    def make_report(self, relative, rows=1, age_sec=0.0, payload=b"x" * 1024):
+        directory = self.root / "artifacts/check-vms" / relative
+        (directory / "results").mkdir(parents=True)
+        (directory / "screens").mkdir()
+        (directory / "screens" / "shot.png").write_bytes(payload)
+        for index in range(rows):
+            (directory / "results" / f"vm{index}.json").write_text(json.dumps({"id": f"vm{index}"}))
+        when = 1_000_000.0 - age_sec
+        for path in list(directory.rglob("*")) + [directory]:
+            os.utime(path, (when, when))
+        return directory
+
+    def test_discovery_finds_nested_reports_and_ignores_everything_else(self):
+        old = self.make_report("20260901-000000", age_sec=86400)
+        recent = self.make_report("20260902-000000")
+        nested = self.make_report("doc-20260914/debian-xfce", age_sec=3600)
+        (self.root / "artifacts/check-vms/not-a-report").mkdir()
+        found = report.discover_reports(self.root / "artifacts/check-vms")
+        self.assertEqual(found, [old, nested, recent])  # oldest first
+        # A report's own subdirectories are not separate reports.
+        self.assertNotIn(recent / "results", found)
+
+    def test_prune_keeps_the_newest_and_reports_what_it_freed(self):
+        base = self.root / "artifacts/check-vms"
+        older = self.make_report("20260901-000000", age_sec=4 * 86400)
+        old = self.make_report("20260902-000000", age_sec=3 * 86400)
+        keeper = self.make_report("20260903-000000", age_sec=2 * 86400)
+        removed, active = report.prune_reports(1, base=base, now=1_000_000.0)
+        self.assertEqual([directory for directory, _ in removed], [older, old])
+        self.assertEqual(active, [])
+        self.assertGreater(sum(size for _, size in removed), 2048)
+        self.assertFalse(older.exists())
+        self.assertTrue(keeper.exists())
+
+    def test_prune_never_removes_a_report_that_is_still_being_written(self):
+        base = self.root / "artifacts/check-vms"
+        running = self.make_report("20260904-000000", age_sec=60)
+        newest = self.make_report("20260905-000000")
+        removed, active = report.prune_reports(1, base=base, now=1_000_000.0)
+        self.assertEqual(removed, [])
+        self.assertEqual(active, [running])
+        self.assertTrue(running.exists() and newest.exists())
+
+    def test_older_than_and_dry_run(self):
+        base = self.root / "artifacts/check-vms"
+        ancient = self.make_report("20260801-000000", age_sec=30 * 86400)
+        yesterday = self.make_report("20260913-000000", age_sec=86400)
+        self.make_report("20260914-000000", age_sec=7200)
+        removed, _ = report.prune_reports(1, 7, base=base, now=1_000_000.0, dry_run=True)
+        self.assertEqual([directory for directory, _ in removed], [ancient])
+        self.assertTrue(ancient.exists(), "a dry run must not delete anything")
+        self.assertTrue(yesterday.exists())
+        removed, _ = report.prune_reports(1, 7, base=base, now=1_000_000.0)
+        self.assertFalse(ancient.exists())
+        self.assertTrue(yesterday.exists(), "younger than --older-than, kept even though it is not the newest")
+
+    def test_emptied_campaign_parent_goes_away_with_its_reports(self):
+        base = self.root / "artifacts/check-vms"
+        nested = self.make_report("doc-20260914/debian-xfce", age_sec=86400)
+        self.make_report("20260914-000000")
+        report.prune_reports(1, base=base, now=1_000_000.0)
+        self.assertFalse(nested.exists())
+        self.assertFalse(nested.parent.exists(), "the campaign directory is empty now")
+
+    def test_command_reports_rows_and_size_without_deleting_on_dry_run(self):
+        matrix = self.make_report("20260901-000000", rows=3, age_sec=86400)
+        self.make_report("20260914-000000")
+        args = argparse.Namespace(keep=1, older_than=None, dry_run=True)
+        with mock.patch.object(lifecycle.ui, "print_status") as status:
+            self.assertEqual(lifecycle.cmd_clean_reports(args), 0)
+        lines = [call.args[1] for call in status.call_args_list]
+        self.assertTrue(any("3 rows" in line and str(matrix.name) in line for line in lines), lines)
+        self.assertTrue(any(line.startswith("Would free") for line in lines), lines)
+        self.assertTrue(matrix.exists())
+
+    def test_finished_report_points_at_the_cleanup_only_when_it_is_worth_it(self):
+        base = self.root / "artifacts/check-vms"
+        self.make_report("20260914-000000", payload=b"x" * 4096)
+        with mock.patch.object(report.ui, "print_note") as note:
+            report.warn_reports_size(base, limit=1024 ** 3)
+        note.assert_not_called()
+        with mock.patch.object(report.ui, "print_note") as note:
+            report.warn_reports_size(base, limit=1024)
+        self.assertIn("clean-reports", note.call_args.args[0])

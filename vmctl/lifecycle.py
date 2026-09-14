@@ -823,6 +823,7 @@ def run_local_test_once(vm_name: str, vm: dict[str, Any], args: argparse.Namespa
         detail = str(exc)
 
     report.record(vm_name, vm, args, status, detail, time.monotonic() - started, mode)
+    write_profile_sheet(vm_name, args)
     if status == "passed":
         ui.print_status("ok", f"{vm_name}: {detail}")
     elif status == "failed":
@@ -2742,6 +2743,46 @@ def cmd_report_pdf(args: argparse.Namespace) -> int:
     ui.print_kv("languages", ", ".join(langs))
     written = profiledoc.build(directory, langs, dry_run=args.dry_run)
     ui.print_status("ok", f"{len(written)} files under {ui.pretty_path(directory / 'pdf')}")
+    return 0
+
+
+def write_profile_sheet(vm_name: str, args: argparse.Namespace) -> None:
+    """With --document, a row's PDF is written as soon as the row ends, not hours later.
+
+    Only this profile's sheet: parallel rows would otherwise write the shared index at the same time,
+    and the index is rebuilt anyway by the build that closes the run.
+    """
+    directory = getattr(args, "_report_dir", None)
+    if not directory or args.dry_run or not getattr(args, "document", False):
+        return
+    try:
+        profiledoc.build(Path(directory), profiledoc.LANGS, only=vm_name)
+    except (VMError, OSError) as exc:
+        # A missing weasyprint must not turn a passing row into a failure.
+        ui.print_note(f"Profile sheet for {vm_name} not written: {exc}")
+
+
+def cmd_clean_reports(args: argparse.Namespace) -> int:
+    """Keep the newest check-vms reports and remove the rest; never touch one being written."""
+    keep = max(0, int(getattr(args, "keep", 5)))
+    older_than = getattr(args, "older_than", None)
+    ui.print_header("Clean check-vms reports")
+    total = report.discover_reports()
+    ui.print_kv("reports", str(len(total)))
+    ui.print_kv("policy", f"keep the {keep} newest" + (f", remove what is older than {older_than} days" if older_than else ""))
+    removed, active = report.prune_reports(keep, older_than, dry_run=args.dry_run)
+    for directory in active:
+        ui.print_note(f"Written less than {int(report.REPORT_ACTIVE_SEC / 60)} minutes ago, kept: {ui.pretty_path(directory)}")
+    for directory, size in removed:
+        verb = "Would remove" if args.dry_run else "Removed"
+        rows = len(list((directory / "results").glob("*.json"))) if directory.exists() else 0
+        detail = f"{rows} row{'s' if rows != 1 else ''}, {runtime.format_bytes(size)}" if rows else runtime.format_bytes(size)
+        ui.print_status("ok", f"{verb} {ui.pretty_path(directory)} ({detail})")
+    freed = sum(size for _, size in removed)
+    if not removed:
+        ui.print_status("ok", "Nothing to remove")
+    else:
+        ui.print_status("ok", f"{'Would free' if args.dry_run else 'Freed'} {runtime.format_bytes(freed)}")
     return 0
 
 

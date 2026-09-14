@@ -656,6 +656,11 @@ without a result is reported at phase `worker` with unavailable duration (0).
 
 ### Profile sheets (PDF)
 
+With `--document` each row writes its own sheet as soon as it finishes, so a long matrix fills
+`<report>/pdf/<lang>/` while it runs; the index is written once, at the end of the run, and
+`vmctl report-pdf <report>` rebuilds everything (index included) from a report at any point,
+even while the matrix is still going.
+
 ```bash
 vmctl check-vms --report --document            # the run keeps a screenshot timeline and ends with the PDFs
 vmctl report-pdf                               # or later, from the newest report; --lang it for one language
