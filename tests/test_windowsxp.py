@@ -142,15 +142,20 @@ class WindowsXpTests(BaseVmctlTestCase):
             self.assertGreater(run.call_count, first, "new answers: rebuilt")
 
     def test_the_tablet_rides_a_controller_xp_has_a_driver_for(self):
+        import shutil
         import vmctl.qemu
         self.vm_config.update({"usb_tablet": True, "usb_controller": "builtin"})
-        args = vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True,
-                                      allow_missing_disk=True)
-        self.assertIn("usb-tablet", args)
-        self.assertNotIn("qemu-xhci", args, "XP has no xHCI driver: the tablet would not exist")
+
+        def args():
+            # the CI runner has no QEMU binary to find
+            with mock.patch.object(shutil, "which", return_value="/usr/bin/qemu-system-x86_64"):
+                return vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True,
+                                              allow_missing_disk=True)
+
+        self.assertIn("usb-tablet", args())
+        self.assertNotIn("qemu-xhci", args(), "XP has no xHCI driver: the tablet would not exist")
         self.vm_config.pop("usb_controller")
-        self.assertIn("qemu-xhci", vmctl.qemu.common_args(self.vm_config, None, dry_run=True,
-                                                          headless=True, allow_missing_disk=True))
+        self.assertIn("qemu-xhci", args())
 
     def test_installer_cd_sits_behind_the_disk_in_the_boot_order(self):
         args = vmctl.windowsxp.install_media_args(Path("/tmp/install.iso"))

@@ -218,8 +218,10 @@ class VvfatShareTests(BaseVmctlTestCase):
 
     def args(self, phase):
         import vmctl.qemu
-        return vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True,
-                                      allow_missing_disk=True, network_phase=phase)
+        # the CI runner has no QEMU: common_args must not look for the binary here
+        with mock.patch.object(shutil, "which", return_value="/usr/bin/qemu-system-x86_64"):
+            return vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True,
+                                          allow_missing_disk=True, network_phase=phase)
 
     def test_the_share_is_a_read_only_fat_disk_and_never_faces_an_installer(self):
         runtime_args = " ".join(self.args("runtime"))
