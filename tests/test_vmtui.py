@@ -249,6 +249,17 @@ class VmtuiTests(unittest.TestCase):
         # the recommended entry always exists in the menu it is rendered for
         self.assertIn(lines[0], menu)
 
+    def test_force_stop_is_offered_only_while_running_and_maps_to_the_flag(self):
+        script = ("source bin/vmtui; load_vm_facts test-ssh; FACTS[running]=1; "
+                  "FACTS[runtime]=tracked:4242; build_vm_menu_items")
+        menu = self.run_bash(script).stdout.splitlines()
+        self.assertIn("Force Stop", menu)
+        self.assertIn("Stop VM", menu)
+        stopped = self.run_bash("source bin/vmtui; load_vm_facts test-ssh; build_vm_menu_items").stdout
+        self.assertNotIn("Force Stop", stopped)
+        action = self.run_bash("source bin/vmtui; resolve_action 'Force Stop'").stdout.strip()
+        self.assertEqual(action, "force-stop")
+
     def test_recommended_action_follows_state(self):
         result = self.run_bash("source bin/vmtui; load_vm_facts test-ssh; recommended_action")
         self.assertEqual(result.stdout.strip(), "Guided Provision")

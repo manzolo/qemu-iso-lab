@@ -1169,6 +1169,7 @@ build_vm_menu_items() {
         # A VM can be running on a disk that has no OS yet (installer in
         # progress): Stop/SSH must be reachable regardless of `installed`.
         emit_action "Stop VM" "Graceful power-off of the running VM"
+        emit_action "Force Stop" "Kill the QEMU process without waiting for the guest (unsaved changes lost)"
         emit_action "Attach Display" "Watch the screen of the headless VM in a VNC viewer"
         if [[ $has_ssh == "1" ]]; then
             emit_action "SSH Console" "Open a shell inside the VM"
@@ -1522,6 +1523,7 @@ resolve_action() {
         "Cloud-Init Flow") printf '%s\n' cloud-init-install ;;
         "Seeded Installer") printf '%s\n' install-cloud-init ;;
         "Stop VM") printf '%s\n' stop ;;
+        "Force Stop") printf '%s\n' force-stop ;;
         "Post-Install") printf '%s\n' post-install ;;
         "First Boot") printf '%s\n' start-cloud-init ;;
         "Boot Check") printf '%s\n' boot-check ;;
@@ -1761,6 +1763,11 @@ run_action() {
         stop)
             if confirm_box "Stop VM" "Power off '$current_vm'?\n\nvmctl tries a graceful shutdown first (QMP / SSH) and only then kills the process."; then
                 run_vmctl stop "$current_vm" || true
+            fi
+            ;;
+        force-stop)
+            if confirm_box "Force Stop" "Kill the QEMU process of '$current_vm' right now?\n\nNo guest agent, ACPI or SSH request: SIGTERM, then SIGKILL. Unsaved guest changes are lost and an install in progress is interrupted. Use it when the guest ignores a graceful stop."; then
+                run_vmctl stop "$current_vm" --force || true
             fi
             ;;
         export-libvirt|unexport-libvirt)

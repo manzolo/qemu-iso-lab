@@ -233,6 +233,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = _add(subparsers, "stop", help="stop a running VM")
     p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--force", action="store_true", help="skip the graceful power-off and signal QEMU directly (SIGTERM, then SIGKILL)")
     p.set_defaults(func=lifecycle.cmd_stop)
 
     p = _add(subparsers, "cancel-install", help="cancel a TUI background installation and stop its VM, preserving disk and logs")

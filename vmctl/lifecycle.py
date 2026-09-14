@@ -14,7 +14,7 @@ import shlex
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows
 from vmctl.errors import VMError
@@ -108,10 +108,43 @@ def local_tcp_port_open(port: int, host: str = "127.0.0.1", timeout_sec: float =
         return False
 
 
-def find_qemu_process_by_hostfwd_port(port: int) -> tuple[int | None, str | None]:
+def vm_ssh_host_port(vm: dict[str, Any]) -> int | None:
+    ssh_cfg = cloud_init.ssh_access_config(vm)
+    if ssh_cfg is None or not ssh_cfg.get("ssh_host_port"):
+        return None
+    return int(ssh_cfg["ssh_host_port"])
+
+
+def vm_owner_paths(name: str, vm: dict[str, Any]) -> list[str]:
+    """The paths only this VM's own QEMU can carry: its artifact directory and its disk."""
+    paths = [str(runtime.vm_artifact_base(name))]
+    disk = vm.get("disk", {}).get("path")
+    if disk:
+        paths.append(str(runtime.resolve_path(disk)))
+    return paths
+
+
+def find_qemu_process_by_hostfwd_port(port: int, owner_paths: list[str] | None = None) -> tuple[int | None, str | None]:
+    """A QEMU forwarding this host port, and with `owner_paths`, only if it is this VM's own.
+
+    The port is not proof of ownership: any process on the host can forward it, and another lab or
+    another checkout using the same number would otherwise be taken for ours — `vmctl stop` would
+    then power off someone else's VM. Callers that know the VM pass its paths; callers that only
+    want to know who holds the port pass nothing.
+    """
     needles = (f":127.0.0.1:{port}-:22", f":{port}-:22")
-    proc_root = Path("/proc")
-    for proc_dir in proc_root.iterdir():
+    for pid, cmdline in iter_qemu_processes():
+        if not any(needle in cmdline for needle in needles):
+            continue
+        if owner_paths is not None and not any(path in cmdline for path in owner_paths):
+            continue  # same host port, someone else's VM: never ours to stop
+        return pid, cmdline
+    return None, None
+
+
+def iter_qemu_processes() -> Iterator[tuple[int, str]]:
+    """Every running QEMU as (pid, command line); the one place that reads /proc."""
+    for proc_dir in Path("/proc").iterdir():
         if not proc_dir.name.isdigit():
             continue
         try:
@@ -121,30 +154,15 @@ def find_qemu_process_by_hostfwd_port(port: int) -> tuple[int | None, str | None
         if not raw:
             continue
         cmdline = raw.replace(b"\x00", b" ").decode(errors="replace").strip()
-        if "qemu-system-x86_64" not in cmdline:
-            continue
-        if any(needle in cmdline for needle in needles):
-            return int(proc_dir.name), cmdline
-    return None, None
+        if "qemu-system-x86_64" in cmdline:
+            yield int(proc_dir.name), cmdline
 
 
 def find_qemu_process_by_disk_path(disk_path: Path) -> tuple[int | None, str | None]:
     needle = str(disk_path)
-    proc_root = Path("/proc")
-    for proc_dir in proc_root.iterdir():
-        if not proc_dir.name.isdigit():
-            continue
-        try:
-            raw = (proc_dir / "cmdline").read_bytes()
-        except OSError:
-            continue
-        if not raw:
-            continue
-        cmdline = raw.replace(b"\x00", b" ").decode(errors="replace").strip()
-        if "qemu-system-x86_64" not in cmdline:
-            continue
+    for pid, cmdline in iter_qemu_processes():
         if needle in cmdline:
-            return int(proc_dir.name), cmdline
+            return pid, cmdline
     return None, None
 
 
@@ -168,6 +186,16 @@ def cleanup_stale_bootstrap_pid(name: str, dry_run: bool = False, emit: bool = F
     if not dry_run:
         pid_path.unlink()
     return True
+
+
+def warn_foreign_hostfwd(port: int | None, name: str) -> None:
+    """Say who really holds the port instead of reporting nothing found."""
+    if port is None:
+        return
+    pid, _ = find_qemu_process_by_hostfwd_port(port)
+    if pid is not None:
+        ui.print_status("warn", f"Host port {port} is forwarded by another QEMU (pid {pid}), "
+                                f"not by '{name}': it is not this lab's VM and will not be touched", ok=False)
 
 
 def vm_runtime_status(name: str, vm: dict[str, Any]) -> tuple[str, str]:
@@ -205,6 +233,7 @@ def stop_qemu_process(
     ssh_poweroff_cmd: list[str] | None = None,
     grace_sec: int | None = None,
     agent_vm: dict[str, Any] | None = None,
+    force: bool = False,
 ) -> int:
     grace = ACPI_POWEROFF_GRACE_SEC if grace_sec is None else grace_sec
 
@@ -225,9 +254,15 @@ def stop_qemu_process(
         ui.print_status("ok", f"Would stop {description} (pid {pid})")
         return 0
 
+    if force:
+        # Each graceful attempt waits out its own grace period: on a Windows profile that is three
+        # times 300 s before the first signal, and a guest stuck in its installer answers none of
+        # them. Force goes straight to the process, still SIGTERM first so QEMU closes the qcow2.
+        ui.print_status("warn", "Force: skipping the graceful power-off (unsaved guest changes are lost)", ok=False)
+
     # The guest agent asks the operating system directly, so it works where ACPI is ignored
     # and where there is no SSH server to fall back on (Windows 7).
-    if agent_vm is not None and guest_agent.enabled(agent_vm):
+    if not force and agent_vm is not None and guest_agent.enabled(agent_vm):
         ui.print_note("Asking the guest to power off (QEMU guest agent)...")
         try:
             guest_agent.shutdown(agent_vm)
@@ -240,7 +275,7 @@ def stop_qemu_process(
                     return finalize_stop(f"Stopped {description} (guest agent powered it off)")
                 time.sleep(1)
             ui.print_status("warn", f"{description} is still up after the agent shutdown", ok=False)
-    if qmp_socket is not None and qmp_socket.exists():
+    if not force and qmp_socket is not None and qmp_socket.exists():
         ui.print_note("Asking the guest to power off (ACPI, via QMP)...")
         if qemu.qmp_command(qmp_socket, "system_powerdown"):
             deadline = time.monotonic() + grace
@@ -2105,10 +2140,12 @@ def cmd_start(args: argparse.Namespace) -> int:
     if not getattr(args, "background", False):
         running, bg_pid, _ = is_bootstrap_vm_running(args.vm)
         if not running:
-            ssh_cfg = cloud_init.ssh_access_config(vm)
-            if ssh_cfg and ssh_cfg.get("ssh_host_port"):
-                bg_pid, _ = find_qemu_process_by_hostfwd_port(int(ssh_cfg["ssh_host_port"]))
+            port = vm_ssh_host_port(vm)
+            if port is not None:
+                bg_pid, _ = find_qemu_process_by_hostfwd_port(port, vm_owner_paths(args.vm, vm))
                 running = bg_pid is not None
+                if not running:
+                    warn_foreign_hostfwd(port, args.vm)
         if running and bg_pid is not None:
             ui.print_status("warn", f"VM '{args.vm}' is already running headless (pid {bg_pid})", ok=False)
             ui.print_note(f"  vmctl shell {args.vm}              — open an SSH session")
@@ -2405,10 +2442,9 @@ def cmd_stop(args: argparse.Namespace) -> int:
     pid_path = bootstrap_pid_path(args.vm)
     running, pid, cmdline = is_bootstrap_vm_running(args.vm)
     if pid is None:
-        ssh_cfg = cloud_init.ssh_access_config(vm)
-        if ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
-            port = int(ssh_cfg["ssh_host_port"])
-            fallback_pid, _ = find_qemu_process_by_hostfwd_port(port)
+        port = vm_ssh_host_port(vm)
+        if port is not None:
+            fallback_pid, _ = find_qemu_process_by_hostfwd_port(port, vm_owner_paths(args.vm, vm))
             if fallback_pid is not None:
                 return stop_qemu_process(
                     fallback_pid,
@@ -2419,15 +2455,16 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     ssh_poweroff_cmd=ssh_poweroff_command(vm),
                     grace_sec=poweroff_grace_sec(vm),
                     agent_vm=vm,
+                    force=getattr(args, "force", False),
                 )
+        warn_foreign_hostfwd(port, args.vm)
         ui.print_status("ok", f"No tracked background VM for '{args.vm}'")
         return 0
     if not running:
         cleanup_stale_bootstrap_pid(args.vm, dry_run=args.dry_run, emit=True)
-        ssh_cfg = cloud_init.ssh_access_config(vm)
-        if ssh_cfg is not None and ssh_cfg.get("ssh_host_port"):
-            port = int(ssh_cfg["ssh_host_port"])
-            fallback_pid, _ = find_qemu_process_by_hostfwd_port(port)
+        port = vm_ssh_host_port(vm)
+        if port is not None:
+            fallback_pid, _ = find_qemu_process_by_hostfwd_port(port, vm_owner_paths(args.vm, vm))
             if fallback_pid is not None:
                 return stop_qemu_process(
                     fallback_pid,
@@ -2438,7 +2475,9 @@ def cmd_stop(args: argparse.Namespace) -> int:
                     ssh_poweroff_cmd=ssh_poweroff_command(vm),
                     grace_sec=poweroff_grace_sec(vm),
                     agent_vm=vm,
+                    force=getattr(args, "force", False),
                 )
+        warn_foreign_hostfwd(port, args.vm)
         return 0
 
     assert pid is not None
@@ -2452,6 +2491,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
         ssh_poweroff_cmd=ssh_poweroff_command(vm),
         grace_sec=poweroff_grace_sec(vm),
         agent_vm=vm,
+        force=getattr(args, "force", False),
     )
 
 

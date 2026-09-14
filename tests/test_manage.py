@@ -157,6 +157,41 @@ class ManageTests(BaseVmctlTestCase):
         kill_mock.assert_called_once_with(5678, self.vmctl.signal.SIGTERM)
         self.assertLessEqual(sleep_mock.call_count, 1)
 
+    def test_a_foreign_qemu_on_the_same_host_port_is_not_this_vm(self):
+        """Another lab forwarding 2222 must never be taken for ours: vmctl stop would kill it."""
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.write_config_dir()
+        foreign = ("qemu-system-x86_64 -drive file=/home/user/otherlab/disk.qcow2 "
+                   "-netdev user,id=net0,hostfwd=tcp::2222-:22")
+        ours = (f"qemu-system-x86_64 -drive file={self.root}/artifacts/testvm/disk.qcow2 "
+                "-netdev user,id=n1,hostfwd=tcp:127.0.0.1:2222-:22")
+        owner = self.vmctl.vm_owner_paths(self.vm_name, self.vm_config)
+
+        with mock.patch.object(vmctl.lifecycle, "iter_qemu_processes", side_effect=lambda: iter([(4242, foreign)])):
+            self.assertEqual(self.vmctl.find_qemu_process_by_hostfwd_port(2222, owner), (None, None))
+            # without owner paths the caller is only asking who holds the port
+            self.assertEqual(self.vmctl.find_qemu_process_by_hostfwd_port(2222)[0], 4242)
+        with mock.patch.object(vmctl.lifecycle, "iter_qemu_processes", side_effect=lambda: iter([(4242, foreign), (5678, ours)])):
+            self.assertEqual(self.vmctl.find_qemu_process_by_hostfwd_port(2222, owner)[0], 5678)
+
+    def test_cmd_stop_leaves_a_foreign_qemu_alone_and_says_who_holds_the_port(self):
+        self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}
+        self.write_config_dir()
+        foreign = ("qemu-system-x86_64 -drive file=/home/user/otherlab/disk.qcow2 "
+                   "-netdev user,id=net0,hostfwd=tcp::2222-:22")
+        args = argparse.Namespace(vm=self.vm_name, dry_run=False, force=True)
+
+        with mock.patch.object(vmctl.lifecycle, "iter_qemu_processes", side_effect=lambda: iter([(4242, foreign)])), \
+             mock.patch.object(vmctl.lifecycle, "stop_qemu_process") as stop, \
+             mock.patch.object(os, "kill") as kill_mock, \
+             mock.patch.object(vmctl.lifecycle.ui, "print_status") as status:
+            self.assertEqual(self.vmctl.cmd_stop(args), 0)
+
+        stop.assert_not_called()
+        kill_mock.assert_not_called()
+        warned = [call.args[1] for call in status.call_args_list]
+        self.assertTrue(any("forwarded by another QEMU (pid 4242)" in line for line in warned), warned)
+
     def test_cmd_stop_falls_back_to_discovered_qemu_after_stale_pid_file(self):
         self.vm_config["cloud_init"] = {
             "user": "tester",

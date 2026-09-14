@@ -160,6 +160,33 @@ class GuestAgentTests(BaseVmctlTestCase):
                 qmp.assert_called_once_with(qmp_path, "system_powerdown")
             qmp_path.touch()
 
+    def test_force_skips_every_graceful_attempt_and_signals_qemu(self):
+        qmp_path = qemu.qmp_socket_path(self.vm_config)
+        qmp_path.touch()
+        with mock.patch.object(guest_agent, "shutdown") as shutdown, \
+             mock.patch.object(lifecycle, "process_cmdline", side_effect=["qemu", None]), \
+             mock.patch.object(qemu, "qmp_command") as qmp, \
+             mock.patch.object(lifecycle.os, "kill") as kill, \
+             mock.patch.object(lifecycle.time, "sleep"):
+            self.assertEqual(lifecycle.stop_qemu_process(
+                123, "Stop", "VM", agent_vm=self.vm_config, qmp_socket=qmp_path,
+                ssh_poweroff_cmd=["ssh", "poweroff"], grace_sec=300, force=True,
+            ), 0)
+        shutdown.assert_not_called()
+        qmp.assert_not_called()
+        kill.assert_called_once_with(123, lifecycle.signal.SIGTERM)
+
+    def test_stop_force_flag_travels_from_the_command_line(self):
+        pid_path = lifecycle.bootstrap_pid_path(self.vm_name)
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text("123\n")
+        args = cli.build_parser().parse_args(["stop", self.vm_name, "--force"])
+        self.assertTrue(args.force)
+        with mock.patch.object(lifecycle, "is_bootstrap_vm_running", return_value=(True, 123, "qemu")), \
+             mock.patch.object(lifecycle, "stop_qemu_process", return_value=0) as stop:
+            self.assertEqual(args.func(args), 0)
+        self.assertTrue(stop.call_args.kwargs["force"])
+
     def test_stop_dry_run_does_not_contact_agent(self):
         with mock.patch.object(guest_agent, "shutdown") as shutdown, \
              mock.patch.object(lifecycle, "process_cmdline", return_value="qemu"):
