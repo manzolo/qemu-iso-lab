@@ -876,7 +876,17 @@ class VmctlTests(BaseVmctlTestCase):
             ("skip", "import-template profile"),
         )
 
-    def test_prepare_vm_for_local_test_reassigns_busy_ssh_port(self):
+    def test_the_full_matrix_sets_experimental_profiles_aside(self):
+        cfg = {"vms": {
+            "steady": dict(self.vm_config, meta={"status": "unattended"}),
+            "shaky": dict(self.vm_config, meta={"status": "experimental"}),
+            "plain": dict(self.vm_config),
+        }}
+        # Windows 98 would otherwise sit at its dialog until the timeout, holding a worker
+        self.assertEqual(vmctl.lifecycle.experimental_profiles(cfg, ["steady", "shaky", "plain"]), ["shaky"])
+        self.assertIn("name it", vmctl.lifecycle.EXPERIMENTAL_SKIP_NOTE)
+
+
         vm = json.loads(json.dumps(self.vm_config))
         vm["cloud_init"] = {"user": "vmuser", "ssh_host_port": 2222}
 

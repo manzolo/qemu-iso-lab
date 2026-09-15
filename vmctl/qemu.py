@@ -100,6 +100,9 @@ def machine_arg(vm: dict[str, Any], accel: str | None = None) -> str:
         # protocol: on Ubuntu 14.04 QEMU then routed every absolute pointer event to that vmmouse
         # instead of the USB tablet and the desktop pointer stood still (query-mice, verified live).
         machine += ",vmport=off"
+    if vm.get("acpi") is False:
+        # Guests older than ACPI: Windows NT 4.0 was installed and verified with the tables off.
+        machine += ",acpi=off"
     return machine
 
 

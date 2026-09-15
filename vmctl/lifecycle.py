@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windows98, windowsxp
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windows98, windowsnt4, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -413,6 +413,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         return (command, f"WINNT.SIF install only (no SSH server on {windowsxp.product_name(vm)})")
     if windows98.windows98_config(vm) is not None:
         return ("bootstrap-windows98", "MSBATCH.INF install only (no SSH server on Windows 98)")
+    if windowsnt4.windowsnt4_config(vm) is not None:
+        return ("bootstrap-windowsnt4", "UNATTEND.TXT install only (no SSH server on Windows NT 4.0)")
     if windows.windows_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-windows", "autounattend + post-install")
@@ -517,7 +519,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -772,6 +774,25 @@ def run_local_test_vm(
     if mode == "bootstrap-windows98":
         try:
             cmd_bootstrap_windows98(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
+            boot_for_report_screenshot(vm_name, prepared_vm, args)
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-windowsnt4":
+        try:
+            cmd_bootstrap_windowsnt4(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -1808,6 +1829,67 @@ def cmd_bootstrap_windows98(args: argparse.Namespace) -> int:
     )
     ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
     ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: Windows 98 ships no server)")
+    return 0
+
+
+def cmd_bootstrap_windowsnt4(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    if windowsnt4.windowsnt4_config(vm) is None:
+        raise VMError(f"VM '{args.vm}' does not define windowsnt4_config")
+    windowsnt4.check_profile(args.vm, vm)
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Windows NT 4.0 (UNATTEND.TXT): {args.vm}")
+
+    source = runtime.resolve_path(str(vm["iso"]))
+    if not source.is_file() and not args.dry_run:
+        raise VMError(
+            f"Windows NT 4.0 ISO not found: {ui.pretty_path(source)}. Microsoft publishes no URL for it; "
+            f"point vms/profiles/local.json at your own copy (see local.json.example)."
+        )
+    windowsnt4.ensure_dos_pieces(vm, dry_run=args.dry_run)
+    # Not ensure_vm_disk: WINNT.EXE runs from DOS and copies onto a C: that must already be a
+    # FAT16 volume, with boot code that steps aside until the NT loader owns the disk.
+    windowsnt4.prepare_disk(vm, dry_run=args.dry_run)
+    answer = windowsnt4.render_unattend(args.vm, vm, source)
+    install_iso = windowsnt4.ensure_install_iso(args.vm, vm, source, answer, dry_run=args.dry_run)
+
+    # No -no-reboot: WINNT.EXE reboots into text-mode Setup, which reboots into the GUI stage,
+    # which reboots into the first logon. The disk carries bootindex=1 and wins as soon as it
+    # holds a boot sector; before that our MBR returns to the BIOS and the CD's DOS floppy boots.
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        allow_missing_disk=args.dry_run,
+        enable_clipboard=False,
+        disk_bootindex=1,
+        network_phase="install",
+    )
+    install_qemu_args += windowsnt4.install_media_args(install_iso)
+
+    ui.print_note("Booting the DOS floppy - waiting for the completion token on COM1 (WINNT.EXE copy, text stage, GUI stage, first logon)...")
+    ui.print_note(f"Watch the screen with: vmctl attach {args.vm}")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    try:
+        qemu.run_and_expect(
+            install_qemu_args,
+            expected_text=windowsnt4.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=getattr(args, "timeout", 5400),
+            dry_run=args.dry_run,
+            log_path=serial_log,
+            # NT 4 cannot power the machine off: after the token the guest shuts down to "safe to
+            # turn off" and QEMU is closed by the host once this grace has passed.
+            exit_grace_sec=windowsnt4.SHUTDOWN_GRACE_SEC,
+        )
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, windowsnt4.BOOTSTRAP_FAILED_TOKEN, "Windows NT 4.0", serial_log) from exc
+    ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
+    ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: Windows NT 4.0 ships no server; the desktop autologs in as Administrator)")
     return 0
 
 
@@ -2944,17 +3026,36 @@ def cmd_clean_reports(args: argparse.Namespace) -> int:
     return 0
 
 
+EXPERIMENTAL_SKIP_NOTE = "experimental profile: the full matrix skips it, name it on the command line to run it"
+
+
+def experimental_profiles(cfg: dict[str, Any], names: list[str]) -> list[str]:
+    """The profiles whose ``meta.status`` is experimental: a known incomplete flow, not a regression."""
+    return [name for name in names if str(config.get_vm(cfg, name).get("meta", {}).get("status") or "") == "experimental"]
+
+
 def cmd_test_local(args: argparse.Namespace) -> int:
     cfg = config.load_config()
-    selected_names = list(args.vms) if getattr(args, "vms", None) else config.sorted_vm_names(cfg)
+    explicit = bool(getattr(args, "vms", None))
+    selected_names = list(args.vms) if explicit else config.sorted_vm_names(cfg)
     selected_names = list(dict.fromkeys(selected_names))
     for vm_name in selected_names:
         config.get_vm(cfg, vm_name)
+    # A full matrix is a regression run: an experimental profile is expected to stop somewhere
+    # (Windows 98 waits at a dialog until the timeout), so it is reported as skipped rather than
+    # occupying a worker for an hour. Naming it runs it, which is how it gets promoted.
+    experimental = [] if explicit else experimental_profiles(cfg, selected_names)
+    selected_names = [name for name in selected_names if name not in experimental]
     args.vms = selected_names
     report_directory = report.init(args)
     if getattr(args, "document", False) and report_directory is None:
         raise VMError("--document needs --report: the screenshot timeline and the PDFs live in the report directory")
     results: list[tuple[str, str, str]] = []
+    if experimental:
+        ui.print_kv("experimental", ", ".join(experimental) + " (skipped; run by name to validate)")
+        for vm_name in experimental:
+            results.append((vm_name, "skipped", EXPERIMENTAL_SKIP_NOTE))
+            report.record(vm_name, config.get_vm(cfg, vm_name), args, "skipped", EXPERIMENTAL_SKIP_NOTE, 0.0, "matrix")
     try:
         parallel = scheduler.parse_parallel(getattr(args, "parallel", 1))
     except ValueError as exc:

@@ -23,7 +23,7 @@ Every tracked profile has `meta.status`:
 
 - `manual`: interactive installation, live media or an import template; automation may still boot or inspect it.
 - `unattended`: an automated installation/provisioning recipe exists; this is not a claim that this revision passed a live test.
-- `experimental`: a known incomplete or unsettled flow. Currently the package-only Ubuntu niri recipes and the custom Omarchy/NVIDIA flow.
+- `experimental`: a known incomplete or unsettled flow. Currently the package-only Ubuntu niri recipes, the custom Omarchy/NVIDIA flow and `windows98-unattended`. A full `check-vms` (no profile names) reports them as skipped instead of running them; `check-vms <name>` runs one on purpose, which is how it gets promoted (2026-09-14).
 
 `meta.verified` is the last live PASS date supplied by the maintainer. It is omitted when no date is recorded, and is never updated by unit tests or dry runs. A historical date does not certify subsequent profile changes. The list and HTML report show both fields separately from the current run's PASS/FAIL result.
 
@@ -167,6 +167,7 @@ Order after the maintainer's update: FreeBSD, Windows XP/98, then Devuan, Proxmo
 | Profile | SSH | Status | Verified | Live | Evidence / remaining work |
 |---|---|---|---|---|---|
 | `windowsxp-unattended` | - | unattended | 2026-09-14 | PASS, 8.7 min | Install only (no SSH server on XP). Hands-free from a medium with no boot record: GRUB chainloads SETUPLDR.BIN. SP3 ITA installed from the CD, exit 3010 (reboot pending), confirmed as applied by `winver` after the next boot. Autologon permanent, USB tablet active (`query-mice`: absolute), share as a read-only FAT disk. Product key and ISO are the maintainer's, in `local.json`. |
+| `windowsnt4-unattended` | - | unattended | 2026-09-15 | PASS, 28 min (run 10 of 10) | Install only (no SSH server). FreeDOS floppy on the CD runs `WINNT.EXE /U /S /B`; FAT16 disk prepared by the host, kept raw; `\I386\$OEM$` with SP6a as its own .EXE, `CSDVersion = Service Pack 6` read back on COM1; PCnet with `OEMNADAP.IN_` rewritten on the CD (`TP=0`); standard VGA 640x480 (the Cirrus driver spins the first boot); `RunOnce` + `Sermouse` off + `ping` pause so the token reaches COM1; `net user` + `AUTOLOG.REG` so the autologon survives the first boot; `VMCTLOFF.EXE` shuts down to "safe to turn off". Second boot verified: desktop, autologon, no service errors. Guest clock reads the RTC as local time (2 h behind here): untouched. Product key, ISO, SP6a and the Windows 98 ISO for the DOS CD driver are the maintainer's, in `local.json`. |
 | `freebsd-unattended` | 2271 | unattended | 2026-09-14 | PASS, 1.5 min | `artifacts/check-vms/20260914-130825-835989/`: clean install, natural shutdown, SSH identity, pgrep -a -x sshd, service status, freebsd-version and sudo. BIOS/UFS server only; EFI and desktop untested. |
 
 Windows XP, what each live run cost (2026-09-14, six runs): the OEM ISO has no El Torito record
@@ -181,6 +182,20 @@ no xHCI driver; a vvfat share needs `snapshot=on`, since an IDE disk cannot be a
 node; and `AutoLogonCount` makes Winlogon delete the autologon values it was given, so the counter
 is removed. Remaining: `windows98-unattended` (MSBATCH.INF), and XP is untested on media that do
 carry a boot record.
+
+Windows NT 4.0, what the ten runs of 2026-09-14/15 cost, in order: `$OEM$` at the root is ignored
+(Codex's find: it belongs under `\I386`); extracted service-pack files with lower-case names stop the
+DOS-side copy; `TimeZone` is the localized display name, not Windows 2000's index; the DEC 21x4 asks
+for the cable type and its auto-detection spins the first boot; `BACHSB~1.RM_` renamed by xorriso
+without `untranslated_names`; the PCnet INF opens its dialog regardless of unattended mode (rewritten
+on the CD, and `TP=0` or the network stage ends in a WinSock error and a `tcpip.sys` stop); `regedit`
+is not on the PATH during `CMDLINES.TXT`; `[GuiRunOnce]` left RunOnce empty; `start /wait` returns
+nothing on NT 4; the Cirrus driver spins the first boot with and without SP6a; `sermouse.sys` holds
+COM1 while RunOnce fires; the blank-password autologon is a one-shot; NT 4 never issues FLUSH CACHE,
+so a hard-killed QEMU left a qcow2 whose metadata still described the empty disk (raw now); the ISA
+NE2000 installs unattended but its NT 4 driver does not start on QEMU's card. The matrix wrapper
+was innocent: a stall at "Configurazione del computer" under `check-vms` coincided with the host
+swapping.
 
 FreeBSD manual evidence: `artifacts/freebsd-probe/manual/03-script-install.png` shows
 bsdinstall completing the disc1 UFS install; `04-pkg.png` exposed the chroot PATH issue

@@ -738,6 +738,158 @@ takes to override the KVM default.
 
 Install only, like ReactOS and Windows XP: no SSH server exists for this guest.
 
+## Windows NT 4.0: UNATTEND.TXT
+
+Every trap this flow steps around, one row each with symptom, cause and remedy, is in
+[`NT4_PITFALLS.md`](NT4_PITFALLS.md). Read it before changing anything below.
+
+```bash
+vmctl bootstrap-windowsnt4 windowsnt4-unattended   # your own ISO + CD key in local.json; xorriso, mtools, mkfs.vfat
+```
+
+The oldest guest in the catalogue, and the one furthest from the later flows.
+The NT 4 CD boots straight into text-mode Setup, which reads no answer file, so
+the unattended path is Microsoft's own `WINNT.EXE /U:<answer> /S:<source> /B`
+run from DOS. The rebuilt ISO therefore carries a **FreeDOS 1.3 boot floppy**
+as its El Torito image (`144m/x86BOOT.img` of the FreeDOS Floppy Edition, at
+`isos/freedos-1.3-x86boot.img`), with `OAKCDROM.SYS` and `MSCDEX.EXE` from a
+Windows 9x startup disk copied onto it - `windowsnt4_config.cdrom_driver_iso`
+names a Windows 98 ISO and the flow extracts the two files from its boot image
+into `isos/dos/`. The DOS of a Windows 98 startup disk itself refuses to run
+`WINNT.EXE` from a CD ("long file name protection", verified live), which is
+why the kernel is FreeDOS. `FDCONFIG.SYS` loads the CD driver, `FDAUTO.BAT`
+mounts the CD as D: and starts `WINNT.EXE`, which copies `\I386` and `$OEM$` to
+`C:\$WIN_NT$.~LS`, writes a boot sector for the NT loader and reboots.
+
+**The host prepares the disk**, as in the Windows 98 flow, but keeps it **raw**
+(`disk.format: raw`, enforced by the profile check). NT 4's IDE driver never
+issues FLUSH CACHE, so with a qcow2 image the L1/L2/refcount updates sit in
+QEMU's metadata cache until QEMU exits cleanly; two runs that ended in a hard
+kill (timeout, host under memory pressure) left a 470 MB file whose header
+still described the empty disk (`qemu-img check`: 4 clusters allocated), every
+cluster allocated after the format reading back as zeros while the FAT, in a
+cluster allocated by the format itself, carried all the later updates - which
+looked exactly like a filesystem wiped from inside the guest. Same construction otherwise: the same MBR that
+steps aside with `int 0x18` until the partition is bootable, one active
+partition of type 06, `mkfs.vfat -F 16 -h 2048` (FAT16 - neither DOS nor NT 4
+reads FAT32; `-h` is BPB_HiddSec, which the NT boot sector computes every
+address from) and `int 0x18` at offset 0x3E of the fresh boot sector. The disk
+is 2 GB at most: `WINNT.EXE` runs from DOS and copies to one FAT16 volume.
+
+Three things about the answer file cost a live run each (2026-09-14):
+
+- **`$OEM$` lives under `\I386`**, not at the root of the medium. At the root
+  Setup ignores it silently: no `CMDLINES.TXT`, no service pack, `CSDVersion`
+  empty. Everything in it needs an 8.3 upper-case name because the copy happens
+  in DOS - an extracted service pack stopped the copy on its first lower-case
+  name - so SP6a travels as its self-extracting `SP6I386.EXE` (grafted as
+  `NT4SP.EXE`) and `VMCTL.CMD`, run by `CMDLINES.TXT` at the end of the GUI
+  stage, starts it with `/u /q /z /o` (unattended, quiet, no reboot, overwrite
+  OEM files). `UPDATE_EXIT=0` and `CSDVersion = Service Pack 6` were read back
+  from the installed hive.
+- **`TimeZone` is the display name, in the language of the medium.** The
+  numeric indexes (110 = Berlin/Rome) belong to Windows 2000; an English string
+  on an Italian CD opens the Date/Time dialog with GMT selected. The right
+  string is in Microsoft's own sample answer file at `\I386\UNATTEND.TXT` on
+  every localized CD, and the flow reads it from there when the profile sets no
+  `timezone`.
+- **The NIC is the AMD PCnet** (`network_device: pcnet`), detected by Setup.
+  The DEC 21x4 (`tulip`) opens "Tipo di connessione" even in unattended mode;
+  the PCnet opens its "Full duplex / Porta 10Base-T" dialog because its INF
+  never looks at the unattended flag, and the flow rewrites `OEMNADAP.IN_` on
+  the CD (see below). An ISA NE2000 (`ne2k_isa`, still accepted: declared with
+  `InstallAdapters` and a `[NE2000Params]` section repeating QEMU's I/O base
+  and IRQ) installs without any patch because `OEMNADN2.INF` honours
+  `STF_GUI_UNATTENDED`, but at runtime NT 4's `ne2000.sys` reports QEMU's card
+  as "not functioning" (System log, `%%31`) and the guest has no network.
+  Independently of the adapter, a fresh GUI stage twice ended in a
+  `tcpip.sys` IRQL_NOT_LESS_OR_EQUAL stop at the same address when the adapter
+  driver had not started (PCnet with TP=1; NE2000 on IRQ 9), while the same
+  disk resumed after a reboot went through: the NT 4.0 RTM TCP/IP does not
+  survive a bound adapter that fails to start, so the adapter parameters must
+  be right the first time.
+- **The Cirrus driver hangs the first boot.** With `-vga cirrus` and
+  `[Display]` at 800x600x16 the installed system spun the kernel at one address
+  with 100 % CPU, the screen frozen on the desktop colour and no reaction to
+  Ctrl-Alt-Del, first blamed on the NIC; the same disk booted with `-vga std`
+  reached the logon screen in a minute, and an SP-less install with Cirrus hung
+  the same way. So the profile is the standard VGA at 640x480 with 16 colours
+  (`[Display]` 4 bpp), `check_profile` rejects cirrus, and NT 4 has no driver
+  for anything better in QEMU.
+
+- **Even the PCnet's own INF opens a dialog** (kept for a profile that names
+  `pcnet`). `OEMNADAP.INF` ("Scheda
+  Ethernet PCI AMD PCNET v3.11": Full duplex, Porta 10Base-T) never looks at
+  `STF_GUI_UNATTENDED`, unlike Microsoft's INF for the ISA twin
+  (`OEMNADAM.INF`), so no answer-file section can silence it. The rebuilt CD
+  therefore carries the vendor INF with three lines added after its
+  `adapteroptions` label - `ifstr(i) $(!STF_GUI_UNATTENDED) == "YES"` /
+  `Set TPValue = 0` / `goto skipoptions` / `endif` - which writes what a
+  confirmed dialog writes, without the dialog. `TPValue = 0` matters: the
+  dialog leaves "Porta 10Base-T" unchecked and Continue stores TP=0 (auto
+  port), while the INF's internal default is 1; a run that skipped the dialog
+  with TP=1 met "Migrazione da WinSock 1.1 a 2.0 non riuscita" and then a
+  `tcpip.sys` IRQL_NOT_LESS_OR_EQUAL stop in the network stage.
+  The `.IN_` is a one-file MSZIP cabinet: the module reads it
+  (`cab_extract_single`, deflate blocks sharing one window) and writes it back
+  stored (`cab_store_single`), and `windowsnt4_config.patch_pcnet_inf: false`
+  opts out. The file is left alone when it already knows the variable.
+- **`CMDLINES.TXT` commands see no `%SystemRoot%` on the PATH**: a bare
+  `regedit` came back as "non è riconosciuto come comando interno o esterno",
+  so the autologon values are written with `%SystemRoot%\regedit.exe`.
+
+Two more are inherited: `-compliance omit_version:untranslated_names` on the
+xorriso rebuild, or `BACHSB~1.RM_` becomes `BACHSB_1.RM_` and text-mode Setup
+stops on "Impossibile copiare il seguente file: bachsb~1.rmi" (verified live on
+this medium too); and `acpi: false` in the profile, which `machine_arg` turns
+into `acpi=off`.
+
+**Completion.** `CMDLINES.TXT` copies `FIRST.CMD`, `REPORT.CMD` and the
+shutdown tool to `C:\VMCTL` and imports `VMCTL.REG` with
+`%SystemRoot%\regedit.exe`: the autologon values for the blank-password
+Administrator, a `RunOnce` value with the first-logon command, and
+`Services\Sermouse Start=4`. That last one is why the token reaches the host:
+at every boot `sermouse.sys` probes COM1 for a serial mouse (the `DSs` noise in
+the serial log) and still holds the port when Explorer runs RunOnce, so a
+command redirected to COM1 on the RunOnce line failed silently and the value
+was consumed (verified live: the same script run by hand a minute later
+printed everything). The RunOnce line therefore carries no redirection;
+`FIRST.CMD` waits five seconds (`ping -n 6 127.0.0.1`, the only sleep NT 4
+has) and then runs `REPORT.CMD` with its output on COM1. Winlogon performs the
+blank-password automatic logon exactly once and then resets `AutoAdminLogon`
+to 0 (the second boot showed the Ctrl-Alt-Del prompt), so `REPORT.CMD` gives
+Administrator the profile's `admin_password` (`net user`, default `lab`) and
+re-imports the autologon values with it (`AUTOLOG.REG`). Not `[GuiRunOnce]`: written the NT 4 way (one
+quoted command per line) it left the RunOnce key empty and nothing ran at the
+first logon (hive read offline, verified live). The same .reg turns off the
+crash dump and the automatic reboot after a stop error (`CrashControl`): a
+dump written at a first-boot crash went through the pagefile and left the
+FAT16 volume with empty directories and an unbootable C:, so a stop error now
+stays on the screen for the timeline to capture. `REPORT.CMD` then prints on
+COM1: `ver`, `CSDVersion` exported with `regedit /e`, the profile's
+`setup_commands`, the token. The service pack is judged by that `CSDVersion`
+line, not by its exit code: NT 4's `start /wait` hands nothing back (the log
+said 9009, the code of the regedit that had failed before it, while the hive
+already said Service Pack 6). NT 4 has no `shutdown.exe` (Resource Kit), no WMI
+and no Windows Script Host, so the script ends with `VMCTLOFF.EXE`: a 1 KB PE
+written by hand in `vms/profile-files/windowsnt4/exitwin.asm` (nasm, bytes
+embedded in the module) that enables `SeShutdownPrivilege` and calls
+`ExitWindowsEx(EWX_SHUTDOWN | EWX_FORCE)` - with `EWX_POWEROFF` added NT 4
+rebooted instead (verified live). NT 4 cannot power the machine off - no APM,
+no ACPI - so the guest stops at "It is now safe to turn off your computer" with
+everything flushed, and `run_and_expect` closes QEMU once `SHUTDOWN_GRACE_SEC`
+(120 s) has passed. This
+is the one flow where the host, not the guest, ends the process; the guest's
+shutdown is the flush.
+
+Install only, like ReactOS, Windows 98 and Windows XP: no SSH server exists for
+this guest. No USB either (`usb_tablet` must be off, the pointer is PS/2), and
+no audio device NT 4 has a driver for. The DOS side of the flow comes from two
+places: `isos/freedos-1.3-x86boot.img` is `144m/x86BOOT.img` out of
+`FD13-FloppyEdition.zip` (sha256 `75a4e11a…b072`, the image itself
+`3f7834ea…8925`), and `isos/dos/OAKCDROM.SYS` + `MSCDEX.EXE` are the files of
+the same name on a Windows 98 startup disk (`271741af…dfc5`, `6bc3f4c4…9217`).
+
 ## The completion-token rule
 
 Every flow signals success by printing a token on the serial console, and every

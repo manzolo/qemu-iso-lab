@@ -190,6 +190,67 @@
           "YResolution": 768
         }
       }
+    },
+    "windowsnt4-unattended": {
+      "name": "Windows NT 4.0 Workstation (unattended)",
+      "meta": {
+        "slug": "windowsnt4-unattended",
+        "family": "windows",
+        "role": "desktop",
+        "release_model": "retro",
+        "status": "unattended",
+        "verified": "2026-09-15"
+      },
+      "iso": "isos/windowsnt4.iso",
+      "disk": {
+        "path": "artifacts/windowsnt4-unattended/disk.raw",
+        "size": "2G",
+        "format": "raw",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "acpi": false,
+      "memory_mb": 256,
+      "cpus": 1,
+      "cpu_model": "pentium",
+      "network": "user",
+      "network_device": "pcnet",
+      "video": {
+        "default": "std",
+        "headless": [
+          "-vga",
+          "std",
+          "-display",
+          "none"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "windowsnt4_config": {
+        "computer_name": "NT4-LAB",
+        "full_name": "Lab User",
+        "organization": "qemu-iso-lab",
+        "workgroup": "WORKGROUP",
+        "target_path": "WINNT",
+        "display": {
+          "BitsPerPel": 4,
+          "XResolution": 640,
+          "YResolution": 480
+        },
+        "freedos_floppy": "isos/freedos-1.3-x86boot.img",
+        "cdrom_driver": "isos/dos/OAKCDROM.SYS",
+        "mscdex": "isos/dos/MSCDEX.EXE",
+        "admin_password": "lab"
+      }
     }
   }
 }

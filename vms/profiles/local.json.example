@@ -119,6 +119,14 @@
         "product_key": "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX",
         "service_pack": "/path/to/WindowsXP-KB936929-SP3-x86-XXX.exe"
       }
+    },
+    "windowsnt4-unattended": {
+      "iso": "/path/to/WindowsNT4-Workstation.iso",
+      "windowsnt4_config": {
+        "product_key": "XXX-XXXXXXX",
+        "service_pack": "/path/to/SP6I386.EXE",
+        "cdrom_driver_iso": "/path/to/Windows98.iso"
+      }
     }
   }
 }

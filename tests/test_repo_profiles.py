@@ -90,12 +90,14 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         }
         verified_batch_a_retry = {"debian-kde", "kali"}
         verified_batch_b_c = {"freebsd-unattended", "windowsxp-unattended", "windows2000-unattended"}
+        verified_nt4 = {"windowsnt4-unattended"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = ("2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
                              else "2026-09-12" if name in verified_history
                              else "2026-09-13" if name in verified_batch_a
-                             else "2026-09-14" if name in verified_batch_a_retry | verified_batch_b_c else None)
+                             else "2026-09-14" if name in verified_batch_a_retry | verified_batch_b_c
+                             else "2026-09-15" if name in verified_nt4 else None)
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
         # Promoted on 2026-09-09: verify-desktop reported an active local graphical session for
         # the autologin user on the live matrix, which is what the flavor recipe has to prove.

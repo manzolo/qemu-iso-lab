@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windows98", "post-install", "cancel-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "agent", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -175,6 +175,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=int, default=5400, help="seconds to wait for the install to complete (default: 5400)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_windows98)
 
+    p = _add(subparsers, "bootstrap-windowsnt4", help="fully unattended Windows NT 4.0 install (UNATTEND.TXT from a FreeDOS boot floppy on the CD), install only")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=5400, help="seconds to wait for the install to complete (default: 5400)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_windowsnt4)
+
     p = _add(subparsers, "bootstrap-windows2000", help="fully unattended Windows 2000 install (WINNT.SIF), install only")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=3600, help="seconds to wait for the install to complete (default: 3600)")
@@ -300,7 +305,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=lifecycle.cmd_boot_check)
 
     p = _add(subparsers, "check-vms", aliases=["test-local"], help="run the local VM validation matrix")
-    p.add_argument("vms", nargs="*", help="optional subset of VM profiles to test")
+    p.add_argument("vms", nargs="*", help="optional subset of VM profiles to test (the full matrix skips meta.status experimental profiles; naming one runs it)")
     p.add_argument("--timeout", type=int, default=300, help="seconds for unattended/bootstrap and boot-check flows (default: 300)")
     p.add_argument("--parallel", default="1", metavar="N|auto",
                    help="VMs to test concurrently: a number, or 'auto' to start as many as the host's free RAM and CPUs "
