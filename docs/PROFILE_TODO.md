@@ -96,6 +96,42 @@ Still missing from batch A: `oracle-linux-9` (ISO and SHA-256 verified, profile 
 
 Ordered by value over cost. Each item names the evidence behind it.
 
+### The five rows the 2026-09-15 matrix did not pass (first job of the next session)
+
+Full documented run, `artifacts/check-vms/doc-20260915-full/` (92 rows: 45 PASS, 4 FAIL, 1 WARN,
+42 SKIP, 19:29-23:24, `--restore --document --parallel auto --timeout 3600`). Screens, timelines and
+one PDF sheet per profile are in that directory; the JSON of each row is under `results/`.
+
+1. **`windowsnt4-unattended` (FAIL, timeout 3600 s)** - stalled at the end-of-GUI-stage dialog
+   "Installazione di Windows NT 4.00 completata... Riavvia il computer", CPU halted, disk untouched,
+   which `NoWaitAfterGUIMode = 1` is supposed to suppress. Same class of stall as row 24 of
+   `NT4_PITFALLS.md` (twice at "Configurazione del computer", once under `check-vms` and once under a
+   plain bootstrap with 19 GB free). **First thing to test**: whether any keystroke dismisses it - the
+   runs that passed had a screenshot recorder sending one Shift every 20 s, the matrix captures
+   without touching the guest, so the flow may have always had this defect, masked by that recorder.
+   If confirmed, the fix is in the answer file or in a guest-side nudge, not in the matrix.
+2. **`centos-stream-10` (FAIL, timeout 3600 s)** - the kickstart never reached
+   `==> Kickstart install complete!`; the captured serial shows the installer still alive and talking.
+   It passed on 2026-09-13, so it is a regression or a mirror/network problem. Start from the timeline
+   frames and the tail of the serial log in the report.
+3. **`ubuntu-10.04-unattended` (FAIL, 459 s)** - installed, then the SSH desktop check returned 1
+   (the command waiting for `gnome-session|x-session-manag(er)?` and `dpkg-query` on `ubuntu-desktop`).
+   Verified live on 2026-09-12, so look at what changed: old-releases mirror, or the 90x2 s wait being
+   too short on a loaded host (the row ran while three other guests were installing).
+4. **`cachyos-nvidia` (FAIL, 236 s)** - installed, then `~/bin/cachyos-nvidia-post-install` exited 1
+   over SSH. The script's own output is in the row's JSON and in the report.
+5. **`windows7-unattended` (WARN, 711 s)** - the install finished but the guest agent stayed silent
+   ("guest agent silent"), which is the check added for that profile after the 2026-09-07 diagnosis
+   (`CLAUDE.md`, the pinned `qemu-ga-win-101.1.0-1.el7ev` MSI). Check whether the MSI still installs
+   and whether `QEMU-GA` is running in the guest, before touching the flow.
+
+Also from that run: **an automatic retry for a failed row** was discussed and deliberately not built
+yet. The agreed shape, if it is built: one extra attempt (not two, a timeout costs the full hour),
+the outcome always stating "passed at attempt 2 of 2" with the first failure's reason, no retry for
+deterministic failures (profile check, missing ISO or key), and the VM's artifacts cleaned between
+attempts or the second attempt boots the half-installed disk. The single place for it is
+`lifecycle.run_local_test_once`, which is already where the row is recorded and its sheet written.
+
 ### Flows and scheduler
 
 1. **`bootstrap-unattended` has no timeout on the installer phase and no failure token.** The installer
