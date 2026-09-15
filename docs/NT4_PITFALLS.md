@@ -32,7 +32,23 @@ and pays for it again. Symptoms are quoted as the Italian medium shows them.
 | 21 | The guest cannot power the machine off | No APM, no ACPI in NT 4 | The guest stops at "Adesso è possibile spegnere il computer" with everything flushed and `run_and_expect` closes QEMU after `SHUTDOWN_GRACE_SEC` (120 s): the one flow where the host ends the process |
 | 22 | After a hard-killed run the disk lists empty directories, `afd.sys` "not MZ", boot hangs; the qcow2 is 470 MB but `qemu-img check` says 4 clusters allocated | NT 4's IDE driver never issues FLUSH CACHE, so qcow2 L1/L2/refcount updates sit in QEMU's cache until a clean exit; a hard kill (timeout, host under memory pressure) keeps only writes into clusters allocated by the format itself (FAT, root) | `disk.format: raw` (enforced), `prepare_disk` writes the raw image directly |
 | 23 | A first-boot stop error trashed the FAT16 volume | NT 4 writes the memory dump through the pagefile; with the wrong picture of the disk it lands anywhere | `CrashControl CrashDumpEnabled=0`, `AutoReboot=0`: a stop error stays on the screen for the report's timeline |
-| 24 | "Configurazione del computer per l'esecuzione di Windows NT" sits for an hour with 0 % CPU | Seen once, under `check-vms`, while the host was swapping and background tasks were being killed for lack of memory; never reproduced | Not a flow defect: keep the host out of swap during the matrix |
+| 24 | "Configurazione del computer per l'esecuzione di Windows NT" sits with the CPU halted and the disk untouched, about 16 minutes into the run, until the timeout | Intermittent: twice in about a dozen full installs, the second time under a plain `bootstrap` with 19 GB free on the host, so the `check-vms` wrapper and host memory pressure are both ruled out. The serial log carries one `Slirp: Failed to send packet`, which points at the network stage waiting on something that never arrives | None yet. Kill the run and start it again: the retry passed both times (28-30 min). If it becomes frequent, look at the install-time NIC first |
+
+## More colours: both attempts failed (2026-09-15)
+
+The tracked profile runs the plain VGA driver at 640x480 in 16 colours because NT 4
+has nothing better that survives on QEMU. Two alternatives were tried on copies of
+the installed disk and on fresh installs; neither works, so do not spend another
+evening on them without new information.
+
+| Attempt | What was done | Result |
+|---|---|---|
+| NT 4's own Cirrus driver at 256 colours | `CIRRUS.SYS` + `CIRRUS.DLL` from the medium, then the SP6a versions, copied into `system32` with the `Services\cirrus\Device0` keys (`InstalledDisplayDrivers = cirrus`, 1024x768, 8 bpp) on a copy of the installed disk, booted with `-vga cirrus` | `STOP c0000143 - File di sistema richiesto DISPLAY_DRIVER.DLL danneggiato o mancante`, both driver versions. The same adapter with the Setup-chosen 800x600x16 spins the kernel at 100 % instead (row 17) |
+| VBEMP, the VESA miniport (`vbempk.zip`, bearwindows.zcm.com.au) | Installed the supported unattended way: the three package files plus NT's own expanded `framebuf.dll` in `$OEM$\Textmode`, `[OEMBootFiles]` + `[DisplayDrivers] "AnaPa Corp VBE Miniport" = OEM`, `[Display]` 1024x768x16, `-vga std` | Two fresh installs. Text-mode Setup first refused the package ("Tipi di file non validi o mancanti: sezione Files.Display.VBEMP": its `txtsetup.oem` comments out the `dll` line, and NT 4 wants both file types), and once that was fixed the driver loaded (`vbemp.sys` and `framebuf.dll` both in the module list) and took the first boot down with `STOP 0x1E KMODE_EXCEPTION_NOT_HANDLED` in `win32k.sys`, in the VBE 3.0 variant and in the VBE 2.0 one QEMU's VGA matches |
+
+What was not tried: an older VBEMP release (`vbempg.zip`, 2007), 256 colours through
+`vga256.dll` rather than `framebuf.dll`, and NT 4 with a later service pack level at
+install time rather than SP6a applied by `CMDLINES.TXT`.
 
 Things that looked like causes and were not: the DOS-side copy (all 1521 files of
 `$WIN_NT$.~LS\I386` compared byte for byte with the ISO after a failed run: identical);
