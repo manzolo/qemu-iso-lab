@@ -955,6 +955,40 @@ so these jobs wait for pfSense to finish; unrelated VMs can still run alongside 
 The waiting message lists the conflicting ports. This coordination applies to
 jobs in the same `check-vms` invocation.
 
+### Occasional stalls, and how to tell one from a regression
+
+A row that times out is not automatically a broken profile. Two guests have now been seen to
+stall on an install that works: `windowsnt4-unattended` (rows 24 and 25 of
+[NT4_PITFALLS.md](NT4_PITFALLS.md)) and, on 2026-09-16, `windows10-unattended`, whose matrix row
+stopped at 211 s on an empty Windows Setup screen and burned the whole 3600 s timeout — while the
+same row, re-run alone straight afterwards with the same ISO and the same code, reached the
+completion token in nine minutes and passed in 622 s with its post-install over SSH.
+
+How a stall looks, as opposed to a flow that is failing:
+
+- the timeline stops producing frames. `--document` keeps a frame only when the screen changed,
+  so a row whose last frame is minutes or hours before the timeout was showing one unchanging
+  screen the whole time;
+- the guest's disk stops being written (`ls -l artifacts/<vm>/disk.*` while the run is going),
+  and the QEMU process is idle rather than busy;
+- the captured output ends mid-phase with no error from the guest.
+
+What to do with one:
+
+1. **Re-run that single row before looking for a regression**: `vmctl check-vms <name>
+   --no-clean-first --report <dir>`. Nine minutes of evidence beats an afternoon of theories, and
+   for both guests above the retry passed.
+2. Keep the failing evidence first. `--restore` removes the artifacts of the row when the run
+   ends, so a disk or a log worth reading must be copied aside **while the run is still going**.
+3. Do not demote a profile, or advance its `meta.verified`, on the strength of one stall in
+   either direction: a stall says nothing about the flow, which is exactly why it is worth
+   recognising it as such.
+
+There is no automatic retry yet — the shape agreed for one is in
+[PROFILE_TODO.md](PROFILE_TODO.md): a single extra attempt, the outcome always stating that it
+passed at attempt 2 of 2 together with the first failure's reason, no retry for deterministic
+failures such as a missing ISO, and the VM's artifacts cleaned in between.
+
 ### HTML reports and screenshots
 
 ```bash
