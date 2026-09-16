@@ -33,6 +33,7 @@ and pays for it again. Symptoms are quoted as the Italian medium shows them.
 | 22 | After a hard-killed run the disk lists empty directories, `afd.sys` "not MZ", boot hangs; the qcow2 is 470 MB but `qemu-img check` says 4 clusters allocated | NT 4's IDE driver never issues FLUSH CACHE, so qcow2 L1/L2/refcount updates sit in QEMU's cache until a clean exit; a hard kill (timeout, host under memory pressure) keeps only writes into clusters allocated by the format itself (FAT, root) | `disk.format: raw` (enforced), `prepare_disk` writes the raw image directly |
 | 23 | A first-boot stop error trashed the FAT16 volume | NT 4 writes the memory dump through the pagefile; with the wrong picture of the disk it lands anywhere | `CrashControl CrashDumpEnabled=0`, `AutoReboot=0`: a stop error stays on the screen for the report's timeline |
 | 24 | "Configurazione del computer per l'esecuzione di Windows NT" sits with the CPU halted and the disk untouched, about 16 minutes into the run, until the timeout | Intermittent: twice in about a dozen full installs, the second time under a plain `bootstrap` with 19 GB free on the host, so the `check-vms` wrapper and host memory pressure are both ruled out. The serial log carries one `Slirp: Failed to send packet`, which points at the network stage waiting on something that never arrives | None yet. Kill the run and start it again: the retry passed both times (28-30 min). If it becomes frequent, look at the install-time NIC first |
+| 25 | The same “Migrazione da WinSock 1.1 a 2.0 non riuscita (0xffffffff)” box as row 12, **with `TPValue = 0` already applied**, and a STOP 0x0A in `tcpip.sys` once it is dismissed | Not the known cause: `OEMNADAP.IN_` on the rebuilt ISO carries the patched `adapteroptions` branch, and the patched string is on the guest disk as well (grepped in the raw image after the failure). The serial log again shows repeated `Slirp: Failed to send packet, ret: -1`, the same signal row 24 records. TP=1 is one way to reach this box, not the only one | None yet. Two matrix runs (2026-09-15, 2026-09-16) ended here or at row 24, both network-stage stalls behind a modal window. Suspect the install-time NIC, as row 24 already says, not the INF patch |
 
 ## More colours: both attempts failed (2026-09-15)
 
@@ -49,6 +50,13 @@ evening on them without new information.
 What was not tried: an older VBEMP release (`vbempg.zip`, 2007), 256 colours through
 `vga256.dll` rather than `framebuf.dll`, and NT 4 with a later service pack level at
 install time rather than SP6a applied by `CMDLINES.TXT`.
+
+Rows 24 and 25 share one property the list did not state before: under `check-vms` **nothing
+ever sends a keystroke to the guest**, so a modal window costs the whole timeout - while the
+runs that passed were recorded with a screenshot helper that pressed a key every 20 seconds.
+A dialog that one keypress clears is therefore no proof that the flow is unattended. On
+2026-09-16 the WinSock box of row 25 was dismissed by hand and Setup went straight into the
+`tcpip.sys` stop the box was announcing.
 
 Things that looked like causes and were not: the DOS-side copy (all 1521 files of
 `$WIN_NT$.~LS\I386` compared byte for byte with the ISO after a failed run: identical);

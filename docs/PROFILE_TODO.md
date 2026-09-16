@@ -96,41 +96,70 @@ Still missing from batch A: `oracle-linux-9` (ISO and SHA-256 verified, profile 
 
 Ordered by value over cost. Each item names the evidence behind it.
 
-### The five rows the 2026-09-15 matrix did not pass (first job of the next session)
+### The five rows of 2026-09-15, retried on 2026-09-16: three closed, two open
 
-Full documented run, `artifacts/check-vms/doc-20260915-full/` (92 rows: 45 PASS, 4 FAIL, 1 WARN,
-42 SKIP, 19:29-23:24, `--restore --document --parallel auto --timeout 3600`). Screens, timelines and
-one PDF sheet per profile are in that directory; the JSON of each row is under `results/`.
+Retry run `artifacts/check-vms/retry-20260916/` (the same five profiles, `--restore --document
+--parallel auto --timeout 3600`, 09:54-11:10), then single bootstraps for the fixes. The evidence
+of the original run is still in `artifacts/check-vms/doc-20260915-full/`.
 
-1. **`windowsnt4-unattended` (FAIL, timeout 3600 s)** - stalled at the end-of-GUI-stage dialog
-   "Installazione di Windows NT 4.00 completata... Riavvia il computer", CPU halted, disk untouched,
-   which `NoWaitAfterGUIMode = 1` is supposed to suppress. Same class of stall as row 24 of
-   `NT4_PITFALLS.md` (twice at "Configurazione del computer", once under `check-vms` and once under a
-   plain bootstrap with 19 GB free). **First thing to test**: whether any keystroke dismisses it - the
-   runs that passed had a screenshot recorder sending one Shift every 20 s, the matrix captures
-   without touching the guest, so the flow may have always had this defect, masked by that recorder.
-   If confirmed, the fix is in the answer file or in a guest-side nudge, not in the matrix.
-2. **`centos-stream-10` (FAIL, timeout 3600 s)** - the kickstart never reached
-   `==> Kickstart install complete!`; the captured serial shows the installer still alive and talking.
-   It passed on 2026-09-13, so it is a regression or a mirror/network problem. Start from the timeline
-   frames and the tail of the serial log in the report.
-3. **`ubuntu-10.04-unattended` (FAIL, 459 s)** - installed, then the SSH desktop check returned 1
-   (the command waiting for `gnome-session|x-session-manag(er)?` and `dpkg-query` on `ubuntu-desktop`).
-   Verified live on 2026-09-12, so look at what changed: old-releases mirror, or the 90x2 s wait being
-   too short on a loaded host (the row ran while three other guests were installing).
-4. **`cachyos-nvidia` (FAIL, 236 s)** - installed, then `~/bin/cachyos-nvidia-post-install` exited 1
-   over SSH. The script's own output is in the row's JSON and in the report.
-5. **`windows7-unattended` (WARN, 711 s)** - the install finished but the guest agent stayed silent
-   ("guest agent silent"), which is the check added for that profile after the 2026-09-07 diagnosis
-   (`CLAUDE.md`, the pinned `qemu-ga-win-101.1.0-1.el7ev` MSI). Check whether the MSI still installs
-   and whether `QEMU-GA` is running in the guest, before touching the flow.
+**Closed.**
 
-Also from that run: **an automatic retry for a failed row** was discussed and deliberately not built
-yet. The agreed shape, if it is built: one extra attempt (not two, a timeout costs the full hour),
-the outcome always stating "passed at attempt 2 of 2" with the first failure's reason, no retry for
-deterministic failures (profile check, missing ISO or key), and the VM's artifacts cleaned between
-attempts or the second attempt boots the half-installed disk. The single place for it is
-`lifecycle.run_local_test_once`, which is already where the row is recorded and its sheet written.
+1. **`cachyos-nvidia`** - failed again identically (FAIL, 212 s after 236 s). The cause was not
+   ours: the `cachyos` repo, which shadows `multilib`, shipped `lib32-nvidia-utils` 610.57.04-1
+   depending on `nvidia-utils=610.57.04` while the same repo carried 615.71.09-2 for the 64-bit
+   packages, so the whole transaction failed. The 32-bit userspace is for Steam, not for the
+   desktop this profile verifies: it now installs best effort with a warning
+   (`vms/profile-files/cachyos-nvidia/bin/cachyos-nvidia-post-install`). Re-verified live on
+   2026-09-16: install, post-install, reboot and `verify-desktop` all pass, with the warning
+   printed and the run continuing.
+2. **`centos-stream-10`** - not the mirror and not the kickstart. The profile pinned the
+   20260908.0 boot ISO while the Stream 10 tree had moved to 20260914.0, and the append carried no
+   `inst.stage2`, so anaconda fetched its runtime image from `inst.repo`: initrd of one compose,
+   stage2 of another, `Anaconda.Modules.Storage` exited 1 at startup and the row burned the full
+   hour with no diagnosis. Same failure, same frame, on 09-15 and 09-16. Fixed twice over: the ISO
+   pin and its vendor checksum were refreshed, and `kickstart.resolve_stage2()` now reads the
+   medium's own `inst.stage2=` from its boot configuration and adds it whenever `inst_repo` is a
+   URL, so kernel, initrd and runtime always come from one build. Verified live on 2026-09-16.
+3. **`ubuntu-10.04-unattended`** - passed unchanged (404 s after failing at 459 s), in a run of
+   five rows instead of ninety-two. Fragile under load, not broken; if it fails again, the
+   desktop-check retries are the place to look, not the profile.
+
+**Open, and they are real work rather than a retry.**
+
+4. **`windows7-unattended` (WARN, 748 s, was 711 s)** - "guest agent silent" is the symptom, not
+   the defect: the installed disk does not boot Windows at all, it lands in "Ripristino da errori
+   di Windows - Avvio di Windows non riuscito" and from there in WinRE, which is also why nothing
+   answers the agent and why the guest ignores the ACPI power-off for 300 s. The guest's own
+   System event log (read from a preserved copy of the disk) shows why: after the first-logon
+   script writes the token and calls `shutdown.exe /s /t 10 /f`, the guest **does not power off**
+   - it comes back up twice, for 14 s and 4 s (Event 12 / 6013 / 6006, Kernel-Power 109 with
+   transitions 5 and 4), and the last session never reaches a clean shutdown. The last install
+   frame shows the desktop with a pending-reboot modal from the device installation and a failed
+   driver balloon, which is the obvious suspect for the two restarts. The split is exact: the four
+   runs before `--document` (09-13/14) passed with "guest agent answers", the three after it are
+   all WARN; `vmctl/windows.py` has not changed since 09-13, so either `--document` touches
+   something or four-vs-three is a coincidence that needs one more run to settle.
+   `bcdedit /set {default} bootstatuspolicy IgnoreAllFailures` would turn the row green and hide a
+   guest that restarts twice and is cut off - do not reach for it before the restarts are
+   understood.
+5. **`windowsnt4-unattended` (FAIL, timeout)** - a different stall than on 09-15: the WinSock
+   migration box of `NT4_PITFALLS.md` row 12, **with the `TPValue = 0` patch present both on the
+   rebuilt ISO and on the guest disk**, followed by the STOP 0x0A in `tcpip.sys` once the box was
+   dismissed by hand. Recorded as row 25 there. What the two stalls have in common, and what the
+   trap list now says: under `check-vms` nothing ever sends a keystroke, so any modal window costs
+   the whole timeout - and the runs that passed had a screenshot helper pressing a key every 20 s,
+   which means the flow may never have been as unattended as the green rows suggested. The next
+   step is the install-time NIC (row 24's `Slirp: Failed to send packet` appears here too), not
+   the INF patch.
+
+Also from these runs, still not built: **an automatic retry for a failed row**. Agreed shape - one
+extra attempt, the outcome always stating "passed at attempt 2 of 2" with the first failure's
+reason, no retry for deterministic failures (profile check, missing ISO or key), artifacts cleaned
+between attempts. `lifecycle.run_local_test_once` is the single place for it. Two more things the
+day argued for: the matrix's per-row output is block-buffered into a file that stays empty for
+long stretches (`PYTHONUNBUFFERED=1` fixes it and made every single run today readable live), and
+`--restore` deletes the artifacts of a failed row before anyone can look at them - the Windows 7
+diagnosis above only exists because the disk was copied aside by hand while the run was going.
 
 ### Flows and scheduler
 
