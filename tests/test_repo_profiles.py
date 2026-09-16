@@ -93,8 +93,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_nt4 = {"windowsnt4-unattended"}
         # Re-verified on 2026-09-16 after the 09-15 matrix failed them: cachyos-nvidia once the
         # 32-bit NVIDIA packages became best effort, centos-stream-10 once the installer took its
-        # stage2 from the medium instead of the moving repository (docs/PROFILE_TODO.md).
-        verified_retry = {"cachyos-nvidia", "centos-stream-10"}
+        # stage2 from the medium instead of the moving repository, windows7-unattended once the
+        # report's screenshot boot stopped cutting the guest mid-boot (docs/PROFILE_TODO.md).
+        verified_retry = {"cachyos-nvidia", "centos-stream-10", "windows7-unattended"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = ("2026-09-16" if name in verified_retry

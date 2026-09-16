@@ -23,7 +23,7 @@ Every tracked profile has `meta.status`:
 
 - `manual`: interactive installation, live media or an import template; automation may still boot or inspect it.
 - `unattended`: an automated installation/provisioning recipe exists; this is not a claim that this revision passed a live test.
-- `experimental`: a known incomplete or unsettled flow. Currently the package-only Ubuntu niri recipes, the custom Omarchy/NVIDIA flow and `windows98-unattended`. A full `check-vms` (no profile names) reports them as skipped instead of running them; `check-vms <name>` runs one on purpose, which is how it gets promoted (2026-09-14).
+- `experimental`: a known incomplete or unsettled flow. Currently the package-only Ubuntu niri recipes, the custom Omarchy/NVIDIA flow, `windows98-unattended` and, since 2026-09-16, `windowsnt4-unattended`, demoted after failing reproducibly outside the matrix with its documented cause excluded (its `verified` keeps the 09-15 date: the field records the last live PASS, it does not certify the current code). A full `check-vms` (no profile names) reports them as skipped instead of running them; `check-vms <name>` runs one on purpose, which is how it gets promoted (2026-09-14).
 
 `meta.verified` is the last live PASS date supplied by the maintainer. It is omitted when no date is recorded, and is never updated by unit tests or dry runs. A historical date does not certify subsequent profile changes. The list and HTML report show both fields separately from the current run's PASS/FAIL result.
 
@@ -211,13 +211,11 @@ diagnosis above only exists because the disk was copied aside by hand while the 
 
 ### Profiles
 
-6. **Live validation of batch A** (11 profiles, all `experimental`): `vmctl check-vms <names>
-   --clean-first --report`, promote each PASS to `unattended` with `meta.verified`. Watch `fedora-kde`
-   (SDDM vs Plasma Login Manager) and `fedora-kinoite` (SDDM layered over SSH, desktop checked after
-   the reboot) first: they carry the only untested mechanisms.
-7. `cachyos-nvidia`: failed three times on 2026-09-13 on `lib32-nvidia-utils` requiring
-   `nvidia-utils=610.57.04` not yet in the repo. Upstream skew, nothing to fix here; re-run when
-   CachyOS syncs and record the date.
+6. **Promote `windowsnt4-unattended` back to `unattended`** once the STOP 0x0A in `tcpip.sys` is
+   understood (see the retry section above): `vmctl check-vms windowsnt4-unattended --clean-first
+   --report` runs it even while it is experimental, which is how it gets its status back.
+7. **A full matrix after the 2026-09-16 fixes.** The last complete run is 09-15, three fixes old:
+   the state of the other rows is yesterday's, not today's.
 8. Rest of batch A: `oracle-linux-9` (ISO and SHA-256 from `linux.oracle.com/security/gpg/checksum/`,
    verified 2026-09-13), `windows-server-2025` (public evaluation ISO but no vendor checksum found for
    the evaluation build; `install.wim` image name to read with `7z`; `windows.py` knows no "Server"
