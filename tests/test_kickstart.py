@@ -122,6 +122,53 @@ class KickstartConfigTests(BaseVmctlTestCase):
         self.assertIn("inst.ks=hd:LABEL=KS_CFG:/ks.cfg", append)
         self.assertIn("console=ttyS0,115200", append)
 
+    def test_network_install_takes_stage2_from_the_medium(self):
+        """A netinst boots a pinned kernel/initrd but installs from a moving repository.
+
+        Without inst.stage2 anaconda fetches its runtime image from inst.repo, so the initrd
+        of one compose meets the stage2 of another and the installer dies before saying why.
+        """
+        self._kickstart_vm()
+        repo = "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/os/"
+        self.vm_config["kickstart_config"]["inst_repo"] = repo
+        label = "hd:LABEL=CentOS-Stream-10-BaseOS-x86_64"
+        append = vmctl.kickstart.kernel_append(self.vm_config, stage2=label)
+        self.assertIn(f"inst.stage2={label}", append)
+        self.assertIn(f"inst.repo={repo}", append)
+        # A cdrom source already reads its runtime image from the medium: nothing is added.
+        self.vm_config["kickstart_config"].pop("inst_repo")
+        self.assertNotIn("inst.stage2", vmctl.kickstart.kernel_append(self.vm_config, stage2=label))
+        # Unknown token (dry run, no xorriso): the append stays exactly as it was before.
+        self.vm_config["kickstart_config"]["inst_repo"] = repo
+        self.assertNotIn("inst.stage2", vmctl.kickstart.kernel_append(self.vm_config))
+
+    def test_stage2_is_read_from_the_boot_configuration_of_the_iso(self):
+        self._kickstart_vm()
+        iso_path = self.root / "isos" / "centos.iso"
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_bytes(b"ISO")
+
+        def fake_run(cmd, **kwargs):
+            dest = Path(cmd[cmd.index("-extract") + 2])
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(
+                "linuxefi /images/pxeboot/vmlinuz inst.stage2=hd:LABEL=CentOS-Stream-10-BaseOS-x86_64 quiet\n",
+                encoding="utf-8",
+            )
+
+        with mock.patch.object(vmctl.runtime, "run", side_effect=fake_run):
+            self.assertEqual(
+                vmctl.kickstart.resolve_stage2(iso_path),
+                "hd:LABEL=CentOS-Stream-10-BaseOS-x86_64",
+            )
+        # No xorriso, or a medium that names no stage2: the caller keeps the old behaviour.
+        with mock.patch.object(vmctl.runtime, "run", side_effect=OSError("no xorriso")):
+            self.assertIsNone(vmctl.kickstart.resolve_stage2(iso_path))
+        # A dry run never touches the media.
+        with mock.patch.object(vmctl.runtime, "run") as run:
+            self.assertIsNone(vmctl.kickstart.resolve_stage2(iso_path, dry_run=True))
+        run.assert_not_called()
+
 
 class KickstartBootstrapTests(BaseVmctlTestCase):
     def _kickstart_vm(self) -> None:

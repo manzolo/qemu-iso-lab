@@ -134,6 +134,18 @@ CachyOS (`cachyos-desktop`, `cachyos-nvidia`) rides the same handler on the Cach
 3. Boots headless with serial stdio and appropriate kickstart kernel appends.
 4. Uses `run_and_expect` to wait for `"==> Kickstart install complete!"`, then starts installed VM headless.
 
+A netinst profile boots a **pinned** kernel/initrd and installs from a **moving** repository, so
+`kickstart.resolve_stage2()` reads the medium's own `inst.stage2=` out of its boot configuration
+(`/EFI/BOOT/grub.cfg`, then isolinux) and `kernel_append()` adds it whenever `inst_repo` is a URL:
+without it anaconda resolves its runtime image from `inst.repo`, and the initrd of one compose
+meets the stage2 of another. That is what broke `centos-stream-10` on 2026-09-15/16 after passing
+on 09-13 — the Stream 10 tree moved from 20260908.0 to 20260914.0, `Anaconda.Modules.Storage`
+exited 1 at startup, and the only symptom was the full 3600 s timeout with no diagnosis (verified
+live, twice, and fixed live). The medium is already attached (`-cdrom`); a `cdrom` source needs no
+token, and an unreadable one (dry run, no xorriso) simply keeps the previous append. Dated ISOs in
+a rolling directory still age out of the mirror: refreshing the pin is maintenance, but it now
+fails loudly at download time instead of an hour later inside the guest.
+
 **Alpine** (`bootstrap-alpine`):
 1. Generates a `setup-alpine` answer file + `install.sh` (setup-alpine with `ERASE_DISKS`, then chroot: packages, password hash, sudo, `chroot_commands`) into an `ALPINESEED` seed ISO on a virtio CD-ROM.
 2. Extracts `boot/vmlinuz-<flavor>` + `boot/initramfs-<flavor>` (`lts` for the standard ISO).

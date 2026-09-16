@@ -1,6 +1,7 @@
 """AlmaLinux/RHEL kickstart install helpers: config generation, boot artifacts, ISO packing."""
 from __future__ import annotations
 
+import re
 import shlex
 import tempfile
 from pathlib import Path
@@ -95,10 +96,53 @@ def resolve_ostree_ref(vm: dict[str, Any], iso_path: Path, dry_run: bool = False
     return refs[0]
 
 
-def kernel_append(vm: dict[str, Any]) -> str:
+# Where the RHEL-family media keep the boot configuration that names their own stage2.
+STAGE2_BOOT_CONFIGS = ("/EFI/BOOT/grub.cfg", "/isolinux/isolinux.cfg", "/boot/grub2/grub.cfg")
+
+
+def resolve_stage2(iso_path: Path, dry_run: bool = False) -> str | None:
+    """The ``inst.stage2=`` token the medium uses for itself, read from its own boot config.
+
+    A netinst profile boots the kernel and initrd extracted from a **pinned** ISO but installs
+    from a **rolling** repository. Anaconda resolves its runtime image (stage2) from
+    ``inst.repo`` when nothing else says otherwise, so the guest ends up running an initrd of
+    one compose against the stage2 of another. On 2026-09-15 the CentOS Stream 10 tree moved
+    from 20260908.0 to 20260914.0 and that pair stopped working: ``Anaconda.Modules.Storage``
+    exited 1 at startup, the installer died before saying anything useful, and the only symptom
+    was the full 3600 s timeout (verified live, twice). The medium is already attached, so
+    taking its own token keeps kernel, initrd and stage2 from one build while the packages
+    still come from the network.
+
+    Returns None when the token cannot be read (dry run, missing ISO, no xorriso): the caller
+    then keeps the previous behaviour instead of failing.
+    """
+    if dry_run or not iso_path.is_file():
+        return None
+    for member in STAGE2_BOOT_CONFIGS:
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "boot.cfg"
+            try:
+                runtime.run(
+                    ["xorriso", "-osirrox", "on", "-indev", str(iso_path), "-extract", member, str(dest)],
+                    quiet=True,
+                )
+                text = dest.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+        match = re.search(r"inst\.stage2=(\S+)", text)
+        if match:
+            return match.group(1)
+    return None
+
+
+def kernel_append(vm: dict[str, Any], stage2: str | None = None) -> str:
+    repo = install_repo(vm)
+    # A cdrom install already reads stage2 from the medium; only a network source needs to be
+    # told, or it would fetch the runtime image from the repository instead (see resolve_stage2).
+    stage2_arg = f"inst.stage2={stage2} " if stage2 and repo != "cdrom" else ""
     return (
         "inst.ks=hd:LABEL=KS_CFG:/ks.cfg inst.text inst.cmdline "
-        f"inst.repo={install_repo(vm)} console=ttyS0,115200"
+        f"{stage2_arg}inst.repo={repo} console=ttyS0,115200"
     )
 
 

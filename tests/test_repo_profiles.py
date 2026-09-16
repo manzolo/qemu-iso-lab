@@ -91,9 +91,10 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_batch_a_retry = {"debian-kde", "kali"}
         verified_batch_b_c = {"freebsd-unattended", "windowsxp-unattended", "windows2000-unattended"}
         verified_nt4 = {"windowsnt4-unattended"}
-        # Re-verified on 2026-09-16 after the 09-15 matrix failed it: the 32-bit NVIDIA packages
-        # became best effort (docs/PROFILE_TODO.md).
-        verified_retry = {"cachyos-nvidia"}
+        # Re-verified on 2026-09-16 after the 09-15 matrix failed them: cachyos-nvidia once the
+        # 32-bit NVIDIA packages became best effort, centos-stream-10 once the installer took its
+        # stage2 from the medium instead of the moving repository (docs/PROFILE_TODO.md).
+        verified_retry = {"cachyos-nvidia", "centos-stream-10"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = ("2026-09-16" if name in verified_retry

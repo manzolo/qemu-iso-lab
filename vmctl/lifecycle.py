@@ -2170,6 +2170,9 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         ui.print_status("ok", f"ostree ref: {ostree_ref}")
     seed_iso = kickstart.create_kickstart_iso(args.vm, vm, dry_run=args.dry_run, ostree_ref=ostree_ref)
     kernel_path, initrd_path = kickstart.extract_kickstart_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+    stage2 = kickstart.resolve_stage2(iso_path, dry_run=args.dry_run)
+    if stage2:
+        ui.print_status("ok", f"installer runtime from the medium: {stage2}")
 
     install_qemu_args = qemu.common_args(
         vm,
@@ -2188,7 +2191,7 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
     install_qemu_args += [
         "-kernel", str(kernel_path),
         "-initrd", str(initrd_path),
-        "-append", kickstart.kernel_append(vm),
+        "-append", kickstart.kernel_append(vm, stage2=stage2),
     ]
 
     ui.print_note("Booting Kickstart installer — waiting for completion token...")

@@ -135,7 +135,7 @@ MISSING void-live-x86_64-20250202-xfce.iso
 
 - `kali`: `kali-linux-2026.2-installer-netinst-amd64.iso`, SHA-256 `d32f929dacc48134a31461a09f2160d13ad1d26b820cee920446813ca979b39b`. [Vendor SHA256SUMS](https://cdimage.kali.org/kali-2026.2/SHA256SUMS); fetched through current/SHA256SUMS on 2026-09-13. [Official preseed examples](https://www.kali.org/docs/general-use/kali-preseeding/) and [Xfce answer file](https://gitlab.com/kalilinux/recipes/kali-preseed-examples/-/blob/main/xfce-default.cfg) provide the task selection and mirror.
 
-- `centos-stream-10`: `CentOS-Stream-10-20260908.0-x86_64-boot.iso`, SHA-256 `6a3476d08b40095bcf4c61ac6128a9e198e08068274b3df4b4e1a9d0cb73812b`. [Vendor SHA256SUM](https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/SHA256SUM), retrieved 2026-09-13. The dated ISO may age out of this rolling directory; update URL and vendor checksum together, never attach this hash to latest.
+- `centos-stream-10`: `CentOS-Stream-10-20260914.0-x86_64-boot.iso`, SHA-256 `ede5601165eb5585d4a680fe1c88aa08efd8d78f9f3676e05eb5d1c35ff12485`. [Vendor SHA256SUM](https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/SHA256SUM), retrieved 2026-09-16. The dated ISO may age out of this rolling directory; update URL and vendor checksum together, never attach this hash to latest.
 
 ## Batch B: FreeBSD
 
