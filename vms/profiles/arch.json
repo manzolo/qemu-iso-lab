@@ -297,7 +297,7 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
-        "verified": "2026-09-09"
+        "verified": "2026-09-16"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {

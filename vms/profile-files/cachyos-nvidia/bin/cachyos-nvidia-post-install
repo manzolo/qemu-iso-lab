@@ -16,7 +16,15 @@ sudo pacman -S --noconfirm --needed \
   foot niri \
   "${headers[@]}" \
   nvidia-open-dkms nvidia-utils nvidia-settings \
-  lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libva-nvidia-driver
+  opencl-nvidia libva-nvidia-driver
+
+# The 32-bit userspace is for Steam, not for the desktop this profile verifies, and the
+# cachyos repo (which shadows multilib) lets it fall behind: on 2026-09-16 it still shipped
+# lib32-nvidia-utils 610.57.04-1, whose 'nvidia-utils=610.57.04' no longer resolved against
+# the 615.71.09-2 the same repo had for 64-bit, and the whole transaction failed. Best effort.
+if ! sudo pacman -S --noconfirm --needed lib32-nvidia-utils lib32-opencl-nvidia; then
+  echo "==> WARNING: 32-bit NVIDIA userspace not installed (repo versions out of sync); continuing."
+fi
 
 # Wayland compositors need the DRM KMS interface of the NVIDIA driver.
 printf 'options nvidia_drm modeset=1 fbdev=1\noptions nvidia NVreg_PreserveVideoMemoryAllocations=1\n' \

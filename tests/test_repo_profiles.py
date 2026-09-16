@@ -91,9 +91,13 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_batch_a_retry = {"debian-kde", "kali"}
         verified_batch_b_c = {"freebsd-unattended", "windowsxp-unattended", "windows2000-unattended"}
         verified_nt4 = {"windowsnt4-unattended"}
+        # Re-verified on 2026-09-16 after the 09-15 matrix failed it: the 32-bit NVIDIA packages
+        # became best effort (docs/PROFILE_TODO.md).
+        verified_retry = {"cachyos-nvidia"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
-            expected_date = ("2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
+            expected_date = ("2026-09-16" if name in verified_retry
+                             else "2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
                              else "2026-09-12" if name in verified_history
                              else "2026-09-13" if name in verified_batch_a
                              else "2026-09-14" if name in verified_batch_a_retry | verified_batch_b_c
