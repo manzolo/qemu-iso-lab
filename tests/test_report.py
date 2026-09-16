@@ -84,22 +84,34 @@ class ReportTests(BaseVmctlTestCase):
         self.assertIn("function setStatus(value)", html_text)
         self.assertIn(".metric[data-status], .badge[data-status]", html_text)
 
-    def test_final_capture_wakes_a_blanked_console_but_the_watcher_does_not(self):
-        # A server guest reaches the screenshot minutes after boot, past console blanking:
-        # without the nudge the capture is a black rectangle (seen in the Rocky report row).
+    def test_only_a_blank_screen_is_woken(self):
+        # A server guest reaches the screenshot minutes after boot, past console blanking: without
+        # the nudge the capture is a black rectangle (seen in the Rocky report row). But a key is
+        # not neutral on a guest that is showing something - on the Windows 7 desktop it opened the
+        # Start menu, and the same Enter would have pressed the default button of the reboot dialog
+        # the device installation leaves up - so the nudge waits for a frame that came back blank.
         calls = []
+        frame = [b"P6 2 1 255\n" + b"\xff" * 6]
 
         def fake_qmp(socket_path, command, arguments=None):
             calls.append(command)
             if command == "screendump":
-                Path(arguments["filename"]).write_bytes(b"P6 2 1 255\n" + b"\xff" * 6)
+                Path(arguments["filename"]).write_bytes(frame[0])
             return True
 
         with mock.patch.object(qemu, "qmp_command", side_effect=fake_qmp), \
              mock.patch.object(report.time, "sleep") as sleep:
             self.assertIsNone(report.capture_screenshot("vm", self.vm_config, self.root))
-        self.assertEqual(calls, ["send-key", "screendump"])  # a lit screen is kept at once
-        sleep.assert_called_once_with(report.CONSOLE_WAKE_DELAY_SEC)
+        self.assertEqual(calls, ["screendump"], "a lit screen is kept at once, untouched")
+        sleep.assert_not_called()
+
+        calls.clear()
+        frame[0] = b"P6 2 1 255\n" + b"\x00" * 6  # blank: now the nudge is worth its risk
+        with mock.patch.object(qemu, "qmp_command", side_effect=fake_qmp), \
+             mock.patch.object(report.time, "sleep") as sleep:
+            self.assertIsNone(report.capture_screenshot("vm", self.vm_config, self.root))
+        self.assertEqual(calls[:3], ["screendump", "send-key", "screendump"])
+        sleep.assert_called_with(report.CONSOLE_WAKE_DELAY_SEC)
 
         calls.clear()
         with mock.patch.object(qemu, "qmp_command", side_effect=fake_qmp):

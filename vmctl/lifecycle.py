@@ -546,17 +546,39 @@ def maybe_clean_local_test_candidates(selected_names: list[str], cfg: dict[str, 
 
 
 INSTALL_ONLY_SCREENSHOT_WAIT_SEC = 120
+# A guest that has just been installed is still busy at its next boot - Windows runs the servicing
+# pass its driver installers asked for - and a blind wait photographs whatever happens to be on the
+# screen and then stops a machine in the middle of that work: the stop request lands on a guest too
+# busy to answer, the grace runs out and the SIGTERM leaves the disk marked as a failed boot, so the
+# boot after that opens "Avvio di Windows non riuscito" and WinRE. That is how a healthy Windows 7
+# install was reported as "guest agent silent" on 2026-09-15 and 09-16: reproduced on a single row
+# with no --document and no parallelism, and read back from the guest's own event log, where the
+# failing disk has one system start that the same install done outside the matrix does not have.
+# When the profile has an agent, wait for it to answer instead of counting seconds: that answer is
+# the guest itself saying it is ready to be photographed and asked to shut down.
+INSTALL_ONLY_SCREENSHOT_AGENT_WAIT_SEC = 420
+INSTALL_ONLY_SCREENSHOT_POLL_SEC = 5
 
 
 def boot_for_report_screenshot(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> None:
     """Install-only flows (pfSense, Windows without SSH) end with the guest powered off, so there is
-    nothing to photograph: when a report is being written, boot the installed disk headless, give it
-    time to reach its console/desktop, and let the caller's capture + stop do the rest."""
+    nothing to photograph: when a report is being written, boot the installed disk headless, wait
+    for it to be genuinely up, and let the caller's capture + stop do the rest."""
     if not getattr(args, "_report_dir", None) or args.dry_run:
         return
     ui.print_note(f"Report: booting the installed {vm_name} for the final screenshot")
     start_installed_vm_headless(vm_name, vm, True, dry_run=False)
-    time.sleep(INSTALL_ONLY_SCREENSHOT_WAIT_SEC)
+    if not guest_agent.enabled(vm):
+        time.sleep(INSTALL_ONLY_SCREENSHOT_WAIT_SEC)
+        return
+    deadline = time.monotonic() + INSTALL_ONLY_SCREENSHOT_AGENT_WAIT_SEC
+    while time.monotonic() < deadline:
+        if guest_agent.responds(vm, timeout=INSTALL_ONLY_SCREENSHOT_POLL_SEC):
+            return
+        time.sleep(INSTALL_ONLY_SCREENSHOT_POLL_SEC)
+    ui.print_status("warn", f"{vm_name}: the guest agent stayed silent for "
+                            f"{INSTALL_ONLY_SCREENSHOT_AGENT_WAIT_SEC}s after the install; "
+                            "photographing the guest as it is")
 
 
 def run_local_test_vm(

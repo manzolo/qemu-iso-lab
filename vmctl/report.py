@@ -198,7 +198,11 @@ def capture_screenshot(vm_name: str, vm: dict[str, Any], directory: Path, wake: 
     try:
         ppm.parent.mkdir(parents=True, exist_ok=True)
         for attempt in range(attempts):
-            if wake:
+            # Only a screen that came back blank is worth a keystroke. Waking before every capture
+            # types into guests that are showing something already, and a key is not neutral there:
+            # on the Windows 7 desktop it opened the Start menu, and the same Enter would have
+            # pressed the default button of the reboot dialog the device installation leaves up.
+            if wake and attempt:
                 wake_console(vm)
             with _QMP_LOCK:
                 dumped = qemu.qmp_command(qemu.qmp_socket_path(vm), "screendump", arguments={"filename": str(ppm.resolve())})

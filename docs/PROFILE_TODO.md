@@ -126,31 +126,34 @@ of the original run is still in `artifacts/check-vms/doc-20260915-full/`.
 
 **Open, and they are real work rather than a retry.**
 
-4. **`windows7-unattended` (WARN, 748 s, was 711 s)** - "guest agent silent" is the symptom, not
-   the defect: the installed disk does not boot Windows at all, it lands in "Ripristino da errori
-   di Windows - Avvio di Windows non riuscito" and from there in WinRE, which is also why nothing
-   answers the agent and why the guest ignores the ACPI power-off for 300 s. The guest's own
-   System event log (read from a preserved copy of the disk) shows why: after the first-logon
-   script writes the token and calls `shutdown.exe /s /t 10 /f`, the guest **does not power off**
-   - it comes back up twice, for 14 s and 4 s (Event 12 / 6013 / 6006, Kernel-Power 109 with
-   transitions 5 and 4), and the last session never reaches a clean shutdown. The last install
-   frame shows the desktop with a pending-reboot modal from the device installation and a failed
-   driver balloon, which is the obvious suspect for the two restarts. The split is exact: the four
-   runs before `--document` (09-13/14) passed with "guest agent answers", the three after it are
-   all WARN; `vmctl/windows.py` has not changed since 09-13, so either `--document` touches
-   something or four-vs-three is a coincidence that needs one more run to settle.
-   `bcdedit /set {default} bootstatuspolicy IgnoreAllFailures` would turn the row green and hide a
-   guest that restarts twice and is cut off - do not reach for it before the restarts are
-   understood.
-5. **`windowsnt4-unattended` (FAIL, timeout)** - a different stall than on 09-15: the WinSock
-   migration box of `NT4_PITFALLS.md` row 12, **with the `TPValue = 0` patch present both on the
-   rebuilt ISO and on the guest disk**, followed by the STOP 0x0A in `tcpip.sys` once the box was
-   dismissed by hand. Recorded as row 25 there. What the two stalls have in common, and what the
-   trap list now says: under `check-vms` nothing ever sends a keystroke, so any modal window costs
-   the whole timeout - and the runs that passed had a screenshot helper pressing a key every 20 s,
-   which means the flow may never have been as unattended as the green rows suggested. The next
-   step is the install-time NIC (row 24's `Slirp: Failed to send packet` appears here too), not
-   the INF patch.
+4. **`windows7-unattended` - closed on 2026-09-16, and the defect was in the matrix, not in the
+   profile.** "guest agent silent" was the label; the installed disk was not booting Windows at
+   all, it opened "Avvio di Windows non riuscito" and then WinRE. Three runs settled it: the same
+   install done standalone boots normally and its agent answers, so the flow is healthy; a
+   `check-vms` run of that single row, with no `--document` and no parallelism, reproduced the WARN
+   exactly, which cleared the `--document` correlation as coincidence; and the guest's own event
+   log, read from both disks, shows the difference - one extra system start on the failing disk,
+   4 s long, where `boot_for_report_screenshot` boots the freshly installed guest. That boot waited
+   a blind `INSTALL_ONLY_SCREENSHOT_WAIT_SEC` = 120 s and then stopped a Windows still running the
+   servicing pass its driver installers asked for: the agent could not answer, the 300 s ACPI grace
+   ran out, and the SIGTERM left the disk marked as a failed boot. The boot now waits for the guest
+   agent to answer (up to 420 s, returning as soon as it does), and `wake_console()` only nudges a
+   capture that came back blank - its Enter opened the Start menu on the desktop and would have
+   pressed "Riavvia ora" on the pending-reboot dialog. Same command as the reproduction: PASS in
+   298 s with "guest agent answers", a real desktop in the report, and 450 s saved on the row.
+
+5. **`windowsnt4-unattended` - still open, and now a reproducible regression.** Two standalone
+   runs on 2026-09-16, outside `check-vms`, both ended in the STOP 0x0A in `tcpip.sys` at the same
+   address, so it is neither intermittent nor a matrix artefact. The documented cause (row 12 of
+   `NT4_PITFALLS.md`, `TPValue` left at 1) is excluded by the guest's own registry: the failed
+   install has `Services\AMDPCN1\Parameters` `TP 0`, `FDUP 0`, `MediaType 1`, which is exactly what
+   the patch writes. Moving `TPValue = 0` outside its `STF_GUI_UNATTENDED` guard made no difference
+   and was reverted rather than kept as unexplained churn. The profile passed ten runs on 09-14/15
+   with the same ISO, the same code (`windowsnt4.py` untouched since 09-15) and no QEMU upgrade on
+   the host since August, so the variable that changed has not been found yet. The next experiment
+   is to separate adapter from stack: install with no network adapter at all and see whether the
+   stop follows. Note also that the `Slirp: Failed to send packet` of row 24 shows up early in runs,
+   not only at a stall, so it is weaker evidence than it looked.
 
 Also from these runs, still not built: **an automatic retry for a failed row**. Agreed shape - one
 extra attempt, the outcome always stating "passed at attempt 2 of 2" with the first failure's

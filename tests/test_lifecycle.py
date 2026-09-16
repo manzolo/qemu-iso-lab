@@ -2069,3 +2069,49 @@ class GracefulStopTests(BaseVmctlTestCase):
         self.assertEqual(rc, 0)
         qmp.assert_not_called()
         kill.assert_called_once_with(4242, signal.SIGTERM)
+
+
+class ReportScreenshotBootTests(BaseVmctlTestCase):
+    """The install-only screenshot boot must not stop a guest in the middle of its first boot.
+
+    A blind wait photographed whatever was on the screen and then asked a still-busy Windows 7 to
+    power off: the request went unanswered, the grace expired and the SIGTERM left the disk marked
+    as a failed boot, so the next boot opened WinRE and the row was recorded as "guest agent
+    silent" - on a healthy install (2026-09-16, reproduced on one row, confirmed in the guest's
+    event log).
+    """
+
+    def _args(self):
+        return argparse.Namespace(dry_run=False, _report_dir=str(self.root / "report"))
+
+    def test_a_profile_with_an_agent_waits_for_it_instead_of_counting_seconds(self):
+        vm = dict(self.vm_config, guest_agent=True)
+        answers = [False, False, True]
+        with mock.patch.object(vmctl.lifecycle, "start_installed_vm_headless") as boot, \
+             mock.patch.object(vmctl.lifecycle.guest_agent, "enabled", return_value=True), \
+             mock.patch.object(vmctl.lifecycle.guest_agent, "responds", side_effect=answers) as responds, \
+             mock.patch.object(vmctl.lifecycle.time, "sleep") as sleep:
+            vmctl.lifecycle.boot_for_report_screenshot("vm", vm, self._args())
+        boot.assert_called_once()
+        self.assertEqual(responds.call_count, 3, "returns as soon as the guest says it is ready")
+        self.assertEqual(sleep.call_count, 2, "one poll interval per unanswered probe, no blind wait")
+        sleep.assert_called_with(vmctl.lifecycle.INSTALL_ONLY_SCREENSHOT_POLL_SEC)
+
+    def test_a_silent_agent_is_bounded_and_reported(self):
+        vm = dict(self.vm_config, guest_agent=True)
+        clock = iter([0.0] + [float(i) for i in range(0, 10_000, 100)])
+        with mock.patch.object(vmctl.lifecycle, "start_installed_vm_headless"), \
+             mock.patch.object(vmctl.lifecycle.guest_agent, "enabled", return_value=True), \
+             mock.patch.object(vmctl.lifecycle.guest_agent, "responds", return_value=False), \
+             mock.patch.object(vmctl.lifecycle.time, "monotonic", side_effect=lambda: next(clock)), \
+             mock.patch.object(vmctl.lifecycle.time, "sleep"), \
+             mock.patch.object(vmctl.lifecycle.ui, "print_status") as status:
+            vmctl.lifecycle.boot_for_report_screenshot("vm", vm, self._args())
+        self.assertTrue(any("stayed silent" in str(call) for call in status.call_args_list))
+
+    def test_without_an_agent_the_wait_is_unchanged(self):
+        with mock.patch.object(vmctl.lifecycle, "start_installed_vm_headless"), \
+             mock.patch.object(vmctl.lifecycle.guest_agent, "enabled", return_value=False), \
+             mock.patch.object(vmctl.lifecycle.time, "sleep") as sleep:
+            vmctl.lifecycle.boot_for_report_screenshot("vm", self.vm_config, self._args())
+        sleep.assert_called_once_with(vmctl.lifecycle.INSTALL_ONLY_SCREENSHOT_WAIT_SEC)
