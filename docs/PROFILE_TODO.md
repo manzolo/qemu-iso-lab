@@ -155,6 +155,24 @@ of the original run is still in `artifacts/check-vms/doc-20260915-full/`.
    stop follows. Note also that the `Slirp: Failed to send packet` of row 24 shows up early in runs,
    not only at a stall, so it is weaker evidence than it looked.
 
+### The full matrix of 2026-09-16 (`artifacts/check-vms/full-20260916/`)
+
+92 rows, 48 PASS, 1 FAIL, 0 WARN, 43 SKIP (15:26-18:53, `--restore --document --parallel auto
+--timeout 3600`), against 45 PASS / 4 FAIL / 1 WARN on 09-15. The four rows fixed during the day
+pass inside the matrix too, not only as single runs: `cachyos-nvidia` 502 s, `centos-stream-10`
+290 s, `ubuntu-10.04-unattended` 358 s, `windows7-unattended` 315 s with "guest agent answers".
+`windowsnt4-unattended` is skipped, as its demotion intends.
+
+The one FAIL, **`windows10-unattended`**, was an occasional stall, not a regression: the timeline
+stops at 211 s on an empty Windows Setup screen and nothing changes for the remaining 57 minutes.
+The same row re-run alone straight afterwards reached the completion token in **9 minutes** and
+finished PASS in 622 s with its post-install over SSH. Nothing in the day's changes touches the
+install phase (the watcher captured with `wake=False` before and after), so this is the same
+family as the NT 4 stalls of row 24.
+
+That is now the second stall in one day that cost a full hour of timeout and passed on the next
+attempt, which is the strongest argument yet for the item below.
+
 Also from these runs, still not built: **an automatic retry for a failed row**. Agreed shape - one
 extra attempt, the outcome always stating "passed at attempt 2 of 2" with the first failure's
 reason, no retry for deterministic failures (profile check, missing ISO or key), artifacts cleaned
