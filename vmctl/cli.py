@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "agent", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -159,6 +159,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_alpine)
+
+    p = _add(subparsers, "bootstrap-nixos", help="fully automated NixOS install from the profile's configuration.nix + post-install via serial console")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=3600, help="seconds to wait for the install to complete (default: 3600)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_nixos)
 
     p = _add(subparsers, "bootstrap-pearos", help="fully automated pearOS NiceC0re install (live squashfs unpack, like its Calamares) + post-install via serial console")
     p.add_argument("vm", help=VM_HELP)
@@ -359,7 +364,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = _add(subparsers, "setup", help="verify host prerequisites")
     p.set_defaults(func=lifecycle.cmd_setup)
 
-    p = _add(subparsers, "clean", help="remove artifacts for one VM (or all VMs)")
+    p = _add(subparsers, "clean", help="force-stop and remove artifacts for one VM (or all VMs)")
     p.add_argument("vm", nargs="?", help=VM_HELP)
     p.add_argument("--all", action="store_true", help="clean artifacts for every configured VM")
     p.set_defaults(func=lifecycle.cmd_clean)

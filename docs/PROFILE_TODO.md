@@ -10,6 +10,7 @@ Add profiles that cover a new axis: firmware, installation flow, operating syste
 - Automated servers: `debian-server` (preseed), `almalinux-server` and `rocky-9` (kickstart), `ubuntu-server-ci` (autoinstall plus disk boot).
 - Windows installation: `windows10-unattended`, `windows11-unattended`, `windows7-unattended`; import templates remain available separately.
 - Immutable desktop: `fedora-silverblue` with ostree kickstart.
+- Declarative install: `nixos-server` and `nixos-gnome` through `bootstrap-nixos`, which renders the guest's whole `configuration.nix` from the profile; the desktop variant is one field.
 - `pearos-nicecore` / `pearos-nicecore-unattended`: Arch-based macOS-like Plasma 6 desktop. User-supplied medium like EndeavourOS: the vendor signs every ISO URL (pay-what-you-want gate), so the published link answers 302 and only the size and SHA-256 come from its release index. The unattended profile rides `bootstrap-pearos`, which reproduces their Calamares unpackfs install (live squashfs onto the disk, no package downloaded) and skips their first-boot OOBE by creating the profile's user itself.
 - openSUSE automation: `opensuse-tumbleweed-autoyast`.
 - Ubuntu desktop flavors: five autoinstall recipes with explicit package, display-manager and graphical-session checks.
@@ -30,7 +31,7 @@ Every tracked profile has `meta.status`:
 
 Recorded dates:
 
-- 2026-09-19: `pearos-nicecore-unattended`, first live run of `bootstrap-pearos` (install, SSH provisioning and `verify-desktop` reporting an active graphical session for the autologin user).
+- 2026-09-19: `pearos-nicecore-unattended` (first live run of `bootstrap-pearos`), `nixos-server` and `nixos-gnome` (first live runs of `bootstrap-nixos`; the GNOME row through `verify-desktop` on its autologin session).
 
 - 2026-09-12: `ubuntu-8.04-unattended`, `ubuntu-10.04-unattended`, `ubuntu-12.04-unattended`, `ubuntu-14.04-unattended`, `ubuntu-16.04-unattended`, `ubuntu-18.04-unattended`, `ubuntu-20.04-unattended`, `ubuntu-22.04-unattended` and `reactos`, each reinstalled from a clean disk with the final recipe (autologin session, passwordless sudo, legacy SSH verified in-guest).
 - 2026-09-09: the whole unattended matrix, 28 profiles reinstalled from scratch

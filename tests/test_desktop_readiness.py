@@ -90,6 +90,12 @@ else:
             with self.subTest(settings=settings):
                 self.assertNotEqual(self.probe(**settings).returncode, 0)
 
+    def test_nixos_default_target_alias_passes(self):
+        """NixOS prints default.target, an alias of graphical.target: the guest is graphical."""
+        result = self.probe(target='default.target')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Desktop ready: lab', result.stdout)
+
     def test_all_flavors_use_shared_assertive_checks(self):
         profiles = json.loads((ROOT / 'vms/profiles/ubuntu-flavors.json').read_text())['vms']
         for vm in profiles.values():

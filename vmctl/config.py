@@ -71,6 +71,7 @@ USER_IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
     ("kickstart_config", "username"),
     ("alpine_config", "username"),
     ("pearos_config", "username"),
+    ("nixos_config", "username"),
     ("windows_config", "username"),
     ("pfsense_config", "username"),
     ("freebsd_config", "username"),

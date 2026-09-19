@@ -93,6 +93,194 @@
         }
       },
       "usb_tablet": true
+    },
+    "nixos-server": {
+      "name": "NixOS 25.11 Server (unattended)",
+      "meta": {
+        "slug": "nixos",
+        "family": "nix",
+        "role": "server",
+        "release_model": "channel-based",
+        "status": "unattended",
+        "verified": "2026-09-19"
+      },
+      "iso": "isos/latest-nixos-minimal-x86_64-linux.iso",
+      "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-minimal-x86_64-linux.iso",
+      "disk": {
+        "path": "artifacts/nixos-server/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/nixos-server/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "usb_tablet": true,
+      "audio": false,
+      "nixos_config": {
+        "hostname": "nixos",
+        "username": "lab",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "Europe/Rome",
+        "locale": "en_US.UTF-8",
+        "keymap": "it",
+        "state_version": "25.11",
+        "desktop": "none",
+        "disk_device": "vda",
+        "packages": [
+          "git",
+          "vim",
+          "curl",
+          "htop"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "nixos",
+        "user": "lab",
+        "ssh_host_port": 2273,
+        "post_install_run": [
+          "nixos-version",
+          "systemctl is-system-running --wait || systemctl --failed --no-pager",
+          "sudo -n true && echo \"passwordless sudo ok\"",
+          "nix-store --verify --check-contents >/dev/null && echo \"nix store consistent\""
+        ]
+      },
+      "notes": "Declarative install: bootstrap-nixos partitions the disk, lets nixos-generate-config write the hardware part and installs the configuration.nix rendered from nixos_config. No answer file exists for NixOS because none is needed.",
+      "video": {
+        "default": "std",
+        "headless": [
+          "-vga",
+          "std",
+          "-display",
+          "none"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      }
+    },
+    "nixos-gnome": {
+      "name": "NixOS 25.11 GNOME (unattended)",
+      "meta": {
+        "slug": "nixos",
+        "family": "nix",
+        "role": "desktop",
+        "release_model": "channel-based",
+        "status": "unattended",
+        "verified": "2026-09-19"
+      },
+      "iso": "isos/latest-nixos-minimal-x86_64-linux.iso",
+      "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-minimal-x86_64-linux.iso",
+      "disk": {
+        "path": "artifacts/nixos-gnome/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/nixos-gnome/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 6144,
+      "cpus": 4,
+      "network": "user",
+      "usb_tablet": true,
+      "audio": true,
+      "video": {
+        "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga",
+          "-display",
+          "none"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "nixos_config": {
+        "hostname": "nixos-gnome",
+        "username": "lab",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "Europe/Rome",
+        "locale": "en_US.UTF-8",
+        "keymap": "it",
+        "state_version": "25.11",
+        "desktop": "gnome",
+        "disk_device": "vda",
+        "packages": [
+          "git",
+          "vim",
+          "curl",
+          "firefox"
+        ],
+        "extra_config": [
+          "# A lab guest should not lock itself: the report screenshot would be a lock screen",
+          "# and vmctl attach would ask for a password (verified live 2026-09-19).",
+          "services.displayManager.gdm.autoSuspend = false;",
+          "programs.dconf.profiles.user.databases = [{",
+          "  settings = {",
+          "    \"org/gnome/desktop/screensaver\".lock-enabled = false;",
+          "    \"org/gnome/desktop/screensaver\".idle-activation-enabled = false;",
+          "    \"org/gnome/desktop/session\".idle-delay = lib.gvariant.mkUint32 0;",
+          "  };",
+          "}];"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "nixos-gnome",
+        "user": "lab",
+        "ssh_host_port": 2274,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service"
+        ]
+      },
+      "notes": "The desktop is one field of nixos_config: GDM, GNOME and autologin come from the generated configuration.nix, and the tty1 getty is disabled the way NixOS documents for autologin."
     }
   }
 }

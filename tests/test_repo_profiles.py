@@ -12,6 +12,7 @@ import vmctl.autoyast  # noqa: E402
 import vmctl.config  # noqa: E402
 import vmctl.kickstart  # noqa: E402
 import vmctl.netlab  # noqa: E402
+import vmctl.nixos  # noqa: E402
 import vmctl.pearos  # noqa: E402
 import vmctl.preseed  # noqa: E402
 import vmctl.reactos  # noqa: E402
@@ -95,6 +96,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # pearOS NiceC0re: bootstrap-pearos installed and provisioned it on the first live run
         # (verify-desktop reported an active graphical session for the autologin user).
         verified_pearos = {"pearos-nicecore-unattended"}
+        # NixOS: both rode bootstrap-nixos live on 2026-09-19 (server verified over SSH,
+        # GNOME through verify-desktop on the autologin session).
+        verified_nixos = {"nixos-server", "nixos-gnome"}
         # Re-verified on 2026-09-16 after the 09-15 matrix failed them: cachyos-nvidia once the
         # 32-bit NVIDIA packages became best effort, centos-stream-10 once the installer took its
         # stage2 from the medium instead of the moving repository, windows7-unattended once the
@@ -108,7 +112,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                              else "2026-09-13" if name in verified_batch_a
                              else "2026-09-14" if name in verified_batch_a_retry | verified_batch_b_c
                              else "2026-09-15" if name in verified_nt4
-                             else "2026-09-19" if name in verified_pearos else None)
+                             else "2026-09-19" if name in verified_pearos | verified_nixos else None)
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
         # Promoted on 2026-09-09: verify-desktop reported an active local graphical session for
         # the autologin user on the live matrix, which is what the flavor recipe has to prove.
@@ -221,6 +225,22 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         script = vmctl.pearos.render_install_script("pearos-nicecore-unattended", pearos)
         self.assertIn("unsquashfs", script)
         self.assertNotIn("pacstrap", script)
+
+        # NixOS: the guest is its configuration.nix, so the flow renders one instead of an
+        # answer file, and the desktop variant differs from the server one by a single field.
+        server = cfg["vms"]["nixos-server"]
+        gnome = cfg["vms"]["nixos-gnome"]
+        self.assertEqual(vmctl.nixos.check_profile("nixos-server", server), [])
+        self.assertEqual(vmctl.nixos.check_profile("nixos-gnome", gnome), [])
+        self.assertEqual(server["nixos_config"]["username"], "lab")
+        self.assertEqual(server["ssh_provision"]["user"], "lab")
+        self.assertEqual(server["nixos_config"]["state_version"], gnome["nixos_config"]["state_version"])
+        self.assertEqual(server["nixos_config"].get("desktop", "none"), "none")
+        self.assertEqual(gnome["nixos_config"]["desktop"], "gnome")
+        self.assertEqual(server["iso"], gnome["iso"])
+        rendered = vmctl.nixos.render_configuration("nixos-gnome", gnome)
+        self.assertIn("services.displayManager.autoLogin", rendered)
+        self.assertIn("lock-enabled = false;", rendered)
         # 20.04 and 22.04 ride the autoinstall recipe of ubuntu-gnome-24.04, which is the 24.04 entry.
         for version, port in (("20.04", 2258), ("22.04", 2259)):
             vm = cfg["vms"][f"ubuntu-{version}-unattended"]

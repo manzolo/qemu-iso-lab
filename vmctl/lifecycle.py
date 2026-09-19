@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pearos, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windows98, windowsnt4, windowsxp
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windows98, windowsnt4, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -406,6 +406,10 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-pearos", "live squashfs unpack + post-install")
         return ("skip", "pearos_config without SSH post-install")
+    if nixos.nixos_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-nixos", "declarative nixos-install + post-install")
+        return ("skip", "nixos_config without SSH post-install")
     if freebsd.freebsd_config(vm) is not None:
         return ("bootstrap-freebsd", "FreeBSD bsdinstall + SSH verification")
     if pfsense.pfsense_config(vm) is not None:
@@ -523,7 +527,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -760,6 +764,25 @@ def run_local_test_vm(
     if mode == "bootstrap-pearos":
         try:
             cmd_bootstrap_pearos(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
+            args._report_phase = "post-install"
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-nixos":
+        try:
+            cmd_bootstrap_nixos(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -1535,6 +1558,71 @@ def cmd_bootstrap_pearos(args: argparse.Namespace) -> int:
         )
     except VMError as exc:
         raise explain_failed_bootstrap(exc, pearos.BOOTSTRAP_FAILED_TOKEN, "pearOS", serial_log) from exc
+    ui.print_status("ok", "Installation complete — starting installed VM for post-install")
+
+    report.phase(args, "post-install")
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
+    run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
+    return 0
+
+
+def cmd_bootstrap_nixos(args: argparse.Namespace) -> int:
+    """NixOS: partition, generate the hardware config, install the profile's configuration.nix."""
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    problems = nixos.check_profile(args.vm, vm)
+    if problems:
+        raise VMError("; ".join(problems))
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap NixOS: {args.vm}")
+
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+
+    seed_iso = nixos.create_nixos_seed_iso(args.vm, vm, dry_run=args.dry_run)
+    live_boot = nixos.resolve_live_boot(iso_path, dry_run=args.dry_run)
+    kernel_path, initrd_path = nixos.extract_nixos_boot_artifacts(vm, iso_path, live_boot, dry_run=args.dry_run)
+
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+        network_phase="install",
+    )
+    install_qemu_args += ["-cdrom", str(iso_path)]
+    install_qemu_args += nixos.seed_iso_drive_args(seed_iso)
+    install_qemu_args += ["-kernel", str(kernel_path), "-initrd", str(initrd_path)]
+    if live_boot is not None:
+        install_qemu_args += ["-append", nixos.live_kernel_append(live_boot)]
+    elif not args.dry_run:
+        raise VMError(
+            f"Could not read the boot configuration of {ui.pretty_path(iso_path)}: the NixOS live "
+            "system boots through an init= store path that only the medium knows"
+        )
+
+    ui.print_note("Booting the NixOS installer — waiting for the live shell, then running nixos-install...")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    try:
+        qemu.run_and_expect(
+            install_qemu_args,
+            expected_text=nixos.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=getattr(args, "timeout", 3600),
+            auto_inputs=[(nixos.NIXOS_LIVE_PROMPT, f"\n{nixos.live_trigger_command()}\n")],
+            dry_run=args.dry_run,
+            log_path=serial_log,
+        )
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, nixos.BOOTSTRAP_FAILED_TOKEN, "NixOS", serial_log) from exc
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     report.phase(args, "post-install")
@@ -3357,12 +3445,13 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
 
 def cmd_clean(args: argparse.Namespace) -> int:
     cfg = config.load_config()
+    # The guest disk is about to be deleted, so skip guest shutdown and its grace periods.
     if args.all:
         for name, vm in config.sorted_vm_items(cfg):
-            cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+            cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
             clean_vm(name, vm, dry_run=args.dry_run)
         return 0
     vm = config.get_vm(cfg, args.vm)
-    cmd_stop(argparse.Namespace(vm=args.vm, dry_run=args.dry_run))
+    cmd_stop(argparse.Namespace(vm=args.vm, dry_run=args.dry_run, force=True))
     clean_vm(args.vm, vm, dry_run=args.dry_run)
     return 0

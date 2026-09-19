@@ -357,6 +357,56 @@ restarting the service alone shows the greeter, not the autologin.
 The kernel line of the installed system keeps a serial console
 (`alpine_config.kernel_opts`), so `post-install-serial.log` stays readable.
 
+## NixOS: the configuration is the answer file
+
+```bash
+vmctl bootstrap-nixos nixos-server
+vmctl bootstrap-nixos nixos-gnome
+```
+
+NixOS needs no answer file because the installation *is* a configuration. The
+flow renders the profile's whole `configuration.nix` from `nixos_config`, packs
+it with an `install.sh` into a `NIXSEED` seed ISO and boots the official
+installer image headless. The installer autologins a shell on the serial
+console, so `run_and_expect` only has to type the trigger: mount the seed and
+run it with sudo. The script then partitions (GPT `BOOT` + `ROOT`, fat32 +
+ext4), lets `nixos-generate-config` write the hardware part, drops the rendered
+configuration on top and runs `nixos-install --no-root-passwd`, and everything
+the guest ends up with — user, hashed password, SSH key, passwordless sudo,
+display manager, autologin, packages — comes from that one file.
+
+Three things are read from the medium instead of being pinned
+(`nixos.resolve_live_boot`, from the ISO's own `isolinux.cfg`): the kernel and
+initrd paths under `/boot/nix/store/<hash>-.../`, the `init=` store path the
+live system boots through, and the ISO's volume label, which its `root=LABEL=`
+names. All three change with every rebuild of a channel's image, so a profile
+that pinned them would break at the next one.
+
+What the two live runs of 2026-09-19 taught, in the order it cost time:
+
+- the live prompt is not what it looks like. The stream carries
+  `[<ESC>]0;nixos@nixos: ~<BEL>nixos@nixos:~]$`, so the literal
+  `[nixos@nixos:~]$` never matches and the first run sat at the prompt until its
+  timeout. `NIXOS_LIVE_PROMPT` matches `nixos@nixos:~]$`;
+- mounting by `/dev/disk/by-label/...` right after `mkfs` loses the race with
+  udev ("Can't lookup blockdev"); the script mounts by device path;
+- `systemctl get-default` prints `default.target` on NixOS, an alias of
+  `graphical.target`. The shared `verify-desktop` now accepts exactly that name
+  when `graphical.target` is active, and still rejects any other target;
+- Nix wraps GNOME's binary, so the shell's `comm` is `.gnome-shell-wr` and
+  `pgrep -x gnome-shell` never matches: the desktop profile checks the session,
+  not a process name;
+- a lab guest that locks itself shows a lock screen in the report and asks for a
+  password on `vmctl attach`, so the GNOME profile turns off idle activation and
+  the lock through `programs.dconf.profiles.user.databases`.
+
+`nixos_config` takes `username`, `password_hash` and `state_version` (the
+channel's release), and optionally `hostname`, `timezone`, `locale`, `keymap`,
+`desktop` (`none`, `gnome`, `plasma`), `user_groups`, `packages`,
+`extra_config` (raw Nix lines), `disk_device` and `install_args`. A new desktop
+variant is a profile, not code: `nixos-gnome` differs from `nixos-server` by one
+field plus its own SSH port.
+
 ## pearOS NiceC0re: unpackfs, like its own Calamares
 
 ```bash

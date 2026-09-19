@@ -28,7 +28,18 @@ fail() { printf 'Desktop verification failed: %s\n' "$*" >&2; exit 1; }
 [ -n "$user" ] || fail 'missing expected user'
 case "$attempts" in ''|*[!0-9]*|0) fail 'attempts must be positive' ;; esac
 case "$interval" in ''|*[!0-9]*) fail 'interval must be nonnegative' ;; esac
-[ "$(systemctl get-default)" = graphical.target ] || fail 'default target is not graphical.target'
+default_target=$(systemctl get-default)
+if [ "$default_target" != graphical.target ]; then
+    # NixOS boots its own default.target, an alias of graphical.target, and prints that
+    # name here; the guest is graphical all the same, so accept it when graphical.target
+    # is actually active. Any other target (multi-user...) still fails.
+    if [ "$default_target" = default.target ]; then
+        systemctl is-active --quiet graphical.target ||
+            fail "default.target is not an alias of an active graphical.target"
+    else
+        fail "default target is not graphical.target ($default_target)"
+    fi
+fi
 for package in $packages; do
     case "$manager" in
         dpkg) [ "$(dpkg-query -W -f='${Status}' "$package")" = 'install ok installed' ] || fail "package not installed: $package" ;;

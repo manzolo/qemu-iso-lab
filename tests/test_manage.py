@@ -273,16 +273,37 @@ class ManageTests(BaseVmctlTestCase):
             "vars_path": "artifacts/testvm/OVMF_VARS.fd",
         }
         self.write_config_dir()
-        self.create_disk()
+        for all_vms in (False, True):
+            for dry_run in (False, True):
+                with self.subTest(all_vms=all_vms, dry_run=dry_run):
+                    disk_path = self.create_disk()
 
-        with mock.patch.object(vmctl.lifecycle, "cmd_stop", return_value=0) as stop_cmd:
-            exit_code = self.vmctl.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False))
+                    def stop(args):
+                        self.assertTrue(disk_path.exists())
+                        self.assertEqual(args.vm, self.vm_name)
+                        self.assertEqual(args.dry_run, dry_run)
+                        self.assertTrue(args.force)
+                        return 0
 
-        self.assertEqual(exit_code, 0)
-        stop_cmd.assert_called_once()
-        stop_args = stop_cmd.call_args.args[0]
-        self.assertEqual(stop_args.vm, self.vm_name)
-        self.assertFalse(stop_args.dry_run)
+                    with mock.patch.object(vmctl.lifecycle, "cmd_stop", side_effect=stop) as stop_cmd:
+                        exit_code = self.vmctl.cmd_clean(argparse.Namespace(
+                            vm=None if all_vms else self.vm_name, all=all_vms, dry_run=dry_run,
+                        ))
+
+                    self.assertEqual(exit_code, 0)
+                    stop_cmd.assert_called_once()
+                    self.assertEqual(disk_path.exists(), dry_run)
+
+    def test_cmd_clean_preserves_artifacts_when_stop_fails(self):
+        for all_vms in (False, True):
+            with self.subTest(all_vms=all_vms):
+                disk_path = self.create_disk()
+                with mock.patch.object(vmctl.lifecycle, "cmd_stop", side_effect=self.vmctl.VMError("stop failed")), \
+                     self.assertRaisesRegex(self.vmctl.VMError, "stop failed"):
+                    self.vmctl.cmd_clean(argparse.Namespace(
+                        vm=None if all_vms else self.vm_name, all=all_vms, dry_run=False,
+                    ))
+                self.assertTrue(disk_path.exists())
 
     def test_cmd_delete_iso_removes_cached_iso_and_partial_download(self):
         iso_path = self.root / self.vm_config["iso"]
