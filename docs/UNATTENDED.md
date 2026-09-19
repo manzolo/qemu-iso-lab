@@ -1051,6 +1051,15 @@ jobs in the same `check-vms` invocation.
 
 ### Occasional stalls, and how to tell one from a regression
 
+AutoYaST has a long window where silence is normal: between linuxrc's last line
+(the guest's IP addresses) and the token its chroot script prints at the end,
+YaST runs on the **graphical** console and writes nothing to the serial. A
+screenshot taken during that window shows the ordinary "Performing Installation
+— Installing Packages" progress bar, which is what `--document` keeps; the
+2026-09-19 investigation of a row that had timed out found exactly that, with
+the medium six days old and seven other VMs sharing the line. Before suspecting
+the profile, look at the screen.
+
 A row that times out is not automatically a broken profile. Two guests have now been seen to
 stall on an install that works: `windowsnt4-unattended` (rows 24 and 25 of
 [NT4_PITFALLS.md](NT4_PITFALLS.md)) and, on 2026-09-16, `windows10-unattended`, whose matrix row

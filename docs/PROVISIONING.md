@@ -112,7 +112,14 @@ Tracked profiles are generic on purpose:
   `autoinstall.username`, `archinstall_config.username`,
   `omarchy_config.username`, `preseed_config.username`,
   `kickstart_config.username`, `alpine_config.username`,
+  `autoyast_config.username`, `nixos_config.username`, `pearos_config.username`,
   `windows_config.username`; they must agree).
+
+  Every section that creates the guest user has to be on that list, and a test in
+  `tests/test_repo_profiles.py` enforces it. `autoyast_config` was missing on
+  2026-09-19: a `local.json` override moved `ssh_provision.user`, AutoYaST kept
+  installing the tracked user, and the post-install waited for SSH as somebody the
+  guest had never heard of until it timed out.
 
 To use your own name, key and dotfiles, override only the identity fields in
 the git-ignored `vms/profiles/local.json`; every `{{user}}` follows:

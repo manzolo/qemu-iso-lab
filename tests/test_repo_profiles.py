@@ -126,6 +126,19 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             self.assertEqual(Path(vm["iso"]).name, vm["iso_url"].rsplit("/", 1)[1])
             self.assertRegex(vm["iso_sha256"], r"^[0-9a-f]{64}$")
 
+        # Every section that creates the guest user must be an identity field, or a local.json
+        # override moves ssh_provision.user while the installer keeps making the tracked one:
+        # opensuse-tumbleweed-autoyast installed "lab" and vmctl then waited for SSH as the
+        # overridden user until its timeout (2026-09-19). Adding a flow means adding its field.
+        identity_sections = {section for section, _ in vmctl.config.USER_IDENTITY_FIELDS}
+        for name, vm in cfg["vms"].items():
+            for section, block in vm.items():
+                if not isinstance(block, dict):
+                    continue
+                if "username" in block or (section == "cloud_init" and "user" in block):
+                    self.assertIn(section, identity_sections,
+                                  f"{name}.{section} names the guest user but is not a USER_IDENTITY_FIELD")
+
         # Every tracked profile that provisions over SSH needs its own host port:
         # two VMs on the same forward silently break a parallel check-vms run.
         ports: dict[int, str] = {}
