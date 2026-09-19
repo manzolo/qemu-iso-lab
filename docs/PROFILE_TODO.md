@@ -10,6 +10,7 @@ Add profiles that cover a new axis: firmware, installation flow, operating syste
 - Automated servers: `debian-server` (preseed), `almalinux-server` and `rocky-9` (kickstart), `ubuntu-server-ci` (autoinstall plus disk boot).
 - Windows installation: `windows10-unattended`, `windows11-unattended`, `windows7-unattended`; import templates remain available separately.
 - Immutable desktop: `fedora-silverblue` with ostree kickstart.
+- `pearos-nicecore`: manual Arch-based Plasma 6 desktop, installed interactively with Calamares (internet required); no unattended path.
 - openSUSE automation: `opensuse-tumbleweed-autoyast`.
 - Ubuntu desktop flavors: five autoinstall recipes with explicit package, display-manager and graphical-session checks.
 - Network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab`.
@@ -52,6 +53,7 @@ Recorded dates:
 - Consider a small Alpine EFI smoke profile alongside the BIOS baseline.
 - Automate a FreeBSD installation to test provisioning assumptions outside Linux.
 - Retrieve matching vendor checksums for discovery-selected Alpine/Fedora images; do not attach a static hash to a changing URL.
+- Teach ISO discovery to read the matching per-release SHA-256 from the NiceC0re index it already downloads for `pearos-nicecore`.
 - Resume interrupted ISO downloads with HTTP Range requests: the Fedora archive cut a 2.4 GB
   transfer at 115 MB and the whole file had to be fetched again.
 

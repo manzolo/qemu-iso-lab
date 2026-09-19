@@ -123,12 +123,12 @@ See [docs/IMPORT_DISKS.md](docs/IMPORT_DISKS.md) for checks, dependencies and fa
 
 ## The catalog
 
-72 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
+92 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
 prints them all; the table shows what each family offers.
 
 | Family | Profiles | Highlights | Unattended |
 |--------|----------|------------|------------|
-| Arch | `arch`, `endeavouros`, `cachyos-live`, `cachyos-desktop`, `cachyos-nvidia`, `arch-noctalia`, `arch-dms`, `arch-dms-nvidia`, `arch-omarchy-nvidia` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes | `bootstrap-archinstall`, `bootstrap-omarchy` |
+| Arch | `arch`, `endeavouros`, `pearos-nicecore`, `cachyos-live`, `cachyos-desktop`, `cachyos-nvidia`, `arch-noctalia`, `arch-dms`, `arch-dms-nvidia`, `arch-omarchy-nvidia` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes, pearOS macOS-like Plasma 6 desktop (manual Calamares install) | `bootstrap-archinstall`, `bootstrap-omarchy` |
 | Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop-live`, `ubuntu-server-live`, `ubuntu-server-ci`, `ubuntu-niri`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
 | Ubuntu desktop flavors | `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `ubuntu-budgie-24.04` | LXQt, Plasma, Xfce, MATE and Budgie on the 24.04 LTS server ISO, display-manager autologin (kvm-lab's flavor family) | `bootstrap-unattended` |
 | Ubuntu desktop history | `ubuntu-8.04-desktop`, `ubuntu-10.04-desktop`, `ubuntu-12.04-desktop`, `ubuntu-14.04-desktop`, `ubuntu-16.04-desktop`, `ubuntu-18.04-desktop`, `ubuntu-20.04-desktop`, `ubuntu-22.04-desktop`, `ubuntu-24.04-desktop` | every Ubuntu desktop LTS from Hardy to Noble on the official desktop ISO (vendor checksums from old-releases / releases), BIOS + PATA + e1000 for 8.04, UEFI from 14.04 on; `ubuntu-8.04-unattended`, `ubuntu-10.04-unattended`, `ubuntu-12.04-unattended`, `ubuntu-14.04-unattended`, `ubuntu-16.04-unattended`, `ubuntu-18.04-unattended` install the same desktops from the d-i alternate/server media with autologin and legacy-SSH provisioning; `ubuntu-20.04-unattended`, `ubuntu-22.04-unattended` and `ubuntu-gnome-24.04` do it with autoinstall + `ubuntu-desktop` | `bootstrap-preseed`, `bootstrap-unattended` |

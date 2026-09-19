@@ -60,6 +60,11 @@ Discovery remains enabled for `alpine-niri` and `fedora-niri-dms`; neither is a 
 
 Windows and pfSense use user-supplied media without a vendor checksum source in the catalog. EndeavourOS is also supplied locally. Omarchy retains its existing pinned checksum.
 
+`pearos-nicecore` selects its ISO through discovery against the vendor's
+[NiceC0re release index](https://pearos.xyz/assets/data/nicecore-versions.json),
+which publishes a per-release SHA-256. No static hash is pinned while the ISO URL
+changes monthly; discovery does not yet read the matching checksum from the index.
+
 Run the read-only cache audit against the checkout that owns the ISOs:
 
 ```bash
