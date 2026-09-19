@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "agent", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -159,6 +159,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_alpine)
+
+    p = _add(subparsers, "bootstrap-pearos", help="fully automated pearOS NiceC0re install (live squashfs unpack, like its Calamares) + post-install via serial console")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=3600, help="seconds to wait for the install to complete (default: 3600)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_pearos)
 
     p = _add(subparsers, "bootstrap-windows", help="fully automated Windows 10/11 autounattend install (prompt-free ISO, virtio drivers) + post-install over OpenSSH")
     p.add_argument("vm", help=VM_HELP)

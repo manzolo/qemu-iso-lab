@@ -64,8 +64,9 @@
         "release_model": "rolling",
         "status": "manual"
       },
-      "iso": "isos/pearOS-NiceC0re-latest.iso",
-      "iso_url": "https://iso.pearos.xyz/iso/pearOS-NiceC0re-2026.09-x86_64.iso",
+      "iso": "isos/pearOS-NiceC0re-2026.09-x86_64.iso",
+      "iso_size": 3395530752,
+      "iso_sha256": "03899e9b46dd06cf947801f48bece5b680441c1e5e6f9c80cf85f86149fc4555",
       "disk": {
         "path": "artifacts/pearos-nicecore/disk.qcow2",
         "size": "40G",
@@ -107,13 +108,98 @@
         }
       },
       "usb_tablet": true,
-      "iso_discovery": {
-        "index_url": "https://pearos.xyz/assets/data/nicecore-versions.json",
-        "pattern": "\"download\"\\s*:\\s*\"(?P<url>https://iso\\.pearos\\.xyz/iso/pearOS-NiceC0re-[0-9.]+-x86_64\\.iso)\"",
-        "sort": "desc",
-        "limit": 1
+      "notes": "Arch Linux based, macOS-like KDE Plasma 6 desktop on Wayland. Interactive Calamares installation requires an internet connection; no unattended path. User-supplied medium: every /iso/ URL now needs a signed link, so the plain URL in the vendor index answers 302 to a download-expired page and vmctl cannot fetch it. Download the ISO from https://pearos.xyz/download/ (the pay-what-you-want gate mints a free signed link) and save it as isos/pearOS-NiceC0re-2026.09-x86_64.iso. The size and SHA-256 pinned here come from the vendor release index https://pearos.xyz/assets/data/nicecore-versions.json; a fresh ISO is built monthly and older builds are retired, so refreshing the pin is maintenance."
+    },
+    "pearos-nicecore-unattended": {
+      "name": "pearOS NiceC0re (unattended)",
+      "meta": {
+        "slug": "pearos",
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling",
+        "status": "unattended",
+        "verified": "2026-09-19"
       },
-      "notes": "Arch Linux based, macOS-like KDE Plasma 6 desktop on Wayland. Interactive Calamares installation requires an internet connection; no unattended path. The rolling ISO is built monthly and older builds are retired. The vendor publishes a per-release SHA-256 in the same discovery index; no static checksum or size is pinned while the ISO URL changes monthly."
+      "iso": "isos/pearOS-NiceC0re-2026.09-x86_64.iso",
+      "iso_size": 3395530752,
+      "iso_sha256": "03899e9b46dd06cf947801f48bece5b680441c1e5e6f9c80cf85f86149fc4555",
+      "disk": {
+        "path": "artifacts/pearos-nicecore-unattended/disk.qcow2",
+        "size": "40G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/pearos-nicecore-unattended/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 8192,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "video": {
+        "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga",
+          "-display",
+          "none"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "installer_boot": {
+        "kernel": "arch/boot/x86_64/vmlinuz-linux",
+        "initrd": "arch/boot/x86_64/initramfs-linux.img"
+      },
+      "pearos_config": {
+        "hostname": "pearos",
+        "username": "lab",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "Europe/Rome",
+        "locale": "en_US.UTF-8",
+        "keymap": "it",
+        "session": "plasma",
+        "disk_device": "vda"
+      },
+      "ssh_provision": {
+        "hostname": "pearos",
+        "user": "lab",
+        "ssh_host_port": 2272,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager pacman --package pearos-settings"
+        ]
+      },
+      "notes": "Unattended counterpart of pearos-nicecore, on the same user-supplied ISO (see that profile for where to download it). pearOS installs with Calamares in unpackfs mode, which has no answer file: bootstrap-pearos reproduces what its own Calamares configuration and alg-* helpers do, unpacking the live squashfs onto the disk and configuring it, so no package is downloaded during the install."
     },
     "endeavouros": {
       "name": "EndeavourOS Titan",

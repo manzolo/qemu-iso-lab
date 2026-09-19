@@ -357,6 +357,50 @@ restarting the service alone shows the greeter, not the autologin.
 The kernel line of the installed system keeps a serial console
 (`alpine_config.kernel_opts`), so `post-install-serial.log` stays readable.
 
+## pearOS NiceC0re: unpackfs, like its own Calamares
+
+```bash
+vmctl bootstrap-pearos pearos-nicecore-unattended
+```
+
+pearOS is Arch under a macOS-like Plasma 6 desktop, shipped as a plain archiso
+image, and its installer is **Calamares in unpackfs mode**: it never pacstraps a
+package list, it copies the live squashfs onto the disk and configures it.
+Calamares has no answer file, so this flow reproduces what the vendor's own
+`pear-calamares-config` and its `/usr/local/bin/alg-*` helpers do, in one script
+on a `PEARSEED` seed ISO. `run_and_expect` answers `pearOS-Live-System login:`
+with `root` (no password), mounts the seed at the live prompt and runs it:
+
+1. GPT `EFI` (fat32) + `ROOT` (ext4), the defaults of their `partition.conf`;
+2. `unsquashfs` of `/run/archiso/bootmnt/arch/x86_64/airootfs.sfs` onto the root
+   and the ISO's kernel as `/boot/vmlinuz-linux-cachyos-lts` — the two entries of
+   their `unpackfs.conf`. Nothing is downloaded: the install is the medium;
+3. fstab, machine-id, locale, keymap, timezone, hostname;
+4. the archiso hooks leave `mkinitcpio.conf`, **then** the live-only packages are
+   removed, **then** the initramfs is built. In any other order the rebuild that
+   removing `mkinitcpio-archiso` fires ends in `Hook 'archiso' cannot be found`
+   and overwrites a good image (verified live on 2026-09-19);
+5. the profile's user, passwordless sudo, the SSH key and SDDM autologin. Their
+   Calamares creates a throwaway `default` user and leaves the real one to a
+   first-boot OOBE (`/usr/local/bin/post_setup`, launched from an autostart
+   entry); this flow creates the profile's user directly and removes that entry,
+   so the guest needs no first-boot wizard;
+6. the live session is stripped the way their `alg-finalisation` does it
+   (pacman-init units, the tty1 autologin, the live-only `alg-*` helpers, the
+   live keyring), GRUB is installed, then sync → flush → completion token →
+   poweroff.
+
+The live ISO autologins into SDDM, so the boot line adds
+`systemd.unit=multi-user.target` next to `console=ttyS0,115200`, and
+`archisolabel=` comes from the medium itself (`pearos_iso_label`, blkid): the
+build is monthly and its label carries the month, so nothing is pinned to a
+release. The medium is user-supplied — every `iso.pearos.xyz` URL needs a signed
+link — see [PROFILES.md](PROFILES.md) and the profile's notes.
+
+`pearos_config` takes `username` + `password_hash`, and optionally `hostname`,
+`timezone`, `locale`, `keymap`, `session`, `user_groups`, `disk_device`,
+`services`, `remove_packages` and `chroot_commands`.
+
 ## Windows 10/11: autounattend
 
 ```bash

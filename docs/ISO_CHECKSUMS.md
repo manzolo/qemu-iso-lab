@@ -26,6 +26,8 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `lubuntu-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `lubuntu-lab` | `ubuntu-22.04.5-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04.5/SHA256SUMS) |
 | `pihole-lab` | `ubuntu-22.04.5-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04.5/SHA256SUMS) |
+| `pearos-nicecore` | `pearOS-NiceC0re-2026.09-x86_64.iso` | [Index](https://pearos.xyz/assets/data/nicecore-versions.json) |
+| `pearos-nicecore-unattended` | `pearOS-NiceC0re-2026.09-x86_64.iso` | [Index](https://pearos.xyz/assets/data/nicecore-versions.json) |
 | `popos-cosmic` | `pop-os_24.04_amd64_generic_22.iso` | [Manifest](https://iso.pop-os.org/24.04/amd64/generic/22/SHA256SUMS) |
 | `rocky-9` | `Rocky-9.8-x86_64-minimal.iso` | [Manifest](https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-minimal.iso.CHECKSUM) |
 | `ubuntu-budgie-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
@@ -60,10 +62,14 @@ Discovery remains enabled for `alpine-niri` and `fedora-niri-dms`; neither is a 
 
 Windows and pfSense use user-supplied media without a vendor checksum source in the catalog. EndeavourOS is also supplied locally. Omarchy retains its existing pinned checksum.
 
-`pearos-nicecore` selects its ISO through discovery against the vendor's
-[NiceC0re release index](https://pearos.xyz/assets/data/nicecore-versions.json),
-which publishes a per-release SHA-256. No static hash is pinned while the ISO URL
-changes monthly; discovery does not yet read the matching checksum from the index.
+`pearos-nicecore` and `pearos-nicecore-unattended` share one user-supplied medium with a vendor checksum. Since August 2026
+every `https://iso.pearos.xyz/iso/...` URL requires a signed link: the plain URL published
+in the vendor's [NiceC0re release index](https://pearos.xyz/assets/data/nicecore-versions.json)
+answers `302` to a download-expired page, so `vmctl fetch-iso` cannot resolve it and the
+profile carries no `iso_url`. Download the ISO from https://pearos.xyz/download/ (the
+pay-what-you-want gate mints a free signed link) and save it under `isos/`. The size and
+SHA-256 in the profile come from that index, which publishes them per release; a new build
+lands monthly and older ones are retired, so refreshing the pin is maintenance.
 
 Run the read-only cache audit against the checkout that owns the ISOs:
 

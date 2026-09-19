@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windows98, windowsnt4, windowsxp
+from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, omarchy, pearos, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windows98, windowsnt4, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -1451,6 +1451,71 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
         ui.print_kv("pid", str(pid))
 
     report.phase(args, "post-install")
+    run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
+    return 0
+
+
+def cmd_bootstrap_pearos(args: argparse.Namespace) -> int:
+    """pearOS NiceC0re: unpackfs install driven over the live ISO's serial console."""
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    problems = pearos.check_profile(args.vm, vm)
+    if problems:
+        raise VMError("; ".join(problems))
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap pearOS NiceC0re: {args.vm}")
+
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+
+    seed_iso = pearos.create_pearos_seed_iso(args.vm, vm, dry_run=args.dry_run)
+    kernel_path, initrd_path = pearos.extract_pearos_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+    iso_label = pearos.pearos_iso_label(iso_path)
+
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+        network_phase="install",
+    )
+    install_qemu_args += ["-cdrom", str(iso_path)]
+    install_qemu_args += pearos.seed_iso_drive_args(seed_iso)
+    install_qemu_args += [
+        "-kernel", str(kernel_path),
+        "-initrd", str(initrd_path),
+        "-append", pearos.live_kernel_append(iso_label),
+    ]
+
+    ui.print_note("Booting the pearOS live ISO — waiting for the root prompt, then unpacking the squashfs...")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    try:
+        qemu.run_and_expect(
+            install_qemu_args,
+            expected_text=pearos.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=getattr(args, "timeout", 3600),
+            auto_inputs=[
+                (pearos.PEAROS_SERIAL_LOGIN_PROMPT, "root\n"),
+                (pearos.PEAROS_LIVE_PROMPT, f"\n{pearos.live_trigger_command()}\n"),
+            ],
+            dry_run=args.dry_run,
+            log_path=serial_log,
+        )
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, pearos.BOOTSTRAP_FAILED_TOKEN, "pearOS", serial_log) from exc
+    ui.print_status("ok", "Installation complete — starting installed VM for post-install")
+
+    report.phase(args, "post-install")
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
     run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
     ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0

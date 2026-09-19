@@ -12,6 +12,7 @@ import vmctl.autoyast  # noqa: E402
 import vmctl.config  # noqa: E402
 import vmctl.kickstart  # noqa: E402
 import vmctl.netlab  # noqa: E402
+import vmctl.pearos  # noqa: E402
 import vmctl.preseed  # noqa: E402
 import vmctl.reactos  # noqa: E402
 import vmctl.state  # noqa: E402
@@ -91,6 +92,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_batch_a_retry = {"debian-kde", "kali"}
         verified_batch_b_c = {"freebsd-unattended", "windowsxp-unattended", "windows2000-unattended"}
         verified_nt4 = {"windowsnt4-unattended"}
+        # pearOS NiceC0re: bootstrap-pearos installed and provisioned it on the first live run
+        # (verify-desktop reported an active graphical session for the autologin user).
+        verified_pearos = {"pearos-nicecore-unattended"}
         # Re-verified on 2026-09-16 after the 09-15 matrix failed them: cachyos-nvidia once the
         # 32-bit NVIDIA packages became best effort, centos-stream-10 once the installer took its
         # stage2 from the medium instead of the moving repository, windows7-unattended once the
@@ -103,7 +107,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                              else "2026-09-12" if name in verified_history
                              else "2026-09-13" if name in verified_batch_a
                              else "2026-09-14" if name in verified_batch_a_retry | verified_batch_b_c
-                             else "2026-09-15" if name in verified_nt4 else None)
+                             else "2026-09-15" if name in verified_nt4
+                             else "2026-09-19" if name in verified_pearos else None)
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
         # Promoted on 2026-09-09: verify-desktop reported an active local graphical session for
         # the autologin user on the live matrix, which is what the flavor recipe has to prove.
@@ -198,6 +203,24 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             check = vm["ssh_provision"]["post_install_run"][0]
             self.assertIn("verify-desktop" if float(version) >= 16 else "x-session-manag(er)?", check)
         self.assertEqual(cfg["vms"]["ubuntu-8.04-unattended"]["preseed_config"]["disk_device"], "auto")
+
+        # pearOS NiceC0re: its Calamares installs by unpacking the live squashfs, so the flow
+        # carries no package list; the medium is user-supplied and pinned by the vendor index.
+        pearos_manual = cfg["vms"]["pearos-nicecore"]
+        pearos = cfg["vms"]["pearos-nicecore-unattended"]
+        self.assertEqual(pearos_manual["meta"]["status"], "manual")
+        self.assertNotIn("iso_url", pearos_manual)
+        self.assertNotIn("iso_discovery", pearos_manual)
+        self.assertEqual(pearos["iso"], pearos_manual["iso"])
+        self.assertEqual(pearos["iso_sha256"], pearos_manual["iso_sha256"])
+        self.assertEqual(pearos["pearos_config"]["username"], "lab")
+        self.assertEqual(pearos["ssh_provision"]["user"], "lab")
+        self.assertEqual(pearos["firmware"]["type"], "efi")
+        self.assertEqual(pearos["disk"]["interface"], "virtio")
+        self.assertEqual(vmctl.pearos.check_profile("pearos-nicecore-unattended", pearos), [])
+        script = vmctl.pearos.render_install_script("pearos-nicecore-unattended", pearos)
+        self.assertIn("unsquashfs", script)
+        self.assertNotIn("pacstrap", script)
         # 20.04 and 22.04 ride the autoinstall recipe of ubuntu-gnome-24.04, which is the 24.04 entry.
         for version, port in (("20.04", 2258), ("22.04", 2259)):
             vm = cfg["vms"][f"ubuntu-{version}-unattended"]
