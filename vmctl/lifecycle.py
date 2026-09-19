@@ -402,6 +402,10 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-alpine", "setup-alpine + post-install")
         return ("skip", "alpine_config without SSH post-install")
+    if pearos.pearos_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-pearos", "live squashfs unpack + post-install")
+        return ("skip", "pearos_config without SSH post-install")
     if freebsd.freebsd_config(vm) is not None:
         return ("bootstrap-freebsd", "FreeBSD bsdinstall + SSH verification")
     if pfsense.pfsense_config(vm) is not None:
@@ -519,7 +523,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -737,6 +741,25 @@ def run_local_test_vm(
     if mode == "bootstrap-alpine":
         try:
             cmd_bootstrap_alpine(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
+            args._report_phase = "post-install"
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-pearos":
+        try:
+            cmd_bootstrap_pearos(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,

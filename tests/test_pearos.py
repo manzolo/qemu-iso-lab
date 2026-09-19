@@ -9,6 +9,7 @@ if str(ROOT) not in sys.path:
 
 import vmctl.archinstall  # noqa: E402
 import vmctl.errors  # noqa: E402
+import vmctl.lifecycle  # noqa: E402
 import vmctl.pearos  # noqa: E402
 
 from tests._common import BaseVmctlTestCase  # noqa: E402
@@ -115,6 +116,23 @@ class PearosRenderTests(BaseVmctlTestCase):
         problems = vmctl.pearos.check_profile(self.vm_name, self.vm_config)
         self.assertTrue(any("efi" in p for p in problems), problems)
         self.assertTrue(any("virtio" in p for p in problems), problems)
+
+    def test_the_matrix_runs_it_through_bootstrap_pearos(self):
+        self._pearos_vm()
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2272}
+        mode, note = vmctl.lifecycle.local_test_mode(self.vm_config)
+        self.assertEqual(mode, "bootstrap-pearos")
+        self.assertIn("squashfs", note)
+        # --restore/--clean-first has to be allowed to wipe the row, like every other flow.
+        cfg = {"vms": {self.vm_name: self.vm_config}}
+        self.assertEqual(vmctl.lifecycle.local_test_clean_candidates([self.vm_name], cfg), [self.vm_name])
+
+    def test_the_matrix_skips_a_profile_without_ssh(self):
+        self._pearos_vm()
+        self.vm_config.pop("ssh_provision", None)
+        mode, note = vmctl.lifecycle.local_test_mode(self.vm_config)
+        self.assertEqual(mode, "skip")
+        self.assertIn("without SSH post-install", note)
 
     def test_check_profile_accepts_the_tracked_shape(self):
         self._pearos_vm()
