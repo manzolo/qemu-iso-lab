@@ -371,7 +371,12 @@
         "status": "manual"
       },
       "iso": "isos/openSUSE-Slowroll-DVD-x86_64-Media.iso",
-      "iso_url": "https://download.opensuse.org/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",
+      "iso_url": "https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",
+      "iso_urls": [
+        "https://download.opensuse.org/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",
+        "https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",
+        "https://mirror.dogado.de/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso"
+      ],
       "iso_size": 4655677440,
       "disk": {
         "path": "artifacts/opensuse-slowroll/disk.qcow2",

@@ -10,7 +10,12 @@
         "status": "manual"
       },
       "iso": "isos/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
-      "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
+      "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
+      "iso_urls": [
+        "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
+        "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
+        "https://mirror.dogado.de/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso"
+      ],
       "disk": {
         "path": "artifacts/opensuse-tumbleweed-kde/disk.qcow2",
         "size": "36G",
@@ -57,7 +62,12 @@
         "status": "manual"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
-      "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_urls": [
+        "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+        "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+        "https://mirror.dogado.de/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso"
+      ],
       "disk": {
         "path": "artifacts/opensuse-tumbleweed-net/disk.qcow2",
         "size": "24G",
@@ -105,7 +115,12 @@
         "verified": "2026-09-09"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
-      "iso_url": "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_urls": [
+        "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+        "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+        "https://mirror.dogado.de/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso"
+      ],
       "disk": {
         "path": "artifacts/opensuse-tumbleweed-autoyast/disk.qcow2",
         "size": "40G",
