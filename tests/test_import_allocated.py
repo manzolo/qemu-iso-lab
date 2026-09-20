@@ -12,6 +12,7 @@ from unittest import mock
 
 from vmctl import cli, host_setup, import_allocated as allocated, import_dev, lifecycle, runtime
 from vmctl.errors import VMError
+from vmctl.flash_progress import OperationProgress
 
 
 class AllocatedImportTests(unittest.TestCase):
@@ -55,6 +56,8 @@ class AllocatedImportTests(unittest.TestCase):
                         output.seek(block.start)
                         output.write(self.source.read_bytes()[block.start:block.end])
             self.write_map(Path(cmd[-1]), self.blocks)
+        elif cmd[:2] == ["qemu-img", "convert"]:
+            self.fake_convert(cmd, **kwargs)
 
     def fake_convert(self, cmd, **kwargs):
         shutil.copyfile(cmd[-2], cmd[-1])
@@ -67,7 +70,7 @@ class AllocatedImportTests(unittest.TestCase):
             self.fake_run(cmd, **kwargs)
             if cmd[0] == "ddrescue":
                 raise KeyboardInterrupt()
-        with self.patches(), mock.patch.object(runtime, "run", side_effect=interrupted):
+        with self.patches(), mock.patch.object(OperationProgress, "run", side_effect=interrupted):
             with self.assertRaises(KeyboardInterrupt):
                 self.do_import()
         self.assertEqual(self.target.read_bytes(), b"original VM disk")
@@ -115,6 +118,92 @@ class AllocatedImportTests(unittest.TestCase):
             result = allocated.build_domain([part, unknown], 4096, self.root)
         self.assertEqual(result, [allocated.Block(0, 1024, "+"), allocated.Block(1024, 512, "?"), allocated.Block(1536, 2560, "+")])
 
+    def gpt_device(self, size, entry_lba=None, valid=True):
+        """A fake disk whose last sector carries a backup GPT header (entry array at *entry_lba*)."""
+        sector = 512
+        last = size // sector - 1
+        entry_lba = last - 32 if entry_lba is None else entry_lba
+        header = bytearray(92)
+        header[0:8] = b"EFI PART" if valid else b"NOT GPT!"
+        header[24:32] = last.to_bytes(8, "little")            # MyLBA
+        header[72:80] = entry_lba.to_bytes(8, "little")       # PartitionEntryLBA
+        header[80:84] = (128).to_bytes(4, "little")           # NumberOfPartitionEntries
+        header[84:88] = (128).to_bytes(4, "little")           # SizeOfPartitionEntry
+        device = self.root / "gpt-device"
+        with device.open("wb") as out:
+            out.truncate(size)
+            out.seek(last * sector)
+            out.write(bytes(header) + b"\0" * (sector - len(header)))
+        return str(device), entry_lba * sector
+
+    def test_unpartitioned_tail_is_skipped_but_backup_gpt_and_last_mib_are_kept(self):
+        size = 64 * 1024**2
+        device, backup_start = self.gpt_device(size)
+        part = {**self.part, "start": 1024**2, "size": 4 * 1024**2}   # ends at 5 MiB; 59 MiB of nothing follow
+        def partclone(cmd):
+            self.write_map(Path(cmd[cmd.index("--output") + 1]), [allocated.Block(0, 512, "+"), allocated.Block(512, 4 * 1024**2 - 512, "?")])
+        with mock.patch.object(runtime, "require_command"), mock.patch.object(runtime, "run", side_effect=partclone), \
+                contextlib.redirect_stdout(io.StringIO()):
+            result = allocated.build_domain([part], size, self.root, device=device, table_label="gpt")
+        partition_end = 5 * 1024**2
+        tail = [block for block in result if block.end > partition_end]
+        # the unpartitioned space is out of the domain (merged with the free tail of the filesystem)
+        self.assertEqual(tail[0].status, "?")
+        self.assertEqual(tail[-1].status, "+")                      # the end of the disk is copied
+        self.assertEqual(tail[-1].end, size)
+        # the copy resumes at the last MiB, which contains the backup entry array and header
+        self.assertEqual(tail[-1].start, size - allocated.TAIL_KEEP_BYTES)
+        self.assertLess(tail[-1].start, backup_start)
+        skipped = sum(max(0, block.end - max(block.start, partition_end)) for block in result if block.status == "?")
+        self.assertEqual(skipped, size - allocated.TAIL_KEEP_BYTES - partition_end)
+
+    def test_backup_gpt_array_earlier_than_the_last_mib_extends_the_kept_tail(self):
+        size = 64 * 1024**2
+        device, backup_start = self.gpt_device(size, entry_lba=size // 512 - 4096)  # array 2 MiB before the end
+        part = {**self.part, "start": 1024**2, "size": 4 * 1024**2, "fstype": "crypto_LUKS"}
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = allocated.build_domain([part], size, self.root, device=device, table_label="gpt")
+        self.assertEqual(result[-1], allocated.Block(backup_start, size - backup_start, "+"))
+        self.assertEqual(result[-2].status, "?")
+
+    def test_tail_is_copied_in_full_without_a_readable_backup_gpt_or_a_device(self):
+        size = 64 * 1024**2
+        part = {**self.part, "start": 1024**2, "size": 4 * 1024**2, "fstype": "crypto_LUKS"}
+        bad_device, _ = self.gpt_device(size, valid=False)
+        for device, label in ((bad_device, "gpt"), (None, "gpt"), (bad_device, None), ("/nonexistent/device", "gpt")):
+            with self.subTest(device=device, table_label=label), contextlib.redirect_stdout(io.StringIO()):
+                result = allocated.build_domain([part], size, self.root, device=device, table_label=label)
+                self.assertEqual(result, [allocated.Block(0, size, "+")])
+
+    def test_mbr_tail_keeps_only_the_last_mib(self):
+        size = 64 * 1024**2
+        device = self.root / "mbr-device"
+        with device.open("wb") as out:
+            out.truncate(size)
+        part = {**self.part, "start": 1024**2, "size": 4 * 1024**2, "fstype": "crypto_LUKS"}
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = allocated.build_domain([part], size, self.root, device=str(device), table_label="dos")
+        self.assertEqual(result[-2], allocated.Block(5 * 1024**2, size - allocated.TAIL_KEEP_BYTES - 5 * 1024**2, "?"))
+        self.assertEqual(result[-1], allocated.Block(size - allocated.TAIL_KEEP_BYTES, allocated.TAIL_KEEP_BYTES, "+"))
+
+    def test_small_tail_is_never_skipped(self):
+        size = 8 * 1024**2
+        device, _ = self.gpt_device(size)
+        part = {**self.part, "start": 1024**2, "size": 6 * 1024**2 + 512 * 1024, "fstype": "crypto_LUKS"}  # tail of 512 KiB
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = allocated.build_domain([part], size, self.root, device=device, table_label="gpt")
+        self.assertEqual(result, [allocated.Block(0, size, "+")])
+
+    def test_import_summary_reports_the_skipped_tail(self):
+        # the domain build is mocked: a tail of 512 bytes marked "?" after the partition (ends at 1536)
+        self.blocks = [allocated.Block(0, 1024, "+"), allocated.Block(1024, 512, "?"), allocated.Block(1536, 256, "?"), allocated.Block(1792, 256, "+")]
+        with self.patches(), mock.patch.object(OperationProgress, "run", side_effect=self.fake_run):
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.do_import()
+        text = out.getvalue()
+        self.assertIn("256 B of unpartitioned space after the last partition", text)
+        self.assertIn("512 B of free filesystem space", text)
+
     def test_invalid_domain_maps_fail_closed(self):
         for data in ("", "0 ?\n0 512 ?\n1024 512 +\n", "0 ?\n0 4096 +\n", "0 ?\n0 512 -\n", "0 ?\n0 0 +\n"):
             with self.subTest(data=data):
@@ -127,24 +216,22 @@ class AllocatedImportTests(unittest.TestCase):
         def checked_run(cmd, **kwargs):
             self.assertEqual(self.target.read_bytes(), b"original VM disk")
             self.fake_run(cmd, **kwargs)
-        with self.patches(), mock.patch.object(runtime, "run", side_effect=checked_run) as run, \
-                mock.patch.object(runtime, "run_progress", side_effect=self.fake_convert):
+        with self.patches(), mock.patch.object(OperationProgress, "run", side_effect=checked_run) as run:
             self.do_import()
         self.assertEqual(self.target.read_bytes(), b"B" * 512 + b"A" * 512 + b"\0" * 512 + b"T" * 512)
         self.assertFalse(self.work.exists())
         self.assertIn("--sparse", run.call_args_list[0].args[0])
-        self.assertEqual([call.args[0][0] for call in run.call_args_list], ["ddrescue", "ddrescuelog", "qemu-img"])
+        self.assertEqual([call.args[0][0] for call in run.call_args_list], ["ddrescue", "ddrescuelog", "qemu-img", "qemu-img"])
 
     def test_unrecovered_blocks_do_not_replace_target(self):
         def incomplete(cmd, **kwargs):
             self.fake_run(cmd, **kwargs)
             if cmd[0] == "ddrescuelog":
                 raise subprocess.CalledProcessError(1, cmd)
-        with self.patches(), mock.patch.object(runtime, "run", side_effect=incomplete), \
-                mock.patch.object(runtime, "run_progress") as convert:
+        with self.patches(), mock.patch.object(OperationProgress, "run", side_effect=incomplete) as run:
             with self.assertRaisesRegex(VMError, "Import incomplete"):
                 self.do_import()
-        convert.assert_not_called()
+        self.assertFalse(any(call.args[0][:2] == ["qemu-img", "convert"] for call in run.call_args_list))
         self.assertEqual(self.target.read_bytes(), b"original VM disk")
         self.assertTrue((self.work / "rescue.map").exists())
 
@@ -152,18 +239,17 @@ class AllocatedImportTests(unittest.TestCase):
         def truncated(cmd, **kwargs):
             if cmd[0] == "ddrescue":
                 self.write_map(Path(cmd[-1]), [allocated.Block(0, 512, "+")])
-        with self.patches(), mock.patch.object(runtime, "run", side_effect=truncated), \
-                mock.patch.object(runtime, "run_progress") as convert:
+        with self.patches(), mock.patch.object(OperationProgress, "run", side_effect=truncated) as run:
             with self.assertRaisesRegex(VMError, "does not cover"):
                 self.do_import()
-        convert.assert_not_called()
+        self.assertFalse(any(call.args[0][:2] == ["qemu-img", "convert"] for call in run.call_args_list))
         self.assertEqual(self.target.read_bytes(), b"original VM disk")
 
     def test_changed_allocation_map_prevents_resume(self):
         self.interrupt_import()
         self.args.resume = True
         self.blocks = [allocated.Block(0, 2048, "+")]
-        with self.patches(), mock.patch.object(runtime, "run") as run:
+        with self.patches(), mock.patch.object(OperationProgress, "run") as run:
             with self.assertRaisesRegex(VMError, "partition allocation"):
                 self.do_import()
         run.assert_not_called()
@@ -183,12 +269,11 @@ class AllocatedImportTests(unittest.TestCase):
                     raise subprocess.CalledProcessError(1, cmd)
 
                 with self.patches(), mock.patch.object(allocated, "build_domain", side_effect=build_domain), \
-                        mock.patch.object(runtime, "run", side_effect=rejected) as run, \
-                        mock.patch.object(runtime, "run_progress") as convert:
+                        mock.patch.object(OperationProgress, "run", side_effect=rejected) as run:
                     with self.assertRaisesRegex(VMError, "could not map allocated blocks") as caught:
                         self.do_import()
                 self.assertEqual(run.call_count, 1)
-                convert.assert_not_called()
+                self.assertFalse(any(call.args[0][:2] == ["qemu-img", "convert"] for call in run.call_args_list))
                 message = str(caught.exception)
                 self.assertIn(self.part["path"], message)
                 self.assertIn(str(scans[-1]), message)
@@ -209,8 +294,7 @@ class AllocatedImportTests(unittest.TestCase):
         self.assertTrue(list(self.work.glob("scan-*")))
         self.assertFalse((self.work / "manifest.json").exists())
         self.args.resume = True
-        with self.patches(), mock.patch.object(runtime, "run", side_effect=self.fake_run), \
-                mock.patch.object(runtime, "run_progress", side_effect=self.fake_convert):
+        with self.patches(), mock.patch.object(OperationProgress, "run", side_effect=self.fake_run):
             self.do_import()
         self.assertFalse(self.work.exists())
         self.assertEqual(self.target.read_bytes(), b"B" * 512 + b"A" * 512 + b"\0" * 512 + b"T" * 512)
@@ -220,7 +304,7 @@ class AllocatedImportTests(unittest.TestCase):
         self.args.resume = True
         with (self.work / "lock").open("a") as lock:
             allocated.fcntl.flock(lock, allocated.fcntl.LOCK_EX | allocated.fcntl.LOCK_NB)
-            with self.patches(), mock.patch.object(runtime, "run") as run:
+            with self.patches(), mock.patch.object(OperationProgress, "run") as run:
                 with self.assertRaisesRegex(VMError, "Another allocated import"):
                     self.do_import()
             run.assert_not_called()
@@ -228,8 +312,7 @@ class AllocatedImportTests(unittest.TestCase):
     def test_interrupt_and_resume(self):
         self.interrupt_import()
         self.args.resume = True
-        with self.patches(), mock.patch.object(runtime, "run", side_effect=self.fake_run) as run, \
-                mock.patch.object(runtime, "run_progress", side_effect=self.fake_convert):
+        with self.patches(), mock.patch.object(OperationProgress, "run", side_effect=self.fake_run) as run:
             self.do_import()
         self.assertNotIn("--sparse", run.call_args_list[0].args[0])
         self.assertFalse(self.work.exists())
@@ -246,7 +329,7 @@ class AllocatedImportTests(unittest.TestCase):
                     path.unlink()
                 else:
                     path.write_bytes(b"X" + before[1:])
-                with self.patches(), mock.patch.object(runtime, "run") as run:
+                with self.patches(), mock.patch.object(OperationProgress, "run") as run:
                     with self.assertRaisesRegex(VMError, "Cannot resume"):
                         self.do_import()
                 run.assert_not_called()
@@ -254,8 +337,11 @@ class AllocatedImportTests(unittest.TestCase):
                 os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
 
     def test_conversion_failure_retains_old_target_and_resumable_raw(self):
-        with self.patches(), mock.patch.object(runtime, "run", side_effect=self.fake_run), \
-                mock.patch.object(runtime, "run_progress", side_effect=subprocess.CalledProcessError(1, "qemu-img")):
+        def failed_convert(cmd, **kwargs):
+            if cmd[:2] == ["qemu-img", "convert"]:
+                raise subprocess.CalledProcessError(1, cmd)
+            self.fake_run(cmd, **kwargs)
+        with self.patches(), mock.patch.object(OperationProgress, "run", side_effect=failed_convert):
             with self.assertRaises(subprocess.CalledProcessError):
                 self.do_import()
         self.assertEqual(self.target.read_bytes(), b"original VM disk")
@@ -263,7 +349,7 @@ class AllocatedImportTests(unittest.TestCase):
 
     def test_existing_state_is_not_deleted_by_fresh_import(self):
         self.interrupt_import()
-        with self.patches(), mock.patch.object(runtime, "run") as run:
+        with self.patches(), mock.patch.object(OperationProgress, "run") as run:
             with self.assertRaisesRegex(VMError, "already exists"):
                 self.do_import()
         run.assert_not_called()
@@ -340,14 +426,14 @@ class AllocatedImportIntegrationTests(unittest.TestCase):
                     mock.patch.object(allocated, "require_stopped"), \
                     mock.patch.object(import_dev, "validate_import_source", return_value=info):
                 if resume:
-                    run = runtime.run
-                    def interrupted(cmd, **kwargs):
+                    run = OperationProgress.run
+                    def interrupted(progress, cmd, **kwargs):
                         if cmd[0] == "ddrescue":
                             limited = [f"--size={size // 2}" if arg == f"--size={size}" else arg for arg in cmd]
-                            run(limited, **kwargs)
+                            run(progress, limited, **kwargs)
                             raise KeyboardInterrupt()
-                        run(cmd, **kwargs)
-                    with mock.patch.object(runtime, "run", side_effect=interrupted):
+                        run(progress, cmd, **kwargs)
+                    with mock.patch.object(OperationProgress, "run", autospec=True, side_effect=interrupted):
                         with self.assertRaises(KeyboardInterrupt):
                             allocated.import_disk(args, vm, target, info)
                     self.assertEqual(target.read_bytes(), b"old target")

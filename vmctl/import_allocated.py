@@ -11,19 +11,23 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 from vmctl import flash, runtime, ui
 from vmctl.errors import VMError
-
-if TYPE_CHECKING:
-    from vmctl.flash_progress import FlashProgress
+from vmctl.flash_progress import OperationProgress
 
 
 PARTCLONE = {
     "ext2": "partclone.extfs", "ext3": "partclone.extfs", "ext4": "partclone.extfs",
     "ntfs": "partclone.ntfs", "vfat": "partclone.fat", "exfat": "partclone.exfat",
 }
+
+# The end of the disk is always copied: the backup GPT header sits in the last sector and
+# its partition entry array just before it (33 sectors on a standard table). One MiB covers
+# any entry array a real disk carries and costs nothing.
+TAIL_KEEP_BYTES = 1024 * 1024
+GPT_HEADER_SIZE = 92
 
 
 @dataclass(frozen=True)
@@ -124,8 +128,55 @@ def partition_plan(device: str, info: dict[str, Any]) -> tuple[dict[str, Any], l
     return table, plan
 
 
+def gpt_backup_start(device: str, size: int, sector: int = 512) -> int | None:
+    """Byte offset of the backup GPT partition entry array, read from the backup header in
+    the disk's last sector; ``None`` when there is no valid backup header there."""
+    try:
+        with Path(device).open("rb") as handle:
+            handle.seek(size - sector)
+            header = handle.read(GPT_HEADER_SIZE)
+    except OSError:
+        return None
+    if len(header) < GPT_HEADER_SIZE or header[:8] != b"EFI PART":
+        return None
+    my_lba = int.from_bytes(header[24:32], "little")
+    entry_lba = int.from_bytes(header[72:80], "little")
+    count = int.from_bytes(header[80:84], "little")
+    entry_size = int.from_bytes(header[84:88], "little")
+    if my_lba != size // sector - 1 or entry_lba <= 0 or entry_lba >= my_lba or count <= 0 or entry_size <= 0:
+        return None
+    return entry_lba * sector
+
+
+def trailing_keep_from(device: str | None, label: str | None, plan_end: int, size: int, sector: int = 512) -> tuple[int, str]:
+    """Where the copy of the tail after the last partition starts, and why.
+
+    Between the last partition and the backup GPT structures there is only unpartitioned
+    space: no filesystem, no bootloader, nothing a guest can see. On the 250 GB disk that
+    motivated this, sda2 ended at 34 GB and the remaining 199 GB were read in full at
+    500 MB/s for nothing (2026-09-20). GPT: keep from the backup entry array (read from the
+    backup header itself, never assumed) or the last MiB, whichever comes first; if the
+    header cannot be read, copy the tail whole rather than guess. MBR: nothing lives after
+    the last partition, the last MiB is kept out of caution. No device or unknown table:
+    copy everything, the historical behaviour.
+    """
+    if device is None or label not in ("gpt", "dos"):
+        return plan_end, "unpartitioned tail copied in full"
+    keep = max(plan_end, size - TAIL_KEEP_BYTES)
+    if label == "gpt":
+        backup = gpt_backup_start(device, size, sector)
+        if backup is None:
+            return plan_end, "the backup GPT header could not be read, so the unpartitioned tail is copied in full"
+        return max(plan_end, min(keep, backup)), "backup GPT kept"
+    return keep, "MBR disk, nothing lives after the last partition"
+
+
 def build_domain(plan: list[dict[str, Any]], size: int, scratch: Path,
-                 progress: FlashProgress | None = None) -> list[Block]:
+                 progress: OperationProgress | None = None,
+                 device: str | None = None, table_label: str | None = None) -> list[Block]:
+    """The ddrescue domain: ``+`` blocks are read, ``?`` blocks are skipped. *device* and
+    *table_label* (``gpt``/``dos``) let the unpartitioned tail be skipped; without them the
+    tail is copied in full. (The loop's own ``label`` is the progress caption.)"""
     blocks: list[Block] = []
     end = 0
     for index, part in enumerate(plan):
@@ -169,7 +220,11 @@ def build_domain(plan: list[dict[str, Any]], size: int, scratch: Path,
                 append_block(blocks, start + block.start, block.size, block.status)
             append_block(blocks, start + mapped[-1].end, length - mapped[-1].end, "+")
         end = start + length
-    append_block(blocks, end, size - end, "+")
+    keep_from, reason = trailing_keep_from(device, table_label, end, size)
+    if keep_from > end:
+        ui.print_note(f"After the last partition: skipping {runtime.format_bytes(keep_from - end)} of unpartitioned space ({reason})")
+        append_block(blocks, end, keep_from - end, "?")
+    append_block(blocks, keep_from, size - keep_from, "+")
     return blocks
 
 
@@ -238,7 +293,8 @@ def import_disk(args: argparse.Namespace, vm: dict[str, Any], disk_path: Path, i
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as exc:
                 raise VMError("Another allocated import is using this target") from exc
-            _import_locked(args, vm, disk_path, info, table, plan, size, work, resume)
+            progress = OperationProgress(disk_path.parent / "logs", operation="import")
+            _import_locked(args, vm, disk_path, info, table, plan, size, work, resume, progress)
             completed = True
     finally:
         if completed:
@@ -250,7 +306,7 @@ def import_disk(args: argparse.Namespace, vm: dict[str, Any], disk_path: Path, i
 
 def _import_locked(args: argparse.Namespace, vm: dict[str, Any], disk_path: Path,
                    info: dict[str, Any], table: dict[str, Any], plan: list[dict[str, Any]],
-                   size: int, work: Path, resume: bool) -> None:
+                   size: int, work: Path, resume: bool, progress: OperationProgress) -> None:
     from vmctl.import_dev import validate_import_source
 
     raw, domain, rescue = work / "source.raw", work / "domain.map", work / "rescue.map"
@@ -260,8 +316,12 @@ def _import_locked(args: argparse.Namespace, vm: dict[str, Any], disk_path: Path
         if path.is_symlink() or (path.exists() and not path.is_file()):
             raise VMError(f"Invalid import state file: {path}")
     scratch = Path(tempfile.mkdtemp(dir=work, prefix="scan-"))
+    progress.stage(1, "Find used filesystem blocks")
     try:
-        blocks = build_domain(plan, size, scratch)
+        try:
+            blocks = build_domain(plan, size, scratch, progress=progress, device=args.device, table_label=table.get("label"))
+        finally:
+            progress.preserve_logs(scratch)
     except BaseException:
         ui.print_note(f"Partition scan diagnostics kept at: {scratch}")
         raise
@@ -294,26 +354,40 @@ def _import_locked(args: argparse.Namespace, vm: dict[str, Any], disk_path: Path
             output.truncate(size)
         manifest.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
     selected = sum(block.size for block in blocks if block.status == "+")
-    ui.print_kv("to copy", runtime.format_bytes(selected))
-    ui.print_kv("skipped", runtime.format_bytes(size - selected))
-    ui.print_kv("state", str(work))
+    plan_end = max((part["start"] + part["size"] for part in plan), default=0)
+    # A skipped tail merges with free space at the end of the last filesystem: count only the part past the partition.
+    tail_skipped = sum(max(0, block.end - max(block.start, plan_end)) for block in blocks if block.status == "?")
+    print()
+    ui.print_kv("To copy", runtime.format_bytes(selected))
+    ui.print_kv("Skipped", f"{runtime.format_bytes(size - selected - tail_skipped)} of free filesystem space")
+    if tail_skipped:
+        ui.print_kv("Skipped", f"{runtime.format_bytes(tail_skipped)} of unpartitioned space after the last partition")
+    outside = size - sum(part["size"] for part in plan) - tail_skipped
+    if outside:
+        ui.print_kv("Included", f"{runtime.format_bytes(outside)} outside filesystems (boot areas, gaps, partition table) preserved in full")
+    ui.print_kv("State", ui.pretty_path(work))
+    progress.stage(2, "Copy from the physical disk")
     # On resume, write zeros too: an interrupted write may not be in the map yet.
     sparse = [] if resume else ["--sparse"]
-    runtime.run(["ddrescue", *sparse, "--no-scrape", "--retry-passes=0", "--sector-size=512",
-                 f"--size={size}", f"--domain-mapfile={domain}", args.device, str(raw), str(rescue)])
+    progress.run(["ddrescue", *sparse, "--no-scrape", "--retry-passes=0", "--sector-size=512",
+                  f"--size={size}", f"--domain-mapfile={domain}", args.device, str(raw), str(rescue)],
+                 title=f"Reading allocated blocks from {args.device}")
+    progress.stage(3, "Verify the copied disk")
     if read_map(rescue, size)[-1].end != size:
         raise VMError("Import incomplete: rescue map does not cover the entire source disk")
     try:
-        runtime.run(["ddrescuelog", "--done-status", f"--size={size}", f"--domain-mapfile={domain}", str(rescue)])
+        progress.run(["ddrescuelog", "--done-status", f"--size={size}", f"--domain-mapfile={domain}", str(rescue)],
+                     title="Verify all selected blocks were copied")
     except subprocess.CalledProcessError as exc:
         raise VMError("Import incomplete: required blocks remain unread or damaged; the VM disk has not been replaced") from exc
     current = validate_import_source(args.device)
     if int(current["size"]) != size or partition_plan(args.device, current) != (table, plan):
         raise VMError("Source partition layout changed during import")
-    ui.print_note("All required blocks recovered; converting the staged disk")
-    runtime.run_progress(["qemu-img", "convert", "-p", "-f", "raw", "-O", vm["disk"]["format"], str(raw), str(staged)])
+    progress.stage(4, "Create the VM disk image")
+    progress.run(["qemu-img", "convert", "-p", "-f", "raw", "-O", vm["disk"]["format"], str(raw), str(staged)],
+                 title=f"Convert to {vm['disk']['format']}")
     if vm["disk"]["format"] == "qcow2":
-        runtime.run(["qemu-img", "check", "-f", "qcow2", str(staged)])
+        progress.run(["qemu-img", "check", "-f", "qcow2", str(staged)], title="Check the VM disk image")
     require_stopped(args.vm, vm)
     if target_stamp(disk_path) != identity["previous_target"]:
         raise VMError("VM disk changed during import; converted image kept in the state directory")

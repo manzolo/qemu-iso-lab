@@ -1,4 +1,4 @@
-"""Readable flash progress with persistent, unabridged command diagnostics."""
+"""Readable disk operation progress with persistent command diagnostics."""
 from __future__ import annotations
 
 import os
@@ -43,11 +43,12 @@ def stop_process(process: "subprocess.Popen[bytes]") -> None:
     process.wait()
 
 
-class FlashProgress:
-    def __init__(self, directory: Path):
+class OperationProgress:
+    def __init__(self, directory: Path, *, operation: str = "flash", stages: int = 4):
         directory.mkdir(parents=True, exist_ok=True)
-        fd, name = tempfile.mkstemp(prefix="flash-", suffix=".log", dir=directory)
+        fd, name = tempfile.mkstemp(prefix=f"{operation}-", suffix=".log", dir=directory)
         self.log_path = Path(name)
+        self.stages = stages
         os.close(fd)
         # sudo creates the file; the caller must be able to read diagnostics later.
         from vmctl.flash import maybe_restore_sudo_owner
@@ -59,9 +60,9 @@ class FlashProgress:
 
     def stage(self, number: int, title: str) -> None:
         print()
-        ui.print_header(f"{number}/4  {title}")
+        ui.print_header(f"{number}/{self.stages}  {title}")
         with self.log_path.open("a", encoding="utf-8") as log:
-            log.write(f"\n== {number}/4 {title} ==\n")
+            log.write(f"\n== {number}/{self.stages} {title} ==\n")
 
     def _draw(self, title: str, progress: float | None, elapsed: float) -> None:
         width = max(20, shutil.get_terminal_size((80, 24)).columns - 1)
@@ -137,3 +138,7 @@ class FlashProgress:
                 output.write(f"\n--- {path.name} ---\n".encode())
                 with path.open("rb") as source:
                     shutil.copyfileobj(source, output)
+
+
+class FlashProgress(OperationProgress):
+    """Four-stage flash display, sharing its runner with disk imports."""

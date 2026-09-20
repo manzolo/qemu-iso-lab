@@ -209,9 +209,18 @@ is required when that filesystem is present. QEMU tools remain required.
 - Destination formats: RAW and QCOW2, without subformat options.
 
 The domain map includes filesystem metadata and allocated blocks. It also copies
-all areas outside partitions, including bootloader gaps and the backup GPT.
-Large unpartitioned gaps therefore still take time to read. The logical disk
-size and partition boundaries are preserved; this mode does not shrink filesystems.
+the areas outside filesystems that a guest can depend on: the partition table, the
+bootloader gap before the first partition, gaps between partitions and the backup
+GPT at the end of the disk. The **unpartitioned space after the last partition** is
+skipped: on a GPT disk the copy resumes at the backup partition entry array (its
+offset is read from the backup header in the last sector, never assumed) or at the
+last MiB, whichever comes first; on an MBR disk only the last MiB is kept. A 250 GB
+disk whose two partitions end at 34 GB thus reads about 12 GB instead of 212 (the
+allocated data plus the tail). If the backup GPT header cannot be read, the tail is
+copied in full rather than guessed at. The logical disk size and partition
+boundaries are preserved; this mode does not shrink filesystems. An import started
+before this change cannot be resumed with `--resume` (its domain map differs):
+move the state directory aside and start again.
 
 The source must stay unmounted and unchanged throughout the operation, including
 between attempts. Filesystem check failures stop the import; checks are not forced
