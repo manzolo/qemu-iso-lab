@@ -8,6 +8,9 @@
         "role": "desktop",
         "release_model": "retro",
         "status": "unattended",
+        "groups": [
+          "windows-retro"
+        ],
         "verified": "2026-09-14"
       },
       "iso": "isos/windowsxp.iso",
@@ -75,7 +78,10 @@
         "family": "windows",
         "role": "desktop",
         "release_model": "retro",
-        "status": "experimental"
+        "status": "experimental",
+        "groups": [
+          "windows-retro"
+        ]
       },
       "iso": "isos/windows98.iso",
       "disk": {
@@ -133,6 +139,9 @@
         "role": "desktop",
         "release_model": "retro",
         "status": "unattended",
+        "groups": [
+          "windows-retro"
+        ],
         "verified": "2026-09-14"
       },
       "iso": "isos/windows2000.iso",
@@ -199,6 +208,9 @@
         "role": "desktop",
         "release_model": "retro",
         "status": "experimental",
+        "groups": [
+          "windows-retro"
+        ],
         "verified": "2026-09-15"
       },
       "iso": "isos/windowsnt4.iso",

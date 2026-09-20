@@ -96,6 +96,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = _add(subparsers, "list", help="list configured VM profiles")
     p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     p.add_argument("--names", action="store_true", help="emit only the profile names, one per line (for scripts and shell completion)")
+    p.add_argument("--groups", action="store_true", help="list the profile groups (categories) that check-vms --group accepts, with their members")
     p.set_defaults(func=lifecycle.cmd_list)
 
     p = _add(subparsers, "status", help="report local artifacts and runtime state per VM")
@@ -321,6 +322,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = _add(subparsers, "check-vms", aliases=["test-local"], help="run the local VM validation matrix")
     p.add_argument("vms", nargs="*", help="optional subset of VM profiles to test (the full matrix skips meta.status experimental profiles; naming one runs it)")
+    p.add_argument("--group", action="append", metavar="NAME",
+                   help="run a category instead of the whole matrix: ubuntu, ubuntu-lts, ubuntu-flavors, windows-retro, netlab, smoke, "
+                        "a family (debian, fedora, rhel, windows...), a role (desktop, server) or an install flow (bootstrap-preseed...). "
+                        "Repeat to add another; vmctl list --groups shows them all. Like the full matrix, a group skips experimental profiles")
     p.add_argument("--timeout", type=int, default=300, help="seconds for unattended/bootstrap and boot-check flows (default: 300)")
     p.add_argument("--parallel", default="1", metavar="N|auto",
                    help="VMs to test concurrently: a number, or 'auto' to start as many as the host's free RAM and CPUs "

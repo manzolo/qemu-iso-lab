@@ -102,6 +102,9 @@
         "role": "server",
         "release_model": "channel-based",
         "status": "unattended",
+        "groups": [
+          "smoke"
+        ],
         "verified": "2026-09-19"
       },
       "iso": "isos/latest-nixos-minimal-x86_64-linux.iso",

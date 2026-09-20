@@ -1027,6 +1027,47 @@ vmctl check-vms ubuntu-niri arch-noctalia --timeout 600
 vmctl check-vms --parallel 4 --clean-first
 ```
 
+### Running one category instead of the whole matrix
+
+The full matrix takes hours. `--group NAME` runs one category of it, and repeating
+the flag adds another:
+
+```bash
+vmctl list --groups                      # every category, its size and its members
+vmctl check-vms --group ubuntu           # every Ubuntu profile and official flavour
+vmctl check-vms --group smoke            # one profile per install flow: does the machinery still work?
+vmctl check-vms --group rhel --group fedora
+make validate-vms GROUP="ubuntu rhel"    # the same, with --restore and the HTML report
+```
+
+Most categories are **derived** from metadata the profile already carries, so a new VM
+joins them the moment it is written:
+
+| Axis | Groups |
+|------|--------|
+| `meta.family` | `debian`, `arch`, `fedora`, `rhel`, `windows`, `bsd`, `nix`, `alpine`, `opensuse`, `reactos`, `kali`, `mint`, `void` |
+| `meta.status` | `unattended`, `manual`, `experimental` |
+| `meta.role` | `desktop`, `server`, `router`, `installer`, `ci`, `minimal`, `import-template`... |
+| install flow | `bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-windows`, `boot-check`... |
+
+The rest are declared by hand in `meta.groups`, because no other field expresses them:
+
+| Group | What is in it |
+|-------|---------------|
+| `ubuntu` | Ubuntu and its official flavours, whatever their `meta.slug`: the whole release series, the 24.04 flavour sweep, the 26.04 profiles and `lubuntu-lab`. They all share `meta.family: debian` with Debian and Kali, so the family alone could not say "the Ubuntu ones" |
+| `ubuntu-releases` | One unattended desktop install per Ubuntu release, 8.04 to 26.04. 24.04's entry is `ubuntu-gnome-24.04`: it is the same recipe under the flavour naming, so the series has no separate `ubuntu-24.04-unattended` profile |
+| `ubuntu-flavors` | The 24.04 flavour sweep: GNOME, KDE, LXQt, Xfce, MATE, Budgie, Unity, Cinnamon, Studio, Edubuntu |
+| `debian-only` | Debian proper, without the Ubuntu and Kali profiles that share its family |
+| `kali` | Both Kali profiles: the live one (family `kali`) and the preseed one (family `debian`) |
+| `windows-retro` | Windows NT 4.0, 98, 2000 and XP. Windows 7, 10 and 11 stay in `windows` |
+| `netlab` | The network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab` |
+| `smoke` | One profile per install flow that downloads its own medium, the lightest of each: `alpine-ci`, `ubuntu-server-ci`, `debian-server`, `almalinux-server`, `alpine-niri`, `arch-noctalia`, `opensuse-tumbleweed-autoyast`, `nixos-server`, `freebsd-unattended`. Run it before a full matrix: it answers "is every bootstrap flow still working" without the desktop installs |
+
+A group is a selector, like the bare `check-vms`, so it skips `experimental` profiles;
+naming one on the command line still runs it, even together with `--group`. Adding a
+profile to a category is one line in its own `meta.groups`, and a test fails if an
+Ubuntu profile forgets it.
+
 `--parallel N` runs up to N VMs concurrently; `--parallel auto` (what
 `make validate-vms` uses) packs them by the host's resources instead: every VM
 costs its guest RAM plus 512 MB of QEMU overhead and its vCPUs, the budget is

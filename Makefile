@@ -10,7 +10,7 @@ PREFIX ?= $(HOME)/.local
 TIMEOUT ?= 3600
 BIN := $(abspath bin)
 
-.PHONY: help setup install-cli uninstall-cli test lint check ci tui init-local-profile validate-vms guides
+.PHONY: help setup install-cli uninstall-cli test lint check ci tui init-local-profile validate-vms groups guides
 
 help: ## Show this help
 	@printf "\033[1mqemu-iso-lab: developer targets\033[0m\n\n"
@@ -54,8 +54,11 @@ init-local-profile: ## Create vms/profiles/local.json from the example
 		printf "  edit YOUR_USER, the password/hash and the SSH/dotfile paths before using personal profile overrides\n"; \
 	fi
 
-validate-vms: ## Local-only full matrix: reinstall every unattended profile from scratch (experimental ones are reported as skipped), restore the installed disks, write the HTML report (hours; VMS="a b" to narrow, PARALLEL=auto (default) packs VMs by free RAM/CPUs or PARALLEL=N fixes the count, TIMEOUT=3600 s per phase)
-	@./bin/vmctl check-vms $(VMS) --restore --no-clean-first --report --parallel $(or $(PARALLEL),auto) --timeout $(TIMEOUT) --open
+validate-vms: ## Local-only matrix: reinstall every unattended profile from scratch (experimental ones are reported as skipped), restore the installed disks, write the HTML report (hours; GROUP="ubuntu rhel" runs one category, VMS="a b" names profiles, PARALLEL=auto (default) packs VMs by free RAM/CPUs or PARALLEL=N fixes the count, TIMEOUT=3600 s per phase)
+	@./bin/vmctl check-vms $(VMS) $(foreach group,$(GROUP),--group $(group)) --restore --no-clean-first --report --parallel $(or $(PARALLEL),auto) --timeout $(TIMEOUT) --open
+
+groups: ## List the profile categories check-vms --group accepts (also: vmctl list --groups)
+	@./bin/vmctl list --groups
 
 guides: ## Render docs/guides/{it,en} into docs/guides/pdf/<lang>/ (one manual + single PDFs; needs python markdown + weasyprint)
 	python3 tools/build_guides.py

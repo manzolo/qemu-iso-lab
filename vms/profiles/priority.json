@@ -104,6 +104,9 @@
         "role": "server",
         "release_model": "stable",
         "status": "unattended",
+        "groups": [
+          "smoke"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",

@@ -7,7 +7,10 @@
         "family": "alpine",
         "role": "ci",
         "release_model": "stable",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "smoke"
+        ]
       },
       "iso": "isos/alpine-virt-3.24.1-x86_64.iso",
       "iso_url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",

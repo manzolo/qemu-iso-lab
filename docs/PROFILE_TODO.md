@@ -18,6 +18,11 @@ Add profiles that cover a new axis: firmware, installation flow, operating syste
 - Non-Linux coverage: `freebsd` (manual), `reactos` (unattend.inf install through `bootstrap-reactos`).
 - Ubuntu desktop history: nine manual profiles, one per LTS from 8.04 to 24.04, on the official desktop ISOs (`ubuntu-lts.json`). `ubuntu-8.04-unattended` to `ubuntu-18.04-unattended` install them with `bootstrap-preseed`, `ubuntu-20.04-unattended`/`ubuntu-22.04-unattended` with autoinstall like `ubuntu-gnome-24.04`, on the d-i alternate/server media (live PASS 2026-09-12, see below; 16.04 and 18.04 use the shared `verify-desktop`).
 - Canonical names with legacy aliases, safe host-directory migration and pinned CI media with vendor checksums.
+- Profile categories for the matrix: `check-vms --group <name>` runs one slice instead of the
+  full run. `meta.family`, `meta.status`, `meta.role` and the install flow act as categories on
+  their own; `meta.groups` declares only what they cannot express (`ubuntu`, `ubuntu-releases`,
+  `ubuntu-flavors`, `debian-only`, `kali`, `windows-retro`, `netlab`, `smoke`). `vmctl list --groups`
+  and [UNATTENDED.md](UNATTENDED.md#running-one-category-instead-of-the-whole-matrix) list them.
 
 ## Status semantics
 
@@ -48,6 +53,13 @@ Recorded dates:
 
 ## Remaining work
 
+- **`ubuntu-26.04-unattended` has never been run live** (added 2026-09-20, `meta.status: unattended`,
+  no `meta.verified`). It completes the per-release desktop series on the 26.04 ISO that
+  `ubuntu-server-live` and `ubuntu-server-ci` already pin, with the 22.04/24.04 recipe unchanged:
+  autoinstall `packages` carrying `ubuntu-desktop`, gdm3 autologin drop-in, `verify-desktop` over SSH.
+  Two things to watch on the first run: whether 26.04's subiquity resolves `ubuntu-desktop` from
+  `packages` (24.04 does; 20.04 needed `late_commands` with `curtin in-target` because it resolves
+  against the CD pool only), and whether gdm3 is still the display manager under that name.
 - Budgie was promoted from `experimental` to `unattended` on 2026-09-09: `verify-desktop`
   reported `Desktop ready: lab has an active local graphical session` on the live matrix, so
   the LightDM autologin drop-in is confirmed and the flavor no longer differs from the other four.

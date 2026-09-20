@@ -9,6 +9,9 @@
         "role": "router",
         "release_model": "stable",
         "status": "unattended",
+        "groups": [
+          "netlab"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/pfSense-CE-2.7.2-RELEASE-amd64.iso",
@@ -112,6 +115,9 @@
         "role": "server",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "netlab"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
@@ -239,6 +245,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "netlab",
+          "ubuntu"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",

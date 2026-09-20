@@ -108,10 +108,13 @@
       "name": "openSUSE Tumbleweed GNOME (AutoYaST)",
       "meta": {
         "slug": "opensuse",
-        "family": "suse",
+        "family": "opensuse",
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
+        "groups": [
+          "smoke"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",

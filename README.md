@@ -94,6 +94,7 @@ accepts `--dry-run` in front of it.
 | get a command line without SSH (serial: ttyS0 login, pfSense menu) | `vmctl console <vm>` on a background VM, `Ctrl-]` to detach |
 | use an installed VM in virt-manager | `vmctl export-libvirt <vm>`; return with `vmctl unexport-libvirt <vm>` ([guide](docs/LIBVIRT.md)) |
 | save a matrix report with screenshots | `vmctl check-vms alpine-ci debian-server --restore --report --open` |
+| validate one category instead of the whole matrix | `vmctl list --groups`, then `vmctl check-vms --group ubuntu` (or `--group smoke`, one VM per install flow) |
 | keep a copy of an installed VM to go back to | `vmctl checkpoint create <vm> clean-install`, later `vmctl checkpoint restore <vm> clean-install` ([guide](docs/CHECKPOINTS.md)) |
 | get a second, independent VM out of an installed one | `vmctl clone <vm> <new-name>` (`--identity regenerate` for a new hostname/machine-id/host keys; [guide](docs/CLONE.md)) |
 | test every unattended flow without losing my VMs      | `vmctl check-vms --restore` (stashes disks, runs, restores) |

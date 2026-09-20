@@ -1032,6 +1032,9 @@ def run_local_test_vm_subprocess(vm_name: str, args: argparse.Namespace) -> tupl
 def cmd_list(args: argparse.Namespace) -> int:
     cfg = config.load_config()
 
+    if getattr(args, "groups", False):
+        return print_groups(cfg, args)
+
     if getattr(args, "names", False):
         for name in config.sorted_vm_names(cfg):
             print(name)
@@ -1228,6 +1231,32 @@ def cmd_status(args: argparse.Namespace) -> int:
               f"{style_status_cell(runtime_str, runtime_width)}  "
               f"{actual:>{actual_width}}  "
               f"{virtual:>{virtual_width}}")
+    return 0
+
+
+def print_groups(cfg: dict[str, Any], args: argparse.Namespace) -> int:
+    """``vmctl list --groups``: the categories check-vms --group accepts, and who is in them."""
+    index = group_index(cfg)
+    sources = group_sources(cfg)
+    if getattr(args, "json", False):
+        print(json.dumps([{"group": group, "sources": sources[group], "count": len(names), "profiles": names}
+                          for group, names in index.items()], indent=2))
+        return 0
+    ui.print_header("Profile groups")
+    ui.print_note("vmctl check-vms --group <name> runs one; repeat --group to add another.")
+    ui.print_note("declared = meta.groups in the profile; the others follow meta.family, meta.status, meta.role and the install flow.")
+    width = max(len("GROUP"), max(len(group) for group in index))
+    source_width = max(len("FROM"), max(len(",".join(found)) for found in sources.values()))
+    print(f"\n{ui.style('GROUP', ui.BOLD, ui.CYAN):<{width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
+          f"{ui.style('VMS', ui.BOLD, ui.CYAN):>{3 + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
+          f"{ui.style('FROM', ui.BOLD, ui.CYAN):<{source_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
+          f"{ui.style('PROFILES', ui.BOLD, ui.CYAN)}")
+    for group, names in index.items():
+        members = ", ".join(names)
+        if len(members) > 60:
+            members = f"{names[0]}, {names[1]}, ... (+{len(names) - 2} more)"
+        print(f"{ui.style(group, ui.BOLD):<{width + len(ui.BOLD) + len(ui.RESET)}}  "
+              f"{len(names):>3}  {','.join(sources[group]):<{source_width}}  {members}")
     return 0
 
 
@@ -3298,18 +3327,76 @@ def experimental_profiles(cfg: dict[str, Any], names: list[str]) -> list[str]:
     return [name for name in names if str(config.get_vm(cfg, name).get("meta", {}).get("status") or "") == "experimental"]
 
 
+def profile_groups(vm: dict[str, Any]) -> dict[str, list[str]]:
+    """Every category this profile belongs to, by where the membership comes from.
+
+    Four of the five are *derived* from metadata the profile already carries, so a new VM
+    joins them the moment it is written: its ``meta.family`` (``debian``, ``windows``...),
+    its ``meta.status``, its ``meta.role`` (``desktop``, ``server``...) and the install flow
+    ``local_test_mode`` picks for it (``bootstrap-preseed``...). Only what none of those can
+    express is declared by hand in ``meta.groups``: ``ubuntu`` spans a dozen slugs and two
+    families of naming, ``netlab`` is a topology, ``smoke`` is a choice.
+    """
+    meta = vm.get("meta") or {}
+    flow, _ = local_test_mode(vm)
+    return {
+        "declared": config.declared_groups(vm),
+        "family": [str(meta["family"])] if meta.get("family") else [],
+        "status": [str(meta.get("status") or "manual")],
+        "role": [str(meta["role"])] if meta.get("role") else [],
+        "flow": [flow] if flow != "skip" else [],
+    }
+
+
+def group_index(cfg: dict[str, Any]) -> dict[str, list[str]]:
+    """``{group: [profile names]}`` over the whole catalog, in catalog order."""
+    index: dict[str, list[str]] = {}
+    for name, vm in config.sorted_vm_items(cfg):
+        for group in sorted({group for groups in profile_groups(vm).values() for group in groups}):
+            index.setdefault(group, []).append(name)
+    return dict(sorted(index.items()))
+
+
+def group_sources(cfg: dict[str, Any]) -> dict[str, list[str]]:
+    """``{group: [source, ...]}``: which part of the metadata puts profiles in that group."""
+    sources: dict[str, set[str]] = {}
+    for _, vm in config.sorted_vm_items(cfg):
+        for source, groups in profile_groups(vm).items():
+            for group in groups:
+                sources.setdefault(group, set()).add(source)
+    order = ["declared", "family", "status", "role", "flow"]
+    return {group: [source for source in order if source in found] for group, found in sorted(sources.items())}
+
+
+def resolve_group_selection(cfg: dict[str, Any], groups: list[str]) -> list[str]:
+    """The union of the named groups, in catalog order; an unknown name lists what exists."""
+    index = group_index(cfg)
+    unknown = [group for group in groups if group not in index]
+    if unknown:
+        raise VMError(f"Unknown profile group(s): {', '.join(unknown)}. "
+                      f"Available: {', '.join(index)} (vmctl list --groups)")
+    selected: list[str] = []
+    for group in groups:
+        selected.extend(index[group])
+    return list(dict.fromkeys(selected))
+
+
 def cmd_test_local(args: argparse.Namespace) -> int:
     cfg = config.load_config()
-    explicit = bool(getattr(args, "vms", None))
-    selected_names = list(args.vms) if explicit else config.sorted_vm_names(cfg)
-    selected_names = list(dict.fromkeys(selected_names))
+    named = list(dict.fromkeys(getattr(args, "vms", None) or []))
+    wanted_groups = list(dict.fromkeys(getattr(args, "group", None) or []))
+    from_groups = resolve_group_selection(cfg, wanted_groups) if wanted_groups else []
+    selected_names = list(dict.fromkeys([*named, *from_groups])) if (named or from_groups) else config.sorted_vm_names(cfg)
     for vm_name in selected_names:
         config.get_vm(cfg, vm_name)
     # A full matrix is a regression run: an experimental profile is expected to stop somewhere
     # (Windows 98 waits at a dialog until the timeout), so it is reported as skipped rather than
-    # occupying a worker for an hour. Naming it runs it, which is how it gets promoted.
-    experimental = [] if explicit else experimental_profiles(cfg, selected_names)
+    # occupying a worker for an hour. Naming it runs it, which is how it gets promoted; a group
+    # is a selector like the full matrix, not that choice, so it skips them too.
+    experimental = [name for name in experimental_profiles(cfg, selected_names) if name not in named]
     selected_names = [name for name in selected_names if name not in experimental]
+    if wanted_groups:
+        ui.print_kv("groups", f"{', '.join(wanted_groups)} ({len(from_groups)} profiles)")
     args.vms = selected_names
     report_directory = report.init(args)
     if getattr(args, "document", False) and report_directory is None:

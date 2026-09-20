@@ -65,6 +65,7 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | `video` | Named QEMU argument sets, see [Video profiles](#video-profiles). Optional `headless` argument list replaces `-display none` for background/unattended boots; QMP and VNC are still added. |
 | `installer_boot` | `kernel` and `initrd` paths inside the ISO for the unattended flows, when they differ from the flow's default (CachyOS: `arch/boot/x86_64/vmlinuz-linux-cachyos`) |
 | `notes` | Free text shown by `vmctl show` |
+| `meta` | Classification, not behaviour: `slug`, `family` (one spelling per distro: `debian`, `arch`, `windows`...), `role` (`desktop`, `server`...), `release_model`, `status` and `verified` ([Profile status](#profile-status-and-live-verification)), plus `groups`. `family`, `role`, `status` and the install flow already act as categories for `vmctl check-vms --group`; `meta.groups` adds only the ones they cannot express, such as `ubuntu` (which spans a dozen slugs inside the `debian` family) or `smoke`. Group names are lowercase letters, digits and hyphens. `vmctl list --groups` lists them all; the catalogue of declared ones is in [UNATTENDED.md](UNATTENDED.md#running-one-category-instead-of-the-whole-matrix). |
 
 ## Guest agent
 

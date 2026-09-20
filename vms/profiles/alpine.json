@@ -8,6 +8,9 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
+        "groups": [
+          "smoke"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/alpine-standard-3.23-x86_64.iso",

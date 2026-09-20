@@ -143,6 +143,20 @@ def expand_user_placeholder(name: str, vm: dict[str, Any]) -> tuple[dict[str, An
     return cast(dict[str, Any], _substitute(vm, user)), []
 
 
+GROUP_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+
+def declared_groups(vm: dict[str, Any]) -> list[str]:
+    """``meta.groups``: the categories a profile is tagged with by hand, for the ones the
+    rest of the metadata cannot express (``ubuntu`` spans a dozen ``meta.slug`` values, the
+    Windows retro set spans two families of answer file). Derived categories (family,
+    status, role, install flow) are not declared here; see ``lifecycle.profile_groups``."""
+    groups = (vm.get("meta") or {}).get("groups")
+    if not isinstance(groups, list):
+        return []
+    return [str(group) for group in groups]
+
+
 def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
     errors: list[str] = []
 
@@ -178,6 +192,16 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
                         raise ValueError
                 except ValueError:
                     err("meta.verified must be a valid YYYY-MM-DD date")
+            if "groups" in meta:
+                groups = meta["groups"]
+                if not isinstance(groups, list) or not all(isinstance(group, str) for group in groups):
+                    err("meta.groups must be a list of strings")
+                elif len(set(groups)) != len(groups):
+                    err("meta.groups must not repeat a group")
+                else:
+                    for group in groups:
+                        if not GROUP_RE.match(group):
+                            err(f"meta.groups entry {group!r} must be lowercase letters, digits and hyphens")
 
     disk = vm.get("disk")
     if isinstance(disk, dict):

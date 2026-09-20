@@ -8,6 +8,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
@@ -121,6 +125,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
@@ -234,6 +242,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
@@ -347,6 +359,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
@@ -460,6 +476,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
@@ -573,6 +593,11 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors",
+          "ubuntu-releases"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
@@ -681,6 +706,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors"
+        ],
         "verified": "2026-09-13"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
@@ -788,6 +817,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors"
+        ],
         "verified": "2026-09-13"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
@@ -895,6 +928,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors"
+        ],
         "verified": "2026-09-13"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
@@ -1002,6 +1039,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-flavors"
+        ],
         "verified": "2026-09-13"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",

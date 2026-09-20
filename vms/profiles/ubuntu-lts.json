@@ -7,7 +7,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-8.04.4-desktop-amd64.iso",
       "iso_url": "https://old-releases.ubuntu.com/releases/8.04.4/ubuntu-8.04.4-desktop-amd64.iso",
@@ -57,7 +60,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-10.04.4-desktop-amd64.iso",
       "iso_url": "https://old-releases.ubuntu.com/releases/10.04.4/ubuntu-10.04.4-desktop-amd64.iso",
@@ -106,7 +112,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-12.04.5-desktop-amd64.iso",
       "iso_url": "https://old-releases.ubuntu.com/releases/12.04.5/ubuntu-12.04.5-desktop-amd64.iso",
@@ -155,7 +164,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-14.04.6-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/14.04/ubuntu-14.04.6-desktop-amd64.iso",
@@ -208,7 +220,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-16.04.7-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/16.04/ubuntu-16.04.7-desktop-amd64.iso",
@@ -261,7 +276,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-18.04.6-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/18.04/ubuntu-18.04.6-desktop-amd64.iso",
@@ -314,7 +332,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-20.04.6-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/20.04/ubuntu-20.04.6-desktop-amd64.iso",
@@ -367,7 +388,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-22.04.5-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-desktop-amd64.iso",
@@ -420,7 +444,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-24.04.4-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04/ubuntu-24.04.4-desktop-amd64.iso",
@@ -474,6 +501,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-releases"
+        ],
         "verified": "2026-09-12"
       },
       "iso": "isos/ubuntu-8.04.4-alternate-amd64.iso",
@@ -579,6 +610,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-releases"
+        ],
         "verified": "2026-09-12"
       },
       "iso": "isos/ubuntu-10.04.4-alternate-amd64.iso",
@@ -683,6 +718,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-releases"
+        ],
         "verified": "2026-09-12"
       },
       "iso": "isos/ubuntu-12.04.5-alternate-amd64.iso",
@@ -787,6 +826,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-releases"
+        ],
         "verified": "2026-09-12"
       },
       "iso": "isos/ubuntu-14.04.6-server-amd64.iso",
@@ -888,6 +931,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-releases"
+        ],
         "verified": "2026-09-12"
       },
       "iso": "isos/ubuntu-16.04.7-server-amd64.iso",
@@ -996,6 +1043,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-releases"
+        ],
         "verified": "2026-09-12"
       },
       "iso": "isos/ubuntu-18.04.6-server-amd64.iso",
@@ -1104,6 +1155,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-releases"
+        ],
         "verified": "2026-09-12"
       },
       "iso": "isos/ubuntu-20.04.6-live-server-amd64.iso",
@@ -1211,6 +1266,10 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-releases"
+        ],
         "verified": "2026-09-12"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
@@ -1309,6 +1368,118 @@
         ]
       },
       "iso_sha256": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+      "guest_agent": true,
+      "vmport": false
+    },
+    "ubuntu-26.04-unattended": {
+      "name": "Ubuntu 26.04 Desktop (unattended, autoinstall)",
+      "meta": {
+        "slug": "ubuntu",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "unattended",
+        "groups": [
+          "ubuntu",
+          "ubuntu-releases"
+        ]
+      },
+      "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
+      "disk": {
+        "path": "artifacts/ubuntu-26.04-unattended/disk.qcow2",
+        "size": "35G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/ubuntu-26.04-unattended/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "notes": "Ubuntu Server 26.04 autoinstall plus the ubuntu-desktop metapackage, the newest entry of the per-release desktop series (24.04's entry is ubuntu-gnome-24.04). Same recipe as 22.04 and 24.04: gdm3 autologin drop-in, the user in the autologin and nopasswdlogin groups, a ttyS0 getty, and a post-install that asserts an active local graphical session rather than an enabled display manager. The ISO is the one ubuntu-server-live and ubuntu-server-ci already pin. Never run live yet: meta.verified stays empty until a check-vms row passes, and 26.04 may need the 20.04 treatment (ubuntu-desktop through autoinstall late_commands) if subiquity resolves 'packages' against the CD pool only.",
+      "autoinstall": {
+        "hostname": "ubuntu-2604",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true,
+        "packages": [
+          "ubuntu-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "ubuntu-2604",
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          },
+          {
+            "path": "/etc/gdm3/custom.conf",
+            "permissions": "0644",
+            "content": "[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl set-default graphical.target",
+          "for dm in gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
+          "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
+          "systemctl enable --now serial-getty@ttyS0.service"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-2604",
+        "user": "lab",
+        "ssh_host_port": 2275,
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service gdm3.service --package-manager dpkg --package ubuntu-desktop"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ]
+      },
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9",
       "guest_agent": true,
       "vmport": false
     }

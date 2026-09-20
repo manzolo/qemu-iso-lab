@@ -7,7 +7,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "stable",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "debian-only"
+        ]
       },
       "iso": "isos/debian-live-13.4.0-amd64-gnome.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
@@ -55,7 +58,10 @@
         "family": "debian",
         "role": "installer",
         "release_model": "stable",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "debian-only"
+        ]
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -100,7 +106,10 @@
         "family": "debian",
         "role": "server",
         "release_model": "stable",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "debian-only"
+        ]
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -152,7 +161,10 @@
         "family": "debian",
         "role": "server",
         "release_model": "stable",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "debian-only"
+        ]
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -202,6 +214,10 @@
         "role": "server",
         "release_model": "stable",
         "status": "unattended",
+        "groups": [
+          "debian-only",
+          "smoke"
+        ],
         "verified": "2026-09-09"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
@@ -289,7 +305,10 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-26.04-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-desktop-amd64.iso",
@@ -341,7 +360,10 @@
         "family": "debian",
         "role": "server",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "groups": [
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -393,7 +415,11 @@
         "family": "debian",
         "role": "ci-installed",
         "release_model": "lts",
-        "status": "unattended"
+        "status": "unattended",
+        "groups": [
+          "smoke",
+          "ubuntu"
+        ]
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -490,6 +516,9 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "experimental",
+        "groups": [
+          "ubuntu"
+        ],
         "slug": "ubuntu",
         "verified": "2026-09-09"
       },
@@ -608,6 +637,9 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
+        "groups": [
+          "debian-only"
+        ],
         "verified": "2026-09-13"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
@@ -713,6 +745,9 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
+        "groups": [
+          "debian-only"
+        ],
         "verified": "2026-09-14"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
@@ -817,6 +852,9 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
+        "groups": [
+          "debian-only"
+        ],
         "verified": "2026-09-13"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
@@ -921,6 +959,9 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
+        "groups": [
+          "kali"
+        ],
         "verified": "2026-09-14"
       },
       "iso": "isos/kali-linux-2026.2-installer-netinst-amd64.iso",
