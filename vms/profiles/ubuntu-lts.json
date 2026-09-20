@@ -1382,7 +1382,8 @@
         "groups": [
           "ubuntu",
           "ubuntu-releases"
-        ]
+        ],
+        "verified": "2026-09-20"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -1426,7 +1427,7 @@
           ]
         }
       },
-      "notes": "Ubuntu Server 26.04 autoinstall plus the ubuntu-desktop metapackage, the newest entry of the per-release desktop series (24.04's entry is ubuntu-gnome-24.04). Same recipe as 22.04 and 24.04: gdm3 autologin drop-in, the user in the autologin and nopasswdlogin groups, a ttyS0 getty, and a post-install that asserts an active local graphical session rather than an enabled display manager. The ISO is the one ubuntu-server-live and ubuntu-server-ci already pin. Never run live yet: meta.verified stays empty until a check-vms row passes, and 26.04 may need the 20.04 treatment (ubuntu-desktop through autoinstall late_commands) if subiquity resolves 'packages' against the CD pool only.",
+      "notes": "Ubuntu Server 26.04 autoinstall plus the ubuntu-desktop metapackage, the newest entry of the per-release desktop series (24.04's entry is ubuntu-gnome-24.04). Same recipe as 22.04 and 24.04, unchanged: gdm3 autologin drop-in, the user in the autologin and nopasswdlogin groups, a ttyS0 getty, and a post-install that asserts an active local graphical session rather than an enabled display manager. The ISO is the one ubuntu-server-live and ubuntu-server-ci already pin. Live PASS 2026-09-20 in 12.9 min: 26.04's subiquity resolves ubuntu-desktop from autoinstall 'packages' (no late_commands with curtin in-target, which 20.04 needed), and gdm3.service still answers because Ubuntu keeps it an alias of gdm.service, so the verify-desktop service gate holds.",
       "autoinstall": {
         "hostname": "ubuntu-2604",
         "username": "lab",

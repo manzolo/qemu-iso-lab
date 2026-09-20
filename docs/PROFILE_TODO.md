@@ -36,6 +36,15 @@ Every tracked profile has `meta.status`:
 
 Recorded dates:
 
+- 2026-09-20: `ubuntu-26.04-unattended`, first live run of the profile added the same day, PASS in
+  12.9 minutes (`verify-desktop`: "lab has an active local graphical session"). It answered both
+  open questions of the release: 26.04's subiquity resolves `ubuntu-desktop` straight from
+  autoinstall `packages`, so it needs none of the `late_commands` with `curtin in-target` that
+  20.04 required, and `gdm3.service` still answers `systemctl is-active` because Ubuntu keeps it
+  as an alias of `gdm.service` (`display-manager.service` points at the latter), so the
+  `verify-desktop` service gate holds unchanged. Guest: Ubuntu 26.04 LTS, kernel 7.0.0-31-generic,
+  `graphical.target`, `ubuntu-desktop` 1.570.3, session 1 for `lab` on seat0.
+
 - 2026-09-19: `pearos-nicecore-unattended` (first live run of `bootstrap-pearos`), `nixos-server` and `nixos-gnome` (first live runs of `bootstrap-nixos`; the GNOME row through `verify-desktop` on its autologin session).
 
 - 2026-09-12: `ubuntu-8.04-unattended`, `ubuntu-10.04-unattended`, `ubuntu-12.04-unattended`, `ubuntu-14.04-unattended`, `ubuntu-16.04-unattended`, `ubuntu-18.04-unattended`, `ubuntu-20.04-unattended`, `ubuntu-22.04-unattended` and `reactos`, each reinstalled from a clean disk with the final recipe (autologin session, passwordless sudo, legacy SSH verified in-guest).
@@ -53,13 +62,6 @@ Recorded dates:
 
 ## Remaining work
 
-- **`ubuntu-26.04-unattended` has never been run live** (added 2026-09-20, `meta.status: unattended`,
-  no `meta.verified`). It completes the per-release desktop series on the 26.04 ISO that
-  `ubuntu-server-live` and `ubuntu-server-ci` already pin, with the 22.04/24.04 recipe unchanged:
-  autoinstall `packages` carrying `ubuntu-desktop`, gdm3 autologin drop-in, `verify-desktop` over SSH.
-  Two things to watch on the first run: whether 26.04's subiquity resolves `ubuntu-desktop` from
-  `packages` (24.04 does; 20.04 needed `late_commands` with `curtin in-target` because it resolves
-  against the CD pool only), and whether gdm3 is still the display manager under that name.
 - Budgie was promoted from `experimental` to `unattended` on 2026-09-09: `verify-desktop`
   reported `Desktop ready: lab has an active local graphical session` on the live matrix, so
   the LightDM autologin drop-in is confirmed and the flavor no longer differs from the other four.

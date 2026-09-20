@@ -104,6 +104,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # stage2 from the medium instead of the moving repository, windows7-unattended once the
         # report's screenshot boot stopped cutting the guest mid-boot (docs/PROFILE_TODO.md).
         verified_retry = {"cachyos-nvidia", "centos-stream-10", "windows7-unattended"}
+        # First live run of the profile added the same day: 26.04's subiquity installs
+        # ubuntu-desktop straight from autoinstall "packages" and gdm3.service still answers.
+        verified_ubuntu_2604 = {"ubuntu-26.04-unattended"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = ("2026-09-16" if name in verified_retry
@@ -112,7 +115,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                              else "2026-09-13" if name in verified_batch_a
                              else "2026-09-14" if name in verified_batch_a_retry | verified_batch_b_c
                              else "2026-09-15" if name in verified_nt4
-                             else "2026-09-19" if name in verified_pearos | verified_nixos else None)
+                             else "2026-09-19" if name in verified_pearos | verified_nixos
+                             else "2026-09-20" if name in verified_ubuntu_2604 else None)
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
         # Promoted on 2026-09-09: verify-desktop reported an active local graphical session for
         # the autologin user on the live matrix, which is what the flavor recipe has to prove.
