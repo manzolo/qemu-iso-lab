@@ -32,6 +32,74 @@ class FlashTests(BaseVmctlTestCase):
         stdin.start()
         self.addCleanup(stdin.stop)
 
+    def test_target_listing_distinguishes_identical_models_and_reports_contents(self):
+        disks = [
+            {"path": "/dev/sda", "type": "disk", "size": 250059350016,
+             "model": "Samsung SSD 850 EVO 250GB", "serial": "SERIAL-A", "tran": "sata",
+             "children": [{"path": "/dev/sda1", "fstype": "ext4", "label": "ROOT"}]},
+            {"path": "/dev/sdb", "type": "disk", "size": 250059350016,
+             "model": "Samsung SSD 850 EVO 250GB", "serial": "SERIAL-B", "tran": "usb",
+             "children": [{"path": "/dev/sdb1", "fstype": "ntfs", "label": "Backup",
+                           "mountpoints": ["/media/Backup"]}]},
+            {"path": "/dev/rootdisk", "type": "disk"},
+        ]
+        output = io.StringIO()
+        with mock.patch.object(vmctl.disk_inspect, "lsblk_devices", return_value=disks), \
+             mock.patch.object(vmctl.disk_inspect, "root_block_device", return_value="/dev/rootdisk"), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch("sys.stdout", output):
+            vmctl.disk_inspect.cmd_list_target_devices(argparse.Namespace())
+        rows = [line.split("\t") for line in output.getvalue().splitlines()]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0][:5], ["/dev/sda", "232.9 GiB", "Samsung SSD 850 EVO 250GB", "SERIAL-A", "sata"])
+        self.assertEqual(rows[1][3:5], ["SERIAL-B", "usb"])
+        self.assertIn("sda1: ext4 label=ROOT", rows[0][5])
+        self.assertIn("sdb1: ntfs label=Backup", rows[1][5])
+        self.assertIn("mounted: /media/Backup", rows[1][5])
+
+    def test_empty_listing_handles_missing_identity_and_control_characters(self):
+        info = {"path": "/dev/sdz", "size": 1024**3, "model": "USB\tDisk\nModel",
+                "serial": None, "tran": None, "children": []}
+        output = io.StringIO()
+        with mock.patch.object(vmctl.disk_inspect, "list_flashable_devices", return_value=[info]), \
+             mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch("sys.stdout", output):
+            vmctl.disk_inspect.cmd_list_empty_devices(argparse.Namespace())
+        self.assertEqual(output.getvalue().splitlines(), [
+            "/dev/sdz\t1.0 GiB\tUSB Disk Model\t-\t-\tno recognized filesystems"])
+
+    def test_unallocated_space_uses_partition_ranges_not_filesystem_usage(self):
+        disk = {"size": 250059350016, "log-sec": 4096, "children": [
+            {"type": "part", "start": 2048, "size": 536870912},
+            {"type": "part", "start": 1050624, "size": 42411736576,
+             "children": [{"type": "crypt", "size": 42411736576}]},
+        ]}
+        self.assertEqual(vmctl.disk_inspect.unallocated_bytes(disk), 207110742528)
+        # Extended/logical partitions may overlap; their union is occupied once.
+        disk = {"size": 10240, "children": [
+            {"type": "part", "start": 2, "size": 8192},
+            {"type": "part", "start": 4, "size": 2048},
+        ]}
+        self.assertEqual(vmctl.disk_inspect.unallocated_bytes(disk), 2048)
+        self.assertEqual(vmctl.disk_inspect.unallocated_bytes({"size": 1024}), 1024)
+        self.assertEqual(vmctl.disk_inspect.unallocated_bytes({"size": 1024, "fstype": "ext4"}), 0)
+        for child in ({"type": "part", "size": 100},
+                      {"type": "crypt", "size": 100},
+                      {"type": "part", "start": 2, "size": 2048}):
+            self.assertIsNone(vmctl.disk_inspect.unallocated_bytes({"size": 1024, "children": [child]}))
+
+    def test_device_json_retains_partition_geometry_and_identity(self):
+        info = {"path": "/dev/sdz", "size": 1024**3, "serial": "DISK-ID",
+                "unallocated_bytes": 1024**2, "children": [{"path": "/dev/sdz1", "start": 2048}]}
+        for mode, listing in (("list-target-devices", "list_non_root_devices"),
+                              ("list-empty-devices", "list_flashable_devices")):
+            output = io.StringIO()
+            with mock.patch.object(vmctl.disk_inspect, listing, return_value=[info]), \
+                 mock.patch.object(vmctl.runtime, "require_command"), \
+                 mock.patch("sys.stdout", output):
+                self.assertEqual(vmctl.cli.dispatch_internal(mode, ["--json"]), 0)
+            self.assertEqual(json.loads(output.getvalue()), [info])
+
     def test_cmd_flash_requires_matching_confirmation(self):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdy", dry_run=True)
@@ -579,7 +647,7 @@ class FlashTests(BaseVmctlTestCase):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, device="/dev/sdz", confirm_device="/dev/sdz", force_target=True)
 
-        def fake_run(cmd, dry_run=False, quiet=False):
+        def fake_run(cmd, dry_run=False, quiet=False, **kwargs):
             if cmd == ["blockdev", "--rereadpt", "/dev/sdz"]:
                 raise self.vmctl.subprocess.CalledProcessError(1, cmd)
 

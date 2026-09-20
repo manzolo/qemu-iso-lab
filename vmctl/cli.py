@@ -440,10 +440,13 @@ INTERNAL_MODES = {
 
 
 def dispatch_internal(mode: str, argv: list[str]) -> int:
-    if mode == "list-empty-devices":
-        return disk_inspect.cmd_list_empty_devices(argparse.Namespace())
-    if mode == "list-target-devices":
-        return disk_inspect.cmd_list_target_devices(argparse.Namespace())
+    if mode in {"list-empty-devices", "list-target-devices"}:
+        p = argparse.ArgumentParser(prog=f"vmctl {mode}")
+        p.add_argument("--json", action="store_true", help="include disk identity and partition details")
+        args = p.parse_args(argv)
+        if mode == "list-empty-devices":
+            return disk_inspect.cmd_list_empty_devices(args)
+        return disk_inspect.cmd_list_target_devices(args)
     if mode == "flash-helper":
         p = argparse.ArgumentParser(prog="vmctl flash-helper")
         p.add_argument("--vm", required=True)

@@ -32,7 +32,7 @@ class AllocatedFlashTests(unittest.TestCase):
                     raise VMError("scan failed")
             self.assertEqual(attach.call_args.args[0], ["losetup", "--find", "--show", "--read-only",
                              "--offset", "1024", "--sizelimit", "4096", "--sector-size", "512", "source"])
-            detach.assert_called_once_with(["losetup", "--detach", "/dev/loop123"], quiet=True)
+            detach.assert_called_once_with(["losetup", "--detach", "/dev/loop123"], quiet=True, show_command=False)
 
     def test_unknown_and_encrypted_filesystems_are_copied_in_full(self):
         for fstype in ("crypto_LUKS", "BitLocker", "", "xfs"):
@@ -86,16 +86,19 @@ class AllocatedFlashTests(unittest.TestCase):
             source.touch()
             def convert(cmd, **kwargs):
                 Path(cmd[-1]).write_bytes(bytes(4096))
-            def scan(raw, size, work):
+            def scan(raw, size, work, **kwargs):
                 (work / "partition-0.log").write_text("NTFS is hibernated")
                 raise VMError("partclone rejected source")
             with mock.patch.object(allocated.lifecycle, "running_qemu_pid", return_value=None), \
-                 mock.patch.object(runtime, "run", side_effect=convert), \
+                 mock.patch.object(allocated.FlashProgress, "run", side_effect=convert), \
                  mock.patch.object(allocated, "build_domain", side_effect=scan):
                 with self.assertRaisesRegex(VMError, "NTFS is hibernated"):
                     with allocated.prepare("vm", {"disk": {"format": "qcow2"}}, source, {"size": 8192}):
                         self.fail("scan failure accepted")
-            self.assertEqual(list(Path(directory).iterdir()), [source])
+            self.assertEqual(sorted(path.name for path in Path(directory).iterdir()), ["logs", source.name])
+            logs = list((Path(directory) / "logs").glob("flash-*.log"))
+            self.assertEqual(len(logs), 1)
+            self.assertIn("NTFS is hibernated", logs[0].read_text())
 
 
 @unittest.skipUnless(all(shutil.which(tool) for tool in ("qemu-img", "sfdisk", "blkid", "ddrescue", "ddrescuelog")),

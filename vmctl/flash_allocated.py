@@ -12,6 +12,7 @@ from typing import Any
 
 from vmctl import import_allocated, lifecycle, runtime, ui
 from vmctl.errors import VMError
+from vmctl.flash_progress import FlashProgress
 
 
 def require_tools(force_target: bool) -> None:
@@ -31,7 +32,7 @@ def partition_view(raw: Path, start: int, size: int) -> Iterator[str]:
     try:
         yield device
     finally:
-        runtime.run(["losetup", "--detach", device], quiet=True)
+        runtime.run(["losetup", "--detach", device], quiet=True, show_command=False)
 
 
 def partition_geometry(raw: Path, size: int) -> list[tuple[int, int]]:
@@ -55,7 +56,8 @@ def partition_geometry(raw: Path, size: int) -> list[tuple[int, int]]:
         raise VMError(f"Cannot safely map flash source: {exc}") from exc
 
 
-def build_domain(raw: Path, size: int, work: Path) -> list[import_allocated.Block]:
+def build_domain(raw: Path, size: int, work: Path,
+                 progress: FlashProgress | None = None) -> list[import_allocated.Block]:
     geometry = partition_geometry(raw, size)
     with ExitStack() as views:
         plan = []
@@ -68,7 +70,7 @@ def build_domain(raw: Path, size: int, work: Path) -> list[import_allocated.Bloc
                     raise
                 fstype = "unknown"
             plan.append({"path": device, "start": start, "size": length, "fstype": fstype})
-        return import_allocated.build_domain(plan, size, work)
+        return import_allocated.build_domain(plan, size, work, progress=progress)
 
 
 @dataclass(frozen=True)
@@ -77,19 +79,29 @@ class PreparedCopy:
     domain: Path
     rescue: Path
     size: int
+    progress: FlashProgress | None = None
 
     def copy_to(self, device: str) -> None:
         # --sparse would skip zero-valued *allocated* data on a used target.
-        runtime.run([
+        cmd = [
             "ddrescue", "--force", "--no-scrape", "--retry-passes=0", "--sector-size=512",
             f"--size={self.size}", f"--domain-mapfile={self.domain}",
             str(self.raw), device, str(self.rescue),
-        ])
+        ]
+        if self.progress is None:
+            runtime.run(cmd)
+        else:
+            self.progress.stage(3, "Copy to the physical disk")
+            self.progress.run(cmd, title=f"Writing allocated blocks to {device}")
         if import_allocated.read_map(self.rescue, self.size)[-1].end != self.size:
             raise VMError("Flash incomplete: rescue map does not cover the source disk")
         try:
-            runtime.run(["ddrescuelog", "--done-status", f"--size={self.size}",
-                         f"--domain-mapfile={self.domain}", str(self.rescue)])
+            cmd = ["ddrescuelog", "--done-status", f"--size={self.size}",
+                   f"--domain-mapfile={self.domain}", str(self.rescue)]
+            if self.progress is None:
+                runtime.run(cmd)
+            else:
+                self.progress.run(cmd, title="Verify all selected blocks were copied")
         except subprocess.CalledProcessError as exc:
             raise VMError("Flash incomplete: required blocks remain unread or unwritten") from exc
 
@@ -100,25 +112,30 @@ def prepare(name: str, vm: dict[str, Any], disk_path: Path, target_info: dict[st
         raise VMError("--allocated-only currently requires a target with 512-byte logical sectors")
     if lifecycle.running_qemu_pid(name, vm) is not None:
         raise VMError(f"Stop VM '{name}' before flashing its disk")
+    progress = FlashProgress(disk_path.parent / "logs")
     # Conversion resolves backing files and freezes the source before any target
     # writes. A private directory prevents other users from replacing the maps.
     with tempfile.TemporaryDirectory(prefix=".allocated-flash-", dir=disk_path.parent) as directory:
         work = Path(directory)
         raw = work / "source.raw"
-        ui.print_note("Preparing a temporary sparse RAW copy and scanning filesystem allocation")
-        runtime.run(["qemu-img", "convert", "-p", "-f", vm["disk"]["format"],
-                     "-O", "raw", str(disk_path), str(raw)])
+        progress.stage(1, "Prepare the source image")
+        progress.run(["qemu-img", "convert", "-p", "-f", vm["disk"]["format"],
+                      "-O", "raw", str(disk_path), str(raw)], title="Prepare working image")
         size = raw.stat().st_size
         if size <= 0 or size % 512 or size > int(target_info["size"]):
             raise VMError("Prepared image has an invalid size or exceeds the flash target")
         try:
-            blocks = build_domain(raw, size, work)
+            progress.stage(2, "Find used filesystem blocks")
+            blocks = build_domain(raw, size, work, progress=progress)
         except (VMError, subprocess.CalledProcessError) as exc:
             logs = "\n".join(path.read_text(errors="replace")[-4096:] for path in sorted(work.glob("*.log")))
             raise VMError(f"Allocated flash scan failed before target writes: {exc}\n{logs}") from exc
+        finally:
+            progress.preserve_logs(work)
         domain = work / "domain.map"
         domain.write_text(import_allocated.map_text(blocks), encoding="ascii")
         selected = sum(block.size for block in blocks if block.status == "+")
-        ui.print_kv("to copy", runtime.format_bytes(selected))
-        ui.print_kv("free filesystem space skipped", runtime.format_bytes(size - selected))
-        yield PreparedCopy(raw, domain, work / "rescue.map", size)
+        print()
+        ui.print_kv("To copy", runtime.format_bytes(selected))
+        ui.print_kv("Skipped", f"{runtime.format_bytes(size - selected)} of free filesystem space")
+        yield PreparedCopy(raw, domain, work / "rescue.map", size, progress)

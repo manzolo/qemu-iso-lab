@@ -1,6 +1,7 @@
 import os
 import json
 import subprocess
+import shutil
 import sys
 import tempfile
 import unittest
@@ -625,6 +626,45 @@ MENU_NO_TAGS=1 MENU_CONTEXT_HINTS=1 MENU_REFRESH=1 fzf_pick T Header test-ssh \
         self.assertIn("Guided Provision", rows["empty"][2])
         self.assertNotIn("screen", rows["empty"][2])
 
+    @unittest.skipUnless(shutil.which("fzf"), "fzf is not installed")
+    def test_search_matches_contiguous_names_not_descriptions(self):
+        fzf_path = shutil.which("fzf")
+        for query, expected in (("cac", "cachyos-nvidia"),
+                                ("fo", "Force Flash"), ("force", "Force Flash")):
+            script = r"""
+source bin/vmtui
+fzf() { "$REAL_FZF" "$@" --filter="$TEST_QUERY" | tee "$TEST_MATCHES"; }
+MENU_NO_TAGS=1 MENU_STYLED=1 fzf_pick T H '' \
+    cachyos-nvidia '■ cachyos-nvidia     CachyOS + NVIDIA' \
+    arch-noctalia '■ arch-noctalia      Arch Linux with CachyOS tools' \
+    'Force Flash' '  Force Flash        Wipe a physical disk' \
+    'Clean VM' '  Clean VM           Remove artifacts for this VM' \
+    'Remove from libvirt' '  Remove from libvirt    Preserve the disk'
+"""
+            matches = self.bindir / "matches"
+            result = subprocess.run(["bash", "-c", script], cwd=ROOT,
+                                    env={**self.env, "REAL_FZF": fzf_path, "TEST_QUERY": query,
+                                         "TEST_MATCHES": str(matches)},
+                                    capture_output=True, text=True, check=True)
+            self.assertEqual(result.stdout.strip(), expected)
+            self.assertEqual([row.split("\t")[0] for row in matches.read_text().splitlines()], [expected])
+
+    def test_styled_dashboard_keeps_context_after_search_column_split(self):
+        result = self.run_bash(r"""
+source bin/vmtui
+fzf() {
+    printf '%s\n' "$@" >&2
+    cat >&2
+    printf 'test-ssh\tTest SSH\tDescription\tHint\n'
+}
+MENU_NO_TAGS=1 MENU_STYLED=1 MENU_CONTEXT_HINTS=1 fzf_pick T H '' \
+    test-ssh $'test-ssh     Test SSH description\t0 1 1 0 has_ssh=1'
+""")
+        self.assertEqual(result.stdout, "test-ssh\n")
+        self.assertIn('"$VMTUI_PICKER_HEADER" {4}', result.stderr)
+        self.assertIn("--exact", result.stderr)
+        self.assertIn("--nth=1", result.stderr)
+
     def test_dashboard_names_the_bootstrap_bound_to_install_shortcut(self):
         for vm, action in (("alpine-niri", "Alpine Bootstrap"),
                            ("debian-server", "Debian Preseed Bootstrap"),
@@ -976,6 +1016,146 @@ run_action 'Import Disk'
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.splitlines(), ["import-device", "test-ssh", "--device", "/dev/fake",
                                                                "--confirm-device", "/dev/fake", *flags])
+
+    def test_device_menus_keep_paths_separate_from_identifying_details(self):
+        fake_vmctl = self.bindir / "fake-vmctl"
+        devices = [
+            {"path": "/dev/sda", "size": 250059350016, "model": "Samsung SSD",
+             "serial": "SERIAL-A", "tran": "sata",
+             "children": [{"path": "/dev/sda1", "size": 1024**3, "fstype": "ext4", "label": "ROOT"}]},
+            {"path": "/dev/sdb", "size": 250059350016, "model": "Samsung SSD",
+             "serial": "SERIAL-B", "tran": "usb"},
+        ]
+        fake_vmctl.write_text("#!/bin/sh\nprintf '%s\\n' '" + json.dumps(devices) + "'\n", encoding="utf-8")
+        fake_vmctl.chmod(0o755)
+        for menu in ("list_target_device_menu_items", "list_empty_device_menu_items"):
+            result = self.run_bash(f"source bin/vmtui\nVMCTL='{fake_vmctl}'\n{menu}")
+            rows = result.stdout.splitlines()
+            self.assertEqual(rows[::2], ["/dev/sda", "/dev/sdb"])
+            self.assertIn("SERIAL-A", rows[1].split("\t")[0])
+            self.assertIn("SERIAL-B", rows[3].split("\t")[0])
+            self.assertIn("SATA", rows[1])
+            self.assertIn("ROOT", rows[1].split("\t")[1])
+            self.assertNotIn("ROOT", rows[1].split("\t")[0])
+
+    def test_flash_confirmation_shows_selected_disk_details_before_writing(self):
+        for action in ("Flash Empty Disk", "Force Flash"):
+            script = """
+source bin/vmtui
+current_vm=test-ssh
+list_target_device_menu_items() {
+    printf '%s\\n' /dev/sda $'Disk A\\tSerial: SERIAL-A\\\\nSamsung SSD\\\\next4 label=ROOT' \
+        /dev/sdb $'Disk B\\tSerial: SERIAL-B\\\\nSamsung SSD\\\\nntfs'
+}
+list_empty_device_menu_items() { list_target_device_menu_items; }
+menu_choose_fit() { printf '%s\\n' /dev/sdb; }
+confirm_box() {
+    printf '%s\\n' "$2"
+    printf 'danger=%s target=%s\\n' "$CONFIRM_DESTRUCTIVE" "$CONFIRM_TARGET" >&2
+    return 1
+}
+confirm_device_path() { echo UNEXPECTED_PATH_PROMPT; }
+run_vmctl() { echo UNEXPECTED_WRITE; }
+"""
+            result = self.run_bash(script + f"run_action '{action}'")
+            self.assertIn("/dev/sdb", result.stdout)
+            self.assertIn("Serial: SERIAL-B\nSamsung SSD\nntfs", result.stdout)
+            self.assertNotIn("SERIAL-A", result.stdout)
+            self.assertNotIn("UNEXPECTED", result.stdout)
+            self.assertIn("danger=1 target=/dev/sdb", result.stderr)
+
+    def test_destructive_confirmation_highlights_target_and_defaults_to_cancel(self):
+        for answer in ("default", "yes", "escape"):
+            result = self.run_bash(r"""
+source bin/vmtui
+UI_BACKEND=fzf
+fzf() {
+    printf '%s\n' "$@" >&2
+    local -a rows
+    mapfile -t rows
+    printf '%s\n' "${rows[@]}" >&2
+    case "$TEST_ANSWER" in
+        default) printf '%s\n' "${rows[0]}" ;;
+        yes) printf '%s\n' "${rows[1]}" ;;
+        escape) return 130 ;;
+    esac
+}
+""" + f"TEST_ANSWER={answer}\n" + r"""
+if CONFIRM_DESTRUCTIVE=1 CONFIRM_TARGET=/dev/sdb confirm_box 'Force Flash' 'Disk details'; then
+    echo confirmed
+else
+    echo cancelled
+fi
+""")
+            self.assertEqual(result.stdout.strip(), "confirmed" if answer == "yes" else "cancelled")
+            self.assertIn("DANGER — Force Flash", result.stderr)
+            self.assertIn("\x1b[1;97;41m  WARNING: DESTRUCTIVE DISK WRITE", result.stderr)
+            self.assertIn("ALL DATA ON /dev/sdb WILL BE LOST.", result.stderr)
+            self.assertIn("This operation cannot be undone.", result.stderr)
+            self.assertIn("border:red", result.stderr)
+            self.assertIn("--disabled", result.stderr)
+            self.assertIn("start:pos(1)", result.stderr)
+            self.assertIn("No\tNo — cancel, keep the disk unchanged", result.stderr)
+            self.assertIn("Yes — erase /dev/sdb", result.stderr)
+
+    def test_destructive_dialog_confirmation_uses_colors_and_defaults_to_no(self):
+        result = self.run_bash(r"""
+source bin/vmtui
+dialog() { printf '%s\n' "$@"; return 1; }
+CONFIRM_DESTRUCTIVE=1 CONFIRM_TARGET=/dev/sdb confirm_box 'Force Flash' 'Disk details' || true
+""")
+        self.assertIn("--defaultno", result.stdout)
+        self.assertIn("--colors", result.stdout)
+        self.assertIn("--yes-label\nErase disk", result.stdout)
+        self.assertIn("--no-label\nCancel", result.stdout)
+        self.assertIn(r"\Zb\Z1WARNING: DESTRUCTIVE DISK WRITE", result.stdout)
+        self.assertIn("ALL DATA ON /dev/sdb WILL BE LOST.", result.stdout)
+
+    def test_device_picker_attaches_details_to_fzf_preview_and_returns_only_path(self):
+        result = self.run_bash(r"""
+source bin/vmtui
+UI_BACKEND=fzf
+fzf() {
+    printf '%s\n' "$@" >&2
+    cat >&2
+    printf '%s\n' $'/dev/sdb\tDisk B\tSerial B\\nPartitions B'
+}
+choose_device 'Force Flash' 'Choose disk' \
+    /dev/sda $'Disk A\tSerial A\\nPartitions A' \
+    /dev/sdb $'Disk B\tSerial B\\nPartitions B'
+""")
+        self.assertEqual(result.stdout, "/dev/sdb\n")
+        self.assertIn('--preview\nprintf "%b\\n" {3}', result.stderr)
+        self.assertIn("down,55%,wrap,border-top", result.stderr)
+        self.assertIn("--with-nth=2", result.stderr)
+        self.assertIn("--header-lines=1", result.stderr)
+        self.assertIn("/dev/sda\tDisk A\tSerial A\\nPartitions A", result.stderr)
+
+    def test_force_flash_defaults_to_allocated_copy_but_allows_full_copy(self):
+        for selection in ("default", "full"):
+            result = self.run_bash(r"""
+source bin/vmtui
+current_vm=test-ssh
+list_target_device_menu_items() { printf '%s\n' /dev/fake 'Test disk'; }
+choose_device() { printf '%s\n' /dev/fake; }
+confirm_box() { return 0; }
+confirm_device_path() { return 0; }
+menu_choose_fit() {
+    printf 'default=%s first=%s\n' "$MENU_DEFAULT_ITEM" "$3" >&2
+    if [[ "$COPY_TEST_SELECTION" == full ]]; then
+        printf '%s\n' "$5"
+    else
+        printf '%s\n' "$MENU_DEFAULT_ITEM"
+    fi
+}
+run_vmctl() { printf '%s\n' "$@"; }
+""" + f"COPY_TEST_SELECTION={selection}\nrun_action 'Force Flash'")
+            self.assertIn("default=allocated first=allocated", result.stderr)
+            expected = ["flash", "test-ssh", "--device", "/dev/fake",
+                        "--confirm-device", "/dev/fake", "--force-target"]
+            if selection == "default":
+                expected.append("--allocated-only")
+            self.assertEqual(result.stdout.splitlines(), expected)
 
     def test_list_remote_menu_items_reads_remotes_json(self):
         result = self.run_bash("source bin/vmtui; list_remote_menu_items")

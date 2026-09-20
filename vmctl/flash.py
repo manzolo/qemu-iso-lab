@@ -361,21 +361,19 @@ def cmd_flash(args: argparse.Namespace) -> int:
         if (info["children"] or not args.force_target) and info["children"]:
             raise VMError(f"Refusing device with existing partitions before sudo validation: {args.device}")
 
-    ui.print_header(f"Flash VM to physical disk: {args.vm}")
-    ui.print_kv("source", ui.pretty_path(disk_path))
-    ui.print_kv("format", disk["format"])
-    ui.print_kv("layout", source_layout or "unknown")
-    ui.print_kv("image", runtime.format_bytes(virtual_size))
-    ui.print_kv("target", args.device)
-    ui.print_kv("size", runtime.format_bytes(info["size"]))
-    ui.print_kv("model", info["model"] or "-")
-    ui.print_kv("mode", "allocated filesystem blocks (partclone + ddrescue)" if allocated_only else "every sector")
-    if source_layout is None and qemu.is_container_disk_format(str(disk.get("format", "")).lower()):
-        ui.print_note("Guest partition layout will be detected on the target disk after copying the image.")
+    ui.print_header(f"Flash · {args.vm}")
+    ui.print_kv("Target", f"{args.device} · {runtime.format_bytes(info['size'])}")
+    ui.print_kv("Model", info["model"] or "-")
+    ui.print_kv("Serial", info.get("serial") or "-")
+    ui.print_kv("Source", ui.pretty_path(disk_path))
+    ui.print_kv("Image", f"{runtime.format_bytes(virtual_size)} · {disk['format']}")
+    ui.print_kv("Copy", "Used blocks only" if allocated_only else "Full disk image")
+    print()
     if args.force_target:
-        ui.print_status("warn", "Force mode enabled: existing partition table/signatures will be wiped", ok=False)
+        ui.print_status("warn", f"Existing data on {args.device} will be overwritten.", ok=False)
     if allocated_only:
-        ui.print_status("warn", "Allocated-only copy: free filesystem blocks keep their previous bytes; a temporary sparse RAW copy needs local disk space", ok=False)
+        ui.print_note("Unused filesystem blocks on the target will keep their old contents.")
+        ui.print_note("A temporary working image requires local free space.")
     if helper_will_recheck:
         ui.print_status("warn", "Full target validation will run after sudo elevation", ok=False)
     if vm["firmware"]["type"] == "bios" and source_layout == "gpt":
@@ -403,7 +401,7 @@ def cmd_flash(args: argparse.Namespace) -> int:
         expand = False
     if expand is not None:
         helper_cmd.append("--expand" if expand else "--no-expand")
-    runtime.run(helper_cmd, dry_run=args.dry_run)
+    runtime.run(helper_cmd, dry_run=args.dry_run, show_command=args.dry_run)
     if args.dry_run:
         ui.print_status("ok", f"Would flash {ui.pretty_path(disk_path)} to {args.device} via sudo helper")
     else:
@@ -451,16 +449,17 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
             if prepared.size > info["size"]:
                 raise VMError("Prepared image exceeds the flash target")
         try:
+            show_command = not allocated_only
             if args.force_target:
                 if _device_has_gpt_metadata(info):
                     runtime.require_command("sgdisk")
                 for child in info["children"]:
                     child_path = child.get("path")
                     if child_path:
-                        runtime.run(["wipefs", "-a", "-f", child_path], dry_run=False, quiet=True)
+                        runtime.run(["wipefs", "-a", "-f", child_path], dry_run=False, quiet=True, show_command=show_command)
                 if _device_has_gpt_metadata(info):
-                    runtime.run(["sgdisk", "--zap-all", args.device], dry_run=False, quiet=True)
-                runtime.run(["wipefs", "-a", "-f", args.device], dry_run=False, quiet=True)
+                    runtime.run(["sgdisk", "--zap-all", args.device], dry_run=False, quiet=True, show_command=show_command)
+                runtime.run(["wipefs", "-a", "-f", args.device], dry_run=False, quiet=True, show_command=show_command)
                 runtime.reread_partition_table(args.device, dry_run=False)
             if prepared is not None:
                 prepared.copy_to(args.device)
@@ -468,6 +467,9 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
                 runtime.run(["qemu-img", "convert", "-n", "-p", "-f", disk["format"],
                              "-O", "raw", str(disk_path), args.device], dry_run=False)
             try:
+                if allocated_only:
+                    print()
+                    ui.print_header("4/4  Finalize disk layout")
                 runtime.reread_partition_table(args.device, dry_run=False)
                 # Probe the written bytes rather than lsblk/udev's cached table.
                 if disk_inspect.partition_layout(Path(args.device)) == "gpt":
@@ -481,7 +483,9 @@ def cmd_flash_helper(args: argparse.Namespace) -> int:
             except (VMError, subprocess.CalledProcessError, ValueError, KeyError, OSError) as exc:
                 raise VMError(f"Disk image copied to {args.device}, but post-flash repair/expansion did not complete: {exc}") from exc
         finally:
-            runtime.run(["sync"], dry_run=False, quiet=True)
+            if allocated_only:
+                ui.print_note("Flushing pending writes to disk…")
+            runtime.run(["sync"], dry_run=False, quiet=True, show_command=show_command)
 
     return 0
 

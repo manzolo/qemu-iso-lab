@@ -96,7 +96,7 @@ MENU_REFRESH_TAG="__refresh"
 MENU_HOTKEY_TAG="__hotkey"
 MENU_HIGHLIGHTED=""
 
-# Items are "tag<TAB>description"; only the description is shown and searched.
+# Tags remain hidden. Styled tables search only their name column.
 fzf_pick() {
     local title="$1"
     local header="$2"
@@ -132,6 +132,19 @@ fzf_pick() {
         if [[ "${MENU_STYLED:-0}" == "1" && "$1" == __sep_* ]]; then
             display=$'\e[90m'"${display//━/─}"$'\e[0m'
         fi
+        if [[ "${MENU_STYLED:-0}" == "1" ]]; then
+            local visible="${display%%$'\t'*}" indent name_and_details
+            indent="${visible%%[! ]*}"
+            name_and_details="${visible#"$indent"}"
+            if [[ "$name_and_details" == *"  "* ]]; then
+                display="$indent${name_and_details/  /$' \t'}"
+            else
+                display="$visible"$'\t'
+            fi
+            if [[ "${MENU_CONTEXT_HINTS:-0}" == "1" ]]; then
+                display+=$'\t'"$row_hint"
+            fi
+        fi
         lines+=("$1"$'\t'"$display")
         if [[ -n "$default_tag" && "$1" == "$default_tag" ]]; then
             default_pos=$index
@@ -140,6 +153,7 @@ fzf_pick() {
     done
     local -a args=(
         --layout=reverse --header-first --no-multi --cycle --info=inline
+        --exact
         --delimiter=$'\t' --with-nth=2
         --border=rounded --border-label=" $title " --prompt="filter> "
         --header="$(printf '%b' "$header")"
@@ -150,8 +164,19 @@ fzf_pick() {
         lines=("__columns"$'\t'"$MENU_COLUMN_HEADER" "${lines[@]}")
         args+=(--header-lines=1)
     fi
+    if [[ "${MENU_DEVICE_PREVIEW:-0}" == "1" ]]; then
+        args+=(--preview 'printf "%b\n" {3}'
+            --preview-window 'down,55%,wrap,border-top'
+            --bind 'shift-down:preview-down,shift-up:preview-up'
+            --nth=2,3)
+    fi
     if [[ "${MENU_STYLED:-0}" == "1" ]]; then
-        args+=(--color="header:-1" --prompt="Search › " --info=hidden)
+        args+=(--color="header:-1" --prompt="Search name › " --info=hidden
+            --with-nth=2,3 --nth=1 --tabstop=1)
+    fi
+    if [[ "${MENU_DANGER:-0}" == "1" ]]; then
+        args+=(--color="header:-1,border:red,pointer:red,hl:red,hl+:red"
+            --disabled --prompt="Confirm> ")
     fi
     if (( default_pos > 0 )); then
         args+=(--sync --bind "start:pos($default_pos)")
@@ -163,6 +188,9 @@ fzf_pick() {
     export VMTUI_PICKER_HEADER
     if [[ "${MENU_CONTEXT_HINTS:-0}" == "1" ]]; then
         local transform='transform-header:printf "%s\n\n%s" "$VMTUI_PICKER_HEADER" {3}'
+        if [[ "${MENU_STYLED:-0}" == "1" ]]; then
+            transform='transform-header:printf "%s\n\n%s" "$VMTUI_PICKER_HEADER" {4}'
+        fi
         args+=(--bind "focus:$transform"
             --bind 'zero:transform-header:printf "%s\n\n  No matching VM" "$VMTUI_PICKER_HEADER"')
     fi
@@ -259,9 +287,16 @@ fzf_confirm() {
     local title="$1"
     local message="$2"
     local choice
-    choice=$(MENU_NO_TAGS=1 fzf_pick "$title" "$message\n\nEnter = confirm highlighted answer · Esc = No" "Yes" \
-        "Yes" "Yes — go ahead" \
-        "No" "No — cancel") || return 1
+    if [[ "${CONFIRM_DESTRUCTIVE:-0}" == "1" ]]; then
+        choice=$(MENU_NO_TAGS=1 MENU_DANGER=1 fzf_pick "$title" \
+            "$message\n\nUp/Down = choose · Enter = confirm · Esc = cancel" "No" \
+            "No" "No — cancel, keep the disk unchanged" \
+            "Yes" $'\e[1;91m'"Yes — erase ${CONFIRM_TARGET:-the disk}"$'\e[0m') || return 1
+    else
+        choice=$(MENU_NO_TAGS=1 fzf_pick "$title" "$message\n\nEnter = confirm highlighted answer · Esc = No" "Yes" \
+            "Yes" "Yes — go ahead" \
+            "No" "No — cancel") || return 1
+    fi
     [[ "$choice" == "Yes" ]]
 }
 
@@ -354,11 +389,23 @@ msg_box() {
 }
 
 confirm_box() {
+    local title="$1" message="$2"
+    local -a options=()
+    if [[ "${CONFIRM_DESTRUCTIVE:-0}" == "1" ]]; then
+        title="DANGER — $title"
+        local banner="ALL DATA ON ${CONFIRM_TARGET:-THE TARGET DISK} WILL BE LOST.\nThis operation cannot be undone."
+        if [[ "$UI_BACKEND" == "fzf" ]]; then
+            message=$'\e[1;97;41m  WARNING: DESTRUCTIVE DISK WRITE  \e[0m\n\n\e[1;91m'"$banner"$'\e[0m\n\n'"$message"
+        else
+            options+=(--colors --defaultno --yes-label "Erase disk" --no-label "Cancel")
+            message="\Zb\Z1WARNING: DESTRUCTIVE DISK WRITE\n\n$banner\Zn\n\n$message"
+        fi
+    fi
     if [[ "$UI_BACKEND" == "fzf" ]]; then
-        fzf_confirm "$@"
+        fzf_confirm "$title" "$message"
         return
     fi
-    dialog --clear --title "$1" --yesno "$2" 12 76
+    dialog --clear "${options[@]}" --title "$title" --yesno "$message" "${CONFIRM_HEIGHT:-12}" 76
 }
 
 input_box() {
@@ -1263,45 +1310,73 @@ msg_na_action() {
 # ---------------------------------------------------------------------------
 
 list_empty_device_menu_items() {
-    python3 - "$VMCTL" <<'PY'
-import subprocess
-import sys
-
-vmctl = sys.argv[1]
-result = subprocess.run(
-    [vmctl, "list-empty-devices"],
-    check=True,
-    capture_output=True,
-    text=True,
-)
-for line in result.stdout.splitlines():
-    if not line.strip():
-        continue
-    path, size, model = (line.split("\t", 2) + ["-", "-"])[:3]
-    print(path)
-    print(f"{size:>10}  {model}")
-PY
+    list_device_menu_items list-empty-devices
 }
 
 list_target_device_menu_items() {
-    python3 - "$VMCTL" <<'PY'
+    list_device_menu_items list-target-devices
+}
+
+list_device_menu_items() {
+    python3 - "$ROOT_DIR" "$VMCTL" "$1" "$(term_cols)" <<'PYTHON'
+import json
 import subprocess
 import sys
 
-vmctl = sys.argv[1]
+sys.path.insert(0, sys.argv[1])
+from vmctl.tui_devices import menu_items
+
 result = subprocess.run(
-    [vmctl, "list-target-devices"],
+    [sys.argv[2], sys.argv[3], "--json"],
     check=True,
     capture_output=True,
     text=True,
 )
-for line in result.stdout.splitlines():
-    if not line.strip():
-        continue
-    path, size, model = (line.split("\t", 2) + ["-", "-"])[:3]
+for path, description in menu_items(json.loads(result.stdout), int(sys.argv[4])):
     print(path)
-    print(f"{size:>10}  {model}")
-PY
+    print(description)
+PYTHON
+}
+
+choose_device() {
+    local title="$1" prompt="$2"
+    shift 2
+    local columns
+    columns=$(python3 - "$ROOT_DIR" "$(term_cols)" <<'PYTHON'
+import sys
+sys.path.insert(0, sys.argv[1])
+from vmctl.tui_devices import menu_header
+print(menu_header(int(sys.argv[2])))
+PYTHON
+    )
+    local -a items=()
+    while (( $# >= 2 )); do
+        if [[ "$UI_BACKEND" == fzf ]]; then
+            items+=("$1" "$2")
+        else
+            # dialog uses the same compact table; full details follow on confirmation.
+            items+=("$1" "${2%%$'\t'*}")
+        fi
+        shift 2
+    done
+    if [[ "$UI_BACKEND" != fzf ]]; then
+        prompt+="\n\n$columns"
+    fi
+    MENU_NO_TAGS=1 MENU_DEVICE_PREVIEW=1 MENU_COLUMN_HEADER="$columns" \
+        MENU_WIDTH="$(term_cols)" menu_choose_fit "$title" "$prompt" "${items[@]}"
+}
+
+# Reuse the selected row so confirmation shows the same disk identification.
+device_menu_details() {
+    local selected="$1"
+    shift
+    while (( $# >= 2 )); do
+        if [[ "$1" == "$selected" ]]; then
+            printf '%b\n' "${2#*$'\t'}"
+            return 0
+        fi
+        shift 2
+    done
 }
 
 # ---------------------------------------------------------------------------
@@ -1349,12 +1424,14 @@ run_vmctl() {
         return $?
     fi
     clear
-    printf 'Selected VM: %s\n' "$current_vm"
-    printf '$ %q' "$VMCTL"
-    for arg in "$@"; do
-        printf ' %q' "$arg"
-    done
-    printf '\n\n'
+    if [[ "$1" != flash ]]; then
+        printf 'Selected VM: %s\n' "$current_vm"
+        printf '$ %q' "$VMCTL"
+        for arg in "$@"; do
+            printf ' %q' "$arg"
+        done
+        printf '\n\n'
+    fi
 
     local started status=0
     started=$(date +%s)
@@ -1804,22 +1881,20 @@ run_action() {
             local title="Flash Empty Disk"
             [[ $force -eq 1 ]] && title="Force Flash"
             local selected_device
-            selected_device=$(menu_choose_fit "$title" "Select the target device for '$current_vm'" "${device_items[@]}") || return 0
+            selected_device=$(choose_device "$title" "Select the target device for '$current_vm'" "${device_items[@]}") || return 0
             local warning="Write the VM disk image to $selected_device?"
-            if [[ $force -eq 1 ]]; then
-                warning="WIPE $selected_device and write the VM disk image to it?\n\nALL DATA ON THE DEVICE WILL BE LOST."
-            fi
+            warning+="\n\n$(device_menu_details "$selected_device" "${device_items[@]}")"
             warning+="\n\nAfter copying, you may choose to expand a supported final NTFS partition. The default is No."
-            if ! confirm_box "$title" "$warning"; then
+            if ! CONFIRM_HEIGHT=0 CONFIRM_DESTRUCTIVE=1 CONFIRM_TARGET="$selected_device" confirm_box "$title" "$warning"; then
                 return 0
             fi
             confirm_device_path "$selected_device" || return 0
             if [[ $force -eq 1 ]]; then
                 # --allocated-only needs the wipe, so it is offered on this path only.
                 local copy_mode
-                copy_mode=$(menu_choose_fit "$title" "Copy mode for '$current_vm' -> $selected_device" \
-                    "full" "Write every sector, zeroing free space (slow on large images)" \
-                    "allocated" "Copy allocated blocks only; free space keeps its previous bytes (much faster)") || return 0
+                copy_mode=$(MENU_DEFAULT_ITEM=allocated menu_choose_fit "$title" "Copy mode for '$current_vm' -> $selected_device" \
+                    "allocated" "Copy allocated blocks only; free space keeps its previous bytes (much faster)" \
+                    "full" "Write every sector, zeroing free space (slow on large images)") || return 0
                 if [[ "$copy_mode" == "allocated" ]]; then
                     run_vmctl flash "$current_vm" --device "$selected_device" --confirm-device "$selected_device" --force-target --allocated-only || true
                 else
@@ -1837,7 +1912,7 @@ run_action() {
                 return 0
             fi
             local selected_device
-            selected_device=$(menu_choose_fit "Import Disk" "Select the source device to import into '$current_vm'" "${device_items[@]}") || return 0
+            selected_device=$(choose_device "Import Disk" "Select the source device to import into '$current_vm'" "${device_items[@]}") || return 0
             local import_mode
             local -a import_flags=()
             import_mode=$(menu_choose_fit "Import Mode" "Import $selected_device into '$current_vm'" \

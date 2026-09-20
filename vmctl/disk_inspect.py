@@ -61,6 +61,36 @@ def find_device_node(nodes: list[dict[str, Any]], device: str) -> dict[str, Any]
     return None
 
 
+def unallocated_bytes(node: dict[str, Any]) -> int | None:
+    """Approximate bytes outside partitions, including small table/alignment gaps.
+
+    lsblk START uses the kernel's 512-byte sector offsets, including on 4Kn
+    disks. Merge ranges so extended/overlapping partitions are not counted twice.
+    This display-only estimate says nothing about free space inside filesystems.
+    """
+    size = int(node.get("size") or 0)
+    if size <= 0:
+        return None
+    children = node.get("children") or []
+    if not children:
+        return 0 if node.get("fstype") else size
+    ranges = []
+    for child in children:
+        if child.get("type") != "part" or child.get("start") is None or child.get("size") is None:
+            return None
+        start = int(child["start"]) * 512
+        end = start + int(child["size"])
+        if start < 0 or end <= start or end > size:
+            return None
+        ranges.append((start, end))
+    occupied = 0
+    previous_end = 0
+    for start, end in sorted(ranges):
+        occupied += max(0, end - max(start, previous_end))
+        previous_end = max(previous_end, end)
+    return size - occupied
+
+
 def lsblk_devices() -> list[dict[str, Any]]:
     output = runtime.run_output(
         [
@@ -68,7 +98,7 @@ def lsblk_devices() -> list[dict[str, Any]]:
             "--json",
             "-b",
             "-o",
-            "PATH,NAME,TYPE,SIZE,START,LOG-SEC,MODEL,MOUNTPOINTS,PKNAME,PTTYPE,FSTYPE",
+            "PATH,NAME,TYPE,SIZE,START,LOG-SEC,MODEL,SERIAL,TRAN,LABEL,MOUNTPOINTS,PKNAME,PTTYPE,FSTYPE",
         ]
     )
     payload = json.loads(output)
@@ -113,6 +143,10 @@ def inspect_block_device(device: str) -> dict[str, Any]:
         "name": node.get("name", ""),
         "size": int(node.get("size", 0) or 0),
         "model": str(node.get("model") or "").strip(),
+        "serial": node.get("serial"),
+        "tran": node.get("tran"),
+        "label": node.get("label"),
+        "unallocated_bytes": unallocated_bytes(node),
         "mountpoints": mountpoints,
         "children": node.get("children") or [],
         "logical_sector_size": int(node.get("log-sec", 512) or 512),
@@ -137,6 +171,10 @@ def inspect_block_device_basic(device: str) -> dict[str, Any]:
         "name": node.get("name", ""),
         "size": int(node.get("size", 0) or 0),
         "model": str(node.get("model") or "").strip(),
+        "serial": node.get("serial"),
+        "tran": node.get("tran"),
+        "label": node.get("label"),
+        "unallocated_bytes": unallocated_bytes(node),
         "mountpoints": collect_mountpoints(node),
         "children": node.get("children") or [],
         "logical_sector_size": int(node.get("log-sec", 512) or 512),
@@ -160,6 +198,11 @@ def list_non_root_devices() -> list[dict[str, Any]]:
                 "path": path,
                 "size": int(node.get("size", 0) or 0),
                 "model": str(node.get("model") or "").strip(),
+                "serial": node.get("serial"),
+                "tran": node.get("tran"),
+                "label": node.get("label"),
+                "fstype": node.get("fstype"),
+                "unallocated_bytes": unallocated_bytes(node),
                 "mountpoints": collect_mountpoints(node),
                 "children": node.get("children") or [],
                 "is_root_disk": False,
@@ -229,16 +272,55 @@ def partition_extent_bytes(node: dict[str, Any], logical_sector_size: int) -> in
     return (start * logical_sector_size) + size
 
 
+def device_contents(info: dict[str, Any]) -> str:
+    """Describe existing filesystems without claiming that an unrecognized disk is empty."""
+    entries = []
+
+    def visit(node: dict[str, Any]) -> None:
+        details = []
+        if node.get("fstype"):
+            details.append(str(node["fstype"]))
+        if node.get("label"):
+            details.append(f'label={node["label"]}')
+        if details or node is not info:
+            name = Path(node.get("path") or node.get("name") or "?").name
+            entries.append(f"{name}: {' '.join(details) or 'unknown filesystem'}")
+        for child in node.get("children") or []:
+            visit(child)
+
+    visit(info)
+    return "; ".join(entries) or "no recognized filesystems"
+
+
+def print_device_row(info: dict[str, Any]) -> None:
+    # Keep the original three TSV columns; append identification and contents.
+    contents = device_contents(info)
+    if info.get("mountpoints"):
+        contents += "; mounted: " + ", ".join(info["mountpoints"])
+    fields = [info["path"], runtime.format_bytes(info["size"]), info.get("model"),
+              info.get("serial"), info.get("tran"), contents]
+    # Disk labels and model strings must not create extra menu rows/columns.
+    print("\t".join(" ".join(str(value or "-").split()) for value in fields))
+
+
 def cmd_list_empty_devices(args: argparse.Namespace) -> int:
     runtime.require_command("lsblk")
     runtime.require_command("wipefs")
-    for info in list_flashable_devices():
-        print("\t".join([info["path"], runtime.format_bytes(info["size"]), info["model"] or "-"]))
+    devices = list_flashable_devices()
+    if getattr(args, "json", False):
+        print(json.dumps(devices))
+        return 0
+    for info in devices:
+        print_device_row(info)
     return 0
 
 
 def cmd_list_target_devices(args: argparse.Namespace) -> int:
     runtime.require_command("lsblk")
-    for info in list_non_root_devices():
-        print("\t".join([info["path"], runtime.format_bytes(info["size"]), info["model"] or "-"]))
+    devices = list_non_root_devices()
+    if getattr(args, "json", False):
+        print(json.dumps(devices))
+        return 0
+    for info in devices:
+        print_device_row(info)
     return 0

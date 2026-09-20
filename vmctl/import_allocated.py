@@ -11,10 +11,13 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from vmctl import flash, runtime, ui
 from vmctl.errors import VMError
+
+if TYPE_CHECKING:
+    from vmctl.flash_progress import FlashProgress
 
 
 PARTCLONE = {
@@ -121,7 +124,8 @@ def partition_plan(device: str, info: dict[str, Any]) -> tuple[dict[str, Any], l
     return table, plan
 
 
-def build_domain(plan: list[dict[str, Any]], size: int, scratch: Path) -> list[Block]:
+def build_domain(plan: list[dict[str, Any]], size: int, scratch: Path,
+                 progress: FlashProgress | None = None) -> list[Block]:
     blocks: list[Block] = []
     end = 0
     for index, part in enumerate(plan):
@@ -130,16 +134,22 @@ def build_domain(plan: list[dict[str, Any]], size: int, scratch: Path) -> list[B
         append_block(blocks, end, start - end, "+")
         command = PARTCLONE.get(part["fstype"])
         if command is None:
-            ui.print_note(f"{part['path']}: {part['fstype']}, copying the entire partition")
+            label = f"Partition {index + 1}: {part['fstype']}" if progress else part['path']
+            ui.print_note(f"{label}: copying the entire partition")
             append_block(blocks, start, length, "+")
         else:
             runtime.require_command(command)
-            ui.print_note(f"{part['path']}: mapping allocated {part['fstype']} blocks")
+            if progress is None:
+                ui.print_note(f"{part['path']}: mapping allocated {part['fstype']} blocks")
             domain = scratch / f"partition-{index}.map"
             log = scratch / f"partition-{index}.log"
             try:
-                runtime.run([command, "--domain", "--source", part["path"], "--output", str(domain),
-                             "--logfile", str(log)])
+                cmd = [command, "--domain", "--source", part["path"], "--output", str(domain),
+                       "--logfile", str(log)]
+                if progress is None:
+                    runtime.run(cmd)
+                else:
+                    progress.run(cmd, title=f"Partition {index + 1}/{len(plan)} · {part['fstype']} · {runtime.format_bytes(length)}")
             except subprocess.CalledProcessError as exc:
                 guidance = (
                     " If NTFS is unclean or hibernated, check the volume in Windows and shut it down fully."
