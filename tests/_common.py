@@ -26,6 +26,8 @@ import vmctl.preseed  # noqa: E402
 import vmctl.reactos  # noqa: E402
 import vmctl.scheduler  # noqa: E402
 import vmctl.kickstart  # noqa: E402
+import vmctl.checkpoint  # noqa: E402
+import vmctl.clone  # noqa: E402
 import vmctl.cloud_init  # noqa: E402
 import vmctl.config  # noqa: E402
 import vmctl.disk_inspect  # noqa: E402
@@ -52,6 +54,7 @@ import vmctl.runtime  # noqa: E402
 import vmctl.ssh  # noqa: E402
 import vmctl.state  # noqa: E402
 import vmctl.ui  # noqa: E402
+import vmctl.vmstate  # noqa: E402
 import vmctl.windows  # noqa: E402
 import vmctl.windowsnt4  # noqa: E402
 import vmctl.windowsxp  # noqa: E402
@@ -73,7 +76,7 @@ class _VmctlFacade:
     _SEARCH_ORDER = (
         vmctl.lifecycle, vmctl.libvirt, vmctl.freebsd, vmctl.nixos, vmctl.pearos, vmctl.pfsense, vmctl.reactos, vmctl.scheduler, vmctl.netlab, vmctl.report, vmctl.profiledoc, vmctl.ssh, vmctl.host_setup, vmctl.flash, vmctl.flash_allocated, vmctl.flash_progress, vmctl.tui_devices, vmctl.import_dev, vmctl.disk_inspect,
         vmctl.iso, vmctl.alpine, vmctl.autoyast, vmctl.windows, vmctl.windowsnt4, vmctl.windowsxp, vmctl.archinstall, vmctl.omarchy, vmctl.preseed, vmctl.kickstart, vmctl.cloud_init, vmctl.qemu, vmctl.config,
-        vmctl.runtime, vmctl.ui, vmctl.state, vmctl.errors,
+        vmctl.clone, vmctl.checkpoint, vmctl.vmstate, vmctl.runtime, vmctl.ui, vmctl.state, vmctl.errors,
     )
 
     def __getattr__(self, name):

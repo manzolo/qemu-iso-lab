@@ -94,6 +94,8 @@ accepts `--dry-run` in front of it.
 | get a command line without SSH (serial: ttyS0 login, pfSense menu) | `vmctl console <vm>` on a background VM, `Ctrl-]` to detach |
 | use an installed VM in virt-manager | `vmctl export-libvirt <vm>`; return with `vmctl unexport-libvirt <vm>` ([guide](docs/LIBVIRT.md)) |
 | save a matrix report with screenshots | `vmctl check-vms alpine-ci debian-server --restore --report --open` |
+| keep a copy of an installed VM to go back to | `vmctl checkpoint create <vm> clean-install`, later `vmctl checkpoint restore <vm> clean-install` ([guide](docs/CHECKPOINTS.md)) |
+| get a second, independent VM out of an installed one | `vmctl clone <vm> <new-name>` (`--identity regenerate` for a new hostname/machine-id/host keys; [guide](docs/CLONE.md)) |
 | test every unattended flow without losing my VMs      | `vmctl check-vms --restore` (stashes disks, runs, restores) |
 | re-run the SSH provisioning steps of a profile        | `vmctl post-install <vm>`                                |
 | prove a VM still boots (CI-style)                     | `vmctl boot-check <vm>`, `vmctl check-vms`               |
@@ -222,6 +224,8 @@ using the lab, for the printable guides and for developing. The pages:
 | [docs/UNATTENDED.md](docs/UNATTENDED.md) | The five unattended flows step by step, the completion-token rule, boot checks and the local validation matrix |
 | [docs/NETWORK-LAB.md](docs/NETWORK-LAB.md) | The network lab: pfSense + Pi-hole + client on an isolated segment, `networks`/phases, host access through the router, libvirt road, differences from kvm-lab |
 | [docs/LIBVIRT.md](docs/LIBVIRT.md) | `export-libvirt` / `unexport-libvirt`: hand an installed VM to virt-manager and back |
+| [docs/CHECKPOINTS.md](docs/CHECKPOINTS.md) | `vmctl checkpoint`: named full copies of a stopped VM's disk and EFI vars, what they protect against, their relation with `clean` |
+| [docs/CLONE.md](docs/CLONE.md) | `vmctl clone`: an independent copy as a new local profile (own disk, ports, MACs) and the explicit choice about the guest's identity |
 | [docs/guides/](docs/guides/README.md) | Printable step-by-step guides in reading order, in English (`en/`) and Italian (`it/`): every flow, working inside the guests, the network lab schema, the virsh cheat sheet; `make guides` builds one manual PDF per language plus one PDF per guide |
 | [docs/PROVISIONING.md](docs/PROVISIONING.md) | `cloud_init`, `ssh_provision`, `autoinstall` and `omarchy_config` fields, `copy_from_host`, `post_install_run`, sudo, guest identity and `local.json` |
 | [docs/VMTUI.md](docs/VMTUI.md) | The TUI in depth: dashboard, filters, contextual menu, video profiles, post-install chaining, remote SPICE |

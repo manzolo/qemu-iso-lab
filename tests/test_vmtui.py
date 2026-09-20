@@ -199,14 +199,133 @@ class VmtuiTests(unittest.TestCase):
         return ""
 
     def test_unified_menu_has_all_sections(self):
+        # A new VM: its install flow on top, nothing to run yet.
         output = self._unified_menu("ubuntu-niri")
         self.assertIn("__sep_INSTALL", output)
-        self.assertIn("__sep_RUN", output)
+        self.assertNotIn("__sep_RUN", output)
         self.assertIn("__sep_MAINTENANCE", output)
         self.assertIn("__sep_ADVANCED", output)
         self.assertNotIn("__sep_OTHER", output)
+        self.assertNotIn("Install / Reinstall...", output)
         # Back is the last selectable row
         self.assertEqual(output[-2], "Back")
+        # A disk with data: RUN first, the install flows behind "Install / Reinstall...".
+        self.mark_installed("test-ssh")
+        output = self._unified_menu("test-ssh")
+        self.assertNotIn("__sep_INSTALL", output)
+        self.assertLess(output.index("__sep_RUN"), output.index("__sep_MAINTENANCE"))
+        self.assertLess(output.index("__sep_MAINTENANCE"), output.index("__sep_ADVANCED"))
+        self.assertEqual(output[output.index("__sep_RUN") + 2], "Boot Desktop")
+        self.assertIn("Install / Reinstall...", output)
+        self.assertNotIn("Guided Provision", output)
+        self.assertIn("Checkpoints", output)
+        self.assertIn("Libvirt / Remote...", output)
+        self.assertIn("Physical Disks...", output)
+        self.assertEqual(output[-2], "Back")
+
+    def test_clone_entry_asks_name_and_identity_then_calls_the_cli(self):
+        self.mark_installed("test-ssh")
+        self.assertIn("Clone VM...", self._unified_menu("test-ssh"))
+        self.assertNotIn("Clone VM...", self._unified_menu("alpine-ci"))  # no data to copy
+        result = self.run_bash(
+            "source bin/vmtui; current_vm=test-ssh; load_vm_facts test-ssh; "
+            "input_box() { echo test-ssh-2; }; "
+            "menu_choose_fit() { echo \"choices=$*\" >&2; echo regenerate; }; "
+            "run_vmctl() { printf '%s\\n' \"$*\"; }; run_action 'Clone VM...'"
+        )
+        self.assertEqual(result.stdout.strip(), "clone test-ssh test-ssh-2 --identity regenerate")
+        self.assertIn("regenerate", result.stderr)
+        self.assertIn("keep", result.stderr)
+
+    def test_clean_on_a_clone_offers_to_delete_the_whole_profile(self):
+        self.mark_installed("test-ssh")
+        for choice, expected in (("Delete the clone", "clean test-ssh --remove-profile"), ("Clean artifacts only", "clean test-ssh"), ("Back", "")):
+            with self.subTest(choice=choice):
+                result = self.run_bash(
+                    "source bin/vmtui; current_vm=test-ssh; load_vm_facts test-ssh; FACTS[clone_of]=origin-vm; "
+                    f"menu_choose_fit() {{ echo {choice!r}; }}; confirm_box() {{ return 0; }}; "
+                    "run_vmctl() { printf '%s\\n' \"$*\"; }; run_action 'Clean VM' || echo left-menu"
+                )
+                lines = result.stdout.splitlines()
+                self.assertEqual(lines[0] if lines else "", expected)
+                self.assertEqual("left-menu" in lines, choice == "Delete the clone")
+        # a VM that is not a clone keeps the plain confirmation
+        result = self.run_bash(
+            "source bin/vmtui; current_vm=test-ssh; load_vm_facts test-ssh; confirm_box() { return 0; }; "
+            "run_vmctl() { printf '%s\\n' \"$*\"; }; run_action 'Clean VM'"
+        )
+        self.assertEqual(result.stdout.strip(), "clean test-ssh")
+
+    def test_install_submenu_holds_the_flows_and_reinstall_wording(self):
+        self.mark_installed("test-ssh")
+        result = self.run_bash("source bin/vmtui; load_vm_facts test-ssh; list_install_menu_items")
+        items = result.stdout.splitlines()
+        self.assertEqual(items[0], "Guided Provision")
+        self.assertIn("Reinstall:", items[1])
+        for tag in ("Fetch ISO", "Prepare VM", "Back"):
+            self.assertIn(tag, items[0::2])
+        self.assertEqual(items[-2], "Back")
+        # the submenu entry opens it, the shortcut still reaches the flow inside it
+        result = self.run_bash("source bin/vmtui; resolve_action 'Install / Reinstall...'; "
+                               "load_vm_facts test-ssh; vm_hidden_actions")
+        lines = result.stdout.splitlines()
+        self.assertEqual(lines[0], "install-menu")
+        self.assertIn("Guided Provision", lines[1:])
+        self.assertIn("Export to libvirt", lines[1:])
+        self.assertIn("Import Disk", lines[1:])
+        self.assertNotIn("Back", lines[1:])
+
+    def test_running_vm_menu_keeps_run_first_and_hides_disk_operations(self):
+        result = self.run_bash(
+            "source bin/vmtui; current_vm=test-ssh; load_vm_facts test-ssh; "
+            "FACTS[running]=1; FACTS[installed]=1; RECOMMENDED=$(recommended_action); build_vm_menu_items; "
+            "echo ==; vm_hidden_actions"
+        )
+        menu, hidden = result.stdout.split("==\n")
+        lines = menu.splitlines()
+        self.assertEqual(lines[0], "__sep_RUN")
+        self.assertEqual(lines[2], "Stop VM")
+        for absent in ("Install / Reinstall...", "Physical Disks...", "Clean VM", "Checkpoints", "Boot Check"):
+            self.assertNotIn(absent, lines)
+        self.assertIn("Libvirt / Remote...", lines)
+        self.assertNotIn("Guided Provision", hidden.splitlines())
+        self.assertNotIn("Import Disk", hidden.splitlines())
+        self.assertIn("Remote SPICE", hidden.splitlines())
+
+    def test_alt_u_on_a_disk_with_data_runs_the_flow_behind_the_submenu(self):
+        fake = self.bindir / "fzf"
+        fake.write_text(
+            f"#!{sys.executable}\n"
+            "import os, sys\n"
+            "from pathlib import Path\n"
+            "if sys.argv[1:] == ['--version']:\n"
+            "    print('0.40.0'); raise SystemExit\n"
+            "marker = Path(os.environ['VMTUI_ROOT_DIR']) / 'picked'\n"
+            "sys.stdin.read()\n"
+            "if not marker.exists():\n"
+            "    marker.touch(); print('alt-u'); print('Profile Details\\tProfile Details')\n"
+            "else:\n"
+            "    print('\\nBack\\tBack')\n",
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        self.mark_installed("test-ssh")
+        result = subprocess.run(
+            ["bash", "-lc", "source bin/vmtui; current_vm=test-ssh; "
+             "is_na_action() { return 1; }; run_action() { echo \"action=$1\"; }; vm_menu_loop"],
+            cwd=ROOT, env=dict(self.env, VMTUI_UI="fzf"),
+            capture_output=True, text=True, check=True, timeout=15,
+        )
+        self.assertEqual(result.stdout.strip(), "action=Guided Provision")
+
+    def test_submenu_loop_runs_the_pick_and_returns_on_back(self):
+        result = self.run_bash(
+            "source bin/vmtui; current_vm=test-ssh; load_vm_facts test-ssh; "
+            "menu_choose_fit() { if [[ ! -e $VMTUI_ROOT_DIR/once ]]; then touch \"$VMTUI_ROOT_DIR/once\"; echo 'Import Disk'; else echo Back; fi; }; "
+            "is_na_action() { return 1; }; run_action() { echo \"action=$1\"; }; "
+            "submenu_loop 'Physical Disks' prompt list_physical_menu_items; echo done"
+        )
+        self.assertEqual(result.stdout.splitlines(), ["action=Import Disk", "done"])
 
     def test_unified_menu_for_autoinstall_plus_cloud_init_vm(self):
         output = self._unified_menu("ubuntu-niri")
@@ -421,7 +540,7 @@ class VmtuiTests(unittest.TestCase):
                 self.assertFalse(any(row.startswith("Boot Desktop\t") for row in first["rows"]))
                 self.assertTrue(any(row.startswith("Boot Desktop\t") for row in second["rows"]))
                 header = next(arg for arg in second["args"] if arg.startswith("--header="))
-                self.assertIn("DISK WITH DATA", header)
+                self.assertIn("ON HOST / CAPACITY", header)
                 self.assertIn("Ctrl-R / F5", header)
                 position = next(i for i, row in enumerate(second["rows"], 1)
                                 if row.startswith("Profile Details\t"))
@@ -730,9 +849,26 @@ run_dashboard_hotkey alt-u {vm}
                 )
                 lines = result.stdout.splitlines()
                 self.assertIn("RAM/CPU", lines[0])
+                self.assertIn("FW", lines[0])
                 self.assertIn("SSH", lines[0])
                 for row in [lines[0], *lines[3::2]]:
                     self.assertLessEqual(len(row), width - 8)
+
+    def test_dashboard_rows_show_firmware_and_a_state_flag(self):
+        self.mark_installed("test-ssh")
+        result = self.run_bash("source bin/vmtui; list_dashboard_items all ''")
+        lines = result.stdout.splitlines()[1:]
+        row = self._description_of(lines, "test-ssh")
+        self.assertIn("  UEFI  ", row)
+        self.assertRegex(row, r"\? 24M$")  # data, no record: the "?" flag, then the bytes on the host
+        bios_row = self._description_of(lines, "reactos")
+        self.assertIn("  Bios  ", bios_row)
+        # a recorded verification turns the flag into a check mark
+        self.run_bash("source bin/vmtui; python3 -c \"$PY_COMMON\nvmstate.complete_install('test-ssh', 'bootstrap-unattended')\nvmstate.record_verified('test-ssh', 'post-install')\" \"$ROOT_DIR\" \"$CONFIG_DIR\"")
+        row = self._description_of(self.run_bash("source bin/vmtui; list_dashboard_items all ''").stdout.splitlines()[1:], "test-ssh")
+        self.assertRegex(row, r"✓ 24M$")
+        header = self.run_bash("source bin/vmtui; dashboard_header 1 1 0").stdout
+        self.assertIn("✓ boot verified", header)
 
     def test_dashboard_summary_and_rows(self):
         self.mark_installed("test-ssh")
@@ -759,7 +895,7 @@ run_dashboard_hotkey alt-u {vm}
         job.mkdir(parents=True, exist_ok=True)
         (job / "lock").touch()
         for recorded, expected in [("running\n", "interrupted"), ("failed (1)\n", "failed (1)"),
-                                   ("completed\n", "disk ")]:
+                                   ("completed\n", "? ")]:
             with self.subTest(recorded=recorded):
                 (job / "status").write_text(recorded, encoding="utf-8")
                 result = self.run_bash("source bin/vmtui; list_dashboard_items all ''")
@@ -787,14 +923,18 @@ run_dashboard_hotkey alt-u {vm}
         self.assertEqual(result.stdout.split("\n")[:5], ["0", "--video", "std", "0", "0"])
 
     def test_unified_menu_for_arch_bootstrap_vm(self):
-        # SSH Console is offered only once the disk holds an OS
+        # SSH Console is offered only once the disk holds an OS; the install flows then
+        # live behind "Install / Reinstall..."
         self.mark_installed("arch-noctalia")
         output = self._unified_menu("arch-noctalia")
-        self.assertIn("Arch Bootstrap", output)
-        self.assertIn("Arch Install (Interactive)", output)
         self.assertIn("SSH Console", output)
-        self.assertNotIn("Full Bootstrap", output)
-        self.assertNotIn("Debian Preseed Bootstrap", output)
+        self.assertIn("Install / Reinstall...", output)
+        self.assertNotIn("Arch Bootstrap", output)
+        submenu = self.run_bash("source bin/vmtui; load_vm_facts arch-noctalia; list_install_menu_items").stdout.splitlines()
+        self.assertIn("Arch Bootstrap", submenu)
+        self.assertIn("Arch Install (Interactive)", submenu)
+        self.assertNotIn("Full Bootstrap", submenu)
+        self.assertNotIn("Debian Preseed Bootstrap", submenu)
 
     def test_unified_menu_offers_attach_display_only_while_running(self):
         self.mark_installed("test-ssh")
@@ -814,10 +954,11 @@ run_dashboard_hotkey alt-u {vm}
     def test_unified_menu_for_omarchy_bootstrap_vm(self):
         self.mark_installed("arch-omarchy-nvidia")
         output = self._unified_menu("arch-omarchy-nvidia")
-        self.assertIn("Omarchy Bootstrap", output)
-        self.assertIn("Omarchy Unattended Install", output)
         self.assertIn("SSH Console", output)
-        self.assertNotIn("Arch Bootstrap", output)
+        submenu = self.run_bash("source bin/vmtui; load_vm_facts arch-omarchy-nvidia; list_install_menu_items").stdout.splitlines()
+        self.assertIn("Omarchy Bootstrap", submenu)
+        self.assertIn("Omarchy Unattended Install", submenu)
+        self.assertNotIn("Arch Bootstrap", submenu)
 
     def test_unified_menu_for_preseed_vm(self):
         output = self._unified_menu("debian-server")
@@ -901,9 +1042,12 @@ run_dashboard_hotkey alt-u {vm}
 
     def test_unified_menu_includes_advanced_entries(self):
         output = self._unified_menu("alpine-ci")
-        self.assertIn("Flash Empty Disk", output)
-        self.assertIn("Force Flash", output)
-        self.assertIn("Import Disk", output)
+        self.assertIn("Physical Disks...", output)
+        self.assertEqual(self.run_bash("source bin/vmtui; resolve_action 'Physical Disks...'").stdout.strip(), "physical-menu")
+        submenu = self.run_bash("source bin/vmtui; load_vm_facts alpine-ci; list_physical_menu_items").stdout.splitlines()
+        self.assertIn("Flash Empty Disk", submenu)
+        self.assertIn("Force Flash", submenu)
+        self.assertIn("Import Disk", submenu)
 
     def test_unified_menu_includes_maintenance_entries(self):
         output = self._unified_menu("alpine-ci")
@@ -951,7 +1095,10 @@ run_dashboard_hotkey alt-u {vm}
 
     def test_libvirt_menu_and_actions(self):
         self.mark_installed("test-ssh")
-        output = self._unified_menu("test-ssh")
+        self.assertIn("Libvirt / Remote...", self._unified_menu("test-ssh"))
+        self.assertEqual(self.run_bash("source bin/vmtui; resolve_action 'Libvirt / Remote...'").stdout.strip(), "libvirt-menu")
+        output = self.run_bash("source bin/vmtui; load_vm_facts test-ssh; list_libvirt_menu_items").stdout.splitlines()
+        self.assertIn("Remote SPICE", output)
         for label, command in (("Export to libvirt", "export-libvirt"), ("Remove from libvirt", "unexport-libvirt")):
             self.assertIn(label, output)
             result = self.run_bash(f"source bin/vmtui; resolve_action {label!r}")

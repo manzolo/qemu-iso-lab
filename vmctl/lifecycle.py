@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, windows, windows98, windowsnt4, windowsxp
+from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -1083,18 +1083,17 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 
 def disk_status(vm: dict[str, Any]) -> tuple[str, str, str]:
-    disk_path = runtime.resolve_path(vm["disk"]["path"])
-    if not disk_path.is_file():
-        return "missing", "-", "-"
+    """``(missing|ready, bytes on the host, virtual capacity)`` as formatted strings.
 
-    actual_size = runtime.format_bytes(disk_path.stat().st_size)
-    virtual_size = "-"
-    if shutil.which("qemu-img") is not None:
-        try:
-            virtual_size = runtime.format_bytes(int(runtime.image_info(disk_path, quiet=True).get("virtual-size", 0) or 0))
-        except Exception:
-            virtual_size = "?"
-    return "ready", actual_size, virtual_size
+    The host figure is the allocated blocks of the image (what ``du`` reports), not its
+    apparent size: a sparse raw image is as large as its capacity on paper and nearly empty
+    on disk. Neither number is the guest filesystem's used or free space.
+    """
+    facts = vmstate.disk_facts(vm)
+    if not facts["present"]:
+        return "missing", "-", "-"
+    virtual_size = runtime.format_bytes(facts["virtual_bytes"]) if facts["virtual_bytes"] else "?"
+    return "ready", runtime.format_bytes(facts["host_bytes"]), virtual_size
 
 
 def iso_status(vm: dict[str, Any]) -> str:
@@ -1132,10 +1131,12 @@ def format_runtime_cell(runtime_str: str, runtime_note: str) -> str:
 
 
 def status_cell_style(value: str) -> tuple[str, ...]:
-    if value in {"ready"}:
+    if value in {"ready", vmstate.LABEL_VERIFIED}:
         return (ui.GREEN, ui.BOLD)
-    if value in {"missing"}:
+    if value in {"missing", vmstate.LABEL_UNVERIFIED, vmstate.LABEL_INCOMPLETE}:
         return (ui.YELLOW, ui.BOLD)
+    if value == vmstate.LABEL_INSTALLED:
+        return (ui.CYAN, ui.BOLD)
     if value.startswith(("tracked:", "hostfwd:", "open:")):
         return (ui.GREEN, ui.BOLD)
     if value.startswith(("closed:",)):
@@ -1162,7 +1163,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         disk, actual, virtual = disk_status(vm)
         runtime_str, runtime_note = vm_runtime_status(name, vm)
         runtime_cell = format_runtime_cell(runtime_str, runtime_note)
-        rows.append((name, disk, iso_status(vm), nvram_status(vm), runtime_cell, actual, virtual, runtime_note))
+        known = vmstate.summary(name, vm)
+        rows.append((name, disk, iso_status(vm), nvram_status(vm), runtime_cell, actual, virtual, runtime_note, known))
 
     if getattr(args, "json", False):
         out = [
@@ -1172,11 +1174,24 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "iso": iso_str,
                 "nvram": nvram,
                 "runtime": runtime_str,
-                "actual_size": actual,
+                # Bytes the image occupies on the host and its virtual capacity: neither is
+                # the guest filesystem's used or free space.
+                "host_size": actual,
                 "virtual_size": virtual,
+                "host_bytes": known["host_bytes"],
+                "virtual_bytes": known["virtual_bytes"],
+                "install": known["label"],
+                "install_detail": known["detail"],
+                "install_state": known["install_state"],
+                "install_flow": known["install_flow"],
+                "install_at": known["install_at"],
+                "verified": known["verified"],
+                "verify_kind": known["verify_kind"],
+                "verify_at": known["verify_at"],
+                "origin": known["origin_kind"],
                 "runtime_note": runtime_note if runtime_note != "-" else None,
             }
-            for name, disk, iso_str, nvram, runtime_str, actual, virtual, runtime_note in rows
+            for name, disk, iso_str, nvram, runtime_str, actual, virtual, runtime_note, known in rows
         ]
         print(json.dumps(out, indent=2))
         return 0
@@ -1190,19 +1205,24 @@ def cmd_status(args: argparse.Namespace) -> int:
     iso_width = max(len("ISO"), max(len(row[2]) for row in rows))
     nvram_width = max(len("NVRAM"), max(len(row[3]) for row in rows))
     runtime_width = max(len("RUNTIME"), max(len(row[4]) for row in rows))
-    actual_width = max(len("ACTUAL"), max(len(row[5]) for row in rows))
-    virtual_width = max(len("VIRTUAL"), max(len(row[6]) for row in rows))
+    actual_width = max(len("ON HOST"), max(len(row[5]) for row in rows))
+    virtual_width = max(len("CAPACITY"), max(len(row[6]) for row in rows))
+    install_width = max(len("INSTALL"), max(len(row[8]["label"]) for row in rows))
 
+    # ON HOST is what the image occupies on the host, CAPACITY the disk the guest sees;
+    # INSTALL is what is known about the disk (vmstate.summary), not the profile's history.
     print(f"{ui.style('PROFILE', ui.BOLD, ui.CYAN):<{name_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
           f"{ui.style('DISK', ui.BOLD, ui.CYAN):<{disk_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
+          f"{ui.style('INSTALL', ui.BOLD, ui.CYAN):<{install_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
           f"{ui.style('ISO', ui.BOLD, ui.CYAN):<{iso_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
           f"{ui.style('NVRAM', ui.BOLD, ui.CYAN):<{nvram_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
           f"{ui.style('RUNTIME', ui.BOLD, ui.CYAN):<{runtime_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
-          f"{ui.style('ACTUAL', ui.BOLD, ui.CYAN):>{actual_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
-          f"{ui.style('VIRTUAL', ui.BOLD, ui.CYAN):>{virtual_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}")
-    for name, disk, iso_str, nvram, runtime_str, actual, virtual, runtime_note in rows:
+          f"{ui.style('ON HOST', ui.BOLD, ui.CYAN):>{actual_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}  "
+          f"{ui.style('CAPACITY', ui.BOLD, ui.CYAN):>{virtual_width + len(ui.BOLD) + len(ui.CYAN) + len(ui.RESET)}}")
+    for name, disk, iso_str, nvram, runtime_str, actual, virtual, runtime_note, known in rows:
         print(f"{ui.style(name, ui.BOLD):<{name_width + len(ui.BOLD) + len(ui.RESET)}}  "
               f"{style_status_cell(disk, disk_width)}  "
+              f"{style_status_cell(known['label'], install_width)}  "
               f"{style_status_cell(iso_str, iso_width)}  "
               f"{style_status_cell(nvram, nvram_width)}  "
               f"{style_status_cell(runtime_str, runtime_width)}  "
@@ -1300,6 +1320,7 @@ def cmd_provision(args: argparse.Namespace) -> int:
         spice_port=getattr(args, "spice_port", None),
     )
     qemu_args += ["-cdrom", str(iso_path)]
+    vmstate.begin_install(args.vm, "provision", interactive=True, dry_run=args.dry_run)
     runtime.run(qemu_args, dry_run=args.dry_run)
     return 0
 
@@ -1320,6 +1341,7 @@ def cmd_install(args: argparse.Namespace) -> int:
     if args.cloud_init:
         qemu_args += cloud_init.cloud_init_drive_args(cloud_init.create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run))
     stdout_log, stderr_log = announce_phase_logs(args.vm, "install")
+    vmstate.begin_install(args.vm, "install", interactive=True, dry_run=args.dry_run)
     runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     return 0
 
@@ -1351,6 +1373,7 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-archinstall", dry_run=args.dry_run)
     reset_vm_nvram(vm, dry_run=args.dry_run)
 
     bootstrap_iso = archinstall.create_bootstrap_iso(args.vm, vm, dry_run=args.dry_run)
@@ -1395,6 +1418,7 @@ def cmd_bootstrap_archinstall(args: argparse.Namespace) -> int:
         )
     except VMError as exc:
         raise explain_failed_bootstrap(exc, archinstall.BOOTSTRAP_FAILED_TOKEN, "Arch", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-archinstall", vm, dry_run=args.dry_run)
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
@@ -1434,6 +1458,7 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-alpine", dry_run=args.dry_run)
     reset_vm_nvram(vm, dry_run=args.dry_run)
 
     seed_iso = alpine.create_alpine_seed_iso(args.vm, vm, dry_run=args.dry_run)
@@ -1475,6 +1500,7 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
         )
     except VMError as exc:
         raise explain_failed_bootstrap(exc, alpine.BOOTSTRAP_FAILED_TOKEN, "Alpine", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-alpine", vm, dry_run=args.dry_run)
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
@@ -1516,6 +1542,7 @@ def cmd_bootstrap_pearos(args: argparse.Namespace) -> int:
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-pearos", dry_run=args.dry_run)
     reset_vm_nvram(vm, dry_run=args.dry_run)
 
     seed_iso = pearos.create_pearos_seed_iso(args.vm, vm, dry_run=args.dry_run)
@@ -1558,6 +1585,7 @@ def cmd_bootstrap_pearos(args: argparse.Namespace) -> int:
         )
     except VMError as exc:
         raise explain_failed_bootstrap(exc, pearos.BOOTSTRAP_FAILED_TOKEN, "pearOS", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-pearos", vm, dry_run=args.dry_run)
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     report.phase(args, "post-install")
@@ -1581,6 +1609,7 @@ def cmd_bootstrap_nixos(args: argparse.Namespace) -> int:
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-nixos", dry_run=args.dry_run)
     reset_vm_nvram(vm, dry_run=args.dry_run)
 
     seed_iso = nixos.create_nixos_seed_iso(args.vm, vm, dry_run=args.dry_run)
@@ -1623,6 +1652,7 @@ def cmd_bootstrap_nixos(args: argparse.Namespace) -> int:
         )
     except VMError as exc:
         raise explain_failed_bootstrap(exc, nixos.BOOTSTRAP_FAILED_TOKEN, "NixOS", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-nixos", vm, dry_run=args.dry_run)
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     report.phase(args, "post-install")
@@ -1671,6 +1701,7 @@ def run_windows_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int,
         ssh.post_install_copy_raw(vm, entry, dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     for command in ssh_cfg.get("post_install_run", []):
         ssh.post_install_run_raw(vm, str(command), dry_run=dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    vmstate.record_verified(vm_name, "post-install", dry_run=dry_run)
 
 
 def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
@@ -1687,6 +1718,7 @@ def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
     virtio_iso = windows.ensure_virtio_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-windows", dry_run=args.dry_run)
     reset_vm_nvram(vm, dry_run=args.dry_run)
 
     seed_iso = windows.create_windows_seed_iso(args.vm, vm, dry_run=args.dry_run)
@@ -1730,6 +1762,7 @@ def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
                 f"(details in {ui.pretty_path(serial_log)} and C:\\vmctl\\setup.log in the guest)"
             ) from exc
         raise
+    vmstate.complete_install(args.vm, "bootstrap-windows", vm, dry_run=args.dry_run)
     if cloud_init.ssh_access_config(vm) is None:
         ui.print_status("ok", f"Installation complete for VM '{args.vm}' (no ssh_provision: skipping post-install)")
         return 0
@@ -1765,6 +1798,7 @@ def cmd_bootstrap_freebsd(args: argparse.Namespace) -> int:
     source = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-freebsd", dry_run=args.dry_run)
     media = freebsd.ensure_install_iso(args.vm, vm, source,
         cloud_init._authorized_keys_for_vm(vm, dry_run=args.dry_run), dry_run=args.dry_run)
     command = qemu.common_args(vm, None, dry_run=args.dry_run,
@@ -1780,6 +1814,7 @@ def cmd_bootstrap_freebsd(args: argparse.Namespace) -> int:
             exit_grace_sec=freebsd.SHUTDOWN_GRACE_SEC)
     except VMError as exc:
         raise explain_failed_bootstrap(exc, freebsd.BOOTSTRAP_FAILED_TOKEN, "FreeBSD", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-freebsd", vm, dry_run=args.dry_run)
     start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
     report.phase(args, "post-install")
     run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
@@ -1802,6 +1837,7 @@ def cmd_bootstrap_pfsense(args: argparse.Namespace) -> int:
     source_iso = pfsense_source_iso(args.vm, vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-pfsense", dry_run=args.dry_run)
     config_xml = pfsense.render_config_xml(
         args.vm, vm, top,
         password_hash="dry-run" if args.dry_run else None,
@@ -1842,6 +1878,7 @@ def cmd_bootstrap_pfsense(args: argparse.Namespace) -> int:
                 f"pfSense bsdinstall reported a failure (the installer log follows the token in {ui.pretty_path(serial_log)})"
             ) from exc
         raise
+    vmstate.complete_install(args.vm, "bootstrap-pfsense", vm, dry_run=args.dry_run)
     ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
     router_user = str((pfsense.pfsense_config(vm) or {}).get("username"))
     for host_port, guest_port in sorted(top["router_gui"].items()):
@@ -1880,6 +1917,7 @@ def cmd_bootstrap_reactos(args: argparse.Namespace) -> int:
     source_iso = reactos_source_iso(args.vm, vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-reactos", dry_run=args.dry_run)
     unattend = reactos.render_unattend(args.vm, vm)
     install_iso = reactos.ensure_install_iso(args.vm, vm, source_iso, unattend, dry_run=args.dry_run)
 
@@ -1910,6 +1948,7 @@ def cmd_bootstrap_reactos(args: argparse.Namespace) -> int:
         log_path=serial_log,
         exit_grace_sec=reactos.SHUTDOWN_GRACE_SEC,
     )
+    vmstate.complete_install(args.vm, "bootstrap-reactos", vm, dry_run=args.dry_run)
     ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
     ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: ReactOS ships no server, the desktop autologs in as Administrator)")
     return 0
@@ -1939,6 +1978,7 @@ def cmd_bootstrap_windowsxp(args: argparse.Namespace) -> int:
     source_iso = windowsxp_source_iso(args.vm, vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-windowsxp", dry_run=args.dry_run)
     answer = windowsxp.render_winnt_sif(args.vm, vm)
     install_iso = windowsxp.ensure_install_iso(args.vm, vm, source_iso, answer, dry_run=args.dry_run)
 
@@ -1970,6 +2010,7 @@ def cmd_bootstrap_windowsxp(args: argparse.Namespace) -> int:
         log_path=serial_log,
         exit_grace_sec=windowsxp.SHUTDOWN_GRACE_SEC,
     )
+    vmstate.complete_install(args.vm, "bootstrap-windowsxp", vm, dry_run=args.dry_run)
     ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
     ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH on this generation; the desktop autologs in)")
     return 0
@@ -1997,6 +2038,7 @@ def cmd_bootstrap_windows98(args: argparse.Namespace) -> int:
     # Not ensure_vm_disk: Setup neither partitions nor formats, so the host hands it a disk that is
     # already a FAT32 volume with boot code that steps aside until Windows owns it.
     windows98.prepare_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-windows98", dry_run=args.dry_run)
     answer = windows98.render_msbatch(args.vm, vm)
     install_iso = windows98.ensure_install_iso(args.vm, vm, source, answer, dry_run=args.dry_run)
 
@@ -2025,6 +2067,7 @@ def cmd_bootstrap_windows98(args: argparse.Namespace) -> int:
         log_path=serial_log,
         exit_grace_sec=windows98.SHUTDOWN_GRACE_SEC,
     )
+    vmstate.complete_install(args.vm, "bootstrap-windows98", vm, dry_run=args.dry_run)
     ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
     ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: Windows 98 ships no server)")
     return 0
@@ -2050,6 +2093,7 @@ def cmd_bootstrap_windowsnt4(args: argparse.Namespace) -> int:
     # Not ensure_vm_disk: WINNT.EXE runs from DOS and copies onto a C: that must already be a
     # FAT16 volume, with boot code that steps aside until the NT loader owns the disk.
     windowsnt4.prepare_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-windowsnt4", dry_run=args.dry_run)
     answer = windowsnt4.render_unattend(args.vm, vm, source)
     install_iso = windowsnt4.ensure_install_iso(args.vm, vm, source, answer, dry_run=args.dry_run)
 
@@ -2086,6 +2130,7 @@ def cmd_bootstrap_windowsnt4(args: argparse.Namespace) -> int:
         )
     except VMError as exc:
         raise explain_failed_bootstrap(exc, windowsnt4.BOOTSTRAP_FAILED_TOKEN, "Windows NT 4.0", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-windowsnt4", vm, dry_run=args.dry_run)
     ui.print_status("ok", f"Installation complete for VM '{args.vm}'")
     ui.print_note(f"Start it with: vmctl start {args.vm}   (no SSH: Windows NT 4.0 ships no server; the desktop autologs in as Administrator)")
     return 0
@@ -2279,6 +2324,7 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-preseed", dry_run=args.dry_run)
     reset_vm_nvram(vm, dry_run=args.dry_run)
 
     kernel_path, initrd_path = preseed.extract_preseed_boot_artifacts(
@@ -2322,6 +2368,7 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         log_path=serial_log,
     )
+    vmstate.complete_install(args.vm, "bootstrap-preseed", vm, dry_run=args.dry_run)
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
@@ -2361,6 +2408,7 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-kickstart", dry_run=args.dry_run)
     reset_vm_nvram(vm, dry_run=args.dry_run)
 
     ostree_ref = kickstart.resolve_ostree_ref(vm, iso_path, dry_run=args.dry_run)
@@ -2401,6 +2449,7 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         log_path=serial_log,
     )
+    vmstate.complete_install(args.vm, "bootstrap-kickstart", vm, dry_run=args.dry_run)
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
@@ -2440,6 +2489,7 @@ def cmd_bootstrap_autoyast(args: argparse.Namespace) -> int:
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-autoyast", dry_run=args.dry_run)
     reset_vm_nvram(vm, dry_run=args.dry_run)
 
     seed_iso = autoyast.create_autoyast_iso(args.vm, vm, dry_run=args.dry_run)
@@ -2473,6 +2523,7 @@ def cmd_bootstrap_autoyast(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         log_path=serial_log,
     )
+    vmstate.complete_install(args.vm, "bootstrap-autoyast", vm, dry_run=args.dry_run)
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
 
     start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
@@ -2504,6 +2555,7 @@ def cmd_install_archinstall(args: argparse.Namespace) -> int:
     ui.print_note("In the live environment run:")
     ui.print_note("  mkdir -p /tmp/archconf && mount /dev/vdb /tmp/archconf && bash /tmp/archconf/run.sh")
     stdout_log, stderr_log = announce_phase_logs(args.vm, "install-archinstall")
+    vmstate.begin_install(args.vm, "install-archinstall", interactive=True, dry_run=args.dry_run)
     runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
     return 0
 
@@ -2517,6 +2569,8 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    flow = getattr(args, "_flow", "install-unattended")
+    vmstate.begin_install(args.vm, flow, dry_run=args.dry_run)
     headless = getattr(args, "headless", False)
     seed_path = cloud_init.create_autoinstall_seed(args.vm, vm, dry_run=args.dry_run)
     append_args = "autoinstall ds=nocloud"
@@ -2541,6 +2595,7 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
     qemu_args += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", append_args]
     stdout_log, stderr_log = announce_phase_logs(args.vm, "install-unattended")
     runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    vmstate.complete_install(args.vm, flow, vm, dry_run=args.dry_run)
     return 0
 
 
@@ -2553,6 +2608,8 @@ def cmd_install_omarchy(args: argparse.Namespace) -> int:
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
     ensure_vm_disk(vm, dry_run=args.dry_run)
+    flow = getattr(args, "_flow", "install-omarchy")
+    vmstate.begin_install(args.vm, flow, dry_run=args.dry_run)
     seed_path = omarchy.create_cidata_iso(args.vm, vm, dry_run=args.dry_run)
     headless = getattr(args, "headless", False)
     qemu_args = qemu.common_args(
@@ -2571,6 +2628,7 @@ def cmd_install_omarchy(args: argparse.Namespace) -> int:
     qemu_args += omarchy.cidata_drive_args(seed_path)
     stdout_log, stderr_log = announce_phase_logs(args.vm, "install-omarchy")
     runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    vmstate.complete_install(args.vm, flow, vm, dry_run=args.dry_run)
     return 0
 
 
@@ -2659,6 +2717,7 @@ def run_post_install(vm_name: str, vm: dict[str, Any], timeout_sec: int, dry_run
 
     run_verify_after_reboot(vm_name, vm, ssh_cfg, timeout_sec, dry_run=dry_run,
                             stdout_log=stdout_log, stderr_log=stderr_log)
+    vmstate.record_verified(vm_name, "post-install", dry_run=dry_run)
 
 
 def run_verify_after_reboot(
@@ -2751,6 +2810,7 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
             spice_port=getattr(args, "spice_port", None),
             dry_run=args.dry_run,
             _vm_override=vm,
+            _flow="bootstrap-unattended",
         )
     )
 
@@ -2798,6 +2858,7 @@ def cmd_bootstrap_omarchy(args: argparse.Namespace) -> int:
             spice_port=getattr(args, "spice_port", None),
             dry_run=args.dry_run,
             _vm_override=vm,
+            _flow="bootstrap-omarchy",
         )
     )
 
@@ -3113,6 +3174,8 @@ def cmd_boot_check(args: argparse.Namespace) -> int:
         auto_inputs=auto_inputs,
         dry_run=args.dry_run,
     )
+    if boot_from == "disk":
+        vmstate.record_verified(args.vm, "boot-check", str(expected_text), dry_run=args.dry_run)
     ui.print_status("ok", f"Boot check passed for '{args.vm}'")
     return 0
 
@@ -3406,11 +3469,11 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return 1
 
 
-def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
+def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: bool = False) -> None:
     disk_path = runtime.resolve_path(vm["disk"]["path"])
     fw = vm["firmware"]
     vars_path = runtime.resolve_path(fw["vars_path"]) if fw["type"] == "efi" else None
-    for path in [disk_path, vars_path]:
+    for path in [disk_path, vars_path, vmstate.state_path(name)]:
         if path and path.exists():
             ui.print_note(f"Removing {path}")
             if not dry_run:
@@ -3437,6 +3500,14 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
             ui.print_note(f"Removing {subdir}")
             if not dry_run:
                 shutil.rmtree(subdir)
+    # Checkpoints are the way back from a clean: they stay unless --checkpoints says otherwise.
+    if checkpoints:
+        checkpoint.delete_all(name, dry_run=dry_run)
+    else:
+        kept = checkpoint.list_checkpoints(name)
+        if kept:
+            ui.print_note(f"Keeping {len(kept)} checkpoint(s) under {ui.pretty_path(checkpoint.checkpoints_dir(name))}: "
+                          f"vmctl checkpoint restore {name} <name> brings one back; vmctl clean {name} --checkpoints removes them")
     if base.exists() and not any(base.iterdir()):
         ui.print_note(f"Removing empty dir {base}")
         if not dry_run:
@@ -3445,13 +3516,169 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False) -> None:
 
 def cmd_clean(args: argparse.Namespace) -> int:
     cfg = config.load_config()
+    checkpoints = bool(getattr(args, "checkpoints", False))
+    remove_profile = bool(getattr(args, "remove_profile", False))
     # The guest disk is about to be deleted, so skip guest shutdown and its grace periods.
     if args.all:
+        if remove_profile:
+            raise VMError("--remove-profile applies to one VM, not to --all")
         for name, vm in config.sorted_vm_items(cfg):
             cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
-            clean_vm(name, vm, dry_run=args.dry_run)
+            clean_vm(name, vm, dry_run=args.dry_run, checkpoints=checkpoints)
         return 0
-    vm = config.get_vm(cfg, args.vm)
-    cmd_stop(argparse.Namespace(vm=args.vm, dry_run=args.dry_run, force=True))
-    clean_vm(args.vm, vm, dry_run=args.dry_run)
+    name = config.canonical_vm_name(args.vm)
+    vm = config.get_vm(cfg, name)
+    if remove_profile:
+        # Refuse before deleting anything: a tracked profile keeps its artifacts too.
+        if name in clone.tracked_profile_names():
+            raise VMError(f"'{name}' is a tracked profile; --remove-profile removes only profiles that live in local.json alone (clones)")
+    cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
+    clean_vm(name, vm, dry_run=args.dry_run, checkpoints=remove_profile or checkpoints)
+    if remove_profile:
+        base = runtime.vm_artifact_base(name)
+        if base.exists() and not args.dry_run:
+            shutil.rmtree(base, ignore_errors=True)
+        clone.delete_local_profile(name, dry_run=args.dry_run)
     return 0
+
+
+# --- checkpoints ---------------------------------------------------------------------------
+
+def libvirt_domain_defined(vm_name: str, uri: str = "qemu:///system") -> bool:
+    """Whether the VM was handed to libvirt (export-libvirt): its disk is then libvirt's to run."""
+    if shutil.which("virsh") is None:
+        return False
+    try:
+        names = libvirt.virsh_output(uri, "list", "--all", "--name").splitlines()
+    except (VMError, subprocess.CalledProcessError, OSError):
+        return False
+    return libvirt.domain_name(vm_name) in names
+
+
+def ensure_vm_quiescent(vm_name: str, vm: dict[str, Any], action: str) -> None:
+    """A checkpoint or clone touches the disk file itself, so nothing may be using it: no
+    QEMU on it (tracked or not), no installation job, no libvirt domain defined over it."""
+    runtime_str, note = vm_runtime_status(vm_name, vm)
+    if runtime_str.startswith(("tracked:", "hostfwd:", "running:")):
+        raise VMError(f"Cannot {action} '{vm_name}' while it is running ({runtime_str}); stop it first (vmctl stop {vm_name})")
+    job = tui_jobs.status(tui_jobs.job_dir(state.ROOT, vm_name))
+    if job == "running":
+        raise VMError(f"Cannot {action} '{vm_name}': an installation is in progress (vmtui Installation Log / Cancel Installation)")
+    if libvirt_domain_defined(vm_name):
+        raise VMError(f"Cannot {action} '{vm_name}': it is defined in libvirt; vmctl unexport-libvirt {vm_name} first")
+
+
+def confirm_or_yes(args: argparse.Namespace, prompt: str) -> None:
+    """Destructive checkpoint actions ask, unless --yes was given; a pipe never counts as yes."""
+    if getattr(args, "yes", False) or getattr(args, "dry_run", False):
+        return
+    if not runtime.confirm_default_no(prompt):
+        raise VMError("Not confirmed (pass --yes to skip the question in scripts)")
+
+
+def regenerate_clone_identity(dst: str, profile: dict[str, Any], origin: dict[str, Any], timeout_sec: int, dry_run: bool = False) -> None:
+    """Boot the clone headless, give it its own hostname, machine-id and SSH host keys, stop it."""
+    if dry_run:
+        ui.print_note(f"Would boot '{dst}' headless, run the identity script over SSH and stop it")
+        return
+    ui.print_note(f"Booting '{dst}' headless to regenerate its guest identity")
+    start_installed_vm_headless(dst, profile, True, dry_run=False)
+    try:
+        ssh.wait_for_ssh(profile, timeout_sec)
+        ssh.ensure_passwordless_sudo(profile)
+        script = clone.identity_script(dst, clone.guest_hostname(origin))
+        runtime.run(ssh.remote_sudo_shell_cmd(profile, script), show_command=False)
+        ui.print_status("ok", f"Guest identity of '{dst}' regenerated (hostname, machine-id, SSH host keys)")
+    finally:
+        cmd_stop(argparse.Namespace(vm=dst, dry_run=False, force=False))
+
+
+def cmd_clone(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    src = config.canonical_vm_name(args.vm)
+    vm = config.get_vm(cfg, src)
+    dst = clone.validate_name(args.destination)
+    mode = str(getattr(args, "identity", None) or "keep")
+    if mode not in clone.IDENTITY_CHOICES:
+        raise VMError(f"--identity must be one of: {', '.join(clone.IDENTITY_CHOICES)}")
+    clone.check_destination(cfg, dst)
+    clone.check_source(src, vm)
+    ensure_vm_quiescent(src, vm, "clone")
+    supported, advice = clone.identity_support(vm)
+    if mode == "regenerate" and not supported:
+        raise VMError(f"--identity regenerate is not available for '{src}': {advice}. Clone with --identity keep and follow that advice inside the guest.")
+
+    profile, report = clone.derive_profile(cfg, src, vm, dst, ssh_port=getattr(args, "ssh_port", None))
+    ui.print_header(f"Clone {src} -> {dst}")
+    ui.print_kv("profile", f"'{dst}' added to vms/profiles/local.json (a complete copy: later edits of '{src}' do not follow)")
+    for old, new in report["ports"].items():
+        ui.print_kv("host port", f"{old} -> {new}")
+    if report["macs_dropped"]:
+        ui.print_note(f"{report['macs_dropped']} explicit MAC address(es) dropped: the clone's NICs get their own")
+    for line in clone.describe_identity(vm, src, dst, mode):
+        ui.print_note(line)
+
+    clone.copy_artifacts(src, vm, dst, profile, dry_run=args.dry_run)
+    _, created_local = clone.write_profile(dst, profile, dry_run=args.dry_run)
+    if mode == "regenerate" and supported:
+        try:
+            regenerate_clone_identity(dst, profile, vm, int(getattr(args, "timeout", 300) or 300), dry_run=args.dry_run)
+        except (VMError, OSError, subprocess.CalledProcessError) as exc:
+            # Half a clone must not stay published: unpublish it and say how to redo it.
+            if not args.dry_run:
+                clone.remove_profile(dst, created=created_local)
+                shutil.rmtree(runtime.vm_artifact_base(dst), ignore_errors=True)
+            raise VMError(f"Identity regeneration failed ({exc}); the clone '{dst}' was removed again. "
+                          f"Retry with --identity keep to get the copy without touching the guest.") from exc
+    ui.print_status("ok", f"Clone '{dst}' ready" + (" (dry run)" if args.dry_run else ""))
+    ssh_cfg = cloud_init.ssh_access_config(profile)
+    if ssh_cfg and ssh_cfg.get("ssh_host_port"):
+        ui.print_note(f"vmctl start {dst} --headless --background && vmctl shell {dst}   (SSH on 127.0.0.1:{ssh_cfg['ssh_host_port']})")
+    else:
+        ui.print_note(f"vmctl start {dst}")
+    ui.print_note(f"vmctl clean {dst} removes its artifacts; the profile stays in local.json until you delete the '{dst}' entry")
+    return 0
+
+
+def cmd_checkpoint(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    vm = config.get_vm(cfg, args.vm)
+    action = args.action
+    if action == "list":
+        rows = checkpoint.list_checkpoints(args.vm)
+        if getattr(args, "json", False):
+            print(json.dumps(rows, indent=2))
+            return 0
+        ui.print_header(f"Checkpoints of {args.vm}")
+        if not rows:
+            ui.print_status("ok", f"No checkpoints for '{args.vm}' (vmctl checkpoint create {args.vm} <name>)")
+            return 0
+        name_width = max(len("NAME"), max(len(row["name"]) for row in rows))
+        print(f"{'NAME':<{name_width}}  {'CREATED':<20}  {'ON HOST':>9}  {'CAPACITY':>9}  {'NVRAM':<5}  {'DISK':<10}  NOTE")
+        for row in rows:
+            created = str(row.get("created_at") or "?")[:19].replace("T", " ")
+            capacity = runtime.format_bytes(int(row["virtual_bytes"])) if row.get("virtual_bytes") else "?"
+            print(f"{row['name']:<{name_width}}  {created:<20}  {runtime.format_bytes(int(row['host_bytes'])):>9}  {capacity:>9}  "
+                  f"{'yes' if row['nvram'] else 'no':<5}  {row['label']:<10}  {row.get('note') or ''}")
+        return 0
+
+    name = checkpoint.validate_name(getattr(args, "name", None))
+    if action == "create":
+        ensure_vm_quiescent(args.vm, vm, "checkpoint")
+        checkpoint.create(args.vm, vm, name, note=getattr(args, "note", None), compress=bool(getattr(args, "compress", False)),
+                          replace=bool(getattr(args, "replace", False)), dry_run=args.dry_run)
+        return 0
+    if action == "restore":
+        ensure_vm_quiescent(args.vm, vm, "restore a checkpoint into")
+        if checkpoint.load_manifest(checkpoint.checkpoint_dir(args.vm, name)) is None:
+            raise VMError(f"Checkpoint '{name}' of '{args.vm}' does not exist (vmctl checkpoint list {args.vm})")
+        confirm_or_yes(args, f"Replace the current disk (and EFI vars) of '{args.vm}' with checkpoint '{name}'? The current state is lost.")
+        checkpoint.restore(args.vm, vm, name, dry_run=args.dry_run)
+        return 0
+    if action == "delete":
+        if not checkpoint.checkpoint_dir(args.vm, name).is_dir():
+            raise VMError(f"Checkpoint '{name}' of '{args.vm}' does not exist")
+        confirm_or_yes(args, f"Delete checkpoint '{name}' of '{args.vm}'?")
+        checkpoint.delete(args.vm, name, dry_run=args.dry_run)
+        return 0
+    raise VMError(f"Unknown checkpoint action: {action}")

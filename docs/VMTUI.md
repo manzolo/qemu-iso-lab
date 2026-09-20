@@ -27,11 +27,20 @@ The main screen lists every profile with live state:
 | Glyph | Meaning |
 |-------|---------|
 | `●` | running |
-| `■` | stopped, disk has data (an OS is installed) |
+| `■` | stopped, disk has data |
 | `□` | disk prepared but still empty |
 | `○` | no disk |
 
-Each row also shows RAM/CPU, the SSH host port and the disk size or ISO state.
+Each row also shows RAM/CPU, the firmware (`UEFI` or `Bios`), the SSH host port and,
+for a disk with data, one flag for what is known about it followed by the bytes it
+occupies on the host: `✓ 8.3G` boot verified, `~ 8.3G` installed but not verified yet,
+`? 8.3G` no record for this disk, `! 8.3G` an unattended install that never completed
+(the legend sits under the counters; the meaning of each state is in
+[PROFILES.md](PROFILES.md#what-is-known-about-the-disk-statejson-vmctl-status-the-tui)).
+The VM header spells it out: `8.3G on host / 32G capacity` and an `Install:` line with
+the flow and the dates. None of these figures is the guest filesystem's used or free
+space, and a pre-existing disk without a record keeps the `?` until a post-install or a
+disk boot-check passes on it.
 With fzf, column headings stay visible while scrolling, status markers are colored,
 and column widths adapt to the terminal (narrow screens omit the description).
 Installed VMs are listed first and the cursor starts on the VM you opened last.
@@ -96,16 +105,30 @@ are listed, and the suggested next step is marked `▶` and preselected, so Ente
 does the obvious thing: install when there is no disk, boot when it is stopped,
 SSH when it is running.
 
+The layout follows the state of the disk. A VM whose disk has data opens on RUN;
+its install flows move behind `Install / Reinstall...` (they wipe the disk, and the
+entry says so). A VM without data keeps its install flow on top, where Enter runs it.
+libvirt/remote and the physical-disk operations live in submenus at every state.
+
 | Section | Entries |
 |---------|---------|
-| INSTALL | The install flow matching the profile: `Full Bootstrap`, `Omarchy Bootstrap`, `Arch Bootstrap`, `Arch Install (Interactive)`, `Debian Preseed Bootstrap`, `Kickstart Bootstrap`, `Unattended Install`, `Cloud-Init Flow`, `Seeded Installer`, `Guided Provision`, `Installer Only` |
-| RUN | `Boot Desktop`, `Boot Headless`, `Stop VM` and `Attach Display` (only while running: the screen of the headless VM in a VNC viewer), `SSH Console` (only with SSH provisioning, also while an installer is running on an empty disk), `First Boot` (cloud-init), `Remote SPICE` |
-| MAINTENANCE | `Video Profile`, `Post-Install`, `Boot Check`, `Fetch ISO`, `Prepare VM`, `Profile Details` |
-| ADVANCED | `Clean VM`, `Delete ISO`, `Flash Empty Disk`, `Force Flash`, `Import Disk` |
-| | `Back` (or Esc) returns to the dashboard |
+| RUN (disk with data) | `Boot Desktop`, `Boot Headless`, `SSH Console` and `Serial Console` (with SSH provisioning), `First Boot` (cloud-init); while running: `Stop VM`, `Force Stop`, `Attach Display` (the screen of the headless VM in a VNC viewer), the consoles |
+| INSTALL (no data yet) | The install flow matching the profile: `Full Bootstrap`, `Omarchy Bootstrap`, `Arch Bootstrap`, `Arch Install (Interactive)`, `Debian Preseed Bootstrap`, `Kickstart Bootstrap`, `AutoYaST Bootstrap`, `Alpine Bootstrap`, `Windows Bootstrap`, `Unattended Install`, `Cloud-Init Flow`, `Seeded Installer`, `Guided Provision`, `Installer Only`; then `Fetch ISO`, `Prepare VM` |
+| MAINTENANCE | `Install / Reinstall...` (disk with data: the same flows, `Fetch ISO`, `Prepare VM`), `Clone VM...` (disk with data: a new local profile with its own disk copy, ports and MACs, asking what to do with the guest identity; [CLONE.md](CLONE.md)), `Checkpoints` (stopped VM with a disk: named full copies of disk + EFI vars, restore or delete; [CHECKPOINTS.md](CHECKPOINTS.md)), `Post-Install`, `Boot Check`, `Video Profile`, `Libvirt / Remote...` (`Export to libvirt`, `Remove from libvirt`, `Remote SPICE`), `Physical Disks...` (`Flash Empty Disk`, `Force Flash`, `Import Disk`), `Profile Details` |
+| ADVANCED (stopped) | `Clean VM` (keeps checkpoints), `Delete ISO` |
+| | `Back` (or Esc) returns to the dashboard; Esc in a submenu returns to the VM menu |
 
-Destructive actions (`Cancel Installation`, `Stop VM`, `Clean VM`, `Delete ISO`, flash and import) ask
-for confirmation; flash and import also require typing the device path.
+An installation in progress replaces all of this with `Installation Log`, `Attach
+Display`, `Cancel Installation` and `Profile Details`.
+
+The shortcuts do not care where an action sits: `Alt-U` on a disk with data runs the
+reinstall flow that lives behind `Install / Reinstall...`, and a dashboard shortcut
+accepts an action offered in a submenu, without opening it. A shortcut whose action is
+not available at all (Alt-X on a stopped VM) still only redraws.
+
+Destructive actions (`Cancel Installation`, `Stop VM`, `Clean VM`, `Delete ISO`, checkpoint
+restore and delete, flash and import) ask for confirmation; flash and import also require
+typing the device path. `Clean VM` keeps the VM's checkpoints.
 
 `Force Flash` first asks for the copy mode: **full** writes every sector and
 zeroes free space, **allocated** copies only the blocks the image allocates —

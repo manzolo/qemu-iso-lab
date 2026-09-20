@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import vmctl
-from vmctl import config, disk_inspect, flash, import_dev, lifecycle, ui
+from vmctl import clone, config, disk_inspect, flash, import_dev, lifecycle, ui
 from vmctl.errors import VMError
 
 
@@ -37,6 +37,8 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
      ["boot-check", "check-vms", "report-pdf"]),
     ("Physical disks", "DESTRUCTIVE, ask for sudo, require --confirm-device",
      ["flash", "import-device"]),
+    ("Checkpoints and clones", "full copies of a stopped VM: named checkpoints to go back to, clones as new local profiles",
+     ["checkpoint", "clone"]),
     ("Maintenance", "",
      ["clean", "clean-reports", "clean-stale", "delete-iso", "completion"]),
 ]
@@ -55,7 +57,10 @@ typical flows:
   vmctl bootstrap-windows <vm>          Windows 10/11: autounattend.xml install + OpenSSH post-install
   vmctl bootstrap-reactos <vm>          ReactOS: unattend.inf install (text + GUI stage), install only
   vmctl lab install                     network lab: pfSense + Pi-hole + client, then `vmctl lab up`
-  vmctl clean <vm>                      remove its disk and generated artifacts
+  vmctl checkpoint create <vm> clean-install   full copy of the stopped VM's disk + EFI vars; restore/list/delete
+  vmctl clone <vm> <new-name>           independent copy as a new profile in local.json (own disk, ports, MACs)
+  vmctl clean <new-name> --remove-profile   delete a clone: artifacts, checkpoints and its local.json entry
+  vmctl clean <vm>                      remove its disk and generated artifacts (checkpoints stay: --checkpoints)
   vmctl <command> --help                all options of one command
   vmtui                                 the same, as a dialog menu
 
@@ -364,10 +369,60 @@ def build_parser() -> argparse.ArgumentParser:
     p = _add(subparsers, "setup", help="verify host prerequisites")
     p.set_defaults(func=lifecycle.cmd_setup)
 
-    p = _add(subparsers, "clean", help="force-stop and remove artifacts for one VM (or all VMs)")
+    p = _add(subparsers, "clean", help="force-stop and remove artifacts for one VM (or all VMs); checkpoints are kept unless --checkpoints")
     p.add_argument("vm", nargs="?", help=VM_HELP)
     p.add_argument("--all", action="store_true", help="clean artifacts for every configured VM")
+    p.add_argument("--checkpoints", action="store_true", help="also remove the VM's checkpoints (artifacts/<vm>/checkpoints)")
+    p.add_argument("--remove-profile", action="store_true",
+                   help="also delete the profile from vms/profiles/local.json: for a clone or a profile that exists only there (checkpoints go too); tracked profiles are refused")
     p.set_defaults(func=lifecycle.cmd_clean)
+
+    p = _add(subparsers, "checkpoint", help="create/list/restore/delete named copies of a stopped VM's disk + EFI vars (full qemu-img copy, survives clean)",
+             epilog="""examples:
+  vmctl checkpoint create debian-server clean-install --note "fresh install, verified"
+  vmctl checkpoint list debian-server
+  vmctl checkpoint restore debian-server clean-install        asks for confirmation; --yes for scripts
+  vmctl checkpoint delete debian-server before-update --yes
+
+The VM must be stopped, not installing and not defined in libvirt. A checkpoint is a full copy
+under artifacts/<vm>/checkpoints/<name>/ (disk in the VM's format, nvram.fd for EFI profiles,
+the state.json record, manifest.json): it needs no other file and stays valid whatever happens
+to the current disk. Restore converts into a staging directory first and swaps with renames,
+so a failure leaves the current disk in place. TPM state is not handled (profiles declaring
+tpm are refused). See docs/CHECKPOINTS.md.""")
+    p.add_argument("action", choices=["create", "list", "restore", "delete"], help="what to do")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("name", nargs="?", help="checkpoint name: letters, digits, '.', '_', '-' (create/restore/delete)")
+    p.add_argument("--note", help="create: a free-text note kept in the manifest and shown by list")
+    p.add_argument("--compress", action="store_true", help="create: compressed qcow2 copy (smaller, slower to write and to restore)")
+    p.add_argument("--replace", action="store_true", help="create: overwrite an existing checkpoint with the same name")
+    p.add_argument("--yes", action="store_true", help="restore/delete: do not ask for confirmation")
+    p.add_argument("--json", action="store_true", help="list: machine-readable output")
+    p.set_defaults(func=lifecycle.cmd_checkpoint)
+
+    p = _add(subparsers, "clone", help="independent copy of a stopped VM as a new profile in local.json: full disk copy, EFI vars, SSH key, its own ports and MACs",
+             epilog="""examples:
+  vmctl clone debian-server debian-server-2
+  vmctl clone debian-server debian-server-2 --identity regenerate     new hostname, machine-id, SSH host keys (Linux, over SSH)
+  vmctl clone ubuntu-gnome-24.04 ubuntu-test --ssh-port 2400
+  vmctl --dry-run clone debian-server debian-server-2                 the plan and the profile, nothing written
+
+The origin must be stopped, not installing and not defined in libvirt; network lab members cannot
+be cloned. The clone's profile is a complete copy with every path under artifacts/<new-name>/, the
+first free host ports from 2300 for SSH and every forward, explicit MACs dropped (the default MAC
+follows the disk path) and meta.clone_of. Copied: disk (qemu-img convert, no backing file), EFI
+vars, the generated SSH key pair, state.json. Not copied: PID files, sockets, logs, checkpoints,
+installer seeds. By default the guest keeps the origin's hostname, /etc/machine-id, SSH host keys
+and static addresses (--identity keep); --identity regenerate fixes the first three for the Linux
+guests this lab provisions and is refused, with advice, for Windows, pfSense, ReactOS, FreeBSD and
+NixOS. A failure leaves the origin untouched and publishes no clone. See docs/CLONE.md.""")
+    p.add_argument("vm", help="the origin: " + VM_HELP)
+    p.add_argument("destination", help="new profile name (lowercase letters, digits, '.', '-')")
+    p.add_argument("--ssh-port", type=int, help="host port for the clone's SSH forward (default: first free from 2300)")
+    p.add_argument("--identity", choices=list(clone.IDENTITY_CHOICES), default="keep",
+                   help="keep the guest identity (default) or regenerate hostname, machine-id and SSH host keys over SSH")
+    p.add_argument("--timeout", type=int, default=300, help="regenerate: seconds to wait for the clone's SSH (default: 300)")
+    p.set_defaults(func=lifecycle.cmd_clone)
 
     p = _add(subparsers, "clean-reports", help="remove old check-vms report directories, keeping the newest ones")
     p.add_argument("--keep", type=int, default=5, help="how many of the newest reports to keep (default: 5)")

@@ -254,6 +254,17 @@ fzf_pick() {
                         return 0
                     fi
                 done
+                # MENU_HIDDEN_ACTIONS (one tag per line): actions the caller offers behind a
+                # submenu right now; the shortcut runs them without opening it.
+                if [[ -n "${MENU_HIDDEN_ACTIONS:-}" ]]; then
+                    local hidden
+                    while IFS= read -r hidden; do
+                        if [[ -n "$hidden" && "$hidden" == "$wanted" ]]; then
+                            printf '%s\n' "$wanted"
+                            return 0
+                        fi
+                    done <<< "$MENU_HIDDEN_ACTIONS"
+                fi
             fi
             # Return the cursor with the result: callers run us in $(...),
             # where assignments to MENU_HIGHLIGHTED cannot reach the parent.
@@ -585,13 +596,14 @@ from pathlib import Path
 
 sys.path.insert(0, sys.argv[1])
 
-from vmctl import cloud_init, config, lifecycle, runtime, state, tui_jobs
+from vmctl import clone, cloud_init, config, lifecycle, runtime, state, tui_jobs, vmstate
 
-# A disk image with less than this allocated is "prepared" (created by prep or
-# an install that stopped early) and has no data on it; a fresh qcow2 allocates
-# ~200 KiB. Above it the disk "has data": there is no marker of a *completed*
-# install, so the UI says "disk has data" rather than "installed".
-INSTALLED_MIN_ALLOCATED = 16 * 1024 * 1024
+# A disk image with less than vmstate.DATA_MIN_BYTES allocated is "prepared" (created by
+# prep or an install that stopped early) and has no data on it; a fresh qcow2 allocates
+# ~200 KiB. Above it the disk "has data". Whether an install *completed* on it and whether
+# it *booted* afterwards are separate facts, recorded in artifacts/<vm>/state.json by the
+# flows themselves (vmstate.summary decides the wording; the profile's history never does).
+INSTALLED_MIN_ALLOCATED = vmstate.DATA_MIN_BYTES
 
 state.ROOT = Path(sys.argv[1])
 state.CONFIG_DIR = Path(sys.argv[2])
@@ -617,15 +629,14 @@ def facts(name, vm):
     except Exception:
         disk, actual, virtual = "missing", "-", "-"
     prepared = disk == "ready"
-    installed = False
-    if prepared:
-        disk_path = runtime.resolve_path(vm["disk"]["path"])
-        try:
-            allocated = int(runtime.image_info(disk_path, quiet=True).get("actual-size", 0) or 0)
-        except Exception:
-            # st_size is the apparent size of a sparse file; count allocated blocks
-            allocated = disk_path.stat().st_blocks * 512
-        installed = allocated >= INSTALLED_MIN_ALLOCATED
+    try:
+        known = vmstate.summary(name, vm)
+    except Exception:
+        known = {"has_data": False, "host_bytes": 0, "virtual_bytes": None, "label": vmstate.LABEL_NO_DISK,
+                 "detail": "", "install_state": "none", "install_flow": None, "install_at": None,
+                 "verified": False, "verify_kind": None, "verify_at": None}
+    # "installed" keeps its historical meaning for the menu: the disk has data on it.
+    installed = prepared and bool(known["has_data"])
     try:
         runtime_str, note = lifecycle.vm_runtime_status(name, vm)
     except Exception:
@@ -655,6 +666,23 @@ def facts(name, vm):
         "installed": installed,
         "disk_actual": actual,
         "disk_virtual": virtual,
+        # Bytes on the host vs. capacity the guest sees (never guest used/free space).
+        "disk_host": vmstate.compact_size(known["host_bytes"]) if prepared else "",
+        "disk_capacity": vmstate.compact_size(known["virtual_bytes"]) if prepared else "",
+        "install_label": known["label"],
+        "install_detail": known["detail"],
+        "install_state": known["install_state"],
+        "install_flow": known["install_flow"] or "",
+        "install_at": (known["install_at"] or "")[:10],
+        "verified": bool(known["verified"]),
+        "verify_kind": known["verify_kind"] or "",
+        "verify_at": (known["verify_at"] or "")[:10],
+        "state_word": state_word(known),
+        "can_regenerate_identity": clone.identity_support(vm)[0],
+        "clone_of": str(meta.get("clone_of") or ""),
+        "has_checkpoints": (runtime.vm_artifact_base(name) / "checkpoints").is_dir()
+                           and any(not p.name.startswith(".") and (p / "manifest.json").is_file()
+                                   for p in (runtime.vm_artifact_base(name) / "checkpoints").iterdir()),
         "running": runtime_str.startswith(("tracked:", "hostfwd:", "running:")),
         "runtime": runtime_str,
         "runtime_note": "" if note in ("-", None) else str(note),
@@ -693,6 +721,20 @@ def glyph(f):
     if f["prepared"]:
         return "□"
     return "○"
+
+
+def state_word(known):
+    """The phrase after "stopped," in the header: what is known about a disk with data."""
+    label = known["label"]
+    if label == vmstate.LABEL_VERIFIED:
+        return f"disk has data, installed, boot verified ({known['verify_kind']} {str(known['verify_at'] or '')[:10]})"
+    if label == vmstate.LABEL_INSTALLED:
+        return f"disk has data, installed ({known['install_flow']} {str(known['install_at'] or '')[:10]}), boot not verified"
+    if label == vmstate.LABEL_INCOMPLETE:
+        return f"disk has data, {known['install_flow']} started {str(known['install_at'] or '')[:10]} and never completed"
+    if label == vmstate.LABEL_UNVERIFIED:
+        return "disk has data, unverified (no install record for this disk)"
+    return ""
 PY
 
 # vm_facts NAME → "key<TAB>value" lines (booleans as 1/0)
@@ -733,21 +775,27 @@ context_hints = sys.argv[7] == "1"
 if not color:
     width = min(width, 92)  # The dialog dashboard is capped at 100 columns.
 
-def format_row(marker, name, label, resources, ssh, status):
+# What is known about a disk with data, as one character (the legend is in the header):
+# ✓ boot verified, ~ installed but not verified yet, ? no record for this disk, ! an
+# unattended install that never completed.
+STATE_FLAGS = {"verified": "✓", "installed": "~", "unverified": "?", "incomplete": "!"}
+
+def format_row(marker, name, label, resources, firmware, ssh, status):
     # Keep operational details visible; use extra space for names and titles.
+    # Fixed columns: RAM/CPU (7), FW (4), SSH (6), STATE / DISK (14) + separators = 45.
     if width >= 72:
-        name_width = min(32, max(23, (width - 39) // 2))
-        label_width = width - 39 - name_width
+        name_width = min(32, max(23, (width - 45) // 2))
+        label_width = width - 45 - name_width
         columns = [f"{marker} {ellipsize(name, name_width):<{name_width}}",
                    f"{ellipsize(label, label_width):<{label_width}}"]
     else:
-        name_width = max(8, width - 37)
+        name_width = max(8, width - 43)
         columns = [f"{marker} {ellipsize(name, name_width):<{name_width}}"]
-    columns += [f"{resources:>7}", f"{ssh:>6}", ellipsize(status, 16)]
+    columns += [f"{resources:>7}", f"{firmware:<4}", f"{ssh:>6}", ellipsize(status, 14)]
     return ellipsize("  ".join(columns), width)
 
 if mode == "__header":
-    print(format_row(" ", "PROFILE", "DESCRIPTION", "RAM/CPU", "SSH", "STATE / DISK"))
+    print(format_row(" ", "PROFILE", "DESCRIPTION", "RAM/CPU", "FW", "SSH", "STATE / DISK"))
     raise SystemExit(0)
 
 rows = [facts(name, vm) for name, vm in VMS.items()]
@@ -772,7 +820,8 @@ for f in rows:
         if f["runtime"].startswith("hostfwd:"):
             status = "running, ssh up"
     elif f["installed"]:
-        status = f"disk {f['disk_actual']}"
+        # one flag for what is known about the disk + what it occupies on the host
+        status = f"{STATE_FLAGS.get(f['install_label'], '?')} {f['disk_host']}"
     elif f["prepared"]:
         status = "empty disk"
     else:
@@ -781,8 +830,9 @@ for f in rows:
     if f["job_status"] and f["job_status"] != "completed":
         status = "installing" if f["job_status"] == "running" else f["job_status"]
     ssh = f":{f['ssh_port']}" if f["ssh_port"] else ""
+    firmware = "UEFI" if f["firmware"] == "EFI" else f["firmware"].title() if f["firmware"] else "?"
     line = format_row(glyph(f), f["name"], f["label"],
-                      f"{memory_label(f['memory_mb'])}/{f['cpus']}", ssh, status)
+                      f"{memory_label(f['memory_mb'])}/{f['cpus']}", firmware, ssh, status)
     if color:
         tone = 32 if f["running"] else 36 if f["installed"] else 33 if f["prepared"] else 90
         line = f"\x1b[{tone}m{line[0]}\x1b[0m{line[1:]}"
@@ -901,7 +951,7 @@ vm_status_summary() {
     if [[ "${FACTS[running]:-0}" == "1" ]]; then
         printf '%s\n' "running"
     elif [[ "${FACTS[installed]:-0}" == "1" ]]; then
-        printf '%s\n' "stopped, disk has data"
+        printf '%s\n' "stopped, ${FACTS[state_word]:-disk has data}"
     elif [[ "${FACTS[prepared]:-0}" == "1" ]]; then
         printf '%s\n' "prepared, empty disk"
     else
@@ -1059,7 +1109,7 @@ vm_status_header() {
     elif [[ "${FACTS[job_status]:-}" == "running" ]]; then
         parts+=("preparing or provisioning")
     elif [[ "${FACTS[installed]:-0}" == "1" ]]; then
-        parts+=("■ stopped, disk has data")
+        parts+=("■ stopped, ${FACTS[state_word]:-disk has data}")
     elif [[ "${FACTS[prepared]:-0}" == "1" ]]; then
         parts+=("□ disk prepared but empty — pick an INSTALL action")
     else
@@ -1069,7 +1119,7 @@ vm_status_header() {
         parts+=("Installation: ${FACTS[job_status]}")
     fi
     if [[ "${FACTS[prepared]:-0}" == "1" ]]; then
-        parts+=("disk ${FACTS[disk_actual]:-?} / ${FACTS[disk_virtual]:-?}")
+        parts+=("on host ${FACTS[disk_host]:-?} · capacity ${FACTS[disk_capacity]:-?}")
     fi
     if [[ "${FACTS[iso_ready]:-0}" == "1" ]]; then
         parts+=("ISO ready")
@@ -1094,11 +1144,18 @@ vm_workspace_header() {
         return
     fi
     local marker='○' status='Not installed' tone=90 disk='Not prepared' disk_label='DISK'
+    local install_line=''
     local iso='Missing' iso_tone=33 ssh="${FACTS[ssh_port]:-—}"
     if [[ "${FACTS[running]:-0}" == "1" ]]; then
         marker='●'; status='Running'; tone=32
     elif [[ "${FACTS[installed]:-0}" == "1" ]]; then
         marker='■'; status='Stopped'; tone=36
+        case "${FACTS[install_label]:-}" in
+            verified) status='Verified' ;;
+            installed) status='Installed' ;;
+            incomplete) status='Incomplete'; tone=33 ;;
+            unverified) status='Unverified'; tone=33 ;;
+        esac
     elif [[ "${FACTS[prepared]:-0}" == "1" ]]; then
         marker='□'; status='Empty disk'; tone=33
     fi
@@ -1106,9 +1163,11 @@ vm_workspace_header() {
         marker='●'; status='Installing'; tone=33
     fi
     if [[ "${FACTS[prepared]:-0}" == "1" ]]; then
-        disk="${FACTS[disk_actual]:-?} / ${FACTS[disk_virtual]:-?}"
+        # what the image occupies on the host / the capacity the guest sees
+        disk="${FACTS[disk_host]:-?} on host / ${FACTS[disk_capacity]:-?} capacity"
+        disk_label='ON HOST / CAPACITY'
     fi
-    [[ "${FACTS[installed]:-0}" == "1" ]] && disk_label='DISK WITH DATA'
+    [[ "${FACTS[installed]:-0}" == "1" ]] && install_line="${FACTS[install_detail]:-}"
     if [[ "${FACTS[iso_ready]:-0}" == "1" ]]; then
         iso='Ready'; iso_tone=36
     fi
@@ -1129,6 +1188,9 @@ vm_workspace_header() {
         summary=$(vm_status_header)
         printf '  \e[90m%s\e[0m\n' "${summary%% ·*}"
     fi
+    if [[ -n "$install_line" ]]; then
+        printf '  \e[90mInstall: %s\e[0m\n' "$install_line"
+    fi
     if [[ -n "${FACTS[job_status]:-}" ]]; then
         printf '  Installation: %s\n' "${FACTS[job_status]}"
     fi
@@ -1145,17 +1207,21 @@ list_vm_menu_items_unified() {
 
 # Same output, from FACTS already loaded in the calling shell (mapfile runs the
 # producer in a subshell, so the loop loads facts itself and calls this).
+#
+# The menu is built around the everyday use of the VM. A disk with data puts RUN first
+# (boot, consoles); the install flows move behind "Install / Reinstall...". A new VM keeps
+# its install flow on top, where Enter runs it. libvirt/remote and the physical-disk
+# operations sit in their own submenus everywhere, checkpoints in MAINTENANCE.
 build_vm_menu_items() {
     local installed="${FACTS[installed]:-0}"
     local running="${FACTS[running]:-0}"
     local has_ssh="${FACTS[has_ssh]:-0}"
     local has_cloud_init="${FACTS[has_cloud_init]:-0}"
+    local prepared="${FACTS[prepared]:-0}"
 
-    emit_section "INSTALL"
-    if [[ -n "${FACTS[job_status]:-}" ]]; then
-        emit_action "Installation Log" "${FACTS[job_status]} — view progress and errors"
-    fi
     if [[ "${FACTS[job_status]:-}" == "running" ]]; then
+        emit_section "INSTALL"
+        emit_action "Installation Log" "${FACTS[job_status]} — view progress and errors"
         if [[ $running == "1" ]]; then
             emit_action "Attach Display" "Watch the installer in a VNC viewer"
         else
@@ -1166,53 +1232,9 @@ build_vm_menu_items() {
         emit_action "Back" "Return to the VM list; installation continues"
         return
     fi
-    if [[ "${FACTS[has_omarchy]:-0}" == "1" ]]; then
-        emit_action "Omarchy Bootstrap" "Official cidata install + NVIDIA post-install"
-        emit_action "Omarchy Unattended Install" "Install from the official ISO and stop after reboot"
-    elif [[ "${FACTS[has_archinstall]:-0}" == "1" ]]; then
-        emit_action "Arch Bootstrap" "Fully automated pacstrap install + post-install (Arch, CachyOS)"
-        emit_action "Arch Install (Interactive)" "Boot live ISO with pre-built archinstall config"
-    elif [[ "${FACTS[has_preseed]:-0}" == "1" ]]; then
-        emit_action "Debian Preseed Bootstrap" "Fully automated Debian install + post-install"
-        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-    elif [[ "${FACTS[has_kickstart]:-0}" == "1" ]]; then
-        emit_action "Kickstart Bootstrap" "Fully automated AlmaLinux/RHEL install + post-install"
-        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-    elif [[ "${FACTS[has_autoyast]:-0}" == "1" ]]; then
-        emit_action "AutoYaST Bootstrap" "Fully automated openSUSE install + post-install"
-        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-    elif [[ "${FACTS[has_alpine]:-0}" == "1" ]]; then
-        emit_action "Alpine Bootstrap" "Fully automated setup-alpine install + post-install"
-        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-    elif [[ "${FACTS[has_freebsd]:-0}" == "1" ]]; then
-        emit_action "FreeBSD Bootstrap" "Scripted FreeBSD disc1 install and SSH verification"
-    elif [[ "${FACTS[has_pfsense]:-0}" == "1" ]]; then
-        emit_action "pfSense Bootstrap" "Scripted pfSense install for the network lab router (rendered config.xml)"
-        emit_action "Network Lab Plan" "Topology, forwards and install order of the lab"
-    elif [[ "${FACTS[has_reactos]:-0}" == "1" ]]; then
-        emit_action "ReactOS Bootstrap" "Fully automated ReactOS install (unattend.inf, install only)"
-        emit_action "Guided Provision" "Prepare artifacts, boot the ReactOS BootCD by hand"
-    elif [[ "${FACTS[has_windows]:-0}" == "1" ]]; then
-        emit_action "Windows Bootstrap" "Fully automated autounattend install + OpenSSH post-install"
-        emit_action "Guided Provision" "Prepare artifacts, boot the Windows installer by hand"
-    elif [[ "${FACTS[has_autoinstall]:-0}" == "1" && $has_ssh == "1" ]]; then
-        emit_action "Full Bootstrap" "Unattended install, first boot, and post-install"
-        emit_action "Unattended Install" "Run the configured Ubuntu autoinstall flow"
-        emit_action "Cloud-Init Flow" "Manual installer with first-boot handoff"
-    elif [[ "${FACTS[has_autoinstall]:-0}" == "1" ]]; then
-        emit_action "Unattended Install" "Run the configured Ubuntu autoinstall flow"
-        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-    elif [[ $has_cloud_init == "1" ]]; then
-        emit_action "Cloud-Init Flow" "Manual installer with first-boot handoff"
-        emit_action "Seeded Installer" "Boot installer with a generated cloud-init seed"
-        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-    else
-        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
-        emit_action "Installer Only" "Boot the installer without preparation"
-    fi
 
-    emit_section "RUN"
     if [[ $running == "1" ]]; then
+        emit_section "RUN"
         # A VM can be running on a disk that has no OS yet (installer in
         # progress): Stop/SSH must be reachable regardless of `installed`.
         emit_action "Stop VM" "Graceful power-off of the running VM"
@@ -1224,6 +1246,7 @@ build_vm_menu_items() {
         fi
         emit_action "Boot Desktop" "Already running: restart with display, or open SSH"
     elif [[ $installed == "1" ]]; then
+        emit_section "RUN"
         emit_action "Boot Desktop" "Start the VM with display"
         emit_action "Boot Headless" "Start the VM in the background"
         if [[ $has_ssh == "1" ]]; then
@@ -1233,33 +1256,167 @@ build_vm_menu_items() {
         if [[ $has_cloud_init == "1" ]]; then
             emit_action "First Boot" "Start the VM with cloud-init enabled"
         fi
+    else
+        emit_section "INSTALL"
+        if [[ -n "${FACTS[job_status]:-}" ]]; then
+            emit_action "Installation Log" "${FACTS[job_status]} — view progress and errors"
+        fi
+        emit_install_actions
+        emit_action "Fetch ISO" "Download or validate the configured ISO"
+        emit_action "Prepare VM" "Create disk and firmware artifacts"
     fi
-    emit_action "Export to libvirt" "Define the installed VM for virt-manager"
-    emit_action "Remote SPICE" "Start this VM on a remote host and open SPICE viewer"
 
     emit_section "MAINTENANCE"
-    emit_action "Remove from libvirt" "Remove definition and preserve the disk"
-    emit_action "Video Profile" "$(video_profile_desc)"
+    if [[ $running != "1" && $installed == "1" ]]; then
+        if [[ -n "${FACTS[job_status]:-}" ]]; then
+            emit_action "Installation Log" "${FACTS[job_status]} — view progress and errors"
+        fi
+        emit_action "Install / Reinstall..." "$(primary_install_action) and the other install flows (the disk is wiped)"
+        emit_action "Clone VM..." "Independent copy as a new local profile: own disk, ports and MACs"
+    fi
+    if [[ $running != "1" && ( $installed == "1" || $prepared == "1" || "${FACTS[has_checkpoints]:-0}" == "1" ) ]]; then
+        emit_action "Checkpoints" "Save or restore a named full copy of the disk + EFI vars (clean-install, before-update)"
+    fi
     if [[ $has_ssh == "1" ]]; then
         emit_action "Post-Install" "Run configured SSH provisioning tasks"
     fi
-    emit_action "Boot Check" "Run a headless smoke test"
-    emit_action "Fetch ISO" "Download or validate the configured ISO"
-    emit_action "Prepare VM" "Create disk and firmware artifacts"
+    if [[ $running != "1" ]]; then
+        emit_action "Boot Check" "Run a headless smoke test"
+    fi
+    emit_action "Video Profile" "$(video_profile_desc)"
+    emit_action "Libvirt / Remote..." "Export to virt-manager, remove from libvirt, remote SPICE"
+    if [[ $running != "1" ]]; then
+        emit_action "Physical Disks..." "Flash the VM disk to a device, or import a device into the VM"
+    fi
     emit_action "Profile Details" "Review this VM configuration"
 
-    emit_section "ADVANCED"
-    emit_action "Clean VM" "Remove disk, firmware vars and artifacts for this VM"
-    emit_action "Delete ISO" "Remove this VM's cached ISO"
-    emit_action "Flash Empty Disk" "Write the VM disk to an empty physical device"
-    emit_action "Force Flash" "Wipe and write a non-empty physical device"
-    emit_action "Import Disk" "Read a physical device into the VM image"
+    if [[ $running != "1" ]]; then
+        emit_section "ADVANCED"
+        emit_action "Clean VM" "Remove disk, firmware vars and artifacts for this VM (checkpoints stay)"
+        emit_action "Delete ISO" "Remove this VM's cached ISO"
+    fi
 
     emit_section "─"
     emit_action "Back" "Return to the VM list"
 }
 
-# Safety net: the state may change between rendering the menu and choosing.
+# The install flows of this profile, most automated first. On a disk with data the
+# primary entry says so: it starts over.
+emit_install_actions() {
+    local again=""
+    [[ "${FACTS[installed]:-0}" == "1" ]] && again="Reinstall: "
+    local has_ssh="${FACTS[has_ssh]:-0}"
+    local has_cloud_init="${FACTS[has_cloud_init]:-0}"
+    if [[ "${FACTS[has_omarchy]:-0}" == "1" ]]; then
+        emit_action "Omarchy Bootstrap" "${again}Official cidata install + NVIDIA post-install"
+        emit_action "Omarchy Unattended Install" "Install from the official ISO and stop after reboot"
+    elif [[ "${FACTS[has_archinstall]:-0}" == "1" ]]; then
+        emit_action "Arch Bootstrap" "${again}Fully automated pacstrap install + post-install (Arch, CachyOS)"
+        emit_action "Arch Install (Interactive)" "Boot live ISO with pre-built archinstall config"
+    elif [[ "${FACTS[has_preseed]:-0}" == "1" ]]; then
+        emit_action "Debian Preseed Bootstrap" "${again}Fully automated Debian install + post-install"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ "${FACTS[has_kickstart]:-0}" == "1" ]]; then
+        emit_action "Kickstart Bootstrap" "${again}Fully automated AlmaLinux/RHEL install + post-install"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ "${FACTS[has_autoyast]:-0}" == "1" ]]; then
+        emit_action "AutoYaST Bootstrap" "${again}Fully automated openSUSE install + post-install"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ "${FACTS[has_alpine]:-0}" == "1" ]]; then
+        emit_action "Alpine Bootstrap" "${again}Fully automated setup-alpine install + post-install"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ "${FACTS[has_freebsd]:-0}" == "1" ]]; then
+        emit_action "FreeBSD Bootstrap" "${again}Scripted FreeBSD disc1 install and SSH verification"
+    elif [[ "${FACTS[has_pfsense]:-0}" == "1" ]]; then
+        emit_action "pfSense Bootstrap" "${again}Scripted pfSense install for the network lab router (rendered config.xml)"
+        emit_action "Network Lab Plan" "Topology, forwards and install order of the lab"
+    elif [[ "${FACTS[has_reactos]:-0}" == "1" ]]; then
+        emit_action "ReactOS Bootstrap" "${again}Fully automated ReactOS install (unattend.inf, install only)"
+        emit_action "Guided Provision" "Prepare artifacts, boot the ReactOS BootCD by hand"
+    elif [[ "${FACTS[has_windows]:-0}" == "1" ]]; then
+        emit_action "Windows Bootstrap" "${again}Fully automated autounattend install + OpenSSH post-install"
+        emit_action "Guided Provision" "Prepare artifacts, boot the Windows installer by hand"
+    elif [[ "${FACTS[has_autoinstall]:-0}" == "1" && $has_ssh == "1" ]]; then
+        emit_action "Full Bootstrap" "${again}Unattended install, first boot, and post-install"
+        emit_action "Unattended Install" "Run the configured Ubuntu autoinstall flow"
+        emit_action "Cloud-Init Flow" "Manual installer with first-boot handoff"
+    elif [[ "${FACTS[has_autoinstall]:-0}" == "1" ]]; then
+        emit_action "Unattended Install" "${again}Run the configured Ubuntu autoinstall flow"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ $has_cloud_init == "1" ]]; then
+        emit_action "Cloud-Init Flow" "${again}Manual installer with first-boot handoff"
+        emit_action "Seeded Installer" "Boot installer with a generated cloud-init seed"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    else
+        emit_action "Guided Provision" "${again}Fetch ISO, prepare artifacts, boot installer"
+        emit_action "Installer Only" "Boot the installer without preparation"
+    fi
+}
+
+# --- submenus: tag/description pairs, Back last. Requires FACTS. --------------------
+
+list_install_menu_items() {
+    emit_install_actions
+    emit_action "Fetch ISO" "Download or validate the configured ISO"
+    emit_action "Prepare VM" "Create disk and firmware artifacts"
+    emit_action "Back" "Return to the VM menu"
+}
+
+list_libvirt_menu_items() {
+    emit_action "Export to libvirt" "Define the installed VM for virt-manager"
+    emit_action "Remove from libvirt" "Remove definition and preserve the disk"
+    emit_action "Remote SPICE" "Start this VM on a remote host and open SPICE viewer"
+    emit_action "Back" "Return to the VM menu"
+}
+
+list_physical_menu_items() {
+    emit_action "Flash Empty Disk" "Write the VM disk to an empty physical device"
+    emit_action "Force Flash" "Wipe and write a non-empty physical device"
+    emit_action "Import Disk" "Read a physical device into the VM image"
+    emit_action "Back" "Return to the VM menu"
+}
+
+# The actions a shortcut may run although the top-level menu shows them behind a
+# submenu right now (Alt-U reinstall on a disk with data, and the submenu contents).
+vm_hidden_actions() {
+    local -a items=()
+    if [[ "${FACTS[job_status]:-}" == "running" ]]; then
+        return 0
+    fi
+    if [[ "${FACTS[running]:-0}" != "1" && "${FACTS[installed]:-0}" == "1" ]]; then
+        mapfile -t items < <(list_install_menu_items)
+        printf '%s\n' "${items[@]::${#items[@]}-2}" | awk 'NR % 2 == 1'
+    fi
+    mapfile -t items < <(list_libvirt_menu_items)
+    printf '%s\n' "${items[@]::${#items[@]}-2}" | awk 'NR % 2 == 1'
+    if [[ "${FACTS[running]:-0}" != "1" ]]; then
+        mapfile -t items < <(list_physical_menu_items)
+        printf '%s\n' "${items[@]::${#items[@]}-2}" | awk 'NR % 2 == 1'
+    fi
+}
+
+# submenu_loop TITLE PROMPT BUILDER: pick an action from BUILDER's items and run it;
+# Back or Esc returns to the VM menu. Requires FACTS.
+submenu_loop() {
+    local title="$1" prompt="$2" builder="$3"
+    while true; do
+        local -a items=()
+        mapfile -t items < <("$builder")
+        local selected
+        selected=$(MENU_NO_TAGS=1 MENU_CANCEL_LABEL="Back" MENU_WIDTH=96 menu_choose_fit "$title" "$prompt" "${items[@]}") || return 0
+        case "$selected" in
+            "Back"|__sep_*) return 0 ;;
+        esac
+        if is_na_action "$selected" "$current_vm"; then
+            msg_na_action "$selected" "$current_vm"
+            continue
+        fi
+        run_action "$selected" || return 0
+        load_vm_facts "$current_vm"
+        RECOMMENDED=$(recommended_action)
+    done
+}
+
 is_na_action() {
     local tag="$1"
     local vm_name="$2"
@@ -1564,6 +1721,100 @@ prompt_post_install() {
     esac
 }
 
+# list_checkpoint_items NAME -> tag/description pairs, one per checkpoint (vmctl checkpoint list --json)
+list_checkpoint_items() {
+    "$VMCTL" checkpoint list "$1" --json 2>/dev/null | python3 -c '
+import json, sys
+from datetime import datetime
+rows = json.load(sys.stdin)
+def size(n):
+    n = float(n or 0)
+    for unit in ("B", "K", "M", "G", "T"):
+        if n < 1000 or unit == "T":
+            return f"{n:.0f}{unit}" if n >= 100 or unit == "B" else f"{n:.1f}{unit}"
+        n /= 1024
+for row in rows:
+    created = str(row.get("created_at") or "?")[:16].replace("T", " ")
+    note = f" - {row["note"]}" if row.get("note") else ""
+    state = row["label"] if row.get("complete") else "INCOMPLETE"
+    print(row["name"])
+    print(f"{created}  {size(row["host_bytes"])} on host  {state}{note}")
+'
+}
+
+# clone_vm_dialog NAME: new profile name, then what to do with the guest identity, then vmctl clone.
+clone_vm_dialog() {
+    local vm_name="$1"
+    local destination
+    destination=$(input_box "Clone $vm_name" "Name of the new profile (lowercase letters, digits, '.', '-'); it is added to vms/profiles/local.json:" "${vm_name}-2") || return 0
+    [[ -z "$destination" ]] && return 0
+    local -a choices=("keep" "Keep the guest identity: same hostname, machine-id, SSH host keys as '$vm_name' (fix by hand later)")
+    if [[ "${FACTS[can_regenerate_identity]:-0}" == "1" ]]; then
+        choices=("regenerate" "Boot the clone once headless and give it a new hostname, machine-id and SSH host keys (over SSH)" "${choices[@]}")
+    fi
+    choices+=("Back" "Cancel")
+    local identity
+    identity=$(MENU_DEFAULT_ITEM="${choices[0]}" menu_choose_fit "Clone $vm_name -> $destination" \
+        "The disk is copied in full (qemu-img convert), with the EFI vars and the SSH key; the clone gets its own ports and MACs.\nWhat about the identity inside the guest?" \
+        "${choices[@]}") || return 0
+    [[ "$identity" == "Back" || "$identity" == __sep_* ]] && return 0
+    run_vmctl clone "$vm_name" "$destination" --identity "$identity" || true
+}
+
+# checkpoint_menu NAME: create a checkpoint of the stopped VM, or pick one to restore/delete.
+checkpoint_menu() {
+    local vm_name="$1"
+    while true; do
+        local -a items=("Create checkpoint" "Full copy of the current disk + EFI vars under a name you choose")
+        local -a rows
+        mapfile -t rows < <(list_checkpoint_items "$vm_name")
+        if [[ ${#rows[@]} -gt 0 ]]; then
+            items+=("__sep_checkpoints" "── existing checkpoints (pick one to restore or delete) ──")
+            items+=("${rows[@]}")
+        fi
+        items+=("Back" "Return to the VM menu")
+        local choice
+        choice=$(MENU_NO_TAGS=0 menu_choose_fit "Checkpoints — $vm_name" \
+            "A checkpoint is a self-contained copy: it survives Clean VM and stays valid however the disk changes.\nThe VM must be stopped." \
+            "${items[@]}") || return 0
+        case "$choice" in
+            "Back") return 0 ;;
+            __sep_*) continue ;;
+            "Create checkpoint")
+                local name
+                name=$(input_box "New checkpoint" "Name (letters, digits, '.', '_', '-'), e.g. clean-install or before-update:" "clean-install") || continue
+                [[ -z "$name" ]] && continue
+                local note
+                note=$(input_box "Note (optional)" "A short note shown next to '$name' in the list:" "") || note=""
+                if [[ -n "$note" ]]; then
+                    run_vmctl checkpoint create "$vm_name" "$name" --note "$note" || true
+                else
+                    run_vmctl checkpoint create "$vm_name" "$name" || true
+                fi
+                ;;
+            *)
+                local action
+                action=$(menu_choose_fit "Checkpoint '$choice'" "What to do with checkpoint '$choice' of '$vm_name'?" \
+                    "Restore" "Replace the current disk and EFI vars with this checkpoint (the current state is lost)" \
+                    "Delete" "Remove this checkpoint from artifacts/$vm_name/checkpoints" \
+                    "Back" "Return to the checkpoint list") || continue
+                case "$action" in
+                    Restore)
+                        if confirm_box "Restore checkpoint" "Replace the current disk and EFI vars of '$vm_name' with checkpoint '$choice'?\n\nThe current disk content is lost (take a checkpoint of it first if you want it back)."; then
+                            run_vmctl checkpoint restore "$vm_name" "$choice" --yes || true
+                        fi
+                        ;;
+                    Delete)
+                        if confirm_box "Delete checkpoint" "Delete checkpoint '$choice' of '$vm_name'?\n\nThis cannot be undone."; then
+                            run_vmctl checkpoint delete "$vm_name" "$choice" --yes || true
+                        fi
+                        ;;
+                esac
+                ;;
+        esac
+    done
+}
+
 resolve_action() {
     case "$1" in
         "Export to libvirt") printf '%s\n' export-libvirt ;;
@@ -1606,6 +1857,11 @@ resolve_action() {
         "Boot Check") printf '%s\n' boot-check ;;
         "Video Profile") printf '%s\n' video-profile ;;
         "Clean VM") printf '%s\n' clean ;;
+        "Checkpoints") printf '%s\n' checkpoints ;;
+        "Clone VM...") printf '%s\n' clone-vm ;;
+        "Install / Reinstall...") printf '%s\n' install-menu ;;
+        "Libvirt / Remote...") printf '%s\n' libvirt-menu ;;
+        "Physical Disks...") printf '%s\n' physical-menu ;;
         "Delete ISO") printf '%s\n' delete-iso ;;
         "Status") printf '%s\n' status ;;
         "Remote Hosts") printf '%s\n' remote-hosts ;;
@@ -1857,9 +2113,48 @@ run_action() {
             run_vmctl boot-check "$current_vm" || true
             ;;
         clean)
-            if confirm_box "Confirm Clean" "Remove artifacts for VM '$current_vm'?\n\nThis deletes the disk image, firmware vars and generated files under artifacts/$current_vm.\nThe cached ISO is kept."; then
+            if [[ -n "${FACTS[clone_of]:-}" ]]; then
+                # A clone is a profile in local.json: offer to take the whole thing away.
+                local what
+                what=$(menu_choose_fit "Clean clone $current_vm" \
+                    "'$current_vm' is a clone of '${FACTS[clone_of]}' (a profile in vms/profiles/local.json)." \
+                    "Delete the clone" "Remove disk, artifacts, checkpoints AND the profile entry from local.json" \
+                    "Clean artifacts only" "Remove disk, firmware vars and generated files; keep the profile and its checkpoints" \
+                    "Back" "Cancel") || what="Back"
+                case "$what" in
+                    "Delete the clone")
+                        if confirm_box "Delete clone" "Delete the clone '$current_vm' completely?\n\nDisk, artifacts, checkpoints and the local.json entry are removed (local.json.bak keeps the previous file). '${FACTS[clone_of]}' is not touched."; then
+                            run_vmctl clean "$current_vm" --remove-profile || true
+                            # The profile is gone: leave its menu, back to the dashboard.
+                            return 1
+                        fi
+                        ;;
+                    "Clean artifacts only")
+                        run_vmctl clean "$current_vm" || true
+                        ;;
+                esac
+                return 0
+            fi
+            if confirm_box "Confirm Clean" "Remove artifacts for VM '$current_vm'?\n\nThis deletes the disk image, firmware vars and generated files under artifacts/$current_vm.\nThe cached ISO is kept, and so are its checkpoints (vmctl clean --checkpoints removes them)."; then
                 run_vmctl clean "$current_vm" || true
             fi
+            ;;
+        checkpoints)
+            checkpoint_menu "$current_vm"
+            ;;
+        clone-vm)
+            clone_vm_dialog "$current_vm"
+            ;;
+        install-menu)
+            submenu_loop "Install / Reinstall — $current_vm" \
+                "Install flows of this profile. On a disk with data the bootstrap starts over: the disk is wiped.\nTake a checkpoint first if you may want the current state back." \
+                list_install_menu_items
+            ;;
+        libvirt-menu)
+            submenu_loop "Libvirt / Remote — $current_vm" "Hand the VM to virt-manager and back, or run it on a remote host." list_libvirt_menu_items
+            ;;
+        physical-menu)
+            submenu_loop "Physical Disks — $current_vm" "DESTRUCTIVE on the target: every action asks for the device path and confirmation." list_physical_menu_items
             ;;
         flash|flash-force)
             local force=0
@@ -2054,11 +2349,13 @@ vm_menu_loop() {
         # Alt shortcuts for the everyday actions (fzf only): each picks its entry when the
         # menu offers it right now and is a no-op otherwise. Alt-U is this profile's
         # unattended install, Alt-Enter the suggested action.
-        local hotkeys hotkey_hint
+        local hotkeys hotkey_hint hidden_actions
         hotkeys=$(vm_menu_hotkeys)
         hotkey_hint=$(vm_menu_hotkey_hint)
+        hidden_actions=$(vm_hidden_actions)
         local selected
         selected=$(MENU_NO_TAGS=1 MENU_REFRESH=1 MENU_STYLED=1 MENU_HOTKEYS="$hotkeys" MENU_HOTKEY_HINT="$hotkey_hint" \
+            MENU_HIDDEN_ACTIONS="$hidden_actions" \
             MENU_DEFAULT_ITEM="${vm_cursor:-$RECOMMENDED}" MENU_CANCEL_LABEL="Back" MENU_WIDTH=96 \
             menu_choose_fit \
             "$current_vm — ${FACTS[label]:-}" \
@@ -2236,6 +2533,7 @@ dashboard_header() {
     if [[ "$UI_BACKEND" != "fzf" ]]; then
         printf '%s profiles · %s with data · %s running\n' "$total" "$installed" "$running"
         printf '● Running   ■ Disk with data   □ Empty disk   ○ No disk\n'
+        printf 'Disk flags: ✓ boot verified   ~ installed, not verified   ? no record   ! install incomplete\n'
         return
     fi
     # Neutral labels and bright counters give the summary a clear hierarchy.
@@ -2243,6 +2541,7 @@ dashboard_header() {
     printf '\n  \e[90m%-18s  %-18s  %s\e[0m\n' 'PROFILES' 'DISK WITH DATA' 'RUNNING'
     printf '  \e[1m%-18s\e[0m  \e[1;36m%-18s\e[0m  \e[1;32m● %s\e[0m\n\n' "$total" "$installed" "$running"
     printf '  \e[32m●\e[0m Running   \e[36m■\e[0m With data   \e[33m□\e[0m Empty   \e[90m○\e[0m No disk\n'
+    printf '  \e[90mDisk: \e[32m✓\e[90m verified  \e[36m~\e[90m installed  \e[33m?\e[90m unverified  \e[31m!\e[90m incomplete\e[0m\n'
 }
 
 dashboard_loop() {
@@ -2364,10 +2663,13 @@ run_dashboard_hotkey() {
     [[ -n "$action" ]] || return 0
     local -a menu_items=()
     mapfile -t menu_items < <(build_vm_menu_items)
-    local offered=0 i
+    local offered=0 i hidden
     for (( i=0; i<${#menu_items[@]}; i+=2 )); do
         [[ "${menu_items[i]}" == "$action" ]] && offered=1
     done
+    while IFS= read -r hidden; do
+        [[ -n "$hidden" && "$hidden" == "$action" ]] && offered=1
+    done < <(vm_hidden_actions)
     if (( ! offered )); then
         msg_box "$vm" "'$action' is not available for this VM right now (${FACTS[label]:-})."
         return 0

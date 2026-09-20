@@ -153,6 +153,11 @@ replace. A minimal override looks like this:
 Never commit a real user name, password or hash into a tracked profile: the
 repository is public.
 
+A cloned VM (`vmctl clone`, [CLONE.md](CLONE.md)) is written to `local.json` as a
+complete profile with its own paths and ports; the identity *inside* its guest
+(hostname, machine-id, SSH host keys) is the origin's until `--identity regenerate`
+or you change it by hand.
+
 ## Desktop readiness checks
 
 The Ubuntu flavors and network-lab client, CachyOS, Arch niri sessions, Fedora niri/Silverblue and openSUSE AutoYaST copy `vms/profile-files/common/bin/verify-desktop` into the guest. The read-only check requires `graphical.target`, installed desktop packages, an active display manager and an active local graphical session belonging to the configured user. A greeter, another user, an SSH session or an inactive session does not count as autologin. The helper retries service/session readiness for up to roughly two minutes because SSH can become ready before the desktop. For greetd, a local tty session also needs the expected compositor running under that user.

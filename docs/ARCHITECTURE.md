@@ -89,6 +89,9 @@ produces isolated per-VM artifacts.
 | `ui.py`                   | ~65   | ANSI codes + print/style helpers.                               |
 | `runtime.py`              | ~204  | `run`, `run_progress`, `image_info`, path / format helpers.     |
 | `config.py`               | ~108  | `load_config`, `validate_vm_profile`, `get_vm`.                 |
+| `clone.py`                | ~300  | `vmctl clone`: derived profile (paths, ports, MACs, meta.clone_of) written complete into `local.json`, staged copy of disk/vars/keys/record, guest identity script for Linux guests. |
+| `checkpoint.py`           | ~330  | `vmctl checkpoint`: full `qemu-img convert` copies of disk + EFI vars + record under `artifacts/<vm>/checkpoints/<name>/`, staging + rename for create/restore/delete. |
+| `vmstate.py`              | ~250  | `artifacts/<vm>/state.json`: install completed / boot verified / origin, disk facts, `summary()` wording for status and the TUI. |
 | `iso.py`                  | ~255  | ISO download, validation, discovery, installer extraction.     |
 | `cloud_init.py`           | ~192  | cloud-init / autoinstall seed builders.                         |
 | `omarchy.py`              | ~210  | Omarchy config rendering and unattended `cidata` builder.       |
@@ -106,7 +109,7 @@ produces isolated per-VM artifacts.
 | `lifecycle.py`            | ~717  | All other `cmd_*` handlers + background-VM tracking.            |
 | `cli.py`                  | ~181  | `build_parser`, `dispatch_internal`, `main`. Wires it together. |
 
-**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`iso`/`cloud_init`/`omarchy`/`qemu`/`disk_inspect` ← {`alpine`, `autoyast`, `preseed`, `kickstart`, `windows`} ← {`flash`, `import_dev`, `ssh`, `host_setup`, `report`} ← `netlab` ← {`pfsense`, `libvirt`} ← `lifecycle` ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
+**Import direction**: `errors` ← `state` ← {`ui`, `runtime`} ← `config`/`vmstate`/`iso`/`cloud_init`/`omarchy`/`qemu`/`disk_inspect` ← {`alpine`, `autoyast`, `preseed`, `kickstart`, `windows`} ← {`flash`, `import_dev`, `ssh`, `host_setup`, `report`} ← `netlab` ← {`pfsense`, `libvirt`} ← `lifecycle` ← `cli`. No cycles. Mutable state is always accessed via the module (`from vmctl import state` then `state.ROOT`), never as `from vmctl.state import ROOT` (would capture a stale binding).
 
 ## Typical flows
 

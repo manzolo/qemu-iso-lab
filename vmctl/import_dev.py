@@ -10,7 +10,7 @@ from pathlib import Path
 
 from typing import Any
 
-from vmctl import config, disk_inspect, flash, import_allocated, runtime, ui
+from vmctl import config, disk_inspect, flash, import_allocated, runtime, ui, vmstate
 from vmctl import state
 from vmctl.errors import VMError
 
@@ -120,6 +120,9 @@ def cmd_import_device(args: argparse.Namespace) -> int:
         ui.print_status("ok", f"Would import {args.device} into {ui.pretty_path(disk_path)} via sudo helper")
     else:
         ui.print_status("ok", f"Imported {args.device} into {ui.pretty_path(disk_path)}")
+    # The system on this disk was installed somewhere else: what the record said about the
+    # previous image (installed, verified) is no longer about this one.
+    vmstate.record_origin(args.vm, "import", args.device, dry_run=args.dry_run)
     return 0
 
 

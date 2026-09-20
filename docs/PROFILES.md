@@ -242,11 +242,38 @@ artifacts/<vm>/
 ├── preseed/ kickstart/ omarchy/   the other unattended seeds
 ├── ssh/                generated key pair when the profile asks for one
 ├── logs/               install, post-install and boot-check logs
-└── runtime/            PID files, QMP and VNC sockets of background VMs
+├── runtime/            PID files, QMP and VNC sockets of background VMs
+└── state.json          what the flows recorded about this disk (see below)
 ```
 
 `vmctl status` reports these together with runtime state (tracked background
 QEMU processes and SSH forward ports). `vmctl clean-stale` removes dead PID files.
+
+### What is known about the disk (`state.json`, `vmctl status`, the TUI)
+
+Three facts are kept apart because they come from three different places:
+
+| Fact | Source | Shown as |
+|------|--------|----------|
+| the image occupies N bytes on the host and has a capacity of M | measured (allocated blocks, `qemu-img info`) | `ON HOST` / `CAPACITY` |
+| the disk has data on it | measured: more than 16 MiB allocated (a fresh qcow2 has ~200 KiB) | `empty` vs. everything below |
+| an installation completed on it | recorded by the unattended flow when the guest's completion token arrived | `installed` |
+| the installed disk booted and passed a check | recorded when the SSH post-install ran through or a disk `boot-check` passed | `verified` |
+
+Neither size is the guest filesystem's used or free space. A disk with data and no
+record is `unverified` (a pre-existing install, an installer booted by hand, an
+imported device); an unattended install that started and never sent its token is
+`incomplete`. `meta.verified` in the profile is the maintainer's last live PASS of the
+*recipe* and never certifies the disk in `artifacts/` today.
+
+The record is invalidated by the operation that changes the disk: every install flow
+resets it when it starts (`vmctl install`/`provision` too: booting the ISO over a
+verified disk makes it `unverified` until the next check), `vmctl clean` deletes it
+with the disk, `import-device` clears it and notes the source device, a checkpoint
+restore brings back the record saved with the checkpoint, a clone carries the
+origin's record. `check-vms --restore` moves the whole directory aside and back, so
+the record travels with its disk. A record over an image without data (disk deleted
+by hand, then `vmctl prep`) is ignored.
 
 ## Windows import templates
 

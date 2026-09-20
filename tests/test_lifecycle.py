@@ -147,9 +147,15 @@ class VmctlTests(BaseVmctlTestCase):
         output = stdout.getvalue()
         self.assertIn(self.vm_name, output)
         self.assertIn("ready", output)
-        self.assertIn(self.vmctl.format_bytes(disk_path.stat().st_size), output)
+        # ON HOST is the allocated size (what du shows), never the apparent st_size.
+        self.assertIn(self.vmctl.format_bytes(disk_path.stat().st_blocks * 512), output)
         self.assertIn(self.vmctl.format_bytes(2 * 1024**3), output)
         self.assertIn("RUNTIME", output)
+        self.assertIn("ON HOST", output)
+        self.assertIn("CAPACITY", output)
+        self.assertNotIn("ACTUAL", output)
+        # A 4-byte file holds no data: whatever the profile says, the disk is empty.
+        self.assertIn("empty", output)
 
     def test_cmd_status_hides_untouched_vms_by_default(self):
         other_vm = json.loads(json.dumps(self.vm_config))
