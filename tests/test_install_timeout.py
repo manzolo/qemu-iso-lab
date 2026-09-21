@@ -112,6 +112,7 @@ class InstallPhaseTimeoutTests(BaseVmctlTestCase):
         for key, value in overrides.items():
             setattr(args, key, value)
         with mock.patch.object(vmctl.runtime, "run") as run, \
+             mock.patch.object(vmctl.runtime, "require_command"), \
              mock.patch.object(vmctl.lifecycle.iso, "ensure_iso", return_value=self.root / "isos/test.iso"), \
              mock.patch.object(vmctl.lifecycle.iso, "extract_installer_boot_artifacts",
                                return_value=(self.root / "k", self.root / "i")), \
