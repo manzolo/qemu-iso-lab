@@ -79,8 +79,23 @@ defaults were raised to 1800 like the siblings.
 
 The other failure, `ubuntu-8.04-unattended`, timed out cleanly at 3600 s waiting for the preseed
 token, with the captured console stopping 3.7 s into the kernel boot. It passed on 2026-09-12.
-Both failures are Ubuntu rows that stalled early under eight concurrent VMs: per the rule below,
-re-run each alone before calling it a regression.
+
+**Both were re-run alone on 2026-09-21, and neither is a regression.** `ubuntu-8.04-unattended`
+passed in 8.1 min at the first attempt (`artifacts/check-vms/20260921-071206-370139/`).
+`ubuntu-20.04-unattended` hung a second time in that run, failing cleanly at the new 3600 s bound,
+and then **passed in 7.6 min** on a third attempt driven straight through `bootstrap-unattended`
+on a cleaned state (`verify-desktop`: active local graphical session). So the 20.04 hang is
+intermittent, not deterministic: two hangs and one pass out of three, all from a virgin disk, with
+and without host contention. Its signature both times was subiquity spinning in
+`Network/_send_update: CHANGE enp0s5` before the install phase ever started, which points at the
+installer's network/mirror step retrying forever rather than at anything in the profile — this
+host has a known flaky LAN resolver, and subiquity has no internal bound on that step. Worth
+capturing the next occurrence before touching the profile.
+
+One gap remains in the evidence chain: the timeout error names the console log under
+`artifacts/<vm>/logs/`, which `--restore` deletes as soon as the row ends, so a matrix run keeps
+the message but not the console. The error should carry the tail of that log the way
+`explain_failed_bootstrap` already does for FAILED tokens.
 
 ## Remaining work
 
