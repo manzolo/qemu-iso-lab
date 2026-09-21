@@ -143,7 +143,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = _add(subparsers, "bootstrap-omarchy", help="fully automated Omarchy cidata install + SSH post-install")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--spice-port", type=int, help="expose the installer stage via SPICE on 127.0.0.1:PORT")
-    p.add_argument("--timeout", type=int, default=600, help="seconds to wait for SSH after installation (default: 600)")
+    p.add_argument("--timeout", type=int, default=1800, help="seconds for the installer to finish, then for SSH after it (default: 1800, like the other bootstraps)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_omarchy)
 
     p = _add(subparsers, "bootstrap-preseed", help="fully automated Debian preseed install + post-install via serial console")
@@ -255,7 +255,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--video", choices=VIDEO_CHOICES, help=VIDEO_HELP)
     p.add_argument("--headless", action="store_true", help="run the installer stage without a display")
     p.add_argument("--spice-port", type=int, help="expose the installer stage via SPICE on 127.0.0.1:PORT")
-    p.add_argument("--timeout", type=int, default=300, help="seconds to wait for the installer to reboot (default: 300)")
+    p.add_argument("--timeout", type=int, default=1800, help="seconds for the installer to finish, then for SSH after it (default: 1800, like the other bootstraps)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_unattended)
 
     p = _add(subparsers, "start", help="boot the installed disk for one VM")

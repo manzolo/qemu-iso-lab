@@ -112,6 +112,7 @@ SSH-provisioned ports in use: `cachyos-desktop` → 2223, `cachyos-nvidia` → 2
 ### Unattended install flows
 
 **Ubuntu** (`bootstrap-unattended`):
+0. `--timeout` bounds the **installer**, then the SSH wait, like every other bootstrap (default raised 300 → 1800 on 2026-09-21). It did not until then: this flow boots the installer with a plain `runtime.run`, which had no timeout, while the other flows go through `qemu.run_and_expect`, which always had one. An Ubuntu 20.04 autoinstall spinning forever in `subiquity/Network/_send_update: CHANGE enp0s5` therefore held a full `check-vms` run for five hours instead of failing after one, and the whole matrix waited behind it (2026-09-20). `runtime.run(timeout_sec=...)` now SIGTERMs the child (QEMU closes the qcow2 on it, SIGKILL would not), SIGKILLs after 15 s and names the console log in the error. `vmctl install-unattended <vm>` by hand stays unbounded on purpose.
 1. Generates cloud-init seed ISO + autoinstall seed.
 2. Extracts `casper/vmlinuz` + `casper/initrd` from the ISO, boots with `-append autoinstall -no-reboot`.
 3. Waits for installer to exit, then starts the installed VM headless in background.

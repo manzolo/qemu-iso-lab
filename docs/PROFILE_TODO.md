@@ -60,6 +60,28 @@ Recorded dates:
 - 2026-09-07: `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `rocky-9`, `fedora-silverblue`, `opensuse-tumbleweed-autoyast` (superseded above).
 - 2026-09-06: the three network-lab profiles and all Windows profiles (the two Windows templates keep this date).
 
+## Full matrix of 2026-09-20/21 (`artifacts/check-vms/20260920-224925-149137/`)
+
+97 rows on restored artifacts (`--restore --parallel auto --timeout 3600`): **51 PASS, 2 FAIL,
+44 SKIP**. The 44 skips are the expected ones: 36 manual profiles with no `ci.expect`, the 4
+experimental, the 2 Windows import templates with no ISO, 2 disk boot-checks with no disk.
+`ubuntu-26.04-unattended` passed here too (12.8 min), the day it was added. Slowest passes:
+`windows11-unattended` 30.0, `edubuntu-24.04` 27.5, `fedora-kinoite` 25.2, `kali` 23.9 min.
+
+The run itself exposed a hole in the harness, now closed. `ubuntu-20.04-unattended` hung in
+`subiquity/Network/_send_update: CHANGE enp0s5` and stayed there for 6 h 43 on a 1 h timeout,
+because `bootstrap-unattended` installed through a plain `runtime.run` with no timeout while
+every other flow uses `qemu.run_and_expect`, which has one. The whole matrix waited behind that
+one worker from 01:50 until it was released by hand; the row's recorded error (a failed
+`verify-desktop`) is a consequence of that release on a half-installed disk, not the cause.
+`runtime.run` now takes `timeout_sec`, the two autoinstall bootstraps pass theirs, and their
+defaults were raised to 1800 like the siblings.
+
+The other failure, `ubuntu-8.04-unattended`, timed out cleanly at 3600 s waiting for the preseed
+token, with the captured console stopping 3.7 s into the kernel boot. It passed on 2026-09-12.
+Both failures are Ubuntu rows that stalled early under eight concurrent VMs: per the rule below,
+re-run each alone before calling it a regression.
+
 ## Remaining work
 
 - Budgie was promoted from `experimental` to `unattended` on 2026-09-09: `verify-desktop`

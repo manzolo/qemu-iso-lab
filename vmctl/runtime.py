@@ -91,6 +91,16 @@ def _stream_pipe(pipe: Any, stream: Any, log_fh: Any) -> None:
         pipe.close()
 
 
+TERMINATE_GRACE_SEC = 15
+
+
+def _timed_out(cmd: list[str], timeout_sec: float | None, log: Path | None) -> VMError:
+    """The message a stuck install must leave behind: how long, what did not exit, where to look."""
+    where = f" Output: {log}" if log is not None else ""
+    return VMError(f"Timed out after {int(timeout_sec or 0)}s: {Path(cmd[0]).name} did not exit "
+                   f"(the guest never powered itself off).{where}")
+
+
 def run(
     cmd: list[str],
     dry_run: bool = False,
@@ -101,22 +111,35 @@ def run(
     stdin_text: str | None = None,
     show_command: bool = True,
     capture_error_output: bool = False,
+    timeout_sec: float | None = None,
 ) -> None:
+    """Run *cmd* to completion. ``timeout_sec`` bounds the wait and is what the unattended
+    install phases pass: a guest that never powers itself off would otherwise hold the
+    caller forever (an Ubuntu 20.04 autoinstall spinning in subiquity's network loop held a
+    full check-vms run for five hours on 2026-09-20, because this wait had no bound while
+    `qemu.run_and_expect` — used by every other flow — always had one)."""
     if show_command:
         ui.print_command(cmd)
     if not dry_run:
         if quiet and stdout_log is None and stderr_log is None:
-            subprocess.run(
-                cmd,
-                check=True,
-                input=stdin_text,
-                text=stdin_text is not None or capture_error_output,
-                stdout=subprocess.PIPE if capture_error_output else subprocess.DEVNULL,
-                stderr=subprocess.PIPE if capture_error_output else subprocess.DEVNULL,
-            )
+            try:
+                subprocess.run(
+                    cmd,
+                    check=True,
+                    input=stdin_text,
+                    text=stdin_text is not None or capture_error_output,
+                    stdout=subprocess.PIPE if capture_error_output else subprocess.DEVNULL,
+                    stderr=subprocess.PIPE if capture_error_output else subprocess.DEVNULL,
+                    timeout=timeout_sec,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise _timed_out(cmd, timeout_sec, None) from exc
             return
         if stdout_log is None and stderr_log is None:
-            subprocess.run(cmd, check=True, input=stdin_text, text=stdin_text is not None)
+            try:
+                subprocess.run(cmd, check=True, input=stdin_text, text=stdin_text is not None, timeout=timeout_sec)
+            except subprocess.TimeoutExpired as exc:
+                raise _timed_out(cmd, timeout_sec, None) from exc
             return
 
         stdout_fh = None
@@ -159,7 +182,19 @@ def run(
                 assert process.stdin is not None
                 process.stdin.write(stdin_text)
                 process.stdin.close()
-            returncode = process.wait()
+            try:
+                returncode = process.wait(timeout=timeout_sec)
+            except subprocess.TimeoutExpired as exc:
+                # SIGTERM first: QEMU closes the qcow2 on it, SIGKILL would not.
+                process.terminate()
+                try:
+                    process.wait(timeout=TERMINATE_GRACE_SEC)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+                stdout_thread.join(timeout=5)
+                stderr_thread.join(timeout=5)
+                raise _timed_out(cmd, timeout_sec, stdout_log) from exc
             stdout_thread.join()
             stderr_thread.join()
             if returncode != 0:

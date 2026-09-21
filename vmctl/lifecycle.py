@@ -2623,7 +2623,10 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
     qemu_args += cloud_init.cloud_init_drive_args(seed_path)
     qemu_args += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", append_args]
     stdout_log, stderr_log = announce_phase_logs(args.vm, "install-unattended")
-    runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    # Bounded only when a bootstrap drives it: `vmctl install-unattended <vm>` by hand stays unbounded,
+    # because someone is watching the installer and may take as long as they like.
+    runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log,
+                timeout_sec=getattr(args, "timeout", None))
     vmstate.complete_install(args.vm, flow, vm, dry_run=args.dry_run)
     return 0
 
@@ -2656,7 +2659,10 @@ def cmd_install_omarchy(args: argparse.Namespace) -> int:
     qemu_args += ["-cdrom", str(iso_path)]
     qemu_args += omarchy.cidata_drive_args(seed_path)
     stdout_log, stderr_log = announce_phase_logs(args.vm, "install-omarchy")
-    runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log)
+    # Bounded only when a bootstrap drives it: `vmctl install-omarchy <vm>` by hand stays unbounded,
+    # because someone is watching the installer and may take as long as they like.
+    runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log,
+                timeout_sec=getattr(args, "timeout", None))
     vmstate.complete_install(args.vm, flow, vm, dry_run=args.dry_run)
     return 0
 
@@ -2840,6 +2846,7 @@ def cmd_bootstrap_unattended(args: argparse.Namespace) -> int:
             dry_run=args.dry_run,
             _vm_override=vm,
             _flow="bootstrap-unattended",
+            timeout=args.timeout,
         )
     )
 
@@ -2888,6 +2895,7 @@ def cmd_bootstrap_omarchy(args: argparse.Namespace) -> int:
             dry_run=args.dry_run,
             _vm_override=vm,
             _flow="bootstrap-omarchy",
+            timeout=args.timeout,
         )
     )
 
