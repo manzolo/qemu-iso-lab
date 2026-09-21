@@ -50,6 +50,53 @@ class RunTimeoutTests(BaseVmctlTestCase):
                                stdout_log=self.root / "logs" / "b.log", timeout_sec=30)
 
 
+class TimeoutEvidenceTests(BaseVmctlTestCase):
+    """The error has to carry the console, not a path to it: `check-vms --restore` deletes the
+    row's artifacts the moment it ends, so by the time anyone opens the report the file is gone."""
+
+    def test_the_error_quotes_the_console_the_restore_is_about_to_delete(self):
+        log = self.root / "logs" / "install.log"
+        script = ("import time; "
+                  "[print('console line %d' % i, flush=True) for i in range(500)]; "
+                  "time.sleep(30)")
+        with mock.patch("sys.stdout", new_callable=io.StringIO):
+            with self.assertRaises(self.vmctl.VMError) as caught:
+                self.vmctl.run([sys.executable, "-c", script], stdout_log=log, quiet=True, timeout_sec=2)
+        message = str(caught.exception)
+        self.assertIn("Captured output:", message)
+        self.assertIn("console line 499", message)          # the newest lines, where a hang shows
+        self.assertNotIn("console line 0\n", message)       # older ones fall outside the budget
+        self.assertLessEqual(len(message.split("Captured output:\n")[1]), self.vmctl.TIMEOUT_TAIL_CHARS)
+        # The log itself is gone after a restore; the message must still stand alone.
+        log.unlink()
+        self.assertIn("console line 499", message)
+
+    def test_a_guest_console_with_nul_padding_and_broken_utf8_is_still_readable(self):
+        log = self.root / "logs" / "serial.log"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_bytes(b"boot\0\0\0 ok\n" + b"\xff\xfe invalid\n" + b"subiquity/Network/_send_update\n")
+        tail = self.vmctl.log_tail(log)
+        self.assertNotIn("\0", tail)
+        self.assertIn("boot ok", tail)
+        self.assertIn("_send_update", tail)
+
+    def test_no_log_or_an_unreadable_one_never_breaks_the_message(self):
+        self.assertEqual(self.vmctl.log_tail(None), "")
+        self.assertEqual(self.vmctl.log_tail(self.root / "nope.log"), "")
+        with mock.patch("sys.stdout", new_callable=io.StringIO):
+            with self.assertRaises(self.vmctl.VMError) as caught:
+                self.vmctl.run([sys.executable, "-c", "import time; time.sleep(30)"], quiet=True, timeout_sec=0.5)
+        self.assertNotIn("Captured output:", str(caught.exception))
+
+    def test_an_empty_console_adds_no_captured_section(self):
+        log = self.root / "logs" / "silent.log"
+        with mock.patch("sys.stdout", new_callable=io.StringIO):
+            with self.assertRaises(self.vmctl.VMError) as caught:
+                self.vmctl.run([sys.executable, "-c", "import time; time.sleep(30)"],
+                               stdout_log=log, quiet=True, timeout_sec=1)
+        self.assertNotIn("Captured output:", str(caught.exception))
+
+
 class InstallPhaseTimeoutTests(BaseVmctlTestCase):
     """Which flows bound the installer, and which deliberately do not."""
 

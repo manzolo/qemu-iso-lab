@@ -92,13 +92,40 @@ def _stream_pipe(pipe: Any, stream: Any, log_fh: Any) -> None:
 
 
 TERMINATE_GRACE_SEC = 15
+# Same budget `qemu.run_and_expect` gives its own "Captured output:" tail.
+TIMEOUT_TAIL_CHARS = 4000
+
+
+def log_tail(log: Path | None, limit: int = TIMEOUT_TAIL_CHARS) -> str:
+    """The last *limit* readable characters of *log*, or "" when there is nothing to read.
+
+    A serial console log is written by the guest: it carries NUL padding (`tr -d '\000'` is
+    how you read one by hand) and is not necessarily valid UTF-8, so nothing here may raise.
+    """
+    if log is None:
+        return ""
+    try:
+        with log.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            # Read well past the budget: NULs and multi-byte sequences shrink on decoding.
+            handle.seek(max(0, size - 16 * limit))
+            data = handle.read()
+    except OSError:
+        return ""
+    return data.replace(b"\0", b"").decode("utf-8", "replace")[-limit:]
 
 
 def _timed_out(cmd: list[str], timeout_sec: float | None, log: Path | None) -> VMError:
-    """The message a stuck install must leave behind: how long, what did not exit, where to look."""
+    """The message a stuck install must leave behind: how long, what did not exit, and the
+    console itself — not just its path. `check-vms --restore` deletes the row's artifacts as
+    soon as it ends, so a path alone points at a file that no longer exists by the time
+    anyone reads the report (2026-09-21)."""
     where = f" Output: {log}" if log is not None else ""
+    tail = log_tail(log)
+    captured = f"\nCaptured output:\n{tail}" if tail.strip() else ""
     return VMError(f"Timed out after {int(timeout_sec or 0)}s: {Path(cmd[0]).name} did not exit "
-                   f"(the guest never powered itself off).{where}")
+                   f"(the guest never powered itself off).{where}{captured}")
 
 
 def run(
