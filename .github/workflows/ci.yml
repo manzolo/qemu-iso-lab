@@ -80,6 +80,9 @@ jobs:
   ubuntu-server-ci-install-boot:
     needs: test
     runs-on: ubuntu-latest
+    # A backstop under the runner's own 6h limit: the install below is bounded,
+    # the SSH wait and boot-check that follow it are not all equally so.
+    timeout-minutes: 150
 
     steps:
       - name: Checkout
@@ -95,8 +98,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-system-x86 qemu-utils xorriso genisoimage ovmf
 
+      # The runner has no KVM: subiquity takes ~59 minutes under TCG (measured on the
+      # 2026-09-20 green run, guest clock 3540s at "reboot: Power down"). Until the
+      # installer was bounded this number only capped the SSH wait, so 2400 looked
+      # generous; applied to the install itself it killed a healthy run mid-kernel.
       - name: Bootstrap ubuntu-server-ci
-        run: ./bin/vmctl bootstrap-unattended ubuntu-server-ci --timeout 2400
+        run: ./bin/vmctl bootstrap-unattended ubuntu-server-ci --timeout 5400
 
       - name: Stop installed ubuntu-server-ci background VM
         run: ./bin/vmctl stop ubuntu-server-ci
