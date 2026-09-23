@@ -9,8 +9,9 @@ PREFIX ?= $(HOME)/.local
 # check-vms defaults to 300 s per phase, enough only for boot checks: a real install takes 10-60 min.
 TIMEOUT ?= 3600
 BIN := $(abspath bin)
+TUI_PYTHON ?= $(if $(wildcard .venv-tui/bin/python),.venv-tui/bin/python,python3)
 
-.PHONY: help setup install-cli uninstall-cli test lint check ci tui init-local-profile validate-vms groups guides
+.PHONY: help setup install-cli uninstall-cli test lint check ci tui tui-preview init-local-profile validate-vms groups guides
 
 help: ## Show this help
 	@printf "\033[1mqemu-iso-lab: developer targets\033[0m\n\n"
@@ -44,6 +45,9 @@ ci: ## Unit tests exactly as GitHub Actions runs them
 
 tui: ## Open the text UI (same as running vmtui)
 	@./bin/vmtui
+
+tui-preview: ## Try the experimental Textual dashboard (optional tui dependency)
+	@$(TUI_PYTHON) ./bin/vmtui-preview
 
 init-local-profile: ## Create vms/profiles/local.json from the example
 	@if [ -e vms/profiles/local.json ]; then \

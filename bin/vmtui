@@ -737,6 +737,15 @@ def state_word(known):
     return ""
 PY
 
+# Machine-readable snapshot for the experimental dashboard. Keep the same facts
+# as the classic UI; viewing the catalog must never launch a VM operation.
+dashboard_snapshot() {
+    python3 -c "$PY_COMMON
+import json
+print(json.dumps([facts(name, vm) for name, vm in VMS.items()]))
+" "$ROOT_DIR" "$CONFIG_DIR"
+}
+
 # vm_facts NAME → "key<TAB>value" lines (booleans as 1/0)
 vm_facts() {
     python3 -c "$PY_COMMON

@@ -1,0 +1,100 @@
+"""Read the classic TUI's snapshot and reuse its existing, guarded actions.
+
+This bridge is deliberately small: bootstrap selection, confirmations, sudo and
+physical-disk workflows stay in vmtui/vmctl during the dashboard experiment.
+"""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+from typing import Any
+
+from vmctl.config import natural_key
+
+Facts = dict[str, Any]
+
+
+def visible_rows(rows: list[Facts], query: str, mode: str) -> list[Facts]:
+    words = query.casefold().split()
+    selected = [row for row in rows
+                if all(word in f"{row['name']} {row['label']} {row['family']}".casefold()
+                       for word in words)
+                and (mode != "disk" or row["prepared"])
+                and (mode != "running" or row["running"])]
+    return sorted(selected, key=lambda row: (
+        not row["running"], not row["installed"], not row["prepared"],
+        natural_key(row["name"]),
+    ))
+
+
+def status_label(row: Facts) -> tuple[str, str]:
+    job = row["job_status"]
+    if job and job != "completed":
+        return ("Installing", "#e8be78") if job == "running" else (job.capitalize(), "#f08a8a")
+    if row["running"]:
+        return "Running", "#86d5ab"
+    labels = {
+        "verified": ("Boot verified", "#86d5ab"),
+        "installed": ("Installed", "#84c9e7"),
+        "unverified": ("Unverified", "#e8be78"),
+        "incomplete": ("Incomplete", "#f08a8a"),
+        "empty": ("Empty disk", "#a6b4c8"),
+        "no disk": ("No disk", "#a6b4c8"),
+    }
+    return labels.get(row["install_label"], ("Unknown", "#a6b4c8"))
+
+
+def primary_action(row: Facts) -> tuple[str, str]:
+    if row["job_status"] == "running":
+        return "Installation log", "alt-l"
+    if row["running"]:
+        return "Open display", "alt-a"
+    if row["installed"]:
+        return "Boot desktop", "alt-d"
+    return "Install…", "alt-u"
+
+
+def resources(row: Facts) -> str:
+    memory = row["memory_mb"]
+    ram = f"{memory / 1024:g}G" if memory >= 1024 else f"{memory}M"
+    return f"{ram} / {row['cpus']}"
+
+
+class ClassicBridge:
+    def __init__(self) -> None:
+        self.script = Path(__file__).resolve().parent.parent / "bin" / "vmtui"
+        self.env = {**os.environ, "VMTUI_TEST_MODE": "1"}
+
+    def snapshot(self) -> list[Facts]:
+        result = subprocess.run(
+            ["bash", "-c", 'source "$1"; dashboard_snapshot', "vmtui-preview", str(self.script)],
+            env=self.env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode:
+            raise RuntimeError(result.stderr.strip() or "Unable to read VM state")
+        rows: list[Facts] = json.loads(result.stdout)
+        return rows
+
+    def run(self, name: str, action: str) -> int:
+        if action not in {"menu", "classic", "alt-l", "alt-a", "alt-d", "alt-u"}:
+            raise ValueError(f"Unsupported preview action: {action}")
+        # Values are positional arguments, never interpolated into shell code.
+        script = '''source "$1"
+install_interrupt_guard
+case "$3" in
+    classic) main_menu_loop ;;
+    menu) current_vm="$2"; state_set last-vm "$current_vm"; vm_menu_loop ;;
+    *) run_dashboard_hotkey "$3" "$2" ;;
+esac
+'''
+        previous = signal.signal(signal.SIGINT, lambda *_: None)
+        try:
+            return subprocess.run(
+                ["bash", "-c", script, "vmtui-preview", str(self.script), name, action],
+                env=self.env, check=False,
+            ).returncode
+        finally:
+            signal.signal(signal.SIGINT, previous)

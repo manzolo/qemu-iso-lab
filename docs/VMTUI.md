@@ -20,6 +20,56 @@ The TUI uses **fzf** when installed (fuzzy type-to-filter, cursor on the
 suggested entry, version 0.40 or newer) and falls back to **dialog** otherwise.
 Force one with `VMTUI_UI=fzf` or `VMTUI_UI=dialog`.
 
+### Experimental Textual dashboard
+
+![Textual dashboard preview](screenshots/vmtui-preview.png)
+
+Try the alternate layout with `make tui-preview`. The regular `make tui` stays
+available. Install the optional dependency once in a local environment:
+
+```bash
+python3 -m venv .venv-tui
+.venv-tui/bin/python -m pip install -e '.[tui]'
+make tui-preview
+```
+
+The target uses `.venv-tui/bin/python` when present; override it with
+`make tui-preview TUI_PYTHON=/path/to/python` if needed. It also needs the classic
+UI's prerequisites (Bash, Python and fzf >= 0.40 or dialog).
+
+The preview provides a search field, All / With disk / Running filters, a compact
+profile table, contextual details and installation activity. It reads the same
+snapshot as the classic dashboard and refreshes every 15 seconds (or with F5),
+preserving the selected profile and search. ISO availability is shown separately
+from the disk's installation state. With disk includes empty prepared disks.
+
+At fewer than 100 columns, details move out of the list into an Enter-opened
+dialog. Use `/` to search names, descriptions and families, Tab to move between
+controls, Enter for details, F1 for help and Escape to go back. Escape first
+clears an active search, then returns focus to the list, then exits.
+
+This is a layout experiment: **Install / Boot / Display / Log and All actions
+temporarily open the existing TUI flows**, which still call `vmctl`, recheck
+availability and retain their confirmations. Closing those flows returns to the
+preview. F8 opens the full classic UI, including tools and the network lab.
+No VM operation runs just by opening or filtering the preview.
+
+Run the optional UI tests with:
+
+```bash
+.venv-tui/bin/python -m unittest discover -s tests -p 'test_tui_preview.py' -v
+```
+
+Without Textual, the standard unittest suite skips the interactive preview tests
+and still runs the bridge/filter tests.
+
+Type-checking the preview requires Textual too. If mypy is installed in your
+system Python, point it at the preview environment:
+
+```bash
+python3 -m mypy vmctl/tui_bridge.py vmctl/tui_preview.py --strict --python-executable=.venv-tui/bin/python
+```
+
 ## The dashboard
 
 The main screen lists every profile with live state:

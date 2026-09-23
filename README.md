@@ -175,6 +175,11 @@ How each flow works, and the sequencing rule every flow must respect, is in
 
 ## The TUI
 
+Try the optional Textual layout with `make tui-preview`: search and filters above
+the list, contextual details beside it and installation activity below. See
+[preview setup and controls](docs/VMTUI.md#experimental-textual-dashboard).
+`make tui` continues to open the classic interface.
+
 `vmtui` is a dashboard over the same `vmctl` commands: fzf when installed,
 `dialog` otherwise. Every action echoes the `vmctl` command it runs, so it
 doubles as a discovery tool for the CLI.

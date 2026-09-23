@@ -1,0 +1,94 @@
+Screen {
+    background: #111820;
+    color: #dce5ef;
+}
+#masthead {
+    height: 2;
+    padding: 1 2 0 2;
+    background: #18222e;
+}
+#brand { width: 1fr; color: #84c9e7; }
+#summary { width: auto; color: #a6b4c8; }
+#toolbar { height: 3; margin: 0 2; }
+#search {
+    width: 1fr;
+    margin-right: 2;
+    background: #18222e;
+    border: tall #304050;
+}
+#search:focus { border: tall #84c9e7; }
+#filters { width: auto; height: 3; }
+.filter { min-width: 9; width: auto; margin-left: 1; }
+Button {
+    background: #243343;
+    color: #dce5ef;
+    border: none;
+}
+Button:hover { background: #344b61; }
+Button:focus { text-style: bold; border: tall #84c9e7; }
+Button.active, Button.-primary {
+    background: #84c9e7;
+    color: #111820;
+    text-style: bold;
+}
+#notice { height: 1; margin: 0 2 1 2; color: #a6b4c8; }
+#notice.error { color: #f08a8a; }
+#workspace { height: 1fr; margin: 0 2; }
+#catalog {
+    width: 1fr;
+    border: round #304050;
+    background: #151f2a;
+}
+.eyebrow { height: 1; color: #84c9e7; text-style: bold; margin-bottom: 1; }
+#list-title { margin: 0 1; }
+DataTable { height: 1fr; background: #151f2a; }
+DataTable > .datatable--header {
+    background: #1e2b39;
+    color: #a6b4c8;
+    text-style: none;
+}
+DataTable > .datatable--odd-row { background: #182330; }
+DataTable > .datatable--even-row { background: #151f2a; }
+DataTable > .datatable--cursor { background: #285269; color: #ffffff; text-style: bold; }
+DataTable:focus > .datatable--cursor { background: #285269; }
+#empty { height: auto; padding: 1 2; color: #a6b4c8; display: none; }
+VMDetails {
+    width: 38;
+    height: 1fr;
+    background: #18222e;
+    border: round #304050;
+    padding: 1 2;
+    margin-left: 1;
+}
+#vm-name { height: auto; text-style: bold; color: #ffffff; margin-bottom: 1; }
+#vm-description { height: auto; color: #a6b4c8; margin-bottom: 1; }
+#vm-status { height: auto; margin-bottom: 1; }
+#vm-facts { height: auto; color: #c3cfdd; margin-bottom: 1; }
+#vm-install { height: auto; color: #a6b4c8; margin-bottom: 1; }
+VMDetails Button { width: 100%; margin-bottom: 1; }
+.detail-copy { height: 1fr; }
+#activity { height: 5; margin: 1 2; padding: 0 1; border-top: solid #304050; }
+#activity .eyebrow { margin-bottom: 0; }
+#activity-text { height: 1fr; overflow-y: auto; color: #a6b4c8; }
+Footer { background: #18222e; }
+.compact #masthead { height: 3; layout: vertical; }
+.compact #brand, .compact #summary { width: 100%; height: 1; }
+.compact #search { margin-right: 0; }
+.compact #notice { margin-bottom: 0; }
+.compact #activity { height: 3; margin: 0 2; }
+.compact #details { display: none; }
+ModalScreen { align: center middle; background: #000000 65%; }
+#detail-dialog, #help-dialog {
+    width: 64;
+    max-width: 95%;
+    height: auto;
+    max-height: 95%;
+    border: round #84c9e7;
+    background: #18222e;
+    padding: 1 2;
+    overflow-y: auto;
+}
+#detail-dialog { height: 90%; }
+#detail-dialog VMDetails { width: 100%; margin: 0; border: none; padding: 0; }
+#close-details, #close-help { width: 100%; margin-top: 1; }
+.dialog-title { text-style: bold; color: #84c9e7; margin-bottom: 1; }

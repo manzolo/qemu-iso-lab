@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.venv-tui/
+*.egg-info/
 
 # Virtual machine artifacts
 artifacts/

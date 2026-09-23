@@ -124,6 +124,15 @@ class VmtuiTests(unittest.TestCase):
         result = self.run_bash(f"source bin/vmtui; list_vm_menu_items_unified {vm_name}")
         return result.stdout.splitlines()
 
+    def test_preview_snapshot_uses_the_classic_disk_facts(self):
+        self.mark_prepared("test-ssh")
+        rows = json.loads(self.run_bash("source bin/vmtui; dashboard_snapshot").stdout)
+        row = next(row for row in rows if row["name"] == "test-ssh")
+        self.assertTrue(row["prepared"])
+        self.assertFalse(row["installed"])
+        self.assertEqual(row["install_label"], "empty")
+        self.assertEqual(row["ssh_port"], "2293")
+
     def test_all_automatic_install_commands_detach(self):
         commands = [
             "bootstrap-windows", "bootstrap-alpine", "bootstrap-archinstall",

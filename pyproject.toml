@@ -10,9 +10,15 @@ requires-python = ">=3.10"
 authors = [{ name = "Andrea Manzi" }]
 readme = "README.md"
 
+[project.optional-dependencies]
+tui = ["textual>=8.2.8,<9"]
+
 [project.scripts]
 vmctl = "vmctl.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["vmctl*"]
+
+[tool.setuptools.package-data]
+vmctl = ["*.tcss"]
