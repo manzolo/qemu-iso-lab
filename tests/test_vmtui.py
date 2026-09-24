@@ -124,7 +124,7 @@ class VmtuiTests(unittest.TestCase):
         result = self.run_bash(f"source bin/vmtui; list_vm_menu_items_unified {vm_name}")
         return result.stdout.splitlines()
 
-    def test_preview_snapshot_uses_the_classic_disk_facts(self):
+    def test_dashboard_snapshot_uses_the_classic_disk_facts(self):
         self.mark_prepared("test-ssh")
         rows = json.loads(self.run_bash("source bin/vmtui; dashboard_snapshot").stdout)
         row = next(row for row in rows if row["name"] == "test-ssh")
@@ -132,6 +132,91 @@ class VmtuiTests(unittest.TestCase):
         self.assertFalse(row["installed"])
         self.assertEqual(row["install_label"], "empty")
         self.assertEqual(row["ssh_port"], "2293")
+
+    def test_textual_backend_routes_nested_menus_and_forms_to_textual_widgets(self):
+        self.env["VMTUI_UI"] = "textual"
+        result = self.run_bash('''
+source bin/vmtui
+textual_widget() { printf '%s\n' "$@"; }
+MENU_DEFAULT_ITEM=video MENU_REFRESH=1 menu_choose_fit "Actions" "Choose" video "Video Profile"
+input_box "Device" "Type path" /dev/example
+msg_box "Notice" "Ready"
+CONFIRM_DESTRUCTIVE=1 CONFIRM_TARGET=/dev/example confirm_box "Flash" "Proceed?"
+''')
+        self.assertIn("menu\nActions\nChoose\nvideo\nVideo Profile", result.stdout)
+        self.assertIn("input\nDevice\nType path\n/dev/example", result.stdout)
+        self.assertIn("message\nNotice\nReady", result.stdout)
+        self.assertIn("confirm\nDANGER — Flash", result.stdout)
+        self.assertIn("ALL DATA ON /dev/example WILL BE LOST", result.stdout)
+
+    def test_textual_backend_preserves_menu_settings_and_cancel_status(self):
+        self.env["VMTUI_UI"] = "textual"
+        result = self.run_bash('''
+source bin/vmtui
+textual_widget() {
+    printf '%s|%s|%s\n' "$MENU_DEFAULT_ITEM" "$MENU_REFRESH" "$MENU_NO_TAGS" >&2
+    return 1
+}
+if MENU_DEFAULT_ITEM=video MENU_REFRESH=1 MENU_NO_TAGS=1 menu_choose "Actions" "Choose" video "Video"; then
+    exit 2
+fi
+''')
+        self.assertIn("video|1|1", result.stderr.splitlines())
+
+    def test_dashboard_desktop_commands_use_live_textual_output_without_classic_pause(self):
+        self.env["VMTUI_UI"] = "textual"
+        result = self.run_bash('''
+source bin/vmtui
+current_vm=test-ssh
+textual_widget() { printf '<%s>\n' "$@"; }
+clear() { printf 'unexpected clear\n'; }
+pause_box() { printf 'unexpected pause\n'; }
+run_vmctl start "$current_vm" --video "std"
+run_vmctl attach "$current_vm"
+''')
+        self.assertIn("<desktop>\n<test-ssh>", result.stdout)
+        self.assertIn("<command>\n<test-ssh>", result.stdout)
+        self.assertIn("<start>\n<test-ssh>\n<--video>\n<std>", result.stdout)
+        self.assertIn("<attach>\n<test-ssh>", result.stdout)
+        self.assertNotIn("unexpected", result.stdout)
+        self.assertNotIn("Selected VM:", result.stdout)
+
+    def test_explicit_headless_start_does_not_launch_a_desktop_viewer(self):
+        self.env["VMTUI_UI"] = "textual"
+        result = self.run_bash('''
+source bin/vmtui
+current_vm=test-ssh
+textual_widget() { printf '<%s>\n' "$@"; }
+run_vmctl start "$current_vm" --headless --background
+''')
+        self.assertIn("<command>\n<test-ssh>", result.stdout)
+        self.assertNotIn("<desktop>", result.stdout)
+
+    def test_dashboard_desktop_command_preserves_failure_status(self):
+        self.env["VMTUI_UI"] = "textual"
+        result = self.run_bash('''
+source bin/vmtui
+current_vm=test-ssh
+textual_widget() { return 7; }
+status=0
+run_vmctl start "$current_vm" || status=$?
+printf 'status=%s\n' "$status"
+''')
+        self.assertEqual(result.stdout.strip(), "status=7")
+
+    def test_dashboard_direct_action_rechecks_availability(self):
+        result = self.run_bash('''
+source bin/vmtui
+current_vm=test-ssh
+load_vm_facts "$current_vm"
+msg_box() { printf 'unavailable: %s\n' "$*"; }
+run_action() { printf 'run: %s\n' "$1"; }
+run_vm_menu_action "Boot Desktop"
+run_vm_menu_action "Video Profile"
+''')
+        self.assertIn("unavailable:", result.stdout)
+        self.assertNotIn("run: Boot Desktop", result.stdout)
+        self.assertIn("run: Video Profile", result.stdout)
 
     def test_all_automatic_install_commands_detach(self):
         commands = [
@@ -1326,6 +1411,39 @@ run_vmctl() { printf '%s\n' "$@"; }
         apt_get.chmod(0o755)
         result = self.run_bash("source bin/vmtui; install_command_for remote-viewer")
         self.assertEqual(result.stdout.strip(), "sudo apt-get install -y virt-viewer")
+
+    def _launcher_env(self, *, has_textual: bool) -> dict[str, str]:
+        fake = self.bindir / "fake-python"
+        fake.write_text(
+            "#!/usr/bin/env sh\n"
+            f"if [ \"$1\" = -c ]; then exit {0 if has_textual else 1}; fi\n"
+            "echo \"dashboard $*\"\n",
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        env = {key: value for key, value in self.env.items()
+               if key not in {"VMTUI_TEST_MODE", "VMTUI_UI"}}
+        return dict(env, VMTUI_TEXTUAL_PYTHON=str(fake))
+
+    def test_vmtui_opens_the_textual_dashboard_when_textual_is_importable(self):
+        result = subprocess.run([str(ROOT / "bin/vmtui")], cwd=ROOT, env=self._launcher_env(has_textual=True),
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), f"dashboard {self.bindir}/bin/vmtui-textual")
+
+    def test_vmtui_classic_flag_and_missing_textual_keep_the_shell_menus(self):
+        # A bogus backend makes the classic path fail fast instead of opening a menu loop.
+        env = dict(self._launcher_env(has_textual=True), VMTUI_UI="bogus")
+        result = subprocess.run([str(ROOT / "bin/vmtui"), "--classic"], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=30)
+        self.assertNotIn("dashboard", result.stdout)
+        self.assertIn("VMTUI_UI", result.stderr)
+        env = dict(self._launcher_env(has_textual=False), VMTUI_UI="textual")
+        result = subprocess.run([str(ROOT / "bin/vmtui")], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("dashboard", result.stdout)
+        self.assertIn("needs Textual", result.stderr)
 
     def test_ui_backend_env_override(self):
         env = dict(self.env, VMTUI_UI="dialog")

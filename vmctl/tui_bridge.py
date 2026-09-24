@@ -1,8 +1,4 @@
-"""Read the classic TUI's snapshot and reuse its existing, guarded actions.
-
-This bridge is deliberately small: bootstrap selection, confirmations, sudo and
-physical-disk workflows stay in vmtui/vmctl during the dashboard experiment.
-"""
+"""Read shared VM facts and reuse guarded shell workflows with Textual widgets."""
 from __future__ import annotations
 
 import json
@@ -10,6 +6,7 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import sys
 from typing import Any
 
 from vmctl.config import natural_key
@@ -54,7 +51,29 @@ def primary_action(row: Facts) -> tuple[str, str]:
         return "Open display", "alt-a"
     if row["installed"]:
         return "Boot desktop", "alt-d"
-    return "Install…", "alt-u"
+    unattended = any(value for key, value in row.items() if key in {
+        "has_autoinstall", "has_archinstall", "has_omarchy", "has_preseed",
+        "has_kickstart", "has_autoyast", "has_alpine", "has_windows",
+        "has_freebsd", "has_pfsense", "has_reactos",
+    })
+    return ("Unattended install…" if unattended else "Boot ISO…"), "alt-u"
+
+
+def quick_actions(row: Facts) -> list[tuple[str, str]]:
+    actions = [primary_action(row)]
+    if row["job_status"] == "running":
+        actions.append(("Open display", "alt-a"))
+    else:
+        if row["running"]:
+            if row.get("has_ssh"):
+                actions.append(("SSH console", "alt-s"))
+            actions.append(("Stop VM", "alt-x"))
+        elif row["installed"]:
+            actions.append(("Boot headless", "alt-h"))
+        if not row["running"]:
+            actions.append(("Video profile…", "Video Profile"))
+    actions.append(("All actions…", "menu"))
+    return actions
 
 
 def resources(row: Facts) -> str:
@@ -70,8 +89,9 @@ class ClassicBridge:
 
     def snapshot(self) -> list[Facts]:
         result = subprocess.run(
-            ["bash", "-c", 'source "$1"; dashboard_snapshot', "vmtui-preview", str(self.script)],
-            env=self.env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120,
+            ["bash", "-c", 'source "$1"; dashboard_snapshot', "vmtui-textual", str(self.script)],
+            env={**self.env, "VMTUI_UI": "textual"}, stdin=subprocess.DEVNULL,
+            capture_output=True, text=True, timeout=120,
         )
         if result.returncode:
             raise RuntimeError(result.stderr.strip() or "Unable to read VM state")
@@ -79,22 +99,28 @@ class ClassicBridge:
         return rows
 
     def run(self, name: str, action: str) -> int:
-        if action not in {"menu", "classic", "alt-l", "alt-a", "alt-d", "alt-u"}:
-            raise ValueError(f"Unsupported preview action: {action}")
+        if action not in {"menu", "classic", "alt-l", "alt-a", "alt-d", "alt-u",
+                          "alt-h", "alt-s", "alt-x", "Profile Details", "Video Profile"}:
+            raise ValueError(f"Unsupported dashboard action: {action}")
         # Values are positional arguments, never interpolated into shell code.
         script = '''source "$1"
 install_interrupt_guard
 case "$3" in
     classic) main_menu_loop ;;
     menu) current_vm="$2"; state_set last-vm "$current_vm"; vm_menu_loop ;;
+    "Profile Details"|"Video Profile")
+        current_vm="$2"; load_vm_facts "$current_vm"; run_vm_menu_action "$3" ;;
     *) run_dashboard_hotkey "$3" "$2" ;;
 esac
 '''
         previous = signal.signal(signal.SIGINT, lambda *_: None)
         try:
             return subprocess.run(
-                ["bash", "-c", script, "vmtui-preview", str(self.script), name, action],
-                env=self.env, check=False,
+                ["bash", "-c", script, "vmtui-textual", str(self.script), name, action],
+                env=({key: value for key, value in self.env.items()
+                      if (key, value) != ("VMTUI_UI", "textual")} if action == "classic" else {
+                    **self.env, "VMTUI_UI": "textual", "VMTUI_TEXTUAL_PYTHON": sys.executable,
+                }), check=False,
             ).returncode
         finally:
             signal.signal(signal.SIGINT, previous)

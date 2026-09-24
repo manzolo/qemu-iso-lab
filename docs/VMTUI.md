@@ -4,73 +4,94 @@
 each one before executing it or records it in the background installation log.
 It remembers per-VM video preferences and tracks its background commands.
 
-![Dashboard](screenshots/vmtui-dashboard.png)
+![The Textual dashboard](screenshots/vmtui-dashboard.png)
 
-- [Backends](#backends)
-- [The dashboard](#the-dashboard)
-- [The VM menu](#the-vm-menu)
+- [Frontends](#frontends)
+- [The Textual dashboard](#the-textual-dashboard)
+- [The classic menus](#the-classic-menus): [dashboard](#the-dashboard), [VM menu](#the-vm-menu)
 - [Video profiles](#video-profiles)
 - [After an installer](#after-an-installer)
 - [Remote SPICE](#remote-spice)
 - [Environment variables](#environment-variables)
 
-## Backends
+## Frontends
 
-The TUI uses **fzf** when installed (fuzzy type-to-filter, cursor on the
-suggested entry, version 0.40 or newer) and falls back to **dialog** otherwise.
-Force one with `VMTUI_UI=fzf` or `VMTUI_UI=dialog`.
-
-### Experimental Textual dashboard
-
-![Textual dashboard preview](screenshots/vmtui-preview.png)
-
-Try the alternate layout with `make tui-preview`. The regular `make tui` stays
-available. Install the optional dependency once in a local environment:
+`vmtui` opens the **Textual dashboard** when [Textual](https://textual.textualize.io/)
+is importable: first from the repository's `.venv-tui`, then from `python3`
+(`VMTUI_TEXTUAL_PYTHON` names another interpreter). Install it once:
 
 ```bash
 python3 -m venv .venv-tui
 .venv-tui/bin/python -m pip install -e '.[tui]'
-make tui-preview
+vmtui                  # or: make tui
 ```
 
-The target uses `.venv-tui/bin/python` when present; override it with
-`make tui-preview TUI_PYTHON=/path/to/python` if needed. It also needs the classic
-UI's prerequisites (Bash, Python and fzf >= 0.40 or dialog).
+Without Textual, with `vmtui --classic` (`make tui-classic`) or with `VMTUI_UI=fzf`
+/ `VMTUI_UI=dialog`, it opens the **classic menus**: **fzf** when installed (fuzzy
+type-to-filter, version 0.40 or newer), **dialog** otherwise. `VMTUI_UI=textual`
+insists on the dashboard and fails when Textual is missing. F8 in the dashboard
+opens the classic menus too, including tools and the network lab.
 
-The preview provides a search field, All / With disk / Running filters, a compact
-profile table, contextual details and installation activity. It reads the same
-snapshot as the classic dashboard and refreshes every 15 seconds (or with F5),
+## The Textual dashboard
+
+A search field, All / With disk / Running filters, the profile table, the selected
+profile's details and quick actions, and installation activity. It reads the same
+snapshot as the classic menus and refreshes every 15 seconds (or with F5),
 preserving the selected profile and search. ISO availability is shown separately
 from the disk's installation state. With disk includes empty prepared disks.
 
-At fewer than 100 columns, details move out of the list into an Enter-opened
-dialog. Use `/` to search names, descriptions and families, Tab to move between
-controls, Enter for details, F1 for help and Escape to go back. Escape first
-clears an active search, then returns focus to the list, then exits.
+Use **Right or Enter** to move from the profile list to its actions, **Up/Down**
+to choose a button, and **Left** to return to the list. At fewer than 100 columns,
+the actions open in a dialog with the same controls. Use `/` to search names,
+descriptions and families, Tab for other controls, and F1 for help. Escape returns
+from actions to the list without clearing the search; from the list it clears an
+active search, then exits.
 
-This is a layout experiment: **Install / Boot / Display / Log and All actions
-temporarily open the existing TUI flows**, which still call `vmctl`, recheck
-availability and retain their confirmations. Closing those flows returns to the
-preview. F8 opens the full classic UI, including tools and the network lab.
-No VM operation runs just by opening or filtering the preview.
+Quick actions follow the VM state: **Unattended install** (when configured) or
+**Boot ISO** before installation, **Boot desktop / Boot headless** after installation,
+and **Open display / SSH console / Stop VM** while running. SSH appears only when
+configured. During installation, log and display actions remain available.
 
-Run the optional UI tests with:
+![All actions of a running VM](screenshots/vmtui-actions.png)
+
+**All actions…** opens the VM menu described [below](#the-vm-menu), with its
+submenus, confirmations and text fields drawn by Textual. `/` filters an action
+list, Enter selects, and Left or Escape goes back from the list. In dialogs,
+Left/Right select the Cancel/Continue buttons, Enter activates the selected
+button, and Escape cancels. Confirmations default to Cancel. The workflows are
+the classic ones: they call `vmctl`, recheck availability and keep their
+confirmations.
+
+**Boot desktop starts the VM in the background and opens a separate viewer**
+(`start --headless --background`, then `attach --wait 10`), with the profile's
+headless video configuration. Closing the viewer leaves the VM running; use Open
+display to reconnect or Stop VM to shut it down. The classic menus and a plain
+`vmctl start` use the native QEMU window, whose close button stops QEMU.
+
+Desktop launch and display attachment show live output and completion/errors
+inside the dashboard. Close the viewer, then use Enter or Escape to return.
+Use **Copy command / F2** for the vmctl invocation, **Copy QEMU / F3** for the
+full QEMU command, or select output with the mouse and press **Ctrl+C**. Commands
+keep their quoting and are copied without visual line wrapping. Desktop clipboard
+helpers (`wl-copy`, `xclip` or `xsel`) are used when available, with terminal OSC 52
+as a fallback. **F6** interrupts the current command/viewer session; Ctrl+C only
+copies text. Other commands, live installation logs, SSH/serial sessions and sudo
+prompts use the terminal and return to the dashboard afterwards. No VM operation
+runs just by opening or filtering the dashboard.
+
+The Textual tests and type check need the same environment (`make lint` runs the
+latter automatically when `.venv-tui` exists; without Textual the standard suite
+skips the interactive tests and still runs the bridge/filter tests):
 
 ```bash
-.venv-tui/bin/python -m unittest discover -s tests -p 'test_tui_preview.py' -v
+.venv-tui/bin/python -m unittest tests.test_tui_textual -v
 ```
 
-Without Textual, the standard unittest suite skips the interactive preview tests
-and still runs the bridge/filter tests.
+## The classic menus
 
-Type-checking the preview requires Textual too. If mypy is installed in your
-system Python, point it at the preview environment:
+![The classic fzf dashboard](screenshots/vmtui-classic.png)
 
-```bash
-python3 -m mypy vmctl/tui_bridge.py vmctl/tui_preview.py --strict --python-executable=.venv-tui/bin/python
-```
-
-## The dashboard
+### The dashboard
 
 The main screen lists every profile with live state:
 
@@ -129,7 +150,7 @@ action a keystroke away.
 
 Esc or Ctrl-C returns to the previous screen; from the dashboard it exits the TUI.
 
-## The VM menu
+### The VM menu
 
 With fzf, `Ctrl-R` or `F5` also refreshes the VM menu: the state summary and
 available actions are rebuilt without returning to the dashboard. The highlighted

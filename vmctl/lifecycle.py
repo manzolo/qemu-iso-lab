@@ -3092,7 +3092,11 @@ def cmd_attach(args: argparse.Namespace) -> int:
         ui.print_status("ok", "Would bridge the VNC socket to 127.0.0.1 and open a viewer")
         return 0
 
+    deadline = time.monotonic() + max(0, getattr(args, "wait", 0))
     pid = running_qemu_pid(args.vm, vm)
+    while (pid is None or not sock_path.exists()) and time.monotonic() < deadline:
+        time.sleep(0.1)
+        pid = running_qemu_pid(args.vm, vm)
     if pid is None:
         raise VMError(f"VM '{args.vm}' is not running (start it with: vmctl start {args.vm} --headless --background)")
     if not sock_path.exists():

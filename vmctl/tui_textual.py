@@ -1,4 +1,4 @@
-"""Experimental Textual dashboard. VM operations are delegated to the classic UI."""
+"""Textual dashboard using shared, guarded VM workflows."""
 from __future__ import annotations
 
 import asyncio
@@ -15,14 +15,22 @@ from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Static
 
-from vmctl.tui_bridge import ClassicBridge, Facts, primary_action, resources, status_label, visible_rows
+from vmctl.tui_bridge import ClassicBridge, Facts, quick_actions, resources, status_label, visible_rows
 
 
 class ProfileTable(DataTable[Text | str]):
-    BINDINGS = [Binding("enter", "select_cursor", "Details")]
+    BINDINGS = [Binding("enter", "select_cursor", "Actions"),
+                Binding("right", "open_actions", "Actions", show=False, priority=True)]
+
+    def action_open_actions(self) -> None:
+        self.action_select_cursor()
 
 
 class VMDetails(Vertical):
+    BINDINGS = [Binding("up", "previous_action", show=False),
+                Binding("down", "next_action", show=False),
+                Binding("left", "profiles", "Profiles")]
+
     class Requested(Message):
         def __init__(self, name: str, action: str) -> None:
             super().__init__()
@@ -41,7 +49,10 @@ class VMDetails(Vertical):
             yield Static(id="vm-status")
             yield Static(id="vm-facts", markup=False)
             yield Static(id="vm-install", markup=False)
-        yield Button("Install…", id="primary", variant="primary", disabled=True)
+        yield Static("→ Actions · ↑/↓ Choose · ← Profiles", classes="action-hint", markup=False)
+        yield Button("Boot ISO…", id="primary", variant="primary", disabled=True)
+        yield Button("", id="quick-1", disabled=True)
+        yield Button("", id="quick-2", disabled=True)
         yield Button("All actions…", id="menu", disabled=True)
 
     def on_mount(self) -> None:
@@ -69,13 +80,39 @@ class VMDetails(Vertical):
             f"SSH\n{ssh}"
         )
         self.query_one("#vm-install", Static).update(row["install_detail"] if row["installed"] else "")
-        self.query_one("#primary", Button).label = primary_action(row)[0]
+        actions = quick_actions(row)[:-1]
+        for index, selector in enumerate(("#primary", "#quick-1", "#quick-2")):
+            button = self.query_one(selector, Button)
+            button.display = index < len(actions)
+            if button.display:
+                button.label = actions[index][0]
+        if isinstance(self.app.focused, Button) and not self.app.focused.display:
+            self.query_one("#primary", Button).focus()
+
+    def move_action(self, offset: int) -> None:
+        buttons = [button for button in self.query(Button) if button.display and not button.disabled]
+        if buttons:
+            focused = self.app.focused
+            index = buttons.index(focused) if isinstance(focused, Button) and focused in buttons else 0
+            buttons[(index + offset) % len(buttons)].focus()
+
+    def action_previous_action(self) -> None:
+        self.move_action(-1)
+
+    def action_next_action(self) -> None:
+        self.move_action(1)
+
+    def action_profiles(self) -> None:
+        if isinstance(self.app.screen, DetailsScreen):
+            self.app.pop_screen()
+        self.app.query_one(ProfileTable).focus()
 
     @on(Button.Pressed)
     def request_action(self, event: Button.Pressed) -> None:
         event.stop()
         if self.row is not None:
-            action = primary_action(self.row)[1] if event.button.id == "primary" else "menu"
+            index = {"primary": 0, "quick-1": 1, "quick-2": 2, "menu": -1}[event.button.id or "menu"]
+            action = quick_actions(self.row)[index][1]
             self.post_message(self.Requested(self.row["name"], action))
 
 
@@ -91,6 +128,9 @@ class DetailsScreen(ModalScreen[None]):
             yield VMDetails(self.row)
             yield Button("Back · Esc", id="close-details")
 
+    def on_mount(self) -> None:
+        self.query_one("#primary", Button).focus()
+
     @on(Button.Pressed, "#close-details")
     def close_details(self) -> None:
         self.dismiss()
@@ -101,10 +141,12 @@ class HelpScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="help-dialog"):
-            yield Static("Dashboard preview", classes="dialog-title")
+            yield Static("Dashboard", classes="dialog-title")
             yield Static(
                 "↑ / ↓      Select a profile\n"
-                "Enter      Profile details and actions\n"
+                "→ / Enter  Move to profile actions\n"
+                "↑ / ↓      Move between actions\n"
+                "←          Return to the profile list\n"
                 "/          Search name, description or family\n"
                 "Tab        Move between controls\n"
                 "F5         Refresh (also automatic every 15s)\n"
@@ -116,7 +158,7 @@ class HelpScreen(ModalScreen[None]):
                 "Incomplete: an installation did not finish.\n\n"
                 "ISO availability is separate from installation state.\n"
                 "Disk sizes describe host allocation and virtual capacity.\n\n"
-                "Actions open the existing VM menus and confirmations.\n"
+                "Menus and confirmations use this same frontend.\n"
                 "Close them to return here with your search preserved.",
                 markup=False,
             )
@@ -128,8 +170,8 @@ class HelpScreen(ModalScreen[None]):
 
 
 class Dashboard(App[None]):
-    TITLE = "QEMU ISO Lab · Preview"
-    CSS_PATH = "tui_preview.tcss"
+    TITLE = "QEMU ISO Lab"
+    CSS_PATH = "tui_textual.tcss"
     ENABLE_COMMAND_PALETTE = False
     BINDINGS = [
         Binding("slash", "search", "Search"),
@@ -154,7 +196,7 @@ class Dashboard(App[None]):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="masthead"):
-            yield Static("QEMU [bold]ISO Lab[/bold]  [dim]PREVIEW[/dim]", id="brand")
+            yield Static("QEMU [bold]ISO Lab[/bold]", id="brand")
             yield Static("Loading profiles…", id="summary", markup=False)
         with Horizontal(id="toolbar"):
             yield Input(placeholder="Search profiles, distributions…  /", id="search")
@@ -284,7 +326,10 @@ class Dashboard(App[None]):
             return
         row = self.selected_row()
         if row is not None:
-            self.push_screen(DetailsScreen(row))
+            if self.has_class("compact"):
+                self.push_screen(DetailsScreen(row))
+            else:
+                self.query_one("#primary", Button).focus()
 
     def action_help(self) -> None:
         if not isinstance(self.screen, ModalScreen):
@@ -293,6 +338,8 @@ class Dashboard(App[None]):
     def action_escape(self) -> None:
         if isinstance(self.screen, ModalScreen):
             self.pop_screen()
+        elif isinstance(self.focused, Button) and self.focused.parent is self.query_one("#details"):
+            self.query_one(DataTable).focus()
         elif self.query_one("#search", Input).value:
             self.query_one("#search", Input).value = ""
             self.query_one(DataTable).focus()
@@ -316,7 +363,7 @@ class Dashboard(App[None]):
             with self.suspend():
                 code = self.bridge.run(name, action)
             if code:
-                self.notify(f"Classic UI exited with status {code}", severity="warning")
+                self.notify(f"Action exited with status {code}", severity="warning")
         except Exception as exc:
             self.notify(str(exc), title="Unable to open action", severity="error")
         finally:

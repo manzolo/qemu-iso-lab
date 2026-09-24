@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -42,7 +43,7 @@ def print_status(marker: str, text: str, ok: bool = True) -> None:
 
 
 def print_command(cmd: list[str]) -> None:
-    print(f"{style('$', BOLD, BLUE)} {' '.join(cmd)}")
+    print(f"{style('$', BOLD, BLUE)} {shlex.join(cmd)}")
 
 
 def print_note(text: str) -> None:

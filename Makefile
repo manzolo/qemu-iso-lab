@@ -2,16 +2,15 @@
 #
 # Day-to-day VM work goes through the CLI, not through make:
 #     vmctl --help            (./bin/vmctl --help before `make install-cli`)
-#     vmtui                   text UI (fzf, or dialog) over the same commands
+#     vmtui                   text UI (Textual dashboard; fzf/dialog with --classic)
 
 .DEFAULT_GOAL := help
 PREFIX ?= $(HOME)/.local
 # check-vms defaults to 300 s per phase, enough only for boot checks: a real install takes 10-60 min.
 TIMEOUT ?= 3600
 BIN := $(abspath bin)
-TUI_PYTHON ?= $(if $(wildcard .venv-tui/bin/python),.venv-tui/bin/python,python3)
 
-.PHONY: help setup install-cli uninstall-cli test lint check ci tui tui-preview init-local-profile validate-vms groups guides
+.PHONY: help setup install-cli uninstall-cli test lint check ci tui tui-classic init-local-profile validate-vms groups guides
 
 help: ## Show this help
 	@printf "\033[1mqemu-iso-lab: developer targets\033[0m\n\n"
@@ -35,19 +34,24 @@ uninstall-cli: ## Remove the symlinks created by install-cli
 test: ## Run the unit tests (pytest)
 	@python3 -m pytest -q tests/
 
-lint: ## Type-check the vmctl package (mypy --strict)
-	@python3 -m mypy vmctl/ --strict
+lint: ## Type-check the vmctl package (mypy --strict; the Textual modules with .venv-tui when present)
+	@python3 -m mypy vmctl/ --strict --exclude 'vmctl/tui_(textual|widgets)\.py$$'
+	@if [ -x .venv-tui/bin/python ]; then \
+		python3 -m mypy vmctl/tui_bridge.py vmctl/tui_textual.py vmctl/tui_widgets.py --strict \
+			--follow-imports=silent --python-executable=.venv-tui/bin/python; \
+	else printf '  skipped the Textual modules (no .venv-tui)\n'; fi
 
 check: lint test ## lint + test, run this before pushing
 
 ci: ## Unit tests exactly as GitHub Actions runs them
 	@python3 -m unittest discover -s tests -v
 
-tui: ## Open the text UI (same as running vmtui)
+tui: ## Open the text UI (same as running vmtui: Textual when installed, else fzf/dialog)
 	@./bin/vmtui
 
-tui-preview: ## Try the experimental Textual dashboard (optional tui dependency)
-	@$(TUI_PYTHON) ./bin/vmtui-preview
+tui-classic: ## Open the classic fzf/dialog menus
+	@./bin/vmtui --classic
+
 
 init-local-profile: ## Create vms/profiles/local.json from the example
 	@if [ -e vms/profiles/local.json ]; then \

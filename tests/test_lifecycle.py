@@ -520,6 +520,32 @@ class VmctlTests(BaseVmctlTestCase):
             with self.assertRaisesRegex(vmctl.lifecycle.VMError, "no VNC socket"):
                 self.vmctl.cmd_attach(self._attach_args())
 
+    def test_attach_waits_for_display_before_opening_viewer(self):
+        sock = mock.Mock()
+        sock.exists.side_effect = [False, True, True]
+        bridge = mock.Mock(url="vnc://127.0.0.1:5901", host="127.0.0.1", port=5901)
+        with mock.patch.object(vmctl.qemu, "vnc_socket_path", return_value=sock), \
+                mock.patch.object(vmctl.lifecycle, "running_qemu_pid", return_value=4242), \
+                mock.patch.object(vmctl.lifecycle.time, "sleep") as sleep, \
+                mock.patch.object(vmctl.qemu, "UnixSocketBridge", return_value=bridge), \
+                mock.patch.object(vmctl.lifecycle, "viewer_command", return_value=["viewer"]), \
+                mock.patch.object(vmctl.lifecycle.subprocess, "run", return_value=mock.Mock(returncode=0)):
+            self.assertEqual(self.vmctl.cmd_attach(self._attach_args(wait=10)), 0)
+        sleep.assert_called_once_with(0.1)
+        bridge.start.assert_called_once()
+        bridge.close.assert_called_once()
+
+    def test_attach_wait_timeout_does_not_open_a_viewer_or_stop_vm(self):
+        with mock.patch.object(vmctl.lifecycle, "running_qemu_pid", return_value=4242), \
+                mock.patch.object(vmctl.lifecycle.time, "monotonic", side_effect=[0, 0, 2]), \
+                mock.patch.object(vmctl.lifecycle.time, "sleep"), \
+                mock.patch.object(vmctl.qemu, "UnixSocketBridge") as bridge, \
+                mock.patch.object(vmctl.lifecycle, "stop_qemu_process") as stop:
+            with self.assertRaisesRegex(vmctl.lifecycle.VMError, "no VNC socket"):
+                self.vmctl.cmd_attach(self._attach_args(wait=1))
+        bridge.assert_not_called()
+        stop.assert_not_called()
+
     def test_cmd_attach_dry_run_touches_nothing(self):
         self.create_disk()
         with mock.patch.object(vmctl.lifecycle, "is_bootstrap_vm_running") as running:

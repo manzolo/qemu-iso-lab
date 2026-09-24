@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# vmtui — dialog-based front end over `vmctl`.
+# vmtui — front end over `vmctl`: the Textual dashboard when available,
+# otherwise (or with --classic) the fzf/dialog menus of this script.
 #
 # Layout:
 #   dashboard (all VMs with live state) ─▶ VM workspace (context-aware actions)
@@ -22,6 +23,37 @@ require_command() {
 }
 
 require_command python3
+
+# Default frontend: the Textual dashboard, when Textual is importable (the repo's
+# .venv-tui first, then python3). --classic, VMTUI_UI=fzf or VMTUI_UI=dialog open
+# the menus below; the dashboard's F8 opens them too (it sources this file).
+textual_python() {
+    local candidate
+    local -a candidates=("$ROOT_DIR/.venv-tui/bin/python" python3)
+    [[ -n "${VMTUI_TEXTUAL_PYTHON:-}" ]] && candidates=("$VMTUI_TEXTUAL_PYTHON")
+    for candidate in "${candidates[@]}"; do
+        if "$candidate" -c 'import textual' >/dev/null 2>&1; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" && "${VMTUI_TEST_MODE:-0}" != "1" ]]; then
+    if [[ "${1:-}" == "--classic" ]]; then
+        shift
+        [[ "${VMTUI_UI:-}" == "textual" ]] && unset VMTUI_UI
+    elif [[ -z "${VMTUI_UI:-}" || "${VMTUI_UI}" == "textual" ]]; then
+        if python_bin=$(textual_python); then
+            exec "$python_bin" "$ROOT_DIR/bin/vmtui-textual"
+        fi
+        if [[ "${VMTUI_UI:-}" == "textual" ]]; then
+            printf 'error: VMTUI_UI=textual needs Textual (python3 -m venv .venv-tui && .venv-tui/bin/python -m pip install -e ".[tui]")\n' >&2
+            exit 1
+        fi
+    fi
+fi
 
 # UI backend: fzf when installed (fuzzy search, type-to-filter), dialog otherwise.
 # Force one with VMTUI_UI=fzf or VMTUI_UI=dialog.
@@ -54,8 +86,9 @@ case "$UI_BACKEND" in
         fi
         ;;
     dialog) require_command dialog ;;
+    textual) ;; # Textual dashboard widgets; snapshot reads need no UI dependency.
     *)
-        printf 'error: VMTUI_UI must be "fzf" or "dialog", got: %s\n' "$UI_BACKEND" >&2
+        printf 'error: VMTUI_UI must be "fzf", "dialog" or "textual", got: %s\n' "$UI_BACKEND" >&2
         exit 1
         ;;
 esac
@@ -331,10 +364,20 @@ fzf_input() {
 
 # ---- backend-neutral widgets ----------------------------------------------
 
+textual_widget() {
+    "${VMTUI_TEXTUAL_PYTHON:-python3}" "$ROOT_DIR/bin/vmtui-textual" --widget "$@"
+}
+
 # menu_choose TITLE PROMPT TAG DESC [TAG DESC ...]
 # Tunables (env): MENU_HEIGHT MENU_WIDTH MENU_LIST_HEIGHT MENU_NO_TAGS
 #                 MENU_DEFAULT_ITEM MENU_CANCEL_LABEL MENU_OK_LABEL
 menu_choose() {
+    if [[ "$UI_BACKEND" == "textual" ]]; then
+        MENU_DEFAULT_ITEM="${MENU_DEFAULT_ITEM:-}" MENU_REFRESH="${MENU_REFRESH:-0}" \
+            MENU_NO_TAGS="${MENU_NO_TAGS:-0}" MENU_DEVICE_PREVIEW="${MENU_DEVICE_PREVIEW:-0}" \
+            textual_widget menu "$@"
+        return
+    fi
     if [[ "$UI_BACKEND" == "fzf" ]]; then
         fzf_menu "$@"
         return
@@ -392,6 +435,10 @@ menu_choose_fit() {
 }
 
 msg_box() {
+    if [[ "$UI_BACKEND" == "textual" ]]; then
+        textual_widget message "$@"
+        return
+    fi
     if [[ "$UI_BACKEND" == "fzf" ]]; then
         fzf_msg "$@"
         return
@@ -401,6 +448,14 @@ msg_box() {
 
 confirm_box() {
     local title="$1" message="$2"
+    if [[ "$UI_BACKEND" == "textual" ]]; then
+        if [[ "${CONFIRM_DESTRUCTIVE:-0}" == "1" ]]; then
+            title="DANGER — $title"
+            message="WARNING: DESTRUCTIVE DISK WRITE\n\nALL DATA ON ${CONFIRM_TARGET:-THE TARGET DISK} WILL BE LOST.\nThis operation cannot be undone.\n\n$message"
+        fi
+        CONFIRM_DESTRUCTIVE="${CONFIRM_DESTRUCTIVE:-0}" textual_widget confirm "$title" "$message"
+        return
+    fi
     local -a options=()
     if [[ "${CONFIRM_DESTRUCTIVE:-0}" == "1" ]]; then
         title="DANGER — $title"
@@ -420,6 +475,10 @@ confirm_box() {
 }
 
 input_box() {
+    if [[ "$UI_BACKEND" == "textual" ]]; then
+        textual_widget input "$@"
+        return
+    fi
     if [[ "$UI_BACKEND" == "fzf" ]]; then
         fzf_input "$@"
         return
@@ -1517,7 +1576,7 @@ PYTHON
     )
     local -a items=()
     while (( $# >= 2 )); do
-        if [[ "$UI_BACKEND" == fzf ]]; then
+        if [[ "$UI_BACKEND" == fzf || "$UI_BACKEND" == textual ]]; then
             items+=("$1" "$2")
         else
             # dialog uses the same compact table; full details follow on confirmation.
@@ -1588,6 +1647,23 @@ run_vmctl() {
     if is_detached_install "$1"; then
         run_vmctl_background "$@"
         return $?
+    fi
+    if [[ "$UI_BACKEND" == "textual" ]]; then
+        case "$1" in
+            start|attach)
+                local widget=command arg
+                if [[ "$1" == start ]]; then
+                    widget=desktop
+                    for arg in "$@"; do
+                        case "$arg" in
+                            --headless|--background|--spice-port*) widget=command ;;
+                        esac
+                    done
+                fi
+                textual_widget "$widget" "$current_vm" "$VMCTL" "$@"
+                return $?
+                ;;
+        esac
     fi
     clear
     if [[ "$1" != flash ]]; then
@@ -2670,6 +2746,12 @@ run_dashboard_hotkey() {
         [[ "${entry%%=*}" == "$key" ]] && action="${entry#*=}"
     done < <(vm_menu_hotkeys)
     [[ -n "$action" ]] || return 0
+    run_vm_menu_action "$action"
+}
+
+# Recheck quick actions against the current menu, including calls from the Textual dashboard.
+run_vm_menu_action() {
+    local action="$1" vm="$current_vm"
     local -a menu_items=()
     mapfile -t menu_items < <(build_vm_menu_items)
     local offered=0 i hidden

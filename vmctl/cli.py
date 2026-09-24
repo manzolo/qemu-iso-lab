@@ -297,6 +297,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--viewer", help="viewer command to run; {url}, {host} and {port} are substituted (default: remote-viewer, vncviewer or remmina, whichever exists)")
     p.add_argument("--port", type=int, help="local TCP port for the VNC bridge (default: any free port)")
     p.add_argument("--no-viewer", action="store_true", help="only expose the display on 127.0.0.1 and print the address; Ctrl-C to detach")
+    p.add_argument("--wait", type=float, default=0, help="wait up to this many seconds for a newly started VM's display")
     p.set_defaults(func=lifecycle.cmd_attach)
 
     p = _add(subparsers, "agent", help="talk to the QEMU guest agent of a running VM (no SSH needed)")

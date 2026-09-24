@@ -2,273 +2,133 @@
 
 [![CI](https://github.com/manzolo/qemu-iso-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/manzolo/qemu-iso-lab/actions/workflows/ci.yml)
 
-Test any Linux distro in a QEMU/KVM virtual machine from one JSON profile:
-ISO download, disk, firmware, unattended install and SSH provisioning,
-driven by a single CLI (`vmctl`) or a dashboard TUI (`vmtui`).
+Install and run **Linux, BSD and Windows** guests on QEMU/KVM from one JSON
+profile each: ISO download and checksum, disk, firmware, a **zero-click
+install** and SSH provisioning. 96 profiles, from Arch, Debian, Fedora, NixOS
+and every Ubuntu LTS since 8.04 to Windows 11, 10, 7, XP, 2000 and NT 4,
+FreeBSD, pfSense and ReactOS. One CLI (`vmctl`) and one terminal dashboard
+(`vmtui`) drive all of it.
 
-![vmtui dashboard: every profile with live state, RAM/CPU, SSH port and disk size](docs/screenshots/vmtui-dashboard.png)
-
-## Contents
-
-- [Why](#why)
-- [Quick start](#quick-start)
-- [What do you want to do?](#what-do-you-want-to-do)
-- [The catalog](#the-catalog)
-- [Unattended installs](#unattended-installs)
-- [The TUI](#the-tui)
-- [Make it yours](#make-it-yours)
-- [Documentation](#documentation)
-- [Development](#development)
-- [Repository layout](#repository-layout)
-
-## Why
-
-- **One profile, one VM.** Every guest is a JSON object: ISO source (with
-  mirror discovery and checksum validation), disk, EFI or BIOS firmware, RAM,
-  CPUs, network and video variants. `vmctl show <vm>` prints it resolved.
-- **Zero-click installs.** Ubuntu (autoinstall), Debian (preseed), AlmaLinux and
-  Fedora (kickstart), Arch (pacstrap script), Omarchy (cidata), Alpine
-  (setup-alpine) and Windows 11 (autounattend) install headless on a serial
-  console, boot, and finish with SSH provisioning: dotfiles, scripts, extra
-  packages. Ten minutes later
-  `vmctl shell <vm>` drops you inside.
-- **Isolated and reproducible.** Each VM lives under `artifacts/<vm>/`; ISOs
-  are cached once under `isos/`. `vmctl clean <vm>` force-stops QEMU without
-  waiting for guest shutdown, then removes the disk and generated artifacts.
-  A small Alpine guest boots in GitHub Actions on every push.
+![vmtui: search, filters, every profile with its state, and the actions that make sense for the selected VM](docs/screenshots/vmtui-dashboard.png)
 
 ## Quick start
 
-Host packages (Arch or Debian/Ubuntu shown):
+Host packages (Arch or Debian/Ubuntu):
 
 ```bash
 sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk ddrescue partclone util-linux
 sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk gddrescue partclone fdisk
 ```
 
-Clone, put the two commands on your `PATH`, check the host:
-
 ```bash
-git clone https://github.com/manzolo/qemu-iso-lab.git
-cd qemu-iso-lab
-make install-cli          # symlinks vmctl and vmtui into ~/.local/bin
-vmctl setup               # verifies qemu, qemu-img, OVMF, KVM
+git clone https://github.com/manzolo/qemu-iso-lab.git && cd qemu-iso-lab
+make install-cli                        # vmctl and vmtui into ~/.local/bin
+vmctl setup                             # checks qemu, OVMF, KVM and the helpers
+
+vmctl bootstrap-preseed debian-server   # Debian, zero clicks, ~10 minutes
+vmctl shell debian-server               # SSH into it
 ```
 
-Then pick a VM and go:
+The dashboard needs [Textual](https://textual.textualize.io/) (optional):
 
 ```bash
-vmctl list                          # 44 profiles
-vmctl provision debian-netinst      # ISO + disk + installer, click through it
-vmctl start debian-netinst          # boot the installed disk
-
-vmctl bootstrap-preseed debian-server   # or: install Debian with zero clicks...
-vmctl shell debian-server               # ...and SSH into it
+python3 -m venv .venv-tui && .venv-tui/bin/python -m pip install -e '.[tui]'
+vmtui                                   # without Textual: the fzf/dialog menus
 ```
 
-Optional tab completion of commands and VM names (zsh shown, `bash` works the same):
+Tab completion: `echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc` (bash works too).
 
-```bash
-echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc
-```
+## What it installs
 
-## What do you want to do?
+`vmctl list` prints every profile with its status and last live verification.
+Unattended flows run headless on a serial console, then boot the installed disk
+and run the profile's SSH provisioning.
 
-Everything goes through one command. `vmctl --help` shows the same map grouped
-by task, and `vmctl <command> --help` the options of one command. Every command
-accepts `--dry-run` in front of it.
+| Family | Examples | Zero-click install |
+|--------|----------|--------------------|
+| Ubuntu and flavours | 8.04 → 26.04 desktops, Kubuntu, Xubuntu, Lubuntu, MATE, Budgie, Cinnamon, Studio, niri | `bootstrap-unattended` (autoinstall), `bootstrap-preseed` (d-i, up to 18.04) |
+| Debian / Kali | server, GNOME, KDE, Xfce, Kali | `bootstrap-preseed` |
+| Fedora / RHEL | Workstation, KDE, Silverblue, Kinoite, AlmaLinux, Rocky, CentOS Stream | `bootstrap-kickstart` |
+| Arch family | Arch + niri/DMS/Noctalia, CachyOS, Omarchy, pearOS, NVIDIA recipes | `bootstrap-archinstall`, `bootstrap-omarchy`, `bootstrap-pearos` |
+| Others | openSUSE Tumbleweed, NixOS, Alpine, FreeBSD, Void | `bootstrap-autoyast`, `bootstrap-nixos`, `bootstrap-alpine`, `bootstrap-freebsd` |
+| **Windows** | 11, 10 (OpenSSH, virtio drivers, virtiofs share), 7 | `bootstrap-windows` |
+| **Windows retro** | XP, 2000, NT 4.0, 98 | `bootstrap-windowsxp`, `bootstrap-windows2000`, `bootstrap-windowsnt4`, `bootstrap-windows98` |
+| Network lab | pfSense router + Pi-hole + Lubuntu client on an isolated LAN | `vmctl lab install` |
+| ReactOS | 0.4.16 | `bootstrap-reactos` |
 
-| I want to...                                          | Run                                                      |
-|-------------------------------------------------------|----------------------------------------------------------|
-| check that this host can run the lab                  | `vmctl setup`                                            |
-| see which VMs exist and which are installed/running   | `vmctl list`, `vmctl status`                             |
-| read one profile as `vmctl` sees it                   | `vmctl show <vm>` (`--json` for scripts)                 |
-| install a distro by hand (ISO, disk, installer)       | `vmctl provision <vm>` then click through the installer  |
-| install Ubuntu with zero clicks, ready with SSH       | `vmctl bootstrap-unattended <vm>`                        |
-| install Omarchy with zero clicks, ready with NVIDIA   | `vmctl bootstrap-omarchy arch-omarchy-nvidia`      |
-| same for Debian / AlmaLinux / Fedora / Arch / Alpine  | `vmctl bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-archinstall`, `bootstrap-alpine <vm>` |
-| install Windows 11 with zero clicks, ready with OpenSSH | `vmctl bootstrap-windows windows11-unattended` (your ISO in `isos/`) |
-| boot a VM I already installed                         | `vmctl start <vm>` (`--headless --background` to detach) |
-| get a shell inside it / stop it                       | `vmctl shell <vm>`, `vmctl stop <vm>`                    |
-| watch the screen of a headless VM (even mid-bootstrap) | `vmctl attach <vm>` (VNC viewer, `--no-viewer` for the address only) |
-| get a command line without SSH (serial: ttyS0 login, pfSense menu) | `vmctl console <vm>` on a background VM, `Ctrl-]` to detach |
-| use an installed VM in virt-manager | `vmctl export-libvirt <vm>`; return with `vmctl unexport-libvirt <vm>` ([guide](docs/LIBVIRT.md)) |
-| save a matrix report with screenshots | `vmctl check-vms alpine-ci debian-server --restore --report --open` |
-| validate one category instead of the whole matrix | `vmctl list --groups`, then `vmctl check-vms --group ubuntu` (or `--group smoke`, one VM per install flow) |
-| keep a copy of an installed VM to go back to | `vmctl checkpoint create <vm> clean-install`, later `vmctl checkpoint restore <vm> clean-install` ([guide](docs/CHECKPOINTS.md)) |
-| get a second, independent VM out of an installed one | `vmctl clone <vm> <new-name>` (`--identity regenerate` for a new hostname/machine-id/host keys; [guide](docs/CLONE.md)) |
-| test every unattended flow without losing my VMs      | `vmctl check-vms --restore` (stashes disks, runs, restores) |
-| re-run the SSH provisioning steps of a profile        | `vmctl post-install <vm>`                                |
-| prove a VM still boots (CI-style)                     | `vmctl boot-check <vm>`, `vmctl check-vms`               |
-| write a VM to a real USB disk, or import one          | `vmctl flash`, `vmctl import-device` (destructive, sudo; [guide](docs/IMPORT_DISKS.md)) |
-| import only allocated filesystem blocks, with resume | `vmctl import-device <vm> --device /dev/sdX --confirm-device /dev/sdX --allocated-only` ([guide](docs/IMPORT_DISKS.md)) |
-| flash only the blocks the image allocates (fast)      | `vmctl flash <vm> --device /dev/sdX --confirm-device /dev/sdX --force-target --allocated-only` ([guide](docs/IMPORT_DISKS.md)) |
-| free disk space                                       | `vmctl clean <vm>`, `vmctl clean --all`, `vmctl delete-iso <vm>` |
-| see what a command would do without doing it          | `vmctl --dry-run <command> <vm>`                         |
-| add my own user, key and dotfiles to the VMs          | edit `vms/profiles/local.json` ([Make it yours](#make-it-yours)) |
-| add a new VM                                          | add a profile to `vms/profiles/*.json` ([docs/PROFILES.md](docs/PROFILES.md#adding-a-new-vm)) |
-| hack on `vmctl` itself                                | `make check`, then [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+Windows media have no public URL: put your own ISO in `isos/` (retro keys go in
+`local.json`). Every profile also offers a manual install:
+`vmctl provision <vm>` boots the ISO on a fresh disk.
 
-By default `vmctl flash` writes every sector of the image's virtual size, so a
-sparse image of a large disk spends most of its time zeroing free space (a 477
-GiB image holding 15 GiB of data writes 477 GiB). `--allocated-only` copies just
-the blocks the guest filesystems allocate, mapped with partclone and written with
-ddrescue like the allocated import; it requires `--force-target`, a stopped VM
-and temporary space in `artifacts/<vm>/`, and leaves the bytes already on the
-target wherever the guest has free space.
+## Everyday commands
 
-`vmctl flash` always repairs GPT silently after copying. Expansion is optional:
-with at least 1 GiB of trailing free space, a terminal prompt offers to expand a
-supported final NTFS partition (default **No**). Use `--expand` to accept without
-asking or `--no-expand` to preserve partition/filesystem sizes. With non-TTY
-stdin and neither flag, it preserves sizes and reports the unused space.
-Recovery, BitLocker and unsupported filesystems are left unchanged.
-See [docs/IMPORT_DISKS.md](docs/IMPORT_DISKS.md) for checks, dependencies and failure handling.
+| I want to... | Run |
+|--------------|-----|
+| see the VMs and their state | `vmctl list`, `vmctl status`, `vmctl show <vm>` |
+| boot, enter, stop | `vmctl start <vm>` (`--headless --background`), `vmctl shell <vm>`, `vmctl stop <vm>` |
+| watch a headless VM, also mid-install | `vmctl attach <vm>` (VNC), `vmctl console <vm>` (serial) |
+| keep a copy to go back to | `vmctl checkpoint create <vm> clean`, then `restore` ([guide](docs/CHECKPOINTS.md)) |
+| make an independent second VM | `vmctl clone <vm> <new-name>` ([guide](docs/CLONE.md)) |
+| hand a VM to virt-manager | `vmctl export-libvirt <vm>` ([guide](docs/LIBVIRT.md)) |
+| write to a USB disk, or import one | `vmctl flash`, `vmctl import-device` ([guide](docs/IMPORT_DISKS.md)) |
+| validate the install flows | `vmctl check-vms --group smoke --restore --report --open` |
+| free space | `vmctl clean <vm>`, `vmctl delete-iso <vm>` |
 
-## The catalog
-
-95 tracked profiles in `vms/profiles/*.json`, one file per family. `vmctl list`
-prints them all; the table shows what each family offers.
-
-| Family | Profiles | Highlights | Unattended |
-|--------|----------|------------|------------|
-| Arch | `arch`, `endeavouros`, `pearos-nicecore`, `pearos-nicecore-unattended`, `cachyos-live`, `cachyos-desktop`, `cachyos-nvidia`, `arch-noctalia`, `arch-dms`, `arch-dms-nvidia`, `arch-omarchy-nvidia` | niri + Noctalia, niri + DankMaterialShell, Omarchy + Hyprland, NVIDIA open DKMS recipes, pearOS macOS-like Plasma 6 desktop (ISO supplied by hand; installed unattended by unpacking the live squashfs, like its own Calamares) | `bootstrap-archinstall`, `bootstrap-omarchy`, `bootstrap-pearos` |
-| Debian / Ubuntu | `debian-netinst`, `debian-efi`, `debian-bios`, `debian-gnome-live`, `debian-server`, `ubuntu-desktop-live`, `ubuntu-server-live`, `ubuntu-server-ci`, `ubuntu-niri`, `popos-cosmic`, `kde-neon-user`, `linuxmint-cinnamon` | Debian 13, Ubuntu 26.04, niri on Ubuntu, COSMIC | `bootstrap-preseed`, `bootstrap-unattended` |
-| Ubuntu desktop flavors | `lubuntu-24.04`, `kubuntu-24.04`, `xubuntu-24.04`, `ubuntu-mate-24.04`, `ubuntu-budgie-24.04` | LXQt, Plasma, Xfce, MATE and Budgie on the 24.04 LTS server ISO, display-manager autologin (kvm-lab's flavor family) | `bootstrap-unattended` |
-| Ubuntu desktop history | `ubuntu-8.04-desktop`, `ubuntu-10.04-desktop`, `ubuntu-12.04-desktop`, `ubuntu-14.04-desktop`, `ubuntu-16.04-desktop`, `ubuntu-18.04-desktop`, `ubuntu-20.04-desktop`, `ubuntu-22.04-desktop`, `ubuntu-24.04-desktop` | every Ubuntu desktop LTS from Hardy to Noble on the official desktop ISO (vendor checksums from old-releases / releases), BIOS + PATA + e1000 for 8.04, UEFI from 14.04 on; `ubuntu-8.04-unattended`, `ubuntu-10.04-unattended`, `ubuntu-12.04-unattended`, `ubuntu-14.04-unattended`, `ubuntu-16.04-unattended`, `ubuntu-18.04-unattended` install the same desktops from the d-i alternate/server media with autologin and legacy-SSH provisioning; `ubuntu-20.04-unattended`, `ubuntu-22.04-unattended` and `ubuntu-gnome-24.04` do it with autoinstall + `ubuntu-desktop` | `bootstrap-preseed`, `bootstrap-unattended` |
-| Fedora / RHEL | `fedora-workstation`, `fedora-cinnamon`, `fedora-xfce`, `fedora-server`, `fedora-server-efi`, `fedora-niri-dms`, `fedora-silverblue`, `almalinux-minimal`, `almalinux-server`, `rocky-9` | Fedora 42/44, niri + DankMaterialShell on Fedora, immutable Silverblue (ostree), AlmaLinux 10.1, Rocky Linux 9 | `bootstrap-kickstart` |
-| openSUSE / NixOS / Void | `opensuse-tumbleweed-autoyast`, `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net`, `opensuse-slowroll`, `nixos-server`, `nixos-gnome`, `nixos-graphical`, `nixos-minimal`, `void-xfce` | rolling and declarative distros, Tumbleweed GNOME installed unattended with AutoYaST, NixOS installed from a rendered `configuration.nix` (server and GNOME) | `bootstrap-autoyast`, `bootstrap-nixos`, interactive |
-| Alpine / BSD / Kali | `alpine-ci`, `alpine-ci-installed`, `alpine-niri`, `freebsd`, `kali-live` | the CI smoke-test guests, niri on Alpine 3.23 (musl, OpenRC, seatd), FreeBSD 14.3 | `bootstrap-alpine` |
-| ReactOS | `reactos` | ReactOS 0.4.16 (BIOS, PATA disk, e1000, AC97, one CPU) from the SourceForge zip unpacked by hand into `isos/`; unattended install through `unattend.inf` on a rebuilt BootCD, install only (no SSH server) | `bootstrap-reactos` |
-| Windows | `windows11-unattended`, `windows10-unattended`, `windows7-unattended`, `windows10-template`, `windows11-template` | unattended Windows 11 and 10 (autounattend.xml, virtio drivers, OpenSSH), Windows 7 Ultimate (BIOS/MBR, install only), import targets for physical disks (`vmctl import-device`) | `bootstrap-windows` |
-| Network lab | `pfsense-lab`, `pihole-lab`, `lubuntu-lab` | pfSense CE 2.7.2 router + Pi-hole v6 + Lubuntu client on an isolated LAN segment (kvm-lab's network lab on plain QEMU; libvirt network after export) | `vmctl lab install`, `bootstrap-pfsense`, `bootstrap-unattended` |
-
-Profiles ending in `-local` are full desktop recipes with SSH provisioning,
-meant to be personalised through `local.json`. Profiles named `*-ci` are tiny
-guests that boot under TCG in GitHub Actions.
-
-## Unattended installs
-
-Eight installers run headless on a serial console. Each `bootstrap-*` command
-generates the answer file, extracts kernel and initrd from the ISO, boots the
-installer, waits for a completion token, starts the installed VM in the
-background and runs the profile's SSH provisioning.
-
-```bash
-vmctl bootstrap-unattended ubuntu-niri          # Ubuntu autoinstall + cloud-init
-vmctl bootstrap-preseed debian-server                 # Debian preseed
-vmctl bootstrap-kickstart almalinux-server            # AlmaLinux / RHEL kickstart from the ISO
-vmctl bootstrap-kickstart fedora-niri-dms       # Fedora kickstart from the netinst + online repo
-vmctl bootstrap-kickstart fedora-silverblue           # Fedora Silverblue: ostreesetup instead of %packages
-vmctl bootstrap-autoyast opensuse-tumbleweed-autoyast # openSUSE Tumbleweed: AutoYaST profile on a seed CD
-vmctl bootstrap-alpine alpine-niri                    # Alpine: setup-alpine answer file + chroot steps
-vmctl bootstrap-archinstall arch-dms            # Arch: pacstrap script on the live ISO
-vmctl bootstrap-omarchy arch-omarchy-nvidia     # Omarchy: official cidata mechanism
-vmctl bootstrap-windows windows11-unattended          # Windows 11: autounattend.xml on a seed CD, prompt-free ISO
-vmctl bootstrap-pfsense pfsense-lab                   # pfSense CE: scripted bsdinstall, rendered config.xml (network lab)
-vmctl bootstrap-reactos reactos                       # ReactOS: unattend.inf on a rebuilt BootCD, both Setup stages, install only
-vmctl lab install                                     # the whole network lab: router -> Pi-hole -> client
-```
-
-How each flow works, and the sequencing rule every flow must respect, is in
-[docs/UNATTENDED.md](docs/UNATTENDED.md).
+Every command accepts `--dry-run`; `vmctl --help` lists them all by task.
 
 ## The TUI
 
-Try the optional Textual layout with `make tui-preview`: search and filters above
-the list, contextual details beside it and installation activity below. See
-[preview setup and controls](docs/VMTUI.md#experimental-textual-dashboard).
-`make tui` continues to open the classic interface.
+`vmtui` shows every profile with its live state. Right or Enter moves to the
+selected VM's actions: install before there is a disk, boot after, display, SSH
+and stop while it runs. **All actions…** opens the full menu, grouped and
+filterable, with the suggested next step preselected. Every action runs a
+`vmctl` command, and the dashboard shows the command line so you can copy it.
 
-`vmtui` is a dashboard over the same `vmctl` commands: fzf when installed,
-`dialog` otherwise. Every action echoes the `vmctl` command it runs, so it
-doubles as a discovery tool for the CLI.
+![All actions: the full contextual menu of a running VM](docs/screenshots/vmtui-actions.png)
 
-![vmtui VM menu: one-line state summary and a contextual menu with the suggested next step preselected](docs/screenshots/vmtui-vm-menu.png)
+`/` searches names, descriptions and families, so `windows` lists every
+Windows profile:
 
-Opening a VM shows its state in one line and a single contextual menu grouped
-into INSTALL, RUN, MAINTENANCE and ADVANCED. Only actions that make sense right
-now are listed, and the suggested next step is preselected, so Enter does the
-obvious thing: install when there is no disk, boot when it is stopped, SSH when
-it is running. Details, filters, video profiles and remote SPICE viewing are in
+![Search: the Windows profiles, with the unattended install ready for the selected one](docs/screenshots/vmtui-windows.png)
+
+F8 (or `vmtui --classic`) opens the fzf/dialog menus, which also hold the
+tools and the network lab. Controls, video profiles and remote SPICE:
 [docs/VMTUI.md](docs/VMTUI.md).
 
 ## Make it yours
 
-Tracked profiles use a generic guest user `lab` (password `lab`) and write
-`{{user}}` wherever the name appears in a path or command. Put your identity in
-the git-ignored `vms/profiles/local.json` and every profile follows:
+Tracked profiles use a generic guest user `lab` (password `lab`). Your identity,
+SSH key, dotfiles and extra commands go in the git-ignored
+`vms/profiles/local.json`, deep-merged over every profile:
 
 ```bash
-make init-local-profile      # copies vms/profiles/local.json.example
-$EDITOR vms/profiles/local.json
+make init-local-profile && $EDITOR vms/profiles/local.json
 ```
 
-Replace `YOUR_USER`, the password hash (`openssl passwd -6`) and the SSH key
-path; add `copy_from_host` entries for your dotfiles and `post_install_run`
-commands for anything else. `local.json` is deep-merged over the tracked
-profiles, so you only write what differs. See
-[docs/PROVISIONING.md](docs/PROVISIONING.md).
-
-## Claude Code slash commands
-
-`.claude/commands/` gives a Claude Code session in this checkout six shortcuts for the
-everyday operations, each a short brief that wraps `vmctl` the way the maintainer runs it:
-`/vm-status [vm]`, `/vm-desktop <vm>`, `/vm-unattended <vm> [--clean]` (picks the bootstrap
-flow from the profile, runs it in the background, watches the log), `/vm-ssh <vm> <cmd>`
-(project key, `BatchMode`, the legacy `ssh_options`), `/vm-shot <vm>` (a QMP screenshot,
-also of a running installer) and `/vm-stop <vm>`.
+See [docs/PROVISIONING.md](docs/PROVISIONING.md).
 
 ## Documentation
 
-[docs/README.md](docs/README.md) is the map: what to read, in which order, for
-using the lab, for the printable guides and for developing. The pages:
-
-| Page | What it covers |
-|------|----------------|
-| [docs/PROFILES.md](docs/PROFILES.md) | The profile model: ISO sources and discovery, disk, EFI/BIOS firmware, video variants, artifacts, Windows import templates, adding a new VM |
-| [docs/UNATTENDED.md](docs/UNATTENDED.md) | The five unattended flows step by step, the completion-token rule, boot checks and the local validation matrix |
-| [docs/NETWORK-LAB.md](docs/NETWORK-LAB.md) | The network lab: pfSense + Pi-hole + client on an isolated segment, `networks`/phases, host access through the router, libvirt road, differences from kvm-lab |
-| [docs/LIBVIRT.md](docs/LIBVIRT.md) | `export-libvirt` / `unexport-libvirt`: hand an installed VM to virt-manager and back |
-| [docs/CHECKPOINTS.md](docs/CHECKPOINTS.md) | `vmctl checkpoint`: named full copies of a stopped VM's disk and EFI vars, what they protect against, their relation with `clean` |
-| [docs/CLONE.md](docs/CLONE.md) | `vmctl clone`: an independent copy as a new local profile (own disk, ports, MACs) and the explicit choice about the guest's identity |
-| [docs/guides/](docs/guides/README.md) | Printable step-by-step guides in reading order, in English (`en/`) and Italian (`it/`): every flow, working inside the guests, the network lab schema, the virsh cheat sheet; `make guides` builds one manual PDF per language plus one PDF per guide |
-| [docs/PROVISIONING.md](docs/PROVISIONING.md) | `cloud_init`, `ssh_provision`, `autoinstall` and `omarchy_config` fields, `copy_from_host`, `post_install_run`, sudo, guest identity and `local.json` |
-| [docs/VMTUI.md](docs/VMTUI.md) | The TUI in depth: dashboard, filters, contextual menu, video profiles, post-install chaining, remote SPICE |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | One-page mental map of the code: modules, import order, who owns what |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Developer loop, local checks before pushing, CI jobs, test isolation rules |
-| [docs/CI_BOOT_STRATEGY.md](docs/CI_BOOT_STRATEGY.md) | Why the smoke test boots Alpine under TCG and how the ISO is discovered |
-| [docs/PROFILE_TODO.md](docs/PROFILE_TODO.md) | Planned profile coverage |
-| [docs/VENTOY.md](docs/VENTOY.md) | Reusing a guest disk on a Ventoy USB key |
+[docs/README.md](docs/README.md) is the map. The main pages:
+[PROFILES](docs/PROFILES.md) (the profile model, adding a VM) ·
+[UNATTENDED](docs/UNATTENDED.md) (every install flow) ·
+[PROVISIONING](docs/PROVISIONING.md) ·
+[VMTUI](docs/VMTUI.md) ·
+[NETWORK-LAB](docs/NETWORK-LAB.md) ·
+[IMPORT_DISKS](docs/IMPORT_DISKS.md) ·
+[ARCHITECTURE](docs/ARCHITECTURE.md) ·
+[DEVELOPMENT](docs/DEVELOPMENT.md).
+Printable step-by-step guides in English and Italian are in
+[docs/guides/](docs/guides/README.md) (`make guides` builds the PDFs).
 
 ## Development
 
 ```bash
-make check      # mypy --strict + full test suite, run before every push
-make validate-vms   # local only: reinstall every unattended profile, restore the disks, open the HTML report (hours)
-make ci         # the unittest invocation GitHub Actions runs
-make help       # every developer target
+make check          # mypy --strict + tests, before every push
+make validate-vms   # local only: reinstall every unattended profile, HTML report (hours)
+make help           # every developer target
 ```
 
 The `Makefile` holds developer targets only; user-facing behaviour is a `vmctl`
-subcommand. Tests never touch the host: no QEMU, no ISOs, no personal
-`local.json`. Rules and the CI layout are in
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-
-## Repository layout
-
-```text
-.
-├── bin/            vmctl, vmtui, ventoy-prep, ventoy-copy
-├── vmctl/          the Python package behind vmctl
-├── vms/
-│   ├── profiles/       *.json catalog, local.json (git-ignored), local.json.example
-│   └── profile-files/  scripts and dotfiles deployed by post-install
-├── docs/           the pages listed above
-├── tests/          unit tests (unittest / pytest)
-├── isos/           cached ISOs (git-ignored)
-├── artifacts/      per-VM disks, firmware vars, seeds, logs (git-ignored)
-└── legacy/         the original CachyOS bash prototypes, kept for reference
-```
-
-`vmctl list` shows each profile's status (`manual`, `unattended`, `experimental`) and last recorded live PASS date. These describe the recipe and its history; they do not certify a new change. The HTML validation report keeps this metadata separate from the current run result. See [profile status and backlog](docs/PROFILE_TODO.md).
+subcommand. Tests never touch the host. `.claude/commands/` has Claude Code
+shortcuts for this checkout (`/vm-status`, `/vm-unattended`, `/vm-ssh`, `/vm-shot`, ...).

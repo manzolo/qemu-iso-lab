@@ -65,7 +65,9 @@ VMDetails {
 #vm-status { height: auto; margin-bottom: 1; }
 #vm-facts { height: auto; color: #c3cfdd; margin-bottom: 1; }
 #vm-install { height: auto; color: #a6b4c8; margin-bottom: 1; }
-VMDetails Button { width: 100%; margin-bottom: 1; }
+VMDetails Button { width: 100%; height: 3; min-height: 3; margin-bottom: 0; }
+.action-hint { height: auto; color: #a6b4c8; margin: 1 0; }
+VMDetails:focus-within { border: round #84c9e7; }
 .detail-copy { height: 1fr; }
 #activity { height: 5; margin: 1 2; padding: 0 1; border-top: solid #304050; }
 #activity .eyebrow { margin-bottom: 0; }
@@ -92,3 +94,29 @@ ModalScreen { align: center middle; background: #000000 65%; }
 #detail-dialog VMDetails { width: 100%; margin: 0; border: none; padding: 0; }
 #close-details, #close-help { width: 100%; margin-top: 1; }
 .dialog-title { text-style: bold; color: #84c9e7; margin-bottom: 1; }
+#workflow {
+    margin: 1 2;
+    padding: 1 2;
+    height: 1fr;
+    border: round #84c9e7;
+    background: #18222e;
+}
+#workflow-copy { height: 1fr; }
+#workflow-copy Static { height: auto; }
+.workflow-menu #workflow-copy { height: auto; max-height: 25%; }
+#workflow-search { margin: 1 0; }
+#workflow-options { height: 1fr; background: #151f2a; border: none; }
+#workflow-options > .option-list--option { padding: 0 1; }
+#workflow-options > .option-list--option-highlighted { background: #285269; color: #ffffff; }
+#workflow-device { height: auto; max-height: 25%; overflow-y: auto; color: #a6b4c8; }
+#workflow-input { margin: 1 0; }
+#workflow-buttons { height: 3; margin-top: 1; }
+#workflow-buttons Button { height: 3; min-height: 3; margin-right: 2; }
+.workflow-compact #workflow { margin: 0 1; padding: 0 1; }
+.workflow-compact #workflow .dialog-title { margin-bottom: 0; }
+.workflow-compact.workflow-menu #workflow-copy { max-height: 3; }
+.workflow-compact #workflow-search { margin: 0; }
+.workflow-compact #workflow-buttons { margin-top: 0; }
+#command-status { height: auto; margin-bottom: 1; color: #84c9e7; }
+#command-status.error { color: #f08a8a; }
+#command-output { height: 1fr; background: #151f2a; padding: 0 1; }
