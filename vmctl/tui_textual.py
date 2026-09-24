@@ -15,15 +15,12 @@ from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Static
 
-from vmctl.tui_bridge import ClassicBridge, Facts, quick_actions, resources, status_label, visible_rows
+from vmctl.tui_bridge import ClassicBridge, Facts, primary_action, quick_actions, resources, status_label, visible_rows
 
 
 class ProfileTable(DataTable[Text | str]):
-    BINDINGS = [Binding("enter", "select_cursor", "Actions"),
-                Binding("right", "open_actions", "Actions", show=False, priority=True)]
-
-    def action_open_actions(self) -> None:
-        self.action_select_cursor()
+    BINDINGS = [Binding("enter", "select_cursor", "Default action"),
+                Binding("right", "app.details", "Actions", show=False, priority=True)]
 
 
 class VMDetails(Vertical):
@@ -144,7 +141,8 @@ class HelpScreen(ModalScreen[None]):
             yield Static("Dashboard", classes="dialog-title")
             yield Static(
                 "↑ / ↓      Select a profile\n"
-                "→ / Enter  Move to profile actions\n"
+                "Enter      Run the default profile action\n"
+                "→          Move to profile actions\n"
                 "↑ / ↓      Move between actions\n"
                 "←          Return to the profile list\n"
                 "/          Search name, description or family\n"
@@ -175,7 +173,7 @@ class Dashboard(App[None]):
     ENABLE_COMMAND_PALETTE = False
     BINDINGS = [
         Binding("slash", "search", "Search"),
-        Binding("enter", "details", "Details"),
+        Binding("enter", "primary", "Default action"),
         Binding("f5", "refresh", "Refresh"),
         Binding("f8", "classic", "Classic UI"),
         Binding("f1", "help", "Help"),
@@ -299,7 +297,7 @@ class Dashboard(App[None]):
 
     @on(DataTable.RowSelected)
     def open_selected(self) -> None:
-        self.action_details()
+        self.action_primary()
 
     @on(Input.Changed, "#search")
     def search_changed(self) -> None:
@@ -320,6 +318,13 @@ class Dashboard(App[None]):
 
     def action_search(self) -> None:
         self.query_one("#search", Input).focus()
+
+    def action_primary(self) -> None:
+        if isinstance(self.screen, ModalScreen):
+            return
+        row = self.selected_row()
+        if row is not None:
+            self.run_classic(row["name"], primary_action(row)[1])
 
     def action_details(self) -> None:
         if isinstance(self.screen, ModalScreen):

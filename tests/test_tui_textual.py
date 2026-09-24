@@ -186,7 +186,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(80, 30)) as pilot:
             await self.ready(app, pilot)
             self.assertFalse(app.query_one("#details").display)
-            await pilot.press("enter")
+            await pilot.press("right")
             self.assertIsInstance(app.screen, DetailsScreen)
             self.assertEqual(app.screen.query_one(VMDetails).row["name"], "ubuntu")
             app.action_refresh()
@@ -199,6 +199,22 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             await pilot.resize_terminal(120, 44)
             self.assertTrue(app.query_one("#details").display)
             self.assertEqual(app.selected, "ubuntu")
+
+    async def test_enter_runs_selected_profile_default_action(self):
+        for size in ((120, 44), (80, 30)):
+            with self.subTest(size=size):
+                app = self.make_app()
+                async with app.run_test(size=size) as pilot:
+                    await self.ready(app, pilot)
+                    with patch.object(app, "suspend", return_value=nullcontext()):
+                        for name, action in (("ubuntu", "alt-a"), ("debian", "alt-d"),
+                                             ("alpine", "alt-u")):
+                            app.bridge.run.reset_mock()
+                            await pilot.press("enter")
+                            await self.ready(app, pilot)
+                            app.bridge.run.assert_called_once_with(name, action)
+                            self.assertIsInstance(app.focused, DataTable)
+                            await pilot.press("down")
 
     async def test_action_returns_to_same_filtered_vm(self):
         app = self.make_app()

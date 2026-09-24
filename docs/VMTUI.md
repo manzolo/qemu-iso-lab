@@ -40,7 +40,8 @@ snapshot as the classic menus and refreshes every 15 seconds (or with F5),
 preserving the selected profile and search. ISO availability is shown separately
 from the disk's installation state. With disk includes empty prepared disks.
 
-Use **Right or Enter** to move from the profile list to its actions, **Up/Down**
+Use **Enter** in the profile list to run the selected profile's default action.
+Use **Right** to move from the profile list to its actions, **Up/Down**
 to choose a button, and **Left** to return to the list. At fewer than 100 columns,
 the actions open in a dialog with the same controls. Use `/` to search names,
 descriptions and families, Tab for other controls, and F1 for help. Escape returns
