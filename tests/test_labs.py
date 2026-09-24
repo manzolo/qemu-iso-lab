@@ -108,12 +108,15 @@ class GroupInstallTests(BaseVmctlTestCase):
              mock.patch.object(lifecycle, "clean_vm") as clean, \
              mock.patch.object(lifecycle, "cmd_stop") as stop, \
              mock.patch.object(lifecycle, "cmd_start") as start, \
+             mock.patch.object(lifecycle.pvecluster, "form") as form, \
              mock.patch.object(lifecycle.runtime, "confirm_default_no", return_value=extra.get("_answer", False)) as ask:
             try:
                 lifecycle.cmd_group(argparse.Namespace(**{k: v for k, v in namespace.items() if not k.startswith("_")}))
                 error = None
             except lifecycle.VMError as exc:
                 error = exc
+        # The cross-VM step reaches the guests over SSH: never in a unit test (CI has no lab).
+        self.last_form = form
         return error, install, clean, stop, start, ask
 
     def test_install_keeps_installed_members_and_installs_the_rest_in_start_order(self):
@@ -125,6 +128,7 @@ class GroupInstallTests(BaseVmctlTestCase):
         clean.assert_not_called()
         ask.assert_not_called()  # nothing to delete: no question
         self.assertEqual(stop.call_args_list[0].args[0].vm, "proxmox-ve")  # restart in the runtime phase
+        self.last_form.assert_called_once()  # then the cluster, once the stack is up
 
     def test_install_asks_before_redoing_an_unfinished_member(self):
         states = {"proxmox-ve": {"running": False, "install": "incomplete"},

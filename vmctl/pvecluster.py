@@ -17,7 +17,7 @@ import subprocess
 import time
 from typing import Any
 
-from vmctl import config, proxmox, runtime, ssh, ui
+from vmctl import config, proxmox, ssh, ui
 from vmctl.errors import VMError
 
 QUORUM_WAIT_SEC = 180
@@ -75,9 +75,24 @@ def commands(cfg: dict[str, Any], cluster: str, entry: dict[str, Any]) -> list[t
     return steps
 
 
+SSH_ATTEMPTS, SSH_RETRY_SEC = 6, 5
+
+
+def _ssh(vm: dict[str, Any], command: str) -> subprocess.CompletedProcess[str]:
+    """One remote command; a dropped connection (exit 255) is retried. Right after the stack
+    starts, a node that has just answered the SSH probe closed the next connection, twice, on
+    two runs (verified live); the command itself never ran, so repeating it is safe."""
+    for attempt in range(SSH_ATTEMPTS):
+        result = subprocess.run(ssh.remote_shell_cmd(vm, command), capture_output=True, text=True,
+                                stdin=subprocess.DEVNULL, timeout=600, check=False)
+        if result.returncode != 255 or attempt == SSH_ATTEMPTS - 1:
+            return result
+        time.sleep(SSH_RETRY_SEC)
+    raise AssertionError("unreachable")
+
+
 def _read(vm: dict[str, Any], command: str) -> str:
-    result = subprocess.run(ssh.remote_shell_cmd(vm, command), capture_output=True, text=True,
-                            stdin=subprocess.DEVNULL, timeout=120, check=False)
+    result = _ssh(vm, command)
     if result.returncode:
         raise VMError(f"'{command}' failed on {ssh.ssh_target(vm)[0]}:{ssh.ssh_target(vm)[1]}: "
                       f"{(result.stderr or result.stdout).strip()[-400:]}")
@@ -85,7 +100,15 @@ def _read(vm: dict[str, Any], command: str) -> str:
 
 
 def _run(vm: dict[str, Any], command: str, dry_run: bool) -> None:
-    runtime.run(ssh.remote_shell_cmd(vm, command, dry_run=dry_run), dry_run=dry_run)
+    ui.print_command(ssh.remote_shell_cmd(vm, command, dry_run=dry_run))
+    if dry_run:
+        return
+    result = _ssh(vm, command)
+    if result.stdout.strip():
+        print(result.stdout.rstrip())
+    if result.returncode:
+        raise VMError(f"'{command}' failed on {ssh.ssh_target(vm)[0]}:{ssh.ssh_target(vm)[1]} "
+                      f"(exit {result.returncode}): {(result.stderr or result.stdout).strip()[-600:]}")
 
 
 def members_of(vm: dict[str, Any]) -> int:
