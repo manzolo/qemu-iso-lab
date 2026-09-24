@@ -1645,7 +1645,14 @@ show_installation_log() {
     local log_path="$ROOT_DIR/artifacts/$current_vm/runtime/tui-job/output.log"
     clear
     printf 'Installation log: %s\nCtrl-C returns to the menu; installation continues.\n\n' "$log_path"
-    tail -n 80 -f -- "$log_path" || true
+    # Serial installer logs contain cursor, scrolling-region and alternate-screen
+    # controls. Replaying those on the host can corrupt the resumed dashboard.
+    tail -n 80 -f -- "$log_path" | python3 "$ROOT_DIR/vmctl/tui_log.py" || true
+    if [[ -t 1 ]]; then
+        # Restore text attributes, charset, origin, margins and wrapping before
+        # the caller redraws (also recovers terminals affected by older viewers).
+        printf '\033[0m\033(B\033[?6l\033[r\033[?7h'
+    fi
 }
 
 run_vmctl() {
