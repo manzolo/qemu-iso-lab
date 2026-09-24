@@ -1336,10 +1336,26 @@ second run changed nothing; the client reached the three GUIs and both apps. Eac
 so the lab needs about 12 GB with the client.
 
 The map page (`vmctl group map proxmox-lab --open`) ends with a **runbook** generated from the
-same profiles: the install commands (per member, with its flow), the ZFS mirror (`answer.toml`
-snippet and the checks on each node), the two containers (the helper line and the equivalent
-upstream `ct/<script>.sh` invocation), the cluster steps node by node with each node's SSH line,
-and the stack commands.
+same profiles, in the order a person would run it, with a table of contents. Every block is marked
+*run* (changes something), *check* (read-only) or *try* (a reversible experiment) and carries the
+SSH line of the member it runs on:
+
+1. **Install**: `vmctl group install`, or one command per member with its flow; then `pveversion`
+   and the PVE services on each node.
+2. **Lab network**: `vmbr1`, the segment port with `learning off`, a ping to every other member.
+3. **ZFS pool (mirror)**: the `answer.toml` snippet; on each node `zpool status -x`, `zpool status`,
+   `zpool list -v`, `zfs list`, `pvesm status`, `proxmox-boot-tool status`; a drill that scrubs the
+   pool, takes the second mirror half offline (DEGRADED, the node keeps running) and back (resilver).
+4. **LXC containers**: the helper line and the equivalent upstream invocation; the checks read
+   `/etc/pve/nodes/*/lxc/<id>.conf`, which is cluster-wide, so they hold after a migration.
+5. **Cluster**: the steps node by node, then `pvecm status`/`nodes`, `corosync-cfgtool -s`,
+   `ha-manager status`, and a `pct migrate` to try.
+6. **From the client**: one `curl` per GUI and app.
+7. **Run the stack**.
+
+Every check block was run live on the formed cluster on 2026-09-24 (57 checks, all passing after
+the container checks moved to `/etc/pve`, because the containers had been migrated from the GUI in
+the meantime), and the pool drill went DEGRADED and back to ONLINE on `proxmox-ve`.
 
 ### `extra_disks`
 

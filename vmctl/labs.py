@@ -52,10 +52,10 @@ def start_order(cfg: dict[str, Any], names: list[str]) -> list[str]:
     return sorted(names, key=lambda name: (rank(name), names.index(name)))
 
 
-def _netlab_addresses(cfg: dict[str, Any], names: list[str]) -> tuple[dict[str, str], dict[int, str]]:
+def _netlab_addresses(cfg: dict[str, Any], names: list[str]) -> tuple[dict[str, str], dict[int, tuple[str, str]]]:
     """Segment addresses and WAN forward descriptions of the network lab, from its topology."""
     addresses: dict[str, str] = {}
-    forwards: dict[int, str] = {}
+    forwards: dict[int, tuple[str, str]] = {}
     for name in names:
         vm = config.get_vm(cfg, name)
         lab = netlab.lab_config(vm)
@@ -70,7 +70,7 @@ def _netlab_addresses(cfg: dict[str, Any], names: list[str]) -> tuple[dict[str, 
         for member in top["members"]:
             addresses[member["name"]] = f"{member['ip']}/{prefix}"
         for fwd in top["forwards"]:
-            forwards[int(fwd["wan_port"])] = f"{fwd['target']}:{fwd['target_port']} ({fwd['descr'].removeprefix('vmctl: ')})"
+            forwards[int(fwd["wan_port"])] = (f"{fwd['target']}:{fwd['target_port']}", fwd["descr"].removeprefix("vmctl: "))
     return addresses, forwards
 
 
@@ -94,8 +94,9 @@ def model(cfg: dict[str, Any], group: str, states: dict[str, dict[str, Any]] | N
                 if spec["ssh"] and ssh_cfg.get("ssh_host_port"):
                     forwards.append({"host_port": int(ssh_cfg["ssh_host_port"]), "guest": "22", "what": "SSH"})
                 for fwd in spec["hostfwd"]:
-                    what = lab_forwards.get(int(fwd["host_port"]), "")
-                    forwards.append({"host_port": fwd["host_port"], "guest": str(fwd["guest_port"]), "what": what})
+                    # A router's forward goes on through its NAT rules: via = where it really lands.
+                    via, what = lab_forwards.get(int(fwd["host_port"]), ("", ""))
+                    forwards.append({"host_port": fwd["host_port"], "guest": str(fwd["guest_port"]), "what": what, "via": via})
                 nic.update(address="10.0.2.15/24 (DHCP)", network=SLIRP_SUBNET, forwards=forwards)
             else:
                 segment = str(spec["name"])
@@ -147,125 +148,239 @@ def _zfs(vm: dict[str, Any]) -> dict[str, Any] | None:
 COMMUNITY_URL = "https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/{script}.sh"
 
 
+def _block(kind: str, where: str, commands: list[str]) -> dict[str, Any]:
+    """``kind``: do (changes something), check (read-only), try (a reversible experiment)."""
+    return {"kind": kind, "where": where, "commands": commands}
+
+
+def _web_urls(member: dict[str, Any]) -> list[str]:
+    urls = []
+    for nic in member["nics"]:
+        if nic["type"] == "segment" and nic.get("address") and member["role"] == "hypervisor":
+            urls.append(f"https://{str(nic['address']).split('/')[0]}:8006/")
+    return urls + [str(svc["url"]) for svc in member["services"] if svc.get("url")]
+
+
 def runbook(cfg: dict[str, Any], lab: dict[str, Any]) -> list[dict[str, Any]]:
-    """The commands behind the lab, from the same profiles: each section is a title, a sentence
-    and blocks of (where, commands); ``where`` is ``host`` or a member (run over its SSH line)."""
+    """The commands behind the lab, in the order a person would run them, from the same profiles.
+
+    Each phase has a title, a sentence and blocks; a block is do/check/try, runs on the host or on a
+    member (over the SSH line shown next to it), and every check block is read-only."""
     group = lab["group"]
     members = lab["members"]
-    ssh_of = {member["name"]: member["ssh"] for member in members}
-    sections: list[dict[str, Any]] = []
-    install = [f"vmctl group install {group}    # everything missing, in this order, then up"]
-    install += [f"vmctl {member['flow']} {member['name']}" for member in members
-                if member["flow"].startswith("bootstrap-")]
-    sections.append({"title": "Install", "text": "One command for the whole lab (cumulative: installed members are kept), or one per member with its own unattended flow.",
-                     "blocks": [("host", install)]})
-    mirrors = [member for member in members if member["zfs"]]
+    by_name = {member["name"]: member for member in members}
+    hypervisors = [m for m in members if m["zfs"] or m["role"] == "hypervisor"]
+    lan_of = {m["name"]: str(nic["address"]).split("/")[0] for m in members for nic in m["nics"]
+              if nic["type"] == "segment" and nic.get("address")}
+    phases: list[dict[str, Any]] = []
+
+    install = [f"vmctl group install {group}    # what is missing, in this order, then up (+ cluster)"]
+    install += [f"vmctl {m['flow']} {m['name']}" for m in members if m["flow"].startswith("bootstrap-")]
+    blocks = [_block("do", "host", install), _block("check", "host", [f"vmctl group status {group}"])]
+    blocks += [_block("check", m["name"], ["pveversion", "systemctl is-active pveproxy pvedaemon pve-cluster"])
+               for m in hypervisors]
+    phases.append({"title": "Install", "text": "One command for the whole lab (cumulative: installed members are kept), or one per member with its own unattended flow. Then every node answers.",
+                   "blocks": blocks})
+
+    segments = ", ".join(f"{seg['name']} {seg['subnet']}".strip() for seg in lab["segments"])
+    blocks = []
+    for m in members:
+        others = [ip for name, ip in lan_of.items() if name != m["name"]]
+        commands = ["ip -br addr    # NAT NIC + the lab segment"]
+        if m["name"] in lan_of and m["role"] == "hypervisor":
+            commands = ["ip -br addr show vmbr1", "bridge -d link show | grep -E 'master vmbr1|learning'    # learning off on the segment port"]
+        commands += [f"ping -c1 -W2 {ip}" for ip in others]
+        blocks.append(_block("check", m["name"], commands))
+    phases.append({"title": "Lab network", "text": f"Every VM has a NAT NIC (Internet, SSH and GUI forwards on 127.0.0.1) and a NIC on {segments}; the post-install configured the segment by MAC for the runtime boot.",
+                   "blocks": blocks})
+
+    mirrors = [m for m in members if m["zfs"]]
     if mirrors:
         first = mirrors[0]["zfs"]
-        answer = ["[disk-setup]", 'filesystem = "zfs"', f'disk-list = [{", ".join(repr(d).replace(chr(39), chr(34)) for d in first["disks"])}]',
-                  f'zfs.raid = "{first["raid"]}"']
-        blocks: list[tuple[str, list[str]]] = [("answer.toml (rendered by vmctl, grafted on the ISO)", answer)]
-        for member in mirrors:
-            blocks.append((member["name"], ["zpool status rpool", "zpool list -v rpool",
-                                             "proxmox-boot-tool status    # one ESP per disk: boots from either"]))
-        sections.append({"title": "ZFS mirror", "text": f"The root pool is ZFS {first['raid']} over {' + '.join(first['disks'])} (disk + extra_disks); these commands show it on each node.",
-                         "blocks": blocks})
-    containers: list[tuple[str, list[str]]] = []
-    for member in members:
-        for svc in member["services"]:
-            nat = str(svc.get("nat_address") or "")
-            upstream = (f"TERM=xterm mode=default var_ctid={svc.get('container')} var_hostname={svc.get('hostname')} "
-                        f"var_brg=vmbr0 var_net={nat} var_gateway=10.0.2.2 var_ns=10.0.2.3 "
-                        "var_container_storage=local-zfs var_template_storage=local \
-  "
-                        f'bash -c "$(curl -fsSL {COMMUNITY_URL.format(script=svc.get("script"))})"')
-            containers.append((member["name"], [
-                f"# {svc.get('name')}: what vmctl runs",
-                f"/root/pve-community.sh {svc.get('container')} {svc.get('script')} {svc.get('hostname')} "
-                f"{svc.get('port')} {nat} {svc.get('address')}",
-                "# the same by hand, upstream script",
-                "mkdir -p /usr/local/community-scripts && echo DIAGNOSTICS=no > /usr/local/community-scripts/diagnostics",
-                upstream,
-                f"pct set {svc.get('container')} -onboot 1 -net1 name=eth1,bridge=vmbr1,ip={svc.get('address')}",
-                f"# then: {svc.get('url')}",
+        disks = ", ".join(f'"{disk}"' for disk in first["disks"])
+        blocks = [_block("do", "answer.toml (rendered by vmctl, grafted on the ISO)",
+                         ["[disk-setup]", 'filesystem = "zfs"', f"disk-list = [{disks}]", f'zfs.raid = "{first["raid"]}"'])]
+        for m in mirrors:
+            blocks.append(_block("check", m["name"], [
+                "zpool status -x rpool         # 'pool rpool is healthy'",
+                "zpool status rpool            # mirror-0 with one partition per disk, all ONLINE",
+                "zpool list -v rpool           # size, allocation, fragmentation per device",
+                "zfs list -o name,used,avail,mountpoint",
+                "pvesm status                  # local (dir) and local-zfs (zfspool) active",
+                "proxmox-boot-tool status      # one ESP per disk: the node boots from either",
             ]))
-    if containers:
-        sections.append({"title": "LXC containers", "text": "Created by the Proxmox VE Helper-Scripts (community-scripts.org, main branch, not pinned) on the NAT bridge at a static address outside slirp's DHCP pool, then given a NIC on the lab segment.",
-                         "blocks": containers})
-    names = [member["name"] for member in members]
+        blocks.append(_block("try", mirrors[0]["name"], [
+            "zpool scrub rpool && sleep 20 && zpool status rpool | grep -A1 scan:    # read and verify every block",
+            "dev=$(zpool list -vHP rpool | awk '$1 ~ /^\\/dev\\// {d=$1} END {print d}')    # the second mirror half",
+            "zpool offline rpool \"$dev\" && zpool status -x rpool    # DEGRADED: the node keeps running on one disk",
+            "zpool online rpool \"$dev\" && sleep 5 && zpool status rpool | grep -E 'state|scan|resilver'    # back to ONLINE after a resilver",
+        ]))
+        phases.append({"title": "ZFS pool (mirror)", "text": f"The root pool is ZFS {first['raid']} over {' + '.join(first['disks'])} (disk + extra_disks) on every node. The checks are read-only; the drill takes one half of the mirror offline and back.",
+                       "blocks": blocks})
+
+    blocks = []
+    for m in members:
+        for svc in m["services"]:
+            nat = str(svc.get("nat_address") or "")
+            ctid = svc.get("container")
+            blocks.append(_block("do", m["name"], [
+                f"/root/pve-community.sh {ctid} {svc.get('script')} {svc.get('hostname')} {svc.get('port')} {nat} {svc.get('address')}    # what vmctl ran",
+                "# the same by hand, with the upstream script:",
+                "mkdir -p /usr/local/community-scripts && echo DIAGNOSTICS=no > /usr/local/community-scripts/diagnostics",
+                f"TERM=xterm mode=default var_ctid={ctid} var_hostname={svc.get('hostname')} var_brg=vmbr0 var_net={nat} "
+                "var_gateway=10.0.2.2 var_ns=10.0.2.3 var_container_storage=local-zfs var_template_storage=local \\",
+                f'  bash -c "$(curl -fsSL {COMMUNITY_URL.format(script=svc.get("script"))})"',
+                f"pct set {ctid} -onboot 1 -net1 name=eth1,bridge=vmbr1,ip={svc.get('address')}",
+            ]))
+    if blocks:
+        where = next(m["name"] for m in members if m["services"])
+        blocks.append(_block("check", where, [
+            "pvesh get /cluster/resources --type vm --output-format text    # every container and the node it runs on",
+            "pct list    # the containers of this node",
+        ] + [f"grep -H -E '^(hostname|net0|net1|onboot):' /etc/pve/nodes/*/lxc/{svc.get('container')}.conf    # cluster-wide: the path names the node"
+             for svc in by_name[where]["services"]]))
+        phases.append({"title": "LXC containers", "text": "Two light apps from the Proxmox VE Helper-Scripts (community-scripts.org, main branch, not pinned): created on the NAT bridge at a static address outside slirp's DHCP pool, then given a NIC on the lab segment.",
+                       "blocks": blocks})
+
+    names = [m["name"] for m in members]
     for cluster, entry in pvecluster.clusters(cfg, names).items():
-        steps = pvecluster.commands(cfg, cluster, entry)
         blocks = []
-        for node, command in steps:
-            if blocks and blocks[-1][0] == node:
-                blocks[-1][1].append(command)
+        for node, command in pvecluster.commands(cfg, cluster, entry):
+            if blocks and blocks[-1]["where"] == node and blocks[-1]["kind"] == "do":
+                blocks[-1]["commands"].append(command)
             else:
-                blocks.append((node, [command]))
-        sections.append({"title": f"Cluster {cluster}", "text": f"corosync over the lab segment; {entry['primary']} creates the cluster, the others join it. vmctl group install {group} does all of this and checks quorum.",
-                         "blocks": blocks})
-    sections.append({"title": "Run the stack", "text": "Infrastructure starts first and stops last.",
-                     "blocks": [("host", [f"vmctl group up {group}", f"vmctl group status {group}",
-                                          f"vmctl group map {group} --open", f"vmctl group down {group}",
-                                          f"vmctl group clean {group}    # asks, keeps checkpoints"])]})
-    for section in sections:
-        section["blocks"] = [{"where": where, "ssh": ssh_of.get(where, ""), "commands": list(cmds)}
-                             for where, cmds in section["blocks"]]
-    return sections
+                blocks.append(_block("do", node, [command]))
+        blocks = [b for b in blocks if b["commands"] != ["pvecm status"]]
+        primary = entry["primary"]
+        blocks.append(_block("check", primary, [
+            "pvecm status | grep -E 'Nodes|Quorate|Expected votes'    # 3 nodes, quorate",
+            "pvecm nodes",
+            "corosync-cfgtool -s    # link 0 on the lab addresses, every node connected",
+            "ha-manager status",
+        ]))
+        services = [svc for m in members for svc in m["services"]]
+        if services and len(entry["nodes"]) > 1:
+            target = entry["nodes"][1]
+            ctid = services[0].get("container")
+            blocks.append(_block("try", primary, [
+                f"pct migrate {ctid} {target} --restart    # the container moves; its lab address follows it",
+                f"pvesh get /cluster/resources --type vm --output-format text | grep {ctid}",
+            ]))
+        phases.append({"title": f"Cluster {cluster}", "text": f"corosync on the lab segment: {primary} creates the cluster, the others join it (vmctl group install does this and checks quorum; vmctl group cluster {group} repeats only this step). Every node's GUI shows the whole datacenter.",
+                       "blocks": blocks})
+
+    clients = [m for m in members if m["role"] == "client"]
+    urls = [url for m in members for url in _web_urls(m)]
+    if clients and urls:
+        phases.append({"title": "From the client", "text": "What a user of the lab sees: the client's Firefox opens the first URL and one tab per app at login.",
+                       "blocks": [_block("check", clients[0]["name"],
+                                         [f'curl -ks -o /dev/null -w "%{{http_code}}  {url}\\n" {url}' for url in urls])]})
+
+    phases.append({"title": "Run the stack", "text": "Infrastructure starts first and stops last.",
+                   "blocks": [_block("do", "host", [f"vmctl group up {group}", f"vmctl group map {group} --open",
+                                                    f"vmctl group down {group}",
+                                                    f"vmctl group clean {group}    # asks; checkpoints and ISOs are kept"])]})
+    ssh_of = {m["name"]: m["ssh"] for m in members}
+    for phase in phases:
+        for block in phase["blocks"]:
+            block["ssh"] = ssh_of.get(block["where"], "")
+    return phases
 
 
 # --- the map ---------------------------------------------------------------------------------
 
-_BOX_W, _BOX_H, _GAP, _MARGIN = 230, 118, 40, 40
-_HOST_Y, _BOX_Y = 40, 200
+_BOX_W, _BOX_H, _GAP, _MARGIN = 240, 124, 36, 40
+_TOP_Y, _TOP_H = 24, 70           # the host and Internet nodes
+_NAT_Y = _TOP_Y + _TOP_H + 46     # the NAT bus every VM hangs from
+_PILL_H, _PILL_GAP = 24, 8        # one forward = one pill on the VM's cable
+
+
+def _pill_width(text: str) -> float:
+    return 18 + 7.4 * len(text)
+
+
+def _host_node(x: float, y: float) -> list[str]:
+    """The computer running QEMU: a monitor icon, its address and what reaches the lab from it."""
+    return [
+        f'<g class="node host-n"><rect x="{x}" y="{y}" width="300" height="{_TOP_H}" rx="12"/>',
+        f'<rect class="icon" x="{x + 16}" y="{y + 15}" width="44" height="30" rx="4"/>',
+        f'<rect class="icon-s" x="{x + 32}" y="{y + 47}" width="12" height="6"/>',
+        f'<rect class="icon-s" x="{x + 25}" y="{y + 53}" width="26" height="4" rx="2"/>',
+        f'<text class="node-t" x="{x + 76}" y="{y + 31}">Host · 127.0.0.1</text>',
+        f'<text class="small" x="{x + 76}" y="{y + 52}">this computer: vmctl, SSH, browser</text></g>',
+    ]
+
+
+def _internet_node(x: float, y: float) -> list[str]:
+    cloud = (f"M{x + 40} {y + 58} h120 a26 26 0 0 0 0 -52 a34 34 0 0 0 -62 -8 "
+             f"a30 30 0 0 0 -56 14 a22 22 0 0 0 -2 46 z")
+    return [f'<g class="node net-n"><path d="{cloud}"/>',
+            f'<text class="node-t" x="{x + 100}" y="{y + 40}" text-anchor="middle">Internet</text></g>']
 
 
 def _svg(lab: dict[str, Any]) -> str:
     members = lab["members"]
     count = max(1, len(members))
-    box_h = _BOX_H + 20 * max((len(member["services"]) for member in members), default=0)
-    width = max(760, 2 * _MARGIN + count * _BOX_W + (count - 1) * _GAP)
-    seg_top = _BOX_Y + box_h + 90
+    box_h = _BOX_H + 22 * max((len(member["services"]) for member in members), default=0)
+    width = max(820, 2 * _MARGIN + count * _BOX_W + (count - 1) * _GAP)
+    pills = max((len(nic["forwards"]) for m in members for nic in m["nics"] if nic["type"] == "user"), default=0)
+    box_y = _NAT_Y + 26 + pills * (_PILL_H + _PILL_GAP) + 16
+    seg_top = box_y + box_h + 90
     height = seg_top + 70 * max(1, len(lab["segments"])) + 10
     x_of = {m["name"]: _MARGIN + index * (_BOX_W + _GAP) for index, m in enumerate(members)}
     seg_y = {seg["name"]: seg_top + 70 * index for index, seg in enumerate(lab["segments"])}
     esc = html.escape
     out: list[str] = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Network map of {esc(lab["group"])}">']
-    # Host / Internet bar: every slirp NIC is its own NAT to the host and to the Internet.
-    out.append(f'<rect class="host" x="{_MARGIN}" y="{_HOST_Y}" width="{width - 2 * _MARGIN}" height="46" rx="10"/>')
-    out.append(f'<text class="host-t" x="{_MARGIN + 16}" y="{_HOST_Y + 28}">Host 127.0.0.1 · Internet</text>')
+    # Top: the host and the Internet, joined by the NAT bus. Each VM's slirp NIC is its own NAT: the
+    # guest reaches the Internet through it, the host reaches the guest only through the forwards.
+    internet_x = width - _MARGIN - 200
+    out += _host_node(_MARGIN, _TOP_Y)
+    out += _internet_node(internet_x, _TOP_Y)
+    out.append(f'<line class="natbus" x1="{_MARGIN}" y1="{_NAT_Y}" x2="{width - _MARGIN}" y2="{_NAT_Y}"/>')
+    out.append(f'<line class="natbus-l" x1="{_MARGIN + 150}" y1="{_TOP_Y + _TOP_H}" x2="{_MARGIN + 150}" y2="{_NAT_Y}"/>')
+    out.append(f'<line class="natbus-l" x1="{internet_x + 100}" y1="{_TOP_Y + _TOP_H - 6}" x2="{internet_x + 100}" y2="{_NAT_Y}"/>')
+    out.append(f'<text class="small" x="{width / 2}" y="{_NAT_Y - 10}" text-anchor="middle">'
+               f'NAT (slirp {SLIRP_SUBNET}, one per VM) · forwards on 127.0.0.1</text>')
     for member in members:
         x = x_of[member["name"]]
         cx = x + _BOX_W / 2
-        nat = [nic for nic in member["nics"] if nic["type"] == "user"]
-        for nic in nat:
-            out.append(f'<line class="nat" x1="{cx}" y1="{_HOST_Y + 46}" x2="{cx}" y2="{_BOX_Y}"/>')
-            labels = [f'{f["host_port"]} → :{f["guest"]}' + (f' {f["what"]}' if f["what"] else "") for f in nic["forwards"]]
-            for line, text in enumerate(labels[:6]):
-                out.append(f'<text class="fwd" x="{cx + 8}" y="{_HOST_Y + 70 + 15 * line}">{esc(text)}</text>')
+        for nic in [nic for nic in member["nics"] if nic["type"] == "user"]:
+            out.append(f'<circle class="natport" cx="{cx}" cy="{_NAT_Y}" r="5"/>')
+            out.append(f'<line class="nat" x1="{cx}" y1="{_NAT_Y}" x2="{cx}" y2="{box_y}"/>')
+            for line, fwd in enumerate(nic["forwards"]):
+                if fwd.get("via"):
+                    text = f'{fwd["host_port"]} → {fwd["via"]}'
+                else:
+                    what = f' {fwd["what"]}' if fwd["what"] and len(fwd["what"]) <= 12 else ""
+                    text = f'{fwd["host_port"]} → :{fwd["guest"]}{what}'
+                pill_w = _pill_width(text)
+                y = _NAT_Y + 22 + line * (_PILL_H + _PILL_GAP)
+                out.append(f'<rect class="pill" x="{cx - pill_w / 2}" y="{y}" width="{pill_w}" height="{_PILL_H}" rx="12"/>')
+                out.append(f'<text class="pill-t" x="{cx}" y="{y + 16.5}" text-anchor="middle">{esc(text)}</text>')
         state = "running" if member["running"] else ("stopped" if member["install"] not in ("", "no disk") else "absent")
         badge = {"running": "● running", "stopped": "○ stopped", "absent": "no disk"}[state]
-        out.append(f'<g class="vm {state}"><rect x="{x}" y="{_BOX_Y}" width="{_BOX_W}" height="{box_h}" rx="12"/>')
-        out.append(f'<text class="vm-n" x="{x + 14}" y="{_BOX_Y + 28}">{esc(member["name"])}</text>')
+        out.append(f'<g class="vm {state}"><rect x="{x}" y="{box_y}" width="{_BOX_W}" height="{box_h}" rx="12"/>')
+        out.append(f'<text class="vm-n" x="{x + 14}" y="{box_y + 28}">{esc(member["name"])}</text>')
         role = member["role"] or "vm"
         ram = f'{member["memory_mb"] / 1024:g} GB' if member["memory_mb"] >= 1024 else f'{member["memory_mb"]} MB'
         disks = f' · {member["disks"]} disks' if member["disks"] > 1 else ""
-        out.append(f'<text class="small" x="{x + 14}" y="{_BOX_Y + 50}">{esc(role)} · {ram} · {member["cpus"]} vCPU{disks}</text>')
-        out.append(f'<text class="badge {state}" x="{x + 14}" y="{_BOX_Y + 76}">{badge}</text>')
+        out.append(f'<text class="small" x="{x + 14}" y="{box_y + 50}">{esc(role)} · {ram} · {member["cpus"]} vCPU{disks}</text>')
+        out.append(f'<text class="badge {state}" x="{x + 14}" y="{box_y + 76}">{badge}</text>')
         if member["install"] and state != "absent":
-            out.append(f'<text class="small" x="{x + 14}" y="{_BOX_Y + 98}">disk: {esc(member["install"])}</text>')
+            out.append(f'<text class="small" x="{x + 14}" y="{box_y + 98}">disk: {esc(member["install"])}</text>')
         for index, service in enumerate(member["services"]):
             where = str(service.get("address") or "").split("/")[0]
             label = f'CT {service.get("container", "?")} {service.get("name", "")} · {where}'
-            out.append(f'<text class="svc" x="{x + 14}" y="{_BOX_Y + _BOX_H + 6 + 20 * index}">▣ {esc(label)}</text>')
+            out.append(f'<text class="svc" x="{x + 14}" y="{box_y + _BOX_H + 6 + 20 * index}">▣ {esc(label)}</text>')
         out.append('</g>')
         for nic in member["nics"]:
             if nic["type"] != "segment":
                 continue
             y = seg_y[nic["segment"]]
-            out.append(f'<line class="seg-l" x1="{cx}" y1="{_BOX_Y + box_h}" x2="{cx}" y2="{y}"/>')
+            out.append(f'<line class="seg-l" x1="{cx}" y1="{box_y + box_h}" x2="{cx}" y2="{y}"/>')
             out.append(f'<circle class="port" cx="{cx}" cy="{y}" r="5"/>')
-            out.append(f'<text class="addr" x="{cx + 8}" y="{_BOX_Y + box_h + 22}">{esc(nic["address"] or "address not declared")}</text>')
-            out.append(f'<text class="small" x="{cx + 8}" y="{_BOX_Y + box_h + 38}">{esc(nic["mac"])}</text>')
+            out.append(f'<text class="addr" x="{cx + 8}" y="{box_y + box_h + 22}">{esc(nic["address"] or "address not declared")}</text>')
+            out.append(f'<text class="small" x="{cx + 8}" y="{box_y + box_h + 38}">{esc(nic["mac"])}</text>')
     for seg in lab["segments"]:
         y = seg_y[seg["name"]]
         out.append(f'<line class="bus" x1="{_MARGIN}" y1="{y}" x2="{width - _MARGIN}" y2="{y}"/>')
@@ -287,14 +402,20 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .sub { color:var(--muted); margin:0 0 20px; }
 .map { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:8px; overflow-x:auto; }
 svg { width:100%; min-width:680px; height:auto; display:block; }
-svg text { fill:var(--fg); font:13px system-ui, sans-serif; }
-svg .small { fill:var(--muted); font-size:11.5px; } svg .fwd { fill:var(--accent); font-size:11.5px; }
-svg .host { fill:none; stroke:var(--accent); stroke-width:1.5; stroke-dasharray:6 4; }
-svg .host-t { font-weight:600; fill:var(--accent); }
-svg .nat { stroke:var(--accent); stroke-width:1.5; stroke-dasharray:4 4; }
+svg text { fill:var(--fg); font:14px system-ui, sans-serif; }
+svg .small { fill:var(--muted); font-size:12.5px; } svg .fwd { fill:var(--accent); font-size:11.5px; }
+svg .node rect, svg .node path { fill:var(--card); stroke:var(--accent); stroke-width:2; }
+svg .node .icon { fill:none; stroke:var(--accent); stroke-width:2.5; } svg .node .icon-s { fill:var(--accent); stroke:none; }
+svg .node-t { font-weight:700; font-size:16px; fill:var(--accent); }
+svg .natbus { stroke:var(--accent); stroke-width:3; stroke-linecap:round; }
+svg .natbus-l { stroke:var(--accent); stroke-width:2; }
+svg .natport { fill:var(--accent); }
+svg .nat { stroke:var(--accent); stroke-width:1.8; stroke-dasharray:5 4; }
+svg .pill { fill:var(--card); stroke:var(--accent); stroke-width:1.5; }
+svg .pill-t { fill:var(--accent); font-size:12.5px; font-weight:600; }
 svg .vm rect { fill:var(--card); stroke:var(--line); stroke-width:1.5; }
 svg .vm.running rect { stroke:var(--ok); stroke-width:2.5; }
-svg .vm-n { font-weight:700; font-size:15px; }
+svg .vm-n { font-weight:700; font-size:17px; }
 svg .badge.running { fill:var(--ok); font-weight:600; } svg .badge.stopped { fill:var(--muted); }
 svg .badge.absent { fill:var(--warn); }
 svg .seg-l, svg .bus { stroke:var(--bus); stroke-width:2.5; } svg .bus { stroke-width:4; stroke-linecap:round; }
@@ -307,6 +428,11 @@ pre { background:var(--card); border:1px solid var(--line); border-radius:10px; 
 .table-wrap { overflow-x:auto; }
 h3 { font-size:1rem; margin:22px 0 2px; } .where { font-size:13px; color:var(--muted); margin:10px 0 4px; }
 pre { margin:0 0 6px; font:13px/1.45 ui-monospace, monospace; white-space:pre-wrap; word-break:break-word; }
+pre.check { border-left:4px solid var(--ok); } pre.do { border-left:4px solid var(--accent); } pre.try { border-left:4px solid var(--warn); }
+.kind { display:inline-block; min-width:44px; text-align:center; font-size:11px; font-weight:700; text-transform:uppercase;
+        border-radius:6px; padding:1px 6px; margin-right:6px; color:var(--bg); }
+.kind.do { background:var(--accent); } .kind.check { background:var(--ok); } .kind.try { background:var(--warn); }
+.toc { columns:2; margin:6px 0 10px; padding-left:22px; } .toc li { margin:2px 0; }
 """
 
 
@@ -315,7 +441,7 @@ WEB_PORTS = {80: "http", 8080: "http", 8081: "http", 443: "https", 8006: "https"
 
 
 def _forward_html(fwd: dict[str, Any]) -> str:
-    target = f'127.0.0.1:{fwd["host_port"]} → :{fwd["guest"]}'
+    target = f'127.0.0.1:{fwd["host_port"]} → ' + (str(fwd["via"]) if fwd.get("via") else f':{fwd["guest"]}')
     what = f' · {html.escape(fwd["what"])}' if fwd["what"] else ""
     scheme = WEB_PORTS.get(int(fwd["guest"])) if str(fwd["guest"]).isdigit() else None
     if scheme:
@@ -359,17 +485,22 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
 <div class="table-wrap"><table><thead><tr><th>VM</th><th>Role</th><th>State</th><th>NICs (runtime)</th></tr></thead>
 <tbody>{''.join(rows)}</tbody></table></div>
 <h2>Runbook</h2>
-<p class="sub">Start order: {order}. Every command below comes from the same profiles as the map.</p>
+<p class="sub">Start order: {order}. Every command below comes from the same profiles as the map, in the order you would run them: <b>run</b> changes something, <b>check</b> is read-only, <b>try</b> is a reversible experiment.</p>
 {_runbook_html(lab.get("runbook") or [])}
 </main></body></html>
 """
 
 
+KIND_LABELS = {"do": "run", "check": "check", "try": "try"}
+
+
 def _runbook_html(sections: list[dict[str, Any]]) -> str:
     esc = html.escape
-    parts: list[str] = []
-    for section in sections:
-        parts.append(f'<h3>{esc(section["title"])}</h3><p class="sub">{esc(section["text"])}</p>')
+    toc = "".join(f'<li><a href="#step-{index}">{esc(section["title"])}</a></li>'
+                  for index, section in enumerate(sections, start=1))
+    parts = [f'<ol class="toc">{toc}</ol>']
+    for index, section in enumerate(sections, start=1):
+        parts.append(f'<h3 id="step-{index}">{index}. {esc(section["title"])}</h3><p class="sub">{esc(section["text"])}</p>')
         for block in section["blocks"]:
             where = block["where"]
             if block["ssh"]:
@@ -378,7 +509,9 @@ def _runbook_html(sections: list[dict[str, Any]]) -> str:
                 label = "on the host, in the repository"
             else:
                 label = esc(where)
-            parts.append(f'<div class="where">{label}</div><pre>{esc(chr(10).join(block["commands"]))}</pre>')
+            kind = block.get("kind", "do")
+            parts.append(f'<div class="where"><span class="kind {kind}">{KIND_LABELS.get(kind, kind)}</span> {label}</div>'
+                         f'<pre class="{kind}">{esc(chr(10).join(block["commands"]))}</pre>')
     return "\n".join(parts)
 
 

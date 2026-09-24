@@ -41,6 +41,31 @@ class LabsTests(BaseVmctlTestCase):
         described = [f["what"] for f in router["nics"][0]["forwards"] if f["what"]]
         self.assertTrue(any("pihole-lab" in text for text in described))
 
+    def test_runbook_is_ordered_and_its_checks_are_read_only(self):
+        cfg = self.tracked_config()
+        runbook = labs.model(cfg, "proxmox-lab")["runbook"]
+        self.assertEqual([phase["title"] for phase in runbook],
+                         ["Install", "Lab network", "ZFS pool (mirror)", "LXC containers", "Cluster pve-lab",
+                          "From the client", "Run the stack"])
+        writes = ("pvecm create", "pvecm add", "pct set", "pct migrate", "zpool offline", "zpool scrub",
+                  "pve-community.sh", "vmctl group install", ">>")
+        for phase in runbook:
+            for block in phase["blocks"]:
+                self.assertIn(block["kind"], ("do", "check", "try"))
+                if block["kind"] == "check":
+                    for command in block["commands"]:
+                        self.assertFalse(any(word in command for word in writes), command)
+                if block["where"] not in ("host",) and not block["where"].startswith("answer.toml"):
+                    self.assertTrue(block["ssh"].startswith(f"ssh -i artifacts/{block['where']}/ssh/"), block)
+        pool = next(phase for phase in runbook if phase["title"].startswith("ZFS"))
+        self.assertEqual({b["where"] for b in pool["blocks"] if b["kind"] == "check"},
+                         {"proxmox-ve", "proxmox-ve-node2", "proxmox-ve-node3"})
+        drill = next(b for b in pool["blocks"] if b["kind"] == "try")
+        self.assertLess(next(i for i, c in enumerate(drill["commands"]) if "zpool offline" in c),
+                        next(i for i, c in enumerate(drill["commands"]) if "zpool online" in c))
+        self.assertEqual([phase["title"] for phase in labs.model(cfg, "netlab")["runbook"]],
+                         ["Install", "Lab network", "Run the stack"])
+
     def test_map_is_self_contained_and_escapes_profile_text(self):
         cfg = self.tracked_config()
         lab = labs.model(cfg, "proxmox-lab")
