@@ -109,28 +109,33 @@ class ClassicBridge:
         labs: list[Facts] = json.loads(result.stdout)
         return labs
 
-    def run_group(self, group: str, action: str) -> int:
-        """Run ``vmctl group <action> <group>`` in the terminal; everything but map waits for Enter.
+    def widget(self, *args: str, env: dict[str, str] | None = None) -> int:
+        """A Textual widget of vmtui-textual in its own process (the dashboard is suspended)."""
+        return subprocess.run(
+            [sys.executable, str(self.script.parent / "vmtui-textual"), "--widget", *args],
+            env={**self.env, **(env or {})}, check=False,
+        ).returncode
 
-        ``clean`` and a reinstalling ``install`` ask their own y/N question there (default No)."""
-        if action not in {"up", "down", "status", "map", "install", "clean"}:
+    def run_group(self, group: str, action: str, *, confirm: str | None = None, cautious: bool = False) -> int:
+        """``vmctl group <action> <group>`` in the same output panel as the profile actions.
+
+        That panel has no stdin, so a confirmation is asked first with the Textual dialog (default
+        Cancel when *cautious*: disks get deleted) and the command then runs with ``--yes``."""
+        if action not in {"up", "down", "status", "map", "install", "clean", "cluster"}:
             raise ValueError(f"Unsupported group action: {action}")
-        # Values are positional arguments, never interpolated into shell code.
-        script = (
-            'if [ "$2" = map ]; then "$1" group map "$3" --open; else "$1" group "$2" "$3"; fi\n'
-            'code=$?\n'
-            'if [ "$2" != map ] || [ "$code" -ne 0 ]; then\n'
-            '    printf "\\nPress Enter to return to the dashboard... "\n'
-            '    read -r _\n'
-            'fi\n'
-            'exit "$code"\n'
-        )
+        command = [str(self.script.parent / "vmctl"), "group", action, group]
+        if action == "map":
+            command.append("--open")
         previous = signal.signal(signal.SIGINT, lambda *_: None)
         try:
-            return subprocess.run(
-                ["bash", "-c", script, "vmtui-group", str(self.script.parent / "vmctl"), action, group],
-                env=self.env, check=False,
-            ).returncode
+            if confirm is not None:
+                title = {"install": "Install lab", "clean": "Clean lab"}.get(action, f"Lab {action}")
+                answer = self.widget("confirm", f"{title} · {group}", confirm,
+                                     env={"CONFIRM_DEFAULT": "no" if cautious else "yes"})
+                if answer != 0:
+                    return 0  # cancelled: nothing ran
+                command.append("--yes")
+            return self.widget("command", group, *command)
         finally:
             signal.signal(signal.SIGINT, previous)
 

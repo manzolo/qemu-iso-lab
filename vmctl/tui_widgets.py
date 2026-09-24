@@ -81,7 +81,10 @@ class CommandWidget(App[int]):
         with Horizontal(id="masthead"):
             yield Static("QEMU [bold]ISO Lab[/bold]", id="brand")
         with Vertical(id="workflow"):
-            title = "Open display" if self.command[1] == "attach" else "Start VM"
+            if self.command[1] == "group":
+                title = f"Lab {self.command[2]}"
+            else:
+                title = "Open display" if self.command[1] == "attach" else "Start VM"
             yield Static(f"{title} · {self.vm_name}", classes="dialog-title", markup=False)
             yield Static("Starting…", id="command-status", markup=False)
             yield TextArea(read_only=True, soft_wrap=True, show_line_numbers=False, id="command-output")
@@ -129,8 +132,9 @@ class CommandWidget(App[int]):
             env={**os.environ, "PYTHONUNBUFFERED": "1"}, start_new_session=True,
         )
         self.query_one("#command-status", Static).update(
-            "Viewer session · closing the viewer leaves the VM running."
-            if command[1] == "attach" else "Starting VM…"
+            "Viewer session · closing the viewer leaves the VM running." if command[1] == "attach"
+            else f"Running vmctl group {command[2]}… (F6 interrupts)" if command[1] == "group"
+            else "Starting VM…"
         )
         self.refresh_bindings()
         assert self.process.stdout is not None

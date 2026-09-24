@@ -366,14 +366,24 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("home")  # Labs keeps the selected profile's row; start from the top
             app.query_one(DataTable).focus()
             await pilot.press("enter")
-            app.bridge.run_group.assert_called_with("demo-lab", "up")
+            app.bridge.run_group.assert_called_with("demo-lab", "up", confirm=None, cautious=False)
             await pilot.press("right")
             self.assertEqual(app.focused.id, "lab-up")
             for key, action in (("down", "down"), ("down", "map"), ("down", "status"),
                                 ("down", "install"), ("down", "clean")):
                 await pilot.press(key)
                 await pilot.press("enter")
-                app.bridge.run_group.assert_called_with("demo-lab", action)
+                self.assertEqual(app.bridge.run_group.call_args.args, ("demo-lab", action))
+                confirm = app.bridge.run_group.call_args.kwargs.get("confirm")
+                cautious = app.bridge.run_group.call_args.kwargs.get("cautious")
+                if action == "clean":  # deletes disks: asks, default Cancel
+                    self.assertIn("cannot be undone", confirm)
+                    self.assertTrue(cautious)
+                elif action == "install":  # everything installed here: asks, nothing to delete
+                    self.assertIn("nothing, every member is installed", confirm)
+                    self.assertFalse(cautious)
+                else:
+                    self.assertIsNone(confirm)
             app.bridge.run.assert_not_called()
 
     async def test_enter_on_a_lab_with_a_missing_member_installs_it(self):
@@ -387,7 +397,8 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("home")  # Labs keeps the selected profile's row; start from the top
             app.query_one(DataTable).focus()
             await pilot.press("enter")
-            app.bridge.run_group.assert_called_with("demo-lab", "install")
+            self.assertEqual(app.bridge.run_group.call_args.args, ("demo-lab", "install"))
+            self.assertIn("Install: ubuntu", app.bridge.run_group.call_args.kwargs["confirm"])
 
     async def test_enter_on_a_fully_running_lab_opens_its_map(self):
         app = self.lab_app()
@@ -400,7 +411,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("home")  # Labs keeps the selected profile's row; start from the top
             app.query_one(DataTable).focus()
             await pilot.press("enter")
-            app.bridge.run_group.assert_called_with("demo-lab", "map")
+            app.bridge.run_group.assert_called_with("demo-lab", "map", confirm=None, cautious=False)
 
     async def test_f2_switches_between_labs_and_single_profiles(self):
         app = self.lab_app()
@@ -791,3 +802,35 @@ class WorkflowWidgetTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(pane.scroll_y, 0)
             self.assertIn("/dev/b", app.query_one("#workflow-device", Static).content.plain)
             await pilot.press("escape")
+
+
+class GroupBridgeTests(unittest.TestCase):
+    def run_group(self, action, answers, **kwargs):
+        from vmctl.tui_bridge import ClassicBridge
+        bridge = ClassicBridge()
+        calls = []
+        def widget(*args, env=None):
+            calls.append((args, env))
+            return answers.pop(0)
+        bridge.widget = widget
+        code = bridge.run_group("proxmox-lab", action, **kwargs)
+        return code, calls
+
+    def test_group_actions_run_in_the_command_panel(self):
+        code, calls = self.run_group("down", [0])
+        self.assertEqual(code, 0)
+        (args, _), = calls
+        self.assertEqual(args[:2], ("command", "proxmox-lab"))
+        self.assertEqual(args[3:], ("group", "down", "proxmox-lab"))
+        _, calls = self.run_group("map", [0])
+        self.assertEqual(calls[0][0][-1], "--open")
+
+    def test_a_confirmed_action_gets_yes_and_a_cancelled_one_never_runs(self):
+        code, calls = self.run_group("clean", [1], confirm="Delete?", cautious=True)
+        self.assertEqual((code, len(calls)), (0, 1))  # the dialog only
+        self.assertEqual(calls[0][0][0], "confirm")
+        self.assertEqual(calls[0][1], {"CONFIRM_DEFAULT": "no"})
+        code, calls = self.run_group("clean", [0, 0], confirm="Delete?", cautious=True)
+        self.assertEqual(calls[1][0][-1], "--yes")
+        with self.assertRaises(ValueError):
+            self.run_group("explode", [0])

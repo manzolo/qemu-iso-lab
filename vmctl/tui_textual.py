@@ -637,15 +637,38 @@ class Dashboard(App[None]):
             self.pop_screen()
         self.run_group(event.group, event.action)
 
+    def group_confirmation(self, group: str, action: str) -> tuple[str | None, bool]:
+        """The question install and clean ask before running, and whether it defaults to Cancel."""
+        lab = next((lab for lab in self.labs if lab["group"] == group), None)
+        by_name = {row["name"]: row for row in self.rows}
+        members = [by_name[name] for name in (lab or {}).get("start_order", []) if name in by_name]
+        if action == "clean":
+            present = [row["name"] for row in members if row["install_label"] != "no disk"] or ["(no disk yet)"]
+            return (f"Stop and delete the disks and artifacts of:\n  {', '.join(present)}\n\n"
+                    "Checkpoints and ISOs are kept. This cannot be undone.", True)
+        if action == "install":
+            missing = [row["name"] for row in members if row["install_label"] not in INSTALLED_LABELS]
+            redo = [row["name"] for row in members if row["name"] in missing and row["install_label"] != "no disk"]
+            kept = [row["name"] for row in members if row["name"] not in missing]
+            lines = [f"Install: {', '.join(missing) or 'nothing, every member is installed'}"]
+            if kept:
+                lines.append(f"Keep: {', '.join(kept)}")
+            if redo:
+                lines.append(f"\nReinstall from scratch (their disks are DELETED): {', '.join(redo)}")
+            lines.append("\nThen the stack restarts with its lab NICs (and forms the cluster, if any).")
+            return "\n".join(lines), bool(redo)
+        return None, False
+
     def run_group(self, group: str, action: str) -> None:
+        confirm, cautious = self.group_confirmation(group, action)
         self.interactive = True
         try:
             with self.suspend():
-                code = self.bridge.run_group(group, action)
+                code = self.bridge.run_group(group, action, confirm=confirm, cautious=cautious)
             if code:
                 self.notify(f"vmctl group {action} {group} exited with status {code}", severity="warning")
             elif action == "map":
-                self.notify(f"Network map of {group} opened in the browser (artifacts/labs/{group}/network.html)")
+                self.notify(f"Network map of {group}: artifacts/labs/{group}/network.html")
         except Exception as exc:
             self.notify(str(exc), title="Unable to run the lab action", severity="error")
         finally:
