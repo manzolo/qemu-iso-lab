@@ -14,6 +14,7 @@ from vmctl.tui_bridge import ClassicBridge, primary_action, quick_actions, statu
 
 HAS_TEXTUAL = importlib.util.find_spec("textual") is not None
 if HAS_TEXTUAL:
+    from textual.containers import VerticalScroll
     from textual.widgets import Button, DataTable, Input, OptionList, Static, TextArea
     from vmctl.tui_textual import Dashboard, DetailsScreen, HelpScreen, VMDetails
     from vmctl.tui_widgets import CommandWidget, WorkflowWidget
@@ -199,6 +200,130 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             await pilot.resize_terminal(120, 44)
             self.assertTrue(app.query_one("#details").display)
             self.assertEqual(app.selected, "ubuntu")
+
+    async def test_home_end_select_first_and_last_profile_without_horizontal_scroll(self):
+        app = self.make_app()
+        app.bridge.snapshot.return_value = [profile(f"vm{i}") for i in range(60)]
+        async with app.run_test(size=(116, 44)) as pilot:
+            await self.ready(app, pilot)
+            table = app.query_one(DataTable)
+            await pilot.press("end")
+            self.assertEqual(app.selected, "vm59")
+            self.assertEqual(table.cursor_row, 59)
+            self.assertGreater(table.scroll_y, 0)
+            self.assertEqual(table.scroll_x, 0)
+            self.assertEqual(app.query_one("#details", VMDetails).row["name"], "vm59")
+            await pilot.press("home")
+            self.assertEqual(app.selected, "vm0")
+            self.assertEqual(table.cursor_row, 0)
+            self.assertEqual(table.scroll_y, 0)
+            self.assertEqual(table.scroll_x, 0)
+            app.bridge.run.assert_not_called()
+
+    async def test_home_end_respect_search_focus_and_filtered_profiles(self):
+        app = self.make_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.press("slash", "a", "home")
+            search = app.query_one(Input)
+            self.assertEqual(search.cursor_position, 0)
+            await pilot.press("end")
+            self.assertEqual(search.cursor_position, 1)
+            self.assertEqual(app.selected, "debian")
+            table = app.query_one(DataTable)
+            table.focus()
+            await pilot.press("end")
+            self.assertEqual(app.selected, "alpine")
+            await pilot.press("home")
+            self.assertEqual(app.selected, "debian")
+            search.value = "no matching profile"
+            await pilot.pause()
+            await pilot.press("end", "home")
+            self.assertEqual(table.row_count, 0)
+            self.assertIsNone(app.selected)
+            app.bridge.run.assert_not_called()
+
+    async def test_down_from_search_focuses_results_and_allows_navigation(self):
+        app = self.make_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.press("slash", "a", "down")
+            self.assertIsInstance(app.focused, DataTable)
+            self.assertEqual(app.selected, "debian")
+            await pilot.press("down")
+            self.assertEqual(app.selected, "alpine")
+            await pilot.press("up")
+            self.assertEqual(app.selected, "debian")
+            self.assertEqual(app.query_one(Input).value, "a")
+            await pilot.press("slash")
+            app.query_one(Input).value = "no matching profile"
+            await pilot.pause()
+            await pilot.press("down", "down")
+            self.assertIsInstance(app.focused, DataTable)
+            self.assertIsNone(app.selected)
+            app.bridge.run.assert_not_called()
+
+    async def test_f3_focuses_search_and_preserves_query(self):
+        app = self.make_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.press("f3", "a")
+            search = app.query_one(Input)
+            self.assertIs(app.focused, search)
+            self.assertEqual(search.value, "a")
+            await pilot.press("down", "f3")
+            self.assertIs(app.focused, search)
+            self.assertEqual(search.value, "a")
+            app.bridge.run.assert_not_called()
+
+    async def test_refresh_preserves_scroll_focus_and_updates_changed_cells(self):
+        app = self.make_app()
+        app.bridge.snapshot.return_value = [profile(f"vm{i}") for i in range(80)]
+        async with app.run_test(size=(116, 44)) as pilot:
+            await self.ready(app, pilot)
+            table = app.query_one(DataTable)
+            table.move_cursor(row=45, animate=False)
+            await pilot.pause()
+            table.scroll_to(y=35, animate=False)
+            await pilot.press("f3")
+            scroll = table.scroll_offset
+            for changed in (False, True):
+                with self.subTest(changed=changed):
+                    rows = [dict(row) for row in app.rows]
+                    if changed:
+                        rows[45].update(memory_mb=4096, cpus=4, job_status="failed")
+                    app.bridge.snapshot.return_value = rows
+                    app.action_refresh(quiet=True)
+                    await self.ready(app, pilot)
+                    self.assertEqual(table.scroll_offset, scroll)
+                    self.assertEqual(app.selected, "vm45")
+                    self.assertEqual(table.cursor_row, 45)
+                    self.assertIsInstance(app.focused, Input)
+                    self.assertEqual(table.get_row("vm45")[2], "4G / 4" if changed else "2G / 2")
+            self.assertEqual(table.get_row("vm45")[1].plain, "Failed")
+            self.assertEqual(app.query_one("#details", VMDetails).row["cpus"], 4)
+
+    async def test_refresh_reorders_and_removes_profiles_preserving_valid_selection(self):
+        app = self.make_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.press("down")
+            self.assertEqual(app.selected, "debian")
+            app.bridge.snapshot.return_value = [profile("alpine", running=True),
+                                                profile("debian"), profile("ubuntu")]
+            app.action_refresh(quiet=True)
+            await self.ready(app, pilot)
+            table = app.query_one(DataTable)
+            self.assertEqual([row.key.value for row in table.ordered_rows],
+                             ["alpine", "debian", "ubuntu"])
+            self.assertEqual(app.selected, "debian")
+            self.assertEqual(table.cursor_row, 1)
+            app.bridge.snapshot.return_value = [profile("alpine", running=True)]
+            app.action_refresh(quiet=True)
+            await self.ready(app, pilot)
+            self.assertEqual(table.row_count, 1)
+            self.assertEqual(app.selected, "alpine")
+            self.assertEqual(app.query_one("#details", VMDetails).row["name"], "alpine")
 
     async def test_enter_runs_selected_profile_default_action(self):
         for size in ((120, 44), (80, 30)):
@@ -480,3 +605,51 @@ class WorkflowWidgetTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("B456", str(app.query_one("#workflow-device", Static).content))
             await pilot.press("enter")
         self.assertEqual(app.return_value, "/dev/b")
+
+    async def test_device_preview_shows_free_space_row_without_wrapping_table(self):
+        from vmctl.tui_devices import menu_header, menu_items
+        disk = dict(path="/dev/sda", size=250059350016, model="Samsung SSD 850 EVO 250GB",
+                    serial="S2R6NX0H470302D", tran="sata", mountpoints=[],
+                    unallocated_bytes=215 * 10**9, children=[
+                        dict(path="/dev/sda1", size=512 * 1024**2, fstype="vfat", label="EFI"),
+                        dict(path="/dev/sda2", size=32 * 1024**3, fstype="ext4", label="ROOT")])
+        values = [value for item in menu_items([disk], 116) for value in item]
+        app = WorkflowWidget("menu", "Force Flash", "Choose disk\n\n" + menu_header(116),
+                             values, {"MENU_NO_TAGS": "1", "MENU_DEVICE_PREVIEW": "1"})
+        async with app.run_test(size=(116, 50)) as pilot:
+            await pilot.pause()
+            options = app.query_one(OptionList)
+            self.assertLessEqual(len(str(options.get_option_at_index(0).prompt)),
+                                 options.scrollable_content_region.width - 2)
+            pane = app.query_one("#workflow-device-pane", VerticalScroll)
+            content = app.query_one("#workflow-device", Static).content
+            lines = content.plain.splitlines()
+            free_index = next(i for i, line in enumerate(lines)
+                              if line.startswith("Unallocated") and "│" in line)
+            self.assertLess(free_index, pane.scrollable_content_region.height)
+            for line in lines:
+                self.assertLessEqual(len(line), pane.scrollable_content_region.width)
+            self.assertIn("Free space", lines[free_index])
+            self.assertGreaterEqual(options.size.height, 4)
+            await pilot.press("escape")
+
+    async def test_long_device_preview_can_scroll_to_unallocated_row(self):
+        details = "Device /dev/a\n" + "\n".join(f"Partition {i}" for i in range(40))
+        details += "\nUnallocated 10 GiB"
+        app = WorkflowWidget("menu", "Devices", "Choose", [
+            "/dev/a", "Disk A\t" + details, "/dev/b", "Disk B\tDevice /dev/b"],
+            {"MENU_NO_TAGS": "1"})
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            pane = app.query_one("#workflow-device-pane", VerticalScroll)
+            self.assertGreater(pane.max_scroll_y, 0)
+            pane.focus()
+            await pilot.press("end")
+            await pilot.pause()
+            self.assertEqual(pane.scroll_y, pane.max_scroll_y)
+            self.assertGreaterEqual(app.query_one(OptionList).size.height, 4)
+            app.query_one(OptionList).focus()
+            await pilot.press("down")
+            self.assertEqual(pane.scroll_y, 0)
+            self.assertIn("/dev/b", app.query_one("#workflow-device", Static).content.plain)
+            await pilot.press("escape")

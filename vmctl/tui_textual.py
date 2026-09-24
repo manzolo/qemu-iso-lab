@@ -10,7 +10,7 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.events import Resize
+from textual.events import Key, Resize
 from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Static
@@ -20,7 +20,17 @@ from vmctl.tui_bridge import ClassicBridge, Facts, primary_action, quick_actions
 
 class ProfileTable(DataTable[Text | str]):
     BINDINGS = [Binding("enter", "select_cursor", "Default action"),
+                Binding("home", "first_profile", "First profile", show=False),
+                Binding("end", "last_profile", "Last profile", show=False),
                 Binding("right", "app.details", "Actions", show=False, priority=True)]
+
+    def action_first_profile(self) -> None:
+        if self.row_count:
+            self.move_cursor(row=0, animate=False)
+
+    def action_last_profile(self) -> None:
+        if self.row_count:
+            self.move_cursor(row=self.row_count - 1, animate=False)
 
 
 class VMDetails(Vertical):
@@ -37,17 +47,21 @@ class VMDetails(Vertical):
     def __init__(self, row: Facts | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.row = row
+        self.border_title = "PROFILE"
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(classes="detail-copy"):
-            yield Static("SELECTED PROFILE", classes="eyebrow")
             yield Static(id="vm-name", markup=False)
             yield Static(id="vm-description", markup=False)
             yield Static(id="vm-status")
+            with Horizontal(id="vm-resources"):
+                yield Static(id="vm-memory", classes="resource-card")
+                yield Static(id="vm-cpus", classes="resource-card")
             yield Static(id="vm-facts", markup=False)
             yield Static(id="vm-install", markup=False)
-        yield Static("→ Actions · ↑/↓ Choose · ← Profiles", classes="action-hint", markup=False)
-        yield Button("Boot ISO…", id="primary", variant="primary", disabled=True)
+        yield Static("↑/↓ Choose · ← Profiles", classes="action-hint", markup=False)
+        yield Button("Boot ISO…", id="primary", disabled=True,
+                     tooltip="Default action when the profile list has focus")
         yield Button("", id="quick-1", disabled=True)
         yield Button("", id="quick-2", disabled=True)
         yield Button("All actions…", id="menu", disabled=True)
@@ -61,23 +75,47 @@ class VMDetails(Vertical):
         self.query_one("#vm-description", Static).update(row["label"] if row else "Change the search or filter to see profiles.")
         for button in self.query(Button):
             button.disabled = row is None
+        self.query_one("#vm-resources").display = row is not None
+        self.query_one("#vm-install").display = bool(row and row["installed"] and row["install_detail"])
+        hint = self.query_one(".action-hint", Static)
+        hint.display = row is not None
         if row is None:
             for selector in ("#vm-status", "#vm-facts", "#vm-install"):
                 self.query_one(selector, Static).update("")
             return
         label, color = status_label(row)
-        self.query_one("#vm-status", Static).update(Text(f"● {label}", style=color))
+        status = self.query_one("#vm-status", Static)
+        status.update(Text(f"●  {label}", style=f"bold {color}"))
+        status.styles.border_left = ("thick", color)
+        memory = resources(row).split(" / ")[0]
+        self.query_one("#vm-memory", Static).update(Text.assemble(
+            ("RAM\n", "#a6b4c8"), (memory, "bold #dce5ef")))
+        self.query_one("#vm-cpus", Static).update(Text.assemble(
+            ("CPU\n", "#a6b4c8"), (f"{row['cpus']} vCPU", "bold #dce5ef")))
         firmware = "UEFI" if row["firmware"] == "EFI" else row["firmware"]
-        disk = (f"{row['disk_host'] or '?'} on host / {row['disk_capacity'] or '?'} capacity"
-                if row["prepared"] else "No disk created")
         ssh = f"localhost:{row['ssh_port']}" if row["ssh_port"] else "Not configured"
-        self.query_one("#vm-facts", Static).update(
-            f"RESOURCES\n{resources(row)}  RAM / vCPU\n{firmware} firmware\n\n"
-            f"STORAGE\n{disk}\nISO {'available' if row['iso_ready'] else 'not cached'}\n\n"
-            f"SSH\n{ssh}"
-        )
+        facts = Text()
+        facts.append("STORAGE\n", style="bold #84c9e7")
+        if row["prepared"]:
+            facts.append("Capacity   ", style="#a6b4c8")
+            facts.append(f"{row['disk_capacity'] or '?'}\n")
+            facts.append("On host    ", style="#a6b4c8")
+            facts.append(row["disk_host"] or "?")
+        else:
+            facts.append("No disk created", style="#a6b4c8")
+        facts.append("\n\nBOOT\n", style="bold #84c9e7")
+        facts.append(f"{firmware} · ")
+        facts.append("ISO available" if row["iso_ready"] else "ISO not cached",
+                     style="#86d5ab" if row["iso_ready"] else "#a6b4c8")
+        facts.append("\n\nSSH\n", style="bold #84c9e7")
+        facts.append(ssh)
+        self.query_one("#vm-facts", Static).update(facts)
         self.query_one("#vm-install", Static).update(row["install_detail"] if row["installed"] else "")
         actions = quick_actions(row)[:-1]
+        hint.update(Text.assemble(
+            (f"Enter → {actions[0][0]}", "bold #84c9e7"),
+            "\n↑/↓ Choose · ← Profiles",
+        ))
         for index, selector in enumerate(("#primary", "#quick-1", "#quick-2")):
             button = self.query_one(selector, Button)
             button.display = index < len(actions)
@@ -141,11 +179,13 @@ class HelpScreen(ModalScreen[None]):
             yield Static("Dashboard", classes="dialog-title")
             yield Static(
                 "↑ / ↓      Select a profile\n"
+                "Home / End First / last profile\n"
                 "Enter      Run the default profile action\n"
                 "→          Move to profile actions\n"
                 "↑ / ↓      Move between actions\n"
                 "←          Return to the profile list\n"
-                "/          Search name, description or family\n"
+                "/ or F3    Search name, description or family\n"
+                "↓          Move from search to results\n"
                 "Tab        Move between controls\n"
                 "F5         Refresh (also automatic every 15s)\n"
                 "F8         Open the classic TUI\n"
@@ -173,6 +213,7 @@ class Dashboard(App[None]):
     ENABLE_COMMAND_PALETTE = False
     BINDINGS = [
         Binding("slash", "search", "Search"),
+        Binding("f3", "search", "Search", show=False),
         Binding("enter", "primary", "Default action"),
         Binding("f5", "refresh", "Refresh"),
         Binding("f8", "classic", "Classic UI"),
@@ -197,7 +238,7 @@ class Dashboard(App[None]):
             yield Static("QEMU [bold]ISO Lab[/bold]", id="brand")
             yield Static("Loading profiles…", id="summary", markup=False)
         with Horizontal(id="toolbar"):
-            yield Input(placeholder="Search profiles, distributions…  /", id="search")
+            yield Input(placeholder="Search profiles, distributions…  / or F3", id="search")
             with Horizontal(id="filters"):
                 yield Button("All", id="all", classes="filter active")
                 yield Button("With disk", id="disk", classes="filter")
@@ -219,17 +260,18 @@ class Dashboard(App[None]):
         self.set_class(self.size.width < 100, "compact")
         self.action_refresh()
         if self.poll_enabled:
-            self.set_interval(15, self.action_refresh)
+            self.set_interval(15, lambda: self.action_refresh(quiet=True))
 
     def on_resize(self, event: Resize) -> None:
         self.set_class(event.size.width < 100, "compact")
         if self.loaded:
             self.rebuild_table()
 
-    def action_refresh(self) -> None:
+    def action_refresh(self, *, quiet: bool = False) -> None:
         if not self.refreshing and not self.interactive:
             self.refreshing = True
-            self.query_one("#notice", Static).update("Refreshing VM state…")
+            if not quiet:
+                self.query_one("#notice", Static).update("Refreshing VM state…")
             self.read_snapshot()
 
     @work
@@ -257,7 +299,10 @@ class Dashboard(App[None]):
             self.rebuild_table()
             if isinstance(self.screen, DetailsScreen):
                 opened = self.screen.row["name"]
-                self.screen.query_one(VMDetails).show_row(next((r for r in rows if r["name"] == opened), None))
+                details = self.screen.query_one(VMDetails)
+                row = next((r for r in rows if r["name"] == opened), None)
+                if details.row != row:
+                    details.show_row(row)
         finally:
             self.refreshing = False
 
@@ -268,15 +313,26 @@ class Dashboard(App[None]):
         selected = self.selected if self.selected in names else (names[0] if names else None)
         table = self.query_one(DataTable)
         available = self.size.width - (6 if self.has_class("compact") else 46)
-        with table.prevent(DataTable.RowHighlighted):
-            table.clear(columns=True)
-            table.add_column("PROFILE", width=max(12, min(36, available - 32)))
-            table.add_column("STATE", width=16)
-            table.add_column("RAM / CPU", width=9)
+        widths = [max(12, min(36, available - 32)), 16, 9]
+        same_layout = (
+            [row.key.value for row in table.ordered_rows] == names
+            and [column.width for column in table.columns.values()] == widths
+        )
+        with self.batch_update(), table.prevent(DataTable.RowHighlighted):
+            if not same_layout:
+                table.clear(columns=True)
+                for title, width in zip(("PROFILE", "STATE", "RAM / CPU"), widths):
+                    table.add_column(title, width=width)
             for row in self.filtered:
                 label, tone = status_label(row)
-                table.add_row(Text(row["name"]), Text(label, style=tone), resources(row), key=row["name"])
-            if selected:
+                cells = (Text(row["name"]), Text(label, style=tone), resources(row))
+                if same_layout:
+                    for column, value in zip(table.columns, cells):
+                        if table.get_cell(row["name"], column) != value:
+                            table.update_cell(row["name"], column, value)
+                else:
+                    table.add_row(*cells, key=row["name"])
+            if selected and not same_layout:
                 table.move_cursor(row=names.index(selected), animate=False)
                 self.call_after_refresh(table.move_cursor, row=names.index(selected), animate=False)
         self.selected = selected
@@ -288,7 +344,10 @@ class Dashboard(App[None]):
         return next((row for row in self.rows if row["name"] == self.selected), None)
 
     def update_details(self) -> None:
-        self.query_one("#details", VMDetails).show_row(self.selected_row())
+        details = self.query_one("#details", VMDetails)
+        row = self.selected_row()
+        if details.row != row:
+            details.show_row(row)
 
     @on(DataTable.RowHighlighted)
     def highlight_row(self, event: DataTable.RowHighlighted) -> None:
@@ -307,6 +366,11 @@ class Dashboard(App[None]):
     @on(Input.Submitted, "#search")
     def search_submitted(self) -> None:
         self.query_one(DataTable).focus()
+
+    def on_key(self, event: Key) -> None:
+        if event.key == "down" and isinstance(self.focused, Input) and self.focused.id == "search":
+            event.stop()
+            self.search_submitted()
 
     @on(Button.Pressed, ".filter")
     def filter_changed(self, event: Button.Pressed) -> None:

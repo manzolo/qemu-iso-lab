@@ -57,16 +57,56 @@ VMDetails {
     height: 1fr;
     background: #18222e;
     border: round #304050;
-    padding: 1 2;
+    border-title-color: #84c9e7;
+    border-title-style: bold;
+    padding: 0 2;
     margin-left: 1;
 }
-#vm-name { height: auto; text-style: bold; color: #ffffff; margin-bottom: 1; }
-#vm-description { height: auto; color: #a6b4c8; margin-bottom: 1; }
-#vm-status { height: auto; margin-bottom: 1; }
-#vm-facts { height: auto; color: #c3cfdd; margin-bottom: 1; }
-#vm-install { height: auto; color: #a6b4c8; margin-bottom: 1; }
-VMDetails Button { width: 100%; height: 3; min-height: 3; margin-bottom: 0; }
-.action-hint { height: auto; color: #a6b4c8; margin: 1 0; }
+#vm-name { height: auto; text-style: bold; color: #ffffff; }
+#vm-description { height: auto; color: #a6b4c8; }
+#vm-status {
+    height: auto;
+    background: #202f3c;
+    padding: 0 1;
+    border-left: thick #a6b4c8;
+    margin-bottom: 1;
+}
+#vm-resources {
+    layout: grid;
+    grid-size: 2 1;
+    grid-columns: 1fr 1fr;
+    grid-gutter: 0 1;
+    height: 2;
+    margin-bottom: 1;
+}
+.resource-card {
+    width: 1fr;
+    height: 2;
+    padding: 0 1;
+    content-align: center middle;
+    text-align: center;
+    background: #1c2a37;
+}
+#vm-facts { height: auto; color: #dce5ef; }
+#vm-install { height: auto; color: #a6b4c8; margin-top: 1; }
+VMDetails Button {
+    width: 100%;
+    height: 3;
+    min-height: 3;
+    margin: 0;
+    border: round #40566b;
+    background: #1c2a37;
+    color: #dce5ef;
+    content-align: center middle;
+    text-style: none;
+}
+VMDetails Button:hover { border: round #84c9e7; }
+VMDetails Button:focus {
+    border: round #84c9e7;
+    color: #84c9e7;
+    text-style: bold;
+}
+.action-hint { height: auto; color: #a6b4c8; margin: 1 0 0 0; border-top: solid #304858; }
 VMDetails:focus-within { border: round #84c9e7; }
 .detail-copy { height: 1fr; }
 #activity { height: 5; margin: 1 2; padding: 0 1; border-top: solid #304050; }
@@ -105,10 +145,11 @@ ModalScreen { align: center middle; background: #000000 65%; }
 #workflow-copy Static { height: auto; }
 .workflow-menu #workflow-copy { height: auto; max-height: 25%; }
 #workflow-search { margin: 1 0; }
-#workflow-options { height: 1fr; background: #151f2a; border: none; }
+#workflow-options { height: 1fr; min-height: 4; background: #151f2a; border: none; }
 #workflow-options > .option-list--option { padding: 0 1; }
 #workflow-options > .option-list--option-highlighted { background: #285269; color: #ffffff; }
-#workflow-device { height: auto; max-height: 25%; overflow-y: auto; color: #a6b4c8; }
+#workflow-device-pane { height: auto; max-height: 45%; border-top: solid #304858; }
+#workflow-device { height: auto; color: #a6b4c8; }
 #workflow-input { margin: 1 0; }
 #workflow-buttons { height: 3; margin-top: 1; }
 #workflow-buttons Button { height: 3; min-height: 3; margin-right: 2; }

@@ -24,12 +24,33 @@ def table_row(values: list[str], widths: list[int]) -> str:
 
 
 def device_widths(columns: int) -> list[int]:
-    # Leave room for the outer border, padding and the selection pointer.
-    return [14, 10, max(8, columns - 8 - 14 - 10 - 9 - 5 - 12), 9, 5]
+    # Leave room for panel margins, borders, padding and a scrollbar.
+    return [14, 10, max(8, columns - 14 - 14 - 10 - 9 - 5 - 12), 9, 5]
 
 
 def menu_header(columns: int) -> str:
     return table_row(["DEVICE", "SIZE", "MODEL", "SERIAL", "BUS"], device_widths(columns))
+
+
+def filesystem_label(value: Any) -> str:
+    """Add a single-cell, monochrome marker without replacing the filesystem name."""
+    name = clean(value)
+    kind = name.casefold()
+    if kind == "-":
+        return name
+    if kind in {"ntfs", "ntfs3"}:
+        icon = "⊞"
+    elif kind in {"vfat", "fat", "fat12", "fat16", "fat32", "msdos", "exfat"}:
+        icon = "↔"
+    elif kind == "swap":
+        icon = "≋"
+    elif kind in {"crypto_luks", "bitlocker"}:
+        icon = "▣"
+    elif kind in {"ext2", "ext3", "ext4", "xfs", "btrfs", "f2fs", "zfs", "bcachefs"}:
+        icon = "▤"
+    else:
+        icon = "·"
+    return f"{icon} {name}"
 
 
 def device_details(info: dict[str, Any], columns: int) -> str:
@@ -45,20 +66,23 @@ def device_details(info: dict[str, Any], columns: int) -> str:
         f"Unallocated  {free_text}",
         "",
     ]
-    widths = [18, 10, 12, max(8, columns - 8 - 18 - 10 - 12 - 9)]
+    widths = [18, 10, 12, max(8, columns - 14 - 18 - 10 - 12 - 9)]
     lines.append(table_row(["PARTITION", "SIZE", "FILESYSTEM", "LABEL"], widths))
     lines.append("─" * (sum(widths) + 9))
 
     def visit(node: dict[str, Any]) -> None:
         path = clean(node.get("path") or node.get("name"))
         label = clean(node.get("label"))
+        filesystem = filesystem_label(node.get("fstype"))
         lines.append(table_row([
             path, runtime.format_bytes(int(node.get("size") or 0)),
-            clean(node.get("fstype")), label,
+            filesystem, label,
         ], widths))
         # Preserve full values if they do not fit in a table cell.
         if len(path) > widths[0]:
             lines.append(f"  Path: {path}")
+        if len(filesystem) > widths[2]:
+            lines.append(f"  Filesystem: {filesystem}")
         if len(label) > widths[3]:
             lines.append(f"  Label: {label}")
         for child in node.get("children") or []:

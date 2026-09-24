@@ -242,7 +242,8 @@ class WorkflowWidget(App[str | None]):
             if self.kind == "menu":
                 yield Input(placeholder="Filter actions…  /", id="workflow-search")
                 yield OptionList(id="workflow-options", markup=False)
-                yield Static("", id="workflow-device", markup=False)
+                with VerticalScroll(id="workflow-device-pane"):
+                    yield Static("", id="workflow-device", markup=False)
             elif self.kind == "input":
                 yield Input(value=self.values[0] if self.values else "", id="workflow-input")
             with Horizontal(id="workflow-buttons"):
@@ -293,14 +294,22 @@ class WorkflowWidget(App[str | None]):
             if tag == default:
                 selected = index
         options.highlighted = selected if selected is not None else first
-        self.query_one("#workflow-device").display = False
+        self.query_one("#workflow-device-pane").display = False
 
     @on(OptionList.OptionHighlighted)
     def show_device(self, event: OptionList.OptionHighlighted) -> None:
         description = next((desc for tag, desc in self.items if tag == event.option.id), "")
         details = plain(description).partition("\t")[2]
-        self.query_one("#workflow-device", Static).update(details)
-        self.query_one("#workflow-device").display = bool(details)
+        content = Text(details)
+        offset = 0
+        for line in details.splitlines(keepends=True):
+            if line.startswith("Unallocated"):
+                content.stylize("bold #84c9e7", offset, offset + len(line.rstrip()))
+            offset += len(line)
+        self.query_one("#workflow-device", Static).update(content)
+        pane = self.query_one("#workflow-device-pane", VerticalScroll)
+        pane.display = bool(details)
+        pane.scroll_home(animate=False)
 
     @on(OptionList.OptionSelected)
     def select_option(self, event: OptionList.OptionSelected) -> None:
