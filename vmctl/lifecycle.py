@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
+from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -2311,6 +2311,141 @@ def cmd_lab(args: argparse.Namespace) -> int:
             return code
         return max(code, lab_unexport(names, uri, args))
     raise VMError(f"Unknown lab action: {action}")
+
+
+def group_states(cfg: dict[str, Any], names: list[str]) -> dict[str, dict[str, Any]]:
+    """What the lab map and ``group status`` show live: running or not, and the disk ladder."""
+    states: dict[str, dict[str, Any]] = {}
+    for name in names:
+        vm = config.get_vm(cfg, name)
+        states[name] = {"running": running_qemu_pid(name, vm) is not None,
+                        "install": str(vmstate.summary(name, vm)["label"])}
+    return states
+
+
+def cmd_group(args: argparse.Namespace) -> int:
+    """``vmctl group list|status|up|down|map``: a declared group handled as one stack."""
+    cfg = config.load_config()
+    action = args.action
+    if action == "list":
+        groups = labs.lab_groups(cfg) if args.labs else sorted(
+            {group for _, vm in config.sorted_vm_items(cfg) for group in config.declared_groups(vm)})
+        lab_names = set(labs.lab_groups(cfg))
+        entries: list[dict[str, Any]] = []
+        for group in groups:
+            members = labs.group_members(cfg, group)
+            entry: dict[str, Any] = {"group": group, "members": members, "lab": group in lab_names,
+                                     "start_order": labs.start_order(cfg, members)}
+            if entry["lab"]:
+                # Addresses for the TUI's lab panel; live state stays with the dashboard's own rows.
+                entry["addresses"] = {member["name"]: [nic["address"] for nic in member["nics"] if nic["type"] == "segment"]
+                                      for member in labs.model(cfg, group)["members"]}
+            entries.append(entry)
+        if args.json:
+            print(json.dumps(entries, indent=2))
+        else:
+            for entry in entries:
+                kind = "lab  " if entry["lab"] else "group"
+                print(f"{entry['group']:<18} {kind}  {', '.join(entry['members'])}")
+        return 0
+    if not args.group:
+        raise VMError(f"vmctl group {action} needs a group name (vmctl group list shows them)")
+    names = labs.group_members(cfg, args.group)
+    if not names:
+        raise VMError(f"No profile declares the group '{args.group}' (vmctl group list shows them)")
+    lab = labs.model(cfg, args.group, group_states(cfg, names))
+    order = lab["start_order"]
+    if action == "status":
+        if args.json:
+            print(json.dumps(lab, indent=2))
+            return 0
+        ui.print_header(f"Group {args.group}: {len(order)} VMs, start order {' -> '.join(order)}")
+        for member in lab["members"]:
+            addresses = ", ".join(nic.get("address") or nic["type"] for nic in member["nics"])
+            state = "running" if member["running"] else "stopped"
+            ui.print_note(f"{member['name']:<22} {state:<8} {member['install']:<11} {addresses}")
+        return 0
+    if action == "up":
+        for member in lab["members"]:
+            if member["running"]:
+                ui.print_status("ok", f"{member['name']} is already running")
+            elif member["install"] in ("no disk", "empty"):
+                ui.print_status("warn", f"{member['name']} has no installed disk: skipped (install it first)", ok=False)
+            else:
+                cmd_start(argparse.Namespace(vm=member["name"], headless=True, background=True, video=None,
+                                             cloud_init=False, spice_port=None, dry_run=args.dry_run))
+        ui.print_note(f"Watch a desktop with: vmctl attach <vm>  ·  map: vmctl group map {args.group} --open")
+        return 0
+    if action == "down":
+        for member in reversed(lab["members"]):
+            if member["running"]:
+                cmd_stop(argparse.Namespace(vm=member["name"], dry_run=args.dry_run))
+        return 0
+    if action == "install":
+        return group_install(cfg, args, lab)
+    if action == "clean":
+        present = [member["name"] for member in lab["members"] if member["install"] != "no disk"]
+        if not present:
+            ui.print_status("ok", f"Nothing to clean in {args.group}: no member has a disk")
+            return 0
+        confirm_or_yes(args, f"Stop and delete the disks and artifacts of {', '.join(present)} (checkpoints and ISOs are kept)?")
+        for member in reversed(lab["members"]):
+            vm = config.get_vm(cfg, member["name"])
+            if member["running"]:
+                cmd_stop(argparse.Namespace(vm=member["name"], dry_run=args.dry_run))
+            clean_vm(member["name"], vm, dry_run=args.dry_run)
+        ui.print_status("ok", f"{args.group} cleaned; reinstall it with: vmctl group install {args.group}")
+        return 0
+    if action == "map":
+        dest = Path(args.output).expanduser() if args.output else None
+        if args.dry_run:
+            ui.print_note(f"Would write {ui.pretty_path(dest or labs.map_path(args.group))}")
+            return 0
+        path = labs.write_map(lab, dest)
+        ui.print_status("ok", f"Network map of {args.group}: {ui.pretty_path(path)}")
+        if args.open:
+            import webbrowser
+            webbrowser.open(path.resolve().as_uri())
+        return 0
+    raise VMError(f"Unknown group action: {action}")
+
+
+INSTALLED_LABELS = ("installed", "verified")
+
+
+def group_install(cfg: dict[str, Any], args: argparse.Namespace, lab: dict[str, Any]) -> int:
+    """Install what the group lacks, in start order, with each member's own unattended flow; then
+    bring the stack up in the runtime phase. Cumulative: installed members are kept, so a rerun after
+    a failure continues where it stopped. A disk left empty or by an unfinished install is deleted
+    first (after asking): an install cannot resume on it, and an old disk would boot ahead of the medium."""
+    group = lab["group"]
+    missing = [m["name"] for m in lab["members"] if m["install"] not in INSTALLED_LABELS]
+    if not missing:
+        ui.print_status("ok", f"Every member of {group} is installed")
+    else:
+        redo = [m["name"] for m in lab["members"] if m["name"] in missing and m["install"] != "no disk"]
+        if redo:
+            confirm_or_yes(args, f"Reinstall from scratch (their disks are deleted): {', '.join(redo)}?")
+        ui.print_header(f"Install {group}: {' -> '.join(missing)}"
+                        + (f" (kept: {', '.join(n for n in lab['start_order'] if n not in missing)})" if len(missing) < len(lab["members"]) else ""))
+        for member in lab["members"]:
+            name = member["name"]
+            if name not in missing:
+                continue
+            vm = config.get_vm(cfg, name)
+            if member["running"]:
+                cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+            if name in redo:
+                clean_vm(name, vm, dry_run=args.dry_run)
+            outcome, detail = run_local_test_vm(name, vm, argparse.Namespace(timeout=args.timeout, dry_run=args.dry_run))
+            if outcome != "passed":
+                raise VMError(f"{name} was not installed ({detail}); fix it and rerun vmctl group install {group}")
+            ui.print_status("ok", f"{name} installed ({detail})")
+    # The installs ran with the install-phase NICs: restart everything in the runtime phase.
+    for member in reversed(labs.model(cfg, group, group_states(cfg, lab["start_order"]))["members"]):
+        if member["running"]:
+            cmd_stop(argparse.Namespace(vm=member["name"], dry_run=args.dry_run))
+    return cmd_group(argparse.Namespace(**{**vars(args), "action": "up"}))
 
 
 def lab_in_libvirt(uri: str, names: list[str], dry_run: bool) -> bool:

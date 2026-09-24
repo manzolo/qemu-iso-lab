@@ -325,6 +325,119 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.selected, "alpine")
             self.assertEqual(app.query_one("#details", VMDetails).row["name"], "alpine")
 
+    def lab_app(self):
+        app = self.make_app()
+        app.bridge.labs.return_value = [{"group": "demo-lab", "members": ["alpine", "ubuntu"], "lab": True,
+                                         "start_order": ["ubuntu", "alpine"],
+                                         "addresses": {"ubuntu": ["10.10.10.2/24"], "alpine": ["10.10.10.10/24"]}}]
+        app.bridge.run_group.return_value = 0
+        # A headless test cannot suspend the terminal (App.suspend is unsupported there).
+        app.suspend = lambda: nullcontext()
+        return app
+
+    async def test_labs_filter_lists_each_lab_with_members_in_start_order(self):
+        app = self.lab_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.click("#labs")
+            await pilot.pause()
+            await pilot.press("home")  # Labs keeps the selected profile's row; start from the top
+            table = app.query_one(DataTable)
+            self.assertEqual([row.key.value for row in table.ordered_rows],
+                             ["lab:demo-lab", "vm:demo-lab:ubuntu", "vm:demo-lab:alpine"])
+            self.assertEqual(table.get_row("lab:demo-lab")[1].plain, "1/2 running")
+            self.assertIsNone(app.selected)
+            self.assertFalse(app.query_one("#lab-details").has_class("hidden-panel"))
+            self.assertTrue(app.query_one("#details").has_class("hidden-panel"))
+            self.assertIn("10.10.10.2/24", app.query_one("#lab-members", Static).content.plain)
+            await pilot.press("down")
+            self.assertEqual(app.selected, "ubuntu")
+            self.assertTrue(app.query_one("#lab-details").has_class("hidden-panel"))
+            app.bridge.run_group.assert_not_called()
+
+    async def test_enter_on_a_lab_starts_it_and_the_panel_runs_every_action(self):
+        app = self.lab_app()
+        app.bridge.snapshot.return_value = [profile("alpine", install_label="verified", installed=True),
+                                            profile("ubuntu", running=True, install_label="verified", installed=True)]
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.click("#labs")
+            await pilot.pause()
+            await pilot.press("home")  # Labs keeps the selected profile's row; start from the top
+            app.query_one(DataTable).focus()
+            await pilot.press("enter")
+            app.bridge.run_group.assert_called_with("demo-lab", "up")
+            await pilot.press("right")
+            self.assertEqual(app.focused.id, "lab-up")
+            for key, action in (("down", "down"), ("down", "map"), ("down", "status"),
+                                ("down", "install"), ("down", "clean")):
+                await pilot.press(key)
+                await pilot.press("enter")
+                app.bridge.run_group.assert_called_with("demo-lab", action)
+            app.bridge.run.assert_not_called()
+
+    async def test_enter_on_a_lab_with_a_missing_member_installs_it(self):
+        app = self.lab_app()
+        app.bridge.snapshot.return_value = [profile("alpine", install_label="verified", installed=True),
+                                            profile("ubuntu")]
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.click("#labs")
+            await pilot.pause()
+            await pilot.press("home")  # Labs keeps the selected profile's row; start from the top
+            app.query_one(DataTable).focus()
+            await pilot.press("enter")
+            app.bridge.run_group.assert_called_with("demo-lab", "install")
+
+    async def test_enter_on_a_fully_running_lab_opens_its_map(self):
+        app = self.lab_app()
+        app.bridge.snapshot.return_value = [profile("alpine", running=True, install_label="verified"),
+                                            profile("ubuntu", running=True, install_label="verified")]
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.click("#labs")
+            await pilot.pause()
+            await pilot.press("home")  # Labs keeps the selected profile's row; start from the top
+            app.query_one(DataTable).focus()
+            await pilot.press("enter")
+            app.bridge.run_group.assert_called_with("demo-lab", "map")
+
+    async def test_f2_switches_between_labs_and_single_profiles(self):
+        app = self.lab_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.press("f2")
+            await pilot.pause()
+            self.assertEqual(app.mode, "labs")
+            self.assertEqual(app.current_key, "vm:demo-lab:ubuntu")  # the selected profile, inside its lab
+            await pilot.press("home")
+            self.assertTrue(app.query_one("#labs").has_class("active"))
+            self.assertEqual(app.query_one(DataTable).ordered_rows[0].key.value, "lab:demo-lab")
+            await pilot.press("down")  # a member row: F2 back keeps that profile selected
+            self.assertEqual(app.selected, "ubuntu")
+            await pilot.press("f2")
+            await pilot.pause()
+            self.assertEqual(app.mode, "all")
+            self.assertTrue(app.query_one("#all").has_class("active"))
+            self.assertEqual(app.selected, "ubuntu")
+            self.assertIsInstance(app.focused, DataTable)
+            app.bridge.run_group.assert_not_called()
+
+    async def test_compact_lab_panel_opens_as_a_dialog(self):
+        app = self.lab_app()
+        async with app.run_test(size=(80, 30)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.click("#labs")
+            await pilot.pause()
+            await pilot.press("home")  # Labs keeps the selected profile's row; start from the top
+            app.query_one(DataTable).focus()
+            await pilot.press("right")
+            await pilot.pause()
+            self.assertEqual(app.focused.id, "lab-up")
+            await pilot.press("escape")
+            await pilot.pause()
+            self.assertIsInstance(app.focused, DataTable)
+
     async def test_enter_runs_selected_profile_default_action(self):
         for size in ((120, 44), (80, 30)):
             with self.subTest(size=size):

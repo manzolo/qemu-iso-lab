@@ -151,6 +151,121 @@ class VMDetails(Vertical):
             self.post_message(self.Requested(self.row["name"], action))
 
 
+LAB_ACTIONS = (("lab-up", "Start stack", "up"), ("lab-down", "Stop stack", "down"),
+               ("lab-map", "Network map", "map"), ("lab-status", "Stack status", "status"),
+               ("lab-install", "Install lab…", "install"), ("lab-clean", "Clean lab…", "clean"))
+INSTALLED_LABELS = ("installed", "verified")
+
+
+def lab_primary(lab: Facts, rows: list[Facts]) -> str:
+    """Enter on a lab: install what is missing, else start what is not running, else draw the map."""
+    by_name = {row["name"]: row for row in rows}
+    members = [by_name[name] for name in lab["start_order"] if name in by_name]
+    if any(row["install_label"] not in INSTALLED_LABELS for row in members):
+        return "install"
+    return "map" if members and all(row["running"] for row in members) else "up"
+
+
+class LabDetails(Vertical):
+    BINDINGS = [Binding("up", "previous_action", show=False),
+                Binding("down", "next_action", show=False),
+                Binding("left", "profiles", "Profiles")]
+
+    class Requested(Message):
+        def __init__(self, group: str, action: str) -> None:
+            super().__init__()
+            self.group = group
+            self.action = action
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.lab: Facts | None = None
+        self.border_title = "LAB"
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll(classes="detail-copy"):
+            yield Static(id="lab-name", markup=False)
+            yield Static(id="lab-summary")
+            yield Static(id="lab-members")
+        yield Static("↑/↓ Choose · ← Profiles", classes="action-hint", id="lab-hint", markup=False)
+        for button_id, label, _ in LAB_ACTIONS:
+            yield Button(label, id=button_id)
+
+    def show_lab(self, lab: Facts | None, rows: list[Facts]) -> None:
+        self.lab = lab
+        if lab is None:
+            return
+        by_name = {row["name"]: row for row in rows}
+        members = [by_name[name] for name in lab["start_order"] if name in by_name]
+        running = sum(bool(row["running"]) for row in members)
+        self.query_one("#lab-name", Static).update(lab["group"])
+        tone = "#86d5ab" if running else "#a6b4c8"
+        self.query_one("#lab-summary", Static).update(Text.assemble(
+            (f"●  {running} / {len(members)} running", f"bold {tone}"),
+            ("\nStart order: " + " → ".join(lab["start_order"]), "#a6b4c8")))
+        body = Text()
+        for row in members:
+            label, color = status_label(row)
+            body.append(f"\n{row['name']}\n", style="bold #dce5ef")
+            body.append(f"  {label}", style=color)
+            addresses = ", ".join(lab.get("addresses", {}).get(row["name"], []))
+            if addresses:
+                body.append(f"  ·  {addresses}", style="#a6b4c8")
+            body.append("\n")
+        self.query_one("#lab-members", Static).update(body)
+        primary = lab_primary(lab, rows)
+        label = {action: text for _, text, action in LAB_ACTIONS}[primary]
+        self.query_one("#lab-hint", Static).update(Text.assemble(
+            (f"Enter → {label}", "bold #84c9e7"), "\n↑/↓ Choose · ← Profiles"))
+
+    def move_action(self, offset: int) -> None:
+        buttons = list(self.query(Button))
+        focused = self.app.focused
+        index = buttons.index(focused) if isinstance(focused, Button) and focused in buttons else 0
+        buttons[(index + offset) % len(buttons)].focus()
+
+    def action_previous_action(self) -> None:
+        self.move_action(-1)
+
+    def action_next_action(self) -> None:
+        self.move_action(1)
+
+    def action_profiles(self) -> None:
+        if isinstance(self.app.screen, LabScreen):
+            self.app.pop_screen()
+        self.app.query_one(ProfileTable).focus()
+
+    @on(Button.Pressed)
+    def request_action(self, event: Button.Pressed) -> None:
+        event.stop()
+        if self.lab is not None:
+            action = {button_id: action for button_id, _, action in LAB_ACTIONS}[event.button.id or ""]
+            self.post_message(self.Requested(self.lab["group"], action))
+
+
+class LabScreen(ModalScreen[None]):
+    """The lab panel on narrow terminals, where the side panel is hidden."""
+    BINDINGS = [("escape", "dismiss", "Back")]
+
+    def __init__(self, lab: Facts, rows: list[Facts]) -> None:
+        super().__init__()
+        self.lab = lab
+        self.rows = rows
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="detail-dialog"):
+            yield LabDetails(id="lab-modal")
+            yield Button("Back · Esc", id="close-lab")
+
+    def on_mount(self) -> None:
+        self.query_one(LabDetails).show_lab(self.lab, self.rows)
+        self.query_one("#lab-up", Button).focus()
+
+    @on(Button.Pressed, "#close-lab")
+    def close_lab(self) -> None:
+        self.dismiss()
+
+
 class DetailsScreen(ModalScreen[None]):
     BINDINGS = [("escape", "dismiss", "Back")]
 
@@ -187,7 +302,11 @@ class HelpScreen(ModalScreen[None]):
                 "/ or F3    Search name, description or family\n"
                 "↓          Move from search to results\n"
                 "Tab        Move between controls\n"
+                "F2         Switch between Labs and single profiles\n"
                 "F5         Refresh (also automatic every 15s)\n"
+                "Labs       Filter: each lab with its members; Enter installs\n"
+                "           what is missing, starts the stack or opens its map;\n"
+                "           → start/stop/map/status/install/clean\n"
                 "F8         Open the classic TUI\n"
                 "Esc        Clear search / return to list / quit\n\n"
                 "Boot verified: a disk boot or post-install check passed.\n"
@@ -215,6 +334,7 @@ class Dashboard(App[None]):
         Binding("slash", "search", "Search"),
         Binding("f3", "search", "Search", show=False),
         Binding("enter", "primary", "Default action"),
+        Binding("f2", "toggle_labs", "Labs ⇄ Profiles"),
         Binding("f5", "refresh", "Refresh"),
         Binding("f8", "classic", "Classic UI"),
         Binding("f1", "help", "Help"),
@@ -229,6 +349,9 @@ class Dashboard(App[None]):
         self.filtered: list[Facts] = []
         self.mode = "all"
         self.selected: str | None = None
+        self.labs: list[Facts] = []
+        self.selected_lab: str | None = None
+        self.current_key: str | None = None
         self.refreshing = False
         self.interactive = False
         self.loaded = False
@@ -243,6 +366,7 @@ class Dashboard(App[None]):
                 yield Button("All", id="all", classes="filter active")
                 yield Button("With disk", id="disk", classes="filter")
                 yield Button("Running", id="running", classes="filter")
+                yield Button("Labs", id="labs", classes="filter")
         yield Static("Reading VM state…", id="notice", markup=False)
         with Horizontal(id="workspace"):
             with Vertical(id="catalog"):
@@ -250,6 +374,7 @@ class Dashboard(App[None]):
                 yield ProfileTable(id="profiles", cursor_type="row", zebra_stripes=True)
                 yield Static("No matching profiles. Try another search or filter.", id="empty", markup=False)
             yield VMDetails(id="details")
+            yield LabDetails(id="lab-details", classes="hidden-panel")
         with Vertical(id="activity"):
             yield Static("ACTIVITY", classes="eyebrow")
             yield Static("Reading installation status…", id="activity-text", markup=False)
@@ -278,6 +403,11 @@ class Dashboard(App[None]):
     async def read_snapshot(self) -> None:
         try:
             rows = await asyncio.to_thread(self.bridge.snapshot)
+            try:
+                labs = await asyncio.to_thread(self.bridge.labs)
+            except Exception:
+                labs = self.labs
+            self.labs = labs if isinstance(labs, list) else []
         except Exception as exc:
             self.query_one("#notice", Static).update(f"Refresh failed — {exc}. F5 to retry.")
             self.query_one("#notice").add_class("error")
@@ -306,16 +436,49 @@ class Dashboard(App[None]):
         finally:
             self.refreshing = False
 
-    def rebuild_table(self) -> None:
+    def table_entries(self) -> list[tuple[str, tuple[Text | str, ...], str | None, str | None]]:
+        """(row key, cells, profile, lab) for the current filter; profile keys are the names."""
         query = self.query_one("#search", Input).value
-        self.filtered = visible_rows(self.rows, query, self.mode)
-        names = [row["name"] for row in self.filtered]
-        selected = self.selected if self.selected in names else (names[0] if names else None)
+        if self.mode != "labs":
+            self.filtered = visible_rows(self.rows, query, self.mode)
+            entries: list[tuple[str, tuple[Text | str, ...], str | None, str | None]] = []
+            for row in self.filtered:
+                label, tone = status_label(row)
+                entries.append((row["name"], (Text(row["name"]), Text(label, style=tone), resources(row)), row["name"], None))
+            return entries
+        words = query.casefold().split()
+        by_name = {row["name"]: row for row in self.rows}
+        entries = []
+        self.filtered = []
+        for lab in self.labs:
+            group = str(lab["group"])
+            members = [by_name[name] for name in lab["start_order"] if name in by_name]
+            shown = [row for row in members
+                     if all(word in f"{row['name']} {row['label']} {group}".casefold() for word in words)]
+            if not shown and not all(word in group.casefold() for word in words):
+                continue
+            running = sum(bool(row["running"]) for row in members)
+            entries.append((f"lab:{group}", (Text(f"▾ {group}", style="bold #84c9e7"),
+                            Text(f"{running}/{len(members)} running", style="#86d5ab" if running else "#a6b4c8"), ""),
+                            None, group))
+            for row in shown:
+                label, tone = status_label(row)
+                entries.append((f"vm:{group}:{row['name']}", (Text(f"  {row['name']}"), Text(label, style=tone), resources(row)),
+                                row["name"], group))
+                self.filtered.append(row)
+        return entries
+
+    def rebuild_table(self) -> None:
+        entries = self.table_entries()
+        keys = [key for key, _, _, _ in entries]
+        current = self.current_key if self.current_key in keys else next(
+            (key for key, _, vm, _ in entries if vm is not None and vm == self.selected),
+            keys[0] if keys else None)
         table = self.query_one(DataTable)
         available = self.size.width - (6 if self.has_class("compact") else 46)
         widths = [max(12, min(36, available - 32)), 16, 9]
         same_layout = (
-            [row.key.value for row in table.ordered_rows] == names
+            [row.key.value for row in table.ordered_rows] == keys
             and [column.width for column in table.columns.values()] == widths
         )
         with self.batch_update(), table.prevent(DataTable.RowHighlighted):
@@ -323,35 +486,56 @@ class Dashboard(App[None]):
                 table.clear(columns=True)
                 for title, width in zip(("PROFILE", "STATE", "RAM / CPU"), widths):
                     table.add_column(title, width=width)
-            for row in self.filtered:
-                label, tone = status_label(row)
-                cells = (Text(row["name"]), Text(label, style=tone), resources(row))
+            for key, cells, _, _ in entries:
                 if same_layout:
                     for column, value in zip(table.columns, cells):
-                        if table.get_cell(row["name"], column) != value:
-                            table.update_cell(row["name"], column, value)
+                        if table.get_cell(key, column) != value:
+                            table.update_cell(key, column, value)
                 else:
-                    table.add_row(*cells, key=row["name"])
-            if selected and not same_layout:
-                table.move_cursor(row=names.index(selected), animate=False)
-                self.call_after_refresh(table.move_cursor, row=names.index(selected), animate=False)
-        self.selected = selected
-        self.query_one("#empty").display = not self.filtered
-        self.query_one("#list-title", Static).update(f"PROFILES  {len(self.filtered)} / {len(self.rows)}")
+                    table.add_row(*cells, key=key)
+            if current and not same_layout:
+                table.move_cursor(row=keys.index(current), animate=False)
+                self.call_after_refresh(table.move_cursor, row=keys.index(current), animate=False)
+        self.select_key(current, entries)
+        self.query_one("#empty").display = not entries
+        if self.mode == "labs":
+            self.query_one("#list-title", Static).update(f"LABS  {len(self.labs)}")
+        else:
+            self.query_one("#list-title", Static).update(f"PROFILES  {len(self.filtered)} / {len(self.rows)}")
         self.update_details()
+
+    def select_key(self, key: str | None,
+                   entries: list[tuple[str, tuple[Text | str, ...], str | None, str | None]] | None = None) -> None:
+        entry = next((item for item in (entries if entries is not None else self.table_entries()) if item[0] == key), None)
+        self.current_key = key
+        self.selected = entry[2] if entry else None
+        self.selected_lab = entry[3] if entry else None
 
     def selected_row(self) -> Facts | None:
         return next((row for row in self.rows if row["name"] == self.selected), None)
 
+    def selected_lab_facts(self) -> Facts | None:
+        """The lab whose header row is selected (None on a member or profile row)."""
+        if self.selected is not None or self.selected_lab is None:
+            return None
+        return next((lab for lab in self.labs if lab["group"] == self.selected_lab), None)
+
     def update_details(self) -> None:
         details = self.query_one("#details", VMDetails)
+        lab_details = self.query_one("#lab-details", LabDetails)
+        lab = self.selected_lab_facts()
+        details.set_class(lab is not None, "hidden-panel")
+        lab_details.set_class(lab is None, "hidden-panel")
+        if lab is not None:
+            lab_details.show_lab(lab, self.rows)
+            return
         row = self.selected_row()
         if details.row != row:
             details.show_row(row)
 
     @on(DataTable.RowHighlighted)
     def highlight_row(self, event: DataTable.RowHighlighted) -> None:
-        self.selected = str(event.row_key.value)
+        self.select_key(str(event.row_key.value))
         self.update_details()
 
     @on(DataTable.RowSelected)
@@ -374,11 +558,21 @@ class Dashboard(App[None]):
 
     @on(Button.Pressed, ".filter")
     def filter_changed(self, event: Button.Pressed) -> None:
-        self.mode = event.button.id or "all"
+        self.set_mode(event.button.id or "all")
+
+    def set_mode(self, mode: str) -> None:
+        # A member row selected in Labs stays selected as its own profile row, and back.
+        if self.selected is not None:
+            self.current_key = self.selected
+        self.mode = mode
         for button in self.query(".filter"):
-            button.set_class(button is event.button, "active")
+            button.set_class(button.id == mode, "active")
         self.rebuild_table()
         self.query_one(DataTable).focus()
+
+    def action_toggle_labs(self) -> None:
+        if not isinstance(self.screen, ModalScreen):
+            self.set_mode("all" if self.mode == "labs" else "labs")
 
     def action_search(self) -> None:
         self.query_one("#search", Input).focus()
@@ -386,12 +580,23 @@ class Dashboard(App[None]):
     def action_primary(self) -> None:
         if isinstance(self.screen, ModalScreen):
             return
+        lab = self.selected_lab_facts()
+        if lab is not None:
+            self.run_group(lab["group"], lab_primary(lab, self.rows))
+            return
         row = self.selected_row()
         if row is not None:
             self.run_classic(row["name"], primary_action(row)[1])
 
     def action_details(self) -> None:
         if isinstance(self.screen, ModalScreen):
+            return
+        lab = self.selected_lab_facts()
+        if lab is not None:
+            if self.has_class("compact"):
+                self.push_screen(LabScreen(lab, self.rows))
+            else:
+                self.query_one("#lab-up", Button).focus()
             return
         row = self.selected_row()
         if row is not None:
@@ -407,7 +612,7 @@ class Dashboard(App[None]):
     def action_escape(self) -> None:
         if isinstance(self.screen, ModalScreen):
             self.pop_screen()
-        elif isinstance(self.focused, Button) and self.focused.parent is self.query_one("#details"):
+        elif isinstance(self.focused, Button) and self.focused.parent in (self.query_one("#details"), self.query_one("#lab-details")):
             self.query_one(DataTable).focus()
         elif self.query_one("#search", Input).value:
             self.query_one("#search", Input).value = ""
@@ -425,6 +630,27 @@ class Dashboard(App[None]):
         if isinstance(self.screen, DetailsScreen):
             self.pop_screen()
         self.run_classic(event.name, event.action)
+
+    @on(LabDetails.Requested)
+    def run_lab_requested(self, event: LabDetails.Requested) -> None:
+        if isinstance(self.screen, LabScreen):
+            self.pop_screen()
+        self.run_group(event.group, event.action)
+
+    def run_group(self, group: str, action: str) -> None:
+        self.interactive = True
+        try:
+            with self.suspend():
+                code = self.bridge.run_group(group, action)
+            if code:
+                self.notify(f"vmctl group {action} {group} exited with status {code}", severity="warning")
+            elif action == "map":
+                self.notify(f"Network map of {group} opened in the browser (artifacts/labs/{group}/network.html)")
+        except Exception as exc:
+            self.notify(str(exc), title="Unable to run the lab action", severity="error")
+        finally:
+            self.interactive = False
+        self.action_refresh(quiet=True)
 
     def run_classic(self, name: str, action: str) -> None:
         self.interactive = True

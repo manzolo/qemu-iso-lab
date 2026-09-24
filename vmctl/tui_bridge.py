@@ -98,6 +98,42 @@ class ClassicBridge:
         rows: list[Facts] = json.loads(result.stdout)
         return rows
 
+    def labs(self) -> list[Facts]:
+        """The labs (groups whose members share a segment), with start order and addresses."""
+        result = subprocess.run(
+            [str(self.script.parent / "vmctl"), "group", "list", "--labs", "--json"],
+            env=self.env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60,
+        )
+        if result.returncode:
+            raise RuntimeError(result.stderr.strip() or "Unable to read the labs")
+        labs: list[Facts] = json.loads(result.stdout)
+        return labs
+
+    def run_group(self, group: str, action: str) -> int:
+        """Run ``vmctl group <action> <group>`` in the terminal; everything but map waits for Enter.
+
+        ``clean`` and a reinstalling ``install`` ask their own y/N question there (default No)."""
+        if action not in {"up", "down", "status", "map", "install", "clean"}:
+            raise ValueError(f"Unsupported group action: {action}")
+        # Values are positional arguments, never interpolated into shell code.
+        script = (
+            'if [ "$2" = map ]; then "$1" group map "$3" --open; else "$1" group "$2" "$3"; fi\n'
+            'code=$?\n'
+            'if [ "$2" != map ] || [ "$code" -ne 0 ]; then\n'
+            '    printf "\\nPress Enter to return to the dashboard... "\n'
+            '    read -r _\n'
+            'fi\n'
+            'exit "$code"\n'
+        )
+        previous = signal.signal(signal.SIGINT, lambda *_: None)
+        try:
+            return subprocess.run(
+                ["bash", "-c", script, "vmtui-group", str(self.script.parent / "vmctl"), action, group],
+                env=self.env, check=False,
+            ).returncode
+        finally:
+            signal.signal(signal.SIGINT, previous)
+
     def run(self, name: str, action: str) -> int:
         if action not in {"menu", "classic", "alt-l", "alt-a", "alt-d", "alt-u",
                           "alt-h", "alt-s", "alt-x", "Profile Details", "Video Profile"}:

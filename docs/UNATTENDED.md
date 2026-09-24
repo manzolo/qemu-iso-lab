@@ -1344,6 +1344,74 @@ vmctl start proxmox-ve --background --headless  # runtime phase: both NICs
 vmctl start proxmox-lab-client                  # the desktop opens Firefox on the Proxmox GUI
 ```
 
-The certificate is Proxmox's self-signed one, so the browser asks once. The cross-VM check
-(client reaching `10.10.10.2:8006`) needs both VMs running and is not part of a `check-vms` row,
-which runs one VM at a time.
+The client's desktop opens Firefox on the GUI by itself: an XDG autostart entry runs
+`/usr/local/bin/vmctl-open-proxmox`, which waits (up to 10 minutes) until `https://10.10.10.2:8006/`
+answers, because the lab starts both VMs together and Proxmox answers later than the desktop logs in.
+The policies drop the first-run and privacy-notice tabs. The certificate is Proxmox's self-signed
+one, so the browser asks once. The cross-VM checks need both VMs running and are not part of a
+`check-vms` row, which runs one VM at a time: `vmctl group up proxmox-lab`, then from the client
+`curl -k https://10.10.10.2:8006/`, `http://10.10.10.20/`, `http://10.10.10.21:8080/`.
+
+The post-install also switches the repositories to `pve-no-subscription` (`pve-repos.sh`: the
+enterprise ones answer 401 and "Update package database" fails in the GUI) and creates two light
+LXC containers with the [Proxmox VE Helper-Scripts](https://community-scripts.org/) (`lab_services`,
+`pve-community.sh`): **IT-Tools** (CT 200, Alpine, 256 MB, `http://10.10.10.20/`) and **Glance**
+(CT 201, Debian, 512 MB, `http://10.10.10.21:8080/`). They are bookmarked in the client's toolbar.
+The scripts come from the project's `main` branch and are not pinned. What made them run, and
+what went wrong first (all verified live on 2026-09-24):
+
+- `mode=default` is what skips their whiptail menu; without a TTY and without it the script prints
+  "User exited script" and exits **0**, so the helper checks the log and `pct status`. `TERM=xterm`
+  keeps `clear`/`whiptail` from failing, and `/usr/local/community-scripts/diagnostics` with
+  `DIAGNOSTICS=no` pre-answers the one question default mode still asks.
+- Containers go on `vmbr0` (the NAT NIC: the template and packages come from the Internet) with a
+  **static** address outside slirp's DHCP pool (`.15`-`.30`): `10.0.2.100` and `.101`. With DHCP the
+  first container was handed `10.0.2.15`, the Proxmox host's own address (the installer turns its
+  DHCP lease into a static configuration, so slirp's server believes it free), and the duplicate cut
+  the host off until the container was stopped over the lab segment.
+- The second NIC puts each container on `vmbr1` at its lab address. `pct` refuses a bridge that does
+  not exist, even with the container stopped, and in the post-install boot the segment port is
+  missing, so `pve-lan.sh` runs `ifreload -a` right away: it reports the missing `pvelan0` and exits
+  1, but creates `vmbr1` with its address, and the NIC is hot-plugged. At the runtime boot the port
+  joins the bridge and the containers start by themselves (`onboot`).
+- **The segment port must not learn MACs.** The segment is a QEMU multicast socket, which loops every
+  frame back to its sender: the bridge then learned the containers' MACs on `pvelan0` and sent their
+  traffic back into the segment, so ping half worked and TCP from the client never reached them.
+  `vmbr1` carries `post-up bridge link set dev pvelan0 learning off`; Proxmox's own address was never
+  affected because its MAC is local to the bridge.
+
+## Groups as stacks and the lab map (`vmctl group`)
+
+A declared group (`meta.groups`) can be run as one stack. A **lab** is a group whose members are
+all on a network segment: today `netlab` and `proxmox-lab` (`vmctl group list --labs`).
+
+```bash
+vmctl group list [--labs] [--json]
+vmctl group status proxmox-lab        # running, disk state and addresses of every member
+vmctl group up proxmox-lab            # headless background starts; infrastructure first
+vmctl group down proxmox-lab          # reverse order
+vmctl group map proxmox-lab --open    # artifacts/labs/<group>/network.html (+ lab.json)
+vmctl group install proxmox-lab       # what is missing, in start order, then down + up (runtime NICs)
+vmctl group clean proxmox-lab         # stop and delete every member's disk (asks; checkpoints kept)
+```
+
+`install` is cumulative: installed and verified members are kept, missing ones go through their own
+unattended flow (the one `check-vms` would pick), so a rerun after a failure continues where it
+stopped. A member whose disk is empty or holds an unfinished install is deleted and reinstalled,
+after asking (`--yes` in scripts): an installer cannot resume on it. The installs run with the
+install-phase NICs, so the whole stack is stopped and started again at the end.
+
+The start order puts routers and hypervisors first (`meta.role` router/pfsense/hypervisor), then
+services (pihole/dns/server), then the rest: `pfsense-lab -> pihole-lab -> lubuntu-lab`, the network
+lab's own install order. `up` skips members without an installed disk. The map is one
+self-contained HTML page (inline SVG, light and dark): the host bar with every forward on
+127.0.0.1, one box per VM with its live state, the segments as buses with each NIC's address and
+MAC, the containers a hypervisor serves (`lab_services`) and links for the web forwards. The data
+comes from the profiles only (`labs.model`): the network lab's addresses from its `network_lab`
+topology, the others from `networks[].address`.
+
+In `vmtui` the **Labs** filter (or **F2**, which switches between labs and single profiles and
+keeps the selected profile) lists each lab with its members in start order. On a lab row Enter
+installs what is missing, else starts the stack, else opens the map; → shows *Start stack*, *Stop
+stack*, *Network map*, *Stack status*, *Install lab…* and *Clean lab…* (both ask y/N, default No,
+before deleting a disk).

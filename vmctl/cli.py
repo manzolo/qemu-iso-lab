@@ -33,6 +33,8 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
      ["export-libvirt", "unexport-libvirt"]),
     ("Network lab", "pfSense router + Pi-hole DNS + clients on an isolated LAN segment",
      ["lab"]),
+    ("Groups", "a declared group (netlab, proxmox-lab...) as one stack: start, stop, network map",
+     ["group"]),
     ("Verify", "smoke tests and the local validation matrix",
      ["boot-check", "check-vms", "report-pdf"]),
     ("Physical disks", "DESTRUCTIVE, ask for sudo, require --confirm-device",
@@ -234,6 +236,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--export", action="store_true", help="install: once the three VMs are installed, hand the lab to libvirt (same as lab export)")
     p.add_argument("--libvirt", action="store_true", help="check: probe the LAN addresses (host on lab-lan) instead of the 127.0.0.1 forwards")
     p.set_defaults(func=lifecycle.cmd_lab)
+
+    p = _add(subparsers, "group", help="a declared group as one stack: list the groups (--labs: only those on a network segment), status, up (infrastructure first), down (reverse), map (HTML network map, --open), install (what is missing, cumulative), clean")
+    p.add_argument("action", choices=["list", "status", "up", "down", "map", "install", "clean"], help="what to do with the group (install: what is missing, in start order, then up; clean: stop and delete every member's disk)")
+    p.add_argument("group", nargs="?", help="the group name (meta.groups), e.g. netlab or proxmox-lab")
+    p.add_argument("--labs", action="store_true", help="list: only the labs (groups with a member on a segment)")
+    p.add_argument("--json", action="store_true", help="list/status: machine-readable output")
+    p.add_argument("--open", action="store_true", help="map: open the page in the default browser")
+    p.add_argument("--output", help="map: write the page here instead of artifacts/labs/<group>/network.html")
+    p.add_argument("--timeout", type=int, default=3600, help="install: seconds per member install (default: 3600)")
+    p.add_argument("--yes", action="store_true", help="install/clean: do not ask before deleting disks")
+    p.set_defaults(func=lifecycle.cmd_group)
 
     p = _add(subparsers, "install-archinstall", help="boot the Arch live ISO with a pre-built archinstall config disk")
     p.add_argument("vm", help=VM_HELP)
