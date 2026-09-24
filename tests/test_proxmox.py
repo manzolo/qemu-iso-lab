@@ -1,4 +1,5 @@
 from _common import *
+import ipaddress
 import tomllib
 from vmctl.errors import VMError
 from vmctl import checkpoint, lifecycle, libvirt, proxmox, qemu
@@ -89,6 +90,23 @@ class ProxmoxTests(BaseVmctlTestCase):
             checkpoint.check_profile('proxmox-ve', vm)
         with self.assertRaises(VMError):
             libvirt.export(argparse.Namespace(vm='proxmox-ve', name=None), vm)
+
+    def test_lab_services_match_the_post_install_and_the_client_bookmarks(self):
+        pve, client = self.profile(), self.profile('proxmox-lab-client')
+        commands = pve['ssh_provision']['post_install_run']
+        segment = ipaddress.ip_network('10.10.10.0/24')
+        slirp_dhcp = range(15, 31)
+        for service in pve['lab_services']:
+            with self.subTest(service['name']):
+                expected = (f"/root/pve-community.sh {service['container']} {service['script']} {service['hostname']} "
+                            f"{service['port']} {service['nat_address']} {service['address']}")
+                self.assertIn(expected, commands)
+                self.assertIn(ipaddress.ip_interface(service['address']).ip, segment)
+                # Outside slirp's DHCP pool: a lease there once duplicated the host's own 10.0.2.15.
+                self.assertNotIn(int(str(ipaddress.ip_interface(service['nat_address']).ip).split('.')[-1]), slirp_dhcp)
+                self.assertIn(f'"URL":"{service["url"]}"', json.dumps(client['preseed_config']['late_commands']).replace('\\"', '"'))
+        self.assertLess(commands.index(next(c for c in commands if 'pve-repos.sh' in c)),
+                        commands.index(next(c for c in commands if 'pve-community.sh' in c)))
 
     def test_lab_members_share_the_runtime_segment_only(self):
         for name in ('proxmox-ve', 'proxmox-lab-client'):

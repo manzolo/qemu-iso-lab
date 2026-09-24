@@ -57,7 +57,8 @@
           "type": "segment",
           "name": "pve-lan",
           "phase": "runtime",
-          "mac": "52:54:00:9e:0a:02"
+          "mac": "52:54:00:9e:0a:02",
+          "address": "10.10.10.2/24"
         }
       ],
       "audio": false,
@@ -99,6 +100,16 @@
             "source": "vms/profile-files/proxmox/pve-lan.sh",
             "dest": "/root/pve-lan.sh",
             "dest_mode": "755"
+          },
+          {
+            "source": "vms/profile-files/proxmox/pve-repos.sh",
+            "dest": "/root/pve-repos.sh",
+            "dest_mode": "755"
+          },
+          {
+            "source": "vms/profile-files/proxmox/pve-community.sh",
+            "dest": "/root/pve-community.sh",
+            "dest_mode": "755"
           }
         ],
         "post_install_run": [
@@ -108,12 +119,38 @@
           "proxmox-boot-tool status",
           "test \"$(proxmox-boot-tool status | grep -c 'is configured with')\" -eq 2",
           "timeout 180 sh -c 'until curl -ksf -o /dev/null https://127.0.0.1:8006/; do sleep 3; done'",
-          "timeout 180 sh -c 'until for unit in pveproxy pvedaemon pve-cluster; do systemctl is-active --quiet $unit || exit 1; done; do sleep 3; done' || { systemctl status --no-pager pveproxy pvedaemon pve-cluster; exit 1; }",
+          "timeout 180 sh -c 'until systemctl is-active --quiet pveproxy && systemctl is-active --quiet pvedaemon && systemctl is-active --quiet pve-cluster; do sleep 3; done' || { systemctl status --no-pager pveproxy pvedaemon pve-cluster; exit 1; }",
+          "/root/pve-repos.sh",
           "/root/pve-lan.sh 52:54:00:9e:0a:02 10.10.10.2/24",
-          "grep -q 'bridge-ports pvelan0' /etc/network/interfaces && test -f /etc/systemd/network/10-vmctl-pvelan.link"
+          "/root/pve-community.sh 200 alpine-it-tools it-tools 80 10.0.2.100/24 10.10.10.20/24",
+          "/root/pve-community.sh 201 glance glance 8080 10.0.2.101/24 10.10.10.21/24",
+          "grep -q 'bridge-ports pvelan0' /etc/network/interfaces && test -f /etc/systemd/network/10-vmctl-pvelan.link",
+          "grep -q 'learning off' /etc/network/interfaces"
         ]
       },
-      "notes": "Proxmox VE on a ZFS RAID1 root over two virtio disks (vda + extra_disks vdb), installed by the vendor's automated installer from an answer file grafted on the ISO (bootstrap-proxmox). NIC 1 is NAT: SSH as root on 2276 with the project key, web GUI on https://127.0.0.1:8006 (root / lab). NIC 2 joins the pve-lan segment at runtime as vmbr1 10.10.10.2/24, shared with proxmox-lab-client. The installer only needs KVM; running guests inside it needs nested virtualization on the host."
+      "notes": "Proxmox VE on a ZFS RAID1 root over two virtio disks (vda + extra_disks vdb), installed by the vendor's automated installer from an answer file grafted on the ISO (bootstrap-proxmox). NIC 1 is NAT: SSH as root on 2276 with the project key, web GUI on https://127.0.0.1:8006 (root / lab). NIC 2 joins the pve-lan segment at runtime as vmbr1 10.10.10.2/24, shared with proxmox-lab-client. The installer only needs KVM; running guests inside it needs nested virtualization on the host. The post-install also creates two light LXC containers with the Proxmox VE Helper-Scripts (community-scripts.org, main branch, not pinned): IT-Tools (CT 200, http://10.10.10.20/) and Glance (CT 201, http://10.10.10.21:8080/), each on vmbr0 at a static NAT address outside slirp's DHCP pool and on vmbr1 at its lab address (lab_services).",
+      "lab_services": [
+        {
+          "name": "IT-Tools",
+          "container": 200,
+          "script": "alpine-it-tools",
+          "hostname": "it-tools",
+          "port": 80,
+          "nat_address": "10.0.2.100/24",
+          "address": "10.10.10.20/24",
+          "url": "http://10.10.10.20/"
+        },
+        {
+          "name": "Glance",
+          "container": 201,
+          "script": "glance",
+          "hostname": "glance",
+          "port": 8080,
+          "nat_address": "10.0.2.101/24",
+          "address": "10.10.10.21/24",
+          "url": "http://10.10.10.21:8080/"
+        }
+      ]
     },
     "proxmox-lab-client": {
       "name": "Debian 13 Xfce client of the Proxmox lab",
@@ -202,7 +239,7 @@
           "systemctl enable lightdm.service serial-getty@ttyS0.service",
           "systemctl set-default graphical.target",
           "install -d /etc/firefox/policies",
-          "printf '%s\\n' '{\"policies\": {\"Homepage\": {\"URL\": \"https://10.10.10.2:8006/\", \"StartPage\": \"homepage\"}, \"DisplayBookmarksToolbar\": \"always\", \"Bookmarks\": [{\"Title\": \"Proxmox VE\", \"URL\": \"https://10.10.10.2:8006/\", \"Placement\": \"toolbar\"}]}}' > /etc/firefox/policies/policies.json"
+          "printf '%s\\n' '{\"policies\":{\"Homepage\":{\"URL\":\"https://10.10.10.2:8006/\",\"StartPage\":\"none\"},\"OverrideFirstRunPage\":\"\",\"OverridePostUpdatePage\":\"\",\"DisableTelemetry\":true,\"DontCheckDefaultBrowser\":true,\"Preferences\":{\"datareporting.policy.firstRunURL\":{\"Value\":\"\",\"Status\":\"locked\"}},\"DisplayBookmarksToolbar\":\"always\",\"NoDefaultBookmarks\":true,\"Bookmarks\":[{\"Title\":\"Proxmox VE\",\"URL\":\"https://10.10.10.2:8006/\",\"Placement\":\"toolbar\"},{\"Title\":\"IT-Tools\",\"URL\":\"http://10.10.10.20/\",\"Placement\":\"toolbar\"},{\"Title\":\"Glance\",\"URL\":\"http://10.10.10.21:8080/\",\"Placement\":\"toolbar\"}]}}' > /etc/firefox/policies/policies.json"
         ],
         "disk_device": "/dev/vda"
       },
@@ -225,13 +262,14 @@
         "post_install_run": [
           "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package xfce4 --process xfce4-session",
           "firefox-esr --version",
-          "sudo ~/bin/client-lan.sh 52:54:00:9e:0a:10 10.10.10.10/24",
-          "nmcli -g ipv4.addresses connection show pve-lan | grep -q '10.10.10.10/24'"
+          "sudo ~/bin/client-lan.sh 52:54:00:9e:0a:10 10.10.10.10/24 https://10.10.10.2:8006/",
+          "nmcli -g ipv4.addresses connection show pve-lan | grep -q '10.10.10.10/24'",
+          "test -x /usr/local/bin/vmctl-open-proxmox && grep -q vmctl-open-proxmox /etc/xdg/autostart/vmctl-open-proxmox.desktop"
         ]
       },
       "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc",
       "guest_agent": true,
-      "notes": "Light desktop for the Proxmox lab: debian-xfce plus firefox-esr, whose policies open https://10.10.10.2:8006/ (proxmox-ve on the pve-lan segment) as homepage and toolbar bookmark. NIC 1 is NAT (SSH 2277), NIC 2 joins pve-lan at runtime with 10.10.10.10/24 through NetworkManager. Start proxmox-ve too (vmctl start proxmox-ve --background --headless) and the browser reaches the web GUI across the segment; the certificate is Proxmox's self-signed one.",
+      "notes": "Light desktop for the Proxmox lab: debian-xfce plus firefox-esr, whose policies open https://10.10.10.2:8006/ (proxmox-ve on the pve-lan segment) as homepage and toolbar bookmark (plus IT-Tools and Glance, the LXC apps on proxmox-ve), and an autostart entry opens it at login once Proxmox answers. NIC 1 is NAT (SSH 2277), NIC 2 joins pve-lan at runtime with 10.10.10.10/24 through NetworkManager. Start proxmox-ve too (vmctl start proxmox-ve --background --headless) and the browser reaches the web GUI across the segment; the certificate is Proxmox's self-signed one.",
       "network_device": "virtio-net-pci",
       "networks": [
         {
@@ -244,7 +282,8 @@
           "type": "segment",
           "name": "pve-lan",
           "phase": "runtime",
-          "mac": "52:54:00:9e:0a:10"
+          "mac": "52:54:00:9e:0a:10",
+          "address": "10.10.10.10/24"
         }
       ]
     }

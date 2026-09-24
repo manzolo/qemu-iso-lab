@@ -14,6 +14,9 @@ MACAddress=$mac
 [Link]
 Name=$name
 LINK
+if grep -q '^auto vmbr1$' /etc/network/interfaces && ! grep -q "learning off" /etc/network/interfaces; then
+    sed -i "/^#vmctl lab segment pve-lan/i\\	post-up bridge link set dev $name learning off" /etc/network/interfaces
+fi
 if ! grep -q '^auto vmbr1$' /etc/network/interfaces; then
     cat >> /etc/network/interfaces <<STANZA
 
@@ -25,9 +28,18 @@ iface vmbr1 inet static
 	bridge-ports $name
 	bridge-stp off
 	bridge-fd 0
+	# The segment is a QEMU multicast socket that echoes every frame back to its sender, so
+	# the bridge would learn the containers' MACs on this port and send their traffic back
+	# into the segment (TCP to 10.10.10.20 answered nothing, verified live): no learning here.
+	post-up bridge link set dev $name learning off
 #vmctl lab segment pve-lan
 STANZA
 fi
 # The initramfs udev names the NICs first: it must carry the .link file too.
 update-initramfs -u -k all
+# Bring vmbr1 up now, without its port: the segment NIC exists only in the runtime phase, but the
+# containers' second NIC needs the bridge to exist (pct refuses a missing one, even offline).
+# ifreload reports the missing port and exits 1; the bridge and its address are there anyway.
+ifreload -a || true
+ip link show vmbr1 >/dev/null
 grep -A5 '^auto vmbr1$' /etc/network/interfaces
