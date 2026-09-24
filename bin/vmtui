@@ -762,6 +762,7 @@ def facts(name, vm):
         "has_alpine": has_section(vm, "alpine_config"),
         "has_windows": has_section(vm, "windows_config"),
         "has_freebsd": has_section(vm, "freebsd_config"),
+        "has_proxmox": has_section(vm, "proxmox_config"),
         "has_pfsense": has_section(vm, "pfsense_config"),
         "has_reactos": has_section(vm, "reactos_config"),
         "has_netlab": has_section(vm, "network_lab"),
@@ -1122,6 +1123,8 @@ primary_install_action() {
         printf '%s\n' "Alpine Bootstrap"
     elif [[ "${FACTS[has_freebsd]:-0}" == "1" ]]; then
         printf '%s\n' "FreeBSD Bootstrap"
+    elif [[ "${FACTS[has_proxmox]:-0}" == "1" ]]; then
+        printf '%s\n' "Proxmox Bootstrap"
     elif [[ "${FACTS[has_pfsense]:-0}" == "1" ]]; then
         printf '%s\n' "pfSense Bootstrap"
     elif [[ "${FACTS[has_reactos]:-0}" == "1" ]]; then
@@ -1400,6 +1403,8 @@ emit_install_actions() {
         emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
     elif [[ "${FACTS[has_freebsd]:-0}" == "1" ]]; then
         emit_action "FreeBSD Bootstrap" "${again}Scripted FreeBSD disc1 install and SSH verification"
+    elif [[ "${FACTS[has_proxmox]:-0}" == "1" ]]; then
+        emit_action "Proxmox Bootstrap" "${again}Proxmox VE automated install (answer file on the ISO) + SSH verification"
     elif [[ "${FACTS[has_pfsense]:-0}" == "1" ]]; then
         emit_action "pfSense Bootstrap" "${again}Scripted pfSense install for the network lab router (rendered config.xml)"
         emit_action "Network Lab Plan" "Topology, forwards and install order of the lab"
@@ -1928,6 +1933,7 @@ resolve_action() {
         "Alpine Bootstrap") printf '%s\n' bootstrap-alpine ;;
         "Windows Bootstrap") printf '%s\n' bootstrap-windows ;;
         "FreeBSD Bootstrap") printf '%s\n' bootstrap-freebsd ;;
+        "Proxmox Bootstrap") printf '%s\n' bootstrap-proxmox ;;
         "pfSense Bootstrap") printf '%s\n' bootstrap-pfsense ;;
         "ReactOS Bootstrap") printf '%s\n' bootstrap-reactos ;;
         "Network Lab Plan") printf '%s\n' lab-plan ;;
@@ -2099,6 +2105,9 @@ run_action() {
             ;;
         bootstrap-freebsd)
             run_vmctl bootstrap-freebsd "$current_vm" || true
+            ;;
+        bootstrap-proxmox)
+            run_vmctl bootstrap-proxmox "$current_vm" || true
             ;;
         bootstrap-pfsense)
             if confirm_box "pfSense Bootstrap" "Run the scripted pfSense install for VM '$current_vm'?\n\nThis will:\n- render config.xml from the network_lab topology (WAN slirp, LAN segment, NAT forwards)\n- build a per-VM unattended ISO from the local pfSense CE 2.7.2 ISO (xorriso + growisofs)\n- boot the installer headless (BIOS, ZFS on vtbd0) and wait for the completion token\n\nExpected time: ~5-10 min. Then: vmctl lab up"; then

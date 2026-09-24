@@ -122,8 +122,45 @@ def firmware_args(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     return ["-drive", f"if=pflash,format=raw,readonly=on,file={code}", "-drive", f"if=pflash,format=raw,file={vars_path}"]
 
 
+def extra_disks(vm: dict[str, Any]) -> list[dict[str, Any]]:
+    """The profile's ``extra_disks``: further virtio disks beside ``disk``, e.g. the second half of a mirror.
+
+    Each entry is ``{"path", "size", "format"}``; they follow the main disk on the virtio bus (vdb,
+    vdc, ...), carry no boot index and live under the VM's artifact directory, so ``clean`` removes
+    them with it. Checkpoints, clones and the libvirt export handle one disk and refuse them.
+    """
+    raw = vm.get("extra_disks")
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise VMError("extra_disks must be a list of disk objects")
+    disks: list[dict[str, Any]] = []
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, dict) or not entry.get("path") or not entry.get("size"):
+            raise VMError(f"extra_disks[{index}] needs path and size")
+        interface = str(entry.get("interface") or "virtio")
+        if interface != "virtio":
+            raise VMError(f"extra_disks[{index}]: only virtio disks are supported, not {interface!r}")
+        disks.append({"path": str(entry["path"]), "size": str(entry["size"]),
+                      "format": str(entry.get("format") or "qcow2")})
+    if disks and vm["disk"].get("interface", "virtio") != "virtio":
+        raise VMError("extra_disks need the main disk on virtio as well")
+    return disks
+
+
 def disk_args(vm: dict[str, Any], allow_missing: bool = False, bootindex: int | None = None) -> list[str]:
-    """The VM disk; *bootindex* pins it in the firmware boot order (OVMF ignores ``-boot order``)."""
+    """The VM disks; *bootindex* pins the main one in the firmware boot order (OVMF ignores ``-boot order``)."""
+    extras: list[str] = []
+    for index, extra in enumerate(extra_disks(vm), start=1):
+        extra_path = runtime.resolve_path(extra["path"])
+        if not extra_path.exists() and not allow_missing:
+            raise VMError(f"Disk image not found: {extra_path}")
+        extras += ["-drive", f"id=disk{index},file={extra_path},format={extra['format']},if=none",
+                   "-device", f"virtio-blk-pci,drive=disk{index}"]
+    return _main_disk_args(vm, allow_missing, bootindex) + extras
+
+
+def _main_disk_args(vm: dict[str, Any], allow_missing: bool, bootindex: int | None) -> list[str]:
     disk = vm["disk"]
     disk_path = runtime.resolve_path(disk["path"])
     if not disk_path.exists() and not allow_missing:

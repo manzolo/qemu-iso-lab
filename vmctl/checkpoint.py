@@ -91,6 +91,9 @@ def check_profile(vm_name: str, vm: dict[str, Any]) -> None:
             f"VM '{vm_name}' declares TPM state: checkpoints carry the disk and the EFI vars only, "
             "and a TPM whose state is not saved would not match the restored disk. Not supported."
         )
+    if vm.get("extra_disks"):
+        raise VMError(f"VM '{vm_name}' has extra_disks: checkpoints and clones copy the main disk only, "
+                      "and a restored mirror half would not match its partner. Not supported.")
     fmt = disk_format(vm)
     if fmt not in SUPPORTED_FORMATS:
         raise VMError(f"VM '{vm_name}' uses disk format '{fmt}', which checkpoints do not handle "

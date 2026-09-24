@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
+from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, host_setup, iso, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -354,6 +354,14 @@ def ensure_vm_disk(vm: dict[str, Any], dry_run: bool = False) -> Path:
         ui.print_status("ok", f"Created disk: {ui.pretty_path(disk_path)}")
     else:
         ui.print_status("ok", f"Disk ready: {ui.pretty_path(disk_path)}")
+    for extra in qemu.extra_disks(vm):
+        extra_path = runtime.resolve_path(extra["path"])
+        if extra_path.exists():
+            continue
+        runtime.ensure_parent(extra_path)
+        runtime.run(["qemu-img", "create", "-f", extra["format"], str(extra_path), extra["size"]],
+                    dry_run=dry_run, quiet=True)
+        ui.print_status("ok", f"Created disk: {ui.pretty_path(extra_path)}")
     return disk_path
 
 
@@ -412,6 +420,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         return ("skip", "nixos_config without SSH post-install")
     if freebsd.freebsd_config(vm) is not None:
         return ("bootstrap-freebsd", "FreeBSD bsdinstall + SSH verification")
+    if proxmox.proxmox_config(vm) is not None:
+        return ("bootstrap-proxmox", "Proxmox VE automated install + SSH verification")
     if pfsense.pfsense_config(vm) is not None:
         return ("bootstrap-pfsense", "pfSense scripted install (network lab router)")
     if reactos.reactos_config(vm) is not None:
@@ -527,7 +537,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -723,9 +733,10 @@ def run_local_test_vm(
         if prep_note is not None:
             detail = f"{detail}; {prep_note}"
         return ("passed", detail)
-    if mode == "bootstrap-freebsd":
+    if mode in {"bootstrap-freebsd", "bootstrap-proxmox"}:
+        handler = cmd_bootstrap_freebsd if mode == "bootstrap-freebsd" else cmd_bootstrap_proxmox
         try:
-            cmd_bootstrap_freebsd(
+            handler(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -1850,6 +1861,37 @@ def cmd_bootstrap_freebsd(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bootstrap_proxmox(args: argparse.Namespace) -> int:
+    vm = resolved_vm(args, config.load_config())
+    proxmox.check_profile(args.vm, vm)
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Proxmox VE (automated installer): {args.vm}")
+    source = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-proxmox", dry_run=args.dry_run)
+    media = proxmox.ensure_install_iso(args.vm, vm, source,
+        cloud_init._authorized_keys_for_vm(vm, dry_run=args.dry_run), dry_run=args.dry_run)
+    boot_vm = {**vm, "installer_boot": {"kernel": proxmox.KERNEL_MEMBER, "initrd": proxmox.INITRD_MEMBER}}
+    kernel_path, initrd_path = iso.extract_installer_boot_artifacts(boot_vm, media, dry_run=args.dry_run)
+    command = qemu.common_args(vm, None, dry_run=args.dry_run,
+        accel=automation_accel(vm), headless=True, serial_stdio=True,
+        no_reboot=True, allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False, network_phase="install")
+    command += proxmox.install_media_args(media)
+    command += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", proxmox.KERNEL_APPEND]
+    stdout_log, stderr_log = announce_phase_logs(args.vm, "install-proxmox")
+    report.phase(args, "install")
+    # reboot-mode = "power-off" + -no-reboot: the installer's own shutdown (pool exported) ends QEMU.
+    runtime.run(command, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log,
+                timeout_sec=args.timeout)
+    vmstate.complete_install(args.vm, "bootstrap-proxmox", vm, dry_run=args.dry_run)
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
+    report.phase(args, "post-install")
+    run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
+    return 0
+
+
 def cmd_bootstrap_pfsense(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = resolved_vm(args, cfg)
@@ -2949,6 +2991,8 @@ def ssh_poweroff_command(vm: dict[str, Any]) -> list[str] | None:
         return base + ["shutdown /s /t 0 /f"]
     if freebsd.freebsd_config(vm) is not None:
         return base + ["sudo", "shutdown", "-p", "now"]
+    if proxmox.proxmox_config(vm) is not None:
+        return base + ["systemctl", "poweroff"]
     return base + ["sudo", "systemctl", "poweroff"]
 
 
@@ -3572,7 +3616,8 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: 
     disk_path = runtime.resolve_path(vm["disk"]["path"])
     fw = vm["firmware"]
     vars_path = runtime.resolve_path(fw["vars_path"]) if fw["type"] == "efi" else None
-    for path in [disk_path, vars_path, vmstate.state_path(name)]:
+    extras = [runtime.resolve_path(extra["path"]) for extra in qemu.extra_disks(vm)]
+    for path in [disk_path, *extras, vars_path, vmstate.state_path(name)]:
         if path and path.exists():
             ui.print_note(f"Removing {path}")
             if not dry_run:
@@ -3588,6 +3633,7 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: 
         alpine.alpine_artifact_dir(vm),
         windows.windows_artifact_dir(vm),
         pfsense.pfsense_artifact_dir(vm),
+        proxmox.proxmox_artifact_dir(vm),
         netlab.netlab_artifact_dir(vm),
         omarchy.omarchy_artifact_dir(vm),
         cloud_init.cloud_init_artifact_dir(vm),

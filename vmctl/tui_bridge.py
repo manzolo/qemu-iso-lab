@@ -54,7 +54,7 @@ def primary_action(row: Facts) -> tuple[str, str]:
     unattended = any(value for key, value in row.items() if key in {
         "has_autoinstall", "has_archinstall", "has_omarchy", "has_preseed",
         "has_kickstart", "has_autoyast", "has_alpine", "has_windows",
-        "has_freebsd", "has_pfsense", "has_reactos",
+        "has_freebsd", "has_proxmox", "has_pfsense", "has_reactos",
     })
     return ("Unattended install…" if unattended else "Boot ISO…"), "alt-u"
 

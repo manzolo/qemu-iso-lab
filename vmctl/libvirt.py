@@ -154,6 +154,8 @@ def undefine(uri: str, name: str, dry_run: bool) -> None:
 
 def export(args: argparse.Namespace, vm: dict[str, Any]) -> int:
     name = domain_name(args.name or args.vm)
+    if vm.get("extra_disks"):
+        raise VMError(f"'{args.vm}' has extra_disks: the libvirt export renders the main disk only")
     disk = runtime.resolve_path(vm["disk"]["path"])
     if not disk.is_file():
         raise VMError(f"Installed disk missing: {disk}. Install the VM with vmctl first")

@@ -1061,6 +1061,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `kali` | Both Kali profiles: the live one (family `kali`) and the preseed one (family `debian`) |
 | `windows-retro` | Windows NT 4.0, 98, 2000 and XP. Windows 7, 10 and 11 stay in `windows` |
 | `netlab` | The network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab` |
+| `proxmox-lab` | The Proxmox lab: `proxmox-ve` (ZFS mirror over two disks) and `proxmox-lab-client` (Xfce + Firefox), joined by the `pve-lan` segment |
 | `smoke` | One profile per install flow that downloads its own medium, the lightest of each: `alpine-ci`, `ubuntu-server-ci`, `debian-server`, `almalinux-server`, `alpine-niri`, `arch-noctalia`, `opensuse-tumbleweed-autoyast`, `nixos-server`, `freebsd-unattended`. Run it before a full matrix: it answers "is every bootstrap flow still working" without the desktop installs |
 
 A group is a selector, like the bare `check-vms`, so it skips `experimental` profiles;
@@ -1276,3 +1277,73 @@ vmctl check-vms freebsd-unattended --clean-first --timeout 1800 --report --docum
 FreeBSD pgrep excludes ancestors by default: a check executed over SSH must use `-a`
 to include the listener that is its ancestor ([vendor manual](https://man.freebsd.org/cgi/man.cgi?query=pgrep&sektion=1));
 otherwise a healthy daemon produces a false FAIL (confirmed live on 2026-09-14).
+
+## Proxmox VE (`bootstrap-proxmox`) and the Proxmox lab
+
+`proxmox-ve` installs Proxmox VE 9.2 with the vendor's own automated installer on a **ZFS RAID1
+root over two virtio disks**: `disk` is `vda`, and `extra_disks` adds `vdb` (see below). What the
+flow does, and why:
+
+- **No Proxmox tool on the host.** The ISO's GRUB offers "Install Proxmox VE (Automated)" as soon
+  as `/auto-installer-mode.toml` (`mode = "iso"`) exists at its root, and the installer then reads
+  `/answer.toml` from the same medium. That is exactly what `proxmox-auto-install-assistant
+  prepare-iso --fetch-from iso` does, with `xorriso -boot_image any keep -dev <copy> -map ...`, so
+  `proxmox.ensure_install_iso` does the same on a per-VM copy under `artifacts/<vm>/proxmox/`
+  (cached by a stamp of source ISO + answer file). No Docker, no Debian package.
+- **Direct kernel boot.** `boot/linux26` + `boot/initrd.img` are extracted from that copy and booted
+  with `-kernel` and the ISO's own automated append plus `console=ttyS0,115200`, so the installer's
+  progress (`INFO: progress 49.8 % - extracting base system`) reaches
+  `logs/install-proxmox.stdout.log` instead of the framebuffer only. The initrd finds the copy on
+  the SATA CD by itself.
+- **Completion is the installer's own power-off.** The answer file sets `reboot-mode =
+  "power-off"` and QEMU runs with `-no-reboot`: the installer exports the pool and powers off
+  (`Finished: 'ok' Installation finished - auto powering off in 5 seconds`), QEMU exits, and that
+  natural exit is the signal, as in the Ubuntu autoinstall flow. `reboot-on-error` stays false, so a
+  failed install drops to a shell and shows as the `--timeout` with the console in the log.
+- **Only root.** Proxmox VE creates no other user: `ssh_provision.user` must be `root`, the project
+  key goes in through `root-ssh-keys`, the password through `root-password-hashed`
+  (`proxmox_config.root_password_hash`; a local override changes it, the user name cannot change).
+- **Verification over SSH**: `pveversion`, `zpool status -x rpool`, a `zpool list -v` check that
+  the pool is one `mirror` of exactly two devices, `proxmox-boot-tool status` listing **two** ESPs
+  (the guest boots from either disk), the web GUI answering on `https://127.0.0.1:8006/` and
+  `pveproxy`/`pvedaemon`/`pve-cluster` active.
+
+The host reaches the web GUI through the NAT NIC's forward on `https://127.0.0.1:8006` (`root`
+and the profile's password). Running guests inside Proxmox needs nested virtualization on the host.
+
+### `extra_disks`
+
+`extra_disks` is a list of `{"path", "size", "format"}` beside `disk`: virtio disks that follow
+the main one on the bus (`vdb`, `vdc`, ...), created with it by the bootstrap, with no boot index,
+removed by `vmctl clean`. Checkpoints, clones and `export-libvirt` copy or render one disk and
+refuse a profile that has them (a restored half of a mirror would not match its partner).
+
+### The lab: `proxmox-ve` + `proxmox-lab-client`
+
+Both profiles live in `vms/profiles/proxmox-lab.json` and in the declared group `proxmox-lab`.
+Each VM has two NICs: `nat` (slirp: internet, SSH 2276/2277, the 8006 forward) and `lan`, the
+`pve-lan` segment (the same multicast socket segment the network lab uses), **in the runtime
+phase only**: the installers see one NIC and never ask which one to configure, and the NAT NIC
+keeps its PCI slot and name when the second one appears. Because the post-install boot runs with
+the install NICs, the segment is configured for the next boot, by MAC (both MACs are fixed in the
+profiles):
+
+- on Proxmox, `pve-lan.sh` writes a systemd `.link` naming that NIC `pvelan0`, a `vmbr1` bridge
+  with `10.10.10.2/24` on it in `/etc/network/interfaces`, and rebuilds the initramfs (its udev
+  names the NICs first);
+- on the client (`debian-xfce` plus `firefox-esr`), `client-lan.sh` adds a NetworkManager
+  profile bound to the MAC with `10.10.10.10/24`, and Firefox's policies
+  (`/etc/firefox/policies/policies.json`) open `https://10.10.10.2:8006/` as homepage and toolbar
+  bookmark.
+
+```bash
+vmctl bootstrap-proxmox proxmox-ve
+vmctl bootstrap-preseed proxmox-lab-client      # or: vmctl check-vms --group proxmox-lab
+vmctl stop proxmox-ve; vmctl stop proxmox-lab-client
+vmctl start proxmox-ve --background --headless  # runtime phase: both NICs
+vmctl start proxmox-lab-client                  # the desktop opens Firefox on the Proxmox GUI
+```
+
+The certificate is Proxmox's self-signed one, so the browser asks once. The cross-VM check
+(client reaching `10.10.10.2:8006`) needs both VMs running and is not part of a `check-vms` row,
+which runs one VM at a time.

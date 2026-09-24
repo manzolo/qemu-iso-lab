@@ -1,0 +1,252 @@
+{
+  "_comment": "Proxmox lab: proxmox-ve (ZFS mirror over two virtio disks, automated installer) and proxmox-lab-client (Debian Xfce + Firefox). Each has a NAT NIC for SSH/internet and a second NIC on the pve-lan segment (10.10.10.0/24): the client's browser opens the Proxmox web GUI on https://10.10.10.2:8006. Install with vmctl bootstrap-proxmox proxmox-ve and vmctl bootstrap-preseed proxmox-lab-client, or check-vms --group proxmox-lab.",
+  "vms": {
+    "proxmox-ve": {
+      "name": "Proxmox VE 9.2 (ZFS mirror, lab)",
+      "meta": {
+        "slug": "proxmox-ve",
+        "family": "proxmox",
+        "role": "hypervisor",
+        "release_model": "stable",
+        "status": "experimental",
+        "groups": [
+          "proxmox-lab"
+        ]
+      },
+      "iso": "isos/proxmox-ve_9.2-1.iso",
+      "iso_url": "https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso",
+      "iso_sha256": "4e88fe416df9b527624a175f24c9aa07c714d3332afb1ee3dbf3879573ef2c6c",
+      "disk": {
+        "path": "artifacts/proxmox-ve/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "extra_disks": [
+        {
+          "path": "artifacts/proxmox-ve/disk2.qcow2",
+          "size": "32G",
+          "format": "qcow2"
+        }
+      ],
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/proxmox-ve/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "virtio-net-pci",
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true,
+          "hostfwd": [
+            {
+              "host_port": 8006,
+              "guest_port": 8006
+            }
+          ]
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "pve-lan",
+          "phase": "runtime",
+          "mac": "52:54:00:9e:0a:02"
+        }
+      ],
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "proxmox_config": {
+        "fqdn": "proxmox-ve.lab.internal",
+        "country": "us",
+        "keyboard": "en-us",
+        "timezone": "UTC",
+        "root_password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "filesystem": "zfs",
+        "zfs": {
+          "raid": "raid1"
+        }
+      },
+      "ssh_provision": {
+        "user": "root",
+        "ssh_host_port": 2276,
+        "ssh_key": null,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/proxmox/pve-lan.sh",
+            "dest": "/root/pve-lan.sh",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "pveversion",
+          "zpool status -x rpool | grep -q \"is healthy\"",
+          "zpool list -v -H -P rpool | awk '$1 ~ /^mirror/ {m=1; next} m && $1 ~ /^\\// {n++} END {exit !(m && n == 2)}'",
+          "proxmox-boot-tool status",
+          "test \"$(proxmox-boot-tool status | grep -c 'is configured with')\" -eq 2",
+          "timeout 180 sh -c 'until curl -ksf -o /dev/null https://127.0.0.1:8006/; do sleep 3; done'",
+          "timeout 180 sh -c 'until for unit in pveproxy pvedaemon pve-cluster; do systemctl is-active --quiet $unit || exit 1; done; do sleep 3; done' || { systemctl status --no-pager pveproxy pvedaemon pve-cluster; exit 1; }",
+          "/root/pve-lan.sh 52:54:00:9e:0a:02 10.10.10.2/24",
+          "grep -q 'bridge-ports pvelan0' /etc/network/interfaces && test -f /etc/systemd/network/10-vmctl-pvelan.link"
+        ]
+      },
+      "notes": "Proxmox VE on a ZFS RAID1 root over two virtio disks (vda + extra_disks vdb), installed by the vendor's automated installer from an answer file grafted on the ISO (bootstrap-proxmox). NIC 1 is NAT: SSH as root on 2276 with the project key, web GUI on https://127.0.0.1:8006 (root / lab). NIC 2 joins the pve-lan segment at runtime as vmbr1 10.10.10.2/24, shared with proxmox-lab-client. The installer only needs KVM; running guests inside it needs nested virtualization on the host."
+    },
+    "proxmox-lab-client": {
+      "name": "Debian 13 Xfce client of the Proxmox lab",
+      "meta": {
+        "slug": "debian",
+        "family": "debian",
+        "role": "client",
+        "release_model": "stable",
+        "status": "experimental",
+        "groups": [
+          "proxmox-lab"
+        ]
+      },
+      "iso": "isos/debian-13.4.0-amd64-netinst.iso",
+      "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
+      "disk": {
+        "path": "artifacts/proxmox-lab-client/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/proxmox-lab-client/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "preseed_config": {
+        "hostname": "proxmox-lab-client",
+        "domain": "local",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "mirror_hostname": "deb.debian.org",
+        "mirror_directory": "/debian",
+        "tasks": [
+          "standard",
+          "xfce-desktop"
+        ],
+        "packages": [
+          "openssh-server",
+          "sudo",
+          "curl",
+          "ca-certificates",
+          "locales",
+          "xfce4",
+          "qemu-guest-agent",
+          "spice-vdagent",
+          "firefox-esr"
+        ],
+        "late_commands": [
+          "install -d /etc/lightdm/lightdm.conf.d",
+          "printf '[Seat:*]\\nautologin-user={{user}}\\nautologin-user-timeout=0\\nautologin-session=xfce\\n' > /etc/lightdm/lightdm.conf.d/vmctl-autologin.conf",
+          "systemctl enable lightdm.service serial-getty@ttyS0.service",
+          "systemctl set-default graphical.target",
+          "install -d /etc/firefox/policies",
+          "printf '%s\\n' '{\"policies\": {\"Homepage\": {\"URL\": \"https://10.10.10.2:8006/\", \"StartPage\": \"homepage\"}, \"DisplayBookmarksToolbar\": \"always\", \"Bookmarks\": [{\"Title\": \"Proxmox VE\", \"URL\": \"https://10.10.10.2:8006/\", \"Placement\": \"toolbar\"}]}}' > /etc/firefox/policies/policies.json"
+        ],
+        "disk_device": "/dev/vda"
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2277,
+        "ssh_key": null,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          },
+          {
+            "source": "vms/profile-files/proxmox/client-lan.sh",
+            "dest": "/home/{{user}}/bin/client-lan.sh",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package xfce4 --process xfce4-session",
+          "firefox-esr --version",
+          "sudo ~/bin/client-lan.sh 52:54:00:9e:0a:10 10.10.10.10/24",
+          "nmcli -g ipv4.addresses connection show pve-lan | grep -q '10.10.10.10/24'"
+        ]
+      },
+      "iso_sha256": "0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc",
+      "guest_agent": true,
+      "notes": "Light desktop for the Proxmox lab: debian-xfce plus firefox-esr, whose policies open https://10.10.10.2:8006/ (proxmox-ve on the pve-lan segment) as homepage and toolbar bookmark. NIC 1 is NAT (SSH 2277), NIC 2 joins pve-lan at runtime with 10.10.10.10/24 through NetworkManager. Start proxmox-ve too (vmctl start proxmox-ve --background --headless) and the browser reaches the web GUI across the segment; the certificate is Proxmox's self-signed one.",
+      "network_device": "virtio-net-pci",
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "pve-lan",
+          "phase": "runtime",
+          "mac": "52:54:00:9e:0a:10"
+        }
+      ]
+    }
+  }
+}

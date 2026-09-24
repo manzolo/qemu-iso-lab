@@ -188,7 +188,7 @@ class RepositoryGroupTests(unittest.TestCase):
     def test_declared_groups_exist_and_are_documented(self):
         declared = sorted({group for _, vm in vmctl.config.sorted_vm_items(self.cfg)
                            for group in vmctl.config.declared_groups(vm)})
-        self.assertEqual(declared, ["debian-only", "kali", "netlab", "smoke", "ubuntu",
+        self.assertEqual(declared, ["debian-only", "kali", "netlab", "proxmox-lab", "smoke", "ubuntu",
                                     "ubuntu-flavors", "ubuntu-releases", "windows-retro"])
         documentation = (ROOT / "docs" / "UNATTENDED.md").read_text(encoding="utf-8")
         for group in declared:
