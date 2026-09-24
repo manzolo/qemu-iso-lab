@@ -1339,6 +1339,28 @@ fi
             self.assertIn("No\tNo — cancel, keep the disk unchanged", result.stderr)
             self.assertIn("Yes — erase /dev/sdb", result.stderr)
 
+    def test_data_deleting_confirmations_default_to_no_in_every_backend(self):
+        result = self.run_bash(r"""
+source bin/vmtui
+dialog() { printf 'dialog:%s\n' "$*"; return 1; }
+fzf_pick() { printf 'fzf-default:%s\n' "$3" >&2; return 1; }
+textual_widget() { printf 'textual-default:%s\n' "$CONFIRM_DEFAULT"; return 1; }
+for UI_BACKEND in dialog fzf textual; do
+    CONFIRM_DEFAULT=no confirm_box 'Confirm Clean' 'Remove?' || true
+    confirm_box 'Stop VM' 'Power off?' || true
+done
+""")
+        lines = result.stdout.splitlines()
+        self.assertIn("--defaultno", lines[0])
+        self.assertNotIn("--defaultno", lines[1])
+        self.assertEqual(lines[2:], ["textual-default:no", "textual-default:yes"])
+        self.assertEqual([line for line in result.stderr.splitlines() if line.startswith("fzf-default:")],
+                         ["fzf-default:No", "fzf-default:Yes"])
+        source = (Path(__file__).resolve().parents[1] / "bin" / "vmtui").read_text(encoding="utf-8")
+        for title in ("Restore checkpoint", "Delete checkpoint", "Delete clone", "Confirm Clean",
+                      "Import Disk", "Confirm Clean All", "Confirm Delete ISO", "Clean the network lab"):
+            self.assertIn(f'CONFIRM_DEFAULT=no confirm_box "{title}" ', source)
+
     def test_destructive_dialog_confirmation_uses_colors_and_defaults_to_no(self):
         result = self.run_bash(r"""
 source bin/vmtui

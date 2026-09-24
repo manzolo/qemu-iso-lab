@@ -337,7 +337,9 @@ fzf_confirm() {
             "No" "No — cancel, keep the disk unchanged" \
             "Yes" $'\e[1;91m'"Yes — erase ${CONFIRM_TARGET:-the disk}"$'\e[0m') || return 1
     else
-        choice=$(MENU_NO_TAGS=1 fzf_pick "$title" "$message\n\nEnter = confirm highlighted answer · Esc = No" "Yes" \
+        local default="Yes"
+        [[ "${CONFIRM_DEFAULT:-yes}" == "no" ]] && default="No"
+        choice=$(MENU_NO_TAGS=1 fzf_pick "$title" "$message\n\nEnter = confirm highlighted answer · Esc = No" "$default" \
             "Yes" "Yes — go ahead" \
             "No" "No — cancel") || return 1
     fi
@@ -453,7 +455,8 @@ confirm_box() {
             title="DANGER — $title"
             message="WARNING: DESTRUCTIVE DISK WRITE\n\nALL DATA ON ${CONFIRM_TARGET:-THE TARGET DISK} WILL BE LOST.\nThis operation cannot be undone.\n\n$message"
         fi
-        CONFIRM_DESTRUCTIVE="${CONFIRM_DESTRUCTIVE:-0}" textual_widget confirm "$title" "$message"
+        CONFIRM_DESTRUCTIVE="${CONFIRM_DESTRUCTIVE:-0}" CONFIRM_DEFAULT="${CONFIRM_DEFAULT:-yes}" \
+            textual_widget confirm "$title" "$message"
         return
     fi
     local -a options=()
@@ -466,6 +469,8 @@ confirm_box() {
             options+=(--colors --defaultno --yes-label "Erase disk" --no-label "Cancel")
             message="\Zb\Z1WARNING: DESTRUCTIVE DISK WRITE\n\n$banner\Zn\n\n$message"
         fi
+    elif [[ "${CONFIRM_DEFAULT:-yes}" == "no" ]]; then
+        options+=(--defaultno)
     fi
     if [[ "$UI_BACKEND" == "fzf" ]]; then
         fzf_confirm "$title" "$message"
@@ -1885,12 +1890,12 @@ checkpoint_menu() {
                     "Back" "Return to the checkpoint list") || continue
                 case "$action" in
                     Restore)
-                        if confirm_box "Restore checkpoint" "Replace the current disk and EFI vars of '$vm_name' with checkpoint '$choice'?\n\nThe current disk content is lost (take a checkpoint of it first if you want it back)."; then
+                        if CONFIRM_DEFAULT=no confirm_box "Restore checkpoint" "Replace the current disk and EFI vars of '$vm_name' with checkpoint '$choice'?\n\nThe current disk content is lost (take a checkpoint of it first if you want it back)."; then
                             run_vmctl checkpoint restore "$vm_name" "$choice" --yes || true
                         fi
                         ;;
                     Delete)
-                        if confirm_box "Delete checkpoint" "Delete checkpoint '$choice' of '$vm_name'?\n\nThis cannot be undone."; then
+                        if CONFIRM_DEFAULT=no confirm_box "Delete checkpoint" "Delete checkpoint '$choice' of '$vm_name'?\n\nThis cannot be undone."; then
                             run_vmctl checkpoint delete "$vm_name" "$choice" --yes || true
                         fi
                         ;;
@@ -2208,7 +2213,7 @@ run_action() {
                     "Back" "Cancel") || what="Back"
                 case "$what" in
                     "Delete the clone")
-                        if confirm_box "Delete clone" "Delete the clone '$current_vm' completely?\n\nDisk, artifacts, checkpoints and the local.json entry are removed (local.json.bak keeps the previous file). '${FACTS[clone_of]}' is not touched."; then
+                        if CONFIRM_DEFAULT=no confirm_box "Delete clone" "Delete the clone '$current_vm' completely?\n\nDisk, artifacts, checkpoints and the local.json entry are removed (local.json.bak keeps the previous file). '${FACTS[clone_of]}' is not touched."; then
                             run_vmctl clean "$current_vm" --remove-profile || true
                             # The profile is gone: leave its menu, back to the dashboard.
                             return 1
@@ -2220,7 +2225,7 @@ run_action() {
                 esac
                 return 0
             fi
-            if confirm_box "Confirm Clean" "Remove artifacts for VM '$current_vm'?\n\nThis deletes the disk image, firmware vars and generated files under artifacts/$current_vm.\nThe cached ISO is kept, and so are its checkpoints (vmctl clean --checkpoints removes them)."; then
+            if CONFIRM_DEFAULT=no confirm_box "Confirm Clean" "Remove artifacts for VM '$current_vm'?\n\nThis deletes the disk image, firmware vars and generated files under artifacts/$current_vm.\nThe cached ISO is kept, and so are its checkpoints (vmctl clean --checkpoints removes them)."; then
                 run_vmctl clean "$current_vm" || true
             fi
             ;;
@@ -2305,19 +2310,19 @@ run_action() {
                 resume) import_flags=(--allocated-only --resume) ;;
                 *) return 0 ;;
             esac
-            if ! confirm_box "Import Disk" "Read $selected_device into the disk image of '$current_vm'?\n\nThe current VM disk image will be REPLACED."; then
+            if ! CONFIRM_DEFAULT=no confirm_box "Import Disk" "Read $selected_device into the disk image of '$current_vm'?\n\nThe current VM disk image will be REPLACED."; then
                 return 0
             fi
             confirm_device_path "$selected_device" || return 0
             run_vmctl import-device "$current_vm" --device "$selected_device" --confirm-device "$selected_device" "${import_flags[@]}" || true
             ;;
         clean-all)
-            if confirm_box "Confirm Clean All" "Remove artifacts for ALL configured VMs?\n\nEvery disk image under artifacts/ is deleted. Cached ISOs are kept."; then
+            if CONFIRM_DEFAULT=no confirm_box "Confirm Clean All" "Remove artifacts for ALL configured VMs?\n\nEvery disk image under artifacts/ is deleted. Cached ISOs are kept."; then
                 run_vmctl clean --all || true
             fi
             ;;
         delete-iso)
-            if confirm_box "Confirm Delete ISO" "Delete the cached ISO for VM '$current_vm'?\n\nThis only removes the ISO file configured in the VM profile. It does not remove VM disks or generated artifacts."; then
+            if CONFIRM_DEFAULT=no confirm_box "Confirm Delete ISO" "Delete the cached ISO for VM '$current_vm'?\n\nThis only removes the ISO file configured in the VM profile. It does not remove VM disks or generated artifacts."; then
                 run_vmctl delete-iso "$current_vm" || true
             fi
             ;;
@@ -2553,7 +2558,7 @@ lab_menu_loop() {
             "Unexport") run_vmctl lab unexport || true ;;
             "Libvirt Round Trip") run_vmctl lab libvirt-test || true ;;
             "Clean")
-                if confirm_box "Clean the network lab" "Stop and remove pfsense-lab, pihole-lab and lubuntu-lab (disks and artifacts; ISOs are kept)?\n\nRefused while the lab is defined in libvirt (Unexport first)."; then
+                if CONFIRM_DEFAULT=no confirm_box "Clean the network lab" "Stop and remove pfsense-lab, pihole-lab and lubuntu-lab (disks and artifacts; ISOs are kept)?\n\nRefused while the lab is defined in libvirt (Unexport first)."; then
                     run_vmctl lab clean || true
                 fi
                 ;;

@@ -152,7 +152,20 @@ ModalScreen { align: center middle; background: #000000 65%; }
 #workflow-device { height: auto; color: #a6b4c8; }
 #workflow-input { margin: 1 0; }
 #workflow-buttons { height: 3; margin-top: 1; }
-#workflow-buttons Button { height: 3; min-height: 3; margin-right: 2; }
+#workflow-buttons Button {
+    height: 3;
+    min-height: 3;
+    margin-right: 2;
+    background: #243343;
+    color: #dce5ef;
+    text-style: none;
+}
+#workflow-buttons Button:focus {
+    background: #84c9e7;
+    color: #111820;
+    text-style: bold;
+}
+#workflow-buttons Button.-error:focus { background: #f08a8a; border: tall #f08a8a; }
 .workflow-compact #workflow { margin: 0 1; padding: 0 1; }
 .workflow-compact #workflow .dialog-title { margin-bottom: 0; }
 .workflow-compact.workflow-menu #workflow-copy { max-height: 3; }

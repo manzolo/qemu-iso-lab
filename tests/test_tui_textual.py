@@ -569,11 +569,36 @@ class WorkflowWidgetTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.press(*keys)
             self.assertEqual(app.return_value, expected)
 
+    async def test_confirmation_defaults_to_continue_and_enter_accepts(self):
+        for title in ("Stop VM", "Force Stop", "Bootstrap"):
+            with self.subTest(title=title):
+                app = WorkflowWidget("confirm", title, "Continue?", [], {})
+                async with app.run_test(size=(80, 24)) as pilot:
+                    self.assertEqual(app.focused.id, "workflow-accept")
+                    await pilot.press("enter")
+                self.assertEqual(app.return_value, "Yes")
+
+    async def test_data_deleting_confirmation_defaults_to_cancel(self):
+        app = WorkflowWidget("confirm", "Confirm Clean", "Remove artifacts?", [], {"CONFIRM_DEFAULT": "no"})
+        async with app.run_test(size=(80, 24)) as pilot:
+            self.assertEqual(app.focused.id, "workflow-cancel")
+            self.assertEqual(str(app.query_one("#workflow-accept", Button).label), "Continue")
+            await pilot.press("enter")
+        self.assertIsNone(app.return_value)
+
     async def test_confirmation_horizontal_arrows_move_between_buttons_without_dismissing(self):
         app = WorkflowWidget("confirm", "Bootstrap", "Start installation?", [], {})
         async with app.run_test(size=(115, 53)) as pilot:
+            accept = app.query_one("#workflow-accept", Button)
+            cancel = app.query_one("#workflow-cancel", Button)
+            self.assertIs(app.focused, accept)
+            selected_background = accept.styles.background
+            unselected_background = cancel.styles.background
+            self.assertNotEqual(selected_background, unselected_background)
             await pilot.press("left")
             self.assertEqual(app.focused.id, "workflow-cancel")
+            self.assertEqual(cancel.styles.background, selected_background)
+            self.assertEqual(accept.styles.background, unselected_background)
             self.assertTrue(app.is_running)
             await pilot.press("right")
             self.assertEqual(app.focused.id, "workflow-accept")

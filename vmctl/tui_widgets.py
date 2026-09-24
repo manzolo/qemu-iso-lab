@@ -264,8 +264,12 @@ class WorkflowWidget(App[str | None]):
         elif self.kind == "input":
             self.query_one(Input).focus()
         else:
-            # All confirmations default to cancel, including destructive ones.
-            self.query_one("#workflow-cancel" if self.kind == "confirm"
+            # A confirmation defaults to its action, except the ones that delete data
+            # (CONFIRM_DEFAULT=no) and destructive disk writes, which default to cancel.
+            cautious = self.kind == "confirm" and (
+                self.settings.get("CONFIRM_DESTRUCTIVE") == "1"
+                or self.settings.get("CONFIRM_DEFAULT") == "no")
+            self.query_one("#workflow-cancel" if cautious
                            else "#workflow-accept", Button).focus()
 
     def on_resize(self, event: Resize) -> None:
