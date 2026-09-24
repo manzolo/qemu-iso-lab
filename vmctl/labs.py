@@ -18,6 +18,47 @@ from typing import Any
 from vmctl import cloud_init, config, netlab, proxmox, pvecluster, qemu, runtime
 from vmctl.errors import VMError
 
+# The tracked profiles' shared password ("lab"): a hash the map can recognise without cracking it.
+TRACKED_LAB_HASH = "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/"
+# Sections that declare a guest login, as (section, user key, plain password key, hash key).
+LOGIN_SECTIONS = (
+    ("proxmox_config", None, "root_password", "root_password_hash"),
+    ("preseed_config", "username", None, "password_hash"),
+    ("autoinstall", "username", None, "password_hash"),
+    ("kickstart_config", "username", None, "password_hash"),
+    ("archinstall_config", "username", "password", "password_hash"),
+    ("alpine_config", "username", None, "password_hash"),
+    ("nixos_config", "username", None, "password_hash"),
+    ("freebsd_config", "username", "password", None),
+    ("windows_config", "username", "password", None),
+)
+
+
+def login(vm: dict[str, Any]) -> dict[str, str] | None:
+    """Who logs in and with what, as far as the profile knows. Profiles keep hashes, so the
+    password is shown when it is plain text, when the hash is the tracked "lab" one, or when the
+    local profile carries ``meta.password_hint`` (a reminder that lives in local.json only)."""
+    hint = str((vm.get("meta") or {}).get("password_hint") or "")
+    for section, user_key, plain_key, hash_key in LOGIN_SECTIONS:
+        cfg = vm.get(section)
+        if not isinstance(cfg, dict):
+            continue
+        user = "root" if user_key is None else str(cfg.get(user_key) or "")
+        if not user:
+            continue
+        where = "root@pam, realm Linux PAM" if section == "proxmox_config" else ""
+        if hint:
+            return {"user": user, "password": hint, "note": where or "meta.password_hint"}
+        if plain_key and cfg.get(plain_key):
+            return {"user": user, "password": str(cfg[plain_key]), "note": where}
+        if hash_key and cfg.get(hash_key) == TRACKED_LAB_HASH:
+            return {"user": user, "password": "lab", "note": where or "tracked default"}
+        return {"user": user, "password": "",
+                "note": (where + "; " if where else "") + "password set in vms/profiles/local.json (stored as a hash; "
+                        "add meta.password_hint there to show it here)"}
+    return None
+
+
 # Started first and stopped last: what the other members route through or run on, then the
 # services they resolve names with (the network lab installs pfsense -> pihole -> clients too).
 INFRA_ROLES = ("router", "pfsense", "hypervisor")
@@ -120,6 +161,7 @@ def model(cfg: dict[str, Any], group: str, states: dict[str, dict[str, Any]] | N
             "disks": 1 + len(qemu.extra_disks(vm)),
             "flow": str(state.get("flow") or ""),
             "ssh": _ssh_line(name, vm),
+            "login": login(vm),
             "zfs": _zfs(vm),
             # Guests of a hypervisor member (Proxmox containers) that the lab reaches on the segment.
             "services": [dict(entry) for entry in vm.get("lab_services") or [] if isinstance(entry, dict)],
@@ -436,6 +478,48 @@ pre.check { border-left:4px solid var(--ok); } pre.do { border-left:4px solid va
 """
 
 
+def _login_html(entry: dict[str, str] | None) -> str:
+    if not entry:
+        return '<span class="sub">no login in the profile</span>'
+    password = f'<code>{html.escape(entry["password"])}</code>' if entry["password"] else '<span class="sub">—</span>'
+    note = f'<br><span class="sub">{html.escape(entry["note"])}</span>' if entry["note"] else ""
+    return f'<code>{html.escape(entry["user"])}</code> / {password}{note}'
+
+
+def _access_html(lab: dict[str, Any]) -> str:
+    """Every web UI of the lab with the login it takes, from the host and from the segment."""
+    esc = html.escape
+    rows: list[str] = []
+    for member in lab["members"]:
+        entry = member.get("login")
+        lan = next((str(nic["address"]).split("/")[0] for nic in member["nics"]
+                    if nic["type"] == "segment" and nic.get("address")), "")
+        for nic in member["nics"]:
+            for fwd in nic.get("forwards", []):
+                scheme = WEB_PORTS.get(int(fwd["guest"])) if str(fwd["guest"]).isdigit() else None
+                if not scheme or fwd.get("via"):
+                    continue
+                host_url = f'{scheme}://127.0.0.1:{fwd["host_port"]}/'
+                lan_url = f'{scheme}://{lan}:{fwd["guest"]}/' if lan else ""
+                where = f'<a href="{host_url}">{esc(host_url)}</a>' + (f'<br><span class="sub">from the lab: {esc(lan_url)}</span>' if lan_url else "")
+                rows.append(f'<tr><td><b>{esc(member["name"])}</b> web GUI</td><td>{where}</td><td>{_login_html(entry)}</td></tr>')
+        if member["role"] in ("client", "desktop") and entry:
+            rows.append(f'<tr><td><b>{esc(member["name"])}</b> desktop</td><td><code>vmctl attach {esc(member["name"])}</code>'
+                        f'<span class="sub"> · autologin</span></td><td>{_login_html(entry)}</td></tr>')
+        if member["ssh"]:
+            rows.append(f'<tr><td><b>{esc(member["name"])}</b> SSH</td><td><code>{esc(member["ssh"])}</code></td>'
+                        f'<td><span class="sub">project key, no password</span></td></tr>')
+        for svc in member["services"]:
+            url = str(svc.get("url") or "")
+            rows.append(f'<tr><td><b>{esc(str(svc.get("name")))}</b> (CT {esc(str(svc.get("container")))})</td>'
+                        f'<td><span class="sub">from the lab:</span> <a href="{esc(url)}">{esc(url)}</a></td>'
+                        f'<td><span class="sub">no login</span></td></tr>')
+    if not rows:
+        return '<p class="sub">No web UI or SSH access declared.</p>'
+    return ('<div class="table-wrap"><table><thead><tr><th>What</th><th>Where</th><th>Login</th></tr></thead>'
+            f'<tbody>{"".join(rows)}</tbody></table></div>')
+
+
 # Guest ports that serve a web page, and the scheme they speak.
 WEB_PORTS = {80: "http", 8080: "http", 8081: "http", 443: "https", 8006: "https", 8443: "https"}
 
@@ -470,6 +554,7 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
         state = "running" if member["running"] else "stopped"
         rows.append(f'<tr><td><b>{esc(member["name"])}</b><br><span class="sub">{esc(member["label"])}</span></td>'
                     f'<td>{esc(member["role"])}</td><td>{state}<br><span class="sub">{esc(member["install"])}</span></td>'
+                    f'<td>{_login_html(member.get("login"))}</td>'
                     f'<td>{"<br><br>".join(nics)}</td></tr>')
     group = esc(lab["group"])
     order = " → ".join(esc(name) for name in lab["start_order"])
@@ -481,8 +566,10 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
 <p class="sub">{len(lab["members"])} VMs · {running} running · {len(lab["segments"])} segment(s) · generated {when} by <code>vmctl group map {group}</code></p>
 <div class="map">{_svg(lab)}</div>
 <p class="sub">Every NAT NIC is a private slirp {SLIRP_SUBNET} of its own VM: the guest reaches the Internet, the host reaches it only through the forwards on 127.0.0.1. The segments are shared between the VMs of this host only.</p>
+<h2>Access</h2>
+{_access_html(lab)}
 <h2>Members</h2>
-<div class="table-wrap"><table><thead><tr><th>VM</th><th>Role</th><th>State</th><th>NICs (runtime)</th></tr></thead>
+<div class="table-wrap"><table><thead><tr><th>VM</th><th>Role</th><th>State</th><th>Login</th><th>NICs (runtime)</th></tr></thead>
 <tbody>{''.join(rows)}</tbody></table></div>
 <h2>Runbook</h2>
 <p class="sub">Start order: {order}. Every command below comes from the same profiles as the map, in the order you would run them: <b>run</b> changes something, <b>check</b> is read-only, <b>try</b> is a reversible experiment.</p>

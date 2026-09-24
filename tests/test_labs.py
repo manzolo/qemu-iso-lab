@@ -66,6 +66,27 @@ class LabsTests(BaseVmctlTestCase):
         self.assertEqual([phase["title"] for phase in labs.model(cfg, "netlab")["runbook"]],
                          ["Install", "Lab network", "Run the stack"])
 
+    def test_login_shows_what_the_profile_knows_and_never_a_tracked_hint(self):
+        cfg = self.tracked_config()
+        pve = config.get_vm(cfg, "proxmox-ve")
+        self.assertEqual(labs.login(pve), {"user": "root", "password": "lab", "note": "root@pam, realm Linux PAM"})
+        client = labs.login(config.get_vm(cfg, "proxmox-lab-client"))
+        self.assertEqual((client["user"], client["password"]), ("lab", "lab"))
+        local = json.loads(json.dumps(pve))
+        local["proxmox_config"]["root_password_hash"] = "$6$other$hash"
+        self.assertEqual(labs.login(local)["password"], "")
+        self.assertIn("local.json", labs.login(local)["note"])
+        local["meta"]["password_hint"] = "secret"
+        self.assertEqual(labs.login(local)["password"], "secret")
+        freebsd = config.get_vm(cfg, "freebsd-unattended")
+        self.assertEqual(labs.login(freebsd)["password"], "lab")  # plain text in its own section
+        # A reminder of a real password belongs in the gitignored local.json only: the repo is public.
+        for name, vm in config.sorted_vm_items(cfg):
+            self.assertNotIn("password_hint", vm.get("meta", {}), name)
+        page = labs.render_html(labs.model(cfg, "proxmox-lab"))
+        self.assertIn("<h2>Access</h2>", page)
+        self.assertIn("vmctl attach proxmox-lab-client", page)
+
     def test_map_is_self_contained_and_escapes_profile_text(self):
         cfg = self.tracked_config()
         lab = labs.model(cfg, "proxmox-lab")

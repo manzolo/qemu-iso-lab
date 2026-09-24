@@ -1459,6 +1459,14 @@ MAC, the containers a hypervisor serves (`lab_services`) and links for the web f
 comes from the profiles only (`labs.model`): the network lab's addresses from its `network_lab`
 topology, the others from `networks[].address`.
 
+Before the members, an **Access** table lists every web GUI (the 127.0.0.1 forward and the lab
+address), every SSH line and the client's desktop (`vmctl attach`), each with its login. Profiles
+keep password hashes, so the page shows the password only when the profile has it in plain text,
+when the hash is the tracked profiles' `lab`, or when the local profile carries
+`meta.password_hint`, a reminder that belongs in the gitignored `vms/profiles/local.json` only (a
+test rejects it in a tracked profile: the repository is public). The page itself stays under the
+gitignored `artifacts/`. Proxmox logs in as `root`, realm Linux PAM.
+
 In `vmtui` the **Labs** filter (or **F2**, which switches between labs and single profiles and
 keeps the selected profile) lists each lab with its members in start order. On a lab row Enter
 installs what is missing, else starts the stack, else opens the map; → shows *Start stack*, *Stop
