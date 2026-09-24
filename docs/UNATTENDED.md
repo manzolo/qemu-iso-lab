@@ -1467,6 +1467,9 @@ when the hash is the tracked profiles' `lab`, or when the local profile carries
 test rejects it in a tracked profile: the repository is public). The page itself stays under the
 gitignored `artifacts/`. Proxmox logs in as `root`, realm Linux PAM.
 
+Ideas for the next labs (k3s, routing, HA web, Samba AD, Proxmox replication/HA and Ceph) are
+in [LAB_IDEAS.md](LAB_IDEAS.md).
+
 In `vmtui` the **Labs** filter (or **F2**, which switches between labs and single profiles and
 keeps the selected profile) lists each lab with its members in start order. On a lab row Enter
 installs what is missing, else starts the stack, else opens the map; → shows *Start stack*, *Stop
