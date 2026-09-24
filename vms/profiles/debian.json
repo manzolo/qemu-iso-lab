@@ -470,7 +470,8 @@
         "timezone": "UTC",
         "keyboard_layout": "us",
         "storage_layout": "direct",
-        "install_ssh": true
+        "install_ssh": true,
+        "apt": {"disable_suites": ["security"]}
       },
       "cloud_init": {
         "hostname": "ubuntu-server-ci",

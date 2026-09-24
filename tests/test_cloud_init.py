@@ -146,6 +146,18 @@ class CloudInitTests(BaseVmctlTestCase):
         rendered = json.loads(vmctl.cloud_init.render_autoinstall_user_data(self.vm_name, self.vm_config, dry_run=True).split("\n", 1)[1])
         self.assertNotIn("late-commands", rendered["autoinstall"])
 
+    def test_render_autoinstall_user_data_passes_apt_through(self):
+        self.vm_config["autoinstall"] = {"username": "lab", "password_hash": "$6$x",
+                                         "apt": {"disable_suites": ["security"]}}
+        rendered = json.loads(vmctl.cloud_init.render_autoinstall_user_data(self.vm_name, self.vm_config, dry_run=True).split("\n", 1)[1])
+        self.assertEqual(rendered["autoinstall"]["apt"], {"disable_suites": ["security"]})
+        self.vm_config["autoinstall"]["apt"] = ["security"]
+        with self.assertRaises(self.vmctl.VMError):
+            vmctl.cloud_init.render_autoinstall_user_data(self.vm_name, self.vm_config, dry_run=True)
+        del self.vm_config["autoinstall"]["apt"]
+        rendered = json.loads(vmctl.cloud_init.render_autoinstall_user_data(self.vm_name, self.vm_config, dry_run=True).split("\n", 1)[1])
+        self.assertNotIn("apt", rendered["autoinstall"])
+
     def test_render_autoinstall_user_data_rejects_invalid_updates_value(self):
         self.vm_config["autoinstall"] = {
             "hostname": "testvm",

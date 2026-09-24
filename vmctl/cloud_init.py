@@ -228,6 +228,14 @@ def render_autoinstall_user_data(vm_name: str, vm: dict[str, Any], dry_run: bool
         if updates not in {"security", "all"}:
             raise VMError("autoinstall.updates must be one of: security, all")
         autoinstall_section["updates"] = updates
+    # ``apt``: curtin apt configuration, passed through as is. ``updates`` has no "none", so
+    # ``{"disable_suites": ["security"]}`` is how a profile skips subiquity's security upgrade:
+    # under TCG in CI that step alone took 33-38 minutes and pushed the install past its timeout.
+    apt = config.get("apt")
+    if apt is not None:
+        if not isinstance(apt, dict):
+            raise VMError("autoinstall.apt must be an object (curtin apt configuration)")
+        autoinstall_section["apt"] = apt
     autoinstall_section["shutdown"] = "poweroff"
     ssh_keys = _authorized_keys_for_vm(vm, dry_run=dry_run)
     autoinstall_section["ssh"] = {
