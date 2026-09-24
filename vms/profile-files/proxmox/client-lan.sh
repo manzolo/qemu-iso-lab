@@ -1,12 +1,18 @@
 #!/bin/sh
-# client-lan.sh MAC CIDR URL: static CIDR on the NIC whose address is MAC (the pve-lan segment),
-# and Firefox opening URL (the Proxmox web GUI) at every desktop login.
+# client-lan.sh MAC CIDR URL [URL...]: static CIDR on the NIC whose address is MAC (the pve-lan
+# segment), and Firefox opening URL (the Proxmox web GUI) plus one tab per further URL (the lab's
+# container apps) at every desktop login.
 # The segment NIC exists only in the runtime phase (vmctl start), so the NetworkManager profile
 # is bound to the MAC, not to an interface name, and activates whenever that NIC appears.
 set -eu
 mac=$1
 cidr=$2
 url=$3
+shift 3
+tabs="$url"
+for extra in "$@"; do
+    tabs="$tabs $extra"
+done
 nmcli connection delete pve-lan >/dev/null 2>&1 || true
 nmcli connection add type ethernet con-name pve-lan ifname '*' ethernet.mac-address "$mac" \
     autoconnect yes ipv4.method manual ipv4.addresses "$cidr" ipv6.method disabled
@@ -24,14 +30,14 @@ while [ \$i -lt 200 ] && ! curl -ksf -o /dev/null --max-time 3 "$url"; do
     i=\$((i + 1))
     sleep 3
 done
-exec firefox-esr "$url"
+exec firefox-esr $tabs
 LAUNCHER
 chmod 755 /usr/local/bin/vmctl-open-proxmox
 cat > /etc/xdg/autostart/vmctl-open-proxmox.desktop <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=Proxmox VE web GUI
-Comment=Open $url once the Proxmox lab host answers
+Comment=Open $tabs once the Proxmox lab host answers
 Exec=/usr/local/bin/vmctl-open-proxmox
 X-GNOME-Autostart-enabled=true
 DESKTOP

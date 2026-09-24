@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from vmctl import cloud_init, config, netlab, qemu, runtime
+from vmctl import cloud_init, config, netlab, proxmox, pvecluster, qemu, runtime
 from vmctl.errors import VMError
 
 # Started first and stopped last: what the other members route through or run on, then the
@@ -117,11 +117,100 @@ def model(cfg: dict[str, Any], group: str, states: dict[str, dict[str, Any]] | N
             "cpus": int(vm.get("cpus") or 0), "nics": nics,
             "running": bool(state.get("running")), "install": str(state.get("install") or ""),
             "disks": 1 + len(qemu.extra_disks(vm)),
+            "flow": str(state.get("flow") or ""),
+            "ssh": _ssh_line(name, vm),
+            "zfs": _zfs(vm),
             # Guests of a hypervisor member (Proxmox containers) that the lab reaches on the segment.
             "services": [dict(entry) for entry in vm.get("lab_services") or [] if isinstance(entry, dict)],
         })
-    return {"group": group, "members": members, "segments": list(segments.values()),
-            "start_order": [member["name"] for member in members]}
+    lab = {"group": group, "members": members, "segments": list(segments.values()),
+           "start_order": [member["name"] for member in members]}
+    lab["runbook"] = runbook(cfg, lab)
+    return lab
+
+
+def _ssh_line(name: str, vm: dict[str, Any]) -> str:
+    ssh_cfg = cloud_init.ssh_access_config(vm) or {}
+    if not ssh_cfg.get("ssh_host_port"):
+        return ""
+    return (f"ssh -i artifacts/{name}/ssh/id_ed25519 -p {int(ssh_cfg['ssh_host_port'])} "
+            f"{ssh_cfg.get('user') or 'root'}@127.0.0.1")
+
+
+def _zfs(vm: dict[str, Any]) -> dict[str, Any] | None:
+    cfg = proxmox.proxmox_config(vm)
+    if not cfg or str(cfg.get("filesystem") or "zfs") != "zfs":
+        return None
+    return {"raid": str((cfg.get("zfs") or {}).get("raid") or "raid0"), "disks": proxmox.disk_names(vm)}
+
+
+COMMUNITY_URL = "https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/{script}.sh"
+
+
+def runbook(cfg: dict[str, Any], lab: dict[str, Any]) -> list[dict[str, Any]]:
+    """The commands behind the lab, from the same profiles: each section is a title, a sentence
+    and blocks of (where, commands); ``where`` is ``host`` or a member (run over its SSH line)."""
+    group = lab["group"]
+    members = lab["members"]
+    ssh_of = {member["name"]: member["ssh"] for member in members}
+    sections: list[dict[str, Any]] = []
+    install = [f"vmctl group install {group}    # everything missing, in this order, then up"]
+    install += [f"vmctl {member['flow']} {member['name']}" for member in members
+                if member["flow"].startswith("bootstrap-")]
+    sections.append({"title": "Install", "text": "One command for the whole lab (cumulative: installed members are kept), or one per member with its own unattended flow.",
+                     "blocks": [("host", install)]})
+    mirrors = [member for member in members if member["zfs"]]
+    if mirrors:
+        first = mirrors[0]["zfs"]
+        answer = ["[disk-setup]", 'filesystem = "zfs"', f'disk-list = [{", ".join(repr(d).replace(chr(39), chr(34)) for d in first["disks"])}]',
+                  f'zfs.raid = "{first["raid"]}"']
+        blocks: list[tuple[str, list[str]]] = [("answer.toml (rendered by vmctl, grafted on the ISO)", answer)]
+        for member in mirrors:
+            blocks.append((member["name"], ["zpool status rpool", "zpool list -v rpool",
+                                             "proxmox-boot-tool status    # one ESP per disk: boots from either"]))
+        sections.append({"title": "ZFS mirror", "text": f"The root pool is ZFS {first['raid']} over {' + '.join(first['disks'])} (disk + extra_disks); these commands show it on each node.",
+                         "blocks": blocks})
+    containers: list[tuple[str, list[str]]] = []
+    for member in members:
+        for svc in member["services"]:
+            nat = str(svc.get("nat_address") or "")
+            upstream = (f"TERM=xterm mode=default var_ctid={svc.get('container')} var_hostname={svc.get('hostname')} "
+                        f"var_brg=vmbr0 var_net={nat} var_gateway=10.0.2.2 var_ns=10.0.2.3 "
+                        "var_container_storage=local-zfs var_template_storage=local \
+  "
+                        f'bash -c "$(curl -fsSL {COMMUNITY_URL.format(script=svc.get("script"))})"')
+            containers.append((member["name"], [
+                f"# {svc.get('name')}: what vmctl runs",
+                f"/root/pve-community.sh {svc.get('container')} {svc.get('script')} {svc.get('hostname')} "
+                f"{svc.get('port')} {nat} {svc.get('address')}",
+                "# the same by hand, upstream script",
+                "mkdir -p /usr/local/community-scripts && echo DIAGNOSTICS=no > /usr/local/community-scripts/diagnostics",
+                upstream,
+                f"pct set {svc.get('container')} -onboot 1 -net1 name=eth1,bridge=vmbr1,ip={svc.get('address')}",
+                f"# then: {svc.get('url')}",
+            ]))
+    if containers:
+        sections.append({"title": "LXC containers", "text": "Created by the Proxmox VE Helper-Scripts (community-scripts.org, main branch, not pinned) on the NAT bridge at a static address outside slirp's DHCP pool, then given a NIC on the lab segment.",
+                         "blocks": containers})
+    names = [member["name"] for member in members]
+    for cluster, entry in pvecluster.clusters(cfg, names).items():
+        steps = pvecluster.commands(cfg, cluster, entry)
+        blocks = []
+        for node, command in steps:
+            if blocks and blocks[-1][0] == node:
+                blocks[-1][1].append(command)
+            else:
+                blocks.append((node, [command]))
+        sections.append({"title": f"Cluster {cluster}", "text": f"corosync over the lab segment; {entry['primary']} creates the cluster, the others join it. vmctl group install {group} does all of this and checks quorum.",
+                         "blocks": blocks})
+    sections.append({"title": "Run the stack", "text": "Infrastructure starts first and stops last.",
+                     "blocks": [("host", [f"vmctl group up {group}", f"vmctl group status {group}",
+                                          f"vmctl group map {group} --open", f"vmctl group down {group}",
+                                          f"vmctl group clean {group}    # asks, keeps checkpoints"])]})
+    for section in sections:
+        section["blocks"] = [{"where": where, "ssh": ssh_of.get(where, ""), "commands": list(cmds)}
+                             for where, cmds in section["blocks"]]
+    return sections
 
 
 # --- the map ---------------------------------------------------------------------------------
@@ -216,6 +305,8 @@ th { color:var(--muted); font-weight:600; font-size:12.5px; text-transform:upper
 code { font:13px ui-monospace, monospace; } a { color:var(--accent); }
 pre { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; overflow-x:auto; }
 .table-wrap { overflow-x:auto; }
+h3 { font-size:1rem; margin:22px 0 2px; } .where { font-size:13px; color:var(--muted); margin:10px 0 4px; }
+pre { margin:0 0 6px; font:13px/1.45 ui-monospace, monospace; white-space:pre-wrap; word-break:break-word; }
 """
 
 
@@ -267,12 +358,28 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
 <h2>Members</h2>
 <div class="table-wrap"><table><thead><tr><th>VM</th><th>Role</th><th>State</th><th>NICs (runtime)</th></tr></thead>
 <tbody>{''.join(rows)}</tbody></table></div>
-<h2>Run the stack</h2>
-<pre>vmctl group up {group}      # start order: {order}
-vmctl group status {group}
-vmctl group down {group}    # reverse order</pre>
+<h2>Runbook</h2>
+<p class="sub">Start order: {order}. Every command below comes from the same profiles as the map.</p>
+{_runbook_html(lab.get("runbook") or [])}
 </main></body></html>
 """
+
+
+def _runbook_html(sections: list[dict[str, Any]]) -> str:
+    esc = html.escape
+    parts: list[str] = []
+    for section in sections:
+        parts.append(f'<h3>{esc(section["title"])}</h3><p class="sub">{esc(section["text"])}</p>')
+        for block in section["blocks"]:
+            where = block["where"]
+            if block["ssh"]:
+                label = f'on <b>{esc(where)}</b> · <code>{esc(block["ssh"])}</code>'
+            elif where == "host":
+                label = "on the host, in the repository"
+            else:
+                label = esc(where)
+            parts.append(f'<div class="where">{label}</div><pre>{esc(chr(10).join(block["commands"]))}</pre>')
+    return "\n".join(parts)
 
 
 def map_path(group: str) -> Path:

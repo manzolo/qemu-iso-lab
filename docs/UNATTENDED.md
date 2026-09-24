@@ -1311,6 +1311,36 @@ flow does, and why:
 The host reaches the web GUI through the NAT NIC's forward on `https://127.0.0.1:8006` (`root`
 and the profile's password). Running guests inside Proxmox needs nested virtualization on the host.
 
+### The three-node cluster
+
+`proxmox-ve`, `proxmox-ve-node2` and `proxmox-ve-node3` are three installs of the same profile
+(SSH 2276/2278/2279, web GUI `https://127.0.0.1:8006`/`8007`/`8008`, `vmbr1` 10.10.10.2/.3/.4), each
+with `proxmox_config.cluster = {"name": "pve-lab", "primary": "proxmox-ve"}`. `vmctl group install
+proxmox-lab` forms the cluster once the stack runs with its runtime NICs (`vmctl group cluster
+proxmox-lab` does that step alone on a running stack; both are idempotent). `pvecluster.form`:
+
+- **pins each node name to its lab address in `/etc/hosts` first.** After the install every node's
+  name resolves to `10.0.2.15`, the private slirp address that all three share; pmxcfs resolves the
+  node name once, at start, so the line is rewritten and pve-cluster restarted;
+- runs `pvecm create pve-lab --link0 10.10.10.2` on the primary, so corosync runs on the segment;
+- for each other node: authorizes its root key on the primary, records the primary's host key
+  (`ssh-keyscan`) and runs `pvecm add 10.10.10.2 --link0 <its address> --use_ssh`, which asks nothing;
+- waits for `/etc/pve` to accept writes after every `pvecm` call: pmxcfs restarts and answers "I/O
+  error" for a few seconds (the first run failed there appending the key, verified live);
+- checks `Quorate: Yes` with the expected node count.
+
+Only node 1 carries the LXC apps: a node joining a cluster must hold no guests. Verified live on
+2026-09-24: `vmctl group install proxmox-lab` kept node 1 and the client, installed nodes 2 and 3
+(about 6 minutes each), restarted the stack and formed the cluster (3 nodes, 3 votes, quorate); a
+second run changed nothing; the client reached the three GUIs and both apps. Each node has 3 GB,
+so the lab needs about 12 GB with the client.
+
+The map page (`vmctl group map proxmox-lab --open`) ends with a **runbook** generated from the
+same profiles: the install commands (per member, with its flow), the ZFS mirror (`answer.toml`
+snippet and the checks on each node), the two containers (the helper line and the equivalent
+upstream `ct/<script>.sh` invocation), the cluster steps node by node with each node's SSH line,
+and the stack commands.
+
 ### `extra_disks`
 
 `extra_disks` is a list of `{"path", "size", "format"}` beside `disk`: virtio disks that follow
@@ -1332,9 +1362,11 @@ profiles):
   with `10.10.10.2/24` on it in `/etc/network/interfaces`, and rebuilds the initramfs (its udev
   names the NICs first);
 - on the client (`debian-xfce` plus `firefox-esr`), `client-lan.sh` adds a NetworkManager
-  profile bound to the MAC with `10.10.10.10/24`, and Firefox's policies
-  (`/etc/firefox/policies/policies.json`) open `https://10.10.10.2:8006/` as homepage and toolbar
-  bookmark.
+  profile bound to the MAC with `10.10.10.10/24`; Firefox's policies
+  (`/etc/firefox/policies/policies.json`) make `https://10.10.10.2:8006/` the homepage and bookmark
+  the three GUIs and the two apps, and the autostart opens the GUI plus one tab per app. The
+  keyboard is `preseed_config.keyboard_layout` (`us` in the tracked profile; a local override such
+  as `it` changes it).
 
 ```bash
 vmctl bootstrap-proxmox proxmox-ve
@@ -1393,6 +1425,7 @@ vmctl group down proxmox-lab          # reverse order
 vmctl group map proxmox-lab --open    # artifacts/labs/<group>/network.html (+ lab.json)
 vmctl group install proxmox-lab       # what is missing, in start order, then down + up (runtime NICs)
 vmctl group clean proxmox-lab         # stop and delete every member's disk (asks; checkpoints kept)
+vmctl group cluster proxmox-lab       # only the cross-VM step: form the Proxmox cluster (idempotent)
 ```
 
 `install` is cumulative: installed and verified members are kept, missing ones go through their own

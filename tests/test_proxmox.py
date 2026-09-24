@@ -105,8 +105,28 @@ class ProxmoxTests(BaseVmctlTestCase):
                 # Outside slirp's DHCP pool: a lease there once duplicated the host's own 10.0.2.15.
                 self.assertNotIn(int(str(ipaddress.ip_interface(service['nat_address']).ip).split('.')[-1]), slirp_dhcp)
                 self.assertIn(f'"URL":"{service["url"]}"', json.dumps(client['preseed_config']['late_commands']).replace('\\"', '"'))
+        client_lan = next(c for c in client['ssh_provision']['post_install_run'] if 'client-lan.sh' in c)
+        self.assertTrue(client_lan.endswith(' '.join(s['url'] for s in pve['lab_services'])))  # one tab per app
         self.assertLess(commands.index(next(c for c in commands if 'pve-repos.sh' in c)),
                         commands.index(next(c for c in commands if 'pve-community.sh' in c)))
+
+    def test_cluster_nodes_are_distinct_and_the_runbook_matches_what_form_runs(self):
+        from vmctl import pvecluster
+        cfg = {'vms': json.loads((ROOT / 'vms/profiles/proxmox-lab.json').read_text())['vms']}
+        names = list(cfg['vms'])
+        found = pvecluster.clusters(cfg, names)
+        self.assertEqual(found, {'pve-lab': {'primary': 'proxmox-ve',
+                                             'nodes': ['proxmox-ve', 'proxmox-ve-node2', 'proxmox-ve-node3']}})
+        nodes = [cfg['vms'][name] for name in found['pve-lab']['nodes']]
+        for key in (lambda vm: pvecluster.lan_ip(vm), lambda vm: vm['proxmox_config']['fqdn'],
+                    lambda vm: vm['ssh_provision']['ssh_host_port'], lambda vm: vm['networks'][1]['mac'],
+                    lambda vm: vm['networks'][0]['hostfwd'][0]['host_port'], lambda vm: vm['extra_disks'][0]['path']):
+            self.assertEqual(len({key(vm) for vm in nodes}), 3)
+        steps = pvecluster.commands(cfg, 'pve-lab', found['pve-lab'])
+        self.assertIn(('proxmox-ve', 'pvecm create pve-lab --link0 10.10.10.2'), steps)
+        self.assertIn(('proxmox-ve-node3', 'pvecm add 10.10.10.2 --link0 10.10.10.4 --use_ssh'), steps)
+        # Only node 1 carries the containers: a node that joins a cluster must hold no guests.
+        self.assertEqual([name for name in names if cfg['vms'][name].get('lab_services')], ['proxmox-ve'])
 
     def test_lab_members_share_the_runtime_segment_only(self):
         for name in ('proxmox-ve', 'proxmox-lab-client'):

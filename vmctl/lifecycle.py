@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
+from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -2319,7 +2319,8 @@ def group_states(cfg: dict[str, Any], names: list[str]) -> dict[str, dict[str, A
     for name in names:
         vm = config.get_vm(cfg, name)
         states[name] = {"running": running_qemu_pid(name, vm) is not None,
-                        "install": str(vmstate.summary(name, vm)["label"])}
+                        "install": str(vmstate.summary(name, vm)["label"]),
+                        "flow": local_test_mode(vm)[0]}
     return states
 
 
@@ -2383,6 +2384,10 @@ def cmd_group(args: argparse.Namespace) -> int:
         return 0
     if action == "install":
         return group_install(cfg, args, lab)
+    if action == "cluster":
+        # The cross-VM step of install alone, on a running stack (idempotent).
+        pvecluster.form(cfg, order, args.timeout, dry_run=args.dry_run)
+        return 0
     if action == "clean":
         present = [member["name"] for member in lab["members"] if member["install"] != "no disk"]
         if not present:
@@ -2445,7 +2450,10 @@ def group_install(cfg: dict[str, Any], args: argparse.Namespace, lab: dict[str, 
     for member in reversed(labs.model(cfg, group, group_states(cfg, lab["start_order"]))["members"]):
         if member["running"]:
             cmd_stop(argparse.Namespace(vm=member["name"], dry_run=args.dry_run))
-    return cmd_group(argparse.Namespace(**{**vars(args), "action": "up"}))
+    code = cmd_group(argparse.Namespace(**{**vars(args), "action": "up"}))
+    # Cross-VM steps need the runtime NICs, so they come last: a Proxmox cluster over the segment.
+    pvecluster.form(cfg, lab["start_order"], args.timeout, dry_run=args.dry_run)
+    return code
 
 
 def lab_in_libvirt(uri: str, names: list[str], dry_run: bool) -> bool:

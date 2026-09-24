@@ -238,7 +238,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=lifecycle.cmd_lab)
 
     p = _add(subparsers, "group", help="a declared group as one stack: list the groups (--labs: only those on a network segment), status, up (infrastructure first), down (reverse), map (HTML network map, --open), install (what is missing, cumulative), clean")
-    p.add_argument("action", choices=["list", "status", "up", "down", "map", "install", "clean"], help="what to do with the group (install: what is missing, in start order, then up; clean: stop and delete every member's disk)")
+    p.add_argument("action", choices=["list", "status", "up", "down", "map", "install", "clean", "cluster"], help="what to do with the group (install: what is missing, in start order, then up and the cluster; clean: stop and delete every member's disk; cluster: form the Proxmox cluster of a running stack)")
     p.add_argument("group", nargs="?", help="the group name (meta.groups), e.g. netlab or proxmox-lab")
     p.add_argument("--labs", action="store_true", help="list: only the labs (groups with a member on a segment)")
     p.add_argument("--json", action="store_true", help="list/status: machine-readable output")
