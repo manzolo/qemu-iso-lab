@@ -10,7 +10,7 @@ PREFIX ?= $(HOME)/.local
 TIMEOUT ?= 3600
 BIN := $(abspath bin)
 
-.PHONY: help setup install-cli uninstall-cli test lint check ci tui tui-classic init-local-profile validate-vms groups guides
+.PHONY: help setup install-cli uninstall-cli install test lint check ci tui tui-classic init-local-profile validate-vms groups guides
 
 help: ## Show this help
 	@printf "\033[1mqemu-iso-lab: developer targets\033[0m\n\n"
@@ -27,6 +27,15 @@ install-cli: ## Symlink vmctl and vmtui into $(PREFIX)/bin (default ~/.local/bin
 	@ln -sfn "$(BIN)/vmtui" "$(PREFIX)/bin/vmtui"
 	@printf "  linked %s/bin/vmctl and vmtui -> %s\n" "$(PREFIX)" "$(BIN)"
 	@case ":$$PATH:" in *":$(PREFIX)/bin:"*) ;; *) printf "  note: %s/bin is not in your PATH\n" "$(PREFIX)";; esac
+
+# `make install textual growisofs`: the words after `install` are tool names, not targets.
+ifeq (install,$(firstword $(MAKECMDGOALS)))
+INSTALL_NAMES := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+$(eval $(INSTALL_NAMES):;@:)
+endif
+
+install: ## Install host dependencies: every missing one, or only those named (make install textual growisofs)
+	@./bin/vmctl setup --install $(INSTALL_NAMES)
 
 uninstall-cli: ## Remove the symlinks created by install-cli
 	@rm -f "$(PREFIX)/bin/vmctl" "$(PREFIX)/bin/vmtui"

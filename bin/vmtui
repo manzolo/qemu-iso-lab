@@ -49,7 +49,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" && "${VMTUI_TEST_MODE:-0}" != "1" ]]; then
             exec "$python_bin" "$ROOT_DIR/bin/vmtui-textual"
         fi
         if [[ "${VMTUI_UI:-}" == "textual" ]]; then
-            printf 'error: VMTUI_UI=textual needs Textual (python3 -m venv .venv-tui && .venv-tui/bin/python -m pip install -e ".[tui]")\n' >&2
+            printf 'error: VMTUI_UI=textual needs Textual (make install textual)\n' >&2
             exit 1
         fi
     fi

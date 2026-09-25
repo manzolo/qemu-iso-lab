@@ -390,7 +390,11 @@ def build_parser() -> argparse.ArgumentParser:
     import_dev.add_import_options(p)
     p.set_defaults(func=import_dev.cmd_import_device)
 
-    p = _add(subparsers, "setup", help="verify host prerequisites")
+    p = _add(subparsers, "setup", help="verify host prerequisites; --install installs the missing ones")
+    p.add_argument("--install", nargs="*", metavar="NAME", default=None,
+                   help="install these tools (names as `vmctl setup` prints them, plus ovmf and textual), "
+                        "or every missing one when none is named; asks first")
+    p.add_argument("--yes", action="store_true", help="with --install: do not ask before running the install commands")
     p.set_defaults(func=lifecycle.cmd_setup)
 
     p = _add(subparsers, "clean", help="force-stop and remove artifacts for one VM (or all VMs); checkpoints are kept unless --checkpoints")

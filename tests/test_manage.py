@@ -375,7 +375,8 @@ class ManageTests(BaseVmctlTestCase):
              mock.patch.object(vmctl.state, "COMMON_OVMF_PAIRS", []), \
              mock.patch.object(vmctl.host_setup, "read_os_release", return_value={"ID": "ubuntu", "ID_LIKE": "debian"}), \
              mock.patch("sys.stdout", new_callable=mock.MagicMock()) as stdout:
-            exit_code = self.vmctl.cmd_setup(args)
+            with mock.patch.object(vmctl.host_setup, "textual_python", return_value="python3"):
+                exit_code = self.vmctl.cmd_setup(args)
 
         output = "".join(call.args[0] for call in stdout.write.call_args_list)
         self.assertEqual(exit_code, 1)
@@ -389,9 +390,100 @@ class ManageTests(BaseVmctlTestCase):
     def test_cmd_setup_finds_virtiofsd_outside_path_and_7z_variants(self):
         with mock.patch.object(shutil, "which", side_effect=lambda name: "/usr/bin/7zz" if name == "7zz" else None), \
              mock.patch.object(vmctl.qemu, "find_virtiofsd", return_value="/usr/libexec/virtiofsd"):
-            self.assertTrue(self.vmctl.optional_tool_present("virtiofsd"))
-            self.assertTrue(self.vmctl.optional_tool_present("7z"))
-            self.assertFalse(self.vmctl.optional_tool_present("dialog"))
+            self.assertTrue(self.vmctl.tool_present("virtiofsd"))
+            self.assertTrue(self.vmctl.tool_present("7z"))
+            self.assertFalse(self.vmctl.tool_present("dialog"))
+
+    def test_textual_python_follows_the_vmtui_lookup_order(self):
+        venv_python = str(self.root / ".venv-tui/bin/python")
+
+        def probe(returncodes):
+            def fake_run(cmd, **kwargs):
+                if cmd[0] not in returncodes:
+                    raise FileNotFoundError(cmd[0])
+                return subprocess.CompletedProcess(cmd, returncodes[cmd[0]])
+            return fake_run
+
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("VMTUI_TEXTUAL_PYTHON", None)
+            with mock.patch.object(subprocess, "run", side_effect=probe({venv_python: 0, "python3": 0})):
+                self.assertEqual(self.vmctl.textual_python(), venv_python)
+            with mock.patch.object(subprocess, "run", side_effect=probe({"python3": 0})):
+                self.assertEqual(self.vmctl.textual_python(), "python3")
+            with mock.patch.object(subprocess, "run", side_effect=probe({venv_python: 1, "python3": 1})):
+                self.assertIsNone(self.vmctl.textual_python())
+                self.assertFalse(self.vmctl.tool_present("textual"))
+            with mock.patch.dict(os.environ, {"VMTUI_TEXTUAL_PYTHON": "/opt/py"}), \
+                 mock.patch.object(subprocess, "run", side_effect=probe({"/opt/py": 1, "python3": 0})):
+                self.assertIsNone(self.vmctl.textual_python())
+
+    def test_cmd_setup_reports_missing_textual(self):
+        self.write_config_dir()
+        with mock.patch.object(shutil, "which", return_value="/usr/bin/fake"), \
+             mock.patch.object(vmctl.host_setup, "textual_python", return_value=None), \
+             mock.patch("sys.stdout", new_callable=mock.MagicMock()) as stdout:
+            exit_code = self.vmctl.cmd_setup(argparse.Namespace())
+
+        output = "".join(call.args[0] for call in stdout.write.call_args_list)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("[missing] textual (the vmtui dashboard", output)
+        self.assertIn("make install textual", output)
+
+    def _install(self, names, present=(), distro="ubuntu", **kwargs):
+        with mock.patch.object(vmctl.host_setup, "tool_present", side_effect=lambda name: name in present), \
+             mock.patch.object(vmctl.host_setup, "read_os_release", return_value={"ID": distro}), \
+             mock.patch.object(vmctl.runtime, "confirm_default_no", return_value=True) as confirm, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            vmctl.host_setup.install_tools(names, **kwargs)
+        return [call.args[0] for call in run_cmd.call_args_list], confirm, stdout.getvalue()
+
+    def test_setup_install_named_tools_maps_them_to_packages_once(self):
+        executed, confirm, output = self._install(["growisofs", "cloud-localds", "ddrescue", "ddrescuelog", "fzf"], present={"fzf"})
+        self.assertEqual(executed, [["sudo", "apt", "update"],
+                                    ["sudo", "apt", "install", "-y", "dvd+rw-tools", "cloud-image-utils", "gddrescue"]])
+        self.assertIn("fzf is already installed", output)
+        confirm.assert_called_once()
+
+    def test_setup_install_without_names_installs_every_missing_tool_with_pacman(self):
+        present = set(vmctl.host_setup.installable_names()) - {"sfdisk", "7z"}
+        executed, _, _ = self._install([], present=present, distro="arch")
+        self.assertEqual(executed, [["sudo", "pacman", "-S", "--needed", "p7zip", "util-linux"]])
+
+    def test_setup_install_textual_goes_into_the_repo_venv_without_sudo(self):
+        venv = self.root / ".venv-tui"
+        executed, _, _ = self._install(["textual"], distro="unknown")
+        self.assertEqual(executed, [["python3", "-m", "venv", str(venv)],
+                                    [str(venv / "bin/python"), "-m", "pip", "install", "--quiet", "-e", f"{self.root}[tui]"]])
+        (venv / "bin").mkdir(parents=True)
+        (venv / "bin/python").write_text("", encoding="utf-8")
+        executed, _, _ = self._install(["textual"])
+        self.assertEqual([cmd[1:3] for cmd in executed], [["-m", "pip"]])
+
+    def test_setup_install_refuses_unknown_names_unconfirmed_runs_and_unknown_distros(self):
+        with self.assertRaisesRegex(self.vmctl.VMError, "Unknown tool\\(s\\): nope. Installable: qemu-system-x86_64"):
+            self._install(["nope"])
+        with mock.patch.object(vmctl.runtime, "confirm_default_no", return_value=False), \
+             mock.patch.object(vmctl.host_setup, "tool_present", return_value=False), \
+             mock.patch.object(vmctl.host_setup, "read_os_release", return_value={"ID": "debian"}), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd, \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            with self.assertRaisesRegex(self.vmctl.VMError, "Not confirmed"):
+                vmctl.host_setup.install_tools(["xorriso"])
+        run_cmd.assert_not_called()
+        with self.assertRaisesRegex(self.vmctl.VMError, "No package list for this distribution; install xorriso"):
+            self._install(["xorriso"], distro="gentoo")
+
+    def test_setup_install_yes_and_dry_run_skip_the_question(self):
+        _, confirm, _ = self._install(["xorriso"], assume_yes=True)
+        confirm.assert_not_called()
+        executed, confirm, _ = self._install(["xorriso"], dry_run=True)
+        confirm.assert_not_called()
+        self.assertEqual(executed[-1], ["sudo", "apt", "install", "-y", "xorriso"])
+
+    def test_setup_install_names_everything_setup_checks(self):
+        names = set(vmctl.host_setup.installable_names())
+        self.assertLessEqual(set(vmctl.state.REQUIRED_COMMANDS) | set(vmctl.state.OPTIONAL_COMMANDS), names)
 
     def test_cmd_setup_can_install_missing_packages_after_confirmation(self):
         self.vm_config["firmware"] = {
@@ -421,7 +513,8 @@ class ManageTests(BaseVmctlTestCase):
              mock.patch.object(vmctl.host_setup, "prompt_yes_no", return_value=True), \
              mock.patch.object(vmctl.runtime, "run") as run_cmd, \
              mock.patch("sys.stdout", new_callable=mock.MagicMock()):
-            exit_code = self.vmctl.cmd_setup(args)
+            with mock.patch.object(vmctl.host_setup, "textual_python", return_value="python3"):
+                exit_code = self.vmctl.cmd_setup(args)
 
         self.assertEqual(exit_code, 0)
         executed = [call.args[0] for call in run_cmd.call_args_list]
@@ -447,7 +540,8 @@ class ManageTests(BaseVmctlTestCase):
 
         with mock.patch.object(shutil, "which", return_value="/usr/bin/fake"), \
              mock.patch("sys.stdout", new_callable=mock.MagicMock()) as stdout:
-            exit_code = self.vmctl.cmd_setup(args)
+            with mock.patch.object(vmctl.host_setup, "textual_python", return_value="python3"):
+                exit_code = self.vmctl.cmd_setup(args)
 
         output = "".join(call.args[0] for call in stdout.write.call_args_list)
         self.assertEqual(exit_code, 0)

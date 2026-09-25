@@ -24,6 +24,7 @@ sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvi
 git clone https://github.com/manzolo/qemu-iso-lab.git && cd qemu-iso-lab
 make install-cli                        # vmctl and vmtui into ~/.local/bin
 vmctl setup                             # checks qemu, OVMF, KVM and the helpers
+make install                            # installs what setup reported missing (or: make install growisofs xorriso)
 
 vmctl bootstrap-preseed debian-server   # Debian, zero clicks, ~10 minutes
 vmctl shell debian-server               # SSH into it
@@ -32,7 +33,7 @@ vmctl shell debian-server               # SSH into it
 The dashboard needs [Textual](https://textual.textualize.io/) (optional):
 
 ```bash
-python3 -m venv .venv-tui && .venv-tui/bin/python -m pip install -e '.[tui]'
+make install textual                    # .venv-tui with Textual, no sudo
 vmtui                                   # without Textual: the fzf/dialog menus
 ```
 

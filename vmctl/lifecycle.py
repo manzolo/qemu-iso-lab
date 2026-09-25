@@ -3694,16 +3694,13 @@ def cmd_test_local(args: argparse.Namespace) -> int:
 
 # --- setup / clean -------------------------------------------------------------
 
-def optional_tool_present(name: str) -> bool:
-    """Same lookup the flows use: virtiofsd lives in /usr/libexec, 7z may be 7zz/7za."""
-    if name == "virtiofsd":
-        return qemu.find_virtiofsd() is not None
-    if name == "7z":
-        return any(shutil.which(candidate) for candidate in ("7z", "7zz", "7za"))
-    return shutil.which(name) is not None
-
-
 def cmd_setup(args: argparse.Namespace) -> int:
+    install = getattr(args, "install", None)
+    if install is not None:
+        # One helper for every dependency: the named ones, or all the missing ones, then the check.
+        host_setup.install_tools(install, assume_yes=getattr(args, "yes", False), dry_run=getattr(args, "dry_run", False))
+        args.install = None
+        args._skip_prompt = True
     cfg = config.load_config()
     status_ok = True
 
@@ -3716,7 +3713,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
     ui.print_header("Optional tools")
     for name, note in state.OPTIONAL_COMMANDS.items():
-        present = optional_tool_present(name)
+        present = host_setup.tool_present(name)
         marker = "ok" if present else "missing"
         ui.print_status(marker, f"{name} ({note})", ok=present)
 
