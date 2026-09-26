@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 .venv-tui/
+.tools/
 *.egg-info/
 
 # Virtual machine artifacts

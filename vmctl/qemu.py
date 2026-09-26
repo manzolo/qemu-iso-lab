@@ -240,6 +240,9 @@ def installer_video_variant(vm: dict[str, Any], requested: str | None) -> str | 
 # backend and a vhost-user-fs-pci device carrying the mount tag.
 
 VIRTIOFSD_CANDIDATES = ("virtiofsd", "/usr/libexec/virtiofsd", "/usr/lib/qemu/virtiofsd")
+# Where `vmctl setup --install virtiofsd` puts the upstream static build when the distribution
+# has no usable one (Ubuntu 22.04 ships only QEMU's old C daemon), relative to the repository.
+VIRTIOFSD_LOCAL = ".tools/virtiofsd"
 # "virtiofs" needs a guest driver (Linux, or WinFSP + viofs on Windows 8.1 and later). "vvfat" needs
 # none at all: QEMU exposes the directory as a FAT disk, which is how a guest too old for virtiofs -
 # Windows XP, 98 - can still read the host's files. It is read-only on purpose: QEMU's writable
@@ -283,10 +286,26 @@ def virtiofs_socket_path(vm: dict[str, Any]) -> Path:
     return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / f"virtiofs-{tag}.sock"
 
 
+def is_legacy_virtiofsd(path: str) -> bool:
+    """QEMU's C virtiofsd (Ubuntu 22.04's /usr/lib/qemu/virtiofsd) takes ``-o source=`` and needs
+    root: run by a user, even ``--version`` stops at "setgroups() failed" before printing anything
+    (as root it says ``virtiofsd version 6.2.0``), and so does the daemon, before creating its
+    socket (verified in a Lubuntu 22.04 VM). Only the Rust daemon answers ``virtiofsd 1.x``, so
+    anything else that runs is the old one; a binary that cannot be run at all is given the
+    benefit of the doubt."""
+    try:
+        result = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=10,
+                                stdin=subprocess.DEVNULL, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return re.match(r"virtiofsd \d", (result.stdout or result.stderr).strip()) is None
+
+
 def find_virtiofsd() -> str | None:
-    for candidate in VIRTIOFSD_CANDIDATES:
+    candidates = [*VIRTIOFSD_CANDIDATES[:2], str(runtime.resolve_path(VIRTIOFSD_LOCAL)), *VIRTIOFSD_CANDIDATES[2:]]
+    for candidate in candidates:
         found = shutil.which(candidate)  # also accepts absolute paths; mockable in tests
-        if found:
+        if found and not is_legacy_virtiofsd(found):
             return found
     return None
 
@@ -294,7 +313,9 @@ def find_virtiofsd() -> str | None:
 def virtiofsd_command(vm: dict[str, Any]) -> list[str]:
     binary = find_virtiofsd()
     if binary is None:
-        raise VMError("Missing virtiofsd (package virtiofsd): required by profiles with shared_dir")
+        raise VMError("Missing virtiofsd, required by profiles with shared_dir: vmctl setup --install virtiofsd "
+                      "(the distribution package, or the upstream static build when the distribution has none "
+                      "or only QEMU's old C daemon, which needs root)")
     return [
         binary,
         "--socket-path", str(virtiofs_socket_path(vm)),

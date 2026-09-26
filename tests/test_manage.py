@@ -448,11 +448,36 @@ class ManageTests(BaseVmctlTestCase):
         confirm.assert_called_once()
 
     def test_setup_install_skips_packages_apt_does_not_have(self):
-        # Ubuntu 22.04: virtiofsd ships inside qemu-system-common, and one unknown package name
-        # made `apt install` refuse the whole list (reported from a Lubuntu host, 2026-09-26).
-        executed, _, output = self._install(["xorriso", "virtiofsd"], apt_has={"xorriso"})
+        # Ubuntu 22.04: one unknown package name made `apt install` refuse the whole list
+        # (reported from a Lubuntu host, 2026-09-26).
+        executed, _, output = self._install(["xorriso", "swtpm"], apt_has={"xorriso"})
         self.assertEqual(executed[-1], ["sudo", "apt", "install", "-y", "xorriso"])
-        self.assertIn("virtiofsd: no apt package on this release, skipped", output)
+        self.assertIn("swtpm: no apt package on this release, skipped", output)
+
+    def test_setup_install_brings_the_upstream_virtiofsd_where_apt_has_none(self):
+        # Ubuntu 22.04 has no virtiofsd package, only QEMU's C daemon that needs root.
+        with mock.patch.object(vmctl.host_setup, "install_upstream_virtiofsd") as upstream:
+            executed, _, output = self._install(["xorriso", "virtiofsd"], apt_has={"xorriso"})
+        upstream.assert_called_once()
+        self.assertEqual(executed[-1], ["sudo", "apt", "install", "-y", "xorriso"])
+        self.assertIn("virtiofsd <- upstream static build", output)
+        with mock.patch.object(vmctl.host_setup, "install_upstream_virtiofsd") as upstream:
+            executed, _, _ = self._install(["virtiofsd"], apt_has={"virtiofsd"})
+        upstream.assert_not_called()
+        self.assertEqual(executed[-1], ["sudo", "apt", "install", "-y", "virtiofsd"])
+
+    def test_legacy_c_virtiofsd_is_not_used(self):
+        def fake_run(cmd, **kwargs):
+            if cmd[0].startswith("/usr/lib/qemu"):  # what the C daemon says to a user that is not root
+                return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="setgroups() failed with error=1:Operation not permitted\n")
+            return subprocess.CompletedProcess(cmd, 0, stdout="virtiofsd 1.14.0\n", stderr="")
+        which = {"/usr/lib/qemu/virtiofsd": "/usr/lib/qemu/virtiofsd"}
+        with mock.patch.object(shutil, "which", side_effect=lambda name: which.get(name)), \
+             mock.patch.object(vmctl.qemu.subprocess, "run", side_effect=fake_run):
+            self.assertIsNone(vmctl.qemu.find_virtiofsd())
+            local = str(self.root / ".tools/virtiofsd")
+            which[local] = local
+            self.assertEqual(vmctl.qemu.find_virtiofsd(), local)
 
     def test_setup_install_textual_on_apt_brings_python3_venv(self):
         venv = self.root / ".venv-tui"

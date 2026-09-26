@@ -42,6 +42,16 @@ TOOL_PACKAGES: dict[str, dict[str, str]] = {
     "ntfsresize": {"apt": "ntfs-3g", "pacman": "ntfs-3g"},
 }
 TEXTUAL = "textual"
+# The upstream static virtiofsd (musl, no dependencies), for a distribution without a usable
+# package: Ubuntu 22.04 has none, only QEMU's C daemon, which needs root. The zip is the one
+# attached to the v1.14.0 release notes on gitlab.com/virtio-fs/virtiofsd; its SHA-256 was
+# measured on download (2026-09-26): the project publishes no checksum.
+VIRTIOFSD_RELEASE = {
+    "version": "1.14.0",
+    "url": "https://gitlab.com/-/project/21523468/uploads/f505704014ae7a816e515f2a05a93d8b/virtiofsd-v1.14.0.zip",
+    "sha256": "2e4fe9571f492b00baa34bc4e708e950039c5da05b830b31a8d179cb6ac8978e",
+    "member": "target/x86_64-unknown-linux-musl/release/virtiofsd",
+}
 
 
 # How `vmctl setup` groups what it checks: one line per group when everything is there, and one
@@ -325,6 +335,39 @@ def textual_install_commands() -> list[list[str]]:
     return [*commands, [str(venv / "bin/python"), "-m", "pip", "install", "--quiet", "-e", f"{state.ROOT}[tui]"]]
 
 
+def install_upstream_virtiofsd(dry_run: bool = False) -> Path:
+    """Fetch the pinned upstream static virtiofsd into the repository's .tools/ (no sudo)."""
+    import hashlib
+    import urllib.request
+    import zipfile
+
+    dest = state.ROOT / qemu.VIRTIOFSD_LOCAL
+    release = VIRTIOFSD_RELEASE
+    ui.print_command(["download", release["url"], "->", str(dest)])
+    if dry_run:
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    archive = dest.with_name("virtiofsd.zip.part")
+    try:
+        request = urllib.request.Request(release["url"], headers={"User-Agent": state.HTTP_USER_AGENT})
+        with urllib.request.urlopen(request, timeout=120) as response, archive.open("wb") as fh:
+            shutil.copyfileobj(response, fh)
+        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+        if digest != release["sha256"]:
+            raise VMError(f"virtiofsd {release['version']} download does not match its pinned SHA-256 ({digest})")
+        partial = dest.with_name("virtiofsd.part")
+        with zipfile.ZipFile(archive) as bundle, bundle.open(release["member"]) as source, partial.open("wb") as target:
+            shutil.copyfileobj(source, target)
+        partial.chmod(0o755)
+        partial.replace(dest)
+    except (OSError, zipfile.BadZipFile, KeyError) as exc:
+        raise VMError(f"Unable to install virtiofsd {release['version']} from {release['url']}: {exc}") from exc
+    finally:
+        archive.unlink(missing_ok=True)
+    ui.print_status("ok", f"virtiofsd {release['version']} installed: {ui.pretty_path(dest)}")
+    return dest
+
+
 def install_tools(names: list[str], *, assume_yes: bool = False, dry_run: bool = False) -> None:
     """`vmctl setup --install [NAME...]`: the named tools, or every missing one when none is named;
     a name already present is reported and skipped. Asks before running anything unless --yes."""
@@ -344,6 +387,16 @@ def install_tools(names: list[str], *, assume_yes: bool = False, dry_run: bool =
 
     system = [name for name in wanted if name != TEXTUAL]
     manager = package_manager()
+    # No usable distribution virtiofsd (Ubuntu 22.04 has no package, only QEMU's C daemon that
+    # needs root): the upstream static build goes into .tools/ instead.
+    upstream_virtiofsd = False
+    if "virtiofsd" in system and manager == "apt":
+        # python3 is always there: asked alone, a missing name gives an empty answer, which
+        # apt_available reads as "cannot tell" and the install would try apt anyway.
+        available = apt_available([TOOL_PACKAGES["virtiofsd"]["apt"], "python3"])
+        if available is not None and TOOL_PACKAGES["virtiofsd"]["apt"] not in available:
+            system.remove("virtiofsd")
+            upstream_virtiofsd = True
     if system and manager is None:
         raise VMError(f"No package list for this distribution; install {', '.join(system)} with its package manager "
                       f"({' '.join(host_install_hints())})")
@@ -355,12 +408,19 @@ def install_tools(names: list[str], *, assume_yes: bool = False, dry_run: bool =
         commands += textual_install_commands()
 
     for name in wanted:
-        source = ".venv-tui (pip install -e \".[tui]\")" if name == TEXTUAL else TOOL_PACKAGES[name][manager or "apt"]
+        if name == TEXTUAL:
+            source = ".venv-tui (pip install -e \".[tui]\")"
+        elif name == "virtiofsd" and upstream_virtiofsd:
+            source = f"upstream static build {VIRTIOFSD_RELEASE['version']} into {qemu.VIRTIOFSD_LOCAL} (no sudo)"
+        else:
+            source = TOOL_PACKAGES[name][manager or "apt"]
         ui.print_note(f"{name} <- {source}")
     for cmd in commands:
         ui.print_note(f"  {runtime.shell_join(cmd)}")
     if not (assume_yes or dry_run) and not runtime.confirm_default_no("Run these commands?"):
         raise VMError("Not confirmed (pass --yes to skip the question in scripts)")
+    if upstream_virtiofsd:
+        install_upstream_virtiofsd(dry_run=dry_run)
     for cmd in commands:
         try:
             runtime.run(cmd, dry_run=dry_run)
