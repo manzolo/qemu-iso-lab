@@ -2,6 +2,7 @@
 
 import http.client
 import json
+import subprocess
 import sys
 import threading
 import time
@@ -111,7 +112,15 @@ class RequestTests(BaseVmctlTestCase):
         argv = popen.call_args.args[0]
         self.assertEqual(argv[:5], ["/usr/bin/xterm", "-e", "sh", "-c", webui.HOLD_SCRIPT])
         self.assertEqual(argv[6:], command)  # argv[5] is $0 of the holding shell
-        self.assertIn('"$@"', webui.HOLD_SCRIPT)
+        # A valid sudo timestamp would otherwise let the disk be overwritten with no stop at all.
+        self.assertLess(webui.HOLD_SCRIPT.index("read _"), webui.HOLD_SCRIPT.index('"$@"'))
+        run = subprocess.run(["sh", "-c", webui.HOLD_SCRIPT, "t", "echo", "ran"], input="\n\n", capture_output=True, text=True)
+        self.assertIn("Press Enter to start", run.stdout)
+        self.assertIn("abort. ran\n", run.stdout)  # printed after the prompt, so the command ran
+        self.assertIn("exited with status 0", run.stdout)
+        aborted = subprocess.run(["sh", "-c", webui.HOLD_SCRIPT, "t", "echo", "ran"], input="", capture_output=True, text=True)
+        self.assertNotIn("abort. ran", aborted.stdout)  # EOF at the prompt: never ran
+        self.assertEqual(aborted.returncode, 130)
 
     def test_host_ssh_rejects_missing_config_or_desktop(self):
         from unittest import mock

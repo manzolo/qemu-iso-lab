@@ -257,8 +257,12 @@ def prepare_terminal_command(args: list[str]) -> list[str]:
     return [str(state.ROOT / "bin" / "vmctl"), *args]
 
 
-# Keeps the window open after the command so its last lines can be read; the exit status is shown.
-HOLD_SCRIPT = '"$@"; s=$?; printf "\\n[vmctl exited with status %s] Press Enter to close this window." "$s"; read _'
+# The terminal window is the last stop before a disk is overwritten, and sudo may still hold a
+# valid timestamp: show the command and wait for Enter before running it (Ctrl-C aborts), then
+# keep the window open after the command so its last lines and the exit status can be read.
+HOLD_SCRIPT = ('printf "\\n  %s\\n\\nThis overwrites the target disk. Press Enter to start, Ctrl-C to abort. " "$*"; '
+               'read _ || exit 130; "$@"; s=$?; '
+               'printf "\\n[vmctl exited with status %s] Press Enter to close this window." "$s"; read _')
 
 
 def open_host_terminal(command: list[str], hold: bool = False) -> str:
