@@ -289,9 +289,29 @@ def package_install_commands(names: list[str], manager: str, extra: list[str] | 
     return [["sudo", "apt", "update"], ["sudo", "apt", "install", "-y", *packages]]
 
 
+def textual_venv_usable() -> bool:
+    """.venv-tui exists *and* has pip: a `python3 -m venv` that failed for want of ensurepip
+    (python3-venv missing on Debian/Ubuntu) leaves the directory and its python behind without
+    pip, and the next setup then died on "No module named pip" (Lubuntu 22.04, 2026-09-26)."""
+    python = textual_venv() / "bin/python"
+    if not python.exists():
+        return False
+    try:
+        probe = subprocess.run([str(python), "-m", "pip", "--version"], stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=60, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return probe.returncode == 0
+
+
 def textual_install_commands() -> list[list[str]]:
     venv = textual_venv()
-    commands = [] if (venv / "bin/python").exists() else [["python3", "-m", "venv", str(venv)]]
+    if textual_venv_usable():
+        commands: list[list[str]] = []
+    elif (venv / "bin/python").exists():
+        commands = [["python3", "-m", "venv", "--clear", str(venv)]]
+    else:
+        commands = [["python3", "-m", "venv", str(venv)]]
     return [*commands, [str(venv / "bin/python"), "-m", "pip", "install", "--quiet", "-e", f"{state.ROOT}[tui]"]]
 
 
@@ -318,7 +338,7 @@ def install_tools(names: list[str], *, assume_yes: bool = False, dry_run: bool =
         raise VMError(f"No package list for this distribution; install {', '.join(system)} with its package manager "
                       f"({' '.join(host_install_hints())})")
     # Debian and Ubuntu split ensurepip out of python3: `python3 -m venv` fails without python3-venv.
-    extra = ["python3-venv"] if TEXTUAL in wanted and manager == "apt" and not (textual_venv() / "bin/python").exists() else []
+    extra = ["python3-venv"] if TEXTUAL in wanted and manager == "apt" and not textual_venv_usable() else []
     commands = package_install_commands(system, manager, extra) if (system or extra) and manager else []
     if TEXTUAL in wanted:
         commands += textual_install_commands()

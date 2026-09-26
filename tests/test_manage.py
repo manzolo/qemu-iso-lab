@@ -488,8 +488,21 @@ class ManageTests(BaseVmctlTestCase):
                                     [str(venv / "bin/python"), "-m", "pip", "install", "--quiet", "-e", f"{self.root}[tui]"]])
         (venv / "bin").mkdir(parents=True)
         (venv / "bin/python").write_text("", encoding="utf-8")
-        executed, _, _ = self._install(["textual"])
+        with mock.patch.object(vmctl.host_setup, "textual_venv_usable", return_value=True):
+            executed, _, _ = self._install(["textual"])
         self.assertEqual([cmd[1:3] for cmd in executed], [["-m", "pip"]])
+
+    def test_setup_install_rebuilds_a_venv_left_without_pip(self):
+        # A venv created while python3-venv was missing has a python but no pip; reusing it
+        # ended in "No module named pip" (Lubuntu 22.04).
+        venv = self.root / ".venv-tui"
+        (venv / "bin").mkdir(parents=True)
+        (venv / "bin/python").write_text("", encoding="utf-8")
+        with mock.patch.object(vmctl.host_setup, "textual_venv_usable", return_value=False):
+            executed, _, _ = self._install(["textual"])
+        self.assertEqual(executed[1], ["sudo", "apt", "install", "-y", "python3-venv"])
+        self.assertEqual(executed[2], ["python3", "-m", "venv", "--clear", str(venv)])
+        self.assertEqual(executed[3][1:4], ["-m", "pip", "install"])
 
     def test_setup_install_refuses_unknown_names_unconfirmed_runs_and_unknown_distros(self):
         with self.assertRaisesRegex(self.vmctl.VMError, "Unknown tool\\(s\\): nope. Installable: qemu-system-x86_64"):
