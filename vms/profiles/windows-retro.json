@@ -11,7 +11,7 @@
         "groups": [
           "windows-retro"
         ],
-        "verified": "2026-09-14"
+        "verified": "2026-09-26"
       },
       "iso": "isos/windowsxp.iso",
       "disk": {
@@ -142,7 +142,7 @@
         "groups": [
           "windows-retro"
         ],
-        "verified": "2026-09-14"
+        "verified": "2026-09-26"
       },
       "iso": "isos/windows2000.iso",
       "disk": {

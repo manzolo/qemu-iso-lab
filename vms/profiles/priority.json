@@ -107,7 +107,7 @@
         "groups": [
           "smoke"
         ],
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
       "iso_url": "https://repo.almalinux.org/vault/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
@@ -228,7 +228,7 @@
         "role": "server",
         "release_model": "stable",
         "status": "unattended",
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/Rocky-9.8-x86_64-minimal.iso",
       "iso_url": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-minimal.iso",

@@ -110,9 +110,26 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # The Proxmox lab, promoted like the network lab: four PASS from clean disks, then the
         # three nodes formed a quorate cluster over pve-lan (vmctl group cluster).
         verified_proxmox_lab = {"proxmox-ve", "proxmox-ve-node2", "proxmox-ve-node3", "proxmox-lab-client"}
+        # The full matrix of 2026-09-25/26 from clean disks (check-vms --parallel auto --timeout 3600,
+        # artifacts/check-vms/20260925-223107/): 53 PASS, 0 FAIL; these are the tracked ones.
+        verified_matrix_0926 = {
+            "almalinux-server", "alpine-ci", "alpine-niri", "arch-dms", "arch-dms-nvidia", "arch-noctalia",
+            "cachyos-desktop", "cachyos-nvidia", "centos-stream-10", "debian-gnome", "debian-kde",
+            "debian-server", "debian-xfce", "edubuntu-24.04", "fedora-kde", "fedora-kinoite",
+            "fedora-niri-dms", "fedora-silverblue", "freebsd-unattended", "kali", "kubuntu-24.04",
+            "lubuntu-24.04", "lubuntu-lab", "nixos-gnome", "nixos-server", "opensuse-tumbleweed-autoyast",
+            "pearos-nicecore-unattended", "pfsense-lab", "pihole-lab", "reactos", "rocky-9",
+            "ubuntu-10.04-unattended", "ubuntu-12.04-unattended", "ubuntu-14.04-unattended",
+            "ubuntu-16.04-unattended", "ubuntu-18.04-unattended", "ubuntu-20.04-unattended",
+            "ubuntu-22.04-unattended", "ubuntu-26.04-unattended", "ubuntu-8.04-unattended",
+            "ubuntu-budgie-24.04", "ubuntu-cinnamon-24.04", "ubuntu-gnome-24.04", "ubuntu-mate-24.04",
+            "ubuntu-unity-24.04", "ubuntustudio-24.04", "windows10-unattended", "windows11-unattended",
+            "windows2000-unattended", "windows7-unattended", "windowsxp-unattended", "xubuntu-24.04"
+        }
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
-            expected_date = ("2026-09-16" if name in verified_retry
+            expected_date = ("2026-09-26" if name in verified_matrix_0926
+                             else "2026-09-16" if name in verified_retry
                              else "2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
                              else "2026-09-12" if name in verified_history
                              else "2026-09-13" if name in verified_batch_a

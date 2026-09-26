@@ -11,7 +11,7 @@
         "groups": [
           "smoke"
         ],
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/alpine-standard-3.23-x86_64.iso",
       "iso_discovery": {

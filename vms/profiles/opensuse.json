@@ -115,7 +115,7 @@
         "groups": [
           "smoke"
         ],
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",

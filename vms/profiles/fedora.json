@@ -252,7 +252,7 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/Fedora-Everything-netinst-x86_64-44.iso",
       "iso_discovery": {
@@ -423,7 +423,7 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/Fedora-Silverblue-ostree-x86_64-44-1.7.iso",
       "iso_urls": [
@@ -525,7 +525,7 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
-        "verified": "2026-09-13"
+        "verified": "2026-09-26"
       },
       "iso": "isos/Fedora-Everything-netinst-x86_64-44-1.7.iso",
       "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
@@ -629,7 +629,7 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
-        "verified": "2026-09-13"
+        "verified": "2026-09-26"
       },
       "iso": "isos/Fedora-Kinoite-ostree-x86_64-44-1.7.iso",
       "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Kinoite/x86_64/iso/Fedora-Kinoite-ostree-x86_64-44-1.7.iso",

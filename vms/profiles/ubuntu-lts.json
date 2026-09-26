@@ -505,7 +505,7 @@
           "ubuntu",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-12"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-8.04.4-alternate-amd64.iso",
       "iso_url": "https://old-releases.ubuntu.com/releases/8.04.4/ubuntu-8.04.4-alternate-amd64.iso",
@@ -614,7 +614,7 @@
           "ubuntu",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-12"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-10.04.4-alternate-amd64.iso",
       "iso_url": "https://old-releases.ubuntu.com/releases/10.04.4/ubuntu-10.04.4-alternate-amd64.iso",
@@ -722,7 +722,7 @@
           "ubuntu",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-12"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-12.04.5-alternate-amd64.iso",
       "iso_url": "https://old-releases.ubuntu.com/releases/12.04.5/ubuntu-12.04.5-alternate-amd64.iso",
@@ -830,7 +830,7 @@
           "ubuntu",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-12"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-14.04.6-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/14.04/ubuntu-14.04.6-server-amd64.iso",
@@ -935,7 +935,7 @@
           "ubuntu",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-12"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-16.04.7-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/16.04/ubuntu-16.04.7-server-amd64.iso",
@@ -1047,7 +1047,7 @@
           "ubuntu",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-12"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-18.04.6-server-amd64.iso",
       "iso_url": "https://cdimage.ubuntu.com/releases/18.04/release/ubuntu-18.04.6-server-amd64.iso",
@@ -1159,7 +1159,7 @@
           "ubuntu",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-12"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-20.04.6-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/20.04/ubuntu-20.04.6-live-server-amd64.iso",
@@ -1270,7 +1270,7 @@
           "ubuntu",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-12"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso",
@@ -1383,7 +1383,7 @@
           "ubuntu",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-20"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",

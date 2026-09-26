@@ -105,7 +105,7 @@
         "groups": [
           "smoke"
         ],
-        "verified": "2026-09-19"
+        "verified": "2026-09-26"
       },
       "iso": "isos/latest-nixos-minimal-x86_64-linux.iso",
       "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-minimal-x86_64-linux.iso",
@@ -188,7 +188,7 @@
         "role": "desktop",
         "release_model": "channel-based",
         "status": "unattended",
-        "verified": "2026-09-19"
+        "verified": "2026-09-26"
       },
       "iso": "isos/latest-nixos-minimal-x86_64-linux.iso",
       "iso_url": "https://channels.nixos.org/nixos-25.11/latest-nixos-minimal-x86_64-linux.iso",

@@ -218,7 +218,7 @@
           "debian-only",
           "smoke"
         ],
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -641,7 +641,7 @@
         "groups": [
           "debian-only"
         ],
-        "verified": "2026-09-13"
+        "verified": "2026-09-26"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -749,7 +749,7 @@
         "groups": [
           "debian-only"
         ],
-        "verified": "2026-09-14"
+        "verified": "2026-09-26"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -856,7 +856,7 @@
         "groups": [
           "debian-only"
         ],
-        "verified": "2026-09-13"
+        "verified": "2026-09-26"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -963,7 +963,7 @@
         "groups": [
           "kali"
         ],
-        "verified": "2026-09-14"
+        "verified": "2026-09-26"
       },
       "iso": "isos/kali-linux-2026.2-installer-netinst-amd64.iso",
       "iso_url": "https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-installer-netinst-amd64.iso",

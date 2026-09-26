@@ -36,6 +36,12 @@ Every tracked profile has `meta.status`:
 
 Recorded dates:
 
+- 2026-09-26: the full matrix from clean disks (`vmctl clean --all`, then `check-vms
+  --parallel auto --timeout 3600`, `artifacts/check-vms/20260925-223107/`, 2 h 36 min): 53 PASS,
+  0 FAIL, 48 SKIP (36 manual profiles without `ci.expect`, 8 experimental, 2 without a disk to
+  boot, the 2 Windows templates without their ISO). `meta.verified` moves to this date on the 52
+  tracked profiles that passed (the 53rd lives in `local.json`), `alpine-ci` included.
+
 - 2026-09-26: the Proxmox lab (`proxmox-ve`, `proxmox-ve-node2`, `proxmox-ve-node3`,
   `proxmox-lab-client`) promoted from experimental to unattended, like the network lab. Named
   `check-vms` run from clean disks, four PASS in 8 minutes (`artifacts/check-vms/20260926-072712/`:

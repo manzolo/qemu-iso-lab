@@ -8,7 +8,7 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "unattended",
-        "verified": "2026-09-12"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ReactOS-0.4.16-i386.iso",
       "disk": {

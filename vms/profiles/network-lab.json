@@ -12,7 +12,7 @@
         "groups": [
           "netlab"
         ],
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/pfSense-CE-2.7.2-RELEASE-amd64.iso",
       "disk": {
@@ -118,7 +118,7 @@
         "groups": [
           "netlab"
         ],
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
@@ -249,7 +249,7 @@
           "netlab",
           "ubuntu"
         ],
-        "verified": "2026-09-09"
+        "verified": "2026-09-26"
       },
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",

@@ -118,7 +118,7 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
-        "verified": "2026-09-19"
+        "verified": "2026-09-26"
       },
       "iso": "isos/pearOS-NiceC0re-2026.09-x86_64.iso",
       "iso_size": 3395530752,
