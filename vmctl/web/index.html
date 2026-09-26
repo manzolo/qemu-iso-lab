@@ -1050,9 +1050,11 @@ window.addEventListener("resize",closeContext);
 // --- wiring
 document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
 document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll("[data-filter]").forEach((x) => (x.classList.toggle("active", x === b), x.setAttribute("aria-pressed", x === b))); render(); }));
-// Hovering a running machine shows its screen: a QMP screendump (or VNC for accelerated displays),
-// fetched after a short pause so sweeping the mouse across the list asks for nothing.
-const hover = { vm: null, timer: 0 };
+// Hovering the icon of a running machine shows its screen: a QMP screendump (or VNC for accelerated
+// displays), fetched after a short pause so sweeping the mouse across the list asks for nothing.
+// Only the icon, so reading the list shows nothing; a right-click (the context menu) hides it
+// until the pointer leaves the icon.
+const hover = { vm: null, timer: 0, muted: null };
 function hideHoverShot() { clearTimeout(hover.timer); hover.vm = null; $("hover-shot").style.display = "none"; }
 function placeHoverShot(x, y) {
   const box = $("hover-shot"), w = box.offsetWidth || 380, h = box.offsetHeight || 260;
@@ -1060,8 +1062,9 @@ function placeHoverShot(x, y) {
   box.style.top = Math.max(8, Math.min(y + 18, innerHeight - h - 8)) + "px";
 }
 $("rows").addEventListener("mouseover", (e) => {
-  const tr = e.target.closest("tr[data-vm]"), vm = tr?.dataset.vm;
-  if (!tr || vm === hover.vm) return;
+  const icon = e.target.closest(".catalog-icon"), tr = icon?.closest("tr[data-vm]"), vm = tr?.dataset.vm;
+  if (!icon) { if (!e.target.closest("#hover-shot")) { hideHoverShot(); hover.muted = null; } return; }
+  if (!tr || vm === hover.vm || vm === hover.muted) return;
   hideHoverShot();
   const r = S.vms.find((x) => x.name === vm);
   if (!r || !r.running) return;
@@ -1077,6 +1080,7 @@ $("rows").addEventListener("mouseover", (e) => {
 $("rows").addEventListener("mousemove", (e) => { hover.x = e.clientX; hover.y = e.clientY; if (hover.vm && $("hover-shot").style.display === "block") placeHoverShot(e.clientX, e.clientY); });
 $("rows").addEventListener("mouseleave", hideHoverShot);
 $("rows").addEventListener("mousedown", hideHoverShot);
+$("rows").addEventListener("contextmenu", (e) => { hover.muted = e.target.closest("tr[data-vm]")?.dataset.vm || null; hideHoverShot(); });
 $("rows").onclick = (e) => { const tr = e.target.closest("[data-vm]"); if (tr) { selected = tr.dataset.vm; localStorage.setItem("vmctl-selected", selected); render(); } };
 $("search").oninput = render;
 document.addEventListener("keydown", (e) => {

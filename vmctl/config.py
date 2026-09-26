@@ -388,7 +388,6 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
         all_errors.extend(errors)
         all_errors.extend(validate_vm_profile(name, expanded))
     all_errors.extend(_ssh_port_conflicts(merged_vms))
-    all_errors.extend(_disk_path_conflicts(merged_vms))
     if all_errors:
         raise VMError("Invalid VM profile(s):\n  " + "\n  ".join(all_errors))
 

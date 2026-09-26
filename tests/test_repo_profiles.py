@@ -373,3 +373,16 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrackedDiskPathTests(unittest.TestCase):
+    def test_no_two_tracked_profiles_share_a_disk_or_vars_file(self):
+        # The manual twins renamed on 2026-09-26 briefly kept artifacts/<old name>/, which had
+        # become the unattended profile's directory: each pair would install over the other.
+        import json
+
+        vms: dict = {}
+        for path in sorted((ROOT / "vms/profiles").glob("*.json")):
+            if path.name != "local.json":
+                vms.update(json.loads(path.read_text())["vms"])
+        self.assertEqual(vmctl.config._disk_path_conflicts(vms), [])

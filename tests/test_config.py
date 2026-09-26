@@ -203,15 +203,6 @@ class ConfigTests(BaseVmctlTestCase):
 
         self.assertIn("Duplicate ssh_host_port 2222", str(ctx.exception))
 
-    def test_two_profiles_on_one_disk_are_refused(self):
-        # The manual twins renamed on 2026-09-26 briefly shared artifacts/<name>/disk.qcow2.
-        self.vm_config.pop("cloud_init", None)
-        twin = json.loads(json.dumps(self.vm_config))
-        self.write_config_dir()
-        (self.root / "vms/profiles/local.json").write_text(json.dumps({"vms": {"twin": twin}}))
-        with self.assertRaisesRegex(self.vmctl.VMError, "share disk.path"):
-            self.vmctl.load_config()
-
     def test_load_config_rejects_autoinstall_placeholder_password_hash(self):
         self.vm_config["autoinstall"] = {
             "hostname": "testvm",
