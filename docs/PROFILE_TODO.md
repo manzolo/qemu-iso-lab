@@ -36,6 +36,16 @@ Every tracked profile has `meta.status`:
 
 Recorded dates:
 
+- 2026-09-26: the Proxmox lab (`proxmox-ve`, `proxmox-ve-node2`, `proxmox-ve-node3`,
+  `proxmox-lab-client`) promoted from experimental to unattended, like the network lab. Named
+  `check-vms` run from clean disks, four PASS in 8 minutes (`artifacts/check-vms/20260926-072712/`:
+  ZFS mirror healthy on two disks, both ESPs in `proxmox-boot-tool`, web GUI on 8006, PVE services,
+  `pve-lan` bridge), then `vmctl group up` + `group cluster proxmox-lab` on the same disks: cluster
+  `pve-lab` formed, 3 nodes, quorate. Since then `check-vms` forms the cluster itself as a
+  `cluster-pve-lab` row: `--group proxmox-lab --clean-first` was five PASS in 10 minutes
+  (`artifacts/check-vms/20260926-074936/`, cluster row 130 s). The full matrix of the night before
+  (`artifacts/check-vms/20260925-223107/`) was 53 PASS, 0 FAIL, 48 SKIP.
+
 - 2026-09-20: `ubuntu-26.04-unattended`, first live run of the profile added the same day, PASS in
   12.9 minutes (`verify-desktop`: "lab has an active local graphical session"). It answered both
   open questions of the release: 26.04's subiquity resolves `ubuntu-desktop` straight from
