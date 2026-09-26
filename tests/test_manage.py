@@ -243,6 +243,11 @@ class ManageTests(BaseVmctlTestCase):
             "artifacts/testvm/autoinstall/seed.iso",
             "artifacts/testvm/unattended/seed.iso",
             "artifacts/testvm/installer/vmlinuz",
+            # flow media the old explicit list missed, and a stray file
+            "artifacts/testvm/windowsxp/install.iso",
+            "artifacts/testvm/install-media/setup.iso",
+            "artifacts/testvm/libvirt/domain.xml",
+            "artifacts/testvm/notes.txt",
         ]:
             path = self.root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -263,6 +268,7 @@ class ManageTests(BaseVmctlTestCase):
         self.assertFalse((self.root / "artifacts/testvm/autoinstall").exists())
         self.assertFalse((self.root / "artifacts/testvm/unattended").exists())
         self.assertFalse((self.root / "artifacts/testvm/installer").exists())
+        self.assertFalse((self.root / "artifacts/testvm").exists())  # flow media and strays too
 
     def test_cmd_clean_stops_vm_before_removing_artifacts(self):
         self.vm_config["cloud_init"] = {"user": "tester", "ssh_host_port": 2222}

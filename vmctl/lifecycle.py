@@ -3896,6 +3896,20 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: 
             ui.print_note(f"Removing {subdir}")
             if not dry_run:
                 shutil.rmtree(subdir)
+    # Everything else under artifacts/<vm>/ is generated too: the media the flows rebuild
+    # (freebsd/, reactos/, windowsxp/, install-media/, autoyast/, nixos/, pearos/, haiku/...),
+    # an exported libvirt XML. The explicit list above missed those (5.4 GB left on 2026-09-26),
+    # so the rest of the directory goes as well, the checkpoints excepted.
+    if base.is_dir():
+        for entry in sorted(base.iterdir()):
+            if entry.name == checkpoint.CHECKPOINTS_DIR:
+                continue
+            ui.print_note(f"Removing {entry}")
+            if not dry_run:
+                if entry.is_dir() and not entry.is_symlink():
+                    shutil.rmtree(entry)
+                else:
+                    entry.unlink()
     # Checkpoints are the way back from a clean: they stay unless --checkpoints says otherwise.
     if checkpoints:
         checkpoint.delete_all(name, dry_run=dry_run)
