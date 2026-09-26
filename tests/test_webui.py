@@ -88,6 +88,21 @@ class RequestTests(BaseVmctlTestCase):
         command, _ = webui.prepare_command(["clean", self.vm_name], confirmed=True)
         self.assertNotIn("--yes", command)  # clean has no question to answer
 
+    def test_an_accelerated_display_is_read_over_vnc(self):
+        # virtio-vga-gl + egl-headless (arch-noctalia) answers "no surface" to screendump.
+        from unittest import mock
+        from vmctl import qemu, report
+
+        self.write_config_dir()
+        vm = self.vmctl.get_vm(self.vmctl.load_config(), self.vm_name)
+        for path in (qemu.qmp_socket_path(vm), qemu.vnc_socket_path(vm)):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("")
+        with mock.patch.object(qemu, "qmp_command", return_value=False), \
+             mock.patch.object(report, "capture_via_vnc", return_value=b"PNG") as vnc:
+            self.assertEqual(webui.screenshot_png(self.vm_name), b"PNG")
+        vnc.assert_called_once()
+
     def test_a_web_job_runs_detached_and_its_log_is_readable(self):
         command = [sys.executable, "-c", "print('hello from a job')"]
         job = webui.start_job(command, None)

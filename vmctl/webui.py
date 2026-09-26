@@ -235,7 +235,12 @@ def screenshot_png(vm_name: str) -> bytes | None:
     target = runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "web-screen.ppm"
     target.unlink(missing_ok=True)
     if not qemu.qmp_command(sock, "screendump", arguments={"filename": str(target)}):
-        return None
+        # An accelerated display (virtio-vga-gl + egl-headless: the niri/Noctalia/DMS profiles)
+        # answers "no surface" to screendump: read the same screen over VNC, as the report does.
+        try:
+            return report.capture_via_vnc(vm) if qemu.vnc_socket_path(vm).exists() else None
+        except (OSError, ValueError, VMError):
+            return None
     for _ in range(20):  # QEMU writes the file asynchronously to the reply on some versions
         if target.is_file() and target.stat().st_size > 16:
             break
@@ -501,6 +506,20 @@ def make_server(port: int, token: str) -> ThreadingHTTPServer:
     return server
 
 
+def open_browser(url: str) -> None:
+    """The browser's own chatter (Chrome's Wayland/Vulkan/GCM warnings) must not land in the
+    terminal the server prints to: start it detached with its output discarded."""
+    import shutil
+    import webbrowser
+
+    opener = shutil.which("xdg-open")
+    if opener:
+        subprocess.Popen([opener, url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    else:
+        webbrowser.open(url)
+
+
 def cmd_web(args: argparse.Namespace) -> int:
     token = secrets.token_urlsafe(18)
     try:
@@ -513,9 +532,7 @@ def cmd_web(args: argparse.Namespace) -> int:
     ui.print_note("Jobs started here keep running after Ctrl-C; the TUI shows them too.")
     sys.stdout.flush()  # the URL carries the token: it must reach a log even without a terminal
     if getattr(args, "open", False):
-        import webbrowser
-
-        webbrowser.open(url)
+        open_browser(url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -130,7 +130,7 @@ pre.log { background: #0b1016; border: 1px solid var(--line); border-radius: 8px
       <button id="cmd-run" class="primary">Run</button></div>
   </div></dialog>
 <dialog id="screen-dialog"><header><h1 id="screen-title">Screen</h1><button data-close>Close</button></header>
-  <div class="body" id="screen"><img id="screen-img" alt="VM screen"><p class="s-muted" id="screen-note">A screenshot every 2 s through QMP. For keyboard and mouse use "Open viewer on the host".</p></div></dialog>
+  <div class="body" id="screen"><img id="screen-img" alt="VM screen"><p class="s-muted" id="screen-note">Loading the screen…</p></div></dialog>
 <dialog id="vnc-dialog" style="width:min(1400px,96vw)"><header><h1 id="vnc-title">Console</h1><span><button id="vnc-cad">Ctrl+Alt+Del</button> <button id="vnc-full">Full screen</button> <button id="vnc-close">Close</button></span></header>
   <div id="vnc-screen" style="height:78vh;background:#000"></div><p class="s-muted" id="vnc-note" style="padding:6px 16px;margin:0">Click the screen to type into the VM. Esc goes to the VM too: use Close.</p></dialog>
 <dialog id="help-dialog"><header><h1 id="help-title">ISO needed</h1><button data-close>Close</button></header>
@@ -293,7 +293,8 @@ function openScreen(vm) {
   const tick = () => { if (!$("screen-dialog").open) return clearInterval(screenTimer); $("screen-img").src = `/api/vm/${encodeURIComponent(vm)}/screen.png?token=${encodeURIComponent(TOKEN)}&t=${Date.now()}`; };
   clearInterval(screenTimer); tick(); screenTimer = setInterval(tick, 2000);
 }
-$("screen-img").onerror = () => ($("screen-note").textContent = "No screen: the VM is not running headless (a VM with its own window has no QMP socket).");
+$("screen-img").onerror = () => ($("screen-note").textContent = "No screen yet: the VM is stopped, still booting, or runs in its own QEMU window (only headless VMs expose their screen).");
+$("screen-img").onload = () => ($("screen-note").textContent = "A screenshot every 2 s. For keyboard and mouse use Console.");
 
 // --- console: noVNC in the page, bridged by the server to the VM's runtime/vnc.sock
 const NOVNC = "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.7.0/core/rfb.js";
