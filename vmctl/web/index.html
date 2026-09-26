@@ -104,6 +104,8 @@ button.state:hover { background:#453c28; }
 .actions button:first-child { display:flex; justify-content:space-between; align-items:center; padding:12px; }
 .actions button:last-child { background:transparent; color:var(--accent); border:1px solid var(--line); margin-top:4px; }
 .actions kbd { border-color:#365b54; color:#21443c; }
+.actions button:not(.primary) kbd { margin-left:auto; border-color:#3d526b; color:var(--muted); }
+.actions button kbd + kbd { margin-left:6px; }
 .al { display:inline-flex; align-items:center; gap:9px; min-width:0; }
 .ai { display:inline-flex; flex:0 0 17px; width:17px; height:17px; color:var(--ai,var(--muted)); }
 .ai svg { width:17px; height:17px; }
@@ -282,6 +284,7 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
 #vm-context button.warn:is(:hover,:focus-visible) { background:#433925; }
 #vm-context button.danger:is(:hover,:focus-visible) { background:#472c39; }
 #vm-context button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+#vm-context button kbd { margin-left:auto; border-color:#3d526b; color:var(--muted); }
 .context-title { padding:8px 10px; color:var(--accent); font:11px ui-monospace,monospace; border-bottom:1px solid var(--line); margin-bottom:4px; overflow-wrap:anywhere; }
 .context-group { margin:4px 0 0; padding:7px 10px 3px; color:var(--muted); font-size:9px; font-weight:650; text-transform:uppercase; letter-spacing:.1em; border-top:1px solid var(--line); }
 .context-title + .context-group { border-top:0; }
@@ -376,7 +379,7 @@ main > section { min-width:0; }
 <div id="toolbar">
   <div class="search-box"><input id="search" aria-label="Search profiles" placeholder="Search profiles or distributions…" autocomplete="off"><kbd>/</kbd></div>
   <div class="filters" role="group" aria-label="Profile filters"><button data-filter="all" class="active" aria-pressed="true">All</button><button data-filter="disk" aria-pressed="false">With disk</button><button data-filter="running" aria-pressed="false">Running</button><button data-filter="labs" aria-pressed="false">Labs</button></div>
-  <button id="all-commands">Commands <kbd>C</kbd></button>
+  <button id="all-commands">Commands <kbd>F10</kbd></button>
 </div>
 <div id="activity-panel" popover="auto" role="region" aria-label="Latest activity details"><div class="activity-copy"><div class="eyebrow">Latest activity</div><strong id="activity-status" role="status"></strong><span id="activity-command"></span></div><div class="job-controls"><button id="activity-log">View log</button><button id="activity-cancel" class="danger hidden">Cancel job</button><button id="activity-dismiss" class="hidden" aria-label="Dismiss completed activity" title="Keep in Recent activity">Dismiss</button></div></div>
 <main id="profiles-view">
@@ -419,6 +422,7 @@ const params = new URLSearchParams(location.search);
 if (params.get("token")) { sessionStorage.setItem("vmctl-token", params.get("token")); history.replaceState(null, "", "/" + location.hash); }
 const TOKEN = sessionStorage.getItem("vmctl-token") || "";
 let S = { vms: [], labs: [] }, catalog = [], filter = "all", selected = localStorage.getItem("vmctl-selected") || "", logJob = null, logOffset = 0;
+let dragVm = null;  // the running machine whose icon is being dragged onto another one (vmctl link)
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const ansi = (s) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r(?!\n)/g, "\n");
@@ -599,6 +603,27 @@ function actionsFor(r) {
   return a;
 }
 
+// Function keys: one per kind of action, whatever the machine's state offers right now (the
+// buttons show them). F5/F11/F12 stay with the browser; Shift+F10 is the context menu.
+const FKEYS = [
+  ["F2", "Boot headless", (a) => a.args?.[0] === "start" && a.args.includes("--headless")],
+  ["F3", "Open console", (a) => a.console],
+  ["F4", "SSH", null],
+  ["F6", "Live screenshot", (a) => a.screen],
+  ["F7", "Checkpoint now", (a) => a.args?.[0] === "checkpoint"],
+  ["F8", "Stop", (a) => a.args?.[0] === "stop" && !a.args.includes("--force")],
+  ["F9", "Job log", (a) => a.job],
+  ["F10", "All commands", (a) => !!a.form],
+];
+const fkeyOf = (action) => FKEYS.find(([, , match]) => match && match(action))?.[0] || "";
+function openKeyboardHelp() {
+  $("help-title").textContent = "Keyboard";
+  $("help-text").textContent = ["Type anywhere        filter the machines (Esc clears)", "↑ ↓                  select a machine", "Enter                the machine's main action",
+    ...FKEYS.map(([key, label]) => `${key.padEnd(21)}${label}`), "Shift+F10            the machine's menu (right-click)", "/                    the search box", "F1                   this list",
+    "Mouse: drag the icon of a running machine onto another running machine to link them (vmctl link)."].join("\n");
+  $("help-dialog").showModal();
+}
+
 function visible() {
   const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
   return S.vms.filter((r) => words.every((w) => (r.name + " " + r.label + " " + r.family).toLowerCase().includes(w))
@@ -617,6 +642,9 @@ function render() {
   const rows = visible();
   $("list-title").textContent = `Profiles  ${rows.length} / ${all.length}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
+  // Never rebuild the rows during a drag: the dragged icon would be destroyed and Chromium then
+  // aborts the drop silently (the 5 s state poll did exactly that on a drag longer than a few seconds).
+  if (dragVm) return;
   $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r), false, !!r.running)}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`;
   bindStateLogs($("rows"));
@@ -635,12 +663,12 @@ function renderDetails() {
     ["ISO", { cached: "Ready to use", download: "Available to download", manual: "Provided manually" }[r.iso_source] || (r.iso_ready ? "Ready to use" : "Not cached")],
     ...((r.logins || []).length ? [["Login", r.logins.map((l) => `<span class="mono">${esc(l.user)}</span> / ${l.password ? `<span class="mono">${esc(l.password)}</span>` : '<span class="s-muted">no password</span>'}${l.note ? ` <span class="s-muted">· ${esc(l.note)}</span>` : ""}`).join("<br>")]] : []),
     ...((r.links || []).map((l) => ["Linked", `<span class="mono">${esc(l.address)}</span> <span class="s-muted">on ${esc(l.segment)} with</span> ${l.peers.map((p) => `${esc(p.name)} <span class="mono">${esc(p.address)}</span>`).join(", ")} <button class="ssh-shortcut" data-unlink="${esc(l.segment)}" title="Unplug this machine from the segment">Unlink</button>`])),
-    ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options" aria-label="Open SSH console options">&gt;_ SSH</button></span>` : "Not configured"]];
+    ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options (F4)" aria-label="Open SSH console options">&gt;_ SSH <kbd>F4</kbd></button></span>` : "Not configured"]];
   const actions = actionsFor(r), memory = r.memory_mb >= 1024 ? `${r.memory_mb / 1024} GB` : `${r.memory_mb} MB`;
   const expandedDetails = $("details").dataset.vm === r.name ? [...$("details").querySelectorAll("details[open]")].map(el=>el.className) : [];
   $("details").dataset.vm = r.name;
   const secondary = a => !a.primary && (a.danger || a.form || a.screen || ["attach","checkpoint"].includes(a.args?.[0]));
-  const actionButton = (x,i) => `<button data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${i === 0 ? "<kbd>Enter</kbd>" : ""}</button>`;
+  const actionButton = (x,i) => `<button data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${i === 0 ? "<kbd>Enter</kbd>" : ""}${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
   const mainActions = actions.map((a,i) => secondary(a) ? "" : actionButton(a,i)).join("");
   const extraActions = actions.map((a,i) => ({a,i})).filter(({a}) => secondary(a)).sort((x,y) => Number(!!x.a.danger)-Number(!!y.a.danger));
   $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<div class="profile-title"><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div></div></div>${stateBadge(r)}
@@ -1272,7 +1300,7 @@ function openContext(vm, x, y) {
   const originRow = [...container.querySelectorAll("[data-vm]")].find(row => row.dataset.vm === vm);
   contextOrigin = originRow?.querySelector("[data-member]") || originRow;
   const entries = actionsFor(r).map(a => ({...a, group:a.danger ? "Danger zone" : a.job || a.cancelJob ? "Activity" : a.console || a.screen || a.args?.[0] === "attach" ? "Connect" : ["start","stop"].includes(a.args?.[0]) ? "Power" : "Manage", run:()=>runAction(r,a)}));
-  if (r.ssh_port) entries.push({label:"SSH console…",group:"Connect",icon:"terminal",tone:"info",run:()=>openSsh(r)});
+  if (r.ssh_port) entries.push({label:"SSH console…",group:"Connect",icon:"terminal",tone:"info",key:"F4",run:()=>openSsh(r)});
   entries.push({label:"Customize profile…",group:"Manage",icon:"sliders",run:()=>openProfileEditor(r.name)});
   const groups = r.running ? ["Connect","Power","Activity","Manage","Danger zone"] : ["Power","Activity","Connect","Manage","Danger zone"];
   entries.sort((a,b) => groups.indexOf(a.group)-groups.indexOf(b.group) || Number(!!a.form)-Number(!!b.form));
@@ -1294,7 +1322,7 @@ function openLabContext(card, x, y) {
 function showContext(title, entries, x, y, label) {
   hideHoverShot();
   const menu = $("vm-context"); menu.setAttribute("aria-label", label);
-  menu.innerHTML = `<div class="context-title">${esc(title)}</div>` + entries.map((a,i) => `${i === 0 || a.group !== entries[i-1].group ? `<div class="context-group" role="presentation">${esc(a.group)}</div>` : ""}<button role="menuitem" ${a.disabled ? "disabled" : ""} class="${a.danger ? "danger" : a.warn ? "warn" : ""}" data-context="${i}">${actionIcon(a)}${esc(a.label)}</button>`).join("");
+  menu.innerHTML = `<div class="context-title">${esc(title)}</div>` + entries.map((a,i) => `${i === 0 || a.group !== entries[i-1].group ? `<div class="context-group" role="presentation">${esc(a.group)}</div>` : ""}<button role="menuitem" ${a.disabled ? "disabled" : ""} class="${a.danger ? "danger" : a.warn ? "warn" : ""}" data-context="${i}">${actionIcon(a)}${esc(a.label)}${a.key || fkeyOf(a) ? `<kbd>${a.key || fkeyOf(a)}</kbd>` : ""}</button>`).join("");
   menu.showPopover();
   menu.style.left = Math.max(8, Math.min(x,innerWidth-menu.offsetWidth-8)) + "px";
   menu.style.top = Math.max(8, Math.min(y,innerHeight-menu.offsetHeight-8)) + "px";
@@ -1389,7 +1417,6 @@ $("rows").addEventListener("contextmenu", (e) => { hover.muted = e.target.closes
 $("list").addEventListener("scroll", hideHoverShot);
 
 // Drag a running machine's icon onto another running machine: `vmctl link a b`, a private segment for this session.
-let dragVm = null;
 $("rows").addEventListener("dragstart", (e) => {
   const tr = e.target.closest?.("tr[data-vm]"), vm = tr?.dataset.vm;
   if (!vm || !S.vms.some(r => r.name === vm && r.running)) { e.preventDefault(); return; }
@@ -1405,7 +1432,7 @@ $("rows").addEventListener("dragover", (e) => {
   e.preventDefault(); e.dataTransfer.dropEffect = "link"; tr.classList.add("drop-target");
 });
 $("rows").addEventListener("dragleave", (e) => { const tr = e.target.closest?.("tr[data-vm]"); if (tr && !tr.contains(e.relatedTarget)) tr.classList.remove("drop-target"); });
-$("rows").addEventListener("dragend", () => { dragVm = null; hover.muted = null; $("rows").classList.remove("linking"); $("rows").querySelectorAll("tr.drop-target").forEach((row) => row.classList.remove("drop-target")); });
+$("rows").addEventListener("dragend", () => { dragVm = null; hover.muted = null; $("rows").classList.remove("linking"); $("rows").querySelectorAll("tr.drop-target").forEach((row) => row.classList.remove("drop-target")); render(); });
 $("rows").addEventListener("drop", async (e) => {
   const target = e.target.closest("tr[data-vm]")?.dataset.vm, source = dragVm;
   e.preventDefault(); dragVm = null; $("rows").classList.remove("linking"); $("rows").querySelectorAll("tr.drop-target").forEach((row) => row.classList.remove("drop-target"));
@@ -1424,10 +1451,26 @@ window.addEventListener("resize", hideHoverShot);
 document.addEventListener("visibilitychange", () => { if (document.hidden) hideHoverShot(); });
 $("rows").onclick = (e) => { const tr = e.target.closest("[data-vm]"); if (tr) { selected = tr.dataset.vm; localStorage.setItem("vmctl-selected", selected); render(); } };
 $("search").oninput = render;
+$("search").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); $("search").value = ""; render(); $("search").blur(); } });
 document.addEventListener("keydown", (e) => {
-  if (document.querySelector("dialog[open]") || /BUTTON|A|SUMMARY/.test(document.activeElement.tagName)) return;
-  if (e.key.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); openCommands(selected); return; }
+  if (document.querySelector("dialog[open]")) return;
+  const inField = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
+  const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
+  if (/^F\d+$/.test(e.key) && plain && !e.shiftKey) {
+    if (e.key === "F1") { e.preventDefault(); return openKeyboardHelp(); }
+    if (e.key === "F10") { e.preventDefault(); return openCommands(selected); }
+    const r = S.vms.find((x) => x.name === selected);
+    if (!r) return;
+    if (e.key === "F4") { if (r.ssh_port) { e.preventDefault(); openSsh(r); } return; }
+    const action = actionsFor(r).find((a) => fkeyOf(a) === e.key);
+    if (action && !action.disabled) { e.preventDefault(); runAction(r, action); }
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k" && !inField) { e.preventDefault(); openCommands(selected); return; }
   if (e.key === "/" && document.activeElement !== $("search")) { e.preventDefault(); $("search").focus(); return; }
+  // Typing anywhere filters the list: the search box takes focus on the first letter.
+  if (e.key.length === 1 && e.key !== " " && plain && !inField) { $("search").focus(); return; }
+  if (/BUTTON|A|SUMMARY/.test(document.activeElement.tagName)) return;
   if (document.activeElement === $("search") && e.key !== "Enter" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
   const rows = visible(), i = rows.findIndex((r) => r.name === selected);
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const r = rows[Math.max(0, Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (r) { selected = r.name; render(); document.querySelector("tr.sel")?.scrollIntoView({ block: "nearest" }); } }
