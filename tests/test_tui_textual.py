@@ -245,7 +245,8 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
                     if width == 116:
                         self.assertLess(app.query_one("#details").region.width, wide_panel)
                         self.assertGreaterEqual(app.query_one("#details").region.width, 40)
-                    self.assertEqual(app.query_one("#activity").region.height, 3)
+                    # A short terminal gives the activity rows to the list while no job runs.
+                    self.assertEqual(app.query_one("#activity").region.height, 0 if height < 36 else 3)
             app.bridge.run.assert_not_called()
 
     async def test_home_end_select_first_and_last_profile_without_horizontal_scroll(self):
@@ -590,6 +591,26 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             await self.ready(app, pilot)
             app.bridge.run.assert_called_once_with("ubuntu", "menu")
             self.assertEqual(app.selected, "ubuntu")
+
+    async def test_compact_layout_keeps_the_actions_under_the_list(self):
+        # Below 100 columns the details panel is hidden; without this bar a small terminal
+        # showed a list of VMs and no way to see what could be done with them.
+        app = self.make_app()
+        async with app.run_test(size=(80, 26)) as pilot:
+            await self.ready(app, pilot)
+            self.assertEqual(app.query_one("#details").region.width, 0)
+            self.assertEqual(app.query_one("#action-bar").region.height, 1)
+            primary = app.query_one("#bar-0", Button)
+            self.assertTrue(primary.has_class("default-action"))
+            self.assertTrue(str(primary.label).endswith(" · Enter"))
+            with patch.object(app, "suspend", return_value=nullcontext()):
+                await pilot.click("#bar-0")
+            await self.ready(app, pilot)
+            self.assertEqual(app.bridge.run.call_args.args[0], app.selected)
+        wide = self.make_app()
+        async with wide.run_test(size=(120, 44)) as pilot:
+            await self.ready(wide, pilot)
+            self.assertEqual(wide.query_one("#action-bar").region.height, 0)
 
     async def test_default_profile_button_identifies_the_enter_action(self):
         app = self.make_app()

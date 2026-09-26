@@ -125,8 +125,9 @@ VMDetails:focus-within, LabDetails:focus-within { border: round #84c9e7; }
 #activity .eyebrow { margin-bottom: 0; }
 #activity-text { height: 1fr; overflow-y: auto; color: #a6b4c8; }
 Footer { background: #18222e; }
-.compact #masthead { height: 3; layout: vertical; }
-.compact #brand, .compact #summary { width: 100%; height: 1; }
+.compact #masthead { height: 1; padding: 0 2; }
+.narrow #masthead { height: 3; layout: vertical; }
+.narrow #brand, .narrow #summary { width: 100%; height: 1; }
 .stacked-toolbar #toolbar { layout: vertical; height: 4; }
 .stacked-toolbar #search { width: 100%; height: 3; margin-right: 0; }
 .stacked-toolbar #filters { width: 100%; height: 1; align: left top; }
@@ -134,9 +135,17 @@ Footer { background: #18222e; }
 .stacked-toolbar .filter:focus, .stacked-toolbar #tools:focus { text-style: bold underline; }
 .stacked-toolbar #all { margin-left: 0; }
 .stacked-toolbar #tools { dock: right; }
-.compact #notice { margin-bottom: 0; }
+.compact #notice { margin: 0 2; }
 .compact #activity { height: 3; margin: 0 2; }
+/* A short terminal gives its rows to the list: the activity area shows only while a job runs. */
+.short #activity { display: none; }
+.short #activity.has-jobs { display: block; height: 4; }
 .compact #details { display: none; }
+#action-bar { display: none; height: 1; margin-top: 1; }
+.compact #action-bar { display: block; }
+#action-bar .bar-action { width: auto; min-width: 8; height: 1; min-height: 1; border: none; margin-right: 1; padding: 0 1; }
+#action-bar .bar-action:focus { text-style: bold underline; }
+#action-bar .default-action { background: #84c9e7; color: #111820; text-style: bold; }
 .compact #lab-details { display: none; }
 .hidden-panel { display: none; }
 ModalScreen { align: center middle; background: #000000 65%; }

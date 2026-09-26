@@ -19,7 +19,7 @@ from vmctl.tui_bridge import ClassicBridge, Facts, primary_action, quick_actions
 
 
 class ProfileTable(DataTable[Text | str]):
-    BINDINGS = [Binding("enter", "select_cursor", "Default action"),
+    BINDINGS = [Binding("enter", "select_cursor", "Action"),
                 Binding("home", "first_profile", "First profile", show=False),
                 Binding("end", "last_profile", "Last profile", show=False),
                 Binding("right", "app.details", "Actions", show=False, priority=True)]
@@ -155,6 +155,47 @@ class VMDetails(Vertical):
             index = {"primary": 0, "quick-1": 1, "quick-2": 2, "menu": -1}[event.button.id or "menu"]
             action = quick_actions(self.row)[index][1]
             self.post_message(self.Requested(self.row["name"], action))
+
+
+class ActionBar(Horizontal):
+    """Below 100 columns the details panel is hidden: the selected profile's actions (or the
+    selected lab's) stay here, under the list, so a small terminal still shows what can be done."""
+
+    def compose(self) -> ComposeResult:
+        for index in range(3):
+            yield Button("", id=f"bar-{index}", classes="bar-action")
+        yield Button("More…", id="bar-more", classes="bar-action")
+
+    def show(self, row: Facts | None, lab: Facts | None, rows: list[Facts]) -> None:
+        self.row, self.lab = row, lab
+        if lab is not None:
+            primary = lab_primary(lab, rows)
+            labels = [{action: text for _, text, action in LAB_ACTIONS}[primary]]
+            self.actions = [primary]
+        elif row is not None:
+            quick = quick_actions(row)[:-1][:3]
+            labels = [label for label, _ in quick]
+            self.actions = [action for _, action in quick]
+        else:
+            labels, self.actions = [], []
+        for index in range(3):
+            button = self.query_one(f"#bar-{index}", Button)
+            button.display = index < len(labels)
+            button.set_class(index == 0, "default-action")
+            if button.display:
+                button.label = labels[index] + (" · Enter" if index == 0 else "")
+        self.query_one("#bar-more", Button).display = bool(labels)
+
+    @on(Button.Pressed)
+    def request_action(self, event: Button.Pressed) -> None:
+        event.stop()
+        button = event.button.id or ""
+        if button == "bar-more":
+            self.app.action_details()  # type: ignore[attr-defined]
+        elif self.lab is not None:
+            self.post_message(LabDetails.Requested(self.lab["group"], self.actions[0]))
+        elif self.row is not None:
+            self.post_message(VMDetails.Requested(self.row["name"], self.actions[int(button.rsplit("-", 1)[1])]))
 
 
 LAB_ACTIONS = (("lab-up", "Start stack", "up"), ("lab-down", "Stop stack", "down"),
@@ -344,13 +385,13 @@ class Dashboard(App[None]):
     BINDINGS = [
         Binding("slash", "search", "Search"),
         Binding("f3", "search", "Search", show=False),
-        Binding("enter", "primary", "Default action"),
-        Binding("f2", "toggle_labs", "Labs ⇄ Profiles"),
+        Binding("enter", "primary", "Action"),
+        Binding("f2", "toggle_labs", "Labs"),
         Binding("f4", "tools", "Tools"),
         Binding("f5", "refresh", "Refresh"),
-        Binding("f8", "classic", "Classic UI"),
+        Binding("f8", "classic", "Classic"),
         Binding("f1", "help", "Help"),
-        Binding("escape", "escape", "Back / Quit", priority=True),
+        Binding("escape", "escape", "Back", priority=True),
     ]
 
     def __init__(self, bridge: ClassicBridge | None = None, *, auto_refresh: bool = True) -> None:
@@ -386,6 +427,7 @@ class Dashboard(App[None]):
                 yield Static("PROFILES", id="list-title", classes="eyebrow")
                 yield ProfileTable(id="profiles", cursor_type="row", zebra_stripes=True)
                 yield Static("No matching profiles. Try another search or filter.", id="empty", markup=False)
+                yield ActionBar(id="action-bar")
             yield VMDetails(id="details")
             yield LabDetails(id="lab-details", classes="hidden-panel")
         with Vertical(id="activity"):
@@ -405,8 +447,11 @@ class Dashboard(App[None]):
 
     def update_layout(self, width: int, height: int) -> None:
         self.set_class(width < 100, "compact")
+        self.set_class(width < 64, "narrow")
         self.set_class(width < 140, "stacked-toolbar")
         self.set_class(height < 36, "short")
+        # Every key label on one line down to about 76 columns (a small terminal window).
+        self.query_one(Footer).compact = width < 100
 
     @on(ProfileTable.LayoutChanged)
     def table_resized(self) -> None:
@@ -554,6 +599,7 @@ class Dashboard(App[None]):
         details = self.query_one("#details", VMDetails)
         lab_details = self.query_one("#lab-details", LabDetails)
         lab = self.selected_lab_facts()
+        self.query_one(ActionBar).show(None if lab is not None else self.selected_row(), lab, self.rows)
         details.set_class(lab is not None, "hidden-panel")
         lab_details.set_class(lab is None, "hidden-panel")
         if lab is not None:

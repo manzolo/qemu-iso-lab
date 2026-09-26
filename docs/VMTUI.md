@@ -41,8 +41,10 @@ from the disk's installation state. With disk includes empty prepared disks.
 
 The details panel grows with the terminal, and wide tables include profile
 descriptions. Below 140 columns, search and filters use separate rows; below
-100 columns, details open in a dialog. Short terminals use compact action buttons.
-The activity area expands when installation jobs are present.
+100 columns the details panel gives way to an action bar under the list (the
+default action, the quick ones and **More…**, which opens the details in a
+dialog) and the key bar tightens to fit about 76 columns. Short terminals use
+compact action buttons and show the activity area only while a job runs.
 
 **Tools… / F4** opens the global tools: **Status**, **Status (all)**,
 **Remote Hosts** and **Clean All**, with Textual menus and confirmations.
