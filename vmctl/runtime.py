@@ -36,8 +36,10 @@ def find_free_tcp_port(host: str = "127.0.0.1") -> int:
         return int(sock.getsockname()[1])
 
 
-def image_info(path: Path, quiet: bool = False) -> dict[str, Any]:
-    cmd = ["qemu-img", "info", "--output=json", str(path)]
+def image_info(path: Path, quiet: bool = False, force_share: bool = False) -> dict[str, Any]:
+    # force_share (-U): read the header of an image a running QEMU holds locked; fine for a
+    # read-only look at the capacity, never for a copy (the data may change under it).
+    cmd = ["qemu-img", "info", "--output=json", *(["-U"] if force_share else []), str(path)]
     if quiet:
         result = subprocess.run(cmd, check=False, capture_output=True, text=True)
         if result.returncode != 0:

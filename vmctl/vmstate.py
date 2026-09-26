@@ -207,7 +207,7 @@ def image_facts(path: Path, fmt: str) -> dict[str, Any]:
         facts["virtual_bytes"] = int(st.st_size)
     elif shutil.which("qemu-img") is not None:
         try:
-            facts["virtual_bytes"] = int(runtime.image_info(path, quiet=True).get("virtual-size", 0) or 0)
+            facts["virtual_bytes"] = int(runtime.image_info(path, quiet=True, force_share=True).get("virtual-size", 0) or 0)
         except Exception:
             facts["virtual_bytes"] = None
     return facts

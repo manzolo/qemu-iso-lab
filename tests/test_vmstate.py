@@ -4,6 +4,8 @@ import argparse
 import io
 import json
 import shutil
+import subprocess
+from pathlib import Path
 from unittest import mock
 
 import vmctl.lifecycle
@@ -58,9 +60,17 @@ class VmstateRecordTests(BaseVmctlTestCase):
     def test_qcow2_capacity_comes_from_qemu_img_when_present(self):
         self.write_disk(32 * 1024 * 1024)
         with mock.patch.object(shutil, "which", return_value="/usr/bin/qemu-img"), \
-             mock.patch.object(vmctl.runtime, "image_info", return_value={"virtual-size": 20 * 1024 ** 3}):
+             mock.patch.object(vmctl.runtime, "image_info", return_value={"virtual-size": 20 * 1024 ** 3}) as info:
             facts = self.vmctl.vmstate.disk_facts(self.vm)
         self.assertEqual(facts["virtual_bytes"], 20 * 1024 ** 3)
+        # A running QEMU holds the image locked: only a shared read gets the capacity.
+        self.assertTrue(info.call_args.kwargs["force_share"])
+
+    def test_image_info_force_share_passes_u(self):
+        with mock.patch.object(vmctl.runtime.subprocess, "run",
+                               return_value=subprocess.CompletedProcess([], 0, stdout="{}", stderr="")) as run:
+            vmctl.runtime.image_info(Path("disk.qcow2"), quiet=True, force_share=True)
+        self.assertEqual(run.call_args.args[0], ["qemu-img", "info", "--output=json", "-U", "disk.qcow2"])
 
     # --- the ladder --------------------------------------------------------------------
 
