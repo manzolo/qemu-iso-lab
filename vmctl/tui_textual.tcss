@@ -18,7 +18,7 @@ Screen {
 }
 #search:focus { border: tall #84c9e7; }
 #filters { width: auto; height: 3; }
-.filter { min-width: 9; width: auto; margin-left: 1; }
+.filter, #tools { min-width: 9; width: auto; margin-left: 1; }
 Button {
     background: #243343;
     color: #dce5ef;
@@ -53,7 +53,9 @@ DataTable > .datatable--cursor { background: #285269; color: #ffffff; text-style
 DataTable:focus > .datatable--cursor { background: #285269; }
 #empty { height: auto; padding: 1 2; color: #a6b4c8; display: none; }
 VMDetails, LabDetails {
-    width: 38;
+    width: 30%;
+    min-width: 40;
+    max-width: 72;
     height: 1fr;
     background: #18222e;
     border: round #304050;
@@ -107,15 +109,31 @@ VMDetails Button:focus, LabDetails Button:focus {
     text-style: bold;
 }
 .action-hint { height: auto; color: #a6b4c8; margin: 1 0 0 0; border-top: solid #304858; }
+VMDetails Button.default-action, LabDetails Button.default-action {
+    background: #84c9e7;
+    color: #111820;
+    border: round #84c9e7;
+    text-style: bold;
+}
+VMDetails Button.default-action:focus, LabDetails Button.default-action:focus {
+    border: round #ffffff;
+}
 VMDetails:focus-within, LabDetails:focus-within { border: round #84c9e7; }
 .detail-copy { height: 1fr; }
-#activity { height: 5; margin: 1 2; padding: 0 1; border-top: solid #304050; }
+#activity { height: 3; margin: 0 2; padding: 0 1; border-top: solid #304050; }
+#activity.has-jobs { height: 5; }
 #activity .eyebrow { margin-bottom: 0; }
 #activity-text { height: 1fr; overflow-y: auto; color: #a6b4c8; }
 Footer { background: #18222e; }
 .compact #masthead { height: 3; layout: vertical; }
 .compact #brand, .compact #summary { width: 100%; height: 1; }
-.compact #search { margin-right: 0; }
+.stacked-toolbar #toolbar { layout: vertical; height: 4; }
+.stacked-toolbar #search { width: 100%; height: 3; margin-right: 0; }
+.stacked-toolbar #filters { width: 100%; height: 1; }
+.stacked-toolbar .filter, .stacked-toolbar #tools { height: 1; min-height: 1; border: none; }
+.stacked-toolbar .filter:focus, .stacked-toolbar #tools:focus { text-style: bold underline; }
+.stacked-toolbar #all { margin-left: 0; }
+.stacked-toolbar #tools { dock: right; }
 .compact #notice { margin-bottom: 0; }
 .compact #activity { height: 3; margin: 0 2; }
 .compact #details { display: none; }
@@ -133,7 +151,10 @@ ModalScreen { align: center middle; background: #000000 65%; }
     overflow-y: auto;
 }
 #detail-dialog { height: 90%; }
-#detail-dialog VMDetails { width: 100%; margin: 0; border: none; padding: 0; }
+#detail-dialog VMDetails, #detail-dialog LabDetails {
+    width: 100%; min-width: 0; max-width: 100%; margin: 0; border: none; padding: 0;
+}
+.short VMDetails Button, .short LabDetails Button { height: 1; min-height: 1; border: none; }
 #close-details, #close-help { width: 100%; margin-top: 1; }
 .dialog-title { text-style: bold; color: #84c9e7; margin-bottom: 1; }
 #workflow {

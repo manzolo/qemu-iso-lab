@@ -92,6 +92,19 @@ class DashboardDataTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "missing command: dialog"):
                 ClassicBridge().snapshot()
 
+    def test_bridge_opens_global_tools_with_textual_and_no_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bridge = ClassicBridge()
+            bridge.script = Path(tmp) / "vmtui"
+            marker = Path(tmp) / "opened"
+            bridge.script.write_text(
+                'install_interrupt_guard() { :; }\n'
+                'tools_menu_loop() { printf "%s" "$VMTUI_UI" > "$TOOLS_MARKER"; }\n'
+            )
+            bridge.env["TOOLS_MARKER"] = str(marker)
+            self.assertEqual(bridge.run("", "tools"), 0)
+            self.assertEqual(marker.read_text(), "textual")
+
     @unittest.skipUnless(HAS_TEXTUAL and sys.platform == "linux", "requires Textual and a Linux PTY")
     def test_widget_uses_terminal_size_when_stdout_is_captured(self):
         import fcntl
@@ -200,6 +213,40 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             await pilot.resize_terminal(120, 44)
             self.assertTrue(app.query_one("#details").display)
             self.assertEqual(app.selected, "ubuntu")
+
+    async def test_layout_adapts_to_full_half_and_narrow_terminals(self):
+        app = self.make_app()
+        app.bridge.snapshot.return_value = [profile(f"vm{i}") for i in range(80)]
+        async with app.run_test(size=(236, 54)) as pilot:
+            await self.ready(app, pilot)
+            table = app.query_one(DataTable)
+            app.query_one(Input).value = "vm"
+            await pilot.pause()
+            table.move_cursor(row=40, animate=False)
+            await pilot.pause()
+            wide_panel = app.query_one("#details").region.width
+            self.assertGreater(wide_panel, 60)
+            for width, height in ((236, 54), (116, 54), (80, 30), (236, 54)):
+                with self.subTest(width=width, height=height):
+                    await pilot.resize_terminal(width, height)
+                    await pilot.pause()
+                    self.assertEqual(app.selected, "vm40")
+                    self.assertEqual(app.query_one(Input).value, "vm")
+                    self.assertEqual(len(table.columns), 4 if width == 236 else 3)
+                    if width == 236:
+                        self.assertEqual(table.get_row("vm40")[3].plain, "vm40 Linux")
+                    self.assertLessEqual(sum(column.width + 2 for column in table.columns.values()),
+                                         table.size.width - 2)
+                    self.assertEqual(table.scroll_x, 0)
+                    search = app.query_one(Input).region
+                    filters = app.query_one("#filters").region
+                    self.assertEqual(filters.y >= search.bottom, width < 140)
+                    self.assertLessEqual(app.query_one("#tools").region.right, width)
+                    if width == 116:
+                        self.assertLess(app.query_one("#details").region.width, wide_panel)
+                        self.assertGreaterEqual(app.query_one("#details").region.width, 40)
+                    self.assertEqual(app.query_one("#activity").region.height, 3)
+            app.bridge.run.assert_not_called()
 
     async def test_home_end_select_first_and_last_profile_without_horizontal_scroll(self):
         app = self.make_app()
@@ -444,10 +491,32 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             app.query_one(DataTable).focus()
             await pilot.press("right")
             await pilot.pause()
-            self.assertEqual(app.focused.id, "lab-up")
+            self.assertEqual(app.focused.id, "lab-install")
+            self.assertTrue(app.focused.has_class("default-action"))
             await pilot.press("escape")
             await pilot.pause()
             self.assertIsInstance(app.focused, DataTable)
+
+    async def test_default_button_follows_lab_state_and_receives_focus(self):
+        app = self.lab_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.click("#labs")
+            await pilot.press("home")
+            for state, running, expected in (("no disk", False, "lab-install"),
+                                             ("verified", False, "lab-up"),
+                                             ("verified", True, "lab-map")):
+                app.bridge.snapshot.return_value = [
+                    profile(name, install_label=state, running=running) for name in ("alpine", "ubuntu")]
+                app.action_refresh()
+                await self.ready(app, pilot)
+                defaults = list(app.query("#lab-details Button.default-action"))
+                self.assertEqual([button.id for button in defaults], [expected])
+                self.assertTrue(str(defaults[0].label).endswith(" · Enter"))
+                await pilot.press("right")
+                self.assertEqual(app.focused.id, expected)
+                await pilot.press("left")
+            app.bridge.run_group.assert_not_called()
 
     async def test_enter_runs_selected_profile_default_action(self):
         for size in ((120, 44), (80, 30)):
@@ -522,6 +591,16 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             app.bridge.run.assert_called_once_with("ubuntu", "menu")
             self.assertEqual(app.selected, "ubuntu")
 
+    async def test_default_profile_button_identifies_the_enter_action(self):
+        app = self.make_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            for label in ("Open display", "Boot desktop", "Boot ISO…"):
+                button = app.query_one("#details Button.default-action", Button)
+                self.assertEqual(str(button.label), f"{label} · Enter")
+                await pilot.press("down")
+            app.bridge.run.assert_not_called()
+
     async def test_refresh_failure_retains_rows_and_can_recover(self):
         app = self.make_app()
         async with app.run_test(size=(120, 44)) as pilot:
@@ -535,6 +614,48 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             app.action_refresh()
             await self.ready(app, pilot)
             self.assertFalse(app.query_one("#notice").has_class("error"))
+
+    async def test_tools_button_and_shortcut_preserve_filter_search_and_selection(self):
+        for size in ((120, 44), (80, 30)):
+            with self.subTest(size=size):
+                app = self.make_app()
+                async with app.run_test(size=size) as pilot:
+                    await self.ready(app, pilot)
+                    await pilot.click("#running")
+                    app.query_one(Input).value = "ubuntu"
+                    await pilot.pause()
+                    with patch.object(app, "suspend", return_value=nullcontext()):
+                        await pilot.click("#tools")
+                        await self.ready(app, pilot)
+                        app.bridge.run.assert_called_once_with("", "tools")
+                        app.bridge.run.reset_mock()
+                        await pilot.press("f4")
+                    await self.ready(app, pilot)
+                    app.bridge.run.assert_called_once_with("", "tools")
+                    self.assertEqual(app.mode, "running")
+                    self.assertEqual(app.selected, "ubuntu")
+                    self.assertEqual(app.query_one(Input).value, "ubuntu")
+
+    async def test_global_tools_work_without_search_results(self):
+        app = self.make_app()
+        async with app.run_test(size=(80, 30)) as pilot:
+            await self.ready(app, pilot)
+            app.query_one(Input).value = "no matching profiles"
+            await pilot.pause()
+            self.assertIsNone(app.selected)
+            with patch.object(app, "suspend", return_value=nullcontext()):
+                await pilot.press("f4")
+            await self.ready(app, pilot)
+            app.bridge.run.assert_called_once_with("", "tools")
+            self.assertEqual(app.query_one(DataTable).row_count, 0)
+
+    async def test_tools_shortcut_does_not_leave_open_modal(self):
+        app = self.make_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            await pilot.press("f1", "f4")
+            self.assertIsInstance(app.screen, HelpScreen)
+            app.bridge.run.assert_not_called()
 
 
 @unittest.skipUnless(HAS_TEXTUAL, "optional Textual dependency is not installed")

@@ -24,6 +24,12 @@ class ProfileTable(DataTable[Text | str]):
                 Binding("end", "last_profile", "Last profile", show=False),
                 Binding("right", "app.details", "Actions", show=False, priority=True)]
 
+    class LayoutChanged(Message):
+        pass
+
+    def on_resize(self) -> None:
+        self.post_message(self.LayoutChanged())
+
     def action_first_profile(self) -> None:
         if self.row_count:
             self.move_cursor(row=0, animate=False)
@@ -60,7 +66,7 @@ class VMDetails(Vertical):
             yield Static(id="vm-facts", markup=False)
             yield Static(id="vm-install", markup=False)
         yield Static("↑/↓ Choose · ← Profiles", classes="action-hint", markup=False)
-        yield Button("Boot ISO…", id="primary", disabled=True,
+        yield Button("Boot ISO…", id="primary", disabled=True, classes="default-action",
                      tooltip="Default action when the profile list has focus")
         yield Button("", id="quick-1", disabled=True)
         yield Button("", id="quick-2", disabled=True)
@@ -113,14 +119,14 @@ class VMDetails(Vertical):
         self.query_one("#vm-install", Static).update(row["install_detail"] if row["installed"] else "")
         actions = quick_actions(row)[:-1]
         hint.update(Text.assemble(
-            (f"Enter → {actions[0][0]}", "bold #84c9e7"),
+            ("DEFAULT ACTION · Enter in list", "bold #84c9e7"),
             "\n↑/↓ Choose · ← Profiles",
         ))
         for index, selector in enumerate(("#primary", "#quick-1", "#quick-2")):
             button = self.query_one(selector, Button)
             button.display = index < len(actions)
             if button.display:
-                button.label = actions[index][0]
+                button.label = actions[index][0] + (" · Enter" if index == 0 else "")
         if isinstance(self.app.focused, Button) and not self.app.focused.display:
             self.query_one("#primary", Button).focus()
 
@@ -214,9 +220,13 @@ class LabDetails(Vertical):
             body.append("\n")
         self.query_one("#lab-members", Static).update(body)
         primary = lab_primary(lab, rows)
-        label = {action: text for _, text, action in LAB_ACTIONS}[primary]
+        for button_id, label, action in LAB_ACTIONS:
+            button = self.query_one(f"#{button_id}", Button)
+            button.set_class(action == primary, "default-action")
+            button.label = label + (" · Enter" if action == primary else "")
+            button.tooltip = "Default action when the lab list has focus" if action == primary else None
         self.query_one("#lab-hint", Static).update(Text.assemble(
-            (f"Enter → {label}", "bold #84c9e7"), "\n↑/↓ Choose · ← Profiles"))
+            ("DEFAULT ACTION · Enter in list", "bold #84c9e7"), "\n↑/↓ Choose · ← Profiles"))
 
     def move_action(self, offset: int) -> None:
         buttons = list(self.query(Button))
@@ -259,7 +269,7 @@ class LabScreen(ModalScreen[None]):
 
     def on_mount(self) -> None:
         self.query_one(LabDetails).show_lab(self.lab, self.rows)
-        self.query_one("#lab-up", Button).focus()
+        self.query_one(".default-action", Button).focus()
 
     @on(Button.Pressed, "#close-lab")
     def close_lab(self) -> None:
@@ -303,6 +313,7 @@ class HelpScreen(ModalScreen[None]):
                 "↓          Move from search to results\n"
                 "Tab        Move between controls\n"
                 "F2         Switch between Labs and single profiles\n"
+                "F4         Tools: status, remote hosts, Clean All\n"
                 "F5         Refresh (also automatic every 15s)\n"
                 "Labs       Filter: each lab with its members; Enter installs\n"
                 "           what is missing, starts the stack or opens its map;\n"
@@ -335,6 +346,7 @@ class Dashboard(App[None]):
         Binding("f3", "search", "Search", show=False),
         Binding("enter", "primary", "Default action"),
         Binding("f2", "toggle_labs", "Labs ⇄ Profiles"),
+        Binding("f4", "tools", "Tools"),
         Binding("f5", "refresh", "Refresh"),
         Binding("f8", "classic", "Classic UI"),
         Binding("f1", "help", "Help"),
@@ -367,6 +379,7 @@ class Dashboard(App[None]):
                 yield Button("With disk", id="disk", classes="filter")
                 yield Button("Running", id="running", classes="filter")
                 yield Button("Labs", id="labs", classes="filter")
+                yield Button("Tools…", id="tools")
         yield Static("Reading VM state…", id="notice", markup=False)
         with Horizontal(id="workspace"):
             with Vertical(id="catalog"):
@@ -382,13 +395,21 @@ class Dashboard(App[None]):
 
     def on_mount(self) -> None:
         self.query_one(DataTable).focus()
-        self.set_class(self.size.width < 100, "compact")
+        self.update_layout(self.size.width, self.size.height)
         self.action_refresh()
         if self.poll_enabled:
             self.set_interval(15, lambda: self.action_refresh(quiet=True))
 
     def on_resize(self, event: Resize) -> None:
-        self.set_class(event.size.width < 100, "compact")
+        self.update_layout(event.size.width, event.size.height)
+
+    def update_layout(self, width: int, height: int) -> None:
+        self.set_class(width < 100, "compact")
+        self.set_class(width < 140, "stacked-toolbar")
+        self.set_class(height < 36, "short")
+
+    @on(ProfileTable.LayoutChanged)
+    def table_resized(self) -> None:
         if self.loaded:
             self.rebuild_table()
 
@@ -425,7 +446,8 @@ class Dashboard(App[None]):
             )
             jobs = [f"{r['name']}  ·  {r['job_status']}" for r in rows if r["job_status"]]
             jobs.sort(key=lambda line: "· running" not in line)
-            self.query_one("#activity-text", Static).update("\n".join(jobs) or "No installation jobs. Select a profile to get started.")
+            self.query_one("#activity").set_class(bool(jobs), "has-jobs")
+            self.query_one("#activity-text", Static).update("\n".join(jobs) or "No installation jobs.")
             self.rebuild_table()
             if isinstance(self.screen, DetailsScreen):
                 opened = self.screen.row["name"]
@@ -475,8 +497,16 @@ class Dashboard(App[None]):
             (key for key, _, vm, _ in entries if vm is not None and vm == self.selected),
             keys[0] if keys else None)
         table = self.query_one(DataTable)
-        available = self.size.width - (6 if self.has_class("compact") else 46)
-        widths = [max(12, min(36, available - 32)), 16, 9]
+        # Include cell padding and reserve room for the vertical scrollbar.
+        available = max(1, table.size.width - 2)
+        widths = [max(12, min(38, available - 31)), 16, 9]
+        titles = ["PROFILE", "STATE", "RAM / CPU"]
+        if available >= 100:
+            widths.append(available - sum(widths) - 8)
+            titles.append("DESCRIPTION")
+            descriptions = {row["name"]: row["label"] for row in self.rows}
+            entries = [(key, (*cells, Text(descriptions.get(vm or "", "Network lab"))), vm, lab)
+                       for key, cells, vm, lab in entries]
         same_layout = (
             [row.key.value for row in table.ordered_rows] == keys
             and [column.width for column in table.columns.values()] == widths
@@ -484,7 +514,7 @@ class Dashboard(App[None]):
         with self.batch_update(), table.prevent(DataTable.RowHighlighted):
             if not same_layout:
                 table.clear(columns=True)
-                for title, width in zip(("PROFILE", "STATE", "RAM / CPU"), widths):
+                for title, width in zip(titles, widths):
                     table.add_column(title, width=width)
             for key, cells, _, _ in entries:
                 if same_layout:
@@ -596,7 +626,7 @@ class Dashboard(App[None]):
             if self.has_class("compact"):
                 self.push_screen(LabScreen(lab, self.rows))
             else:
-                self.query_one("#lab-up", Button).focus()
+                self.query_one("#lab-details .default-action", Button).focus()
             return
         row = self.selected_row()
         if row is not None:
@@ -624,6 +654,11 @@ class Dashboard(App[None]):
 
     def action_classic(self) -> None:
         self.run_classic("", "classic")
+
+    @on(Button.Pressed, "#tools")
+    def action_tools(self) -> None:
+        if not isinstance(self.screen, ModalScreen):
+            self.run_classic("", "tools")
 
     @on(VMDetails.Requested)
     def run_requested(self, event: VMDetails.Requested) -> None:

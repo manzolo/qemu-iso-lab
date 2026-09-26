@@ -2333,7 +2333,7 @@ run_action() {
             run_vmctl import-device "$current_vm" --device "$selected_device" --confirm-device "$selected_device" "${import_flags[@]}" || true
             ;;
         clean-all)
-            if CONFIRM_DEFAULT=no confirm_box "Confirm Clean All" "Remove artifacts for ALL configured VMs?\n\nEvery disk image under artifacts/ is deleted. Cached ISOs are kept."; then
+            if CONFIRM_DEFAULT=no confirm_box "Confirm Clean All" "Force-stop ALL configured VMs and delete their disks and generated artifacts?\n\nThis affects every configured VM, regardless of dashboard filters. Checkpoints and cached ISOs are kept. This cannot be undone."; then
                 run_vmctl clean --all || true
             fi
             ;;

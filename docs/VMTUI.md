@@ -39,7 +39,21 @@ snapshot as the classic menus and refreshes every 15 seconds (or with F5),
 preserving the selected profile and search. ISO availability is shown separately
 from the disk's installation state. With disk includes empty prepared disks.
 
+The details panel grows with the terminal, and wide tables include profile
+descriptions. Below 140 columns, search and filters use separate rows; below
+100 columns, details open in a dialog. Short terminals use compact action buttons.
+The activity area expands when installation jobs are present.
+
+**Tools… / F4** opens the global tools: **Status**, **Status (all)**,
+**Remote Hosts** and **Clean All**, with Textual menus and confirmations.
+Tools are available even when the search has no results. **Clean All** defaults
+to Cancel; confirming force-stops every configured VM and deletes its disks and
+generated artifacts, regardless of the current search or filter. Checkpoints
+and cached ISOs are kept.
+
 Use **Enter** in the profile list to run the selected profile's default action.
+Its button has a cyan background and an **Enter** label, for both profiles and
+labs. The highlighted action follows the current VM or lab state.
 Use **Right** to move from the profile list to its actions, **Up/Down**
 to choose a button, and **Left** to return to the list. At fewer than 100 columns,
 the actions open in a dialog with the same controls. Use `/` to search names,

@@ -92,8 +92,10 @@ Windows profile:
 
 ![Search: the Windows profiles, with the unattended install ready for the selected one](docs/screenshots/vmtui-windows.png)
 
-F8 (or `vmtui --classic`) opens the fzf/dialog menus, which also hold the
-tools and the network lab. Controls, video profiles and remote SPICE:
+**Tools… / F4** opens global status, remote hosts and **Clean All**. Clean All
+asks for confirmation and affects every configured VM, regardless of filters;
+checkpoints and cached ISOs are kept.
+F8 (or `vmtui --classic`) opens the fzf/dialog menus. Controls, video profiles and remote SPICE:
 [docs/VMTUI.md](docs/VMTUI.md).
 
 ## Make it yours

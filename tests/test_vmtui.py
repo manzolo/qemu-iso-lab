@@ -1361,6 +1361,20 @@ done
                       "Import Disk", "Confirm Clean All", "Confirm Delete ISO", "Clean the network lab"):
             self.assertIn(f'CONFIRM_DEFAULT=no confirm_box "{title}" ', source)
 
+    def test_clean_all_requires_confirmation_and_ignores_current_profile(self):
+        for answer, expected in ((1, ""), (0, "clean --all")):
+            with self.subTest(answer=answer):
+                result = self.run_bash(
+                    'source bin/vmtui; current_vm=test-ssh; '
+                    'confirm_box() { printf "%s\\n" "confirm-default:$CONFIRM_DEFAULT" "$*" >&2; '
+                    f'return {answer}; }}; '
+                    'run_vmctl() { printf "%s\\n" "$*"; }; run_action "Clean All"'
+                )
+                self.assertEqual(result.stdout.strip(), expected)
+                self.assertIn("confirm-default:no", result.stderr.splitlines())
+                self.assertIn("regardless of dashboard filters", result.stderr)
+                self.assertIn("Checkpoints and cached ISOs are kept", result.stderr)
+
     def test_destructive_dialog_confirmation_uses_colors_and_defaults_to_no(self):
         result = self.run_bash(r"""
 source bin/vmtui

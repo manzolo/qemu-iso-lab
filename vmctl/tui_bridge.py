@@ -140,7 +140,7 @@ class ClassicBridge:
             signal.signal(signal.SIGINT, previous)
 
     def run(self, name: str, action: str) -> int:
-        if action not in {"menu", "classic", "alt-l", "alt-a", "alt-d", "alt-u",
+        if action not in {"menu", "tools", "classic", "alt-l", "alt-a", "alt-d", "alt-u",
                           "alt-h", "alt-s", "alt-x", "Profile Details", "Video Profile"}:
             raise ValueError(f"Unsupported dashboard action: {action}")
         # Values are positional arguments, never interpolated into shell code.
@@ -148,6 +148,7 @@ class ClassicBridge:
 install_interrupt_guard
 case "$3" in
     classic) main_menu_loop ;;
+    tools) tools_menu_loop ;;
     menu) current_vm="$2"; state_set last-vm "$current_vm"; vm_menu_loop ;;
     "Profile Details"|"Video Profile")
         current_vm="$2"; load_vm_facts "$current_vm"; run_vm_menu_action "$3" ;;
