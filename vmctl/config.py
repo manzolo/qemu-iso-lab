@@ -300,7 +300,8 @@ def _ssh_port_conflicts(vms: dict[str, dict[str, Any]]) -> list[str]:
     return errors
 
 
-def load_config() -> dict[str, Any]:
+def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Load profiles; an explicit local document allows validation before saving it."""
     profiles_dir = state.CONFIG_DIR / "profiles"
 
     if not state.CONFIG_DIR.is_dir():
@@ -311,12 +312,16 @@ def load_config() -> dict[str, Any]:
 
     merged_vms: dict[str, dict[str, Any]] = {}
     profile_paths = sorted(profiles_dir.glob("*.json"), key=lambda p: (p.name == "local.json", p.name))
+    if local_profiles is not None and profiles_dir / "local.json" not in profile_paths:
+        profile_paths.append(profiles_dir / "local.json")
     for path in profile_paths:
-        profile_data = runtime.load_json_file(path)
+        profile_data = local_profiles if path.name == "local.json" and local_profiles is not None else runtime.load_json_file(path)
         if "vms" not in profile_data or not isinstance(profile_data["vms"], dict):
             raise VMError(f"Invalid profile file: {path}")
         local_names: set[str] = set()
         for name, vm in profile_data["vms"].items():
+            if not isinstance(vm, dict):
+                raise VMError(f"Invalid VM profile '{name}' in {path}: expected an object")
             if path.name == "local.json":
                 name = canonical_vm_name(name)
                 if name in local_names:

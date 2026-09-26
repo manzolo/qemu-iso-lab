@@ -12,8 +12,8 @@ A small JSON API over what the TUI already uses, so the browser drives the same 
 - a live view of a running VM (QMP screendump, PNG) and the lab network maps.
 
 Security: the server binds 127.0.0.1, checks the Host header (no DNS rebinding) and wants a
-random token on every API call; commands that need a terminal or sudo (shell, console, flash,
-import-device) are not offered, and destructive ones need an explicit confirmation.
+random token on every API call. Terminal/sudo commands cannot run as detached jobs; SSH has
+a dedicated PTY endpoint, and flash is copy-only. Destructive jobs require confirmation.
 """
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ import json
 import os
 import secrets
 import shlex
+import shutil
 import signal
 import socket
 import struct
@@ -39,13 +40,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import config, qemu, runtime, state, tui_jobs, ui
+from vmctl import config, profile_overrides, qemu, runtime, state, tui_jobs, ui
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
 WEB_DIR = Path(__file__).resolve().parent / "web"
-# Need a terminal (interactive SSH, serial console) or sudo on physical disks: not from a browser.
+# Need an interactive terminal or sudo: excluded from the detached job endpoint.
 EXCLUDED_COMMANDS = {"web", "shell", "console", "flash", "import-device", "completion"}
+# Discoverable in the command center, but still refused by the execution endpoint.
+TERMINAL_COMMANDS = {"flash"}
 # Delete or overwrite something: the browser asks first and the request must say it did.
 DESTRUCTIVE = {"clean", "delete-iso", "clean-reports", "clean-stale", "unexport-libvirt"}
 DESTRUCTIVE_ACTIONS = {"checkpoint": {"restore", "delete"}, "group": {"clean", "install"},
@@ -76,11 +79,11 @@ def command_catalog() -> list[dict[str, Any]]:
     catalog: list[dict[str, Any]] = []
     for group, _, names in cli.COMMAND_GROUPS:
         for name in names:
-            if name in EXCLUDED_COMMANDS or name not in parsers:
+            if (name in EXCLUDED_COMMANDS and name not in TERMINAL_COMMANDS) or name not in parsers:
                 continue
             args: list[dict[str, Any]] = []
             for action in parsers[name]._actions:
-                if isinstance(action, argparse._HelpAction):
+                if isinstance(action, argparse._HelpAction) or action.help == argparse.SUPPRESS:
                     continue
                 entry: dict[str, Any] = {
                     "dest": action.dest,
@@ -95,6 +98,10 @@ def command_catalog() -> list[dict[str, Any]]:
                 args.append(entry)
             catalog.append({"name": name, "group": group, "help": cli.COMMAND_HELP.get(name, ""),
                             "args": args, "destructive": name in DESTRUCTIVE,
+                            "terminal_only": name in TERMINAL_COMMANDS,
+                            "exclusive_groups": [[a.option_strings[-1] if a.option_strings else a.dest
+                                                  for a in group._group_actions]
+                                                 for group in parsers[name]._mutually_exclusive_groups],
                             "destructive_actions": sorted(DESTRUCTIVE_ACTIONS.get(name, set()))})
     return catalog
 
@@ -225,6 +232,28 @@ def cancel_job(job_id: str) -> bool:
 
 # --- VM views --------------------------------------------------------------------------------
 
+
+def open_ssh_terminal(vm_name: str) -> str:
+    """Open the existing SSH CLI in a host terminal, never in a detached web job."""
+    from vmctl import ssh
+
+    vm = config.get_vm(config.load_config(), vm_name)
+    ssh.ssh_target(vm)  # validate access without creating keys or opening a connection
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        raise VMError("No desktop session is available. Copy the command into a terminal on the host.")
+    command = [str(state.ROOT / "bin" / "vmctl"), "shell", vm_name]
+    terminals = [("x-terminal-emulator", "-e"), ("gnome-terminal", "--"),
+                 ("konsole", "-e"), ("xfce4-terminal", "-x"), ("kitty", "--"),
+                 ("alacritty", "-e"), ("foot", "--"), ("xterm", "-e")]
+    for name, separator in terminals:
+        executable = shutil.which(name)
+        if executable:
+            subprocess.Popen([executable, separator, *command], cwd=state.ROOT,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
+            return name
+    raise VMError("No supported terminal was found. Copy the command into your terminal on the host.")
+
 def screenshot_png(vm_name: str) -> bytes | None:
     from vmctl import report
 
@@ -284,6 +313,8 @@ def ws_read_frame(stream: Any) -> tuple[int, bytes] | None:
         length = struct.unpack("!H", stream.read(2))[0]
     elif length == 127:
         length = struct.unpack("!Q", stream.read(8))[0]
+    if length > 4 * 1024 * 1024:
+        raise ValueError("WebSocket frame is too large")
     mask = stream.read(4) if head[1] & 0x80 else b""
     payload = stream.read(length)
     if mask:
@@ -357,7 +388,11 @@ class Snapshot:
                 from vmctl.tui_bridge import ClassicBridge
 
                 bridge = ClassicBridge()
-                self.value = {"vms": bridge.snapshot(), "labs": bridge.labs(), "time": time.time()}
+                rows = bridge.snapshot()
+                for row in rows:
+                    argv = tui_jobs.command(tui_jobs.job_dir(state.ROOT, row["name"]))
+                    row["job_command"] = argv[1] if len(argv) > 1 and Path(argv[0]).name == "vmctl" else ""
+                self.value = {"vms": rows, "labs": bridge.labs(), "time": time.time()}
                 self.taken = time.monotonic()
             return self.value
 
@@ -375,13 +410,16 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def _send(self, status: int, body: bytes, content_type: str) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True  # page closed/reloaded while a snapshot was being built
 
     def _json(self, value: Any, status: int = HTTPStatus.OK) -> None:
         self._send(status, json.dumps(value).encode(), "application/json")
@@ -416,6 +454,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({**self.snapshot.get(fresh="fresh" in query), "version": _version()})
             elif path == "/api/commands":
                 self._json(command_catalog())
+            elif path.startswith("/api/vm/") and path.endswith("/override"):
+                self._json(profile_overrides.read_override(path[len("/api/vm/"):-len("/override")]))
             elif path == "/api/jobs":
                 self._json(list_jobs())
             elif path.startswith("/api/jobs/") and path.endswith("/log"):
@@ -425,6 +465,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(run_json(["show", path.split("/")[3], "--json"]))
             elif path.startswith("/api/vm/") and path.endswith("/vnc"):
                 self._vnc(path.split("/")[3])
+            elif path.startswith("/api/vm/") and path.endswith("/ssh"):
+                self._ssh(path[len("/api/vm/"):-len("/ssh")])
             elif path.startswith("/api/vm/") and path.endswith("/screen.png"):
                 image = screenshot_png(path.split("/")[3])
                 if image is None:
@@ -444,6 +486,24 @@ class Handler(BaseHTTPRequestHandler):
             self._error(str(exc))
         except (ValueError, OSError, subprocess.SubprocessError, RuntimeError) as exc:
             self._error(f"{type(exc).__name__}: {exc}", HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _ssh(self, vm_name: str) -> None:
+        from vmctl import ssh, web_terminal
+
+        vm = config.get_vm(config.load_config(), vm_name)
+        key = self.headers.get("Sec-WebSocket-Key")
+        if self.headers.get("Upgrade", "").lower() != "websocket" or not key:
+            raise VMError("Expected a WebSocket upgrade")
+        command = ssh.ssh_shell_cmd(vm)
+        # Keep SSH escapes from launching a local host shell in the browser terminal.
+        command[1:1] = ["-o", "EscapeChar=none"]
+        self.send_response(HTTPStatus.SWITCHING_PROTOCOLS)
+        self.send_header("Upgrade", "websocket")
+        self.send_header("Connection", "Upgrade")
+        self.send_header("Sec-WebSocket-Accept", ws_accept(key))
+        self.end_headers()
+        self.close_connection = True
+        web_terminal.bridge(self, command)
 
     def _vnc(self, vm_name: str) -> None:
         """WebSocket upgrade to the VM's VNC socket (headless VMs: `vmctl start --headless`, bootstraps)."""
@@ -474,7 +534,12 @@ class Handler(BaseHTTPRequestHandler):
         path = unquote(urlparse(self.path).path)
         try:
             length = int(self.headers.get("Content-Length") or 0)
+            if not 0 <= length <= 1024 * 1024:
+                self.close_connection = True
+                raise VMError("Request body must be no larger than 1 MiB")
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            if not isinstance(body, dict):
+                raise VMError("Request body must be a JSON object")
             if path == "/api/run":
                 command, vm = prepare_command(list(body.get("args") or []), bool(body.get("confirmed")))
                 job_id = start_job(command, vm)
@@ -482,6 +547,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"job": job_id, "command": shlex.join(["vmctl", *command[1:]])})
             elif path.startswith("/api/jobs/") and path.endswith("/cancel"):
                 self._json({"cancelled": cancel_job(path[len("/api/jobs/"):-len("/cancel")])})
+            elif path.startswith("/api/vm/") and path.endswith("/ssh-terminal"):
+                terminal = open_ssh_terminal(path[len("/api/vm/"):-len("/ssh-terminal")])
+                self._json({"terminal": terminal})
+            elif path.startswith("/api/vm/") and path.endswith("/override"):
+                saved = profile_overrides.save_override(path[len("/api/vm/"):-len("/override")],
+                                                        body.get("override"), body.get("revision", ""))
+                with self.snapshot.lock:
+                    self.snapshot.value = None
+                self._json(saved)
             else:
                 self._error("Not found", HTTPStatus.NOT_FOUND)
         except VMError as exc:

@@ -32,6 +32,16 @@ def status(directory: Path) -> str:
         return ""
 
 
+def command(directory: Path) -> list[str]:
+    """Read the recorded argv, including jobs launched before the web UI existed."""
+    try:
+        with (directory / "output.log").open(errors="replace") as log:
+            first = log.readline().strip()
+        return shlex.split(first[2:]) if first.startswith("$ ") else []
+    except (OSError, ValueError):
+        return []
+
+
 @contextmanager
 def control_lock(directory: Path) -> Iterator[None]:
     """Serialize launch and cancellation, including VM cleanup after the worker exits."""
@@ -40,7 +50,7 @@ def control_lock(directory: Path) -> Iterator[None]:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise RuntimeError("An installation operation is already in progress") from None
+            raise RuntimeError("Another operation is already in progress") from None
         yield
 
 
@@ -55,7 +65,7 @@ def _start(root: Path, name: str, directory: Path, command: list[str]) -> Path:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise RuntimeError(f"An installation is already running for '{name}'") from None
+            raise RuntimeError(f"A job is already running for '{name}'; open its log or wait for it to finish") from None
         log_path = directory / "output.log"
         with log_path.open("w") as log:
             log.write(f"$ {shlex.join(command)}\n\n")

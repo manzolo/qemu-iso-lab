@@ -6,20 +6,23 @@
 
 **Linux, BSD and Windows virtual machines on QEMU/KVM, installed with zero clicks.**
 One JSON profile per VM describes the ISO (downloaded and checksummed), the
-disk, the firmware, the unattended install and the SSH provisioning. One CLI,
-`vmctl`, and one terminal dashboard, `vmtui`, drive all of it.
+disk, the firmware, the unattended install and the SSH provisioning. Manage it
+from the **web dashboard** (`make web`), the terminal dashboard (`vmtui`) or the
+CLI (`vmctl`), all sharing the same profiles, VM state and jobs.
 
 - **101 profiles**, 56 of them fully unattended: every Ubuntu LTS since 8.04, Debian,
   Fedora, Arch, NixOS, openSUSE, FreeBSD, ReactOS and Windows from 11 back to NT 4.
 - **Labs**: groups of VMs on a private network, installed and started as one stack,
   such as a pfSense + Pi-hole network or a three-node Proxmox VE cluster.
+- **In your browser**: live VM screens, interactive SSH, searchable commands,
+  job logs and local profile customization, served on 127.0.0.1.
 - **Tested for real**: every unattended profile is reinstalled from scratch by a local
   validation matrix; the last full run (2026-09-26) was 53 PASS, 0 FAIL.
 
-![vmtui: every profile with its state, a description and the actions for the selected VM](docs/screenshots/vmtui-dashboard.png)
+![Web dashboard: searchable VM profiles, live state, resources, SSH access and console actions](docs/screenshots/web-dashboard.png)
 
 **Contents:** [Quick start](#quick-start) · [What it installs](#what-it-installs) ·
-[The dashboard](#the-dashboard) · [In the browser](#in-the-browser) · [Labs](#labs) · [Everyday commands](#everyday-commands) ·
+[In the browser](#in-the-browser) · [Terminal dashboard](#the-dashboard) · [Labs](#labs) · [Everyday commands](#everyday-commands) ·
 [Make it yours](#make-it-yours) · [Documentation](#documentation) · [Development](#development)
 
 ## Quick start
@@ -27,8 +30,11 @@ disk, the firmware, the unattended install and the SSH provisioning. One CLI,
 ```bash
 git clone https://github.com/manzolo/qemu-iso-lab.git && cd qemu-iso-lab
 ./setup.sh     # links vmctl + vmtui into ~/.local/bin, installs what is missing, checks the host
-vmtui          # the dashboard: pick a profile, Enter installs or boots it
+make web       # opens the browser dashboard; select a profile and install or boot it
 ```
+
+Prefer a terminal? Run `vmtui` for the TUI, or use `vmctl` directly. The web
+dashboard prints a token URL; use that URL if the browser does not open automatically.
 
 `./setup.sh` (or `make setup`) lists what it is about to install and asks first; it
 needs only `python3`, which every supported distribution ships. It uses `apt` or
@@ -110,12 +116,40 @@ Keys, video profiles and remote SPICE: [docs/VMTUI.md](docs/VMTUI.md).
 
 ## In the browser
 
-`make web` (or `vmctl web --open`) serves the same lab on 127.0.0.1 with a token: every profile
-with the actions for its state, a live screenshot of a running VM, the labs, and every `vmctl`
-command in a form built from the CLI itself. Everything runs as a job with its log followed live,
-shared with the TUI. [docs/WEB.md](docs/WEB.md).
+```bash
+make web                  # open the dashboard on 127.0.0.1:8765
+make web PORT=9000        # use a different port
+# equivalent: vmctl web --open --port 9000
+```
 
-![vmctl web: profiles, the selected VM's actions, jobs](docs/screenshots/web-dashboard.png)
+The web dashboard brings the catalog, VM controls and guest access into one page.
+It runs locally with Python's standard library; the URL printed at startup carries
+the access token.
+
+| From the dashboard | What you can do |
+|--------------------|-----------------|
+| **Profiles** | Search and filter by state, inspect RAM/CPU/disk, and install, boot or stop a VM. Right-click a row for its actions. |
+| **Live console** | Use the guest's screen, keyboard and mouse in the browser, with fit/actual-size, reconnect and full screen. |
+| **SSH** | Open an interactive terminal in the browser or on the host, or copy the connection command. |
+| **Commands** | Browse suggestions and recent commands, filter by category, edit parameters, then copy or run the preview. |
+| **Customize** | Change RAM, CPU or other JSON settings in a local override, keeping the catalog as a template. |
+| **Labs** | Install a new lab or start an installed stack, inspect its members and open its network map. |
+| **Recent activity** | Follow job output live; jobs are shared with the TUI and keep running when you close the page. |
+
+Choose **Boot headless**, then **Open console** to interact with a desktop without
+opening a separate QEMU window. The same console lets you watch unattended installs.
+
+![Live browser console connected to arch-noctalia, with display scaling, reconnect and full-screen controls](docs/screenshots/web-console.png)
+
+Use `/` to search profiles, `C` to open commands and **Ctrl/Cmd+Enter** to run a
+reviewed command. Destructive commands ask for confirmation. Physical-disk **Flash**
+is available as a form that prepares a command to run in a terminal with sudo.
+
+The graphical console and browser SSH terminal load noVNC/xterm.js from a CDN;
+the dashboard and screenshot view need no external assets. After updating the code,
+restart `make web` and open its newly printed URL to load new API features.
+
+Details, shortcuts, local overrides and API: [Web dashboard guide](docs/WEB.md).
 
 ## Labs
 
@@ -127,6 +161,11 @@ logins and a step-by-step runbook.
 |-----|---------------|---------|
 | `netlab` | pfSense router, Pi-hole DNS, Lubuntu desktop client | `vmctl group install netlab` |
 | `proxmox-lab` | three Proxmox VE nodes clustered over ZFS mirrors, a Debian client with a browser | `vmctl group install proxmox-lab` |
+
+In `make web`, choose **Labs** to see each stack's members, addresses and live state.
+Start or stop the stack from its card, or right-click an individual VM for its actions.
+
+![Web Labs view: netlab ready to install and all four Proxmox lab members running](docs/screenshots/web-labs.png)
 
 ![Map of the Proxmox lab: three nodes and the client on the pve-lan segment](docs/screenshots/lab-map-proxmox.png)
 
@@ -149,6 +188,12 @@ Every command accepts `--dry-run`, and `vmctl --help` lists them all by task.
 Tab completion: `echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc` (bash works too).
 
 ## Make it yours
+
+In the web dashboard, select a VM and choose **Customize** (also available by
+right-clicking its row). Set RAM and vCPUs, or expand **Advanced JSON override**
+for other fields. Changes are validated and saved in `vms/profiles/local.json`,
+with a backup; the catalog files stay unchanged. **Restore catalog values** removes
+that VM's override. Resource changes take effect at the next start.
 
 Tracked profiles use a generic guest user, `lab` with password `lab`. Your user
 name, SSH key, dotfiles and extra commands go in `vms/profiles/local.json`, which

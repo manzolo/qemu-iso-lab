@@ -20,9 +20,9 @@ from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
 class CatalogTests(unittest.TestCase):
-    def test_every_offered_command_comes_from_the_parser_and_terminal_ones_stay_out(self):
+    def test_catalog_distinguishes_browser_and_terminal_commands(self):
         catalog = {entry["name"]: entry for entry in webui.command_catalog()}
-        for excluded in ("shell", "console", "flash", "import-device", "web"):
+        for excluded in ("shell", "console", "import-device", "web"):
             self.assertNotIn(excluded, catalog)
         self.assertIn("bootstrap-haiku", catalog)
         group = {arg["dest"]: arg for arg in catalog["group"]["args"]}
@@ -31,6 +31,20 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual((start["headless"]["kind"], start["headless"]["flag"]), ("flag", "--headless"))
         self.assertTrue(catalog["clean"]["destructive"])
         self.assertIn("restore", catalog["checkpoint"]["destructive_actions"])
+        self.assertTrue(catalog["flash"]["terminal_only"])
+        self.assertFalse(catalog["start"]["terminal_only"])
+        self.assertIn(["--expand", "--no-expand"], catalog["flash"]["exclusive_groups"])
+        flash = {arg["flag"]: arg for arg in catalog["flash"]["args"]}
+        self.assertTrue(flash["--device"]["required"])
+        self.assertTrue(flash["--confirm-device"]["required"])
+        for command in catalog.values():
+            self.assertFalse(any(arg["help"] == "==SUPPRESS==" for arg in command["args"]))
+
+    def test_flash_is_never_executed_by_the_web_even_when_confirmed(self):
+        for confirmed in (False, True):
+            with self.subTest(confirmed=confirmed), self.assertRaisesRegex(VMError, "cannot be run"):
+                webui.prepare_command(["flash", "testvm", "--device", "/dev/test",
+                                       "--confirm-device", "/dev/test"], confirmed=confirmed)
 
     def test_destructive_detection(self):
         self.assertTrue(webui.is_destructive(["clean", "vm"]))
@@ -64,6 +78,50 @@ class WebSocketTests(unittest.TestCase):
 
 
 class RequestTests(BaseVmctlTestCase):
+    def test_host_ssh_terminal_uses_fixed_cli_arguments(self):
+        from unittest import mock
+
+        with mock.patch("vmctl.ssh.ssh_target", return_value=("127.0.0.1", 2222, "user")), \
+             mock.patch.dict("os.environ", {"DISPLAY": ":fixture"}), \
+             mock.patch.object(webui.shutil, "which", return_value="/usr/bin/xterm"), \
+             mock.patch.object(webui.subprocess, "Popen") as popen:
+            webui.open_ssh_terminal(self.vm_name)
+        argv = popen.call_args.args[0]
+        self.assertEqual(argv, ["/usr/bin/xterm", "-e", str(self.root / "bin/vmctl"), "shell", self.vm_name])
+        self.assertNotIn("shell", popen.call_args.kwargs)
+
+    def test_host_ssh_rejects_missing_config_or_desktop(self):
+        from unittest import mock
+
+        with self.assertRaisesRegex(VMError, "SSH provisioning"):
+            webui.open_ssh_terminal(self.vm_name)
+        with mock.patch("vmctl.ssh.ssh_target"), mock.patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(VMError, "No desktop session"):
+                webui.open_ssh_terminal(self.vm_name)
+
+    def test_snapshot_reports_the_actual_job_command(self):
+        from unittest import mock
+
+        directory = vmctl.state.ROOT / "artifacts/testvm/runtime/tui-job"
+        directory.mkdir(parents=True)
+        for command in ("start", "stop", "bootstrap-archinstall"):
+            with self.subTest(command=command):
+                (directory / "output.log").write_text(f"$ '/project with spaces/bin/vmctl' {command} testvm\n")
+                with mock.patch("vmctl.tui_bridge.ClassicBridge") as bridge:
+                    bridge.return_value.snapshot.return_value = [{"name": "testvm", "job_status": "running"}]
+                    bridge.return_value.labs.return_value = []
+                    snapshot = webui.Snapshot().get()
+                self.assertEqual(snapshot["vms"][0]["job_command"], command)
+
+    def test_missing_or_malformed_job_command_is_unknown(self):
+        from vmctl import tui_jobs
+
+        directory = vmctl.state.ROOT / "artifacts/testvm/runtime/tui-job"
+        self.assertEqual(tui_jobs.command(directory), [])
+        directory.mkdir(parents=True)
+        (directory / "output.log").write_text("$ 'unterminated\n")
+        self.assertEqual(tui_jobs.command(directory), [])
+
     def test_a_request_becomes_a_vmctl_command_and_names_its_vm(self):
         self.write_config_dir()
         command, vm = webui.prepare_command(["start", self.vm_name, "--headless", "--background"], confirmed=False)
@@ -135,7 +193,71 @@ class ServerTests(BaseVmctlTestCase):
             headers["X-Vmctl-Token"] = token
         conn.request("GET", path, headers=headers)
         response = conn.getresponse()
-        return response.status, response.read()
+        result = response.status, response.read()
+        conn.close()
+        return result
+
+    def test_disconnected_browser_does_not_trigger_another_error_response(self):
+        from unittest import mock
+
+        handler = object.__new__(webui.Handler)
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+        handler.wfile = mock.Mock()
+        handler.wfile.write.side_effect = BrokenPipeError()
+        handler._json({"example": True})
+        self.assertTrue(handler.close_connection)
+
+    def test_new_mutations_require_authentication(self):
+        from unittest import mock
+
+        for endpoint in ("ssh-terminal", "override"):
+            with self.subTest(endpoint=endpoint), mock.patch.object(webui, "open_ssh_terminal") as terminal, \
+                 mock.patch.object(webui.profile_overrides, "save_override") as save:
+                conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+                conn.request("POST", f"/api/vm/testvm/{endpoint}", body="{}")
+                response = conn.getresponse()
+                self.assertEqual(response.status, 401)
+                response.read()
+                conn.close()
+                terminal.assert_not_called()
+                save.assert_not_called()
+
+    def test_override_endpoint_saves_and_invalidates_cached_state(self):
+        status, body = self.get('/api/vm/testvm/override')
+        self.assertEqual(status, 200)
+        revision = json.loads(body)['revision']
+        self.server.RequestHandlerClass.snapshot.value = {'stale': True}
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+        conn.request('POST', '/api/vm/testvm/override',
+                     body=json.dumps({'revision': revision, 'override': {'memory_mb': 4096}}),
+                     headers={'X-Vmctl-Token': 'secret-token'})
+        response = conn.getresponse()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(response.read())['effective']['memory_mb'], 4096)
+        conn.close()
+        self.assertIsNone(self.server.RequestHandlerClass.snapshot.value)
+
+    def test_ssh_websocket_uses_profile_command_and_disables_local_escapes(self):
+        from unittest import mock
+
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+        with mock.patch('vmctl.ssh.ssh_shell_cmd', return_value=['ssh', '-p', '2222', 'user@127.0.0.1']), \
+             mock.patch('vmctl.web_terminal.bridge') as bridge:
+            conn.request('GET', '/api/vm/testvm/ssh', headers={
+                'X-Vmctl-Token': 'secret-token', 'Upgrade': 'websocket', 'Connection': 'Upgrade',
+                'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ=='})
+            response = conn.getresponse()
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.getheader('Sec-WebSocket-Accept'), 's3pPLMBiTxaQ9kYGzzhZRbK+xOo=')
+            # The handler can still be finishing immediately after the upgrade response.
+            for _ in range(100):
+                if bridge.called:
+                    break
+                time.sleep(.01)
+            self.assertEqual(bridge.call_args.args[1], ['ssh', '-o', 'EscapeChar=none', '-p', '2222', 'user@127.0.0.1'])
+        conn.close()
 
     def test_the_page_is_public_and_the_api_needs_the_token_and_a_local_host(self):
         status, body = self.get("/", token=None)

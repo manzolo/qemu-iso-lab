@@ -5,137 +5,266 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QEMU ISO Lab</title>
 <style>
-:root {
-  --bg: #111820; --panel: #18222e; --panel2: #1e2a38; --line: #304050; --text: #dce5ef;
-  --muted: #a6b4c8; --accent: #84c9e7; --ok: #86d5ab; --warn: #e8be78; --bad: #f08a8a; --btn: #243343;
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-code, pre, .mono { font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace; }
-header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-header h1 { font-size: 17px; margin: 0; color: var(--accent); font-weight: 600; }
-header h1 b { color: var(--text); }
-#summary { color: var(--muted); font-size: 13px; }
-#toolbar { display: flex; gap: 8px; padding: 12px 20px; align-items: center; flex-wrap: wrap; }
-#search { flex: 1 1 260px; min-width: 200px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 14px; }
-#search:focus { outline: none; border-color: var(--accent); }
-button { background: var(--btn); color: var(--text); border: 1px solid transparent; border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
-button:hover { background: #344b61; }
-button:disabled { opacity: .45; cursor: default; }
-button.active, button.primary { background: var(--accent); color: #111820; font-weight: 600; }
-button.danger { color: var(--bad); border-color: #5a3a42; }
-button.link { background: none; color: var(--accent); padding: 0; }
-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; padding: 0 20px 16px; align-items: start; }
-main > section:last-child { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
-@media (max-width: 1100px) { td:nth-child(4), th:nth-child(4) { display: none; } }
-/* Narrow window: the selected profile and its actions first, the list below at half height. */
-@media (max-width: 720px) {
-  main { grid-template-columns: 1fr; }
-  main > section:last-child { order: -1; position: static; max-height: none; }
-  #list { max-height: 50vh; }
-}
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.card h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0; padding: 12px 16px 8px; }
-table { width: 100%; border-collapse: collapse; }
-th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 6px 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
-td { padding: 6px 12px; border-bottom: 1px solid #1f2b39; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
-tr.row { cursor: pointer; }
-tr.row:hover td { background: #1b2735; }
-tr.row.sel td { background: #285269; color: #fff; }
-#list { max-height: calc(100vh - 300px); overflow: auto; }
-.state { font-weight: 600; }
-.s-ok { color: var(--ok); } .s-warn { color: var(--warn); } .s-bad { color: var(--bad); } .s-info { color: var(--accent); } .s-muted { color: var(--muted); }
-#details { padding: 0 16px 16px; }
-#details .name { font-size: 18px; font-weight: 600; margin: 4px 0 0; }
-#details .desc { color: var(--muted); margin-bottom: 10px; }
-.facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 12px 0; font-size: 13px; }
-.facts dt { color: var(--muted); } .facts dd { margin: 0; }
-.actions { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
-.actions button { text-align: left; }
-.note { background: var(--panel2); border-left: 3px solid var(--warn); padding: 10px 12px; border-radius: 6px; white-space: pre-wrap; font-size: 13px; margin: 10px 0; }
-#jobs { margin: 0 20px 20px; }
-#jobs table td:first-child { width: 110px; }
-.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--btn); }
-.chip.running { background: #5a4a26; color: var(--warn); } .chip.completed { background: #214234; color: var(--ok); }
-.chip.failed, .chip.interrupted, .chip.cancelled { background: #4a2a30; color: var(--bad); }
-dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(900px, 94vw); max-height: 90vh; }
-dialog::backdrop { background: #000a; }
-dialog header { border-radius: 12px 12px 0 0; justify-content: space-between; }
-dialog .body { padding: 16px; overflow: auto; max-height: calc(90vh - 60px); }
-pre.log { background: #0b1016; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 0; height: 60vh; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
-.form { display: grid; grid-template-columns: 180px 1fr; gap: 8px 12px; align-items: center; }
-.form label { color: var(--muted); font-size: 13px; }
-.form input[type=text], .form select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
-.help { grid-column: 2; color: var(--muted); font-size: 12px; margin-top: -4px; }
-#preview { margin: 14px 0; padding: 8px 10px; background: #0b1016; border-radius: 6px; word-break: break-all; }
-.palette { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 60vh; max-height: calc(90vh - 60px); }
-.pal-list { border-right: 1px solid var(--line); padding: 12px; overflow: auto; }
-.pal-list input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; margin-bottom: 8px; }
-.pal-group { color: var(--accent); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin: 10px 4px 4px; }
-.pal-item { padding: 6px 8px; border-radius: 6px; cursor: pointer; }
-.pal-item:hover { background: #1b2735; }
-.pal-item.sel { background: #285269; }
-.pal-item b { font-family: ui-monospace, monospace; font-weight: 500; font-size: 13px; }
-.pal-item span { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pal-item.sel span { color: #cfe3ee; }
-.pal-form { padding: 16px; overflow: auto; }
-#cmd-head h3 { margin: 0 0 4px; font-family: ui-monospace, monospace; font-size: 16px; }
-#cmd-head p { margin: 0 0 14px; color: var(--muted); }
-.scope button { margin-right: 4px; }
-.fixed { display: inline-block; background: var(--btn); border-radius: 6px; padding: 3px 8px; font-family: ui-monospace, monospace; }
-@media (max-width: 720px) { .palette { grid-template-columns: 1fr; } .pal-list { border-right: 0; border-bottom: 1px solid var(--line); max-height: 35vh; } }
-.labs { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; padding: 0 20px 16px; }
-.lab { padding: 0 16px 16px; }
-.lab .members { margin: 8px 0 12px; font-size: 13px; }
-.lab .members div { display: flex; justify-content: space-between; border-bottom: 1px solid #1f2b39; padding: 3px 0; }
-.lab .buttons { display: flex; flex-wrap: wrap; gap: 6px; }
-#screen img { max-width: 100%; border-radius: 6px; display: block; margin: 0 auto; background: #000; }
-#toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--line); padding: 10px 14px; border-radius: 8px; display: none; max-width: 520px; white-space: pre-wrap; }
-#toast.err { border-color: var(--bad); color: var(--bad); }
-.hidden { display: none !important; }
+:root { color-scheme: dark; --bg:#0c111b; --panel:#141d2b; --panel2:#1b2738; --line:#2a374a; --text:#e6edf7; --muted:#9caec5; --accent:#7ddfc5; --ok:#7ddfc5; --warn:#efc582; --bad:#ff9aab; --btn:#223047; }
+* { box-sizing:border-box; }
+body { margin:0; background:radial-gradient(ellipse at 80% 0%,#19283b 0,transparent 55%),var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; min-height:100vh; }
+code,pre,.mono { font-family:ui-monospace,"Cascadia Code",monospace; }
+button,input,select { font:inherit; }
+button { background:var(--btn); color:var(--text); border:1px solid transparent; border-radius:8px; padding:9px 13px; font-size:13px; cursor:pointer; transition:background .15s,border-color .15s; }
+button:hover { background:#30435f; border-color:#4a607a; }
+button:disabled { opacity:.45; cursor:default; }
+button.active,button.primary { background:var(--accent); color:#102c29; font-weight:650; }
+button.primary:hover { background:#a0edd9; }
+button.danger { color:var(--bad); border-color:#603846; background:#30212e; }
+button.link { background:none; color:var(--accent); padding:0; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+input[type=text],input:not([type]),select { background:#101825; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-width:0; }
+input[type=checkbox] { accent-color:var(--accent); width:16px; height:16px; flex-shrink:0; }
+header { display:flex; align-items:center; gap:14px; padding:16px 24px; border-bottom:1px solid var(--line); }
+header h1 { font-size:17px; margin:0; font-weight:650; letter-spacing:-.025em; }
+header h1 b { color:var(--accent); }
+.brand-mark { display:grid; place-items:center; width:34px; height:34px; background:#203b3b; border:1px solid #39675f; border-radius:10px; color:var(--accent); font:700 18px monospace; }
+#summary { font-size:12px; color:var(--muted); }
+#connection { margin-left:auto; font-size:12px; color:var(--ok); display:flex; align-items:center; gap:7px; }
+#connection.s-warn { color:var(--warn); }
+#connection::before,.state::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; display:inline-block; flex-shrink:0; }
+#version { font:12px ui-monospace,monospace; border-left:1px solid var(--line); padding-left:14px; }
+.overview { padding:28px 24px 20px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.eyebrow { color:var(--accent); text-transform:uppercase; font-size:10px; font-weight:700; letter-spacing:.16em; }
+.overview h2 { font-size:28px; letter-spacing:-.04em; margin:4px 0; }
+.overview p { margin:0; color:var(--muted); font-size:13px; }
+.metrics { display:flex; gap:10px; }
+.metric { min-width:112px; padding:12px 18px; background:#172333a6; border:1px solid var(--line); border-radius:12px; }
+.metric strong { display:block; font-size:25px; line-height:1.3; font-weight:600; }
+.metric span { color:var(--muted); font-size:11px; }
+#toolbar { display:flex; gap:12px; padding:0 24px 16px; align-items:center; flex-wrap:wrap; }
+.search-box { flex:1 1 220px; position:relative; }
+#search { width:100%; padding-right:42px; }
+kbd { font:11px ui-monospace,monospace; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
+.search-box kbd { position:absolute; right:12px; top:11px; }
+.filters { display:flex; gap:3px; background:#111a27; border:1px solid var(--line); padding:3px; border-radius:10px; }
+.filters button { background:transparent; color:var(--muted); padding:6px 12px; }
+.filters button.active { color:var(--text); background:#2b3b52; }
+main { display:grid; grid-template-columns:minmax(0,1fr) minmax(310px,370px); gap:18px; padding:0 24px 20px; align-items:start; }
+main > section:last-child { position:sticky; top:16px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; box-shadow:0 8px 30px #00000012; }
+.card h2 { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:0; padding:17px 18px; border-bottom:1px solid var(--line); }
+table { width:100%; border-collapse:collapse; }
+th { text-align:left; font-weight:500; color:var(--muted); font-size:11px; padding:10px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel); }
+td { padding:12px 16px; border-bottom:1px solid #253145; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:360px; }
+tr:last-child td { border-bottom:0; }
+tr.row { cursor:pointer; }
+tr.row:hover td { background:#1e2b3e; }
+tr.row.sel td { background:#203b42; }
+tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
+.profile-identity,.lab-identity { display:flex; align-items:center; gap:12px; min-width:0; }
+.profile-text { display:block; min-width:0; }
+.catalog-icon { --icon-color:var(--accent); display:inline-flex; align-items:center; justify-content:center; flex:0 0 34px; width:34px; height:34px; border:1px solid color-mix(in srgb,var(--icon-color) 30%,transparent); border-radius:10px; color:var(--icon-color); background:color-mix(in srgb,var(--icon-color) 9%,#111a27); vertical-align:middle; }
+.catalog-icon svg { display:block; width:23px; height:23px; pointer-events:none; }
+.catalog-icon.large { width:46px; height:46px; flex-basis:46px; border-radius:13px; }
+.catalog-icon.large svg { width:30px; height:30px; }
+.lab .members button[data-member] { display:flex; align-items:center; gap:10px; min-width:0; }
+.lab .members button[data-member] .mono { display:block; overflow-wrap:anywhere; }
+.lab-head { gap:10px; }
+.lab-identity h2 { overflow-wrap:anywhere; }
+.lab-head > .chip { flex-shrink:0; }
+@media(max-width:420px) { .profile-identity { gap:8px; } .catalog-icon { width:28px; height:28px; flex-basis:28px; border-radius:8px; } #list td,#list th { padding-left:10px; padding-right:10px; } #list .profile-desc { max-width:170px; } }
+.profile-name { display:block; font-size:13px; font-weight:600; }
+.profile-desc { display:block; color:var(--muted); font-size:11px; margin-top:3px; max-width:300px; overflow:hidden; text-overflow:ellipsis; }
+#list { max-height:520px; overflow:auto; }
+.state { display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:600; border:1px solid currentColor; border-radius:6px; padding:3px 7px; }
+.s-ok { color:var(--ok); } .s-warn { color:var(--warn); } .s-bad { color:var(--bad); } .s-info { color:#9ebdff; } .s-muted { color:var(--muted); }
+#details { padding:18px; }
+#details .name { font-size:20px; font-weight:600; margin:10px 0 3px; overflow-wrap:anywhere; letter-spacing:-.04em; }
+#details .desc { color:var(--muted); font-size:13px; margin-bottom:16px; }
+.facts { display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px 16px; margin:18px 0; font-size:12px; }
+.ssh-access { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.ssh-shortcut { padding:3px 8px; color:var(--accent); border:1px solid #365955; font-size:11px; }
+#ssh-command { padding:14px; background:var(--bg); border:1px solid var(--line); border-radius:8px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.facts dt { color:var(--muted); } .facts dd { margin:0; overflow-wrap:anywhere; }
+.actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.actions button { text-align:left; font-size:12px; }
+.actions button:first-child,.actions button:last-child { grid-column:1/-1; }
+.actions button:first-child { display:flex; justify-content:space-between; align-items:center; padding:12px; }
+.actions button:last-child { background:transparent; color:var(--accent); border:1px solid var(--line); margin-top:4px; }
+.actions kbd { border-color:#365b54; color:#21443c; }
+.note { background:var(--panel2); border-left:3px solid var(--warn); padding:10px 12px; border-radius:6px; white-space:pre-wrap; font-size:13px; margin:10px 0; }
+#jobs { margin:0 24px 24px; }
+.section-heading { display:flex; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); align-items:center; }
+.section-heading h2 { padding:0; border:0; color:var(--text); }
+.section-heading p { margin:4px 0 0; font-size:12px; color:var(--muted); }
+.table-wrap { overflow:auto; }
+#jobs td { font-size:12px; }
+#jobs td:first-child { width:125px; }
+#jobs td:last-child { text-align:right; }
+.chip { display:inline-block; padding:3px 9px; border-radius:6px; font-size:11px; background:var(--btn); }
+.chip.running { background:#453c28; color:var(--warn); } .chip.completed { background:#203d37; color:var(--ok); }
+.chip.failed,.chip.interrupted,.chip.cancelled { background:#492c39; color:var(--bad); }
+dialog { background:var(--panel); color:var(--text); border:1px solid #3b4e66; border-radius:16px; padding:0; width:min(900px,94vw); max-height:90dvh; box-shadow:0 30px 100px #0009; }
+dialog::backdrop { background:#030812bb; backdrop-filter:blur(5px); }
+dialog header { justify-content:space-between; padding:16px 20px; flex-shrink:0; }
+dialog .body { padding:16px; overflow:auto; max-height:calc(90dvh - 80px); }
+pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; padding:12px; margin:0; height:60vh; overflow:auto; white-space:pre-wrap; word-break:break-word; font-size:12.5px; }
+#cmd-dialog { width:min(1180px,96vw); height:min(820px,90dvh); max-height:90dvh; overflow:hidden; }
+#cmd-dialog[open] { display:flex; flex-direction:column; }
+.dialog-subtitle { font-size:12px; color:var(--muted); margin-top:3px; }
+.scope { display:flex; gap:6px; align-items:center; }
+.palette { display:grid; grid-template-columns:320px minmax(0,1fr); flex:1; min-height:0; }
+.pal-list { border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0; background:#101926; }
+.pal-tools { padding:16px; border-bottom:1px solid var(--line); }
+.pal-tools input,.pal-tools select { width:100%; }
+.pal-tools select { margin-top:8px; font-size:12px; padding:8px; }
+#cmd-count { margin-top:10px; color:var(--muted); font-size:11px; }
+#cmd-list { overflow:auto; padding:4px 10px 16px; min-height:0; }
+.pal-group { color:var(--muted); font-size:10px; letter-spacing:.1em; text-transform:uppercase; margin:16px 8px 7px; }
+.pal-item { display:block; width:100%; text-align:left; padding:10px; border-radius:8px; cursor:pointer; background:transparent; margin:3px 0; }
+.pal-item:hover { background:#202e42; }
+.pal-item.sel { background:#203b42; border-color:#3d6b66; }
+.pal-item b { font-family:ui-monospace,monospace; font-weight:600; font-size:12px; }
+.pal-item span { display:block; color:var(--muted); font-size:11px; line-height:1.5; margin-top:4px; }
+.pal-form { display:flex; flex-direction:column; min-height:0; min-width:0; }
+.pal-fields { overflow:auto; padding:24px; flex:1; min-height:0; }
+#cmd-head h3 { margin:7px 0; font-family:ui-monospace,monospace; font-size:24px; letter-spacing:-.04em; overflow-wrap:anywhere; }
+#cmd-head p { margin:0 0 24px; color:var(--muted); font-size:13px; }
+.form-fields { display:grid; gap:16px; }
+.field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.field > label { font-size:12px; font-weight:600; }
+.field input[type=text],.field select { width:100%; }
+.field label.check { display:flex; gap:10px; align-items:center; font-weight:400; color:var(--text); cursor:pointer; }
+.help { color:var(--muted); font-size:12px; }
+.required { color:var(--accent); font-size:10px; margin-left:7px; font-weight:400; }
+.advanced { margin-top:22px; border-top:1px solid var(--line); }
+.advanced summary { cursor:pointer; padding:16px 0; color:var(--muted); font-size:13px; }
+.advanced[open] summary { color:var(--text); }
+.fixed { display:inline-block; background:#203b42; color:var(--accent); border:1px solid #35534f; border-radius:7px; padding:8px 12px; font-family:ui-monospace,monospace; }
+.command-footer { border-top:1px solid var(--line); padding:16px 24px; background:#111a28; flex-shrink:0; }
+.preview-label { font-size:10px; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; }
+#preview { margin:8px 0 12px; padding:12px; background:#090f18; border:1px solid var(--line); border-radius:8px; overflow-wrap:anywhere; white-space:pre-wrap; max-height:100px; overflow:auto; font-size:12px; }
+.command-buttons { display:flex; align-items:center; gap:8px; }
+#cmd-validation { flex:1; font-size:11px; color:var(--muted); }
+#cmd-warning { margin:0 0 10px; font-size:12px; color:var(--warn); }
+.labs { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); gap:16px; padding:0 24px 20px; }
+.lab { padding:0 16px 16px; }
+.lab .members { margin:8px 0 12px; font-size:13px; }
+.lab .members div { display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding:3px 0; }
+.lab .buttons { display:flex; flex-wrap:wrap; gap:6px; }
+#screen img { max-width:100%; border-radius:6px; display:block; margin:0 auto; background:#000; }
+#toast { margin:0; inset:auto 20px 20px auto; position:fixed; bottom:20px; right:20px; background:var(--panel2); border:1px solid var(--line); padding:10px 14px; border-radius:8px; display:none; max-width:min(520px,90vw); white-space:pre-wrap; z-index:20; }
+#toast.err { border-color:var(--bad); color:var(--bad); }
+.hidden { display:none !important; }
+
+.profile-top { display:flex; align-items:center; justify-content:space-between; }
+.machine-icon { display:grid; place-items:center; width:42px; height:42px; border-radius:12px; color:var(--accent); background:#203b42; border:1px solid #365955; }
+.machine-icon svg { width:24px; height:24px; }
+.resources { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:18px 0; }
+.resource { background:#101926; border:1px solid var(--line); border-radius:9px; padding:10px; }
+.resource strong { font:600 16px ui-monospace,monospace; display:block; }
+.resource span { color:var(--muted); font-size:10px; }
+.install-details { border-top:1px solid var(--line); font-size:12px; color:var(--muted); padding-top:12px; }
+.install-details summary { cursor:pointer; }
+.install-details p { margin:8px 0 0; overflow-wrap:anywhere; }
+.action-label { color:var(--muted); text-transform:uppercase; font-size:10px; letter-spacing:.1em; grid-column:1/-1; margin-top:6px; }
+.actions .main-action { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; }
+.lab-head { display:flex; align-items:center; justify-content:space-between; padding:18px 0; }
+.lab-head h2 { border:0; padding:0; color:var(--text); font-size:15px; text-transform:none; letter-spacing:0; }
+.lab-progress { height:4px; background:var(--btn); border-radius:4px; margin-bottom:16px; overflow:hidden; }
+.lab-progress span { display:block; height:100%; background:var(--accent); }
+.lab .members div { padding:10px 0; align-items:center; gap:10px; }
+.lab .members button { background:none; padding:0; text-align:left; color:var(--text); }
+.member-address { display:block; font:11px ui-monospace,monospace; color:var(--muted); margin-top:3px; }
+.lab .buttons { padding-top:8px; }
+.lab-secondary { border-top:1px solid var(--line); margin-top:14px; padding-top:12px; }
+.lab-secondary summary { color:var(--muted); font-size:12px; cursor:pointer; }
+.lab-order { font-size:11px; color:var(--muted); margin:12px 0; overflow-wrap:anywhere; }
+#vnc-dialog { width:min(1500px,97vw); height:92dvh; max-height:94dvh; overflow:hidden; }
+#vnc-dialog[open] { display:flex; flex-direction:column; }
+.console-heading { display:flex; gap:12px; align-items:center; }
+.console-heading h1 { font-size:15px; }
+.console-toolbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.console-toolbar button { font-size:12px; }
+#vnc-screen { flex:1; min-height:0; background:#060a10; position:relative; overflow:hidden; }
+.console-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 18px; background:#111a28; border-top:1px solid var(--line); flex-shrink:0; }
+#vnc-note { margin:0; font-size:12px; color:var(--muted); }
+#vnc-status { white-space:nowrap; }
+#console-shell { display:flex; flex-direction:column; flex:1; min-height:0; background:var(--panel); }
+#console-shell:fullscreen { width:100vw; height:100dvh; max-height:100dvh; border:0; border-radius:0; }
+.console-empty { display:grid; place-items:center; height:100%; color:var(--muted); font-size:14px; }
+@media(max-width:720px) { #vnc-dialog header { gap:12px; } .console-toolbar { width:100%; } .console-toolbar button { flex:1; padding:7px; } .console-heading .machine-icon { width:30px; height:30px; border-radius:8px; } .console-footer { padding:10px; } #vnc-note { font-size:11px; } }
+.profile-heading { display:flex; align-items:center; justify-content:space-between; padding-right:16px; border-bottom:1px solid var(--line); }
+.profile-heading h2 { border:0; }
+.profile-heading button { background:transparent; color:var(--accent); font-size:11px; padding:5px 8px; border:1px solid var(--line); }
+#terminal-dialog { width:min(1200px,96vw); height:85dvh; overflow:hidden; }
+#terminal-dialog[open],#terminal-shell { display:flex; flex-direction:column; }
+#terminal-shell { flex:1; min-height:0; background:var(--panel); }
+#terminal-shell:fullscreen { height:100dvh; width:100vw; }
+#terminal-screen { flex:1; min-height:0; overflow:hidden; background:#0b111b; padding:12px; }
+#terminal-note { color:var(--muted); font-size:12px; margin:0; }
+#profile-dialog { width:min(780px,94vw); }
+#profile-dialog[open] { display:flex; flex-direction:column; }
+#profile-dialog .body { min-height:0; }
+.profile-resources { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.profile-resources input { width:100%; background:var(--bg); color:var(--text); padding:10px; border:1px solid var(--line); border-radius:8px; }
+#profile-json { width:100%; background:#0b1320; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:12px; resize:vertical; font:12px/1.6 ui-monospace,monospace; tab-size:2; }
+#profile-base { font-size:11px; white-space:pre-wrap; overflow-wrap:anywhere; max-height:260px; overflow:auto; }
+#profile-feedback { font-size:12px; color:var(--accent); white-space:pre-wrap; }
+#profile-feedback.error { color:var(--bad); }
+#vm-context { position:fixed; inset:auto; margin:0; width:260px; max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overflow:auto; padding:6px; background:#182537; border:1px solid #3d526b; color:var(--text); border-radius:12px; box-shadow:0 15px 50px #0008; }
+#vm-context button { display:block; width:100%; text-align:left; background:transparent; border-radius:6px; font-size:12px; padding:9px 10px; }
+#vm-context button:hover,#vm-context button:focus { background:#2b4157; }
+#vm-context button.danger { color:var(--bad); border:0; }
+.context-title { padding:8px 10px; color:var(--accent); font:11px ui-monospace,monospace; border-bottom:1px solid var(--line); margin-bottom:4px; overflow-wrap:anywhere; }
+@media(min-width:1450px) { body > header, .overview,#toolbar,main,.labs { padding-left:max(24px,calc((100vw - 1450px)/2)); padding-right:max(24px,calc((100vw - 1450px)/2)); } #jobs { margin-left:max(24px,calc((100vw - 1450px)/2)); margin-right:max(24px,calc((100vw - 1450px)/2)); } }
+@media(max-width:1050px) { #rows td:nth-child(3),#list th:nth-child(3) { display:none; } .metric { min-width:85px; padding:10px 14px; } .palette { grid-template-columns:280px minmax(0,1fr); } }
+@media(max-width:720px) { header { padding:12px 16px; flex-wrap:wrap; } #summary,#version { display:none; } .overview { padding:22px 16px 16px; align-items:stretch; flex-direction:column; gap:16px; } .overview h2 { font-size:25px; } .metrics { gap:8px; } .metric { flex:1; } #toolbar { padding:0 16px 16px; gap:8px; } .search-box { flex-basis:100%; } .filters { flex:1; } .filters button { flex:1; padding:6px 8px; } main { padding:0 16px 16px; grid-template-columns:1fr; } main > section:last-child { position:static; } #list { max-height:320px; } #jobs { margin:0 16px 16px; } .palette { grid-template-columns:1fr; grid-template-rows: minmax(140px,32%) minmax(0,1fr); } .pal-list { border-right:0; border-bottom:1px solid var(--line); } .pal-tools { padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:8px; } .pal-tools select { margin:0; } #cmd-count { display:none; } .pal-group { margin-top:8px; } .pal-item { padding:8px; } #cmd-dialog header { gap:10px; padding:12px; } #cmd-dialog h1 { font-size:14px; } .dialog-subtitle { display:none; } .scope button { padding:6px 9px; font-size:11px; } .pal-fields { padding:16px; } #cmd-head h3 { font-size:20px; } .command-footer { padding:10px 16px; } #preview { max-height:65px; margin:5px 0 8px; padding:8px; } .command-buttons { flex-wrap:wrap; } #cmd-validation { min-width:100px; } .section-heading p { font-size:11px; } }
+@media(prefers-reduced-motion:reduce) { * { transition:none !important; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>QEMU <b>ISO Lab</b></h1>
+  <span class="brand-mark" aria-hidden="true">&gt;_</span><h1>QEMU <b>ISO Lab</b></h1>
   <span id="summary">Reading VM state…</span>
-  <span style="flex:1"></span>
-  <span id="version" class="s-muted"></span>
+  <span id="connection" role="status">Connecting</span><span id="version" class="s-muted"></span>
 </header>
+<section class="overview" aria-label="Lab overview">
+  <div><div class="eyebrow">Your local workspace</div><h2>Virtual machines</h2><p>Build, run and explore your lab.</p></div>
+  <div class="metrics"><div class="metric"><strong id="total-count">—</strong><span>Profiles</span></div><div class="metric"><strong id="running-count" class="s-ok">—</strong><span>Running</span></div><div class="metric"><strong id="disk-count">—</strong><span>With disk</span></div></div>
+</section>
 <div id="toolbar">
-  <input id="search" placeholder="Search profiles, distributions…  ( / )" autocomplete="off">
-  <button data-filter="all" class="active">All</button>
-  <button data-filter="disk">With disk</button>
-  <button data-filter="running">Running</button>
-  <button data-filter="labs">Labs</button>
-  <button id="all-commands">All commands…</button>
+  <div class="search-box"><input id="search" aria-label="Search profiles" placeholder="Search profiles or distributions…" autocomplete="off"><kbd>/</kbd></div>
+  <div class="filters" role="group" aria-label="Profile filters"><button data-filter="all" class="active" aria-pressed="true">All</button><button data-filter="disk" aria-pressed="false">With disk</button><button data-filter="running" aria-pressed="false">Running</button><button data-filter="labs" aria-pressed="false">Labs</button></div>
+  <button id="all-commands">Commands <kbd>C</kbd></button>
 </div>
 <main id="profiles-view">
   <section class="card"><h2 id="list-title">Profiles</h2>
-    <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th><th>Description</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
-  <section class="card"><h2>Profile</h2><div id="details"><p class="s-muted">Select a profile.</p></div></section>
+  <section class="card"><div class="profile-heading"><h2>Selected machine</h2><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
 </main>
 <div id="labs-view" class="labs hidden"></div>
-<section id="jobs" class="card"><h2>Jobs <span class="s-muted" style="text-transform:none;letter-spacing:0">· started here or in vmtui; they keep running if this page or the server closes</span></h2>
-  <table><tbody id="job-rows"><tr><td colspan="3" class="s-muted">No jobs yet.</td></tr></tbody></table>
+<section id="jobs" class="card"><div class="section-heading"><div><h2>Recent activity</h2><p>Jobs from the web and TUI keep running when you close this page.</p></div><span id="job-count" class="chip">0 jobs</span></div>
+  <div class="table-wrap"><table aria-label="Recent jobs"><tbody id="job-rows"><tr><td colspan="3" class="s-muted">No jobs yet. Start a machine or run a command to see its progress here.</td></tr></tbody></table></div>
 </section>
 
 <dialog id="log-dialog"><header><h1 id="log-title">Job</h1><span><button id="log-cancel" class="danger">Cancel job</button> <button data-close>Close</button></span></header>
   <div class="body"><pre class="log" id="log"></pre></div></dialog>
-<dialog id="cmd-dialog" style="width:min(1100px,96vw)"><header><h1 id="cmd-title">Commands</h1><span class="scope"><button data-scope="vm" id="scope-vm">For this VM</button><button data-scope="global">Global</button> <button data-close>Close</button></span></header>
+<dialog id="cmd-dialog" aria-labelledby="cmd-title"><header><div><h1 id="cmd-title">Command center</h1><div class="dialog-subtitle">Choose a command, review its options, then run.</div></div><span class="scope"><button data-scope="vm" id="scope-vm">This VM</button><button data-scope="global">Global</button><button data-close aria-label="Close command center">Close</button></span></header>
   <div class="palette">
-    <div class="pal-list"><input id="cmd-filter" placeholder="Filter commands…" autocomplete="off"><div id="cmd-list"></div></div>
-    <div class="pal-form"><div id="cmd-head"></div><div class="form" id="cmd-form"></div><div id="preview" class="mono"></div>
-      <button id="cmd-run" class="primary">Run</button></div>
+    <nav class="pal-list" aria-label="Commands"><div class="pal-tools"><input id="cmd-filter" aria-label="Search commands" placeholder="Search commands…" autocomplete="off"><select id="cmd-category" aria-label="Command category"><option value="">All categories</option></select><div id="cmd-count" role="status"></div></div><div id="cmd-list"></div></nav>
+    <div class="pal-form"><div class="pal-fields"><div id="cmd-head"></div><form id="cmd-form" novalidate></form></div>
+      <div class="command-footer"><div class="preview-label">Command preview</div><div id="preview" class="mono"></div><p id="cmd-warning" class="hidden" role="status"></p><div class="command-buttons"><span id="cmd-validation" role="status">Review before running.</span><button id="cmd-copy">Copy</button><button id="cmd-run" class="primary">Run command</button></div></div>
+    </div>
   </div></dialog>
 <dialog id="screen-dialog"><header><h1 id="screen-title">Screen</h1><button data-close>Close</button></header>
   <div class="body" id="screen"><img id="screen-img" alt="VM screen"><p class="s-muted" id="screen-note">Loading the screen…</p></div></dialog>
-<dialog id="vnc-dialog" style="width:min(1400px,96vw)"><header><h1 id="vnc-title">Console</h1><span><button id="vnc-cad">Ctrl+Alt+Del</button> <button id="vnc-full">Full screen</button> <button id="vnc-close">Close</button></span></header>
-  <div id="vnc-screen" style="height:78vh;background:#000"></div><p class="s-muted" id="vnc-note" style="padding:6px 16px;margin:0">Click the screen to type into the VM. Esc goes to the VM too: use Close.</p></dialog>
+<dialog id="vnc-dialog" aria-labelledby="vnc-title"><div id="console-shell"><header><div class="console-heading"><span id="console-icon" aria-hidden="true"></span><div><div class="eyebrow">Live console</div><h1 id="vnc-title">Console</h1></div></div><div class="console-toolbar"><button id="vnc-fit" class="active" aria-pressed="true" title="Switch between fit to window and actual size">Fit to window</button><button id="vnc-cad" title="Send Ctrl+Alt+Delete to the guest">Ctrl+Alt+Del</button><button id="vnc-reconnect">Reconnect</button><button id="vnc-full">Full screen</button><button id="vnc-close">Close</button></div></header>
+  <div id="vnc-screen"></div><div class="console-footer"><span id="vnc-status" class="state s-warn" role="status">Connecting</span><p id="vnc-note">Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave.</p></div></div></dialog>
+<dialog id="ssh-dialog" aria-labelledby="ssh-title"><header><div><div class="eyebrow">Terminal access</div><h1 id="ssh-title">SSH console</h1></div><button data-close>Close</button></header><div class="body"><p id="ssh-description" class="s-muted"></p><pre id="ssh-command"></pre><p class="help">Run from the project directory. Uses the profile’s SSH user, port and key.</p><div class="command-buttons"><button id="ssh-browser" class="primary">Open in browser</button><button id="ssh-launch">Open SSH terminal on host ↗</button><button id="ssh-copy">Copy command</button></div><p id="ssh-result" class="help" role="status"></p></div></dialog>
+<dialog id="terminal-dialog" aria-labelledby="terminal-title"><div id="terminal-shell"><header><div><div class="eyebrow">SSH terminal</div><h1 id="terminal-title">SSH</h1></div><div class="console-toolbar"><span id="terminal-status" class="state s-warn" role="status">Connecting</span><button id="terminal-reconnect">Reconnect</button><button id="terminal-full">Full screen</button><button id="terminal-close">Close</button></div></header><div id="terminal-screen"></div><div class="console-footer"><p id="terminal-note">Interactive SSH to the guest. Closing this terminal disconnects SSH; the VM keeps running.</p></div></div></dialog>
+<dialog id="profile-dialog" aria-labelledby="profile-title"><header><div><div class="eyebrow">Local customization</div><h1 id="profile-title">Customize profile</h1></div><button data-close>Close</button></header><div class="body"><p class="s-muted" id="profile-intro">Loading profile…</p><div class="profile-resources"><div class="field"><label for="profile-memory">Memory (MiB)</label><input id="profile-memory" type="number" min="1" step="1"><span id="memory-default" class="help"></span></div><div class="field"><label for="profile-cpus">vCPUs</label><input id="profile-cpus" type="number" min="1" step="1"><span id="cpus-default" class="help"></span></div></div><details class="advanced" id="profile-advanced"><summary>Advanced JSON override</summary><p class="help">Only add fields you want to customize. Objects merge recursively; arrays append to the catalog arrays. Remove a field to inherit it again.</p><textarea id="profile-json" aria-label="Local profile override JSON" spellcheck="false" rows="12"></textarea></details><details class="advanced"><summary>View catalog template</summary><pre id="profile-base"></pre></details><p id="profile-feedback" role="status"></p></div><div class="command-footer"><p class="help">Saved in vms/profiles/local.json. Resource changes apply on the next VM start. Disk size changes do not resize an existing disk.</p><div class="command-buttons"><button id="profile-reset">Restore catalog values</button><button id="profile-save" class="primary">Save local override</button></div></div></dialog>
+<div id="vm-context" popover="manual" role="menu" aria-label="VM actions"></div>
 <dialog id="help-dialog"><header><h1 id="help-title">ISO needed</h1><button data-close>Close</button></header>
   <div class="body"><div class="note" id="help-text"></div></div></dialog>
-<div id="toast"></div>
+<div id="toast" role="status" popover="manual"></div>
 
 <script>
 "use strict";
@@ -150,28 +279,114 @@ const ansi = (s) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r(?!\n)/g
 async function api(path, body) {
   const res = await fetch(path, { method: body ? "POST" : "GET", headers: { "X-Vmctl-Token": TOKEN, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({ error: res.statusText }));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) throw new Error(res.status === 404 && /\/(override|ssh-terminal)$/.test(path) ? "This server needs a restart to load the new features. Restart make web and open its new URL." : data.error || res.statusText);
   return data;
 }
-function toast(msg, err) { const t = $("toast"); t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), err ? 9000 : 3500); }
+function toast(msg, err) { const t = $("toast"); t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block"; t.showPopover?.(); clearTimeout(t._h); t._h = setTimeout(() => { t.hidePopover?.(); t.style.display = "none"; }, err ? 9000 : 3500); }
 
+function installationJob(r) {
+  return /^(bootstrap-|install(?:-|$))/.test(r.job_command || "") || ["provision", "post-install"].includes(r.job_command);
+}
+function activeJobLabel(r) {
+  if (installationJob(r)) return "Installing";
+  return ({start:r.running ? "Running" : "Starting", stop:"Stopping", "fetch-iso":"Downloading ISO", prep:"Preparing", checkpoint:"Checkpoint in progress", clone:"Cloning"})[r.job_command] || "Working";
+}
 function stateOf(r) {
   const job = r.job_status;
-  if (job && job !== "completed") return job === "running" ? ["Installing", "s-warn"] : [job[0].toUpperCase() + job.slice(1), "s-bad"];
+  if (job === "running") { const label = activeJobLabel(r); return [label, label === "Running" ? "s-ok" : "s-warn"]; }
   if (r.running) return ["Running", "s-ok"];
+  // A failed show/stop/etc. is a job outcome, not an installation state.
+  if (job && job !== "completed" && installationJob(r)) return [job[0].toUpperCase() + job.slice(1), "s-bad"];
   if (r.install_label === "no disk" && r.iso_source === "manual") return ["ISO needed", "s-warn"];
-  return ({ verified: ["Boot verified", "s-ok"], installed: ["Installed", "s-info"], unverified: ["Unverified", "s-warn"],
-            incomplete: ["Incomplete", "s-bad"], empty: ["Empty disk", "s-muted"], "no disk": ["No disk", "s-muted"] })[r.install_label] || ["Unknown", "s-muted"];
+  return ({ verified:["Boot verified","s-ok"], installed:["Installed","s-info"], unverified:["Unverified","s-warn"], incomplete:["Incomplete","s-bad"], empty:["Empty disk","s-muted"], "no disk":["No disk","s-muted"] })[r.install_label] || ["Unknown","s-muted"];
 }
+const monitorIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 8l3 2-3 2m5 0h4"/></svg>';
+// Original catalog icon artwork: CC0-1.0. See vmctl/web/ICONS.md.
+// These are project pictograms and monograms, not third-party operating-system logos.
+const iconMonogram = (letters) => `<path d="M7 3H4v3m13-3h3v3M4 18v3h3m13-3v3h-3"/><text x="12" y="15.8" text-anchor="middle" fill="currentColor" stroke="none" font-family="system-ui,sans-serif" font-size="${letters.length > 2 ? 8 : letters.length > 1 ? 10 : 14}" font-weight="700">${letters}</text>`;
+const catalogIcons = {
+  arch: ["Arch Linux", "#7acbf0", iconMonogram("Ar")],
+  cachyos: ["CachyOS", "#73dac5", iconMonogram("Ca")],
+  endeavouros: ["EndeavourOS", "#bda0f4", iconMonogram("En")],
+  pearos: ["pearOS", "#b7dda3", iconMonogram("Pe")],
+  debian: ["Debian", "#efa1b6", iconMonogram("De")],
+  ubuntu: ["Ubuntu", "#f2b08b", iconMonogram("Ub")],
+  lubuntu: ["Lubuntu", "#9bcbf4", iconMonogram("Lu")],
+  kubuntu: ["Kubuntu", "#8ac7ec", iconMonogram("Ku")],
+  xubuntu: ["Xubuntu", "#adc4f7", iconMonogram("Xu")],
+  kali: ["Kali Linux", "#a8b9ed", iconMonogram("Ka")],
+  mint: ["Linux Mint", "#b6da8c", iconMonogram("Mi")],
+  popos: ["Pop!_OS", "#98d5df", iconMonogram("Po")],
+  neon: ["KDE neon", "#98dec4", iconMonogram("Ne")],
+  fedora: ["Fedora", "#a3bdf9", iconMonogram("Fe")],
+  opensuse: ["openSUSE", "#a7dc8b", iconMonogram("Su")],
+  alpine: ["Alpine Linux", "#91cfdd", iconMonogram("Al")],
+  nixos: ["NixOS", "#a7c9f0", iconMonogram("Nx")],
+  void: ["Void Linux", "#b3d3a3", iconMonogram("Vo")],
+  alma: ["AlmaLinux", "#e2ca95", iconMonogram("Am")],
+  rocky: ["Rocky Linux", "#9adebc", iconMonogram("Ro")],
+  centos: ["CentOS", "#d2afe1", iconMonogram("Ce")],
+  rhel: ["RHEL family", "#e8a5a5", iconMonogram("RH")],
+  windows: ["Windows", "#8ecafa", '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18m-8 4 3 2-3 2M6 6.5h.01m3 0h.01"/>'],
+  freebsd: ["FreeBSD", "#edb0a0", iconMonogram("BSD")],
+  pfsense: ["pfSense", "#a4cde9", '<path d="M12 3 4 6v6c0 4 4 7 8 9 4-2 8-5 8-9V6Z"/><path d="M8 10h8m-8 4h8m-4-4v4"/>'],
+  proxmox: ["Proxmox VE", "#edba87", '<rect x="4" y="3" width="16" height="7" rx="2"/><rect x="4" y="14" width="16" height="7" rx="2"/><path d="M8 6.5h.01m3 0h5M8 17.5h.01m3 0h5M12 10v4"/>'],
+  haiku: ["Haiku", "#e8d397", iconMonogram("Ha")],
+  reactos: ["ReactOS", "#b7b7ec", iconMonogram("Re")],
+  linux: ["Linux", "#dcc799", '<path d="m5 6 6 6-6 6m8 0h6M15 5h4"/>'],
+  generic: ["Virtual machine", "#a8b6ca", '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M8 9h8m-8 3h5"/>'],
+  network: ["Network lab", "#87d8c6", '<rect x="8" y="3" width="8" height="6" rx="1.5"/><rect x="2" y="16" width="7" height="5" rx="1.5"/><rect x="15" y="16" width="7" height="5" rx="1.5"/><path d="M12 9v4H5.5v3M12 13h6.5v3"/>'],
+  cluster: ["Virtualization cluster", "#efbd8d", '<rect x="8" y="2" width="8" height="5" rx="1.5"/><rect x="2" y="16" width="8" height="5" rx="1.5"/><rect x="14" y="16" width="8" height="5" rx="1.5"/><path d="M12 7v4m-6 5v-5h12v5M10 18.5h4"/>']
+};
+// Match the profile identity first, then its display name, and finally the broader family.
+// In particular, the Debian client of proxmox-lab is not a Proxmox hypervisor.
+const osIconRules = [
+  ["proxmox", /(?:^|\b)proxmox(?:-ve|\s+ve)(?:\b|_)/],
+  ["pfsense", /\bpfsense\b/], ["cachyos", /\bcachyos\b/],
+  ["endeavouros", /\bendeavouros\b/], ["pearos", /\bpearos\b/],
+  ["lubuntu", /\blubuntu\b/], ["kubuntu", /\bkubuntu\b/], ["xubuntu", /\bxubuntu\b/],
+  ["ubuntu", /\b(?:ubuntu|ubuntustudio|edubuntu)\b/],
+  ["mint", /\b(?:linuxmint|linux mint)\b/], ["popos", /\b(?:popos|pop!_os)\b/],
+  ["neon", /\bkde[ -]neon\b/], ["kali", /\bkali\b/],
+  ["alma", /\balmalinux\b/], ["rocky", /\brocky\b/], ["centos", /\bcentos\b/],
+  ["windows", /\bwindows(?:xp|nt|\d|\b)/], ["reactos", /\breactos\b/],
+  ["freebsd", /\bfreebsd\b/], ["haiku", /\bhaiku\b/],
+  ["nixos", /\bnixos\b/], ["alpine", /\balpine\b/], ["void", /\bvoid\b/],
+  ["opensuse", /\b(?:opensuse|suse)\b/], ["fedora", /\bfedora\b/],
+  ["debian", /\bdebian\b/], ["arch", /\b(?:arch|archlinux)\b/]
+];
+function osIconKey(r) {
+  if (!r) return "generic";
+  for (const text of [r.name, r.label]) {
+    const found = osIconRules.find(([,pattern]) => pattern.test(String(text || "").toLowerCase()));
+    if (found) return found[0];
+  }
+  const family = String(r.family || "").toLowerCase();
+  return ({arch:"arch", debian:"debian", alpine:"alpine", fedora:"fedora", opensuse:"opensuse", nix:"nixos", nixos:"nixos", mint:"mint", void:"void", rhel:"rhel", kali:"kali", bsd:"freebsd", proxmox:"proxmox", windows:"windows", reactos:"reactos", haiku:"haiku", linux:"linux"})[family] || "generic";
+}
+function catalogIcon(key, large = false) {
+  const [label,color,glyph] = catalogIcons[key] || catalogIcons.generic;
+  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}" style="--icon-color:${color}" title="${esc(label)}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false">${glyph}</svg></span>`;
+}
+// End of CC0 catalog icon artwork.
+
+const shellQuote = (s) => /^[\w@%+=:,./-]+$/.test(s) ? s : "'" + s.replace(/'/g, "'\\''") + "'";
 const ram = (r) => (r.memory_mb >= 1024 ? (r.memory_mb / 1024) + "G" : r.memory_mb + "M") + " / " + r.cpus;
 
 function actionsFor(r) {
   const n = r.name, a = [];
-  if (r.job_status === "running") { a.push({ label: "Installation log", job: "vm:" + n }); a.push({ label: "Watch the install (console)", console: true }); }
+  if (r.job_status === "running") {
+    if (r.running && r.job_command === "start") a.push({ label:"Open console", console:true });
+    a.push({ label:installationJob(r) ? "Installation log" : `${activeJobLabel(r)} · job log`, job:"vm:" + n });
+    if (r.running && r.job_command !== "start") a.push({ label:"Open console", console:true });
+    if (r.running) a.push({ label:"Live screenshot", screen:true });
+    a.push({ label:"All commands for " + n + "…", form:n });
+    return a;
+  }
   if (r.running) {
-    if (r.job_status !== "running") a.push({ label: "Console (screen, keyboard, mouse)", console: true });
-    a.push({ label: "Screenshot (every 2 s)", screen: true });
-    a.push({ label: "Open viewer on the host", args: ["attach", n] });
+    if (r.job_status !== "running") a.push({ label: "Open console", console: true });
+    a.push({ label: "Live screenshot", screen: true });
+    a.push({ label: "Host viewer", args: ["attach", n] });
     a.push({ label: "Stop", args: ["stop", n] });
     a.push({ label: "Force stop", args: ["stop", n, "--force"], danger: true });
   } else if (r.installed) {
@@ -197,7 +412,9 @@ function visible() {
 }
 function render() {
   const all = S.vms, withData = all.filter((r) => r.installed).length, running = all.filter((r) => r.running).length;
-  $("summary").textContent = `${all.length} profiles · ${withData} with data · ${running} running`;
+  $("summary").textContent = `${withData} installed · ${S.labs.length} labs`;
+  $("total-count").textContent = all.length; $("running-count").textContent = running;
+  $("disk-count").textContent = all.filter((r) => r.prepared).length;
   const labs = filter === "labs";
   $("profiles-view").classList.toggle("hidden", labs);
   $("labs-view").classList.toggle("hidden", !labs);
@@ -205,38 +422,53 @@ function render() {
   const rows = visible();
   $("list-title").textContent = `Profiles  ${rows.length} / ${all.length}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
-  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}"><td class="mono">${esc(r.name)}</td><td class="state ${c}">${s}</td><td class="mono">${ram(r)}</td><td>${esc(r.label)}</td></tr>`; }).join("")
+  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r))}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td><span class="state ${c}">${s}</span></td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`;
   renderDetails();
 }
+let detailsSignature = "", labsSignature = "";
 function renderDetails() {
+  const signature = JSON.stringify([selected, !!visible().length, S.vms.find((x) => x.name === selected)]);
+  if (signature === detailsSignature) return;
+  detailsSignature = signature;
   const r = S.vms.find((x) => x.name === selected);
-  if (!r) { $("details").innerHTML = '<p class="s-muted">Select a profile.</p>'; return; }
+  $("profile-edit").disabled = !r || !visible().length;
+  if (!r || !visible().length) { $("details").innerHTML = '<p class="s-muted">Select a profile.</p>'; return; }
   const [s, c] = stateOf(r);
-  const facts = [["State", `<span class="state ${c}">${s}</span>`], ["Resources", `${ram(r)} vCPU · ${esc(r.firmware)}`],
-    ["Disk", r.prepared ? `${esc(r.disk_host || "?")} on host · ${esc(r.disk_capacity || "?")} capacity` : "none yet"],
-    ["ISO", { cached: "available", download: "vmctl downloads it", manual: "you provide it" }[r.iso_source] || (r.iso_ready ? "available" : "not cached")],
-    ["SSH", r.ssh_port ? `127.0.0.1:${esc(r.ssh_port)}` : "not configured"], ["Install", esc(r.install_detail || "")]];
-  const actions = actionsFor(r);
-  $("details").innerHTML = `<div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div>
-    <dl class="facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+  const facts = [["Disk", r.prepared ? `${esc(r.disk_host || "?")} used <span class="s-muted">/ ${esc(r.disk_capacity || "?")}</span>` : "Not created yet"],
+    ["ISO", { cached: "Ready to use", download: "Available to download", manual: "Provided manually" }[r.iso_source] || (r.iso_ready ? "Ready to use" : "Not cached")],
+    ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options" aria-label="Open SSH console options">&gt;_ SSH</button></span>` : "Not configured"]];
+  const actions = actionsFor(r), memory = r.memory_mb >= 1024 ? `${r.memory_mb / 1024} GB` : `${r.memory_mb} MB`;
+  $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<span class="state ${c}">${s}</span></div><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div>
+    <div class="resources"><div class="resource"><strong>${esc(memory)}</strong><span>Memory</span></div><div class="resource"><strong>${esc(r.cpus)}</strong><span>vCPUs</span></div><div class="resource"><strong>${esc(r.firmware)}</strong><span>Firmware</span></div></div>
+    <dl class="facts">${facts.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+    ${r.install_detail ? `<details class="install-details"><summary>Installation details</summary><p>${esc(r.install_detail)}</p></details>` : ""}
     ${r.iso_source === "manual" && !r.installed ? `<div class="note">${esc((r.iso_help || "").replace(/\\n/g, "\n"))}</div>` : ""}
-    <div class="actions">${actions.map((x, i) => `<button data-action="${i}" class="${i === 0 ? "primary" : x.danger ? "danger" : ""}">${esc(x.label)}${i === 0 ? "  ·  Enter" : ""}</button>`).join("")}</div>`;
+    <div class="actions">${actions.map((x,i) => `${x.danger ? '<div class="action-label">Power & maintenance</div>' : ""}<button data-action="${i}" class="${x.danger ? "danger" : i === 0 ? "primary main-action" : ""}">${esc(x.label)}${i === 0 ? "<kbd>Enter</kbd>" : ""}</button>`).join("")}</div>`;
+  if ($("ssh-open")) $("ssh-open").onclick = () => openSsh(r);
   $("details").querySelectorAll("[data-action]").forEach((b) => (b.onclick = () => runAction(r, actions[+b.dataset.action])));
 }
 function renderLabs() {
+  const signature = JSON.stringify([S.labs, S.vms, $("search").value]);
+  if (signature === labsSignature) return;
+  labsSignature = signature;
   const byName = Object.fromEntries(S.vms.map((r) => [r.name, r]));
-  $("labs-view").innerHTML = S.labs.map((lab) => {
-    const members = (lab.start_order || lab.members).map((n) => byName[n]).filter(Boolean);
+  const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
+  $("labs-view").innerHTML = S.labs.filter((lab) => words.every((w) => (lab.group + " " + lab.members.join(" ")).toLowerCase().includes(w))).map((lab) => {
+    const names = lab.start_order || lab.members, members = names.map((n) => byName[n]).filter(Boolean);
     const up = members.filter((m) => m.running).length;
+    const installed = names.length > 0 && names.every((n) => byName[n]?.installed);
     const cluster = members.some((m) => m.family === "proxmox");
-    const btn = (label, args, cls = "") => `<button class="${cls}" data-args='${esc(JSON.stringify(args))}'>${label}</button>`;
-    return `<section class="card lab"><h2>${esc(lab.group)}</h2><div class="s-muted">${up} / ${members.length} running · start order ${esc((lab.start_order || []).join(" → "))}</div>
-      <div class="members">${members.map((m) => { const [s, c] = stateOf(m); return `<div><span class="mono">${esc(m.name)} <span class="s-muted">${esc((lab.addresses || {})[m.name] || "")}</span></span><span class="${c}">${s}</span></div>`; }).join("")}</div>
-      <div class="buttons">${btn("Install lab…", ["group", "install", lab.group], "primary")}${btn("Start stack", ["group", "up", lab.group])}${btn("Stop stack", ["group", "down", lab.group])}${btn("Status", ["group", "status", lab.group])}${cluster ? btn("Form cluster", ["group", "cluster", lab.group]) : ""}${btn("Network map", ["group", "map", lab.group])}<button data-map="${esc(lab.group)}">Open map ↗</button>${btn("Clean lab…", ["group", "clean", lab.group], "danger")}</div></section>`;
-  }).join("") || '<p class="s-muted">No labs declared.</p>';
+    const btn = (label,args,cls="") => `<button class="${cls}" data-args='${esc(JSON.stringify(args))}'>${label}</button>`;
+    const primary = installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab…",["group","install",lab.group],"primary");
+    return `<section class="card lab"><div class="lab-head"><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<h2>${esc(lab.group)}</h2></span><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
+      <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "Open profile →")}</span></span></button><span class="state ${c}">${s}</span></div>`; }).join("")}</div>
+      <div class="buttons">${primary}${installed && up > 0 && up < members.length ? btn("Stop stack",["group","down",lab.group]) : ""}${btn("Status",["group","status",lab.group])}<button data-map="${esc(lab.group)}">Open map ↗</button></div>
+      <details class="lab-secondary"><summary>More lab actions</summary><p class="lab-order">Start order: ${esc(names.join(" → "))}</p><div class="buttons">${installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group])}${up && !installed ? btn("Stop stack",["group","down",lab.group]) : ""}${cluster ? btn("Form cluster",["group","cluster",lab.group]) : ""}${btn("Generate map",["group","map",lab.group])}${btn("Clean lab…",["group","clean",lab.group],"danger")}</div></details></section>`;
+  }).join("") || '<p class="s-muted">No matching labs.</p>';
   $("labs-view").querySelectorAll("[data-args]").forEach((b) => (b.onclick = () => run(JSON.parse(b.dataset.args))));
   $("labs-view").querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.map)}/map?token=${encodeURIComponent(TOKEN)}`, "_blank")));
+  $("labs-view").querySelectorAll("[data-member]").forEach((b) => (b.onclick = () => { selected = b.dataset.member; $("search").value = ""; document.querySelector('[data-filter="all"]').click(); }));
 }
 
 async function run(args, danger) {
@@ -245,13 +477,15 @@ async function run(args, danger) {
   if (destructive && !confirm(`vmctl ${args.join(" ")}\n\nThis deletes or overwrites data. Continue?`)) return;
   try {
     const res = await api("/api/run", { args, confirmed: !!destructive });
+    rememberCommand(args[0]);
+    if ($("cmd-dialog").open) $("cmd-dialog").close();
     toast("Started: " + res.command);
     openLog(res.job, res.command);
     refresh(true); refreshJobs();
   } catch (e) { toast(e.message, true); }
 }
 function runAction(r, a) {
-  if (a.job) return openLog(a.job, "Installation of " + r.name);
+  if (a.job) return openLog(a.job, (installationJob(r) ? "Installation" : r.job_command || "Job") + " · " + r.name);
   if (a.screen) return openScreen(r.name);
   if (a.console) return openConsole(r.name);
   if (a.help) { $("help-title").textContent = "ISO needed: " + r.name; $("help-text").textContent = (r.iso_help || "").replace(/\\n/g, "\n"); return $("help-dialog").showModal(); }
@@ -263,6 +497,7 @@ function runAction(r, a) {
 async function refreshJobs() {
   try {
     const jobs = await api("/api/jobs");
+    $("job-count").textContent = `${jobs.length} jobs`;
     $("job-rows").innerHTML = jobs.map((j) => `<tr class="row" data-job="${esc(j.id)}" data-cmd="${esc(j.command)}"><td><span class="chip ${esc(j.status.split(" ")[0])}">${esc(j.status)}</span></td><td class="mono">${esc(j.command)}</td><td class="s-muted">${new Date(j.updated * 1000).toLocaleTimeString()}</td></tr>`).join("")
       || '<tr><td colspan="3" class="s-muted">No jobs yet.</td></tr>';
     $("job-rows").querySelectorAll("[data-job]").forEach((t) => (t.onclick = () => openLog(t.dataset.job, t.dataset.cmd)));
@@ -286,6 +521,72 @@ $("log-cancel").onclick = async () => {
   try { await api(`/api/jobs/${encodeURIComponent(logJob)}/cancel`, {}); toast("Cancelled"); refreshJobs(); } catch (e) { toast(e.message, true); }
 };
 
+// --- SSH: use the existing CLI in an interactive terminal on the host
+let sshVm = "";
+function openSsh(r) {
+  sshVm = r.name; $("ssh-title").textContent = "SSH · " + r.name;
+  $("ssh-description").textContent = r.running ? "Connect to this machine in a terminal window on the host." : "This machine is stopped. Start it before connecting via SSH.";
+  $("ssh-command").textContent = "bin/vmctl shell " + shellQuote(r.name);
+  $("ssh-browser").disabled = !r.running; $("ssh-launch").disabled = !r.running; $("ssh-result").textContent = ""; $("ssh-dialog").showModal();
+}
+$("ssh-launch").onclick = async () => {
+  $("ssh-launch").disabled = true;
+  try { await api(`/api/vm/${encodeURIComponent(sshVm)}/ssh-terminal`, {}); $("ssh-result").textContent = "Terminal launch requested. Continue in the SSH window on the host."; }
+  catch (e) { $("ssh-result").textContent = e.message; }
+  finally { $("ssh-launch").disabled = false; }
+};
+$("ssh-copy").onclick = async () => { try { await navigator.clipboard.writeText($("ssh-command").textContent); $("ssh-result").textContent = "Command copied."; } catch (e) { $("ssh-result").textContent = "Select and copy the command above."; } };
+
+// xterm.js renders the guest SSH PTY; credentials and keys stay in the existing SSH CLI.
+let terminal = null, terminalSocket = null, terminalObserver = null, terminalGeneration = 0, terminalVm = "", xtermLoad = null;
+function loadTerminalAssets() {
+  if (xtermLoad) return xtermLoad;
+  const load = (url, style = false) => new Promise((resolve,reject) => {
+    const el = document.createElement(style ? "link" : "script");
+    if (style) { el.rel = "stylesheet"; el.href = url; } else el.src = url;
+    el.onload = resolve; el.onerror = () => { el.remove(); reject(new Error("Cannot load the terminal library from cdn.jsdelivr.net")); };
+    document.head.append(el);
+  });
+  xtermLoad = Promise.all([
+    load("https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css",true),
+    load("https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"),
+    load("https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js")
+  ]).catch(e => { xtermLoad = null; throw e; });
+  return xtermLoad;
+}
+function disposeTerminal() {
+  terminalObserver?.disconnect(); terminalObserver = null;
+  if (terminalSocket) { terminalSocket.onclose = terminalSocket.onerror = terminalSocket.onmessage = terminalSocket.onopen = null; terminalSocket.close(); terminalSocket = null; }
+  terminal?.dispose(); terminal = null;
+}
+function terminalStatus(label,color,note) { $("terminal-status").textContent = label; $("terminal-status").className = "state " + color; if (note) $("terminal-note").textContent = note; }
+async function openBrowserSsh(vm) {
+  const generation = ++terminalGeneration; disposeTerminal(); terminalVm = vm;
+  $("ssh-dialog").close(); $("terminal-title").textContent = vm;
+  if (!$("terminal-dialog").open) $("terminal-dialog").showModal();
+  $("terminal-screen").innerHTML = ""; terminalStatus("Connecting","s-warn","Loading the SSH terminal…");
+  try {
+    await loadTerminalAssets(); if (generation !== terminalGeneration) return;
+    const term = new window.Terminal({cursorBlink:true,fontSize:14,fontFamily:"ui-monospace, monospace",theme:{background:"#0b111b",foreground:"#e6edf7",cursor:"#7ddfc5"},scrollback:3000});
+    const fit = new window.FitAddon.FitAddon(); terminal = term; term.loadAddon(fit); term.open($("terminal-screen")); fit.fit();
+    const socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/vm/${encodeURIComponent(vm)}/ssh?token=${encodeURIComponent(TOKEN)}`);
+    terminalSocket = socket; socket.binaryType = "arraybuffer";
+    const send = value => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(value)); };
+    term.onData(data => send({type:"input",data}));
+    term.onResize(({cols,rows}) => send({type:"resize",cols,rows}));
+    terminalObserver = new ResizeObserver(() => fit.fit()); terminalObserver.observe($("terminal-screen"));
+    socket.onopen = () => { if (generation !== terminalGeneration) return; send({type:"resize",cols:term.cols,rows:term.rows}); terminalStatus("Session open","s-ok","Log in at the prompt if asked. Close disconnects SSH; the VM keeps running."); term.focus(); };
+    socket.onmessage = e => { if (generation === terminalGeneration) term.write(typeof e.data === "string" ? e.data : new Uint8Array(e.data)); };
+    socket.onerror = () => terminalStatus("Unavailable","s-bad","Could not open SSH. Check the VM and profile, and restart make web if the server was running before this update.");
+    socket.onclose = () => { if (generation !== terminalGeneration) return; terminalStatus("Disconnected","s-muted","SSH session ended. Read the terminal output or use Reconnect to try again."); };
+  } catch (e) { if (generation === terminalGeneration) terminalStatus("Unavailable","s-bad",e.message + ". You can still use the SSH terminal on the host."); }
+}
+$("ssh-browser").onclick = () => openBrowserSsh(sshVm);
+$("terminal-reconnect").onclick = () => openBrowserSsh(terminalVm);
+$("terminal-close").onclick = () => { ++terminalGeneration; disposeTerminal(); if (document.fullscreenElement) document.exitFullscreen().catch(()=>{}); $("terminal-dialog").close(); };
+$("terminal-dialog").addEventListener("cancel",e=>e.preventDefault());
+$("terminal-full").onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await $("terminal-shell").requestFullscreen(); } catch (e) { toast(e.message,true); } };
+
 // --- screen
 let screenTimer = null;
 function openScreen(vm) {
@@ -298,88 +599,172 @@ $("screen-img").onload = () => ($("screen-note").textContent = "A screenshot eve
 
 // --- console: noVNC in the page, bridged by the server to the VM's runtime/vnc.sock
 const NOVNC = "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.7.0/core/rfb.js";
-let rfb = null;
-async function openConsole(vm) {
-  let RFB;
-  try { RFB = (await import(NOVNC)).default; }
-  catch (e) { return toast("Cannot load noVNC from cdn.jsdelivr.net (" + e.message + "): the screenshot view needs no download.", true); }
-  if (rfb) rfb.disconnect();
-  $("vnc-title").textContent = "Console: " + vm;
-  $("vnc-screen").innerHTML = "";
-  const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/vm/${encodeURIComponent(vm)}/vnc?token=${encodeURIComponent(TOKEN)}`;
-  rfb = new RFB($("vnc-screen"), url);
-  rfb.scaleViewport = true;
-  rfb.focusOnClick = true;
-  rfb.addEventListener("connect", () => { $("vnc-note").textContent = "Connected. Click the screen to type into the VM; Esc goes to the VM too: use Close."; rfb.focus(); });
-  rfb.addEventListener("disconnect", (e) => { $("vnc-note").textContent = e.detail.clean ? "Disconnected." : "The console closed: the VM stopped, or it runs with its own window (no VNC socket)."; });
-  $("vnc-dialog").showModal();
+let rfb = null, consoleVm = "", consoleGeneration = 0, consoleFit = true;
+function consoleStatus(label, color, note) {
+  $("vnc-status").textContent = label; $("vnc-status").className = "state " + color;
+  $("vnc-cad").disabled = label !== "Connected";
+  if (note) $("vnc-note").textContent = note;
 }
-function closeConsole() { if (rfb) { rfb.disconnect(); rfb = null; } $("vnc-dialog").close(); }
+async function openConsole(vm) {
+  const generation = ++consoleGeneration;
+  consoleVm = vm;
+  if (rfb) { rfb.disconnect(); rfb = null; }
+  $("vnc-title").textContent = vm; $("console-icon").innerHTML = catalogIcon(osIconKey(S.vms.find(r => r.name === vm)), true);
+  $("vnc-screen").innerHTML = '<div class="console-empty">Connecting to the machine…</div>';
+  consoleStatus("Connecting", "s-warn", "Opening the remote display…");
+  if (!$("vnc-dialog").open) $("vnc-dialog").showModal();
+  try {
+    const RFB = (await import(NOVNC)).default;
+    if (generation !== consoleGeneration || !$("vnc-dialog").open) return;
+    $("vnc-screen").innerHTML = "";
+    const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/vm/${encodeURIComponent(vm)}/vnc?token=${encodeURIComponent(TOKEN)}`;
+    const client = new RFB($("vnc-screen"), url); rfb = client;
+    client.scaleViewport = consoleFit; client.clipViewport = !consoleFit; client.focusOnClick = true;
+    client.addEventListener("connect", () => { if (generation !== consoleGeneration) return; consoleStatus("Connected", "s-ok", "Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave."); client.focus(); });
+    client.addEventListener("disconnect", (e) => { if (generation !== consoleGeneration) return; consoleStatus("Disconnected", "s-bad", e.detail.clean ? "Connection closed. Use Reconnect to open the display again." : "The VM stopped or its display is unavailable. A headless VM is required for this console."); });
+  } catch (e) {
+    if (generation !== consoleGeneration) return;
+    consoleStatus("Unavailable", "s-bad", "Cannot load the console: " + e.message + ". Try Reconnect, or use Live screenshot from the profile.");
+    $("vnc-screen").innerHTML = '<div class="console-empty">The console could not be opened.</div>';
+  }
+}
+function closeConsole() { ++consoleGeneration; if (rfb) { rfb.disconnect(); rfb = null; } if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); $("vnc-dialog").close(); }
 $("vnc-close").onclick = closeConsole;
-$("vnc-dialog").addEventListener("cancel", (e) => e.preventDefault());  // Esc belongs to the VM
-$("vnc-cad").onclick = () => rfb && rfb.sendCtrlAltDel();
-$("vnc-full").onclick = () => $("vnc-screen").requestFullscreen?.();
+$("vnc-dialog").addEventListener("cancel", (e) => e.preventDefault());
+$("vnc-cad").onclick = () => { if (rfb) { rfb.sendCtrlAltDel(); rfb.focus(); } };
+$("vnc-reconnect").onclick = () => openConsole(consoleVm);
+$("vnc-fit").onclick = () => {
+  consoleFit = !consoleFit; $("vnc-fit").textContent = consoleFit ? "Fit to window" : "Actual size";
+  $("vnc-fit").classList.toggle("active", consoleFit); $("vnc-fit").setAttribute("aria-pressed", consoleFit);
+  if (rfb) { rfb.scaleViewport = consoleFit; rfb.clipViewport = !consoleFit; }
+};
+$("vnc-full").onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await $("console-shell").requestFullscreen(); } catch (e) { toast("Full screen unavailable: " + e.message, true); } };
+document.addEventListener("fullscreenchange", () => { $("vnc-full").textContent = document.fullscreenElement ? "Exit full screen" : "Full screen"; });
 
-// --- the command palette: the commands that make sense for this VM (or the global ones), then their options
-let pal = { vm: "", scope: "vm", cmd: null };
+// --- command center: retain drafts while navigating and keep execution explicit
+let pal = { vm: "", scope: "vm", cmd: null }, drafts = new Map(), commandBusy = false;
 const takesVm = (c) => c.args.some((a) => a.dest === "vm" && !a.flag);
+let recentCommands = [];
+try { const saved = JSON.parse(localStorage.getItem("vmctl-recent-commands") || "[]"); if (Array.isArray(saved)) recentCommands = saved.filter((n) => typeof n === "string").slice(0,6); } catch (_) { /* discard invalid saved preferences */ }
+function rememberCommand(name) {
+  recentCommands = [name, ...recentCommands.filter((n) => n !== name)].slice(0,6);
+  try { localStorage.setItem("vmctl-recent-commands", JSON.stringify(recentCommands)); } catch (_) { /* storage is optional */ }
+}
+const draftKey = () => JSON.stringify([pal.vm, pal.scope, pal.cmd]);
 function relevant(c, r) {
-  // Only the profile's own install flow among the 19 bootstrap-* and the flow-specific installers.
   if (c.name.startsWith("bootstrap-")) return c.name === r.unattended_flow;
-  const flag = { "install-archinstall": "has_archinstall", "install-omarchy": "has_omarchy", "install-unattended": "has_autoinstall",
-                 "post-install": "has_ssh", lab: "has_netlab" }[c.name];
+  const flag = { "install-archinstall": "has_archinstall", "install-omarchy": "has_omarchy", "install-unattended": "has_autoinstall", "post-install": "has_ssh", lab: "has_netlab" }[c.name];
   return !flag || !!r[flag];
 }
-function paletteCommands() {
+function scopedCommands() {
   const r = S.vms.find((x) => x.name === pal.vm);
-  const words = $("cmd-filter").value.toLowerCase().split(/\s+/).filter(Boolean);
-  return catalog.filter((c) => (pal.scope === "vm" && r ? takesVm(c) && relevant(c, r) : !takesVm(c))
-    && words.every((w) => (c.name + " " + c.help + " " + c.group).toLowerCase().includes(w)));
+  return catalog.filter((c) => pal.scope === "vm" && r ? takesVm(c) && relevant(c, r) : !takesVm(c));
 }
-function openCommands(vm, scope) {
+function recommendedCommands() {
+  const r = S.vms.find((x) => x.name === pal.vm);
+  if (pal.scope !== "vm" || !r) return ["status", "list", "group", "doctor"];
+  if (r.running) return ["stop", "attach", "show", "post-install", "checkpoint"];
+  if (r.installed) return ["start", "checkpoint", "show", "clone", "flash"];
+  return [r.unattended_flow, "fetch-iso", "provision", "prep", "show"].filter(Boolean);
+}
+function commandSection(c) {
+  if ($("cmd-category").value) return c.group;
+  if (recommendedCommands().includes(c.name)) return "Suggested for you";
+  if (recentCommands.includes(c.name)) return "Recently used";
+  return c.group;
+}
+function paletteCommands() {
+  const words = $("cmd-filter").value.toLowerCase().split(/\s+/).filter(Boolean), category = $("cmd-category").value;
+  const suggested = recommendedCommands();
+  const rank = (c) => suggested.includes(c.name) ? suggested.indexOf(c.name) : recentCommands.includes(c.name) ? 20 + recentCommands.indexOf(c.name) : 100;
+  return scopedCommands().filter((c) => (!category || c.group === category)
+    && words.every((w) => (c.name + " " + c.help + " " + c.group + " " + c.args.map((a) => a.flag).join(" ")).toLowerCase().includes(w)))
+    .sort((a,b) => (Number(b.name === words.join(" ")) - Number(a.name === words.join(" "))) || (category ? 0 : rank(a) - rank(b)));
+}
+function saveDraft() {
+  if (!pal.cmd || !$("cmd-form").childElementCount) return;
+  const values = {};
+  $("cmd-form").querySelectorAll("[data-arg]").forEach((el) => { values[el.dataset.arg] = el.type === "checkbox" ? el.checked : el.value; });
+  drafts.set(draftKey(), { values, advanced: $("cmd-advanced")?.open || false });
+}
+function commandCategories() {
+  $("cmd-category").innerHTML = '<option value="">All categories</option>' + [...new Set(scopedCommands().map((c) => c.group))].map((g) => `<option>${esc(g)}</option>`).join("");
+}
+async function openCommands(vm, scope) {
+  saveDraft();
   pal = { vm: vm || "", scope: vm ? (scope || "vm") : "global", cmd: null };
-  $("scope-vm").textContent = vm ? "For " + vm : "For a VM";
+  $("scope-vm").textContent = "This VM";
   $("scope-vm").disabled = !vm;
   $("cmd-filter").value = "";
-  renderPalette();
-  $("cmd-dialog").showModal();
-  $("cmd-filter").focus();
+  // A transient startup failure must not leave the command center empty forever.
+  if (!catalog.length) { try { catalog = await api("/api/commands"); } catch (e) { toast(e.message, true); } }
+  commandCategories(); renderPalette();
+  $("cmd-dialog").showModal(); $("cmd-filter").focus();
 }
 function renderPalette() {
-  document.querySelectorAll("[data-scope]").forEach((b) => b.classList.toggle("active", b.dataset.scope === pal.scope));
-  $("cmd-title").textContent = pal.scope === "vm" ? "Commands for " + pal.vm : "Global commands";
-  const list = paletteCommands();
-  if (!list.find((c) => c.name === pal.cmd)) pal.cmd = list.length ? list[0].name : null;
+  document.querySelectorAll("[data-scope]").forEach((b) => { b.classList.toggle("active", b.dataset.scope === pal.scope); b.setAttribute("aria-pressed", b.dataset.scope === pal.scope); });
+  $("cmd-title").textContent = "Command center";
+  const list = paletteCommands(), previous = pal.cmd;
+  if (!list.some((c) => c.name === pal.cmd)) pal.cmd = list[0]?.name || null;
+  $("cmd-count").textContent = `${list.length} commands · ${pal.scope === "vm" ? pal.vm : "workspace"}`;
   let group = "";
   $("cmd-list").innerHTML = list.map((c) => {
-    const head = c.group !== group ? `<div class="pal-group">${esc((group = c.group))}</div>` : "";
-    return head + `<div class="pal-item${c.name === pal.cmd ? " sel" : ""}" data-cmd="${esc(c.name)}"><b>${esc(c.name)}</b><span>${esc(c.help)}</span></div>`;
-  }).join("") || '<p class="s-muted">No command matches.</p>';
-  $("cmd-list").querySelectorAll("[data-cmd]").forEach((el) => (el.onclick = () => { pal.cmd = el.dataset.cmd; renderPalette(); }));
-  renderCommandForm();
+    const section = commandSection(c);
+    const head = section !== group ? `<div class="pal-group">${esc((group = section))}</div>` : "";
+    return head + `<button type="button" class="pal-item${c.name === pal.cmd ? " sel" : ""}" aria-pressed="${c.name === pal.cmd}" data-cmd="${esc(c.name)}"><b>${esc(c.name)}${c.terminal_only ? " ↗" : ""}</b><span>${c.terminal_only ? "Terminal · " : ""}${esc(c.help)}</span></button>`;
+  }).join("") || '<p class="s-muted">No matching commands. Try another search or category.</p>';
+  $("cmd-list").querySelectorAll("[data-cmd]").forEach((el) => (el.onclick = () => selectCommand(el.dataset.cmd, true)));
+  if (previous !== pal.cmd || $("cmd-form").dataset.command !== draftKey()) renderCommandForm();
+}
+function selectCommand(name, focus = false) {
+  saveDraft(); pal.cmd = name; renderPalette();
+  $("cmd-list").querySelector(".sel")?.scrollIntoView({ block: "nearest" });
+  if (focus) $("cmd-list").querySelector(".sel")?.focus({ preventScroll:true });
 }
 function renderCommandForm() {
   const c = catalog.find((x) => x.name === pal.cmd);
-  $("cmd-run").disabled = !c;
-  if (!c) { $("cmd-head").innerHTML = ""; $("cmd-form").innerHTML = ""; $("preview").textContent = ""; return; }
-  $("cmd-head").innerHTML = `<h3>${esc(c.name)}</h3><p>${esc(c.help)}</p>`;
-  $("cmd-form").innerHTML = c.args.map((a, i) => {
-    const id = "arg" + i, label = a.flag || a.dest;
-    if (a.dest === "vm" && !a.flag && pal.scope === "vm") return `<label>vm</label><span><span class="fixed">${esc(pal.vm)}</span><input type="hidden" id="${id}" value="${esc(pal.vm)}"></span>`;
+  $("cmd-form").dataset.command = draftKey();
+  $("cmd-run").disabled = !c; $("cmd-copy").disabled = !c;
+  $("cmd-warning").classList.add("hidden");
+  if (!c) {
+    $("cmd-head").innerHTML = '<h3>No command selected</h3><p>Search by name, description or option, or choose another category.</p>';
+    $("cmd-form").innerHTML = ""; $("preview").textContent = "—"; $("cmd-validation").textContent = "Choose a command to continue."; return;
+  }
+  $("cmd-head").innerHTML = `<div class="eyebrow">${esc(c.group)} · ${esc(pal.scope === "vm" ? pal.vm : "workspace")}</div><h3>${esc(c.name)}</h3><p>${esc(c.help)}</p>${c.terminal_only ? '<div class="note">Run this command in a terminal from the project directory. Flash overwrites the target disk and requires sudo. Stop the VM first and verify the device path. Without an expansion flag, the CLI asks after copying when expansion is supported.</div>' : ""}`;
+  const field = (a, i) => {
+    const id = "arg" + i, label = a.flag || a.dest, attr = `id="${id}" data-arg="${i}" aria-describedby="help${i}" ${a.required ? "required" : ""}`;
+    if (a.dest === "vm" && !a.flag && pal.scope === "vm") return `<div class="field"><label for="${id}">Target machine</label><div><span class="fixed">${esc(pal.vm)}</span><input type="hidden" id="${id}" data-arg="${i}" value="${esc(pal.vm)}"></div></div>`;
     let input;
-    if (a.kind === "flag") input = `<label style="display:flex;gap:8px;align-items:center;color:var(--text)"><input type="checkbox" id="${id}"> ${esc(a.help)}</label>`;
-    else if (a.choices.length) input = `<select id="${id}">${a.required ? "" : '<option value=""></option>'}${a.choices.map((o) => `<option>${esc(o)}</option>`).join("")}</select>`;
-    else if (a.dest === "vm" || a.dest === "vms") input = `<input type="text" id="${id}" list="vm-names" placeholder="${a.kind === "list" ? "names separated by spaces" : "profile"}">`;
-    else if (a.dest === "group") input = `<input type="text" id="${id}" list="group-names" placeholder="group">`;
-    else input = `<input type="text" id="${id}" placeholder="${esc(a.default ?? "")}">`;
-    const help = a.kind === "flag" ? "" : `<div class="help">${esc(a.help)}</div>`;
-    return `<label for="${id}">${esc(label)}${a.required && !a.flag ? " *" : ""}</label>${input}${help}`;
-  }).join("") + `<datalist id="vm-names">${S.vms.map((r) => `<option value="${esc(r.name)}">`).join("")}</datalist><datalist id="group-names">${[...new Set(S.labs.map((l) => l.group))].map((g) => `<option value="${esc(g)}">`).join("")}</datalist>`;
-  $("cmd-form").querySelectorAll("input,select").forEach((el) => (el.oninput = preview));
+    if (a.kind === "flag") input = `<label class="check"><input type="checkbox" ${attr}>${esc(a.help)}</label>`;
+    else if (a.choices.length) input = `<select ${attr}>${a.required ? "" : `<option value="">Default${a.default != null ? ": " + esc(a.default) : ""}</option>`}${a.choices.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}</select>`;
+    else if (a.dest === "vm" || a.dest === "vms") input = `<input type="text" ${attr} list="vm-names" placeholder="${a.kind === "list" ? "Names separated by spaces" : "Select a profile"}">`;
+    else if (a.dest === "group") input = `<input type="text" ${attr} list="group-names" placeholder="Select a group">`;
+    else input = `<input type="text" ${attr} placeholder="${esc(a.default != null ? "Default: " + a.default : a.kind === "list" ? "Values separated by spaces" : label)}">`;
+    return `<div class="field"><label for="${id}">${esc(label)}${a.required ? '<span class="required">Required</span>' : ""}</label>${input}<div id="help${i}" class="help">${a.kind === "flag" ? "" : esc(a.help)}</div></div>`;
+  };
+  const main = [], optional = [];
+  c.args.forEach((a, i) => (a.flag && !a.required ? optional : main).push(field(a, i)));
+  $("cmd-form").innerHTML = `<div class="form-fields">${main.join("") || '<p class="help">This command needs no parameters.</p>'}</div>`
+    + (optional.length ? `<details id="cmd-advanced" class="advanced"><summary>Options <span id="option-count">(${optional.length} available)</span></summary><div class="form-fields">${optional.join("")}</div></details>` : "")
+    + `<datalist id="vm-names">${S.vms.map((r) => `<option value="${esc(r.name)}">`).join("")}</datalist><datalist id="group-names">${[...new Set(S.labs.map((l) => l.group))].map((g) => `<option value="${esc(g)}">`).join("")}</datalist>`;
+  const draft = drafts.get(draftKey());
+  if (draft) {
+    $("cmd-form").querySelectorAll("[data-arg]").forEach((el) => { if (Object.hasOwn(draft.values, el.dataset.arg)) { if (el.type === "checkbox") el.checked = draft.values[el.dataset.arg]; else el.value = draft.values[el.dataset.arg]; } });
+    if ($("cmd-advanced")) $("cmd-advanced").open = draft.advanced;
+  }
+  $("cmd-form").querySelectorAll("input,select").forEach((el) => (el.oninput = () => {
+    const arg = c.args[Number(el.dataset.arg)];
+    if (el.type === "checkbox" && el.checked) (c.exclusive_groups || []).filter((g) => g.includes(arg.flag || arg.dest)).forEach((g) => c.args.forEach((other,i) => { if (i !== Number(el.dataset.arg) && g.includes(other.flag || other.dest)) $("arg" + i).checked = false; }));
+    saveDraft(); preview();
+  }));
+  if ($("cmd-advanced")) $("cmd-advanced").ontoggle = saveDraft;
+  $("cmd-form").closest(".pal-fields").scrollTop = 0;
   preview();
 }
 function buildArgs() {
-  const c = catalog.find((x) => x.name === pal.cmd), args = [c.name], opts = [];
+  const c = catalog.find((x) => x.name === pal.cmd);
+  if (!c) return [];
+  const args = [c.name], opts = [];
   c.args.forEach((a, i) => {
     const el = $("arg" + i);
     if (!el) return;
@@ -387,28 +772,156 @@ function buildArgs() {
     const v = el.value.trim();
     if (!v) return;
     const values = a.kind === "list" ? v.split(/\s+/) : [v];
-    if (a.flag) values.forEach((x) => opts.push(a.flag, x)); else args.push(...values);
+    if (a.flag) opts.push(a.flag, ...values); else args.push(...values);
   });
   return [...args, ...opts];
 }
-function preview() { if (pal.cmd) $("preview").textContent = "vmctl " + buildArgs().map((a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`)).join(" "); }
-$("cmd-filter").oninput = renderPalette;
+function destructiveCommand(args) {
+  const c = catalog.find((x) => x.name === args[0]);
+  return !!(c && (c.destructive || c.destructive_actions.includes(args[1]))) || (args[0] === "check-vms" && args.includes("--clean-first"));
+}
+function preview() {
+  if (!pal.cmd) return;
+  const c = catalog.find((x) => x.name === pal.cmd), args = buildArgs();
+  $("preview").textContent = (c.terminal_only ? "bin/vmctl " : "vmctl ") + args.map((a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`)).join(" ");
+  const missing = c.args.filter((a, i) => a.required && (a.kind === "flag" ? !$("arg" + i).checked : !$("arg" + i).value.trim()));
+  const mismatch = c.name === "flash" && $("arg" + c.args.findIndex((a) => a.flag === "--device")).value.trim() !== $("arg" + c.args.findIndex((a) => a.flag === "--confirm-device")).value.trim();
+  $("cmd-run").disabled = commandBusy || !!missing.length || mismatch || !!c.terminal_only;
+  $("cmd-copy").disabled = !!missing.length || mismatch;
+  $("cmd-copy").textContent = c.terminal_only ? "Copy for terminal" : "Copy";
+  $("cmd-validation").textContent = missing.length ? "Required: " + missing.map((a) => a.flag || a.dest).join(", ") : mismatch ? "Device paths must match exactly." : c.terminal_only ? "Run in a terminal · sudo required" : "Ready · Ctrl / ⌘ + Enter to run";
+  const danger = destructiveCommand(args);
+  $("cmd-warning").classList.toggle("hidden", !danger);
+  $("cmd-warning").textContent = danger ? "This command deletes or overwrites data. Confirmation is required before running." : "";
+  $("cmd-run").classList.toggle("danger", danger); $("cmd-run").classList.toggle("primary", !danger);
+  $("cmd-run").textContent = c.terminal_only ? "Terminal only" : commandBusy ? "Starting…" : danger ? "Review & run…" : "Run command";
+  const active = c.args.filter((a, i) => a.flag && (a.kind === "flag" ? $("arg" + i).checked : $("arg" + i).value.trim())).length;
+  if ($("option-count")) $("option-count").textContent = active ? `(${active} set)` : `(${c.args.filter((a) => a.flag && !a.required).length} available)`;
+}
+async function submitCommand() {
+  if (!pal.cmd || commandBusy) return;
+  preview(); if ($("cmd-run").disabled) return;
+  saveDraft(); commandBusy = true; preview();
+  try { await run(buildArgs()); } finally { commandBusy = false; preview(); }
+}
+$("cmd-filter").oninput = () => { saveDraft(); renderPalette(); };
+$("cmd-category").onchange = () => { saveDraft(); renderPalette(); };
 $("cmd-filter").onkeydown = (e) => {
   const list = paletteCommands(), i = list.findIndex((c) => c.name === pal.cmd);
-  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const c = list[Math.max(0, Math.min(list.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (c) { pal.cmd = c.name; renderPalette(); } }
-  if (e.key === "Enter" && pal.cmd) { e.preventDefault(); $("cmd-dialog").close(); run(buildArgs()); }
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const c = list[Math.max(0, Math.min(list.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (c) selectCommand(c.name); }
+  if (e.key === "Enter" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); $("cmd-form").querySelector("input:not([type=hidden]),select,summary")?.focus(); }
 };
-document.querySelectorAll("[data-scope]").forEach((b) => (b.onclick = () => { pal.scope = b.dataset.scope; renderPalette(); }));
-$("cmd-run").onclick = () => { $("cmd-dialog").close(); run(buildArgs()); };
+$("cmd-dialog").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submitCommand(); } });
+$("cmd-dialog").addEventListener("close", saveDraft);
+document.querySelectorAll("[data-scope]").forEach((b) => (b.onclick = () => { saveDraft(); pal.scope = b.dataset.scope; pal.cmd = null; commandCategories(); renderPalette(); }));
+$("cmd-form").onsubmit = (e) => { e.preventDefault(); };
+$("cmd-run").onclick = submitCommand;
+$("cmd-copy").onclick = async () => { try { await navigator.clipboard.writeText($("preview").textContent); toast("Command copied"); } catch (e) { toast("Cannot access the clipboard. Select and copy the preview instead.", true); } };
 $("all-commands").onclick = () => openCommands(selected);
+
+// --- local profile editor
+let profileEdit = null;
+function profileFeedback(message, error = false) { $("profile-feedback").textContent = message; $("profile-feedback").className = error ? "error" : ""; }
+function profileOverride() {
+  const value = JSON.parse($("profile-json").value);
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("The override must be a JSON object.");
+  for (const key of ["memory_mb", "cpus"]) if (key in value && (!Number.isInteger(value[key]) || value[key] < 1)) throw new Error(key + " must be a positive integer.");
+  return value;
+}
+function syncProfileResources(value) {
+  $("profile-memory").value = value.memory_mb ?? ""; $("profile-cpus").value = value.cpus ?? "";
+}
+async function openProfileEditor(vm = selected) {
+  profileEdit = null; $("profile-title").textContent = "Customize · " + vm;
+  $("profile-intro").textContent = "Loading profile…";
+  ["profile-memory", "profile-cpus", "profile-json", "profile-save", "profile-reset"].forEach(id => $(id).disabled = true);
+  $("profile-json").value = ""; $("profile-base").textContent = ""; profileFeedback("");
+  $("profile-dialog").showModal();
+  try {
+    const data = await api(`/api/vm/${encodeURIComponent(vm)}/override`);
+    if (!$("profile-dialog").open) return;
+    profileEdit = data;
+    $("profile-intro").textContent = data.local_only ? "This profile exists only locally. Edit its local definition below." : "Use the catalog as your template. Save only your changes here; leave resource fields blank to inherit the catalog values.";
+    $("profile-json").value = JSON.stringify(data.override,null,2); syncProfileResources(data.override);
+    $("profile-base").textContent = data.base ? JSON.stringify(data.base,null,2) : "No catalog template: this profile was created locally.";
+    $("profile-memory").placeholder = data.base?.memory_mb ?? data.effective.memory_mb;
+    $("profile-cpus").placeholder = data.base?.cpus ?? data.effective.cpus;
+    $("memory-default").textContent = "Catalog: " + (data.base?.memory_mb ?? "—") + " MiB";
+    $("cpus-default").textContent = "Catalog: " + (data.base?.cpus ?? "—");
+    ["profile-memory", "profile-cpus", "profile-json", "profile-save"].forEach(id => $(id).disabled = false);
+    $("profile-reset").disabled = data.local_only;
+    $("profile-memory").focus();
+  } catch (e) { profileFeedback(e.message,true); }
+}
+$("profile-edit").onclick = () => openProfileEditor();
+for (const [id,key] of [["profile-memory","memory_mb"],["profile-cpus","cpus"]]) $(id).oninput = () => {
+  try {
+    const value = profileOverride(), text = $(id).value;
+    if ($(id).validity.badInput || (text && (!Number.isInteger(Number(text)) || Number(text) < 1))) throw new Error("Enter a positive whole number or leave the field blank.");
+    if (text === "") delete value[key]; else value[key] = Number(text);
+    $("profile-json").value = JSON.stringify(value,null,2); $("profile-save").disabled = false; profileFeedback("Unsaved changes");
+  } catch (e) { $("profile-save").disabled = true; profileFeedback(e.message,true); }
+};
+$("profile-json").oninput = () => { try { syncProfileResources(profileOverride()); $("profile-save").disabled = false; profileFeedback("Unsaved changes"); } catch (e) { $("profile-save").disabled = true; profileFeedback(e.message,true); } };
+$("profile-reset").onclick = () => { $("profile-json").value = "{}"; syncProfileResources({}); $("profile-save").disabled = false; profileFeedback("Catalog values restored in this draft. Save to remove the local override."); };
+$("profile-save").onclick = async () => {
+  if (!profileEdit) return;
+  ["profile-save","profile-reset","profile-memory","profile-cpus","profile-json"].forEach(id=>$(id).disabled=true);
+  try {
+    const saved = await api(`/api/vm/${encodeURIComponent(profileEdit.name)}/override`, {override:profileOverride(),revision:profileEdit.revision});
+    profileEdit = saved; profileFeedback("Saved locally. The catalog is unchanged. Resource changes apply at the next start.");
+    await refresh(true);
+  } catch (e) { profileFeedback(e.message,true); }
+  finally { ["profile-save","profile-memory","profile-cpus","profile-json"].forEach(id=>$(id).disabled=false); $("profile-reset").disabled = profileEdit.local_only; }
+};
+
+// --- profile rows and lab members share the same VM context menu
+let contextOrigin = null;
+function closeContext() { $("vm-context").hidePopover(); }
+function openContext(vm, x, y) {
+  const r = S.vms.find(row => row.name === vm); if (!r) return;
+  selected = vm; localStorage.setItem("vmctl-selected",vm); render();
+  const container = filter === "labs" ? $("labs-view") : $("rows");
+  const originRow = [...container.querySelectorAll("[data-vm]")].find(row => row.dataset.vm === vm);
+  contextOrigin = originRow?.querySelector("[data-member]") || originRow;
+  const actions = actionsFor(r), menu = $("vm-context");
+  const entries = actions.map(a => ({label:a.label,danger:a.danger,run:()=>runAction(r,a)}));
+  if (r.ssh_port) entries.push({label:"SSH console…",run:()=>openSsh(r)});
+  entries.push({label:"Customize profile…",run:()=>openProfileEditor(r.name)});
+  menu.innerHTML = `<div class="context-title">${esc(vm)}</div>` + entries.map((a,i) => `<button role="menuitem" class="${a.danger ? "danger" : ""}" data-context="${i}">${esc(a.label)}</button>`).join("");
+  menu.showPopover();
+  menu.style.left = Math.max(8, Math.min(x,innerWidth-menu.offsetWidth-8)) + "px";
+  menu.style.top = Math.max(8, Math.min(y,innerHeight-menu.offsetHeight-8)) + "px";
+  menu.querySelectorAll("button").forEach(b => b.onclick = () => { closeContext(); entries[+b.dataset.context].run(); });
+  menu.querySelector("button")?.focus({preventScroll:true});
+}
+for (const container of [$("rows"), $("labs-view")]) {
+  container.addEventListener("contextmenu", e => {
+    const row = e.target.closest("[data-vm]");
+    if (row) { e.preventDefault(); openContext(row.dataset.vm, e.clientX, e.clientY); }
+  });
+  container.addEventListener("keydown", e => {
+    if (e.key !== "ContextMenu" && !(e.shiftKey && e.key === "F10")) return;
+    const row = e.target.closest("[data-vm]");
+    if (row) { e.preventDefault(); const rect = row.getBoundingClientRect(); openContext(row.dataset.vm, rect.x + 30, rect.y + 20); }
+  });
+}
+$("vm-context").addEventListener("keydown", e => {
+  const buttons=[...$("vm-context").querySelectorAll("button")], i=buttons.indexOf(document.activeElement);
+  if (["ArrowDown","ArrowUp"].includes(e.key)) { e.preventDefault(); buttons[(i+(e.key === "ArrowDown" ? 1 : buttons.length-1))%buttons.length].focus(); }
+  if (e.key === "Escape" || e.key === "Tab") { closeContext(); contextOrigin?.focus({preventScroll:true}); if (e.key === "Escape") e.preventDefault(); }
+});
+document.addEventListener("pointerdown",e => { if (!$("vm-context").contains(e.target)) closeContext(); });
+window.addEventListener("resize",closeContext);
 
 // --- wiring
 document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
-document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll("[data-filter]").forEach((x) => x.classList.toggle("active", x === b)); render(); }));
+document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll("[data-filter]").forEach((x) => (x.classList.toggle("active", x === b), x.setAttribute("aria-pressed", x === b))); render(); }));
 $("rows").onclick = (e) => { const tr = e.target.closest("[data-vm]"); if (tr) { selected = tr.dataset.vm; localStorage.setItem("vmctl-selected", selected); render(); } };
 $("search").oninput = render;
 document.addEventListener("keydown", (e) => {
-  if (document.querySelector("dialog[open]")) return;
+  if (document.querySelector("dialog[open]") || /BUTTON|A|SUMMARY/.test(document.activeElement.tagName)) return;
+  if (e.key.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); openCommands(selected); return; }
   if (e.key === "/" && document.activeElement !== $("search")) { e.preventDefault(); $("search").focus(); return; }
   if (document.activeElement === $("search") && e.key !== "Enter" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
   const rows = visible(), i = rows.findIndex((r) => r.name === selected);
@@ -416,11 +929,11 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && rows[i]) { e.preventDefault(); runAction(rows[i], actionsFor(rows[i])[0]); }
 });
 async function refresh(fresh) {
-  try { S = await api("/api/state" + (fresh ? "?fresh=1" : "")); $("version").textContent = "vmctl " + S.version; render(); }
-  catch (e) { $("summary").textContent = e.message; }
+  try { S = await api("/api/state" + (fresh ? "?fresh=1" : "")); $("version").textContent = "vmctl " + S.version; $("connection").textContent = "Live"; $("connection").className = ""; $("connection").removeAttribute("title"); render(); }
+  catch (e) { $("connection").textContent = "Disconnected · retrying"; $("connection").className = "s-warn"; $("connection").title = e.message; }
 }
 (async () => {
-  if (!TOKEN) { $("summary").textContent = "No token: open the URL that `vmctl web` printed."; return; }
+  if (!TOKEN) { $("connection").textContent = "Token required"; $("summary").textContent = "No token: open the URL that `vmctl web` printed."; return; }
   try { catalog = await api("/api/commands"); } catch (e) { toast(e.message, true); }
   await refresh(); refreshJobs();
   const wanted = decodeURIComponent((location.hash.match(/^#console=(.+)$/) || [])[1] || "");
