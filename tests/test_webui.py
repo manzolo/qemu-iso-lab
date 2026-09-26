@@ -22,8 +22,9 @@ from tests._common import BaseVmctlTestCase  # noqa: E402
 class CatalogTests(unittest.TestCase):
     def test_catalog_distinguishes_browser_and_terminal_commands(self):
         catalog = {entry["name"]: entry for entry in webui.command_catalog()}
-        for excluded in ("shell", "console", "import-device", "web"):
+        for excluded in ("shell", "console", "web"):
             self.assertNotIn(excluded, catalog)
+        self.assertTrue(catalog["import-device"]["terminal_only"])
         self.assertIn("bootstrap-haiku", catalog)
         group = {arg["dest"]: arg for arg in catalog["group"]["args"]}
         self.assertIn("cluster", group["action"]["choices"])
@@ -45,6 +46,15 @@ class CatalogTests(unittest.TestCase):
             with self.subTest(confirmed=confirmed), self.assertRaisesRegex(VMError, "cannot be run"):
                 webui.prepare_command(["flash", "testvm", "--device", "/dev/test",
                                        "--confirm-device", "/dev/test"], confirmed=confirmed)
+
+    def test_terminal_commands_are_validated_by_their_own_parser(self):
+        command = webui.prepare_terminal_command(["flash", "vm", "--device", "/dev/sdb", "--confirm-device", "/dev/sdb"])
+        self.assertEqual(command[1:], ["flash", "vm", "--device", "/dev/sdb", "--confirm-device", "/dev/sdb"])
+        for args, message in (([], "Empty"), (["start", "vm"], "not a terminal command"), (["shell", "vm"], "not a terminal command"),
+                              (["flash", "vm", "--device", "/dev/sdb", "--confirm-device", "/dev/sdb", "--bogus"], "Unknown arguments"),
+                              (["flash", "vm"], "required")):
+            with self.subTest(args=args), self.assertRaisesRegex(VMError, message):
+                webui.prepare_terminal_command(args)
 
     def test_destructive_detection(self):
         self.assertTrue(webui.is_destructive(["clean", "vm"]))
@@ -89,6 +99,19 @@ class RequestTests(BaseVmctlTestCase):
         argv = popen.call_args.args[0]
         self.assertEqual(argv, ["/usr/bin/xterm", "-e", str(self.root / "bin/vmctl"), "shell", self.vm_name])
         self.assertNotIn("shell", popen.call_args.kwargs)
+
+    def test_a_terminal_command_holds_its_window_open(self):
+        from unittest import mock
+
+        command = [str(self.root / "bin/vmctl"), "flash", "vm", "--device", "/dev/sdb", "--confirm-device", "/dev/sdb"]
+        with mock.patch.dict("os.environ", {"DISPLAY": ":fixture"}), \
+             mock.patch.object(webui.shutil, "which", return_value="/usr/bin/xterm"), \
+             mock.patch.object(webui.subprocess, "Popen") as popen:
+            self.assertEqual(webui.open_host_terminal(command, hold=True), "x-terminal-emulator")
+        argv = popen.call_args.args[0]
+        self.assertEqual(argv[:5], ["/usr/bin/xterm", "-e", "sh", "-c", webui.HOLD_SCRIPT])
+        self.assertEqual(argv[6:], command)  # argv[5] is $0 of the holding shell
+        self.assertIn('"$@"', webui.HOLD_SCRIPT)
 
     def test_host_ssh_rejects_missing_config_or_desktop(self):
         from unittest import mock
@@ -212,7 +235,7 @@ class ServerTests(BaseVmctlTestCase):
     def test_new_mutations_require_authentication(self):
         from unittest import mock
 
-        for endpoint in ("ssh-terminal", "override"):
+        for endpoint in ("ssh-terminal", "override", "../terminal"):
             with self.subTest(endpoint=endpoint), mock.patch.object(webui, "open_ssh_terminal") as terminal, \
                  mock.patch.object(webui.profile_overrides, "save_override") as save:
                 conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)

@@ -47,8 +47,9 @@ DEFAULT_PORT = 8765
 WEB_DIR = Path(__file__).resolve().parent / "web"
 # Need an interactive terminal or sudo: excluded from the detached job endpoint.
 EXCLUDED_COMMANDS = {"web", "shell", "console", "flash", "import-device", "completion"}
-# Discoverable in the command center, but still refused by the execution endpoint.
-TERMINAL_COMMANDS = {"flash"}
+# Discoverable in the command center and opened in a terminal window on the host (sudo and the
+# CLI's own questions happen there), never as a detached job.
+TERMINAL_COMMANDS = {"flash", "import-device"}
 # Delete or overwrite something: the browser asks first and the request must say it did.
 DESTRUCTIVE = {"clean", "delete-iso", "clean-reports", "clean-stale", "unexport-libvirt"}
 DESTRUCTIVE_ACTIONS = {"checkpoint": {"restore", "delete"}, "group": {"clean", "install"},
@@ -233,15 +234,39 @@ def cancel_job(job_id: str) -> bool:
 # --- VM views --------------------------------------------------------------------------------
 
 
-def open_ssh_terminal(vm_name: str) -> str:
-    """Open the existing SSH CLI in a host terminal, never in a detached web job."""
-    from vmctl import ssh
+def prepare_terminal_command(args: list[str]) -> list[str]:
+    """Validate a request for a terminal-only command (flash, import-device): its own parser, nothing else.
 
-    vm = config.get_vm(config.load_config(), vm_name)
-    ssh.ssh_target(vm)  # validate access without creating keys or opening a connection
+    No browser confirmation is asked for: the command runs in a terminal window on the host, where
+    sudo asks for the password and the CLI asks its own questions."""
+    if not args or not all(isinstance(arg, str) for arg in args):
+        raise VMError("Empty or invalid command")
+    name = args[0]
+    parsers = _subcommands()
+    if name not in TERMINAL_COMMANDS or name not in parsers:
+        raise VMError(f"'{name}' is not a terminal command")
+    captured = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(captured):
+            _, unknown = parsers[name].parse_known_args(args[1:])
+    except SystemExit as exc:
+        message = captured.getvalue().strip().splitlines()
+        raise VMError(message[-1] if message else f"Invalid arguments for '{name}'") from exc
+    if unknown:
+        raise VMError(f"Unknown arguments for '{name}': {' '.join(unknown)}")
+    return [str(state.ROOT / "bin" / "vmctl"), *args]
+
+
+# Keeps the window open after the command so its last lines can be read; the exit status is shown.
+HOLD_SCRIPT = '"$@"; s=$?; printf "\\n[vmctl exited with status %s] Press Enter to close this window." "$s"; read _'
+
+
+def open_host_terminal(command: list[str], hold: bool = False) -> str:
+    """Run a fixed vmctl command line in a terminal window on the host, never in a detached web job."""
     if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
         raise VMError("No desktop session is available. Copy the command into a terminal on the host.")
-    command = [str(state.ROOT / "bin" / "vmctl"), "shell", vm_name]
+    if hold:
+        command = ["sh", "-c", HOLD_SCRIPT, "vmctl-terminal", *command]
     terminals = [("x-terminal-emulator", "-e"), ("gnome-terminal", "--"),
                  ("konsole", "-e"), ("xfce4-terminal", "-x"), ("kitty", "--"),
                  ("alacritty", "-e"), ("foot", "--"), ("xterm", "-e")]
@@ -253,6 +278,15 @@ def open_ssh_terminal(vm_name: str) -> str:
                              stderr=subprocess.DEVNULL, start_new_session=True)
             return name
     raise VMError("No supported terminal was found. Copy the command into your terminal on the host.")
+
+
+def open_ssh_terminal(vm_name: str) -> str:
+    """Open the existing SSH CLI in a host terminal."""
+    from vmctl import ssh
+
+    vm = config.get_vm(config.load_config(), vm_name)
+    ssh.ssh_target(vm)  # validate access without creating keys or opening a connection
+    return open_host_terminal([str(state.ROOT / "bin" / "vmctl"), "shell", vm_name])
 
 def screenshot_png(vm_name: str) -> bytes | None:
     from vmctl import report
@@ -454,6 +488,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({**self.snapshot.get(fresh="fresh" in query), "version": _version()})
             elif path == "/api/commands":
                 self._json(command_catalog())
+            elif path == "/api/devices":
+                self._json(run_json(["list-target-devices", "--json"]))
             elif path.startswith("/api/vm/") and path.endswith("/override"):
                 self._json(profile_overrides.read_override(path[len("/api/vm/"):-len("/override")]))
             elif path == "/api/jobs":
@@ -547,6 +583,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"job": job_id, "command": shlex.join(["vmctl", *command[1:]])})
             elif path.startswith("/api/jobs/") and path.endswith("/cancel"):
                 self._json({"cancelled": cancel_job(path[len("/api/jobs/"):-len("/cancel")])})
+            elif path == "/api/terminal":
+                command = prepare_terminal_command(list(body.get("args") or []))
+                self._json({"terminal": open_host_terminal(command, hold=True),
+                            "command": shlex.join(["vmctl", *command[1:]])})
             elif path.startswith("/api/vm/") and path.endswith("/ssh-terminal"):
                 terminal = open_ssh_terminal(path[len("/api/vm/"):-len("/ssh-terminal")])
                 self._json({"terminal": terminal})

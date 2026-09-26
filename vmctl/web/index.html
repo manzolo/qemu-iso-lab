@@ -288,7 +288,7 @@ const ansi = (s) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r(?!\n)/g
 async function api(path, body) {
   const res = await fetch(path, { method: body ? "POST" : "GET", headers: { "X-Vmctl-Token": TOKEN, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({ error: res.statusText }));
-  if (!res.ok) throw new Error(res.status === 404 && /\/(override|ssh-terminal)$/.test(path) ? "This server needs a restart to load the new features. Restart make web and open its new URL." : data.error || res.statusText);
+  if (!res.ok) throw new Error(res.status === 404 && /\/(override|ssh-terminal|terminal|devices)$/.test(path) ? "This server needs a restart to load the new features. Restart make web and open its new URL." : data.error || res.statusText);
   return data;
 }
 function toast(msg, err) { const t = $("toast"); t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block"; t.showPopover?.(); clearTimeout(t._h); t._h = setTimeout(() => { t.hidePopover?.(); t.style.display = "none"; }, err ? 9000 : 3500); }
@@ -764,7 +764,7 @@ function renderCommandForm() {
     $("cmd-head").innerHTML = '<h3>No command selected</h3><p>Search by name, description or option, or choose another category.</p>';
     $("cmd-form").innerHTML = ""; $("preview").textContent = "—"; $("cmd-validation").textContent = "Choose a command to continue."; return;
   }
-  $("cmd-head").innerHTML = `<div class="eyebrow">${esc(c.group)} · ${esc(pal.scope === "vm" ? pal.vm : "workspace")}</div><h3>${esc(c.name)}</h3><p>${esc(c.help)}</p>${c.terminal_only ? '<div class="note">Run this command in a terminal from the project directory. Flash overwrites the target disk and requires sudo. Stop the VM first and verify the device path. Without an expansion flag, the CLI asks after copying when expansion is supported.</div>' : ""}`;
+  $("cmd-head").innerHTML = `<div class="eyebrow">${esc(c.group)} · ${esc(pal.scope === "vm" ? pal.vm : "workspace")}</div><h3>${esc(c.name)}</h3><p>${esc(c.help)}</p>${c.terminal_only ? '<div class="note"><b>Open in a terminal</b> runs it in a terminal window on the host: sudo asks for your password there and the CLI asks its own questions (expansion, resume). It overwrites the target: stop the VM first and check that the device is the right disk.</div>' : ""}`;
   const field = (a, i) => {
     const id = "arg" + i, label = a.flag || a.dest, attr = `id="${id}" data-arg="${i}" aria-describedby="help${i}" ${a.required ? "required" : ""}`;
     if (a.dest === "vm" && !a.flag && pal.scope === "vm") return `<div class="field"><label for="${id}">Target machine</label><div><span class="fixed">${esc(pal.vm)}</span><input type="hidden" id="${id}" data-arg="${i}" value="${esc(pal.vm)}"></div></div>`;
@@ -773,6 +773,8 @@ function renderCommandForm() {
     else if (a.choices.length) input = `<select ${attr}>${a.required ? "" : `<option value="">Default${a.default != null ? ": " + esc(a.default) : ""}</option>`}${a.choices.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}</select>`;
     else if (a.dest === "vm" || a.dest === "vms") input = `<input type="text" ${attr} list="vm-names" placeholder="${a.kind === "list" ? "Names separated by spaces" : "Select a profile"}">`;
     else if (a.dest === "group") input = `<input type="text" ${attr} list="group-names" placeholder="Select a group">`;
+    else if (c.terminal_only && a.flag === "--device") input = `<input type="text" ${attr} list="host-devices" placeholder="Pick a disk, e.g. /dev/sdb" autocomplete="off">`;
+    else if (c.terminal_only && a.flag === "--confirm-device") input = `<input type="text" ${attr} placeholder="Filled from --device" autocomplete="off">`;
     else input = `<input type="text" ${attr} placeholder="${esc(a.default != null ? "Default: " + a.default : a.kind === "list" ? "Values separated by spaces" : label)}">`;
     return `<div class="field"><label for="${id}">${esc(label)}${a.required ? '<span class="required">Required</span>' : ""}</label>${input}<div id="help${i}" class="help">${a.kind === "flag" ? "" : esc(a.help)}</div></div>`;
   };
@@ -780,14 +782,16 @@ function renderCommandForm() {
   c.args.forEach((a, i) => (a.flag && !a.required ? optional : main).push(field(a, i)));
   $("cmd-form").innerHTML = `<div class="form-fields">${main.join("") || '<p class="help">This command needs no parameters.</p>'}</div>`
     + (optional.length ? `<details id="cmd-advanced" class="advanced"><summary>Options <span id="option-count">(${optional.length} available)</span></summary><div class="form-fields">${optional.join("")}</div></details>` : "")
-    + `<datalist id="vm-names">${S.vms.map((r) => `<option value="${esc(r.name)}">`).join("")}</datalist><datalist id="group-names">${[...new Set(S.labs.map((l) => l.group))].map((g) => `<option value="${esc(g)}">`).join("")}</datalist>`;
+    + `<datalist id="host-devices"></datalist><datalist id="vm-names">${S.vms.map((r) => `<option value="${esc(r.name)}">`).join("")}</datalist><datalist id="group-names">${[...new Set(S.labs.map((l) => l.group))].map((g) => `<option value="${esc(g)}">`).join("")}</datalist>`;
   const draft = drafts.get(draftKey());
   if (draft) {
     $("cmd-form").querySelectorAll("[data-arg]").forEach((el) => { if (Object.hasOwn(draft.values, el.dataset.arg)) { if (el.type === "checkbox") el.checked = draft.values[el.dataset.arg]; else el.value = draft.values[el.dataset.arg]; } });
     if ($("cmd-advanced")) $("cmd-advanced").open = draft.advanced;
   }
+  if (c.terminal_only) loadDevices();
   $("cmd-form").querySelectorAll("input,select").forEach((el) => (el.oninput = () => {
     const arg = c.args[Number(el.dataset.arg)];
+    if (arg.flag === "--device") { const confirm = $("arg" + c.args.findIndex((x) => x.flag === "--confirm-device")); if (confirm) confirm.value = el.value.trim(); }
     if (el.type === "checkbox" && el.checked) (c.exclusive_groups || []).filter((g) => g.includes(arg.flag || arg.dest)).forEach((g) => c.args.forEach((other,i) => { if (i !== Number(el.dataset.arg) && g.includes(other.flag || other.dest)) $("arg" + i).checked = false; }));
     saveDraft(); preview();
   }));
@@ -795,6 +799,14 @@ function renderCommandForm() {
   $("cmd-form").closest(".pal-fields").scrollTop = 0;
   preview();
 }
+// The host's disks for the --device field of flash / import-device: path, size, model, bus.
+let deviceCache = null;
+async function loadDevices() {
+  const fill = (devices) => { const list = $("host-devices"); if (list) list.innerHTML = devices.filter((d) => !d.is_root_disk).map((d) => `<option value="${esc(d.path)}">${esc(fmtBytes(d.size))} · ${esc(d.model || "?")}${d.tran ? " · " + esc(d.tran) : ""}${d.mountpoints?.length ? " · mounted" : ""}</option>`).join(""); };
+  if (deviceCache) return fill(deviceCache);
+  try { deviceCache = await api("/api/devices"); fill(deviceCache); } catch (e) { /* the field stays free text */ }
+}
+const fmtBytes = (n) => n >= 1e12 ? (n / 1e12).toFixed(1) + " TB" : n >= 1e9 ? Math.round(n / 1e9) + " GB" : Math.round(n / 1e6) + " MB";
 function buildArgs() {
   const c = catalog.find((x) => x.name === pal.cmd);
   if (!c) return [];
@@ -820,15 +832,15 @@ function preview() {
   $("preview").textContent = (c.terminal_only ? "bin/vmctl " : "vmctl ") + args.map((a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`)).join(" ");
   const missing = c.args.filter((a, i) => a.required && (a.kind === "flag" ? !$("arg" + i).checked : !$("arg" + i).value.trim()));
   const mismatch = c.name === "flash" && $("arg" + c.args.findIndex((a) => a.flag === "--device")).value.trim() !== $("arg" + c.args.findIndex((a) => a.flag === "--confirm-device")).value.trim();
-  $("cmd-run").disabled = commandBusy || !!missing.length || mismatch || !!c.terminal_only;
+  $("cmd-run").disabled = commandBusy || !!missing.length || mismatch;
   $("cmd-copy").disabled = !!missing.length || mismatch;
   $("cmd-copy").textContent = c.terminal_only ? "Copy for terminal" : "Copy";
-  $("cmd-validation").textContent = missing.length ? "Required: " + missing.map((a) => a.flag || a.dest).join(", ") : mismatch ? "Device paths must match exactly." : c.terminal_only ? "Run in a terminal · sudo required" : "Ready · Ctrl / ⌘ + Enter to run";
+  $("cmd-validation").textContent = missing.length ? "Required: " + missing.map((a) => a.flag || a.dest).join(", ") : mismatch ? "Device paths must match exactly." : c.terminal_only ? "Opens a terminal window on the host · sudo asks there" : "Ready · Ctrl / ⌘ + Enter to run";
   const danger = destructiveCommand(args);
   $("cmd-warning").classList.toggle("hidden", !danger);
   $("cmd-warning").textContent = danger ? "This command deletes or overwrites data. Confirmation is required before running." : "";
   $("cmd-run").classList.toggle("danger", danger); $("cmd-run").classList.toggle("primary", !danger);
-  $("cmd-run").textContent = c.terminal_only ? "Terminal only" : commandBusy ? "Starting…" : danger ? "Review & run…" : "Run command";
+  $("cmd-run").textContent = c.terminal_only ? (commandBusy ? "Opening…" : "Open in a terminal ↗") : commandBusy ? "Starting…" : danger ? "Review & run…" : "Run command";
   const active = c.args.filter((a, i) => a.flag && (a.kind === "flag" ? $("arg" + i).checked : $("arg" + i).value.trim())).length;
   if ($("option-count")) $("option-count").textContent = active ? `(${active} set)` : `(${c.args.filter((a) => a.flag && !a.required).length} available)`;
 }
@@ -836,7 +848,12 @@ async function submitCommand() {
   if (!pal.cmd || commandBusy) return;
   preview(); if ($("cmd-run").disabled) return;
   saveDraft(); commandBusy = true; preview();
-  try { await run(buildArgs()); } finally { commandBusy = false; preview(); }
+  const c = catalog.find((x) => x.name === pal.cmd);
+  try {
+    if (c.terminal_only) { const res = await api("/api/terminal", { args: buildArgs() }); toast(`Opened in ${res.terminal}: continue there (sudo password, then the CLI's questions).`); }
+    else await run(buildArgs());
+  } catch (e) { toast(e.message, true); }
+  finally { commandBusy = false; preview(); }
 }
 $("cmd-filter").oninput = () => { saveDraft(); renderPalette(); };
 $("cmd-category").onchange = () => { saveDraft(); renderPalette(); };

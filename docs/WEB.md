@@ -67,10 +67,13 @@ The page can delete disks and start anything `vmctl` can, so:
 - every API call needs the token printed at start (the page keeps it in `sessionStorage` and
   drops it from the address bar);
 - commands that need a terminal or sudo cannot run as detached jobs: `shell`, `console`, `flash`,
-  `import-device` (and `web` itself). **Flash** is visible as a terminal-only form: select the
-  target device, repeat its path and copy the command to a terminal in the project directory.
-  `--expand` and `--no-expand` are mutually exclusive; neither is selected by default. The CLI
-  retains its disk checks, sudo flow and post-copy expansion prompt;
+  `import-device` (and `web` itself). **Flash** and **import-device** are terminal-only forms:
+  pick the target disk from the host's disks (`/api/devices` = `vmctl list-target-devices --json`,
+  the system disk left out; `--confirm-device` is filled from it), then **Open in a terminal**
+  starts the command in a terminal window on the host (`/api/terminal`, validated by the
+  subcommand's own parser, only those two commands), where sudo asks for your password and the
+  CLI keeps its disk checks and its questions (expansion, resume); the window stays open at the
+  end with the exit status. *Copy for terminal* remains for a host without a desktop;
 - SSH has dedicated authenticated endpoints for its browser PTY and host terminal; neither
   accepts an arbitrary command from the browser;
 - destructive commands (`clean`, `delete-iso`, `clean-reports`, `checkpoint restore|delete`,
@@ -91,6 +94,8 @@ The page can delete disks and start anything `vmctl` can, so:
 | GET | `/api/vm/<vm>/show` | `vmctl show <vm> --json` |
 | GET / POST | `/api/vm/<vm>/override` | read template/override/revision; save `{"override": {...}, "revision": "..."}` |
 | POST | `/api/vm/<vm>/ssh-terminal` | open `vmctl shell <vm>` in a host terminal |
+| POST | `/api/terminal` | `{"args": ["flash", "vm", "--device", ...]}`: a terminal-only command in a host terminal window |
+| GET | `/api/devices` | the host's block devices (`vmctl list-target-devices --json`) for the `--device` field |
 | GET (WebSocket) | `/api/vm/<vm>/ssh?token=` | interactive SSH PTY; JSON input/resize messages, binary terminal output |
 | GET | `/api/vm/<vm>/screen.png` | a screenshot of a running headless VM (QMP screendump) |
 | GET (WebSocket) | `/api/vm/<vm>/vnc?token=` | the VM's VNC socket, relayed both ways (noVNC in the page) |

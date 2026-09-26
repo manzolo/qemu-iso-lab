@@ -144,8 +144,9 @@ opening a separate QEMU window. The same console lets you watch unattended insta
 ![Live browser console connected to arch-noctalia, with display scaling, reconnect and full-screen controls](docs/screenshots/web-console.png)
 
 Use `/` to search profiles, `C` to open commands and **Ctrl/Cmd+Enter** to run a
-reviewed command. Destructive commands ask for confirmation. Physical-disk **Flash**
-is available as a form that prepares a command to run in a terminal with sudo.
+reviewed command. Destructive commands ask for confirmation. Physical-disk **Flash** and
+**import-device** pick the target disk from a list and open in a terminal window on the host,
+where sudo asks for your password and the CLI asks its questions.
 
 The graphical console and browser SSH terminal load noVNC/xterm.js from a CDN;
 the dashboard and screenshot view need no external assets. After updating the code,
