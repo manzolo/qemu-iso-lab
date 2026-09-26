@@ -21,4 +21,4 @@ where = ["."]
 include = ["vmctl*"]
 
 [tool.setuptools.package-data]
-vmctl = ["*.tcss"]
+vmctl = ["*.tcss", "web/*"]

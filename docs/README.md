@@ -15,6 +15,7 @@ essential steps in Italian for the terminal-at-hand case.
 | [NETWORK-LAB.md](NETWORK-LAB.md) | you build the pfSense + Pi-hole + client lab | Topology, `networks` and phases, host access through the router, the libvirt road, differences from kvm-lab, verification checklist |
 | [LIBVIRT.md](LIBVIRT.md) | you want a vmctl VM in virt-manager | `export-libvirt` / `unexport-libvirt`: what is translated, what is not, how to come back |
 | [IMPORT_DISKS.md](IMPORT_DISKS.md) | you write a VM to a real disk, or read a real disk into a VM | `vmctl flash` (full or allocated-block copy, GPT repair, optional NTFS expansion) and `vmctl import-device` (full or allocated-block, resume) |
+| [WEB.md](WEB.md) | you prefer a browser | `vmctl web`: profiles and their actions, every command as a form, live job logs, VM screens, labs; safety and the JSON API |
 | [VMTUI.md](VMTUI.md) | you prefer menus to flags | The TUI: dashboard, filters, contextual menu, video profiles, remote SPICE |
 | [VENTOY.md](VENTOY.md) | you carry a guest disk on a Ventoy key | The two helper scripts off the `vmctl` path |
 

@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QEMU ISO Lab</title>
+<style>
+:root {
+  --bg: #111820; --panel: #18222e; --panel2: #1e2a38; --line: #304050; --text: #dce5ef;
+  --muted: #a6b4c8; --accent: #84c9e7; --ok: #86d5ab; --warn: #e8be78; --bad: #f08a8a; --btn: #243343;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+code, pre, .mono { font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace; }
+header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+header h1 { font-size: 17px; margin: 0; color: var(--accent); font-weight: 600; }
+header h1 b { color: var(--text); }
+#summary { color: var(--muted); font-size: 13px; }
+#toolbar { display: flex; gap: 8px; padding: 12px 20px; align-items: center; flex-wrap: wrap; }
+#search { flex: 1 1 260px; min-width: 200px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+#search:focus { outline: none; border-color: var(--accent); }
+button { background: var(--btn); color: var(--text); border: 1px solid transparent; border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+button:hover { background: #344b61; }
+button:disabled { opacity: .45; cursor: default; }
+button.active, button.primary { background: var(--accent); color: #111820; font-weight: 600; }
+button.danger { color: var(--bad); border-color: #5a3a42; }
+button.link { background: none; color: var(--accent); padding: 0; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; padding: 0 20px 16px; }
+@media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.card h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0; padding: 12px 16px 8px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 6px 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+td { padding: 6px 12px; border-bottom: 1px solid #1f2b39; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+tr.row { cursor: pointer; }
+tr.row:hover td { background: #1b2735; }
+tr.row.sel td { background: #285269; color: #fff; }
+#list { max-height: calc(100vh - 300px); overflow: auto; }
+.state { font-weight: 600; }
+.s-ok { color: var(--ok); } .s-warn { color: var(--warn); } .s-bad { color: var(--bad); } .s-info { color: var(--accent); } .s-muted { color: var(--muted); }
+#details { padding: 0 16px 16px; }
+#details .name { font-size: 18px; font-weight: 600; margin: 4px 0 0; }
+#details .desc { color: var(--muted); margin-bottom: 10px; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 12px 0; font-size: 13px; }
+.facts dt { color: var(--muted); } .facts dd { margin: 0; }
+.actions { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.actions button { text-align: left; }
+.note { background: var(--panel2); border-left: 3px solid var(--warn); padding: 10px 12px; border-radius: 6px; white-space: pre-wrap; font-size: 13px; margin: 10px 0; }
+#jobs { margin: 0 20px 20px; }
+#jobs table td:first-child { width: 110px; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--btn); }
+.chip.running { background: #5a4a26; color: var(--warn); } .chip.completed { background: #214234; color: var(--ok); }
+.chip.failed, .chip.interrupted, .chip.cancelled { background: #4a2a30; color: var(--bad); }
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(900px, 94vw); max-height: 90vh; }
+dialog::backdrop { background: #000a; }
+dialog header { border-radius: 12px 12px 0 0; justify-content: space-between; }
+dialog .body { padding: 16px; overflow: auto; max-height: calc(90vh - 60px); }
+pre.log { background: #0b1016; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 0; height: 60vh; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
+.form { display: grid; grid-template-columns: 180px 1fr; gap: 8px 12px; align-items: center; }
+.form label { color: var(--muted); font-size: 13px; }
+.form input[type=text], .form select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
+.help { grid-column: 2; color: var(--muted); font-size: 12px; margin-top: -4px; }
+#preview { margin: 14px 0; padding: 8px 10px; background: #0b1016; border-radius: 6px; }
+.labs { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; padding: 0 20px 16px; }
+.lab { padding: 0 16px 16px; }
+.lab .members { margin: 8px 0 12px; font-size: 13px; }
+.lab .members div { display: flex; justify-content: space-between; border-bottom: 1px solid #1f2b39; padding: 3px 0; }
+.lab .buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+#screen img { max-width: 100%; border-radius: 6px; display: block; margin: 0 auto; background: #000; }
+#toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--line); padding: 10px 14px; border-radius: 8px; display: none; max-width: 520px; white-space: pre-wrap; }
+#toast.err { border-color: var(--bad); color: var(--bad); }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>QEMU <b>ISO Lab</b></h1>
+  <span id="summary">Reading VM state…</span>
+  <span style="flex:1"></span>
+  <span id="version" class="s-muted"></span>
+</header>
+<div id="toolbar">
+  <input id="search" placeholder="Search profiles, distributions…  ( / )" autocomplete="off">
+  <button data-filter="all" class="active">All</button>
+  <button data-filter="disk">With disk</button>
+  <button data-filter="running">Running</button>
+  <button data-filter="labs">Labs</button>
+  <button id="all-commands">All commands…</button>
+</div>
+<main id="profiles-view">
+  <section class="card"><h2 id="list-title">Profiles</h2>
+    <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th><th>Description</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+  <section class="card"><h2>Profile</h2><div id="details"><p class="s-muted">Select a profile.</p></div></section>
+</main>
+<div id="labs-view" class="labs hidden"></div>
+<section id="jobs" class="card"><h2>Jobs <span class="s-muted" style="text-transform:none;letter-spacing:0">· started here or in vmtui; they keep running if this page or the server closes</span></h2>
+  <table><tbody id="job-rows"><tr><td colspan="3" class="s-muted">No jobs yet.</td></tr></tbody></table>
+</section>
+
+<dialog id="log-dialog"><header><h1 id="log-title">Job</h1><span><button id="log-cancel" class="danger">Cancel job</button> <button data-close>Close</button></span></header>
+  <div class="body"><pre class="log" id="log"></pre></div></dialog>
+<dialog id="cmd-dialog"><header><h1>Run a vmctl command</h1><button data-close>Close</button></header>
+  <div class="body"><div class="form" id="cmd-form"></div><div id="preview" class="mono"></div>
+  <button id="cmd-run" class="primary">Run</button></div></dialog>
+<dialog id="screen-dialog"><header><h1 id="screen-title">Screen</h1><button data-close>Close</button></header>
+  <div class="body" id="screen"><img id="screen-img" alt="VM screen"><p class="s-muted" id="screen-note">A screenshot every 2 s through QMP. For keyboard and mouse use "Open viewer on the host".</p></div></dialog>
+<dialog id="vnc-dialog" style="width:min(1400px,96vw)"><header><h1 id="vnc-title">Console</h1><span><button id="vnc-cad">Ctrl+Alt+Del</button> <button id="vnc-full">Full screen</button> <button id="vnc-close">Close</button></span></header>
+  <div id="vnc-screen" style="height:78vh;background:#000"></div><p class="s-muted" id="vnc-note" style="padding:6px 16px;margin:0">Click the screen to type into the VM. Esc goes to the VM too: use Close.</p></dialog>
+<dialog id="help-dialog"><header><h1 id="help-title">ISO needed</h1><button data-close>Close</button></header>
+  <div class="body"><div class="note" id="help-text"></div></div></dialog>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const params = new URLSearchParams(location.search);
+if (params.get("token")) { sessionStorage.setItem("vmctl-token", params.get("token")); history.replaceState(null, "", "/" + location.hash); }
+const TOKEN = sessionStorage.getItem("vmctl-token") || "";
+let S = { vms: [], labs: [] }, catalog = [], filter = "all", selected = localStorage.getItem("vmctl-selected") || "", logJob = null, logOffset = 0;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ansi = (s) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r(?!\n)/g, "\n");
+
+async function api(path, body) {
+  const res = await fetch(path, { method: body ? "POST" : "GET", headers: { "X-Vmctl-Token": TOKEN, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({ error: res.statusText }));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+function toast(msg, err) { const t = $("toast"); t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), err ? 9000 : 3500); }
+
+function stateOf(r) {
+  const job = r.job_status;
+  if (job && job !== "completed") return job === "running" ? ["Installing", "s-warn"] : [job[0].toUpperCase() + job.slice(1), "s-bad"];
+  if (r.running) return ["Running", "s-ok"];
+  if (r.install_label === "no disk" && r.iso_source === "manual") return ["ISO needed", "s-warn"];
+  return ({ verified: ["Boot verified", "s-ok"], installed: ["Installed", "s-info"], unverified: ["Unverified", "s-warn"],
+            incomplete: ["Incomplete", "s-bad"], empty: ["Empty disk", "s-muted"], "no disk": ["No disk", "s-muted"] })[r.install_label] || ["Unknown", "s-muted"];
+}
+const ram = (r) => (r.memory_mb >= 1024 ? (r.memory_mb / 1024) + "G" : r.memory_mb + "M") + " / " + r.cpus;
+
+function actionsFor(r) {
+  const n = r.name, a = [];
+  if (r.job_status === "running") { a.push({ label: "Installation log", job: "vm:" + n }); a.push({ label: "Watch the install (console)", console: true }); }
+  if (r.running) {
+    if (r.job_status !== "running") a.push({ label: "Console (screen, keyboard, mouse)", console: true });
+    a.push({ label: "Screenshot (every 2 s)", screen: true });
+    a.push({ label: "Open viewer on the host", args: ["attach", n] });
+    a.push({ label: "Stop", args: ["stop", n] });
+    a.push({ label: "Force stop", args: ["stop", n, "--force"], danger: true });
+  } else if (r.installed) {
+    a.push({ label: "Boot headless", args: ["start", n, "--headless", "--background"] });
+    a.push({ label: "Boot with display (window on the host)", args: ["start", n] });
+    a.push({ label: "Checkpoint now", args: ["checkpoint", "create", n, "web-" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")] });
+  } else if (r.job_status !== "running") {
+    if (r.iso_source === "manual") a.push({ label: "Get the ISO…", help: true });
+    else if (r.unattended_flow) a.push({ label: "Unattended install", args: [r.unattended_flow, n] });
+    if (r.iso_source === "download") a.push({ label: "Download the ISO", args: ["fetch-iso", n] });
+    if (r.iso_source !== "manual") a.push({ label: "Manual install (window on the host)", args: ["provision", n] });
+  }
+  if (!r.running && (r.prepared || r.installed)) a.push({ label: "Clean: delete the disk", args: ["clean", n], danger: true });
+  a.push({ label: "All commands for " + n + "…", form: n });
+  return a;
+}
+
+function visible() {
+  const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
+  return S.vms.filter((r) => words.every((w) => (r.name + " " + r.label + " " + r.family).toLowerCase().includes(w))
+    && (filter !== "disk" || r.prepared) && (filter !== "running" || r.running))
+    .sort((x, y) => (y.running - x.running) || (y.installed - x.installed) || (y.prepared - x.prepared) || x.name.localeCompare(y.name, undefined, { numeric: true }));
+}
+function render() {
+  const all = S.vms, withData = all.filter((r) => r.installed).length, running = all.filter((r) => r.running).length;
+  $("summary").textContent = `${all.length} profiles · ${withData} with data · ${running} running`;
+  const labs = filter === "labs";
+  $("profiles-view").classList.toggle("hidden", labs);
+  $("labs-view").classList.toggle("hidden", !labs);
+  if (labs) return renderLabs();
+  const rows = visible();
+  $("list-title").textContent = `Profiles  ${rows.length} / ${all.length}`;
+  if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
+  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}"><td class="mono">${esc(r.name)}</td><td class="state ${c}">${s}</td><td class="mono">${ram(r)}</td><td>${esc(r.label)}</td></tr>`; }).join("")
+    || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`;
+  renderDetails();
+}
+function renderDetails() {
+  const r = S.vms.find((x) => x.name === selected);
+  if (!r) { $("details").innerHTML = '<p class="s-muted">Select a profile.</p>'; return; }
+  const [s, c] = stateOf(r);
+  const facts = [["State", `<span class="state ${c}">${s}</span>`], ["Resources", `${ram(r)} vCPU · ${esc(r.firmware)}`],
+    ["Disk", r.prepared ? `${esc(r.disk_host || "?")} on host · ${esc(r.disk_capacity || "?")} capacity` : "none yet"],
+    ["ISO", { cached: "available", download: "vmctl downloads it", manual: "you provide it" }[r.iso_source] || (r.iso_ready ? "available" : "not cached")],
+    ["SSH", r.ssh_port ? `127.0.0.1:${esc(r.ssh_port)}` : "not configured"], ["Install", esc(r.install_detail || "")]];
+  const actions = actionsFor(r);
+  $("details").innerHTML = `<div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div>
+    <dl class="facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+    ${r.iso_source === "manual" && !r.installed ? `<div class="note">${esc((r.iso_help || "").replace(/\\n/g, "\n"))}</div>` : ""}
+    <div class="actions">${actions.map((x, i) => `<button data-action="${i}" class="${i === 0 ? "primary" : x.danger ? "danger" : ""}">${esc(x.label)}${i === 0 ? "  ·  Enter" : ""}</button>`).join("")}</div>`;
+  $("details").querySelectorAll("[data-action]").forEach((b) => (b.onclick = () => runAction(r, actions[+b.dataset.action])));
+}
+function renderLabs() {
+  const byName = Object.fromEntries(S.vms.map((r) => [r.name, r]));
+  $("labs-view").innerHTML = S.labs.map((lab) => {
+    const members = (lab.start_order || lab.members).map((n) => byName[n]).filter(Boolean);
+    const up = members.filter((m) => m.running).length;
+    const cluster = members.some((m) => m.family === "proxmox");
+    const btn = (label, args, cls = "") => `<button class="${cls}" data-args='${esc(JSON.stringify(args))}'>${label}</button>`;
+    return `<section class="card lab"><h2>${esc(lab.group)}</h2><div class="s-muted">${up} / ${members.length} running · start order ${esc((lab.start_order || []).join(" → "))}</div>
+      <div class="members">${members.map((m) => { const [s, c] = stateOf(m); return `<div><span class="mono">${esc(m.name)} <span class="s-muted">${esc((lab.addresses || {})[m.name] || "")}</span></span><span class="${c}">${s}</span></div>`; }).join("")}</div>
+      <div class="buttons">${btn("Install lab…", ["group", "install", lab.group], "primary")}${btn("Start stack", ["group", "up", lab.group])}${btn("Stop stack", ["group", "down", lab.group])}${btn("Status", ["group", "status", lab.group])}${cluster ? btn("Form cluster", ["group", "cluster", lab.group]) : ""}${btn("Network map", ["group", "map", lab.group])}<button data-map="${esc(lab.group)}">Open map ↗</button>${btn("Clean lab…", ["group", "clean", lab.group], "danger")}</div></section>`;
+  }).join("") || '<p class="s-muted">No labs declared.</p>';
+  $("labs-view").querySelectorAll("[data-args]").forEach((b) => (b.onclick = () => run(JSON.parse(b.dataset.args))));
+  $("labs-view").querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.map)}/map?token=${encodeURIComponent(TOKEN)}`, "_blank")));
+}
+
+async function run(args, danger) {
+  const cmd = catalog.find((c) => c.name === args[0]);
+  const destructive = danger || (cmd && (cmd.destructive || cmd.destructive_actions.includes(args[1]))) || (args[0] === "check-vms" && args.includes("--clean-first"));
+  if (destructive && !confirm(`vmctl ${args.join(" ")}\n\nThis deletes or overwrites data. Continue?`)) return;
+  try {
+    const res = await api("/api/run", { args, confirmed: !!destructive });
+    toast("Started: " + res.command);
+    openLog(res.job, res.command);
+    refresh(true); refreshJobs();
+  } catch (e) { toast(e.message, true); }
+}
+function runAction(r, a) {
+  if (a.job) return openLog(a.job, "Installation of " + r.name);
+  if (a.screen) return openScreen(r.name);
+  if (a.console) return openConsole(r.name);
+  if (a.help) { $("help-title").textContent = "ISO needed: " + r.name; $("help-text").textContent = (r.iso_help || "").replace(/\\n/g, "\n"); return $("help-dialog").showModal(); }
+  if (a.form) return openCommands(a.form);
+  run(a.args, a.danger);
+}
+
+// --- jobs and logs
+async function refreshJobs() {
+  try {
+    const jobs = await api("/api/jobs");
+    $("job-rows").innerHTML = jobs.map((j) => `<tr class="row" data-job="${esc(j.id)}" data-cmd="${esc(j.command)}"><td><span class="chip ${esc(j.status.split(" ")[0])}">${esc(j.status)}</span></td><td class="mono">${esc(j.command)}</td><td class="s-muted">${new Date(j.updated * 1000).toLocaleTimeString()}</td></tr>`).join("")
+      || '<tr><td colspan="3" class="s-muted">No jobs yet.</td></tr>';
+    $("job-rows").querySelectorAll("[data-job]").forEach((t) => (t.onclick = () => openLog(t.dataset.job, t.dataset.cmd)));
+  } catch (e) { /* the state refresh reports errors */ }
+}
+function openLog(job, title) { logJob = job; logOffset = 0; $("log").textContent = ""; $("log-title").textContent = title || job; $("log-dialog").showModal(); pollLog(); }
+async function pollLog() {
+  if (!logJob || !$("log-dialog").open) return;
+  try {
+    const d = await api(`/api/jobs/${encodeURIComponent(logJob)}/log?offset=${logOffset}`);
+    const pre = $("log"), atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;
+    if (d.text) { pre.textContent += ansi(d.text); if (atEnd) pre.scrollTop = pre.scrollHeight; }
+    logOffset = d.offset;
+    $("log-cancel").classList.toggle("hidden", d.status !== "running");
+    if (d.offset < d.size) return setTimeout(pollLog, 50);
+  } catch (e) { $("log").textContent += "\n[" + e.message + "]"; }
+  setTimeout(pollLog, 1000);
+}
+$("log-cancel").onclick = async () => {
+  if (!confirm("Cancel this job? A VM it started is stopped; disk and logs are kept.")) return;
+  try { await api(`/api/jobs/${encodeURIComponent(logJob)}/cancel`, {}); toast("Cancelled"); refreshJobs(); } catch (e) { toast(e.message, true); }
+};
+
+// --- screen
+let screenTimer = null;
+function openScreen(vm) {
+  $("screen-title").textContent = "Screen: " + vm; $("screen-dialog").showModal();
+  const tick = () => { if (!$("screen-dialog").open) return clearInterval(screenTimer); $("screen-img").src = `/api/vm/${encodeURIComponent(vm)}/screen.png?token=${encodeURIComponent(TOKEN)}&t=${Date.now()}`; };
+  clearInterval(screenTimer); tick(); screenTimer = setInterval(tick, 2000);
+}
+$("screen-img").onerror = () => ($("screen-note").textContent = "No screen: the VM is not running headless (a VM with its own window has no QMP socket).");
+
+// --- console: noVNC in the page, bridged by the server to the VM's runtime/vnc.sock
+const NOVNC = "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.7.0/core/rfb.js";
+let rfb = null;
+async function openConsole(vm) {
+  let RFB;
+  try { RFB = (await import(NOVNC)).default; }
+  catch (e) { return toast("Cannot load noVNC from cdn.jsdelivr.net (" + e.message + "): the screenshot view needs no download.", true); }
+  if (rfb) rfb.disconnect();
+  $("vnc-title").textContent = "Console: " + vm;
+  $("vnc-screen").innerHTML = "";
+  const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/vm/${encodeURIComponent(vm)}/vnc?token=${encodeURIComponent(TOKEN)}`;
+  rfb = new RFB($("vnc-screen"), url);
+  rfb.scaleViewport = true;
+  rfb.focusOnClick = true;
+  rfb.addEventListener("connect", () => { $("vnc-note").textContent = "Connected. Click the screen to type into the VM; Esc goes to the VM too: use Close."; rfb.focus(); });
+  rfb.addEventListener("disconnect", (e) => { $("vnc-note").textContent = e.detail.clean ? "Disconnected." : "The console closed: the VM stopped, or it runs with its own window (no VNC socket)."; });
+  $("vnc-dialog").showModal();
+}
+function closeConsole() { if (rfb) { rfb.disconnect(); rfb = null; } $("vnc-dialog").close(); }
+$("vnc-close").onclick = closeConsole;
+$("vnc-dialog").addEventListener("cancel", (e) => e.preventDefault());  // Esc belongs to the VM
+$("vnc-cad").onclick = () => rfb && rfb.sendCtrlAltDel();
+$("vnc-full").onclick = () => $("vnc-screen").requestFullscreen?.();
+
+// --- the generic command form, built from the argparse catalog
+function openCommands(vm) {
+  const groups = [...new Set(catalog.map((c) => c.group))];
+  const form = $("cmd-form");
+  form.innerHTML = `<label>Command</label><select id="cmd-name">${groups.map((g) => `<optgroup label="${esc(g)}">${catalog.filter((c) => c.group === g).map((c) => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("")}</optgroup>`).join("")}</select><div class="help" id="cmd-help"></div><div id="cmd-args" style="display:contents"></div>`;
+  const pick = () => {
+    const c = catalog.find((x) => x.name === $("cmd-name").value);
+    $("cmd-help").textContent = c.help;
+    $("cmd-args").innerHTML = c.args.map((a, i) => {
+      const id = "arg" + i, label = a.flag || a.dest;
+      let input;
+      if (a.kind === "flag") input = `<input type="checkbox" id="${id}">`;
+      else if (a.choices.length) input = `<select id="${id}">${a.required ? "" : '<option value=""></option>'}${a.choices.map((o) => `<option>${esc(o)}</option>`).join("")}</select>`;
+      else if (a.dest === "vm" || a.dest === "vms") input = `<input type="text" id="${id}" list="vm-names" value="${a.dest === "vm" ? esc(vm || "") : ""}" placeholder="${a.kind === "list" ? "names separated by spaces" : ""}">`;
+      else if (a.dest === "group") input = `<input type="text" id="${id}" list="group-names">`;
+      else input = `<input type="text" id="${id}" placeholder="${esc(a.default ?? "")}">`;
+      return `<label for="${id}">${esc(label)}${a.required && !a.flag ? " *" : ""}</label>${input}<div class="help">${esc(a.help)}</div>`;
+    }).join("") + `<datalist id="vm-names">${S.vms.map((r) => `<option value="${esc(r.name)}">`).join("")}</datalist><datalist id="group-names">${[...new Set(S.labs.map((l) => l.group))].map((g) => `<option value="${esc(g)}">`).join("")}</datalist>`;
+    $("cmd-args").querySelectorAll("input,select").forEach((el) => (el.oninput = preview));
+    preview();
+  };
+  $("cmd-name").onchange = pick;
+  $("cmd-name").value = vm ? (catalog.find((c) => c.args.some((a) => a.dest === "vm")) || catalog[0]).name : catalog[0].name;
+  if (vm) $("cmd-name").value = "show";
+  pick();
+  $("cmd-dialog").showModal();
+}
+function buildArgs() {
+  const c = catalog.find((x) => x.name === $("cmd-name").value), args = [c.name], opts = [];
+  c.args.forEach((a, i) => {
+    const el = $("arg" + i);
+    if (a.kind === "flag") { if (el.checked) opts.push(a.flag); return; }
+    const v = el.value.trim();
+    if (!v) return;
+    const values = a.kind === "list" ? v.split(/\s+/) : [v];
+    if (a.flag) values.forEach((x) => opts.push(a.flag, x)); else args.push(...values);
+  });
+  return [...args, ...opts];
+}
+function preview() { $("preview").textContent = "vmctl " + buildArgs().map((a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`)).join(" "); }
+$("cmd-run").onclick = () => { $("cmd-dialog").close(); run(buildArgs()); };
+$("all-commands").onclick = () => openCommands(selected);
+
+// --- wiring
+document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
+document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll("[data-filter]").forEach((x) => x.classList.toggle("active", x === b)); render(); }));
+$("rows").onclick = (e) => { const tr = e.target.closest("[data-vm]"); if (tr) { selected = tr.dataset.vm; localStorage.setItem("vmctl-selected", selected); render(); } };
+$("search").oninput = render;
+document.addEventListener("keydown", (e) => {
+  if (document.querySelector("dialog[open]")) return;
+  if (e.key === "/" && document.activeElement !== $("search")) { e.preventDefault(); $("search").focus(); return; }
+  if (document.activeElement === $("search") && e.key !== "Enter" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  const rows = visible(), i = rows.findIndex((r) => r.name === selected);
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const r = rows[Math.max(0, Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (r) { selected = r.name; render(); document.querySelector("tr.sel")?.scrollIntoView({ block: "nearest" }); } }
+  if (e.key === "Enter" && rows[i]) { e.preventDefault(); runAction(rows[i], actionsFor(rows[i])[0]); }
+});
+async function refresh(fresh) {
+  try { S = await api("/api/state" + (fresh ? "?fresh=1" : "")); $("version").textContent = "vmctl " + S.version; render(); }
+  catch (e) { $("summary").textContent = e.message; }
+}
+(async () => {
+  if (!TOKEN) { $("summary").textContent = "No token: open the URL that `vmctl web` printed."; return; }
+  try { catalog = await api("/api/commands"); } catch (e) { toast(e.message, true); }
+  await refresh(); refreshJobs();
+  const wanted = decodeURIComponent((location.hash.match(/^#console=(.+)$/) || [])[1] || "");
+  if (wanted) { selected = wanted; render(); openConsole(wanted); }
+  setInterval(refresh, 5000); setInterval(refreshJobs, 3000);
+})();
+</script>
+</body>
+</html>

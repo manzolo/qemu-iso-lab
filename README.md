@@ -19,7 +19,7 @@ disk, the firmware, the unattended install and the SSH provisioning. One CLI,
 ![vmtui: every profile with its state, a description and the actions for the selected VM](docs/screenshots/vmtui-dashboard.png)
 
 **Contents:** [Quick start](#quick-start) · [What it installs](#what-it-installs) ·
-[The dashboard](#the-dashboard) · [Labs](#labs) · [Everyday commands](#everyday-commands) ·
+[The dashboard](#the-dashboard) · [In the browser](#in-the-browser) · [Labs](#labs) · [Everyday commands](#everyday-commands) ·
 [Make it yours](#make-it-yours) · [Documentation](#documentation) · [Development](#development)
 
 ## Quick start
@@ -108,6 +108,15 @@ can copy it.
 
 Keys, video profiles and remote SPICE: [docs/VMTUI.md](docs/VMTUI.md).
 
+## In the browser
+
+`make web` (or `vmctl web --open`) serves the same lab on 127.0.0.1 with a token: every profile
+with the actions for its state, a live screenshot of a running VM, the labs, and every `vmctl`
+command in a form built from the CLI itself. Everything runs as a job with its log followed live,
+shared with the TUI. [docs/WEB.md](docs/WEB.md).
+
+![vmctl web: profiles, the selected VM's actions, jobs](docs/screenshots/web-dashboard.png)
+
 ## Labs
 
 A lab is a group of VMs on a private network segment, installed and started as one
@@ -160,6 +169,7 @@ Details: [docs/PROVISIONING.md](docs/PROVISIONING.md).
 | [UNATTENDED](docs/UNATTENDED.md) | how each unattended install works, and the validation matrix |
 | [PROVISIONING](docs/PROVISIONING.md) | your identity, packages and dotfiles in a fresh guest |
 | [VMTUI](docs/VMTUI.md) | the dashboard and the classic menus |
+| [WEB](docs/WEB.md) | the lab in a browser: actions, jobs, API, safety |
 | [LABS](docs/LABS.md) | the network lab and the Proxmox lab |
 | [guides/](docs/guides/README.md) | printable step-by-step guides in English and Italian (`make guides`) |
 
