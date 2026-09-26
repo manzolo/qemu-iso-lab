@@ -1,15 +1,26 @@
 # QEMU ISO Lab
 
 [![CI](https://github.com/manzolo/qemu-iso-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/manzolo/qemu-iso-lab/actions/workflows/ci.yml)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)
+![Profiles](https://img.shields.io/badge/profiles-101-84c9e7)
 
-Install and run **Linux, BSD and Windows** guests on QEMU/KVM from one JSON
-profile each: ISO download and checksum, disk, firmware, a **zero-click
-install** and SSH provisioning. 96 profiles, from Arch, Debian, Fedora, NixOS
-and every Ubuntu LTS since 8.04 to Windows 11, 10, 7, XP, 2000 and NT 4,
-FreeBSD, pfSense and ReactOS. One CLI (`vmctl`) and one terminal dashboard
-(`vmtui`) drive all of it.
+**Linux, BSD and Windows virtual machines on QEMU/KVM, installed with zero clicks.**
+One JSON profile per VM describes the ISO (downloaded and checksummed), the
+disk, the firmware, the unattended install and the SSH provisioning. One CLI,
+`vmctl`, and one terminal dashboard, `vmtui`, drive all of it.
 
-![vmtui: search, filters, every profile with its state, and the actions that make sense for the selected VM](docs/screenshots/vmtui-dashboard.png)
+- **101 profiles**, 56 of them fully unattended: every Ubuntu LTS since 8.04, Debian,
+  Fedora, Arch, NixOS, openSUSE, FreeBSD, ReactOS and Windows from 11 back to NT 4.
+- **Labs**: groups of VMs on a private network, installed and started as one stack,
+  such as a pfSense + Pi-hole network or a three-node Proxmox VE cluster.
+- **Tested for real**: every unattended profile is reinstalled from scratch by a local
+  validation matrix; the last full run (2026-09-26) was 53 PASS, 0 FAIL.
+
+![vmtui: every profile with its state, a description and the actions for the selected VM](docs/screenshots/vmtui-dashboard.png)
+
+**Contents:** [Quick start](#quick-start) · [What it installs](#what-it-installs) ·
+[The dashboard](#the-dashboard) · [Labs](#labs) · [Everyday commands](#everyday-commands) ·
+[Make it yours](#make-it-yours) · [Documentation](#documentation) · [Development](#development)
 
 ## Quick start
 
@@ -19,145 +30,143 @@ make setup     # links vmctl + vmtui into ~/.local/bin, installs what is missing
 vmtui          # the dashboard: pick a profile, Enter installs or boots it
 ```
 
-`make setup` shows what it is about to install and asks first: QEMU, OVMF and
-the helpers through `apt` or `pacman` (sudo), Textual for the dashboard in the
-repository's `.venv-tui` (no sudo). Run it again at any time: it only installs
-what is missing, then prints one line per group of tools (`vmctl setup -v` for
-every tool).
+`make setup` lists what it is about to install and asks first. It uses `apt` or
+`pacman` for QEMU, OVMF and the helpers, and puts Textual (the dashboard) in the
+repository's `.venv-tui` without sudo. Running it again only installs what is missing.
 
-Ready-made first runs, each one command from an empty disk to a logged-in VM:
+Or skip the dashboard and go straight to a VM, from an empty disk to a logged-in guest:
 
-| What | Command | Time |
-|------|---------|------|
-| Debian server over SSH | `vmctl bootstrap-preseed debian-server && vmctl shell debian-server` | ~5 min |
-| Ubuntu 24.04 GNOME desktop | `vmctl bootstrap-unattended ubuntu-gnome-24.04 && vmctl start ubuntu-gnome-24.04` | ~20 min |
+| You get | Command | Time |
+|---------|---------|------|
+| Debian server, over SSH | `vmctl bootstrap-preseed debian-server && vmctl shell debian-server` | ~5 min |
 | Arch with niri + Noctalia | `vmctl bootstrap-archinstall arch-noctalia && vmctl start arch-noctalia` | ~7 min |
+| Ubuntu 24.04 GNOME | `vmctl bootstrap-unattended ubuntu-gnome-24.04 && vmctl start ubuntu-gnome-24.04` | ~20 min |
 | Windows 11 (your ISO in `isos/`) | `vmctl bootstrap-windows windows11-unattended && vmctl start windows11-unattended` | ~30 min |
-| A whole lab | `vmctl group install proxmox-lab` ([Labs](#labs)) | ~25 min |
+| A three-node Proxmox cluster | `vmctl group install proxmox-lab` | ~25 min |
 
-Tab completion: `echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc` (bash works too).
+Times are from the last validation run on a desktop host with KVM.
 
 <details>
-<summary>Installing the host packages by hand (other distributions, or no sudo from make)</summary>
+<summary>Installing the host packages by hand</summary>
+
+For other distributions, or to see exactly what `make setup` would run:
 
 ```bash
+# Arch / CachyOS
 sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk ddrescue partclone util-linux
+# Debian / Ubuntu (on Ubuntu 22.04 drop virtiofsd: QEMU ships it)
 sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 python3-venv openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk gddrescue partclone fdisk
-make install textual    # only the dashboard, into .venv-tui (or: make install xorriso growisofs ...)
-vmctl setup             # check again
+
+make install textual    # only the dashboard, into .venv-tui (or name any tool: make install xorriso)
+vmctl setup             # check again (-v: one line per tool)
 ```
 
-Only `qemu-system-x86_64`, `qemu-img`, `python3` and the OVMF firmware are
-required; everything else serves a specific flow and `vmctl setup` says which.
-Without Textual, `vmtui` opens the fzf/dialog menus.
+Only `qemu-system-x86_64`, `qemu-img`, `python3` (3.10 or newer) and the OVMF
+firmware are required; every other tool serves one flow, and `vmctl setup` says
+which. Without Textual, `vmtui` opens the classic fzf/dialog menus.
 </details>
 
 ## What it installs
 
-`vmctl list` prints every profile with its status and last live verification.
-Unattended flows run headless on a serial console, then boot the installed disk
-and run the profile's SSH provisioning.
+| Family | Profiles | Unattended with |
+|--------|----------|-----------------|
+| Ubuntu and flavours | every LTS desktop from 8.04 to 26.04, Kubuntu, Xubuntu, Lubuntu, MATE, Budgie, Cinnamon, Studio | `bootstrap-unattended`, `bootstrap-preseed` |
+| Debian, Kali | server, GNOME, KDE, Xfce, Kali | `bootstrap-preseed` |
+| Fedora, RHEL | Workstation, KDE, Silverblue, Kinoite, AlmaLinux, Rocky, CentOS Stream | `bootstrap-kickstart` |
+| Arch family | Arch with niri, DMS or Noctalia, CachyOS, Omarchy, pearOS, NVIDIA recipes | `bootstrap-archinstall`, `bootstrap-omarchy`, `bootstrap-pearos` |
+| More Linux | openSUSE Tumbleweed, NixOS, Alpine | `bootstrap-autoyast`, `bootstrap-nixos`, `bootstrap-alpine` |
+| BSD and others | FreeBSD, pfSense, ReactOS, Proxmox VE; Haiku (manual install) | `bootstrap-freebsd`, `bootstrap-pfsense`, `bootstrap-reactos`, `bootstrap-proxmox` |
+| Windows | 11 and 10 (OpenSSH, virtio drivers, shared folder), 7 | `bootstrap-windows` |
+| Windows retro | XP, 2000, NT 4.0, 98 | `bootstrap-windowsxp`, `bootstrap-windows2000`, `bootstrap-windowsnt4`, `bootstrap-windows98` |
 
-| Family | Examples | Zero-click install |
-|--------|----------|--------------------|
-| Ubuntu and flavours | 8.04 → 26.04 desktops, Kubuntu, Xubuntu, Lubuntu, MATE, Budgie, Cinnamon, Studio, niri | `bootstrap-unattended` (autoinstall), `bootstrap-preseed` (d-i, up to 18.04) |
-| Debian / Kali | server, GNOME, KDE, Xfce, Kali | `bootstrap-preseed` |
-| Fedora / RHEL | Workstation, KDE, Silverblue, Kinoite, AlmaLinux, Rocky, CentOS Stream | `bootstrap-kickstart` |
-| Arch family | Arch + niri/DMS/Noctalia, CachyOS, Omarchy, pearOS, NVIDIA recipes | `bootstrap-archinstall`, `bootstrap-omarchy`, `bootstrap-pearos` |
-| Others | openSUSE Tumbleweed, NixOS, Alpine, FreeBSD, Void | `bootstrap-autoyast`, `bootstrap-nixos`, `bootstrap-alpine`, `bootstrap-freebsd` |
-| **Windows** | 11, 10 (OpenSSH, virtio drivers, virtiofs share), 7 | `bootstrap-windows` |
-| **Windows retro** | XP, 2000, NT 4.0, 98 | `bootstrap-windowsxp`, `bootstrap-windows2000`, `bootstrap-windowsnt4`, `bootstrap-windows98` |
-| **Labs** | pfSense router + Pi-hole + Lubuntu client; three-node Proxmox VE cluster + client ([Labs](#labs)) | `vmctl group install netlab`, `vmctl group install proxmox-lab` |
-| ReactOS | 0.4.16 | `bootstrap-reactos` |
+An unattended install runs headless on a serial console, boots the installed disk
+and runs the profile's SSH provisioning. Every profile also has a manual install:
+`vmctl provision <vm>` boots the ISO on a fresh disk. `vmctl list` shows each
+profile's status and the date of its last live verification.
 
-Windows media have no public URL: put your own ISO in `isos/` (retro keys go in
-`local.json`). Every profile also offers a manual install:
-`vmctl provision <vm>` boots the ISO on a fresh disk.
+Windows media have no public download URL: put your own ISO in `isos/` (the retro
+versions also need your product key in `local.json`).
+
+## The dashboard
+
+`vmtui` lists every profile with its live state. Enter runs the suggested action for
+the selected VM: install it when there is no disk, boot it when there is one, open
+its display while it runs. The panel on the right has the other actions, and
+**All actions…** the full menu. Every action is a `vmctl` command, shown so you
+can copy it.
+
+- `/` searches names, descriptions and families; **All**, **With disk**, **Running**
+  and **Labs** (F2) filter the list.
+- **Tools… (F4)**: status of everything, remote hosts, and **Clean All** (asks first).
+- F8, or `vmtui --classic`: the fzf/dialog menus, for terminals without Textual.
+
+![Search: the Windows profiles, Windows 11 installed and ready to boot](docs/screenshots/vmtui-windows.png)
+
+Keys, video profiles and remote SPICE: [docs/VMTUI.md](docs/VMTUI.md).
+
+## Labs
+
+A lab is a group of VMs on a private network segment, installed and started as one
+stack. Each lab gets a generated network map with addresses, port forwards,
+logins and a step-by-step runbook.
+
+| Lab | What is in it | Install |
+|-----|---------------|---------|
+| `netlab` | pfSense router, Pi-hole DNS, Lubuntu desktop client | `vmctl group install netlab` |
+| `proxmox-lab` | three Proxmox VE nodes clustered over ZFS mirrors, a Debian client with a browser | `vmctl group install proxmox-lab` |
+
+![Map of the Proxmox lab: three nodes and the client on the pve-lan segment](docs/screenshots/lab-map-proxmox.png)
+
+Members, commands and both maps: [docs/LABS.md](docs/LABS.md).
 
 ## Everyday commands
 
 | I want to... | Run |
 |--------------|-----|
 | see the VMs and their state | `vmctl list`, `vmctl status`, `vmctl show <vm>` |
-| boot, enter, stop | `vmctl start <vm>` (`--headless --background`), `vmctl shell <vm>`, `vmctl stop <vm>` |
-| watch a headless VM, also mid-install | `vmctl attach <vm>` (VNC), `vmctl console <vm>` (serial) |
-| keep a copy to go back to | `vmctl checkpoint create <vm> clean`, then `restore` ([guide](docs/CHECKPOINTS.md)) |
+| boot, enter, stop | `vmctl start <vm>`, `vmctl shell <vm>`, `vmctl stop <vm>` |
+| watch a headless VM, even mid-install | `vmctl attach <vm>` (screen), `vmctl console <vm>` (serial) |
+| keep a copy to go back to | `vmctl checkpoint create <vm> clean`, later `restore` ([guide](docs/CHECKPOINTS.md)) |
 | make an independent second VM | `vmctl clone <vm> <new-name>` ([guide](docs/CLONE.md)) |
-| hand a VM to virt-manager | `vmctl export-libvirt <vm>` ([guide](docs/LIBVIRT.md)) |
-| write to a USB disk, or import one | `vmctl flash`, `vmctl import-device` ([guide](docs/IMPORT_DISKS.md)) |
-| validate the install flows | `vmctl check-vms --group smoke --restore --report --open` |
+| open a VM in virt-manager | `vmctl export-libvirt <vm>` ([guide](docs/LIBVIRT.md)) |
+| write a VM to a USB disk, or import one | `vmctl flash`, `vmctl import-device` ([guide](docs/IMPORT_DISKS.md)) |
 | free space | `vmctl clean <vm>`, `vmctl delete-iso <vm>` |
 
-Every command accepts `--dry-run`; `vmctl --help` lists them all by task.
-
-## The TUI
-
-`vmtui` shows every profile with its live state. Right or Enter moves to the
-selected VM's actions: install before there is a disk, boot after, display, SSH
-and stop while it runs. **All actions…** opens the full menu, grouped and
-filterable, with the suggested next step preselected. Every action runs a
-`vmctl` command, and the dashboard shows the command line so you can copy it.
-
-![All actions: the full contextual menu of a running VM](docs/screenshots/vmtui-actions.png)
-
-`/` searches names, descriptions and families, so `windows` lists every
-Windows profile:
-
-![Search: the Windows profiles with their descriptions, Windows 11 installed and ready to boot](docs/screenshots/vmtui-windows.png)
-
-**Tools… / F4** opens global status, remote hosts and **Clean All**. Clean All
-asks for confirmation and affects every configured VM, regardless of filters;
-checkpoints and cached ISOs are kept.
-F8 (or `vmtui --classic`) opens the fzf/dialog menus. Controls, video profiles and remote SPICE:
-[docs/VMTUI.md](docs/VMTUI.md).
-
-## Labs
-
-Groups of VMs on a private segment, installed and started as one stack, each
-with a generated network map (addresses, forwards, logins, a runbook):
-**netlab** (pfSense router, Pi-hole DNS, Lubuntu client) and **proxmox-lab**
-(three Proxmox VE nodes clustered over ZFS mirrors, plus a browser client).
-In `vmtui` they are behind **Labs** (F2).
-
-![Map of the Proxmox lab: three nodes and the client on pve-lan](docs/screenshots/lab-map-proxmox.png)
-
-What each lab contains, the commands and the maps: [docs/LABS.md](docs/LABS.md).
+Every command accepts `--dry-run`, and `vmctl --help` lists them all by task.
+Tab completion: `echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc` (bash works too).
 
 ## Make it yours
 
-Tracked profiles use a generic guest user `lab` (password `lab`). Your identity,
-SSH key, dotfiles and extra commands go in the git-ignored
-`vms/profiles/local.json`, deep-merged over every profile:
+Tracked profiles use a generic guest user, `lab` with password `lab`. Your user
+name, SSH key, dotfiles and extra commands go in `vms/profiles/local.json`, which
+git ignores and which is merged over every profile:
 
 ```bash
 make init-local-profile && $EDITOR vms/profiles/local.json
 ```
 
-See [docs/PROVISIONING.md](docs/PROVISIONING.md).
+Details: [docs/PROVISIONING.md](docs/PROVISIONING.md).
 
 ## Documentation
 
-[docs/README.md](docs/README.md) is the map. The main pages:
-[PROFILES](docs/PROFILES.md) (the profile model, adding a VM) ·
-[UNATTENDED](docs/UNATTENDED.md) (every install flow) ·
-[PROVISIONING](docs/PROVISIONING.md) ·
-[VMTUI](docs/VMTUI.md) ·
-[LABS](docs/LABS.md) ·
-[NETWORK-LAB](docs/NETWORK-LAB.md) ·
-[IMPORT_DISKS](docs/IMPORT_DISKS.md) ·
-[ARCHITECTURE](docs/ARCHITECTURE.md) ·
-[DEVELOPMENT](docs/DEVELOPMENT.md).
-Printable step-by-step guides in English and Italian are in
-[docs/guides/](docs/guides/README.md) (`make guides` builds the PDFs).
+| Page | Read it for |
+|------|-------------|
+| [docs/README.md](docs/README.md) | the map of every page, in reading order |
+| [PROFILES](docs/PROFILES.md) | the profile model, and how to add a VM |
+| [UNATTENDED](docs/UNATTENDED.md) | how each unattended install works, and the validation matrix |
+| [PROVISIONING](docs/PROVISIONING.md) | your identity, packages and dotfiles in a fresh guest |
+| [VMTUI](docs/VMTUI.md) | the dashboard and the classic menus |
+| [LABS](docs/LABS.md) | the network lab and the Proxmox lab |
+| [guides/](docs/guides/README.md) | printable step-by-step guides in English and Italian (`make guides`) |
 
 ## Development
 
 ```bash
-make check          # mypy --strict + tests, before every push
+make check          # mypy --strict + every test (the dashboard's too), before each push
 make validate-vms   # local only: reinstall every unattended profile, HTML report (hours)
 make help           # every developer target
 ```
 
-The `Makefile` holds developer targets only; user-facing behaviour is a `vmctl`
-subcommand. Tests never touch the host. `.claude/commands/` has Claude Code
-shortcuts for this checkout (`/vm-status`, `/vm-unattended`, `/vm-ssh`, `/vm-shot`, ...).
+The `Makefile` holds developer targets only; anything a user runs is a `vmctl`
+subcommand. Tests never touch the host, and CI runs them on Python 3.10 to 3.14.
+More in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
