@@ -151,7 +151,13 @@ Profiles can define smarter sources without giving up a hardcoded fallback:
   media and keys you own; pearOS's signed links): what to get, from where, and what to set in
   `local.json`. `vmctl fetch-iso`, every bootstrap and the dashboard ("ISO needed", *Get the ISO…*)
   show it instead of failing later. A tracked profile needs a download source or `iso_help`
-  (a test enforces it).
+  (a test enforces it);
+- `disk_image` replaces `iso` for a system that is built, not installed (SerenityOS publishes no
+  ISO): `{"path": "isos/serenityos-grub-<commit>.img", "format": "raw", "help": "how to build it"}`.
+  `vmctl prep <vm>` converts the image into the profile's disk (origin `image` in `state.json`) and
+  `vmctl start <vm>` boots it; `install`/`provision` refuse, and a missing image shows `help` like
+  `iso_help`. The image is never validated as an ISO (that check deletes a file it does not
+  recognise). `tools/build_serenityos.sh` is the recipe for a disposable builder VM.
 
 ```json
 "iso_discovery": {

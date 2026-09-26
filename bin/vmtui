@@ -768,6 +768,8 @@ def facts(name, vm):
         # has_* flags travel with each dashboard row (context hints), so the Alt-U hint of the
         # list names the same first step as the VM menu.
         "has_manual_iso": iso_source == "manual",
+        # disk_image profiles (SerenityOS): no installer, vmctl prep turns the image into the disk.
+        "has_disk_image": bool(vm.get("disk_image")),
         "has_unattended_flow": bool(unattended_flow),
         "ssh_port": str(ssh_cfg.get("ssh_host_port") or ""),
         "has_ssh": bool(ssh_cfg),

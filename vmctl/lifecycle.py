@@ -341,11 +341,21 @@ def prepare_background_vm_slot(name: str, dry_run: bool = False) -> tuple[Path, 
     return (pid_path, log_path)
 
 
-def ensure_vm_disk(vm: dict[str, Any], dry_run: bool = False) -> Path:
+def ensure_vm_disk(vm: dict[str, Any], dry_run: bool = False, vm_name: str | None = None) -> Path:
     runtime.require_command("qemu-img")
     disk = vm["disk"]
     disk_path = runtime.resolve_path(disk["path"])
-    if not disk_path.exists():
+    image = vm.get("disk_image")
+    if not disk_path.exists() and image:
+        # The disk *is* the prepared image, converted once into the profile's own disk file.
+        source = iso.ensure_iso(vm, dry_run=dry_run)
+        runtime.ensure_parent(disk_path)
+        runtime.run(["qemu-img", "convert", "-O", disk["format"], "-f", str(image.get("format", "raw")),
+                     str(source), str(disk_path)], dry_run=dry_run, quiet=True)
+        if vm_name:
+            vmstate.record_origin(vm_name, "image", ui.pretty_path(source), dry_run=dry_run)
+        ui.print_status("ok", f"Created disk from the image: {ui.pretty_path(disk_path)}")
+    elif not disk_path.exists():
         runtime.ensure_parent(disk_path)
         cmd = ["qemu-img", "create", "-f", disk["format"]]
         if disk.get("subformat"):
@@ -1115,7 +1125,7 @@ def disk_status(vm: dict[str, Any]) -> tuple[str, str, str]:
 
 
 def iso_status(vm: dict[str, Any]) -> str:
-    iso_path = runtime.resolve_path(vm["iso"])
+    iso_path = iso.medium_path(vm)
     return "ready" if iso_path.is_file() else "missing"
 
 
@@ -1294,7 +1304,7 @@ def cmd_fetch_iso(args: argparse.Namespace) -> int:
 def cmd_delete_iso(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
-    iso_path = runtime.resolve_path(vm["iso"])
+    iso_path = iso.medium_path(vm)
     partial_path = iso_path.with_name(iso_path.name + ".part")
 
     removed = False
@@ -1321,15 +1331,23 @@ def cmd_prep(args: argparse.Namespace) -> int:
     vm = config.get_vm(cfg, args.vm)
     runtime.ensure_vm_dirs(args.vm)
     iso.ensure_iso(vm, dry_run=args.dry_run)
-    ensure_vm_disk(vm, dry_run=args.dry_run)
+    ensure_vm_disk(vm, dry_run=args.dry_run, vm_name=args.vm)
     qemu.firmware_args(vm, dry_run=args.dry_run)
-    ui.print_status("ok", f"Prepared VM '{args.vm}'")
+    ui.print_status("ok", f"Prepared VM '{args.vm}'" + (f": vmctl start {args.vm}" if vm.get("disk_image") else ""))
     return 0
+
+
+def refuse_disk_image(vm: dict[str, Any], vm_name: str) -> None:
+    """A disk_image profile has no installer to boot: its disk comes from the image."""
+    if vm.get("disk_image"):
+        raise VMError(f"'{vm_name}' boots a prepared disk image, not an installer: vmctl prep {vm_name} "
+                      f"creates its disk from the image, vmctl start {vm_name} boots it")
 
 
 def cmd_provision(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
+    refuse_disk_image(vm, args.vm)
     runtime.ensure_vm_dirs(args.vm)
 
     ui.print_header(f"Provision VM: {args.vm}")
@@ -1372,6 +1390,7 @@ def cmd_provision(args: argparse.Namespace) -> int:
 def cmd_install(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
+    refuse_disk_image(vm, args.vm)
     runtime.ensure_vm_dirs(args.vm)
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     qemu_args = qemu.common_args(

@@ -10,9 +10,10 @@ disk, the firmware, the unattended install and the SSH provisioning. Manage it
 from the **web dashboard** (`vmctl web`), the terminal dashboard (`vmtui`) or the
 CLI (`vmctl`), all sharing the same profiles, VM state and jobs.
 
-- **105 profiles**, 57 of them fully unattended: every Ubuntu LTS since 8.04, Debian,
+- **106 profiles**, 57 of them fully unattended: every Ubuntu LTS since 8.04, Debian,
   Fedora, Arch, NixOS, openSUSE, FreeBSD, Haiku, ReactOS and Windows from 11 back to NT 4,
-  plus hobby systems to boot and explore: KolibriOS, Redox OS, MenuetOS.
+  plus hobby systems to boot and explore: KolibriOS, Redox OS, MenuetOS and SerenityOS
+  (built from source in a VM by `tools/build_serenityos.sh`).
 - **Labs**: groups of VMs on a private network, installed and started as one stack,
   such as a pfSense + Pi-hole network or a three-node Proxmox VE cluster.
 - **In your browser**: live VM screens, interactive SSH, searchable commands,

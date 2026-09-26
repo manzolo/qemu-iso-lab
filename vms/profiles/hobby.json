@@ -157,6 +157,60 @@
       },
       "usb_tablet": false,
       "notes": "MenuetOS 64, a 64-bit OS written entirely in assembly (GUI, SMP, networking). The medium is yours to download (see iso_help): no public stable URL, a license to accept, no checksum published. vmctl provision menuetos boots the CD; it runs from RAM. No unattended install and no SSH."
+    },
+    "serenityos": {
+      "name": "SerenityOS (built from source)",
+      "meta": {
+        "slug": "serenityos",
+        "family": "serenityos",
+        "role": "desktop",
+        "release_model": "rolling",
+        "status": "manual",
+        "groups": [
+          "hobby-os"
+        ],
+        "verified": "2026-09-26"
+      },
+      "disk_image": {
+        "path": "isos/serenityos-grub-cccf3076.img",
+        "format": "raw",
+        "commit": "cccf3076aacd936569f1136c6a4523b1a32a2597",
+        "help": "SerenityOS publishes no ISO or disk image: it is built from source, and the build installs a GCC 14 toolchain, runs for 1-3 hours and needs root for the loop devices of the image step. Do it in a throwaway builder VM, not on the host:\n\n1. Install an Ubuntu 22.04+ or Debian 12+ VM (vmctl bootstrap-unattended ubuntu-26.04, or any Linux VM with 4+ vCPUs, 8+ GB of RAM and 40 GB of disk).\n2. Copy tools/build_serenityos.sh into it and run: sudo sh build_serenityos.sh ~/serenity-build cccf3076aacd936569f1136c6a4523b1a32a2597\n3. Copy the resulting serenityos-grub-cccf3076.img back to this host (scp, or the shared folder).\n\nThen: vmctl prep serenityos converts it into the VM's disk, vmctl start serenityos boots it."
+      },
+      "disk": {
+        "path": "artifacts/serenityos/disk.qcow2",
+        "size": "2G",
+        "format": "qcow2",
+        "interface": "sata"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "e1000",
+      "audio": false,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": false,
+      "notes": "SerenityOS, a Unix-like graphical OS with its own kernel, libraries and browser, built from source at a pinned commit (see disk_image.help and tools/build_serenityos.sh; commit cccf3076 of 2026-09-26). The image is raw MBR + GRUB; vmctl prep serenityos turns it into the disk, and it boots straight to the desktop and a Terminal as user anon in about 15 s (q35, AHCI, e1000, standard VGA; verified 2026-09-26). No installer, no unattended flow, no SSH."
     }
   }
 }

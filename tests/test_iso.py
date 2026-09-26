@@ -368,7 +368,8 @@ class IsoArchiveTests(BaseVmctlTestCase):
             for name, vm in json.loads(path.read_text())["vms"].items():
                 with self.subTest(profile=name):
                     has_source = vm.get("iso_url") or vm.get("iso_urls") or vm.get("iso_discovery")
-                    self.assertTrue(has_source or vm.get("iso_help"), f"{name}: no download source and no iso_help")
+                    help_text = vm.get("iso_help") or (vm.get("disk_image") or {}).get("help")  # a built image says how
+                    self.assertTrue(has_source or help_text, f"{name}: no download source and no iso_help")
 
 
 class DownloadProgressTests(unittest.TestCase):

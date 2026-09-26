@@ -113,7 +113,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # First live run of bootstrap-haiku: the QMP pilot, install.sh from the seed CD, SSH as user.
         verified_haiku = {"haiku"}
         # Hobby systems booted live to their desktop on 2026-09-26 (docs/PROFILE_TODO.md); MenuetOS not yet.
-        verified_hobby = {"kolibrios", "redox"}
+        verified_hobby = {"kolibrios", "redox", "serenityos"}
         # The full matrix of 2026-09-25/26 from clean disks (check-vms --parallel auto --timeout 3600,
         # artifacts/check-vms/20260925-223107/): 53 PASS, 0 FAIL; these are the tracked ones.
         verified_matrix_0926 = {

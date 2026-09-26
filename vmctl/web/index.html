@@ -379,6 +379,7 @@ const catalogIcons = {
   kolibrios: ["KolibriOS", "#3f8ed8", iconMonogram("Ko")],
   redox: ["Redox OS", "#c94a2b", iconMonogram("Rx")],
   menuetos: ["MenuetOS", "#7a55b8", iconMonogram("Me")],
+  serenityos: ["SerenityOS", "#b8332e", iconMonogram("Se")],
   linux: ["Linux", "#f4b400", iconPicto("m5 6 6 6-6 6m8 0h6")],
   generic: ["Virtual machine", "#5c6b80", iconPicto("M3 4h18v13H3Z M8 21h8m-4-4v4M8 9h8m-8 3h5")],
   network: ["Network lab", "#2fa58f", iconPicto("M8 3h8v6H8Z M2 16h7v5H2Z M15 16h7v5h-7Z M12 9v4H5.5v3M12 13h6.5v3")],
@@ -397,7 +398,7 @@ const osIconRules = [
   ["alma", /\balmalinux\b/], ["rocky", /\brocky\b/], ["centos", /\bcentos\b/],
   ["windows", /\bwindows(?:xp|nt|\d|\b)/], ["reactos", /\breactos\b/],
   ["freebsd", /\bfreebsd\b/], ["haiku", /\bhaiku\b/],
-  ["kolibrios", /\bkolibri(?:os)?\b/], ["redox", /\bredox\b/], ["menuetos", /\bmenuet(?:os)?\b/],
+  ["kolibrios", /\bkolibri(?:os)?\b/], ["redox", /\bredox\b/], ["menuetos", /\bmenuet(?:os)?\b/], ["serenityos", /\bserenity(?:os)?\b/],
   ["nixos", /\bnixos\b/], ["alpine", /\balpine\b/], ["void", /\bvoid\b/],
   ["opensuse", /\b(?:opensuse|suse)\b/], ["fedora", /\bfedora\b/],
   ["debian", /\bdebian\b/], ["arch", /\b(?:arch|archlinux)\b/]
@@ -462,6 +463,10 @@ function actionsFor(r) {
     a.push({ label: "Boot headless", args: ["start", n, "--headless", "--background"], icon:"play", tone:"ok" });
     a.push({ label: "Boot with display (window on the host)", args: ["start", n], icon:"display", tone:"ok" });
     a.push({ label: "Checkpoint now", args: ["checkpoint", "create", n, "web-" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")], icon:"bookmark", tone:"info" });
+  } else if (r.job_status !== "running" && r.has_disk_image) {
+    // Built, not installed (SerenityOS): the prepared image becomes the disk, then it boots.
+    if (r.iso_source === "manual") a.push({ label: "Get the disk image…", help: true, icon:"disc", tone:"warn" });
+    else a.push({ label: "Create the disk from the image", args: ["prep", n], icon:"download", tone:"ok" });
   } else if (r.job_status !== "running") {
     if (r.iso_source === "manual") a.push({ label: "Get the ISO…", help: true, icon:"disc", tone:"warn" });
     else if (r.unattended_flow) a.push({ label: "Unattended install", args: [r.unattended_flow, n], icon:"wand", tone:"ok" });

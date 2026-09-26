@@ -188,8 +188,18 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
         errors.append(f"{name}: {msg}")
 
     for key in ("name", "iso", "disk", "firmware", "video", "memory_mb", "cpus"):
+        if key == "iso" and "disk_image" in vm:
+            continue  # the medium is a prepared disk image (SerenityOS: built, never installed)
         if key not in vm:
             err(f"missing required field '{key}'")
+    image = vm.get("disk_image")
+    if image is not None:
+        if not isinstance(image, dict) or not isinstance(image.get("path"), str) or not image["path"]:
+            err("disk_image needs a path")
+        elif image.get("format", "raw") not in ("raw", "qcow2"):
+            err("disk_image.format must be raw or qcow2")
+        if "iso" in vm:
+            err("a profile boots either an ISO or a disk_image, not both")
 
     if "name" in vm and not isinstance(vm["name"], str):
         err("name must be a string")

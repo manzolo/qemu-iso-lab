@@ -282,7 +282,7 @@ fifth is **declared** in `meta.groups` for what none of those can express. Decla
 Debian and Kali), `ubuntu-releases` (one unattended desktop per release, 8.04 to 26.04;
 24.04's entry is `ubuntu-gnome-24.04`, there is no `ubuntu-24.04` profile),
 `ubuntu-flavors`, `debian-only`, `kali`, `windows-retro`, `netlab`, `hobby-os` (KolibriOS, Redox OS,
-MenuetOS: manual live systems, so a `--group hobby-os` run records them as skipped) and `smoke` (one profile
+MenuetOS, SerenityOS from a built `disk_image`: manual systems, so a `--group hobby-os` run records them as skipped) and `smoke` (one profile
 per install flow that downloads its own medium, the lightest of each — run it before a full
 matrix). `group_index()`/`group_sources()` build the catalogue, `resolve_group_selection()`
 takes the union in catalog order and an unknown name lists what exists. **A group is a

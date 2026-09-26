@@ -417,7 +417,15 @@ Group `hobby-os`, all `manual` (live systems with no answer file and no SSH), in
 | `redox` | 0.9.0 desktop `livedisk.iso.zst` (`iso_archive` type `zstd`, vendor hash) | bootloader waits for a display mode (Enter), graphical login `user` with an empty password, Orbital desktop in ~50 s (verified 2026-09-26) |
 | `menuetos` | user-supplied `M64CD-<version>.ISO` (`iso_help`) | not booted yet: no medium on this host |
 
-SerenityOS publishes no image: it has to be built from source (GCC 14, its own toolchain, then
-`Meta/serenity.sh image grub`, which needs root for the loop mounts). Being built in the
-`lubuntu22` builder VM (commit `cccf3076`); it needs a new kind of profile that boots a prepared
-disk image instead of an ISO.
+`serenityos` publishes no image and is built from source: `tools/build_serenityos.sh`, run as root
+in a disposable builder VM (here the `lubuntu22` VM, 6 vCPUs / 12 GB, Ubuntu 22.04 with GCC 14 from
+the toolchain PPA), builds the toolchain and the system at commit `cccf3076` (about 2 h) and the
+MBR + GRUB image (`Meta/build-image-grub.sh mbr`, ~1.4 GB). Three traps on 22.04, fixed by the
+script in its working copy: the computed image size (Base + Root + 300 MB) is too small for ext2;
+the loop partition keeps a stale size until `partx -u`; and one early write to `/dev/loop11p1`,
+before udev created the node, left a 1 MB *regular file* there, which every later `mke2fs`
+formatted instead of the partition (`No space left on device` in rsync at the same file each time,
+whatever the image size). The profile is the first `disk_image` one (see PROFILES.md): `vmctl prep
+serenityos` converts the image, and it boots to the desktop and a Terminal as `anon` in ~15 s on
+q35/AHCI/e1000/std VGA (verified 2026-09-26, also through `vmctl start --headless` and the web
+screenshot).

@@ -325,11 +325,20 @@ def _fetch(url: str, destination: Path) -> None:
         raise VMError(f"Failed to download '{url}': {exc}") from exc
 
 
+def medium_path(vm: dict[str, Any]) -> Path:
+    """The file a profile starts from: its ISO, or the prepared disk image of a ``disk_image``
+    profile (SerenityOS publishes no ISO: its image is built from source, then becomes the disk)."""
+    image = vm.get("disk_image")
+    return runtime.resolve_path(str(image["path"] if image else vm["iso"]))
+
+
 def iso_source_kind(vm: dict[str, Any]) -> str:
     """``cached`` (the file is there), ``download`` (vmctl can fetch it) or ``manual`` (only the
     user can provide it: Windows media, signed vendor links). No network is used to decide."""
-    if runtime.resolve_path(vm["iso"]).is_file():
+    if medium_path(vm).is_file():
         return "cached"
+    if vm.get("disk_image"):
+        return "manual"  # built by the user (tools/build_*.sh), never downloaded
     if iso_url_candidates(vm, allow_discovery=False) or vm.get("iso_discovery"):
         return "download"
     return "manual"
@@ -338,10 +347,12 @@ def iso_source_kind(vm: dict[str, Any]) -> str:
 def missing_iso_message(vm: dict[str, Any], vm_name: str | None = None) -> str:
     """What to do when a profile's ISO is missing and vmctl cannot download it: the profile's own
     ``iso_help`` (where to get the medium, what to name it), then where it has to end up."""
-    path = runtime.resolve_path(vm["iso"])
+    path = medium_path(vm)
     name = vm_name or str(vm.get("name") or "this profile")
-    lines = [f"{name} needs an ISO that vmctl cannot download: {ui.pretty_path(path)}"]
-    guide = str(vm.get("iso_help") or "").strip()
+    image = vm.get("disk_image")
+    what = "a disk image that has to be built first" if image else "an ISO that vmctl cannot download"
+    lines = [f"{name} needs {what}: {ui.pretty_path(path)}"]
+    guide = str((image or {}).get("help") or vm.get("iso_help") or "").strip()
     if not guide and str(vm.get("notes") or "").strip():
         guide = "Profile notes: " + str(vm["notes"]).strip()
     if guide:
@@ -349,12 +360,20 @@ def missing_iso_message(vm: dict[str, Any], vm_name: str | None = None) -> str:
     # Without the profile's key (ensure_iso gets only the resolved profile) the display name would
     # read as a key to put in local.json ("set iso for 'MenuetOS 64 (your CD image)'"): say "this profile".
     target = f"'{vm_name}'" if vm_name else "this profile"
-    lines += ["", f"Save it as {ui.pretty_path(path)}, or keep it where it is and set \"iso\" for "
+    key = "disk_image.path" if image else "iso"
+    lines += ["", f"Save it as {ui.pretty_path(path)}, or keep it where it is and set \"{key}\" for "
               f"{target} in vms/profiles/local.json (see local.json.example)."]
     return "\n".join(lines)
 
 
 def ensure_iso(vm: dict[str, Any], dry_run: bool = False) -> Path:
+    if vm.get("disk_image"):
+        # A raw disk image must never go through the ISO checks below: they delete an "invalid" ISO.
+        image = medium_path(vm)
+        if image.is_file() or dry_run:
+            ui.print_status("ok", f"Disk image ready: {ui.pretty_path(image)}")
+            return image
+        raise VMError(missing_iso_message(vm))
     iso_path = runtime.resolve_path(vm["iso"])
     if iso_path.is_file():
         problems = validate_iso_file(iso_path, vm)
