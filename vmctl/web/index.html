@@ -109,6 +109,17 @@ button.warn:hover { background:#3a3128; border-color:#7a6440; }
 .chip.running { background:#453c28; color:var(--warn); } .chip.completed { background:#203d37; color:var(--ok); }
 .chip.failed,.chip.interrupted,.chip.cancelled { background:#492c39; color:var(--bad); }
 dialog { background:var(--panel); color:var(--text); border:1px solid #3b4e66; border-radius:16px; padding:0; width:min(900px,94vw); max-height:90dvh; box-shadow:0 30px 100px #0009; }
+#confirm-dialog { width:min(560px,94vw); }
+#confirm-dialog .body { padding:18px 20px 20px; }
+#confirm-dialog h1 { font-size:18px; margin:0; }
+#confirm-message { margin:0 0 12px; font-size:14px; line-height:1.5; }
+#confirm-command { margin:0 0 12px; padding:10px 12px; background:#0c111b; border:1px solid var(--line); border-radius:8px; font:12.5px ui-monospace,monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+#confirm-facts { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; margin:0 0 4px; font-size:13px; }
+#confirm-facts dt { color:var(--muted); } #confirm-facts dd { margin:0; }
+.confirm-buttons { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; }
+.confirm-buttons button.danger { background:#5a2735; border-color:#8a3a4e; color:#ffd7de; font-weight:650; }
+.confirm-buttons button.danger:hover { background:#73303f; }
+#confirm-dialog .eyebrow.bad { color:var(--bad); }
 dialog::backdrop { background:#030812bb; backdrop-filter:blur(5px); }
 dialog header { justify-content:space-between; padding:16px 20px; flex-shrink:0; }
 dialog .body { padding:16px; overflow:auto; max-height:calc(90dvh - 80px); }
@@ -279,6 +290,7 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
   <div class="body" id="screen"><img id="screen-img" alt="VM screen"><p class="s-muted" id="screen-note">Loading the screen…</p></div></dialog>
 <dialog id="vnc-dialog" aria-labelledby="vnc-title"><div id="console-shell"><header><div class="console-heading"><span id="console-icon" aria-hidden="true"></span><div><div class="eyebrow">Live console</div><h1 id="vnc-title">Console</h1></div></div><div class="console-toolbar"><button id="vnc-fit" class="active" aria-pressed="true" title="Switch between fit to window and actual size">Fit to window</button><button id="vnc-cad" title="Send Ctrl+Alt+Delete to the guest">Ctrl+Alt+Del</button><button id="vnc-reconnect">Reconnect</button><button id="vnc-full">Full screen</button><button id="vnc-close">Close</button></div></header>
   <div id="vnc-screen"></div><div class="console-footer"><span id="vnc-status" class="state s-warn" role="status">Connecting</span><p id="vnc-note">Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave.</p></div></div></dialog>
+<dialog id="confirm-dialog" aria-labelledby="confirm-title"><div class="body"><div class="eyebrow bad" id="confirm-eyebrow">Confirm</div><h1 id="confirm-title">Are you sure?</h1><p id="confirm-message"></p><pre id="confirm-command" class="hidden"></pre><dl id="confirm-facts" class="hidden"></dl><div class="confirm-buttons"><button id="confirm-no">Cancel</button><button id="confirm-yes" class="danger">Continue</button></div></div></dialog>
 <dialog id="ssh-dialog" aria-labelledby="ssh-title"><header><div><div class="eyebrow">Terminal access</div><h1 id="ssh-title">SSH console</h1></div><button data-close>Close</button></header><div class="body"><p id="ssh-description" class="s-muted"></p><pre id="ssh-command"></pre><p class="help">Run from the project directory. Uses the profile’s SSH user, port and key.</p><div class="command-buttons"><button id="ssh-browser" class="primary">Open in browser</button><button id="ssh-launch">Open SSH terminal on host ↗</button><button id="ssh-copy">Copy command</button></div><p id="ssh-result" class="help" role="status"></p></div></dialog>
 <dialog id="terminal-dialog" aria-labelledby="terminal-title"><div id="terminal-shell"><header><div><div class="eyebrow">SSH terminal</div><h1 id="terminal-title">SSH</h1></div><div class="console-toolbar"><span id="terminal-status" class="state s-warn" role="status">Connecting</span><button id="terminal-reconnect">Reconnect</button><button id="terminal-full">Full screen</button><button id="terminal-close">Close</button></div></header><div id="terminal-screen"></div><div class="console-footer"><p id="terminal-note">Interactive SSH to the guest. Closing this terminal disconnects SSH; the VM keeps running.</p></div></div></dialog>
 <dialog id="profile-dialog" aria-labelledby="profile-title"><header><div><div class="eyebrow">Local customization</div><h1 id="profile-title">Customize profile</h1></div><button data-close>Close</button></header><div class="body"><p class="s-muted" id="profile-intro">Loading profile…</p><div class="profile-resources"><div class="field"><label for="profile-memory">Memory (MiB)</label><input id="profile-memory" type="number" min="1" step="1"><span id="memory-default" class="help"></span></div><div class="field"><label for="profile-cpus">vCPUs</label><input id="profile-cpus" type="number" min="1" step="1"><span id="cpus-default" class="help"></span></div></div><details class="advanced" id="profile-advanced"><summary>Advanced JSON override</summary><p class="help">Only add fields you want to customize. Objects merge recursively; arrays append to the catalog arrays. Remove a field to inherit it again.</p><textarea id="profile-json" aria-label="Local profile override JSON" spellcheck="false" rows="12"></textarea></details><details class="advanced"><summary>View catalog template</summary><pre id="profile-base"></pre></details><p id="profile-feedback" role="status"></p></div><div class="command-footer"><p class="help">Saved in vms/profiles/local.json. Resource changes apply on the next VM start. Disk size changes do not resize an existing disk.</p><div class="command-buttons"><button id="profile-reset">Restore catalog values</button><button id="profile-save" class="primary">Save local override</button></div></div></dialog>
@@ -517,10 +529,25 @@ function renderLabs() {
   $("labs-view").querySelectorAll("[data-member]").forEach((b) => (b.onclick = () => { selected = b.dataset.member; $("search").value = ""; document.querySelector('[data-filter="all"]').click(); }));
 }
 
+// A styled confirmation instead of window.confirm: the command, what it touches, one red button.
+function askConfirm({ eyebrow = "Destructive command", title, message, command, facts = [], button = "Continue" }) {
+  const d = $("confirm-dialog");
+  $("confirm-eyebrow").textContent = eyebrow; $("confirm-title").textContent = title; $("confirm-message").textContent = message || "";
+  $("confirm-command").textContent = command || ""; $("confirm-command").classList.toggle("hidden", !command);
+  $("confirm-facts").innerHTML = facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join(""); $("confirm-facts").classList.toggle("hidden", !facts.length);
+  $("confirm-yes").textContent = button;
+  return new Promise((resolve) => {
+    let answer = false;
+    $("confirm-yes").onclick = () => { answer = true; d.close(); };
+    $("confirm-no").onclick = () => d.close();
+    d.onclose = () => { d.onclose = null; resolve(answer); };
+    d.showModal(); $("confirm-no").focus();
+  });
+}
 async function run(args, danger) {
   const cmd = catalog.find((c) => c.name === args[0]);
   const destructive = danger || (cmd && (cmd.destructive || cmd.destructive_actions.includes(args[1]))) || (args[0] === "check-vms" && args.includes("--clean-first"));
-  if (destructive && !confirm(`vmctl ${args.join(" ")}\n\nThis deletes or overwrites data. Continue?`)) return;
+  if (destructive && !await askConfirm({ title: "This deletes or overwrites data", message: "The command runs as a job and cannot be undone.", command: "vmctl " + args.join(" "), button: "Run it" })) return;
   try {
     const res = await api("/api/run", { args, confirmed: !!destructive });
     rememberCommand(args[0]);
@@ -563,7 +590,7 @@ async function pollLog() {
   setTimeout(pollLog, 1000);
 }
 $("log-cancel").onclick = async () => {
-  if (!confirm("Cancel this job? A VM it started is stopped; disk and logs are kept.")) return;
+  if (!await askConfirm({ eyebrow: "Job", title: "Cancel this job?", message: "A VM it started is stopped; disk and logs are kept.", button: "Cancel the job" })) return;
   try { await api(`/api/jobs/${encodeURIComponent(logJob)}/cancel`, {}); toast("Cancelled"); refreshJobs(); } catch (e) { toast(e.message, true); }
 };
 
@@ -895,8 +922,8 @@ async function submitCommand() {
   try {
     if (c.terminal_only) {
       const args = buildArgs(), device = args[args.indexOf("--device") + 1], disk = (deviceCache || []).find((d) => d.path === device);
-      const what = disk ? `${disk.path} (${fmtBytes(disk.size)}, ${disk.model || "unknown model"}, ${(disk.children || []).length} partitions)` : device;
-      if (!confirm(`vmctl ${args.join(" ")}\n\nThis OVERWRITES ${what}. Open the terminal? The command waits there for Enter before it starts.`)) return;
+      const facts = disk ? [["Disk", disk.path], ["Size", fmtBytes(disk.size)], ["Model", disk.model || "unknown"], ["Partitions", String((disk.children || []).length)], ...(disk.serial ? [["Serial", disk.serial]] : [])] : [["Device", device || "?"]];
+      if (!await askConfirm({ eyebrow: "Physical disk", title: `Overwrite ${device || "the target disk"}?`, message: "Everything on it is lost. A terminal window opens on the host and waits for Enter before the command starts; sudo may ask for your password there.", command: "vmctl " + args.join(" "), facts, button: "Open the terminal" })) return;
       const res = await api("/api/terminal", { args }); toast(`Opened in ${res.terminal}: press Enter there to start (sudo may ask for your password).`);
     }
     else await run(buildArgs());
