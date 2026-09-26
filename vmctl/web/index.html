@@ -61,7 +61,9 @@ tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
 .profile-text { display:block; min-width:0; }
 .catalog-icon { --icon-color:var(--accent); --icon-ink:#fff; display:inline-flex; align-items:center; justify-content:center; flex:0 0 34px; width:34px; height:34px; border-radius:10px; color:var(--icon-ink); background:linear-gradient(160deg, color-mix(in srgb,var(--icon-color) 92%,#fff), color-mix(in srgb,var(--icon-color) 78%,#0b1220)); box-shadow:inset 0 0 0 1px color-mix(in srgb,#fff 18%,transparent), 0 1px 2px rgba(0,0,0,.35); vertical-align:middle; }
 .catalog-icon svg { display:block; width:22px; height:22px; pointer-events:none; }
-.catalog-icon[draggable=true] { cursor:grab; }
+.catalog-icon[data-drag] { cursor:grab; touch-action:none; }
+body.dragging { user-select:none; cursor:grabbing; }
+#drag-ghost { position:fixed; z-index:60; display:flex; align-items:center; gap:8px; padding:4px 10px 4px 4px; background:#182537; border:1px solid #3d526b; border-radius:12px; box-shadow:0 10px 30px #0008; pointer-events:none; font-size:12px; }
 #rows.linking tr[data-vm] { opacity:.55; }
 #rows.linking tr.drop-target { opacity:1; outline:2px solid var(--accent); outline-offset:-2px; background:#1c3a33; }
 .lab.session .lab-order { margin:0 0 12px; }
@@ -541,7 +543,7 @@ function iconInk(hex) { const n = parseInt(hex.slice(1), 16); return (0.299*(n>>
 function catalogIcon(key, large = false, drag = false) {
   const [label,color,glyph] = catalogIcons[key] || catalogIcons.generic;
   const artwork = distroIconKeys.has(key) ? `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" focusable="false"><use href="/assets/distro-icons.svg#${esc(key)}" width="24" height="24"/></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">${glyph}</svg>`;
-  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}"${drag ? ' draggable="true"' : ""} style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(drag ? label + " · drag onto another running machine to link them" : label)}" aria-hidden="true">${artwork}</span>`;
+  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}"${drag ? ' data-drag="1"' : ""} style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(drag ? label + " · drag onto another running machine to link them" : label)}" aria-hidden="true">${artwork}</span>`;
 }
 // End of catalog icon definitions.
 
@@ -1417,32 +1419,56 @@ $("rows").addEventListener("mousedown", hideHoverShot);
 $("rows").addEventListener("contextmenu", (e) => { hover.muted = e.target.closest("tr[data-vm]")?.dataset.vm || null; hideHoverShot(); });
 $("list").addEventListener("scroll", hideHoverShot);
 
-// Drag a running machine's icon onto another running machine: `vmctl link a b`, a private segment for this session.
-$("rows").addEventListener("dragstart", (e) => {
-  const tr = e.target.closest?.("tr[data-vm]"), vm = tr?.dataset.vm;
-  if (!vm || !S.vms.some(r => r.name === vm && r.running)) { e.preventDefault(); return; }
-  dragVm = vm; hideHoverShot(); hover.muted = vm;
-  e.dataTransfer.setData("text/plain", vm); e.dataTransfer.effectAllowed = "link";
-  $("rows").classList.add("linking");
+// Drag a running machine's icon onto another running machine: `vmctl link a b`, a private segment for
+// this session. Pointer events, not the browser's native drag and drop: Chromium on Wayland loses the
+// drop (the rows dimmed, nothing happened), and pointers also work on touch screens.
+const dragState = { start: null, ghost: null };
+function endDrag() {
+  dragVm = null; dragState.start = null; hover.muted = null;
+  document.body.classList.remove("dragging");
+  $("rows").classList.remove("linking");
+  $("rows").querySelectorAll("tr.drop-target").forEach((row) => row.classList.remove("drop-target"));
+  dragState.ghost?.remove(); dragState.ghost = null;
+  render();
+}
+function dropTargetAt(x, y, source) {
+  const tr = document.elementFromPoint(x, y)?.closest?.("tr[data-vm]"), vm = tr?.dataset.vm;
+  return vm && vm !== source && S.vms.some((r) => r.name === vm && r.running) ? tr : null;
+}
+$("rows").addEventListener("dragstart", (e) => e.preventDefault());  // no native image drag of the icon
+$("rows").addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  const icon = e.target.closest(".catalog-icon[data-drag]"), vm = icon?.closest("tr[data-vm]")?.dataset.vm;
+  if (!vm || !S.vms.some((r) => r.name === vm && r.running)) return;
+  dragState.start = { vm, x: e.clientX, y: e.clientY, icon };
 });
-$("rows").addEventListener("dragover", (e) => {
-  const tr = e.target.closest("tr[data-vm]"), vm = tr?.dataset.vm;
-  const ok = dragVm && vm && vm !== dragVm && S.vms.some(r => r.name === vm && r.running);
+document.addEventListener("pointermove", (e) => {
+  const d = dragState.start; if (!d) return;
+  if (!dragVm) {
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+    dragVm = d.vm; hideHoverShot(); hover.muted = d.vm;
+    document.body.classList.add("dragging"); $("rows").classList.add("linking");
+    const ghost = document.createElement("div"); ghost.id = "drag-ghost"; ghost.innerHTML = d.icon.outerHTML + `<span class="mono">${esc(d.vm)}</span>`;
+    document.body.appendChild(ghost); dragState.ghost = ghost;
+  }
+  dragState.ghost.style.left = e.clientX + 14 + "px"; dragState.ghost.style.top = e.clientY - 16 + "px";
+  const tr = dropTargetAt(e.clientX, e.clientY, d.vm);
   $("rows").querySelectorAll("tr.drop-target").forEach((row) => { if (row !== tr) row.classList.remove("drop-target"); });
-  if (!ok) return;
-  e.preventDefault(); e.dataTransfer.dropEffect = "link"; tr.classList.add("drop-target");
+  tr?.classList.add("drop-target");
+  e.preventDefault();
 });
-$("rows").addEventListener("dragleave", (e) => { const tr = e.target.closest?.("tr[data-vm]"); if (tr && !tr.contains(e.relatedTarget)) tr.classList.remove("drop-target"); });
-$("rows").addEventListener("dragend", () => { dragVm = null; hover.muted = null; $("rows").classList.remove("linking"); $("rows").querySelectorAll("tr.drop-target").forEach((row) => row.classList.remove("drop-target")); render(); });
-$("rows").addEventListener("drop", async (e) => {
-  const target = e.target.closest("tr[data-vm]")?.dataset.vm, source = dragVm;
-  e.preventDefault(); dragVm = null; $("rows").classList.remove("linking"); $("rows").querySelectorAll("tr.drop-target").forEach((row) => row.classList.remove("drop-target"));
-  if (!source || !target || source === target) return;
-  const ok = await askConfirm({ eyebrow: "Session link", title: `Link ${source} and ${target}?`, button: "Link them",
+document.addEventListener("pointerup", async (e) => {
+  const d = dragState.start; if (!d) return;
+  if (!dragVm) { dragState.start = null; return; }  // a plain click on the icon
+  const target = dropTargetAt(e.clientX, e.clientY, d.vm)?.dataset.vm;
+  endDrag();
+  if (!target) return;
+  const ok = await askConfirm({ eyebrow: "Session link", title: `Link ${d.vm} and ${target}?`, button: "Link them",
     message: "Both machines get a hot-plugged NIC on a private segment (10.99.0.0/24) for this session and, where vmctl can reach the guest over SSH, its address. Nothing is saved in the profiles: the link ends when the machines stop.",
-    command: `vmctl link ${source} ${target}` });
-  if (ok) run(["link", source, target]);
+    command: `vmctl link ${d.vm} ${target}` });
+  if (ok) run(["link", d.vm, target]);
 });
+document.addEventListener("pointercancel", () => { if (dragState.start) endDrag(); });
 $("details").addEventListener("click", (e) => {
   const b = e.target.closest("[data-unlink]"); if (!b || !selected) return;
   run(["link", "--off", "--segment", b.dataset.unlink, selected]);
