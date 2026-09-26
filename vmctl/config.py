@@ -300,6 +300,25 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _disk_path_conflicts(vms: dict[str, dict[str, Any]]) -> list[str]:
+    """Two profiles on one disk or one EFI vars file would install over each other (the manual
+    twins renamed on 2026-09-26 kept artifacts/<old name>/, which became the unattended profile's)."""
+    seen: dict[str, str] = {}
+    errors: list[str] = []
+    for name, vm in vms.items():
+        disk = vm.get("disk") if isinstance(vm.get("disk"), dict) else {}
+        firmware = vm.get("firmware") if isinstance(vm.get("firmware"), dict) else {}
+        for kind, path in (("disk.path", disk.get("path")), ("firmware.vars_path", firmware.get("vars_path"))):
+            if not isinstance(path, str) or not path:
+                continue
+            other = seen.get(path)
+            if other is None:
+                seen[path] = name
+            elif other != name:
+                errors.append(f"VM profiles '{other}' and '{name}' share {kind} {path}")
+    return errors
+
+
 def _ssh_port_conflicts(vms: dict[str, dict[str, Any]]) -> list[str]:
     seen: dict[int, str] = {}
     errors: list[str] = []
@@ -368,6 +387,7 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
         all_errors.extend(errors)
         all_errors.extend(validate_vm_profile(name, expanded))
     all_errors.extend(_ssh_port_conflicts(merged_vms))
+    all_errors.extend(_disk_path_conflicts(merged_vms))
     if all_errors:
         raise VMError("Invalid VM profile(s):\n  " + "\n  ".join(all_errors))
 

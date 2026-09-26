@@ -13,7 +13,7 @@
       "iso_url": "https://mirrors.rit.edu/haiku/r1beta6/haiku-r1beta6-x86_64-anyboot.iso",
       "iso_sha256": "bb7743474fd175aea511be1799764ba054465285bbdf54c4722ca61d1fb4f5c9",
       "disk": {
-        "path": "artifacts/haiku/disk.qcow2",
+        "path": "artifacts/haiku-installer/disk.qcow2",
         "size": "16G",
         "format": "qcow2",
         "interface": "sata"

@@ -68,7 +68,7 @@
       "iso_size": 3395530752,
       "iso_sha256": "03899e9b46dd06cf947801f48bece5b680441c1e5e6f9c80cf85f86149fc4555",
       "disk": {
-        "path": "artifacts/pearos-nicecore/disk.qcow2",
+        "path": "artifacts/pearos-nicecore-installer/disk.qcow2",
         "size": "40G",
         "format": "qcow2",
         "interface": "virtio"
@@ -77,7 +77,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/pearos-nicecore/OVMF_VARS.fd"
+        "vars_path": "artifacts/pearos-nicecore-installer/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 8192,
