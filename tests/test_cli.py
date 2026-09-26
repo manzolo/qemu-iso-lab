@@ -129,5 +129,11 @@ class WelcomeTests(unittest.TestCase):
         self.assertIn(" vmctl web --open", on)
         self.assertNotIn("./bin/", on)
         self.assertIn("no kvm here", on)
-        self.assertIn("still missing: qemu-img", on)
-        self.assertIn("Textual missing", on)
+        self.assertIn("Still missing: qemu-img", on)
+        self.assertIn("no Textual", on)
+        import re
+        for text in (on, off):
+            plain = re.sub(r"\x1b\[[0-9;]*m", "", text)
+            self.assertLessEqual(max(len(line) for line in plain.splitlines()), 80)
+            # a command line holds the command alone: triple-click copies nothing else
+            self.assertIn("\n       vmctl bootstrap-preseed debian-server\n".replace("vmctl", "vmctl" if text is on else "./bin/vmctl"), plain)

@@ -463,41 +463,39 @@ def vmctl_on_path(prefix: Path | None = None) -> bool:
 
 
 def render_welcome(*, profiles: int, on_path: bool, kvm: tuple[bool, str], textual: bool, missing: list[str]) -> str:
-    """The screen `vmctl welcome` prints and setup.sh ends with: what to do next, in order, with
-    commands that work on this host (no make; `./bin/vmctl` while ~/.local/bin is not on PATH)."""
+    """The screen `vmctl welcome` prints and setup.sh ends with: what to do next, in order.
+
+    Every command stands alone on its own line (a triple-click copies exactly it, nothing to trim:
+    zsh does not take `# comments` pasted interactively) and uses what works on this host: no make,
+    `./bin/vmctl` while ~/.local/bin is not on PATH. It fits 80 columns."""
     from vmctl import ui
 
     cmd = "vmctl" if on_path else "./bin/vmctl"
     tui = "vmtui" if on_path else "./bin/vmtui"
     kvm_ok, kvm_note = kvm
-    rows = [
-        ("In your browser", f"{cmd} web --open", "install, boot, console, SSH, every command"),
-        ("In the terminal", tui, "the same lab as a dashboard"),
-        ("A first VM, no clicks", f"{cmd} bootstrap-preseed debian-server", "Debian server, ~10 min, ISO downloaded"),
-        ("Use it", f"{cmd} shell debian-server", "SSH in; `start`, `stop`, `attach` for the rest"),
-        ("What exists", f"{cmd} list · {cmd} status", "profiles, disks, what is running"),
-        ("Make it yours", "vms/profiles/local.json", "your user, SSH key, ISOs (copy local.json.example)"),
-        ("A whole lab", f"{cmd} group install netlab", "pfSense + Pi-hole + client; proxmox-lab: 3 nodes"),
-        ("Help", f"{cmd} --help · {cmd} <command> --help", "docs/ and README.md for the rest"),
-    ]
-    width = max(len(command) for _, command, _ in rows)
-    lines = ["", ui.style("  QEMU ISO Lab is ready", ui.BOLD, ui.GREEN),
-             ui.style("  " + "─" * 70, ui.CYAN)]
-    facts = [f"{profiles} profiles", ("KVM ok" if kvm_ok else "no KVM: slow guests"), ("Textual dashboard ok" if textual else "Textual missing: vmtui falls back to fzf/dialog")]
-    lines.append("  " + ui.style(" · ".join(facts), ui.CYAN))
-    if missing:
-        lines.append("  " + ui.style(f"still missing: {', '.join(missing)}  →  {cmd} setup --install", ui.YELLOW))
-    if not kvm_ok:
-        lines.append("  " + ui.style(kvm_note, ui.YELLOW))
-    lines.append("")
-    for label, command, note in rows:
-        lines.append(f"  {label:<22}{ui.style(command.ljust(width), ui.BOLD)}  {ui.style(note, ui.CYAN)}")
-    lines.append("")
+
+    def step(number: str, title: str, *commands: str) -> list[str]:
+        return [f"  {ui.style(number, ui.BOLD, ui.CYAN)}  {ui.style(title, ui.BOLD)}",
+                *(f"       {ui.style(command, ui.GREEN)}" for command in commands), ""]
+
+    facts = [f"{profiles} profiles", "KVM ok" if kvm_ok else "no KVM", "Textual ok" if textual else "no Textual"]
+    lines = ["", f"  {ui.style('QEMU ISO Lab is ready', ui.BOLD, ui.GREEN)}   {ui.style(' · '.join(facts), ui.CYAN)}", ""]
     if not on_path:
-        lines.append("  " + ui.style("~/.local/bin is not on your PATH yet", ui.YELLOW) + ": the commands above use ./bin/ from this")
-        lines.append("  directory. To use plain vmctl/vmtui everywhere: open a new login shell, or")
-        lines.append("    " + ui.style('export PATH="$HOME/.local/bin:$PATH"', ui.BOLD) + "   (add it to ~/.zshrc or ~/.bashrc)")
-        lines.append("")
-    lines.append("  " + ui.style(f"Print this again any time: {cmd} welcome", ui.CYAN))
-    lines.append("")
+        lines += ["  " + ui.style("~/.local/bin is not on your PATH yet, so the commands start with ./bin/", ui.YELLOW),
+                  "  (run them from this directory, or open a new login shell), or first:",
+                  "       " + ui.style('export PATH="$HOME/.local/bin:$PATH"', ui.GREEN), ""]
+    if missing:
+        lines += ["  " + ui.style("Still missing: " + ", ".join(missing), ui.YELLOW),
+                  "       " + ui.style(f"{cmd} setup --install", ui.GREEN), ""]
+    if not kvm_ok:
+        lines += ["  " + ui.style(kvm_note, ui.YELLOW), ""]
+    lines += step("1", "Open the lab in your browser (install, boot, console, SSH)", f"{cmd} web --open")
+    lines += step("2", "Or use the terminal dashboard", tui)
+    lines += step("3", "Install a first VM with zero clicks, then log in (Debian, ~10 min)",
+                  f"{cmd} bootstrap-preseed debian-server", f"{cmd} shell debian-server")
+    lines += step("·", "Every profile, then what is on disk and running", f"{cmd} list", f"{cmd} status")
+    lines += step("·", "Your user, SSH key and ISOs: copy the example and edit it",
+                  "cp vms/profiles/local.json.example vms/profiles/local.json")
+    lines += step("·", "All commands (README.md and docs/ for the rest)", f"{cmd} --help")
+    lines += ["  " + ui.style(f"This screen again: {cmd} welcome", ui.CYAN), ""]
     return "\n".join(lines)
