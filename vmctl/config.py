@@ -306,8 +306,9 @@ def _disk_path_conflicts(vms: dict[str, dict[str, Any]]) -> list[str]:
     seen: dict[str, str] = {}
     errors: list[str] = []
     for name, vm in vms.items():
-        disk = vm.get("disk") if isinstance(vm.get("disk"), dict) else {}
-        firmware = vm.get("firmware") if isinstance(vm.get("firmware"), dict) else {}
+        raw_disk, raw_firmware = vm.get("disk"), vm.get("firmware")
+        disk: dict[str, Any] = raw_disk if isinstance(raw_disk, dict) else {}
+        firmware: dict[str, Any] = raw_firmware if isinstance(raw_firmware, dict) else {}
         for kind, path in (("disk.path", disk.get("path")), ("firmware.vars_path", firmware.get("vars_path"))):
             if not isinstance(path, str) or not path:
                 continue
