@@ -13,31 +13,44 @@ FreeBSD, pfSense and ReactOS. One CLI (`vmctl`) and one terminal dashboard
 
 ## Quick start
 
-Host packages (Arch or Debian/Ubuntu):
+```bash
+git clone https://github.com/manzolo/qemu-iso-lab.git && cd qemu-iso-lab
+make setup     # links vmctl + vmtui into ~/.local/bin, installs what is missing, checks the host
+vmtui          # the dashboard: pick a profile, Enter installs or boots it
+```
+
+`make setup` shows what it is about to install and asks first: QEMU, OVMF and
+the helpers through `apt` or `pacman` (sudo), Textual for the dashboard in the
+repository's `.venv-tui` (no sudo). Run it again at any time: it only installs
+what is missing, then prints one line per group of tools (`vmctl setup -v` for
+every tool).
+
+Ready-made first runs, each one command from an empty disk to a logged-in VM:
+
+| What | Command | Time |
+|------|---------|------|
+| Debian server over SSH | `vmctl bootstrap-preseed debian-server && vmctl shell debian-server` | ~5 min |
+| Ubuntu 24.04 GNOME desktop | `vmctl bootstrap-unattended ubuntu-gnome-24.04 && vmctl start ubuntu-gnome-24.04` | ~20 min |
+| Arch with niri + Noctalia | `vmctl bootstrap-archinstall arch-noctalia && vmctl start arch-noctalia` | ~7 min |
+| Windows 11 (your ISO in `isos/`) | `vmctl bootstrap-windows windows11-unattended && vmctl start windows11-unattended` | ~30 min |
+| A whole lab | `vmctl group install proxmox-lab` ([Labs](#labs)) | ~25 min |
+
+Tab completion: `echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc` (bash works too).
+
+<details>
+<summary>Installing the host packages by hand (other distributions, or no sudo from make)</summary>
 
 ```bash
 sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk ddrescue partclone util-linux
-sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk gddrescue partclone fdisk
+sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 python3-venv openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk gddrescue partclone fdisk
+make install textual    # only the dashboard, into .venv-tui (or: make install xorriso growisofs ...)
+vmctl setup             # check again
 ```
 
-```bash
-git clone https://github.com/manzolo/qemu-iso-lab.git && cd qemu-iso-lab
-make install-cli                        # vmctl and vmtui into ~/.local/bin
-vmctl setup                             # checks qemu, OVMF, KVM and the helpers
-make install                            # installs what setup reported missing (or: make install growisofs xorriso)
-
-vmctl bootstrap-preseed debian-server   # Debian, zero clicks, ~10 minutes
-vmctl shell debian-server               # SSH into it
-```
-
-The dashboard needs [Textual](https://textual.textualize.io/) (optional):
-
-```bash
-make install textual                    # .venv-tui with Textual, no sudo
-vmtui                                   # without Textual: the fzf/dialog menus
-```
-
-Tab completion: `echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc` (bash works too).
+Only `qemu-system-x86_64`, `qemu-img`, `python3` and the OVMF firmware are
+required; everything else serves a specific flow and `vmctl setup` says which.
+Without Textual, `vmtui` opens the fzf/dialog menus.
+</details>
 
 ## What it installs
 
@@ -54,7 +67,7 @@ and run the profile's SSH provisioning.
 | Others | openSUSE Tumbleweed, NixOS, Alpine, FreeBSD, Void | `bootstrap-autoyast`, `bootstrap-nixos`, `bootstrap-alpine`, `bootstrap-freebsd` |
 | **Windows** | 11, 10 (OpenSSH, virtio drivers, virtiofs share), 7 | `bootstrap-windows` |
 | **Windows retro** | XP, 2000, NT 4.0, 98 | `bootstrap-windowsxp`, `bootstrap-windows2000`, `bootstrap-windowsnt4`, `bootstrap-windows98` |
-| Network lab | pfSense router + Pi-hole + Lubuntu client on an isolated LAN | `vmctl lab install` |
+| **Labs** | pfSense router + Pi-hole + Lubuntu client; three-node Proxmox VE cluster + client ([Labs](#labs)) | `vmctl group install netlab`, `vmctl group install proxmox-lab` |
 | ReactOS | 0.4.16 | `bootstrap-reactos` |
 
 Windows media have no public URL: put your own ISO in `isos/` (retro keys go in
@@ -98,6 +111,18 @@ checkpoints and cached ISOs are kept.
 F8 (or `vmtui --classic`) opens the fzf/dialog menus. Controls, video profiles and remote SPICE:
 [docs/VMTUI.md](docs/VMTUI.md).
 
+## Labs
+
+Groups of VMs on a private segment, installed and started as one stack, each
+with a generated network map (addresses, forwards, logins, a runbook):
+**netlab** (pfSense router, Pi-hole DNS, Lubuntu client) and **proxmox-lab**
+(three Proxmox VE nodes clustered over ZFS mirrors, plus a browser client).
+In `vmtui` they are behind **Labs** (F2).
+
+![Map of the Proxmox lab: three nodes and the client on pve-lan](docs/screenshots/lab-map-proxmox.png)
+
+What each lab contains, the commands and the maps: [docs/LABS.md](docs/LABS.md).
+
 ## Make it yours
 
 Tracked profiles use a generic guest user `lab` (password `lab`). Your identity,
@@ -117,6 +142,7 @@ See [docs/PROVISIONING.md](docs/PROVISIONING.md).
 [UNATTENDED](docs/UNATTENDED.md) (every install flow) ·
 [PROVISIONING](docs/PROVISIONING.md) ·
 [VMTUI](docs/VMTUI.md) ·
+[LABS](docs/LABS.md) ·
 [NETWORK-LAB](docs/NETWORK-LAB.md) ·
 [IMPORT_DISKS](docs/IMPORT_DISKS.md) ·
 [ARCHITECTURE](docs/ARCHITECTURE.md) ·

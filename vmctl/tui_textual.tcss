@@ -14,10 +14,10 @@ Screen {
     width: 1fr;
     margin-right: 2;
     background: #18222e;
-    border: tall #304050;
+    border: round #304050;
 }
-#search:focus { border: tall #84c9e7; }
-#filters { width: auto; height: 3; }
+#search:focus { border: round #84c9e7; }
+#filters { width: auto; height: 3; align: left middle; }
 .filter, #tools { min-width: 9; width: auto; margin-left: 1; }
 Button {
     background: #243343;
@@ -129,7 +129,7 @@ Footer { background: #18222e; }
 .compact #brand, .compact #summary { width: 100%; height: 1; }
 .stacked-toolbar #toolbar { layout: vertical; height: 4; }
 .stacked-toolbar #search { width: 100%; height: 3; margin-right: 0; }
-.stacked-toolbar #filters { width: 100%; height: 1; }
+.stacked-toolbar #filters { width: 100%; height: 1; align: left top; }
 .stacked-toolbar .filter, .stacked-toolbar #tools { height: 1; min-height: 1; border: none; }
 .stacked-toolbar .filter:focus, .stacked-toolbar #tools:focus { text-style: bold underline; }
 .stacked-toolbar #all { margin-left: 0; }

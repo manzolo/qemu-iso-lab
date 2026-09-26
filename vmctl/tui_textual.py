@@ -505,7 +505,7 @@ class Dashboard(App[None]):
             widths.append(available - sum(widths) - 8)
             titles.append("DESCRIPTION")
             descriptions = {row["name"]: row["label"] for row in self.rows}
-            entries = [(key, (*cells, Text(descriptions.get(vm or "", "Network lab"))), vm, lab)
+            entries = [(key, (*cells, Text(descriptions.get(vm or "", "Lab"))), vm, lab)
                        for key, cells, vm, lab in entries]
         same_layout = (
             [row.key.value for row in table.ordered_rows] == keys
