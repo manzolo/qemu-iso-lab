@@ -78,7 +78,7 @@ class LabsTests(BaseVmctlTestCase):
         self.assertIn("local.json", labs.login(local)["note"])
         local["meta"]["password_hint"] = "secret"
         self.assertEqual(labs.login(local)["password"], "secret")
-        freebsd = config.get_vm(cfg, "freebsd-unattended")
+        freebsd = config.get_vm(cfg, "freebsd")
         self.assertEqual(labs.login(freebsd)["password"], "lab")  # plain text in its own section
         # A reminder of a real password belongs in the gitignored local.json only: the repo is public.
         for name, vm in config.sorted_vm_items(cfg):

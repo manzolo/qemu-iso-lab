@@ -6,13 +6,13 @@ from vmctl import haiku, lifecycle, qemu
 
 
 class HaikuTests(BaseVmctlTestCase):
-    def profile(self, name='haiku-unattended'):
+    def profile(self, name='haiku'):
         # Tracked profile file only; never consult the host's local.json.
         return json.loads((ROOT / 'vms/profiles/haiku.json').read_text())['vms'][name]
 
     def test_manual_and_unattended_profiles_pick_their_flows(self):
         self.assertEqual(lifecycle.local_test_mode(self.profile())[0], 'bootstrap-haiku')
-        self.assertNotEqual(lifecycle.local_test_mode(self.profile('haiku'))[0], 'bootstrap-haiku')
+        self.assertNotEqual(lifecycle.local_test_mode(self.profile('haiku-installer'))[0], 'bootstrap-haiku')
 
     def test_profile_checks_refuse_what_the_script_cannot_drive(self):
         for section, key, value in [('firmware', 'type', 'efi'), ('disk', 'interface', 'virtio'),

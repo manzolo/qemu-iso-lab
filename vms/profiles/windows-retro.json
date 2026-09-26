@@ -1,9 +1,9 @@
 {
   "vms": {
-    "windowsxp-unattended": {
+    "windows-xp": {
       "name": "Windows XP Professional (unattended)",
       "meta": {
-        "slug": "windowsxp-unattended",
+        "slug": "windows-xp",
         "family": "windows",
         "role": "desktop",
         "release_model": "retro",
@@ -15,7 +15,7 @@
       },
       "iso": "isos/windowsxp.iso",
       "disk": {
-        "path": "artifacts/windowsxp-unattended/disk.qcow2",
+        "path": "artifacts/windows-xp/disk.qcow2",
         "size": "16G",
         "format": "qcow2",
         "interface": "ide"
@@ -72,10 +72,10 @@
       },
       "iso_help": "Microsoft does not distribute Windows XP: use your own Windows XP Professional CD image and its product key. The key goes in vms/profiles/local.json under windowsxp_config.product_key (an OEM medium asks for it in the GUI stage); optionally windowsxp_config.service_pack points at the SP3 package. Make an ISO from the CD with: dd if=/dev/sr0 of=windowsxp.iso bs=2048 status=progress"
     },
-    "windows98-unattended": {
+    "windows-98": {
       "name": "Windows 98 SE (unattended)",
       "meta": {
-        "slug": "windows98-unattended",
+        "slug": "windows-98",
         "family": "windows",
         "role": "desktop",
         "release_model": "retro",
@@ -86,7 +86,7 @@
       },
       "iso": "isos/windows98.iso",
       "disk": {
-        "path": "artifacts/windows98-unattended/disk.qcow2",
+        "path": "artifacts/windows-98/disk.qcow2",
         "size": "2G",
         "format": "qcow2",
         "interface": "ide"
@@ -133,10 +133,10 @@
       "usb_controller": "builtin",
       "iso_help": "Microsoft does not distribute Windows 98: use your own Windows 98 SE CD image and its product key, which goes in vms/profiles/local.json under windows98_config.product_key. Make an ISO from the CD with: dd if=/dev/sr0 of=windows98.iso bs=2048 status=progress"
     },
-    "windows2000-unattended": {
+    "windows-2000": {
       "name": "Windows 2000 Professional (unattended)",
       "meta": {
-        "slug": "windows2000-unattended",
+        "slug": "windows-2000",
         "family": "windows",
         "role": "desktop",
         "release_model": "retro",
@@ -148,7 +148,7 @@
       },
       "iso": "isos/windows2000.iso",
       "disk": {
-        "path": "artifacts/windows2000-unattended/disk.qcow2",
+        "path": "artifacts/windows-2000/disk.qcow2",
         "size": "12G",
         "format": "qcow2",
         "interface": "ide"
@@ -203,10 +203,10 @@
       },
       "iso_help": "Microsoft does not distribute Windows 2000: use your own Windows 2000 Professional CD image and its product key, which goes in vms/profiles/local.json under windows2000_config.product_key. Make an ISO from the CD with: dd if=/dev/sr0 of=windows2000.iso bs=2048 status=progress"
     },
-    "windowsnt4-unattended": {
+    "windows-nt4": {
       "name": "Windows NT 4.0 Workstation (unattended)",
       "meta": {
-        "slug": "windowsnt4-unattended",
+        "slug": "windows-nt4",
         "family": "windows",
         "role": "desktop",
         "release_model": "retro",
@@ -218,7 +218,7 @@
       },
       "iso": "isos/windowsnt4.iso",
       "disk": {
-        "path": "artifacts/windowsnt4-unattended/disk.raw",
+        "path": "artifacts/windows-nt4/disk.raw",
         "size": "2G",
         "format": "raw",
         "interface": "ide"

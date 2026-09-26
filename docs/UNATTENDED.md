@@ -81,8 +81,8 @@ Renders `preseed.cfg` into a `PRESEED_CFG` seed ISO, extracts `vmlinuz` and
 `initrd.gz`, boots the Debian installer with the preseed kernel arguments and
 waits for `==> Debian preseed install complete!` on the serial console.
 
-The same flow installs the Ubuntu desktop history profiles (`ubuntu-8.04-unattended` to
-`ubuntu-18.04-unattended`) from the d-i media, the alternate CDs and the 14.04-18.04 server ISOs
+The same flow installs the Ubuntu desktop history profiles (`ubuntu-8.04` to
+`ubuntu-18.04`) from the d-i media, the alternate CDs and the 14.04-18.04 server ISOs
 (`installer_boot` = `install/vmlinuz` + `install/initrd.gz`), with the `ubuntu-desktop` task.
 `preseed_config` knobs added for them: `upgrade` (`none`, `safe-upgrade`, `full-upgrade`),
 `extra` (raw preseed lines, e.g. an empty `apt-setup/services-select` because the EOL
@@ -97,7 +97,7 @@ NOPASSWD rule both as a `sudoers.d` drop-in and as the last line of `/etc/sudoer
 The server media do not install the `ubuntu-desktop` *task*; the metapackage goes
 through `pkgsel/include` instead. From 16.04 the guests run systemd, so the shared `verify-desktop` check applies and the
 `ttyS0` getty is `serial-getty@ttyS0.service`; 18.04 autologs in through GDM3.
-20.04 and 22.04 (`ubuntu-20.04-unattended`, `ubuntu-22.04-unattended`) leave d-i behind: they are
+20.04 and 22.04 (`ubuntu-20.04`, `ubuntu-22.04`) leave d-i behind: they are
 `bootstrap-unattended` copies of `ubuntu-gnome-24.04` (live-server autoinstall + `ubuntu-desktop`),
 which stands for 24.04 in the series. The desktop check accepts `x-session-manager`, the name the
 8.04 session runs under, spelled as the 15-character comm `x-session-manag` that `pgrep -x` compares against.
@@ -410,7 +410,7 @@ field plus its own SSH port.
 ## pearOS NiceC0re: unpackfs, like its own Calamares
 
 ```bash
-vmctl bootstrap-pearos pearos-nicecore-unattended
+vmctl bootstrap-pearos pearos-nicecore
 ```
 
 pearOS is Arch under a macOS-like Plasma 6 desktop, shipped as a plain archiso
@@ -454,8 +454,8 @@ link — see [PROFILES.md](PROFILES.md) and the profile's notes.
 ## Windows 10/11: autounattend
 
 ```bash
-vmctl bootstrap-windows windows11-unattended
-vmctl bootstrap-windows windows10-unattended     # same flow, driver_flavor w10, no requirement bypass
+vmctl bootstrap-windows windows-11
+vmctl bootstrap-windows windows-10     # same flow, driver_flavor w10, no requirement bypass
 ```
 
 The technique comes from the kvm-lab repository (`scripts/win11/create_win11_vm.sh`
@@ -552,7 +552,7 @@ split, its own shutdown is the flush, so the token is written right before
 
 ### Windows 7 on the same flow
 
-`windows7-unattended` (kvm-lab's `Windows7U`) reuses `bootstrap-windows` with the
+`windows-7` (kvm-lab's `Windows7U`) reuses `bootstrap-windows` with the
 legacy branch of `windows.py`, selected by the edition name (`Windows 7 ...`) or
 `driver_flavor: w7`: BIOS profile and MBR disk layout (System Reserved + Windows),
 no `LabConfig` bypass, `viostor` from the `w7` directory of the virtio-win CD
@@ -645,8 +645,8 @@ profile like pfSense: install, boot for the report screenshot, stop.
 ## Windows XP and Windows 2000: WINNT.SIF
 
 ```bash
-vmctl bootstrap-windowsxp windowsxp-unattended      # your own ISO + key in local.json
-vmctl bootstrap-windows2000 windows2000-unattended  # the same flow, one section later
+vmctl bootstrap-windowsxp windows-xp      # your own ISO + key in local.json
+vmctl bootstrap-windows2000 windows-2000  # the same flow, one section later
 ```
 
 One module serves both. A profile says which generation it is by the section it
@@ -684,7 +684,7 @@ word and the rebuilt CD falls through to PXE (verified live).
 ## Windows XP: WINNT.SIF
 
 ```bash
-vmctl bootstrap-windowsxp windowsxp-unattended   # your own ISO + key in local.json; xorriso, and grub-mkimage if the medium does not boot
+vmctl bootstrap-windowsxp windows-xp   # your own ISO + key in local.json; xorriso, and grub-mkimage if the medium does not boot
 ```
 
 Setup reads `\I386\WINNT.SIF` from the installation medium: with
@@ -771,7 +771,7 @@ installer runs: a second disk is a second place Setup could install to.
 ## Windows 98: MSBATCH.INF
 
 ```bash
-vmctl bootstrap-windows98 windows98-unattended   # your own ISO + key in local.json; xorriso, mtools, mkfs.vfat
+vmctl bootstrap-windows98 windows-98   # your own ISO + key in local.json; xorriso, mtools, mkfs.vfat
 ```
 
 Nothing here looks like the Windows XP flow. Setup runs from real-mode DOS,
@@ -838,7 +838,7 @@ Every trap this flow steps around, one row each with symptom, cause and remedy, 
 [`NT4_PITFALLS.md`](NT4_PITFALLS.md). Read it before changing anything below.
 
 ```bash
-vmctl bootstrap-windowsnt4 windowsnt4-unattended   # your own ISO + CD key in local.json; xorriso, mtools, mkfs.vfat
+vmctl bootstrap-windowsnt4 windows-nt4   # your own ISO + CD key in local.json; xorriso, mtools, mkfs.vfat
 ```
 
 The oldest guest in the catalogue, and the one furthest from the later flows.
@@ -1062,7 +1062,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `windows-retro` | Windows NT 4.0, 98, 2000 and XP. Windows 7, 10 and 11 stay in `windows` |
 | `netlab` | The network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab` |
 | `proxmox-lab` | The Proxmox lab: `proxmox-ve` (ZFS mirror over two disks) and `proxmox-lab-client` (Xfce + Firefox), joined by the `pve-lan` segment |
-| `smoke` | One profile per install flow that downloads its own medium, the lightest of each: `alpine-ci`, `ubuntu-server-ci`, `debian-server`, `almalinux-server`, `alpine-niri`, `arch-noctalia`, `opensuse-tumbleweed-autoyast`, `nixos-server`, `freebsd-unattended`. Run it before a full matrix: it answers "is every bootstrap flow still working" without the desktop installs |
+| `smoke` | One profile per install flow that downloads its own medium, the lightest of each: `alpine-ci`, `ubuntu-server-ci`, `debian-server`, `almalinux-server`, `alpine-niri`, `arch-noctalia`, `opensuse-tumbleweed-autoyast`, `nixos-server`, `freebsd`. Run it before a full matrix: it answers "is every bootstrap flow still working" without the desktop installs |
 
 A group is a selector, like the bare `check-vms`, so it skips `experimental` profiles;
 naming one on the command line still runs it, even together with `--group`. Adding a
@@ -1103,8 +1103,8 @@ the medium six days old and seven other VMs sharing the line. Before suspecting
 the profile, look at the screen.
 
 A row that times out is not automatically a broken profile. Two guests have now been seen to
-stall on an install that works: `windowsnt4-unattended` (rows 24 and 25 of
-[NT4_PITFALLS.md](NT4_PITFALLS.md)) and, on 2026-09-16, `windows10-unattended`, whose matrix row
+stall on an install that works: `windows-nt4` (rows 24 and 25 of
+[NT4_PITFALLS.md](NT4_PITFALLS.md)) and, on 2026-09-16, `windows-10`, whose matrix row
 stopped at 211 s on an empty Windows Setup screen and burned the whole 3600 s timeout — while the
 same row, re-run alone straight afterwards with the same ISO and the same code, reached the
 completion token in nine minutes and passed in 622 s with its post-install over SSH.
@@ -1244,8 +1244,8 @@ outcome and duration, the captioned frames, the final screen — plus an `index.
 
 ## FreeBSD disc1 (`bootstrap-freebsd`)
 
-`freebsd-unattended` uses the vendor FreeBSD 14.3 disc1, BIOS/pc, UFS on `vtbd0`,
-virtio networking (`vtnet0`) and SSH port 2271. The manual `freebsd` profile is separate.
+`freebsd` uses the vendor FreeBSD 14.3 disc1, BIOS/pc, UFS on `vtbd0`,
+virtio networking (`vtnet0`) and SSH port 2271. The manual `freebsd-installer` profile is separate.
 The [bsdinstall manual](https://man.freebsd.org/cgi/man.cgi?query=bsdinstall&sektion=8&manpath=FreeBSD+14.0-RELEASE+and+Ports)
 documents `/etc/installerconfig`: a partition/distribution preamble and a chroot script.
 On 2026-09-14 the unmodified disc1 installed successfully from its shell; a second ISO
@@ -1270,8 +1270,8 @@ The host allows 120 s for that natural shutdown. A disk boot verifies the SSH id
 `pgrep -a -x sshd`, `service sshd onestatus`, `freebsd-version` and passwordless sudo. No systemd or desktop check is used.
 
 ```sh
-vmctl bootstrap-freebsd freebsd-unattended --timeout 1800
-vmctl check-vms freebsd-unattended --clean-first --timeout 1800 --report --document
+vmctl bootstrap-freebsd freebsd --timeout 1800
+vmctl check-vms freebsd --clean-first --timeout 1800 --report --document
 ```
 
 FreeBSD pgrep excludes ancestors by default: a check executed over SSH must use `-a`
@@ -1280,11 +1280,11 @@ otherwise a healthy daemon produces a false FAIL (confirmed live on 2026-09-14).
 
 ## Haiku (`bootstrap-haiku`)
 
-`haiku-unattended` (SSH 2280) installs Haiku R1/beta6 although Haiku has no answer file and a
+`haiku` (SSH 2280) installs Haiku R1/beta6 although Haiku has no answer file and a
 graphical-only Installer: the live medium already carries every tool an install needs, so the host
 plays the user for the few steps that open a shell, and the rest is a script.
 
-1. `vmctl bootstrap-haiku haiku-unattended` boots the anyboot ISO headless (q35, BIOS, the disk on
+1. `vmctl bootstrap-haiku haiku` boots the anyboot ISO headless (q35, BIOS, the disk on
    the first AHCI port, the ISO and a `VMCTLSEED` seed CD after it) with COM1 on the serial log.
 2. The **pilot** (`haiku.Pilot`) watches the screen through QMP `screendump` and recognises each
    state by a few pixels: the Welcome dialog, the desktop, the Deskbar menu, a Terminal. It clicks

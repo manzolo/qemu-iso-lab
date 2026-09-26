@@ -1,6 +1,6 @@
 {
   "vms": {
-    "haiku": {
+    "haiku-installer": {
       "name": "Haiku R1/beta6",
       "meta": {
         "slug": "haiku",
@@ -45,12 +45,12 @@
         }
       },
       "usb_tablet": true,
-      "notes": "Haiku R1/beta6 (2026-08-26), anyboot ISO with the checksum published on haiku-os.org. Manual install: vmctl provision haiku boots the live medium, choose Install Haiku, partition the disk with DriveSetup (Intel partition map, one Be File System partition), then install and reboot. Haiku has no unattended installer."
+      "notes": "Haiku R1/beta6 (2026-08-26), anyboot ISO with the checksum published on haiku-os.org. Manual install: vmctl provision haiku-installer boots the live medium, choose Install Haiku, partition the disk with DriveSetup (Intel partition map, one Be File System partition), then install and reboot. Haiku has no unattended installer."
     },
-    "haiku-unattended": {
+    "haiku": {
       "name": "Haiku R1/beta6 (unattended)",
       "meta": {
-        "slug": "haiku-unattended",
+        "slug": "haiku",
         "family": "haiku",
         "role": "desktop",
         "release_model": "stable",
@@ -64,7 +64,7 @@
       "iso_url": "https://mirrors.rit.edu/haiku/r1beta6/haiku-r1beta6-x86_64-anyboot.iso",
       "iso_sha256": "bb7743474fd175aea511be1799764ba054465285bbdf54c4722ca61d1fb4f5c9",
       "disk": {
-        "path": "artifacts/haiku-unattended/disk.qcow2",
+        "path": "artifacts/haiku/disk.qcow2",
         "size": "16G",
         "format": "qcow2",
         "interface": "sata"

@@ -1,6 +1,6 @@
 {
   "vms": {
-    "windows10-unattended": {
+    "windows-10": {
       "name": "Windows 10 (unattended)",
       "meta": {
         "slug": "windows-10",
@@ -12,7 +12,7 @@
       },
       "iso": "isos/windows10.iso",
       "disk": {
-        "path": "artifacts/windows10-unattended/disk.qcow2",
+        "path": "artifacts/windows-10/disk.qcow2",
         "size": "64G",
         "format": "qcow2",
         "interface": "virtio"
@@ -21,7 +21,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/windows10-unattended/OVMF_VARS.fd"
+        "vars_path": "artifacts/windows-10/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -48,7 +48,7 @@
       },
       "usb_tablet": true,
       "guest_agent": true,
-      "notes": "Unattended Windows 10 via autounattend.xml (bootstrap-windows), same flow as windows11-unattended: put the retail ISO at isos/windows10.iso (or point 'iso' at it in local.json), it is rebuilt once as isos/windows10-noprompt.iso. Multi-edition ISOs carry several images: 'edition' must name one of them ('Windows 10 Pro' here). No TPM/Secure Boot bypass needed. OpenSSH Server is an optional capability on 1809+.",
+      "notes": "Unattended Windows 10 via autounattend.xml (bootstrap-windows), same flow as windows-11: put the retail ISO at isos/windows10.iso (or point 'iso' at it in local.json), it is rebuilt once as isos/windows10-noprompt.iso. Multi-edition ISOs carry several images: 'edition' must name one of them ('Windows 10 Pro' here). No TPM/Secure Boot bypass needed. OpenSSH Server is an optional capability on 1809+.",
       "windows_config": {
         "username": "lab",
         "password": "lab",
@@ -89,7 +89,7 @@
       },
       "iso_help": "Microsoft gives out only temporary, per-session links. Open https://www.microsoft.com/software-download/windows10ISO from Linux (the page offers the ISO directly there; on Windows it pushes the Media Creation Tool), choose Windows 10 (multi-edition ISO), your language and 64-bit, and download it (the link lasts 24 hours). The image name in install.wim must match windows_config.edition."
     },
-    "windows11-unattended": {
+    "windows-11": {
       "name": "Windows 11 (unattended)",
       "meta": {
         "slug": "windows-11",
@@ -101,7 +101,7 @@
       },
       "iso": "isos/windows11.iso",
       "disk": {
-        "path": "artifacts/windows11-unattended/disk.qcow2",
+        "path": "artifacts/windows-11/disk.qcow2",
         "size": "64G",
         "format": "qcow2",
         "interface": "virtio"
@@ -110,7 +110,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/windows11-unattended/OVMF_VARS.fd"
+        "vars_path": "artifacts/windows-11/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 8192,
@@ -178,7 +178,7 @@
       },
       "iso_help": "Microsoft gives out only temporary, per-session links. Open https://www.microsoft.com/software-download/windows11, choose 'Download Windows 11 Disk Image (ISO) for x64 devices', the edition 'Windows 11 (multi-edition ISO for x64 devices)' and your language, and download it (the link lasts 24 hours). The image name in install.wim must match windows_config.edition: 'Windows 11 Pro' on Microsoft's ISO."
     },
-    "windows10-template": {
+    "windows-10-installer": {
       "name": "Windows 10 Template",
       "meta": {
         "slug": "windows-10-template",
@@ -188,9 +188,9 @@
         "status": "manual",
         "verified": "2026-09-06"
       },
-      "iso": "isos/windows10-template.iso",
+      "iso": "isos/windows-10-installer.iso",
       "disk": {
-        "path": "artifacts/windows10-template/disk.qcow2",
+        "path": "artifacts/windows-10-installer/disk.qcow2",
         "size": "64G",
         "format": "qcow2",
         "interface": "sata"
@@ -199,7 +199,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/windows10-template/OVMF_VARS.fd"
+        "vars_path": "artifacts/windows-10-installer/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 8192,
@@ -227,7 +227,7 @@
       "usb_tablet": true,
       "iso_help": "Microsoft gives out only temporary, per-session links: download the Windows 10 x64 ISO from https://www.microsoft.com/software-download/windows10ISO (open the page from Linux to get the ISO directly)."
     },
-    "windows11-template": {
+    "windows-11-installer": {
       "name": "Windows 11 Template",
       "meta": {
         "slug": "windows-11-template",
@@ -237,9 +237,9 @@
         "status": "manual",
         "verified": "2026-09-06"
       },
-      "iso": "isos/windows11-template.iso",
+      "iso": "isos/windows-11-installer.iso",
       "disk": {
-        "path": "artifacts/windows11-template/disk.qcow2",
+        "path": "artifacts/windows-11-installer/disk.qcow2",
         "size": "96G",
         "format": "qcow2",
         "interface": "sata"
@@ -248,7 +248,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/windows11-template/OVMF_VARS.fd"
+        "vars_path": "artifacts/windows-11-installer/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 12288,
@@ -276,7 +276,7 @@
       "usb_tablet": true,
       "iso_help": "Microsoft gives out only temporary, per-session links: download the Windows 11 x64 ISO from https://www.microsoft.com/software-download/windows11 (multi-edition ISO, your language)."
     },
-    "windows7-unattended": {
+    "windows-7": {
       "name": "Windows 7 Ultimate (unattended)",
       "meta": {
         "slug": "windows-7",
@@ -288,7 +288,7 @@
       },
       "iso": "isos/windows7.iso",
       "disk": {
-        "path": "artifacts/windows7-unattended/disk.qcow2",
+        "path": "artifacts/windows-7/disk.qcow2",
         "size": "40G",
         "format": "qcow2",
         "interface": "virtio"

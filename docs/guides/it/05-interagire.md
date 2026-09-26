@@ -67,7 +67,7 @@ si sta cambiando la rete e SSH cadrebbe. `Ctrl-]` per tornare all'host.
 
 ## 3. Windows: PowerShell via SSH
 
-`vmctl shell windows11-unattended` apre `cmd.exe` come l'utente del profilo (OpenSSH Server
+`vmctl shell windows-11` apre `cmd.exe` come l'utente del profilo (OpenSSH Server
 installato al primo logon dallo script `vmctl-setup.ps1`, chiave del progetto in
 `administrators_authorized_keys`). Da lì:
 
@@ -83,7 +83,7 @@ Un comando solo, senza sessione, con lo stesso `ssh` di prima (porta 2235 per Wi
 2236 per Windows 10):
 
 ```bash
-ssh -i artifacts/windows11-unattended/ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=no \
+ssh -i artifacts/windows-11/ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null -p 2235 lab@127.0.0.1 'powershell -NoProfile -Command "Get-Date; hostname"'
 ```
 
@@ -92,7 +92,7 @@ e si lancia con `powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\<u
 Il `post_install_run` dei profili Windows fa esattamente questo, comando per comando, dopo
 l'installazione; conviene scrivere PowerShell e non `findstr` su output localizzati.
 
-Per portare una VM Windows sul segmento del lab: `vmctl lab attach windows11-unattended
+Per portare una VM Windows sul segmento del lab: `vmctl lab attach windows-11
 --apply` e poi in PowerShell `Get-NetIPConfiguration` per vedere l'indirizzo preso via DHCP
 da Pi-hole (pool `.150-.199`). Attenzione: con la NIC sul segmento la porta SSH 2235 non
 esiste più (niente slirp); si rientra da `vmctl attach` o, su libvirt, via IP.

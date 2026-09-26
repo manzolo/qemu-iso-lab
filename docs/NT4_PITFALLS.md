@@ -1,7 +1,7 @@
 # Windows NT 4.0 unattended: the trap list
 
 Ten live runs on 2026-09-14/15 (plus a handful of control boots on copies of the
-installed disks) were needed before `vmctl bootstrap-windowsnt4 windowsnt4-unattended`
+installed disks) were needed before `vmctl bootstrap-windowsnt4 windows-nt4`
 went from the DOS floppy to "It is now safe to turn off your computer" without a
 keystroke. Every row below cost at least one run. The flow in `vmctl/windowsnt4.py`
 already applies every remedy; this page exists so that nobody "simplifies" one away

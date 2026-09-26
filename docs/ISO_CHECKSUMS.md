@@ -19,15 +19,15 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `fedora-silverblue` | `Fedora-Silverblue-ostree-x86_64-44-1.7.iso` | [Manifest](https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Silverblue/x86_64/iso/Fedora-Silverblue-44-1.7-x86_64-CHECKSUM) |
 | `fedora-workstation` | `Fedora-Workstation-Live-42-1.1.x86_64.iso` | [Manifest](https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-42-1.1-x86_64-CHECKSUM) |
 | `fedora-xfce` | `Fedora-Xfce-Live-42-1.1.x86_64.iso` | [Manifest](https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Spins-42-1.1-x86_64-CHECKSUM) |
-| `freebsd` | `FreeBSD-14.3-RELEASE-amd64-disc1.iso` | [Manifest](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64) |
+| `freebsd-installer` | `FreeBSD-14.3-RELEASE-amd64-disc1.iso` | [Manifest](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64) |
 | `kali-live` | `kali-linux-2026.1-live-amd64.iso` | [Manifest](https://cdimage.kali.org/kali-2026.1/SHA256SUMS) |
 | `kubuntu-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `linuxmint-cinnamon` | `linuxmint-22.3-cinnamon-64bit.iso` | [Manifest](https://mirrors.edge.kernel.org/linuxmint/stable/22.3/sha256sum.txt) |
 | `lubuntu-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `lubuntu-lab` | `ubuntu-22.04.5-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04.5/SHA256SUMS) |
 | `pihole-lab` | `ubuntu-22.04.5-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04.5/SHA256SUMS) |
+| `pearos-nicecore-installer` | `pearOS-NiceC0re-2026.09-x86_64.iso` | [Index](https://pearos.xyz/assets/data/nicecore-versions.json) |
 | `pearos-nicecore` | `pearOS-NiceC0re-2026.09-x86_64.iso` | [Index](https://pearos.xyz/assets/data/nicecore-versions.json) |
-| `pearos-nicecore-unattended` | `pearOS-NiceC0re-2026.09-x86_64.iso` | [Index](https://pearos.xyz/assets/data/nicecore-versions.json) |
 | `popos-cosmic` | `pop-os_24.04_amd64_generic_22.iso` | [Manifest](https://iso.pop-os.org/24.04/amd64/generic/22/SHA256SUMS) |
 | `rocky-9` | `Rocky-9.8-x86_64-minimal.iso` | [Manifest](https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-minimal.iso.CHECKSUM) |
 | `ubuntu-budgie-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
@@ -40,15 +40,15 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `ubuntu-20.04-desktop` | `ubuntu-20.04.6-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/20.04/SHA256SUMS) |
 | `ubuntu-22.04-desktop` | `ubuntu-22.04.5-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04/SHA256SUMS) |
 | `ubuntu-24.04-desktop` | `ubuntu-24.04.4-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04/SHA256SUMS) |
-| `ubuntu-8.04-unattended` | `ubuntu-8.04.4-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/8.04.4/SHA256SUMS) |
-| `ubuntu-10.04-unattended` | `ubuntu-10.04.4-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/10.04.4/SHA256SUMS) |
-| `ubuntu-12.04-unattended` | `ubuntu-12.04.5-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/12.04.5/SHA256SUMS) |
-| `ubuntu-14.04-unattended` | `ubuntu-14.04.6-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/14.04/SHA256SUMS) |
-| `ubuntu-16.04-unattended` | `ubuntu-16.04.7-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/16.04/SHA256SUMS) |
-| `ubuntu-18.04-unattended` | `ubuntu-18.04.6-server-amd64.iso` | [Manifest](https://cdimage.ubuntu.com/releases/18.04/release/SHA256SUMS) |
-| `ubuntu-20.04-unattended` | `ubuntu-20.04.6-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/20.04/SHA256SUMS) |
-| `ubuntu-22.04-unattended` | `ubuntu-22.04.5-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04/SHA256SUMS) |
-| `ubuntu-26.04-unattended` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
+| `ubuntu-8.04` | `ubuntu-8.04.4-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/8.04.4/SHA256SUMS) |
+| `ubuntu-10.04` | `ubuntu-10.04.4-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/10.04.4/SHA256SUMS) |
+| `ubuntu-12.04` | `ubuntu-12.04.5-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/12.04.5/SHA256SUMS) |
+| `ubuntu-14.04` | `ubuntu-14.04.6-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/14.04/SHA256SUMS) |
+| `ubuntu-16.04` | `ubuntu-16.04.7-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/16.04/SHA256SUMS) |
+| `ubuntu-18.04` | `ubuntu-18.04.6-server-amd64.iso` | [Manifest](https://cdimage.ubuntu.com/releases/18.04/release/SHA256SUMS) |
+| `ubuntu-20.04` | `ubuntu-20.04.6-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/20.04/SHA256SUMS) |
+| `ubuntu-22.04` | `ubuntu-22.04.5-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04/SHA256SUMS) |
+| `ubuntu-26.04` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
 | `ubuntu-desktop-live` | `ubuntu-26.04-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
 | `ubuntu-mate-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `ubuntu-niri` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
@@ -63,7 +63,7 @@ Discovery remains enabled for `alpine-niri` and `fedora-niri-dms`; neither is a 
 
 Windows and pfSense use user-supplied media without a vendor checksum source in the catalog. EndeavourOS is also supplied locally. Omarchy retains its existing pinned checksum.
 
-`pearos-nicecore` and `pearos-nicecore-unattended` share one user-supplied medium with a vendor checksum. Since August 2026
+`pearos-nicecore-installer` and `pearos-nicecore` share one user-supplied medium with a vendor checksum. Since August 2026
 every `https://iso.pearos.xyz/iso/...` URL requires a signed link: the plain URL published
 in the vendor's [NiceC0re release index](https://pearos.xyz/assets/data/nicecore-versions.json)
 answers `302` to a download-expired page, so `vmctl fetch-iso` cannot resolve it and the
@@ -84,7 +84,7 @@ Missing files are reported without downloading anything; mismatches print expect
 
 | Profile | File | Pin |
 |---|---|---|
-| `windows7-unattended` | `qemu-ga-win-101.1.0-1.el7ev-x86_64.msi` (`windows_config.guest_agent_msi`) | `157f71a5f118883666ba068dd1dc140a8a3f0261c66151f5e1044396c6ea89e6` |
+| `windows-7` | `qemu-ga-win-101.1.0-1.el7ev-x86_64.msi` (`windows_config.guest_agent_msi`) | `157f71a5f118883666ba068dd1dc140a8a3f0261c66151f5e1044396c6ea89e6` |
 
 This one is different in kind from every row above, and the difference matters. The
 [archive directory](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-qemu-ga/qemu-ga-win-101.1.0-1.el7ev/)
@@ -151,10 +151,10 @@ MISSING void-live-x86_64-20250202-xfce.iso
 
 ## Batch B: FreeBSD
 
-`freebsd-unattended` reuses the vendor-pinned FreeBSD 14.3 disc1 and SHA-256
+`freebsd` reuses the vendor-pinned FreeBSD 14.3 disc1 and SHA-256
 `f564822bc72d420d1e1a6faacb72f6056d828fcf539dfafd52e08503ef5fab68`
 from the [release manifest](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64),
-re-fetched and matched on 2026-09-14, as already recorded for the manual `freebsd` profile. Generated install media carry no vendor hash.
+re-fetched and matched on 2026-09-14, as already recorded for the manual `freebsd-installer` profile. Generated install media carry no vendor hash.
 
 ## Archives: pfSense CE and ReactOS (2026-09-26)
 

@@ -63,3 +63,33 @@ class ProfileMigrationTests(unittest.TestCase):
     def test_refuses_ambiguous_local_override(self):
         with self.assertRaisesRegex(ValueError, "Conflicting"):
             migration.migrate_local_data({"vms": {"arch-dms-local": {}, "arch-dms": {}}})
+
+
+class TwinRenameTests(unittest.TestCase):
+    """2026-09-26: the manual freebsd moves to freebsd-installer before freebsd-unattended takes its name."""
+
+    def test_manual_twin_moves_first_and_a_second_run_changes_nothing(self):
+        import json as _json
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "artifacts/freebsd").mkdir(parents=True)
+            (root / "artifacts/freebsd/state.json").write_text(_json.dumps({"install": {"flow": "provision"}}))
+            (root / "artifacts/freebsd-unattended").mkdir()
+            (root / "artifacts/freebsd-unattended/state.json").write_text(_json.dumps({"install": {"flow": "bootstrap-freebsd"}}))
+            moves = migration.migration_plan(root)
+            self.assertEqual([(s.name, d.name) for s, d in moves][:2],
+                             [("freebsd", "freebsd-installer"), ("freebsd-unattended", "freebsd")])
+            for source, destination in moves:
+                migration.rename_no_replace(source, destination)
+            self.assertEqual(migration.migration_plan(root), [])  # the new freebsd is unattended: it stays
+
+    def test_old_local_file_maps_twins_and_a_migrated_one_is_left_alone(self):
+        old = {"vms": {"freebsd": {"memory_mb": 1}, "freebsd-unattended": {"memory_mb": 2},
+                       "windows11-unattended": {"disk": {"path": "artifacts/windows11-unattended/disk.qcow2"}}}}
+        new = migration.migrate_local_data(old)
+        self.assertEqual(new["vms"]["freebsd-installer"], {"memory_mb": 1})
+        self.assertEqual(new["vms"]["freebsd"], {"memory_mb": 2})
+        self.assertEqual(new["vms"]["windows-11"]["disk"]["path"], "artifacts/windows-11/disk.qcow2")
+        self.assertEqual(migration.migrate_local_data(new), new)

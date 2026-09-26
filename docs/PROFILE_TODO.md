@@ -8,15 +8,15 @@ Add profiles that cover a new axis: firmware, installation flow, operating syste
 
 - BIOS/EFI baselines: `debian-bios`, `debian-efi`, `fedora-server-efi` and the Alpine CI pair.
 - Automated servers: `debian-server` (preseed), `almalinux-server` and `rocky-9` (kickstart), `ubuntu-server-ci` (autoinstall plus disk boot).
-- Windows installation: `windows10-unattended`, `windows11-unattended`, `windows7-unattended`; import templates remain available separately.
+- Windows installation: `windows-10`, `windows-11`, `windows-7`; import templates remain available separately.
 - Immutable desktop: `fedora-silverblue` with ostree kickstart.
 - Declarative install: `nixos-server` and `nixos-gnome` through `bootstrap-nixos`, which renders the guest's whole `configuration.nix` from the profile; the desktop variant is one field.
-- `pearos-nicecore` / `pearos-nicecore-unattended`: Arch-based macOS-like Plasma 6 desktop. User-supplied medium like EndeavourOS: the vendor signs every ISO URL (pay-what-you-want gate), so the published link answers 302 and only the size and SHA-256 come from its release index. The unattended profile rides `bootstrap-pearos`, which reproduces their Calamares unpackfs install (live squashfs onto the disk, no package downloaded) and skips their first-boot OOBE by creating the profile's user itself.
+- `pearos-nicecore-installer` / `pearos-nicecore`: Arch-based macOS-like Plasma 6 desktop. User-supplied medium like EndeavourOS: the vendor signs every ISO URL (pay-what-you-want gate), so the published link answers 302 and only the size and SHA-256 come from its release index. The unattended profile rides `bootstrap-pearos`, which reproduces their Calamares unpackfs install (live squashfs onto the disk, no package downloaded) and skips their first-boot OOBE by creating the profile's user itself.
 - openSUSE automation: `opensuse-tumbleweed-autoyast`.
 - Ubuntu desktop flavors: five autoinstall recipes with explicit package, display-manager and graphical-session checks.
 - Network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab`.
-- Non-Linux coverage: `freebsd` (manual), `reactos` (unattend.inf install through `bootstrap-reactos`).
-- Ubuntu desktop history: nine manual profiles, one per LTS from 8.04 to 24.04, on the official desktop ISOs (`ubuntu-lts.json`). `ubuntu-8.04-unattended` to `ubuntu-18.04-unattended` install them with `bootstrap-preseed`, `ubuntu-20.04-unattended`/`ubuntu-22.04-unattended` with autoinstall like `ubuntu-gnome-24.04`, on the d-i alternate/server media (live PASS 2026-09-12, see below; 16.04 and 18.04 use the shared `verify-desktop`).
+- Non-Linux coverage: `freebsd-installer` (manual), `reactos` (unattend.inf install through `bootstrap-reactos`).
+- Ubuntu desktop history: nine manual profiles, one per LTS from 8.04 to 24.04, on the official desktop ISOs (`ubuntu-lts.json`). `ubuntu-8.04` to `ubuntu-18.04` install them with `bootstrap-preseed`, `ubuntu-20.04`/`ubuntu-22.04` with autoinstall like `ubuntu-gnome-24.04`, on the d-i alternate/server media (live PASS 2026-09-12, see below; 16.04 and 18.04 use the shared `verify-desktop`).
 - Canonical names with legacy aliases, safe host-directory migration and pinned CI media with vendor checksums.
 - Profile categories for the matrix: `check-vms --group <name>` runs one slice instead of the
   full run. `meta.family`, `meta.status`, `meta.role` and the install flow act as categories on
@@ -30,7 +30,7 @@ Every tracked profile has `meta.status`:
 
 - `manual`: interactive installation, live media or an import template; automation may still boot or inspect it.
 - `unattended`: an automated installation/provisioning recipe exists; this is not a claim that this revision passed a live test.
-- `experimental`: a known incomplete or unsettled flow. Currently the package-only Ubuntu niri recipes, the custom Omarchy/NVIDIA flow, `windows98-unattended` and, since 2026-09-16, `windowsnt4-unattended`, demoted after failing reproducibly outside the matrix with its documented cause excluded (its `verified` keeps the 09-15 date: the field records the last live PASS, it does not certify the current code). A full `check-vms` (no profile names) reports them as skipped instead of running them; `check-vms <name>` runs one on purpose, which is how it gets promoted (2026-09-14).
+- `experimental`: a known incomplete or unsettled flow. Currently the package-only Ubuntu niri recipes, the custom Omarchy/NVIDIA flow, `windows-98` and, since 2026-09-16, `windows-nt4`, demoted after failing reproducibly outside the matrix with its documented cause excluded (its `verified` keeps the 09-15 date: the field records the last live PASS, it does not certify the current code). A full `check-vms` (no profile names) reports them as skipped instead of running them; `check-vms <name>` runs one on purpose, which is how it gets promoted (2026-09-14).
 
 `meta.verified` is the last live PASS date supplied by the maintainer. It is omitted when no date is recorded, and is never updated by unit tests or dry runs. A historical date does not certify subsequent profile changes. The list and HTML report show both fields separately from the current run's PASS/FAIL result.
 
@@ -52,7 +52,7 @@ Recorded dates:
   (`artifacts/check-vms/20260926-074936/`, cluster row 130 s). The full matrix of the night before
   (`artifacts/check-vms/20260925-223107/`) was 53 PASS, 0 FAIL, 48 SKIP.
 
-- 2026-09-20: `ubuntu-26.04-unattended`, first live run of the profile added the same day, PASS in
+- 2026-09-20: `ubuntu-26.04`, first live run of the profile added the same day, PASS in
   12.9 minutes (`verify-desktop`: "lab has an active local graphical session"). It answered both
   open questions of the release: 26.04's subiquity resolves `ubuntu-desktop` straight from
   autoinstall `packages`, so it needs none of the `late_commands` with `curtin in-target` that
@@ -61,9 +61,9 @@ Recorded dates:
   `verify-desktop` service gate holds unchanged. Guest: Ubuntu 26.04 LTS, kernel 7.0.0-31-generic,
   `graphical.target`, `ubuntu-desktop` 1.570.3, session 1 for `lab` on seat0.
 
-- 2026-09-19: `pearos-nicecore-unattended` (first live run of `bootstrap-pearos`), `nixos-server` and `nixos-gnome` (first live runs of `bootstrap-nixos`; the GNOME row through `verify-desktop` on its autologin session).
+- 2026-09-19: `pearos-nicecore` (first live run of `bootstrap-pearos`), `nixos-server` and `nixos-gnome` (first live runs of `bootstrap-nixos`; the GNOME row through `verify-desktop` on its autologin session).
 
-- 2026-09-12: `ubuntu-8.04-unattended`, `ubuntu-10.04-unattended`, `ubuntu-12.04-unattended`, `ubuntu-14.04-unattended`, `ubuntu-16.04-unattended`, `ubuntu-18.04-unattended`, `ubuntu-20.04-unattended`, `ubuntu-22.04-unattended` and `reactos`, each reinstalled from a clean disk with the final recipe (autologin session, passwordless sudo, legacy SSH verified in-guest).
+- 2026-09-12: `ubuntu-8.04`, `ubuntu-10.04`, `ubuntu-12.04`, `ubuntu-14.04`, `ubuntu-16.04`, `ubuntu-18.04`, `ubuntu-20.04`, `ubuntu-22.04` and `reactos`, each reinstalled from a clean disk with the final recipe (autologin session, passwordless sudo, legacy SSH verified in-guest).
 - 2026-09-09: the whole unattended matrix, 28 profiles reinstalled from scratch
   (`check-vms --clean-first --parallel 2 --timeout 3600`, reports under
   `artifacts/check-vms/20260909-*`): every Arch/CachyOS, Debian, AlmaLinux/Rocky, Fedora
@@ -81,10 +81,10 @@ Recorded dates:
 97 rows on restored artifacts (`--restore --parallel auto --timeout 3600`): **51 PASS, 2 FAIL,
 44 SKIP**. The 44 skips are the expected ones: 36 manual profiles with no `ci.expect`, the 4
 experimental, the 2 Windows import templates with no ISO, 2 disk boot-checks with no disk.
-`ubuntu-26.04-unattended` passed here too (12.8 min), the day it was added. Slowest passes:
-`windows11-unattended` 30.0, `edubuntu-24.04` 27.5, `fedora-kinoite` 25.2, `kali` 23.9 min.
+`ubuntu-26.04` passed here too (12.8 min), the day it was added. Slowest passes:
+`windows-11` 30.0, `edubuntu-24.04` 27.5, `fedora-kinoite` 25.2, `kali` 23.9 min.
 
-The run itself exposed a hole in the harness, now closed. `ubuntu-20.04-unattended` hung in
+The run itself exposed a hole in the harness, now closed. `ubuntu-20.04` hung in
 `subiquity/Network/_send_update: CHANGE enp0s5` and stayed there for 6 h 43 on a 1 h timeout,
 because `bootstrap-unattended` installed through a plain `runtime.run` with no timeout while
 every other flow uses `qemu.run_and_expect`, which has one. The whole matrix waited behind that
@@ -93,12 +93,12 @@ one worker from 01:50 until it was released by hand; the row's recorded error (a
 `runtime.run` now takes `timeout_sec`, the two autoinstall bootstraps pass theirs, and their
 defaults were raised to 1800 like the siblings.
 
-The other failure, `ubuntu-8.04-unattended`, timed out cleanly at 3600 s waiting for the preseed
+The other failure, `ubuntu-8.04`, timed out cleanly at 3600 s waiting for the preseed
 token, with the captured console stopping 3.7 s into the kernel boot. It passed on 2026-09-12.
 
-**Both were re-run alone on 2026-09-21, and neither is a regression.** `ubuntu-8.04-unattended`
+**Both were re-run alone on 2026-09-21, and neither is a regression.** `ubuntu-8.04`
 passed in 8.1 min at the first attempt (`artifacts/check-vms/20260921-071206-370139/`).
-`ubuntu-20.04-unattended` hung a second time in that run, failing cleanly at the new 3600 s bound,
+`ubuntu-20.04` hung a second time in that run, failing cleanly at the new 3600 s bound,
 and then **passed in 7.6 min** on a third attempt driven straight through `bootstrap-unattended`
 on a cleaned state (`verify-desktop`: active local graphical session). So the 20.04 hang is
 intermittent, not deterministic: two hangs and one pass out of three, all from a virgin disk, with
@@ -191,13 +191,13 @@ of the original run is still in `artifacts/check-vms/doc-20260915-full/`.
    pin and its vendor checksum were refreshed, and `kickstart.resolve_stage2()` now reads the
    medium's own `inst.stage2=` from its boot configuration and adds it whenever `inst_repo` is a
    URL, so kernel, initrd and runtime always come from one build. Verified live on 2026-09-16.
-3. **`ubuntu-10.04-unattended`** - passed unchanged (404 s after failing at 459 s), in a run of
+3. **`ubuntu-10.04`** - passed unchanged (404 s after failing at 459 s), in a run of
    five rows instead of ninety-two. Fragile under load, not broken; if it fails again, the
    desktop-check retries are the place to look, not the profile.
 
 **Open, and they are real work rather than a retry.**
 
-4. **`windows7-unattended` - closed on 2026-09-16, and the defect was in the matrix, not in the
+4. **`windows-7` - closed on 2026-09-16, and the defect was in the matrix, not in the
    profile.** "guest agent silent" was the label; the installed disk was not booting Windows at
    all, it opened "Avvio di Windows non riuscito" and then WinRE. Three runs settled it: the same
    install done standalone boots normally and its agent answers, so the flow is healthy; a
@@ -213,7 +213,7 @@ of the original run is still in `artifacts/check-vms/doc-20260915-full/`.
    pressed "Riavvia ora" on the pending-reboot dialog. Same command as the reproduction: PASS in
    298 s with "guest agent answers", a real desktop in the report, and 450 s saved on the row.
 
-5. **`windowsnt4-unattended` - still open, and now a reproducible regression.** Two standalone
+5. **`windows-nt4` - still open, and now a reproducible regression.** Two standalone
    runs on 2026-09-16, outside `check-vms`, both ended in the STOP 0x0A in `tcpip.sys` at the same
    address, so it is neither intermittent nor a matrix artefact. The documented cause (row 12 of
    `NT4_PITFALLS.md`, `TPValue` left at 1) is excluded by the guest's own registry: the failed
@@ -231,10 +231,10 @@ of the original run is still in `artifacts/check-vms/doc-20260915-full/`.
 92 rows, 48 PASS, 1 FAIL, 0 WARN, 43 SKIP (15:26-18:53, `--restore --document --parallel auto
 --timeout 3600`), against 45 PASS / 4 FAIL / 1 WARN on 09-15. The four rows fixed during the day
 pass inside the matrix too, not only as single runs: `cachyos-nvidia` 502 s, `centos-stream-10`
-290 s, `ubuntu-10.04-unattended` 358 s, `windows7-unattended` 315 s with "guest agent answers".
-`windowsnt4-unattended` is skipped, as its demotion intends.
+290 s, `ubuntu-10.04` 358 s, `windows-7` 315 s with "guest agent answers".
+`windows-nt4` is skipped, as its demotion intends.
 
-The one FAIL, **`windows10-unattended`**, was an occasional stall, not a regression: the timeline
+The one FAIL, **`windows-10`**, was an occasional stall, not a regression: the timeline
 stops at 211 s on an empty Windows Setup screen and nothing changes for the remaining 57 minutes.
 The same row re-run alone straight afterwards reached the completion token in **9 minutes** and
 finished PASS in 622 s with its post-install over SSH. Nothing in the day's changes touches the
@@ -265,7 +265,7 @@ diagnosis above only exists because the disk was copied aside by hand while the 
    (c) detect that token in the installer output *before* booting the disk and waiting for SSH, via
    `lifecycle.explain_failed_bootstrap()`. Covers twelve existing profiles plus the four new flavors.
    Verify like the Arch fix: a real install with a forced failure.
-2. **Profiles that will be skipped should not queue for resources.** `windows11-template` (12 GB)
+2. **Profiles that will be skipped should not queue for resources.** `windows-11-installer` (12 GB)
    sat at the head of the queue asking 12 800 MB for a worker that would skip in a second (no ISO),
    holding the Windows 11 install back. Evaluate `local_test_prereq_skip` before scheduling and
    record SKIP at zero cost.
@@ -300,8 +300,8 @@ diagnosis above only exists because the disk was copied aside by hand while the 
 
 ### Profiles
 
-6. **Promote `windowsnt4-unattended` back to `unattended`** once the STOP 0x0A in `tcpip.sys` is
-   understood (see the retry section above): `vmctl check-vms windowsnt4-unattended --clean-first
+6. **Promote `windows-nt4` back to `unattended`** once the STOP 0x0A in `tcpip.sys` is
+   understood (see the retry section above): `vmctl check-vms windows-nt4 --clean-first
    --report` runs it even while it is experimental, which is how it gets its status back.
 7. **A full matrix after the 2026-09-16 fixes.** The last complete run is 09-15, three fixes old:
    the state of the other rows is yesterday's, not today's.
@@ -323,9 +323,9 @@ Order after the maintainer's update: FreeBSD, Windows XP/98, then Devuan, Proxmo
 
 | Profile | SSH | Status | Verified | Live | Evidence / remaining work |
 |---|---|---|---|---|---|
-| `windowsxp-unattended` | - | unattended | 2026-09-14 | PASS, 8.7 min | Install only (no SSH server on XP). Hands-free from a medium with no boot record: GRUB chainloads SETUPLDR.BIN. SP3 ITA installed from the CD, exit 3010 (reboot pending), confirmed as applied by `winver` after the next boot. Autologon permanent, USB tablet active (`query-mice`: absolute), share as a read-only FAT disk. Product key and ISO are the maintainer's, in `local.json`. |
-| `windowsnt4-unattended` | - | unattended | 2026-09-15 | PASS, 28 min (run 10 of 10) | Install only (no SSH server). FreeDOS floppy on the CD runs `WINNT.EXE /U /S /B`; FAT16 disk prepared by the host, kept raw; `\I386\$OEM$` with SP6a as its own .EXE, `CSDVersion = Service Pack 6` read back on COM1; PCnet with `OEMNADAP.IN_` rewritten on the CD (`TP=0`); standard VGA 640x480 (the Cirrus driver spins the first boot); `RunOnce` + `Sermouse` off + `ping` pause so the token reaches COM1; `net user` + `AUTOLOG.REG` so the autologon survives the first boot; `VMCTLOFF.EXE` shuts down to "safe to turn off". Second boot verified: desktop, autologon, no service errors. Guest clock reads the RTC as local time (2 h behind here): untouched. Product key, ISO, SP6a and the Windows 98 ISO for the DOS CD driver are the maintainer's, in `local.json`. |
-| `freebsd-unattended` | 2271 | unattended | 2026-09-14 | PASS, 1.5 min | `artifacts/check-vms/20260914-130825-835989/`: clean install, natural shutdown, SSH identity, pgrep -a -x sshd, service status, freebsd-version and sudo. BIOS/UFS server only; EFI and desktop untested. |
+| `windows-xp` | - | unattended | 2026-09-14 | PASS, 8.7 min | Install only (no SSH server on XP). Hands-free from a medium with no boot record: GRUB chainloads SETUPLDR.BIN. SP3 ITA installed from the CD, exit 3010 (reboot pending), confirmed as applied by `winver` after the next boot. Autologon permanent, USB tablet active (`query-mice`: absolute), share as a read-only FAT disk. Product key and ISO are the maintainer's, in `local.json`. |
+| `windows-nt4` | - | unattended | 2026-09-15 | PASS, 28 min (run 10 of 10) | Install only (no SSH server). FreeDOS floppy on the CD runs `WINNT.EXE /U /S /B`; FAT16 disk prepared by the host, kept raw; `\I386\$OEM$` with SP6a as its own .EXE, `CSDVersion = Service Pack 6` read back on COM1; PCnet with `OEMNADAP.IN_` rewritten on the CD (`TP=0`); standard VGA 640x480 (the Cirrus driver spins the first boot); `RunOnce` + `Sermouse` off + `ping` pause so the token reaches COM1; `net user` + `AUTOLOG.REG` so the autologon survives the first boot; `VMCTLOFF.EXE` shuts down to "safe to turn off". Second boot verified: desktop, autologon, no service errors. Guest clock reads the RTC as local time (2 h behind here): untouched. Product key, ISO, SP6a and the Windows 98 ISO for the DOS CD driver are the maintainer's, in `local.json`. |
+| `freebsd` | 2271 | unattended | 2026-09-14 | PASS, 1.5 min | `artifacts/check-vms/20260914-130825-835989/`: clean install, natural shutdown, SSH identity, pgrep -a -x sshd, service status, freebsd-version and sudo. BIOS/UFS server only; EFI and desktop untested. |
 
 Windows XP, what each live run cost (2026-09-14, six runs): the OEM ISO has no El Torito record
 at all, so QEMU could not boot it; `grub-mkimage -O i386-pc-eltorito` already contains `cdboot.img`
@@ -337,7 +337,7 @@ only `UnattendSwitch="Yes"` does; `echo ==>` lost its text to cmd's redirection,
 saw a token the guest had printed; the USB tablet needs the builtin UHCI controller because XP has
 no xHCI driver; a vvfat share needs `snapshot=on`, since an IDE disk cannot be a read-only block
 node; and `AutoLogonCount` makes Winlogon delete the autologon values it was given, so the counter
-is removed. Remaining: `windows98-unattended` (MSBATCH.INF), and XP is untested on media that do
+is removed. Remaining: `windows-98` (MSBATCH.INF), and XP is untested on media that do
 carry a boot record.
 
 Windows NT 4.0, what the ten runs of 2026-09-14/15 cost, in order: `$OEM$` at the root is ignored
@@ -375,7 +375,7 @@ checks both; the clean documented retry is still required.
 
 Validation before the FreeBSD commit: `make check` (687 tests, 225 subtests),
 CI-like PATH unittest (687 tests, six existing skips), bootstrap dry run and
-`check-vms freebsd-unattended --dry-run` all passed on 2026-09-14. The final clean
+`check-vms freebsd --dry-run` all passed on 2026-09-14. The final clean
 retry was deferred after the outside-sandbox pgrep found another session running
 `check-vms debian-xfce --document`; that matrix was left untouched.
 
@@ -390,11 +390,11 @@ The report keeps the timeline and English/Italian PDFs. Promoted only after this
 
 ## Haiku (2026-09-26)
 
-`haiku` (`manual`) and `haiku-unattended` (`unattended`, SSH 2280, group `smoke`), both on Haiku
+`haiku-installer` (`manual`) and `haiku` (`unattended`, SSH 2280, group `smoke`), both on Haiku
 R1/beta6 of 2026-08-26: the x86_64 anyboot ISO from the RIT mirror, pinned to the SHA-256
 published on haiku-os.org (matched on download).
 
-`haiku-unattended` passed live on its first `check-vms` run, in 74 s from a clean disk
+`haiku` passed live on its first `check-vms` run, in 74 s from a clean disk
 (`artifacts/check-vms/20260926-102415/`): `bootstrap-haiku` boots the live medium, a QMP pilot
 clicks through to a Terminal and types one line, `install.sh` from the seed CD writes BFS over the
 whole SATA disk, copies the live volume and runs `makebootable`, and the installed system boots to

@@ -6,6 +6,7 @@ import json
 import shutil
 import sys
 import tempfile
+import re
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -241,8 +242,8 @@ class RepositoryGroupTests(unittest.TestCase):
     def test_ubuntu_releases_holds_one_desktop_install_per_release(self):
         releases = self.index["ubuntu-releases"]
         self.assertIn("ubuntu-gnome-24.04", releases)  # 24.04's entry of the series
-        self.assertIn("ubuntu-26.04-unattended", releases)
-        versions = sorted(name.split("-")[1] for name in releases if name.endswith("-unattended"))
+        self.assertIn("ubuntu-26.04", releases)
+        versions = sorted(name.split("-")[1] for name in releases if re.fullmatch(r"ubuntu-\d+\.\d+", name))
         self.assertEqual(versions, ["10.04", "12.04", "14.04", "16.04", "18.04", "20.04", "22.04", "26.04", "8.04"])
         for name in releases:
             self.assertEqual(vmctl.config.get_vm(self.cfg, name)["meta"]["status"], "unattended")

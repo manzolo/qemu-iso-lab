@@ -177,7 +177,7 @@ where possible. Add `--allocated-only` to skip free blocks inside supported
 filesystems instead:
 
 ```bash
-bin/vmctl import-device windows11-template --device /dev/sdX --confirm-device /dev/sdX --allocated-only
+bin/vmctl import-device windows-11-installer --device /dev/sdX --confirm-device /dev/sdX --allocated-only
 ```
 
 Use the actual source device in both device arguments. In `vmtui`, choose
@@ -238,7 +238,7 @@ the error message identifies the relevant log.
 ### Interruption and Resume
 
 State is kept next to the destination, for example
-`artifacts/windows11-template/disk.qcow2.allocated-import/`:
+`artifacts/windows-11-installer/disk.qcow2.allocated-import/`:
 
 - `source.raw`: sparse temporary disk, initially zero outside copied blocks.
 - `domain.map`: blocks that must be read.
@@ -249,7 +249,7 @@ Resume with the same arguments and `--resume`, or choose **Resume allocated impo
 in the TUI:
 
 ```bash
-bin/vmctl import-device windows11-template --device /dev/sdX --confirm-device /dev/sdX --allocated-only --resume
+bin/vmctl import-device windows-11-installer --device /dev/sdX --confirm-device /dev/sdX --allocated-only --resume
 ```
 
 Resume regenerates the allocation map and verifies source/target identity. It also

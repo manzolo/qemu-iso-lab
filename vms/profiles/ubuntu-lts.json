@@ -493,7 +493,7 @@
       "iso_sha256": "3a4c9877b483ab46d7c3fbe165a0db275e1ae3cfe56a5657e5a47c2f99a99d1e",
       "vmport": false
     },
-    "ubuntu-8.04-unattended": {
+    "ubuntu-8.04": {
       "name": "Ubuntu 8.04.4 Desktop (unattended, d-i alternate)",
       "meta": {
         "slug": "ubuntu",
@@ -510,7 +510,7 @@
       "iso": "isos/ubuntu-8.04.4-alternate-amd64.iso",
       "iso_url": "https://old-releases.ubuntu.com/releases/8.04.4/ubuntu-8.04.4-alternate-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-8.04-unattended/disk.qcow2",
+        "path": "artifacts/ubuntu-8.04/disk.qcow2",
         "size": "16G",
         "format": "qcow2",
         "interface": "ide"
@@ -602,7 +602,7 @@
       },
       "notes": "OpenSSH 4.7 in the guest: RSA key, SHA-1 signatures and DH group exchange (ssh_options)."
     },
-    "ubuntu-10.04-unattended": {
+    "ubuntu-10.04": {
       "name": "Ubuntu 10.04.4 Desktop (unattended, d-i alternate)",
       "meta": {
         "slug": "ubuntu",
@@ -619,7 +619,7 @@
       "iso": "isos/ubuntu-10.04.4-alternate-amd64.iso",
       "iso_url": "https://old-releases.ubuntu.com/releases/10.04.4/ubuntu-10.04.4-alternate-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-10.04-unattended/disk.qcow2",
+        "path": "artifacts/ubuntu-10.04/disk.qcow2",
         "size": "16G",
         "format": "qcow2",
         "interface": "virtio"
@@ -710,7 +710,7 @@
       },
       "notes": "OpenSSH 5.3 in the guest: RSA key, SHA-1 signatures and DH group exchange (ssh_options)."
     },
-    "ubuntu-12.04-unattended": {
+    "ubuntu-12.04": {
       "name": "Ubuntu 12.04.5 Desktop (unattended, d-i alternate)",
       "meta": {
         "slug": "ubuntu",
@@ -727,7 +727,7 @@
       "iso": "isos/ubuntu-12.04.5-alternate-amd64.iso",
       "iso_url": "https://old-releases.ubuntu.com/releases/12.04.5/ubuntu-12.04.5-alternate-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-12.04-unattended/disk.qcow2",
+        "path": "artifacts/ubuntu-12.04/disk.qcow2",
         "size": "20G",
         "format": "qcow2",
         "interface": "virtio"
@@ -818,7 +818,7 @@
       },
       "notes": "OpenSSH 5.9 in the guest: RSA key and SHA-1 signatures (ssh_options)."
     },
-    "ubuntu-14.04-unattended": {
+    "ubuntu-14.04": {
       "name": "Ubuntu 14.04.6 Desktop (unattended, d-i server)",
       "meta": {
         "slug": "ubuntu",
@@ -835,7 +835,7 @@
       "iso": "isos/ubuntu-14.04.6-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/14.04/ubuntu-14.04.6-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-14.04-unattended/disk.qcow2",
+        "path": "artifacts/ubuntu-14.04/disk.qcow2",
         "size": "20G",
         "format": "qcow2",
         "interface": "virtio"
@@ -844,7 +844,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-14.04-unattended/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-14.04/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 2048,
@@ -923,7 +923,7 @@
       "notes": "Server ISO (d-i): the ubuntu-desktop task is not installed by pkgsel from this medium (verified live), so the metapackage comes through pkgsel/include from archive.ubuntu.com; OpenSSH 6.6 accepts the ed25519 key.",
       "vmport": false
     },
-    "ubuntu-16.04-unattended": {
+    "ubuntu-16.04": {
       "name": "Ubuntu 16.04.7 Desktop (unattended, d-i server)",
       "meta": {
         "slug": "ubuntu",
@@ -940,7 +940,7 @@
       "iso": "isos/ubuntu-16.04.7-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/16.04/ubuntu-16.04.7-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-16.04-unattended/disk.qcow2",
+        "path": "artifacts/ubuntu-16.04/disk.qcow2",
         "size": "24G",
         "format": "qcow2",
         "interface": "virtio"
@@ -949,7 +949,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-16.04-unattended/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-16.04/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 2048,
@@ -1035,7 +1035,7 @@
       "notes": "Server ISO (d-i) + the ubuntu-desktop metapackage from archive.ubuntu.com (pkgsel/include); Unity 7 on LightDM, systemd, so verify-desktop applies.",
       "vmport": false
     },
-    "ubuntu-18.04-unattended": {
+    "ubuntu-18.04": {
       "name": "Ubuntu 18.04.6 Desktop (unattended, d-i server)",
       "meta": {
         "slug": "ubuntu",
@@ -1052,7 +1052,7 @@
       "iso": "isos/ubuntu-18.04.6-server-amd64.iso",
       "iso_url": "https://cdimage.ubuntu.com/releases/18.04/release/ubuntu-18.04.6-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-18.04-unattended/disk.qcow2",
+        "path": "artifacts/ubuntu-18.04/disk.qcow2",
         "size": "24G",
         "format": "qcow2",
         "interface": "virtio"
@@ -1061,7 +1061,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-18.04-unattended/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-18.04/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 3072,
@@ -1147,7 +1147,7 @@
       "notes": "Server ISO (d-i, only on cdimage.ubuntu.com) + the ubuntu-desktop metapackage from archive.ubuntu.com; GNOME Shell on GDM3, systemd, so verify-desktop applies.",
       "vmport": false
     },
-    "ubuntu-20.04-unattended": {
+    "ubuntu-20.04": {
       "name": "Ubuntu 20.04.6 Desktop (unattended, autoinstall)",
       "meta": {
         "slug": "ubuntu",
@@ -1164,7 +1164,7 @@
       "iso": "isos/ubuntu-20.04.6-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/20.04/ubuntu-20.04.6-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-20.04-unattended/disk.qcow2",
+        "path": "artifacts/ubuntu-20.04/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -1173,7 +1173,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-20.04-unattended/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-20.04/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -1258,7 +1258,7 @@
       "guest_agent": true,
       "vmport": false
     },
-    "ubuntu-22.04-unattended": {
+    "ubuntu-22.04": {
       "name": "Ubuntu 22.04.5 Desktop (unattended, autoinstall)",
       "meta": {
         "slug": "ubuntu",
@@ -1275,7 +1275,7 @@
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-22.04-unattended/disk.qcow2",
+        "path": "artifacts/ubuntu-22.04/disk.qcow2",
         "size": "32G",
         "format": "qcow2",
         "interface": "virtio"
@@ -1284,7 +1284,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-22.04-unattended/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-22.04/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,
@@ -1371,7 +1371,7 @@
       "guest_agent": true,
       "vmport": false
     },
-    "ubuntu-26.04-unattended": {
+    "ubuntu-26.04": {
       "name": "Ubuntu 26.04 Desktop (unattended, autoinstall)",
       "meta": {
         "slug": "ubuntu",
@@ -1388,7 +1388,7 @@
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-26.04-unattended/disk.qcow2",
+        "path": "artifacts/ubuntu-26.04/disk.qcow2",
         "size": "35G",
         "format": "qcow2",
         "interface": "virtio"
@@ -1397,7 +1397,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-26.04-unattended/OVMF_VARS.fd"
+        "vars_path": "artifacts/ubuntu-26.04/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 4096,

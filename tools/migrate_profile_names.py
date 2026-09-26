@@ -2,7 +2,8 @@
 """Migrate renamed profile directories without overwriting or deleting data.
 
 Defaults to a preview. Stop VMs and switch to the renamed catalog before --apply.
-Only the sixteen explicit aliases are migrated; unrelated directories stay put.
+Only the explicit aliases of vmctl.config.PROFILE_ALIASES are migrated, plus the three manual
+twins renamed on 2026-09-26 (TWIN_RENAMES); unrelated directories stay put.
 """
 from __future__ import annotations
 
@@ -30,15 +31,42 @@ def rename_no_replace(source: Path, destination: Path) -> None:
         raise OSError(code, os.strerror(code), str(destination))
 
 
+# 2026-09-26: the manual profiles freebsd, haiku and pearos-nicecore became <name>-installer and
+# their old names went to the unattended profiles, so these cannot be aliases. An old directory
+# under such a name holds the *manual* disk: it moves first, when it is recognisably manual (its
+# state.json names no bootstrap flow) or when the old <name>-unattended directory still exists.
+TWIN_RENAMES = {"freebsd": "freebsd-installer", "haiku": "haiku-installer", "pearos-nicecore": "pearos-nicecore-installer"}
+TWIN_FLOWS = {"freebsd": "bootstrap-freebsd", "haiku": "bootstrap-haiku", "pearos-nicecore": "bootstrap-pearos"}
+
+
+def twin_is_manual(root: Path, old: str) -> bool:
+    directory = root / "artifacts" / old
+    if not directory.is_dir() or directory.is_symlink():
+        return False
+    if (root / "artifacts" / f"{old}-unattended").exists():
+        return True
+    try:
+        flow = json.loads((directory / "state.json").read_text()).get("install", {}).get("flow")
+    except (OSError, ValueError, AttributeError):
+        return False  # no record: it may already be the renamed unattended profile, leave it
+    return bool(flow) and flow != TWIN_FLOWS[old]
+
+
+def ordered_renames(root: Path) -> list[tuple[str, str]]:
+    twins = [(old, new) for old, new in TWIN_RENAMES.items() if twin_is_manual(root, old)]
+    return twins + list(PROFILE_ALIASES.items())
+
+
 def migration_plan(root: Path) -> list[tuple[Path, Path]]:
-    moves = []
-    for old, new in PROFILE_ALIASES.items():
+    moves: list[tuple[Path, Path]] = []
+    vacated: set[Path] = set()
+    for old, new in ordered_renames(root):
         source, destination = root / "artifacts" / old, root / "artifacts" / new
-        if not os.path.lexists(source):
+        if not os.path.lexists(source) or source in {d for _, d in moves}:
             continue
         if source.is_symlink() or not source.is_dir():
             raise ValueError(f"Refusing non-directory or symlink: {source}")
-        if os.path.lexists(destination):
+        if os.path.lexists(destination) and destination not in vacated:
             raise ValueError(f"Conflict: both {source} and {destination} exist; nothing was overwritten")
         for pidfile in (source / "runtime").glob("*.pid"):
             try:
@@ -52,10 +80,15 @@ def migration_plan(root: Path) -> list[tuple[Path, Path]]:
                 pass
             raise ValueError(f"Refusing migration while a process may be active: {pidfile}")
         moves.append((source, destination))
+        vacated.add(source)
     return moves
 
 
 def migrate_local_data(data: dict[str, Any]) -> dict[str, Any]:
+    # A file still using this batch's old names predates the 2026-09-26 rename: its keys named
+    # after a twin are the manual profiles. One mapping over the original keys, no chaining.
+    old_file = any(key.endswith("-unattended") and key in PROFILE_ALIASES for key in data["vms"])
+    mapping = {**(TWIN_RENAMES if old_file else {}), **PROFILE_ALIASES}
     def rewrite(value: Any) -> Any:
         if isinstance(value, dict):
             return {key: rewrite(item) for key, item in value.items()}
@@ -63,12 +96,12 @@ def migrate_local_data(data: dict[str, Any]) -> dict[str, Any]:
             return [rewrite(item) for item in value]
         if isinstance(value, str):
             # Exact path components, including absolute host source paths.
-            return "/".join(PROFILE_ALIASES.get(part, part) for part in value.split("/"))
+            return "/".join(mapping.get(part, part) for part in value.split("/"))
         return value
     result = dict(data)
     profiles: dict[str, Any] = {}
     for old, vm in data["vms"].items():
-        new = PROFILE_ALIASES.get(old, old)
+        new = mapping.get(old, old)
         if new in profiles:
             raise ValueError(f"Conflicting old and new local overrides for {new}; merge them explicitly")
         profiles[new] = rewrite(vm)

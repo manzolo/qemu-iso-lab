@@ -882,14 +882,14 @@ MENU_NO_TAGS=1 MENU_STYLED=1 MENU_CONTEXT_HINTS=1 fzf_pick T H '' \
     def test_dashboard_names_the_bootstrap_bound_to_install_shortcut(self):
         for vm, action in (("alpine-niri", "Alpine Bootstrap"),
                            ("debian-server", "Debian Preseed Bootstrap"),
-                           ("windows11-unattended", "Windows Bootstrap"),
+                           ("windows-11", "Windows Bootstrap"),
                            ("arch-noctalia", "Arch Bootstrap"),
                            ("alpine-ci", "Guided Provision")):
             for installed in (False, True):
-                if vm == "windows11-unattended" and not installed:
+                if vm == "windows-11" and not installed:
                     # No ISO in the test root and no public download: the first step is getting it.
                     action = "Get the ISO"
-                elif vm == "windows11-unattended":
+                elif vm == "windows-11":
                     action = "Windows Bootstrap"
                 with self.subTest(vm=vm, installed=installed):
                     if installed:
@@ -1074,18 +1074,18 @@ run_dashboard_hotkey alt-u {vm}
         self.assertIn("Post-Install", output)
 
     def test_unified_menu_for_windows_unattended_vm(self):
-        output = self._unified_menu("windows11-unattended")
+        output = self._unified_menu("windows-11")
         self.assertIn("Windows Bootstrap", output)
         self.assertNotIn("Alpine Bootstrap", output)
-        result = self.run_bash("source bin/vmtui; load_vm_facts windows11-unattended; recommended_action")
+        result = self.run_bash("source bin/vmtui; load_vm_facts windows-11; recommended_action")
         self.assertEqual(result.stdout.strip(), "Get the ISO")  # Microsoft has no stable URL
         iso = self.bindir / "isos" / "windows11.iso"
         iso.parent.mkdir(parents=True, exist_ok=True)
         iso.write_bytes(b"CD001" + b"\0" * 4091)
-        result = self.run_bash("source bin/vmtui; load_vm_facts windows11-unattended; recommended_action")
+        result = self.run_bash("source bin/vmtui; load_vm_facts windows-11; recommended_action")
         self.assertEqual(result.stdout.strip(), "Windows Bootstrap")
         # the import templates keep the manual flow
-        self.assertNotIn("Windows Bootstrap", self._unified_menu("windows11-template"))
+        self.assertNotIn("Windows Bootstrap", self._unified_menu("windows-11-installer"))
 
     def test_network_lab_menu_exists_when_a_router_profile_is_defined(self):
         self.assertEqual(self.run_bash("source bin/vmtui; catalog_has_network_lab && echo yes").stdout.strip(), "yes")
@@ -1186,7 +1186,7 @@ run_dashboard_hotkey alt-u {vm}
     def test_is_na_action_boot_desktop_when_disk_missing(self):
         # freebsd has no disk in the temp root (plain VM, never installed)
         result = subprocess.run(
-            ["bash", "-lc", "source bin/vmtui; is_na_action 'Boot Desktop' freebsd"],
+            ["bash", "-lc", "source bin/vmtui; is_na_action 'Boot Desktop' freebsd-installer"],
             cwd=ROOT,
             env=self.env,
             capture_output=True,
@@ -1195,7 +1195,7 @@ run_dashboard_hotkey alt-u {vm}
         self.assertEqual(result.returncode, 0)
 
     def test_vm_status_summary_not_installed_when_no_disk(self):
-        result = self.run_bash("source bin/vmtui; vm_status_summary freebsd")
+        result = self.run_bash("source bin/vmtui; vm_status_summary freebsd-installer")
         self.assertEqual(result.stdout.strip(), "not installed")
 
     def test_libvirt_menu_and_actions(self):

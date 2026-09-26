@@ -1,6 +1,6 @@
 {
   "vms": {
-    "freebsd": {
+    "freebsd-installer": {
       "name": "FreeBSD 14.3 Disc1",
       "meta": {
         "slug": "freebsd",

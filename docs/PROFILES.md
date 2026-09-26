@@ -287,7 +287,7 @@ by hand, then `vmctl prep`) is ignored.
 
 ## Windows import templates
 
-`windows10-template` and `windows11-template` are conservative import targets
+`windows-10-installer` and `windows-11-installer` are conservative import targets
 for `vmctl import-device`:
 
 - both use `q35` and EFI;
@@ -296,7 +296,7 @@ for `vmctl import-device`:
 - both use `e1000e` networking for out-of-the-box compatibility;
 - native Windows 11 requirements such as TPM and Secure Boot are not modeled.
 
-`windows11-unattended` and `windows10-unattended` are the installable counterparts: a `virtio` disk (the
+`windows-11` and `windows-10` are the installable counterparts: a `virtio` disk (the
 storage driver is injected during Setup), `virtio-net-pci`, and a
 `windows_config` section driving `vmctl bootstrap-windows` (`driver_flavor` `w11`/`w10`, no requirement bypass on 10)
 ([UNATTENDED.md](UNATTENDED.md#windows-1011-autounattend)). Its `iso` has no

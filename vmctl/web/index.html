@@ -70,6 +70,8 @@ tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
 .lab-head > .chip { flex-shrink:0; }
 @media(max-width:420px) { .profile-identity { gap:8px; } .catalog-icon { width:28px; height:28px; flex-basis:28px; border-radius:8px; } #list td,#list th { padding-left:10px; padding-right:10px; } #list .profile-desc { max-width:170px; } }
 .profile-name { display:block; font-size:13px; font-weight:600; }
+.style-tag { display:inline-block; margin-left:8px; padding:1px 6px; border-radius:5px; font:600 9.5px system-ui,sans-serif; letter-spacing:.04em; text-transform:uppercase; vertical-align:2px; color:var(--muted); border:1px solid var(--line); }
+.style-tag.auto { color:var(--ok); border-color:#2f5a52; background:#16302c; }
 .profile-desc { display:block; color:var(--muted); font-size:11px; margin-top:3px; max-width:300px; overflow:hidden; text-overflow:ellipsis; }
 #list { max-height:520px; overflow:auto; }
 .state { display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:600; border:1px solid currentColor; border-radius:6px; padding:3px 7px; }
@@ -480,7 +482,7 @@ function render() {
   const rows = visible();
   $("list-title").textContent = `Profiles  ${rows.length} / ${all.length}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
-  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r))}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td><span class="state ${c}">${s}</span></td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r))}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td><span class="state ${c}">${s}</span></td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`;
   renderDetails();
 }

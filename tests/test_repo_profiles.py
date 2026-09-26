@@ -46,17 +46,17 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "debian-bios",
             "ubuntu-server-ci",
             "fedora-server-efi",
-            "freebsd",
+            "freebsd-installer",
             "arch-omarchy-nvidia",
             "fedora-niri-dms",
             "alpine-niri",
             "cachyos-nvidia",
-            "windows11-unattended",
-            "windows10-unattended",
+            "windows-11",
+            "windows-10",
             "pfsense-lab",
             "pihole-lab",
             "lubuntu-lab",
-            "windows7-unattended",
+            "windows-7",
             "lubuntu-24.04",
             "kubuntu-24.04",
             "xubuntu-24.04",
@@ -78,12 +78,12 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "arch-omarchy-nvidia", "debian-server", "ubuntu-niri", "fedora-niri-dms", "fedora-silverblue",
             "pfsense-lab", "pihole-lab", "lubuntu-lab", "opensuse-tumbleweed-autoyast", "almalinux-server",
             "rocky-9", "lubuntu-24.04", "kubuntu-24.04", "xubuntu-24.04", "ubuntu-mate-24.04",
-            "ubuntu-budgie-24.04", "ubuntu-gnome-24.04", "windows7-unattended", "windows10-unattended",
-            "windows11-unattended",
+            "ubuntu-budgie-24.04", "ubuntu-gnome-24.04", "windows-7", "windows-10",
+            "windows-11",
         }
-        verified_templates = {"windows10-template", "windows11-template"}
+        verified_templates = {"windows-10-installer", "windows-11-installer"}
         # The Ubuntu desktop history: clean reinstall of each with the final recipe on 2026-09-12.
-        verified_history = {f"ubuntu-{v}-unattended" for v in ("8.04", "10.04", "12.04", "14.04", "16.04", "18.04", "20.04", "22.04")} | {"reactos"}
+        verified_history = {f"ubuntu-{v}" for v in ("8.04", "10.04", "12.04", "14.04", "16.04", "18.04", "20.04", "22.04")} | {"reactos"}
         # Batch A (docs/PROFILE_TODO.md): nine passed live on the evening of 2026-09-13; debian-kde and
         # kali passed after midnight, alone, once the shared bandwidth and the Kali preseed were sorted.
         verified_batch_a = {
@@ -91,42 +91,42 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "ubuntu-unity-24.04", "ubuntu-cinnamon-24.04", "ubuntustudio-24.04", "edubuntu-24.04",
         }
         verified_batch_a_retry = {"debian-kde", "kali"}
-        verified_batch_b_c = {"freebsd-unattended", "windowsxp-unattended", "windows2000-unattended"}
-        verified_nt4 = {"windowsnt4-unattended"}
+        verified_batch_b_c = {"freebsd", "windows-xp", "windows-2000"}
+        verified_nt4 = {"windows-nt4"}
         # pearOS NiceC0re: bootstrap-pearos installed and provisioned it on the first live run
         # (verify-desktop reported an active graphical session for the autologin user).
-        verified_pearos = {"pearos-nicecore-unattended"}
+        verified_pearos = {"pearos-nicecore"}
         # NixOS: both rode bootstrap-nixos live on 2026-09-19 (server verified over SSH,
         # GNOME through verify-desktop on the autologin session).
         verified_nixos = {"nixos-server", "nixos-gnome"}
         # Re-verified on 2026-09-16 after the 09-15 matrix failed them: cachyos-nvidia once the
         # 32-bit NVIDIA packages became best effort, centos-stream-10 once the installer took its
-        # stage2 from the medium instead of the moving repository, windows7-unattended once the
+        # stage2 from the medium instead of the moving repository, windows-7 once the
         # report's screenshot boot stopped cutting the guest mid-boot (docs/PROFILE_TODO.md).
-        verified_retry = {"cachyos-nvidia", "centos-stream-10", "windows7-unattended"}
+        verified_retry = {"cachyos-nvidia", "centos-stream-10", "windows-7"}
         # First live run of the profile added the same day: 26.04's subiquity installs
         # ubuntu-desktop straight from autoinstall "packages" and gdm3.service still answers.
-        verified_ubuntu_2604 = {"ubuntu-26.04-unattended"}
+        verified_ubuntu_2604 = {"ubuntu-26.04"}
         # The Proxmox lab, promoted like the network lab: four PASS from clean disks, then the
         # three nodes formed a quorate cluster over pve-lan (vmctl group cluster).
         verified_proxmox_lab = {"proxmox-ve", "proxmox-ve-node2", "proxmox-ve-node3", "proxmox-lab-client"}
         # First live run of bootstrap-haiku: the QMP pilot, install.sh from the seed CD, SSH as user.
-        verified_haiku = {"haiku-unattended"}
+        verified_haiku = {"haiku"}
         # The full matrix of 2026-09-25/26 from clean disks (check-vms --parallel auto --timeout 3600,
         # artifacts/check-vms/20260925-223107/): 53 PASS, 0 FAIL; these are the tracked ones.
         verified_matrix_0926 = {
             "almalinux-server", "alpine-ci", "alpine-niri", "arch-dms", "arch-dms-nvidia", "arch-noctalia",
             "cachyos-desktop", "cachyos-nvidia", "centos-stream-10", "debian-gnome", "debian-kde",
             "debian-server", "debian-xfce", "edubuntu-24.04", "fedora-kde", "fedora-kinoite",
-            "fedora-niri-dms", "fedora-silverblue", "freebsd-unattended", "kali", "kubuntu-24.04",
+            "fedora-niri-dms", "fedora-silverblue", "freebsd", "kali", "kubuntu-24.04",
             "lubuntu-24.04", "lubuntu-lab", "nixos-gnome", "nixos-server", "opensuse-tumbleweed-autoyast",
-            "pearos-nicecore-unattended", "pfsense-lab", "pihole-lab", "reactos", "rocky-9",
-            "ubuntu-10.04-unattended", "ubuntu-12.04-unattended", "ubuntu-14.04-unattended",
-            "ubuntu-16.04-unattended", "ubuntu-18.04-unattended", "ubuntu-20.04-unattended",
-            "ubuntu-22.04-unattended", "ubuntu-26.04-unattended", "ubuntu-8.04-unattended",
+            "pearos-nicecore", "pfsense-lab", "pihole-lab", "reactos", "rocky-9",
+            "ubuntu-10.04", "ubuntu-12.04", "ubuntu-14.04",
+            "ubuntu-16.04", "ubuntu-18.04", "ubuntu-20.04",
+            "ubuntu-22.04", "ubuntu-26.04", "ubuntu-8.04",
             "ubuntu-budgie-24.04", "ubuntu-cinnamon-24.04", "ubuntu-gnome-24.04", "ubuntu-mate-24.04",
-            "ubuntu-unity-24.04", "ubuntustudio-24.04", "windows10-unattended", "windows11-unattended",
-            "windows2000-unattended", "windows7-unattended", "windowsxp-unattended", "xubuntu-24.04"
+            "ubuntu-unity-24.04", "ubuntustudio-24.04", "windows-10", "windows-11",
+            "windows-2000", "windows-7", "windows-xp", "xubuntu-24.04"
         }
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
@@ -224,14 +224,14 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         self.assertEqual(cfg["vms"]["ubuntu-10.04-desktop"]["disk"]["interface"], "virtio")
         # vmmouse-era guests: no VMware port, or the pointer never reaches the USB tablet (verified on 14.04).
         self.assertIs(cfg["vms"]["ubuntu-14.04-desktop"].get("vmport"), False)
-        self.assertIs(cfg["vms"]["ubuntu-14.04-unattended"].get("vmport"), False)
+        self.assertIs(cfg["vms"]["ubuntu-14.04"].get("vmport"), False)
         self.assertNotIn("vmport", cfg["vms"]["ubuntu-12.04-desktop"])
 
         # The unattended counterparts ride bootstrap-preseed on the d-i media (alternate CDs, the
         # 14.04 server ISO): desktop task, EOL mirror, and legacy SSH for the pre-6.5 sshd guests.
         for version, port, legacy in (("8.04", 2252, True), ("10.04", 2253, True), ("12.04", 2254, True), ("14.04", 2255, False),
                                       ("16.04", 2256, False), ("18.04", 2257, False)):
-            vm = cfg["vms"][f"ubuntu-{version}-unattended"]
+            vm = cfg["vms"][f"ubuntu-{version}"]
             self.assertEqual(vm["meta"]["status"], "unattended")
             self.assertEqual(vm["ssh_provision"]["ssh_host_port"], port)
             desktop = vm["preseed_config"]["tasks"] + vm["preseed_config"]["packages"]
@@ -242,16 +242,16 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             self.assertEqual(vm["preseed_config"]["mirror_hostname"], "old-releases.ubuntu.com" if float(version) < 14 else "archive.ubuntu.com")
             self.assertEqual(vm["ssh_provision"].get("key_type"), "rsa" if legacy else None)
             self.assertEqual("ssh_options" in vm["ssh_provision"], legacy)
-            self.assertIn("lab", vmctl.preseed.render_preseed(f"ubuntu-{version}-unattended", vm))
+            self.assertIn("lab", vmctl.preseed.render_preseed(f"ubuntu-{version}", vm))
             # systemd guests (16.04+) run the shared verify-desktop; upstart ones a pgrep on the session.
             check = vm["ssh_provision"]["post_install_run"][0]
             self.assertIn("verify-desktop" if float(version) >= 16 else "x-session-manag(er)?", check)
-        self.assertEqual(cfg["vms"]["ubuntu-8.04-unattended"]["preseed_config"]["disk_device"], "auto")
+        self.assertEqual(cfg["vms"]["ubuntu-8.04"]["preseed_config"]["disk_device"], "auto")
 
         # pearOS NiceC0re: its Calamares installs by unpacking the live squashfs, so the flow
         # carries no package list; the medium is user-supplied and pinned by the vendor index.
-        pearos_manual = cfg["vms"]["pearos-nicecore"]
-        pearos = cfg["vms"]["pearos-nicecore-unattended"]
+        pearos_manual = cfg["vms"]["pearos-nicecore-installer"]
+        pearos = cfg["vms"]["pearos-nicecore"]
         self.assertEqual(pearos_manual["meta"]["status"], "manual")
         self.assertNotIn("iso_url", pearos_manual)
         self.assertNotIn("iso_discovery", pearos_manual)
@@ -261,8 +261,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         self.assertEqual(pearos["ssh_provision"]["user"], "lab")
         self.assertEqual(pearos["firmware"]["type"], "efi")
         self.assertEqual(pearos["disk"]["interface"], "virtio")
-        self.assertEqual(vmctl.pearos.check_profile("pearos-nicecore-unattended", pearos), [])
-        script = vmctl.pearos.render_install_script("pearos-nicecore-unattended", pearos)
+        self.assertEqual(vmctl.pearos.check_profile("pearos-nicecore", pearos), [])
+        script = vmctl.pearos.render_install_script("pearos-nicecore", pearos)
         self.assertIn("unsquashfs", script)
         self.assertNotIn("pacstrap", script)
 
@@ -283,7 +283,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         self.assertIn("lock-enabled = false;", rendered)
         # 20.04 and 22.04 ride the autoinstall recipe of ubuntu-gnome-24.04, which is the 24.04 entry.
         for version, port in (("20.04", 2258), ("22.04", 2259)):
-            vm = cfg["vms"][f"ubuntu-{version}-unattended"]
+            vm = cfg["vms"][f"ubuntu-{version}"]
             # 22.04 installs the metapackage as an autoinstall package; 20.04's subiquity 22.07 sees only
             # the CD pool at that point, so the desktop goes through a late-command (verified live).
             desktop_sources = vm["autoinstall"].get("packages", []) + vm["autoinstall"].get("late_commands", [])
@@ -294,7 +294,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             self.assertIs(vm.get("vmport"), False)
             self.assertEqual(Path(vm["iso"]).name, vm["iso_url"].rsplit("/", 1)[1])
             self.assertEqual(vm["meta"]["status"], "unattended")
-        self.assertEqual(cfg["vms"]["ubuntu-8.04-unattended"]["disk"]["interface"], "ide")
+        self.assertEqual(cfg["vms"]["ubuntu-8.04"]["disk"]["interface"], "ide")
 
         # ReactOS: no virtio storage driver, no UEFI, no SMP in the release; user-supplied ISO
         # (SourceForge ships it zipped), sha256 is a repository pin.
@@ -309,7 +309,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         self.assertEqual(reactos["iso_archive"], {"type": "zip", "member": "ReactOS-0.4.16-i386.iso"})
 
         # Windows 7: BIOS, e1000e (no NetKVM needed), no SSH (no OpenSSH on 7), generic identity.
-        w7 = cfg["vms"]["windows7-unattended"]
+        w7 = cfg["vms"]["windows-7"]
         self.assertEqual(w7["firmware"]["type"], "bios")
         self.assertEqual(w7["network_device"], "e1000e")
         self.assertNotIn("ssh_provision", w7)
@@ -341,15 +341,15 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
 
         # Windows rides bootstrap-windows: generic identity, virtio disk (viostor is injected
         # in WinPE), OpenSSH post-install, no download URL (Microsoft publishes none).
-        win = cfg["vms"]["windows11-unattended"]
+        win = cfg["vms"]["windows-11"]
         self.assertEqual(win["windows_config"]["username"], "lab")
         self.assertEqual(win["ssh_provision"]["user"], "lab")
         self.assertEqual(win["disk"]["interface"], "virtio")
         self.assertEqual(win["windows_config"]["driver_flavor"], "w11")
         self.assertNotIn("iso_url", win)
         self.assertIn("microsoft.com/software-download/windows11", win["iso_help"])
-        self.assertEqual(cfg["vms"]["windows11-template"]["meta"]["role"], "import-template")
-        w10 = cfg["vms"]["windows10-unattended"]
+        self.assertEqual(cfg["vms"]["windows-11-installer"]["meta"]["role"], "import-template")
+        w10 = cfg["vms"]["windows-10"]
         self.assertEqual(w10["windows_config"]["driver_flavor"], "w10")
         self.assertEqual(w10["windows_config"]["edition"], "Windows 10 Pro")
         self.assertFalse(w10["windows_config"]["bypass_requirements"])

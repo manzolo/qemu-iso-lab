@@ -19,7 +19,7 @@ Reproducible cheat sheets of the main VMs of the lab, in two languages: `it/` (I
 | 35 | [35-opensuse-autoyast.md](it/35-opensuse-autoyast.md) | [35-opensuse-autoyast.md](en/35-opensuse-autoyast.md) | `opensuse-tumbleweed-autoyast` | `vmctl bootstrap-autoyast` |
 | 40 | [40-arch-niri.md](it/40-arch-niri.md) | [40-arch-niri.md](en/40-arch-niri.md) | `arch-dms`, `arch-noctalia`, `cachyos-desktop` | `vmctl bootstrap-archinstall` |
 | 50 | [50-alpine-niri.md](it/50-alpine-niri.md) | [50-alpine-niri.md](en/50-alpine-niri.md) | `alpine-niri` | `vmctl bootstrap-alpine` |
-| 60 | [60-windows.md](it/60-windows.md) | [60-windows.md](en/60-windows.md) | `windows11-unattended`, `windows10-unattended` | `vmctl bootstrap-windows` |
+| 60 | [60-windows.md](it/60-windows.md) | [60-windows.md](en/60-windows.md) | `windows-11`, `windows-10` | `vmctl bootstrap-windows` |
 | 70 | [70-network-lab.html](it/70-network-lab.html) | [70-network-lab.html](en/70-network-lab.html) | `pfsense-lab`, `pihole-lab`, `lubuntu-lab` | `vmctl lab install`, `vmctl bootstrap-pfsense` (pagina curata con lo schema SVG / curated page with the SVG topology) |
 | 80 | [80-virsh-cheatsheet.html](it/80-virsh-cheatsheet.html) | [80-virsh-cheatsheet.html](en/80-virsh-cheatsheet.html) | VM esportate con `vmctl export-libvirt` / VMs exported with `vmctl export-libvirt` | `virsh ...` (bignami a schede / card cheat sheet) |
 

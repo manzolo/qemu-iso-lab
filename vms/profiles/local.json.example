@@ -95,7 +95,7 @@
         ]
       }
     },
-    "windows11-unattended": {
+    "windows-11": {
       "name": "Windows 11 (Local)",
       "iso": "/path/to/Win11_24H2_English_x64.iso",
       "windows_config": {
@@ -113,14 +113,14 @@
         "tag": "shared"
       }
     },
-    "windowsxp-unattended": {
+    "windows-xp": {
       "iso": "/path/to/WindowsXP.iso",
       "windowsxp_config": {
         "product_key": "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX",
         "service_pack": "/path/to/WindowsXP-KB936929-SP3-x86-XXX.exe"
       }
     },
-    "windowsnt4-unattended": {
+    "windows-nt4": {
       "iso": "/path/to/WindowsNT4-Workstation.iso",
       "windowsnt4_config": {
         "product_key": "XXX-XXXXXXX",

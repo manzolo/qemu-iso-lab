@@ -6,7 +6,7 @@ from vmctl import freebsd, lifecycle, cloud_init, config, qemu, runtime
 class FreeBSDTests(BaseVmctlTestCase):
     def profile(self):
         # Tracked single profile only; never consult the host's local.json.
-        return json.loads((ROOT / 'vms/profiles/freebsd-unattended.json').read_text())['vms']['freebsd-unattended']
+        return json.loads((ROOT / 'vms/profiles/freebsd.json').read_text())['vms']['freebsd']
 
     def test_manual_profile_stays_manual_and_new_profile_is_bootstrap(self):
         vm = self.profile()
@@ -71,7 +71,7 @@ class FreeBSDTests(BaseVmctlTestCase):
 
     def test_failed_installer_has_timeout_and_does_not_start_disk(self):
         vm = self.profile()
-        args = argparse.Namespace(vm='freebsd-unattended', timeout=47, dry_run=True)
+        args = argparse.Namespace(vm='freebsd', timeout=47, dry_run=True)
         error = VMError(freebsd.BOOTSTRAP_FAILED_TOKEN + ': pkg failed')
         with mock.patch.object(config, 'load_config', return_value={'vms': {args.vm: vm}}), \
              mock.patch.object(lifecycle.iso, 'ensure_iso', return_value=self.root / 'source.iso'), \

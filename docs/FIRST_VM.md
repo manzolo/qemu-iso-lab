@@ -5,6 +5,9 @@ repository, run the setup, open the web dashboard, then **download, install, use
 an Ubuntu 26.04 desktop VM without typing a single vmctl command**. Each step also gives the
 equivalent command, for the terminal or a script.
 
+The profile is `ubuntu-26.04`; the screenshots were taken just before a rename and show its
+previous name, `ubuntu-26.04-unattended`, which still works as an alias.
+
 Times are the ones measured for these screenshots: a Lubuntu VM with 6 vCPUs and 12 GB of RAM,
 itself running under KVM, on a fast connection. A physical host is faster.
 
@@ -68,7 +71,7 @@ Type in the search box (`/` jumps there) and select a profile. The panel on the 
 machine: resources, disk, ISO, SSH address, and the actions that make sense **for its current
 state**. Right now it has no disk, and the ISO can be downloaded.
 
-![The dashboard with ubuntu-26.04-unattended selected: no disk, ISO available to download](screenshots/first-vm/05-select.png)
+![The dashboard with ubuntu-26.04 selected: no disk, ISO available to download](screenshots/first-vm/05-select.png)
 
 The icons tell the actions apart: green starts or installs, blue looks, amber stops, red deletes.
 
@@ -84,7 +87,7 @@ the vendor and checked against the profile's pinned checksum.
 
 ![ISO ready to use](screenshots/first-vm/07-iso-ready.png)
 
-Terminal equivalent: `vmctl fetch-iso ubuntu-26.04-unattended`.
+Terminal equivalent: `vmctl fetch-iso ubuntu-26.04`.
 
 ## 6. Install it, unattended
 
@@ -99,7 +102,7 @@ install: the log, the console and a screenshot.
 
 ![The machine is installing](screenshots/first-vm/09-installing.png)
 
-Terminal equivalent: `vmctl bootstrap-unattended ubuntu-26.04-unattended`.
+Terminal equivalent: `vmctl bootstrap-unattended ubuntu-26.04`.
 
 ## 7. Watch the install
 
@@ -126,7 +129,7 @@ the VM, and **Close** leaves the console.
 
 ![The Ubuntu 26.04 desktop inside the browser](screenshots/first-vm/13-console-desktop.png)
 
-Terminal equivalent: `vmctl attach ubuntu-26.04-unattended` (a viewer window on the host).
+Terminal equivalent: `vmctl attach ubuntu-26.04` (a viewer window on the host).
 
 ## 9. SSH
 
@@ -144,7 +147,7 @@ ends only the SSH session, never the VM.
 
 ![The SSH session in a terminal window on the host, over the dashboard](screenshots/first-vm/16-ssh-host.png)
 
-Terminal equivalent: `vmctl shell ubuntu-26.04-unattended`.
+Terminal equivalent: `vmctl shell ubuntu-26.04`.
 
 ## 10. Save it, stop it
 
@@ -167,8 +170,8 @@ alone. Restore it before a risky change, or keep a clean copy.
 
 ![A checkpoint written from the page](screenshots/first-vm/20-checkpoint.png)
 
-Terminal equivalents: `vmctl stop ubuntu-26.04-unattended`,
-`vmctl checkpoint create ubuntu-26.04-unattended clean`.
+Terminal equivalents: `vmctl stop ubuntu-26.04`,
+`vmctl checkpoint create ubuntu-26.04 clean`.
 
 ![The finished machine in the list, in Firefox on the Lubuntu desktop](screenshots/first-vm/21-firefox.png)
 
@@ -178,7 +181,7 @@ Everything lives in the repository directory, per machine:
 
 ```text
 isos/ubuntu-26.04-live-server-amd64.iso      the downloaded, checksummed ISO (shared by profiles)
-artifacts/ubuntu-26.04-unattended/
+artifacts/ubuntu-26.04/
 ├── disk.qcow2, OVMF_VARS.fd                 the machine's disk and EFI variables
 ├── ssh/id_ed25519                           the key vmctl shell and the page use
 ├── logs/                                    installer and serial console logs
@@ -187,7 +190,7 @@ artifacts/ubuntu-26.04-unattended/
 └── state.json                               what was installed, when, and whether its boot was verified
 ```
 
-`vmctl clean ubuntu-26.04-unattended` deletes the disk (checkpoints stay, `--checkpoints` removes
+`vmctl clean ubuntu-26.04` deletes the disk (checkpoints stay, `--checkpoints` removes
 them too). `vmtui` shows the same machines, states and jobs in the terminal, and `vmctl --help`
 lists every command.
 

@@ -1,6 +1,6 @@
 # Unattended Windows 11 and Windows 10
 
-Profiles: `windows11-unattended` (SSH 2235) and `windows10-unattended` (SSH 2236). The same
+Profiles: `windows-11` (SSH 2235) and `windows-10` (SSH 2236). The same
 technique as kvm-lab (`autounattend.xml`) ported to plain QEMU. Typical time: 25-40 minutes.
 
 ## 1. Specific prerequisites
@@ -18,7 +18,7 @@ technique as kvm-lab (`autounattend.xml`) ported to plain QEMU. Typical time: 25
 ## 2. Customisation in local.json
 
 ```json
-"windows11-unattended": {
+"windows-11": {
   "iso": "/path/Win11_25H2_Italian_x64_v2.iso",
   "windows_config": {
     "username": "YOUR_USER", "password": "YOUR_PASSWORD", "realname": "Name Surname",
@@ -37,8 +37,8 @@ technique as kvm-lab (`autounattend.xml`) ported to plain QEMU. Typical time: 25
 ## 3. The command
 
 ```bash
-vmctl bootstrap-windows windows11-unattended        # --timeout 3600 by default
-vmctl attach windows11-unattended                   # in another terminal, to watch
+vmctl bootstrap-windows windows-11        # --timeout 3600 by default
+vmctl attach windows-11                   # in another terminal, to watch
 ```
 
 ## 4. What happens, step by step
@@ -90,7 +90,7 @@ vmctl attach windows11-unattended                   # in another terminal, to wa
 ## 5. Check
 
 ```bash
-vmctl shell windows11-unattended                    # cmd.exe over OpenSSH
+vmctl shell windows-11                    # cmd.exe over OpenSSH
 ver
 powershell -NoProfile -Command "(Get-Service sshd).Status; Get-PSDrive -PSProvider FileSystem"
 dir Z:\                                             # the shared folder
@@ -113,9 +113,9 @@ The generated files are in `artifacts/<vm>/windows/` (`autounattend.xml`, `vmctl
 virtio-win ISO as extra CDs reproduces the same install; the serial (COM1) is optional, it
 only serves to read the progress.
 
-## 8. Windows 7 Ultimate (`windows7-unattended`)
+## 8. Windows 7 Ultimate (`windows-7`)
 
-Same command (`vmctl bootstrap-windows windows7-unattended`), same technique as kvm-lab's
+Same command (`vmctl bootstrap-windows windows-7`), same technique as kvm-lab's
 `Windows7U`, with the differences Windows 7 imposes:
 
 - **BIOS and MBR**: profile with `firmware.type: bios`, answer file with the "System Reserved"
@@ -165,13 +165,13 @@ and addresses worked after starting the installed disk. To repeat the check (the
 command deletes the existing Windows 7 guest):
 
 ```sh
-./bin/vmctl clean windows7-unattended
-./bin/vmctl bootstrap-windows windows7-unattended --timeout 3600
-./bin/vmctl start windows7-unattended --headless --background
+./bin/vmctl clean windows-7
+./bin/vmctl bootstrap-windows windows-7 --timeout 3600
+./bin/vmctl start windows-7 --headless --background
 # Wait for Windows to boot, then:
-./bin/vmctl agent windows7-unattended ping
-./bin/vmctl agent windows7-unattended
-./bin/vmctl stop windows7-unattended
+./bin/vmctl agent windows-7 ping
+./bin/vmctl agent windows-7
+./bin/vmctl stop windows-7
 ```
 
 The clean is necessary: an installed disk boots ahead of the CD, so bootstrap on an existing

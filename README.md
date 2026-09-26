@@ -51,7 +51,7 @@ Or skip the dashboard and go straight to a VM, from an empty disk to a logged-in
 | Debian server, over SSH | `vmctl bootstrap-preseed debian-server && vmctl shell debian-server` | ~5 min |
 | Arch with niri + Noctalia | `vmctl bootstrap-archinstall arch-noctalia && vmctl start arch-noctalia` | ~7 min |
 | Ubuntu 24.04 GNOME | `vmctl bootstrap-unattended ubuntu-gnome-24.04 && vmctl start ubuntu-gnome-24.04` | ~20 min |
-| Windows 11 (your ISO in `isos/`) | `vmctl bootstrap-windows windows11-unattended && vmctl start windows11-unattended` | ~30 min |
+| Windows 11 (your ISO in `isos/`) | `vmctl bootstrap-windows windows-11 && vmctl start windows-11` | ~30 min |
 | A three-node Proxmox cluster | `vmctl group install proxmox-lab` | ~25 min |
 
 Times are from the last validation run on a desktop host with KVM.

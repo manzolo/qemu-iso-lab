@@ -27,7 +27,31 @@ PROFILE_ALIASES: dict[str, str] = {
     "ubuntu-server-headless": "ubuntu-server-ci",
     "rocky9": "rocky-9",
     "lubuntu22-lab": "lubuntu-lab",
-    "alpine-installed-ci": "alpine-ci-installed"
+    "alpine-installed-ci": "alpine-ci-installed",
+    # 2026-09-26: "unattended" is the profile's meta.status, not part of its name. The unattended
+    # profile takes the clean name; a manual twin is <name>-installer. The manual twins' old names
+    # (freebsd, haiku, pearos-nicecore) now belong to the unattended profiles and cannot be aliases.
+    "freebsd-unattended": "freebsd",
+    "haiku-unattended": "haiku",
+    "pearos-nicecore-unattended": "pearos-nicecore",
+    "ubuntu-8.04-unattended": "ubuntu-8.04",
+    "ubuntu-10.04-unattended": "ubuntu-10.04",
+    "ubuntu-12.04-unattended": "ubuntu-12.04",
+    "ubuntu-14.04-unattended": "ubuntu-14.04",
+    "ubuntu-16.04-unattended": "ubuntu-16.04",
+    "ubuntu-18.04-unattended": "ubuntu-18.04",
+    "ubuntu-20.04-unattended": "ubuntu-20.04",
+    "ubuntu-22.04-unattended": "ubuntu-22.04",
+    "ubuntu-26.04-unattended": "ubuntu-26.04",
+    "windows11-unattended": "windows-11",
+    "windows10-unattended": "windows-10",
+    "windows7-unattended": "windows-7",
+    "windowsxp-unattended": "windows-xp",
+    "windows2000-unattended": "windows-2000",
+    "windowsnt4-unattended": "windows-nt4",
+    "windows98-unattended": "windows-98",
+    "windows11-template": "windows-11-installer",
+    "windows10-template": "windows-10-installer"
 }
 
 
