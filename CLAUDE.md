@@ -14,7 +14,7 @@ make ci                                        # python -m unittest discover -s 
 make lint                                      # python -m mypy vmctl/ --strict (enforced)
 make install-cli                               # symlink vmctl + vmtui into ~/.local/bin
 make web                                       # vmctl web --open: the lab in a browser on 127.0.0.1 (token in the URL), every command as a job
-./setup.sh (= make setup)                      # first run, needs only sh + python3 (a fresh Ubuntu has no make): install-cli + vmctl setup --install (every missing dependency, Textual included, asks first) + host check; vmctl setup alone only checks (-v: one line per tool)
+./setup.sh (= make setup)                      # first run, needs only sh + python3 (a fresh Ubuntu has no make): install-cli + vmctl setup --install (every missing dependency, Textual included, asks first) + host check; vmctl setup alone only checks (-v: one line per tool); ends with `vmctl welcome` (what to do next, `./bin/` paths while ~/.local/bin is not on PATH)
 make install [names]                           # vmctl setup --install: every missing host dependency, or only the named ones (make install textual growisofs); textual goes into .venv-tui
 make guides                                    # docs/guides/{it,en} -> pdf/<lang>/qemu-iso-lab-guide.pdf (manual) + pdf/<lang>/single|singole/ (markdown + weasyprint); keep both languages in sync
 make validate-vms                              # LOCAL ONLY (hours): check-vms --restore --report --parallel auto (packs VMs by free RAM/CPUs; PARALLEL=N fixes it) over every unattended profile, opens the HTML report

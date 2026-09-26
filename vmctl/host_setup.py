@@ -449,3 +449,55 @@ def prompt_yes_no_default_yes(prompt: str) -> bool:
     if not answer:
         return True
     return answer in {"y", "yes"}
+
+
+def vmctl_on_path(prefix: Path | None = None) -> bool:
+    """True when `vmctl` resolves to this checkout's shim from the current PATH (setup.sh links it)."""
+    found = shutil.which("vmctl")
+    if not found:
+        return False
+    try:
+        return Path(found).resolve() == (state.ROOT / "bin" / "vmctl").resolve()
+    except OSError:
+        return False
+
+
+def render_welcome(*, profiles: int, on_path: bool, kvm: tuple[bool, str], textual: bool, missing: list[str]) -> str:
+    """The screen `vmctl welcome` prints and setup.sh ends with: what to do next, in order, with
+    commands that work on this host (no make; `./bin/vmctl` while ~/.local/bin is not on PATH)."""
+    from vmctl import ui
+
+    cmd = "vmctl" if on_path else "./bin/vmctl"
+    tui = "vmtui" if on_path else "./bin/vmtui"
+    kvm_ok, kvm_note = kvm
+    rows = [
+        ("In your browser", f"{cmd} web --open", "install, boot, console, SSH, every command"),
+        ("In the terminal", tui, "the same lab as a dashboard"),
+        ("A first VM, no clicks", f"{cmd} bootstrap-preseed debian-server", "Debian server, ~10 min, ISO downloaded"),
+        ("Use it", f"{cmd} shell debian-server", "SSH in; `start`, `stop`, `attach` for the rest"),
+        ("What exists", f"{cmd} list · {cmd} status", "profiles, disks, what is running"),
+        ("Make it yours", "vms/profiles/local.json", "your user, SSH key, ISOs (copy local.json.example)"),
+        ("A whole lab", f"{cmd} group install netlab", "pfSense + Pi-hole + client; proxmox-lab: 3 nodes"),
+        ("Help", f"{cmd} --help · {cmd} <command> --help", "docs/ and README.md for the rest"),
+    ]
+    width = max(len(command) for _, command, _ in rows)
+    lines = ["", ui.style("  QEMU ISO Lab is ready", ui.BOLD, ui.GREEN),
+             ui.style("  " + "─" * 70, ui.CYAN)]
+    facts = [f"{profiles} profiles", ("KVM ok" if kvm_ok else "no KVM: slow guests"), ("Textual dashboard ok" if textual else "Textual missing: vmtui falls back to fzf/dialog")]
+    lines.append("  " + ui.style(" · ".join(facts), ui.CYAN))
+    if missing:
+        lines.append("  " + ui.style(f"still missing: {', '.join(missing)}  →  {cmd} setup --install", ui.YELLOW))
+    if not kvm_ok:
+        lines.append("  " + ui.style(kvm_note, ui.YELLOW))
+    lines.append("")
+    for label, command, note in rows:
+        lines.append(f"  {label:<22}{ui.style(command.ljust(width), ui.BOLD)}  {ui.style(note, ui.CYAN)}")
+    lines.append("")
+    if not on_path:
+        lines.append("  " + ui.style("~/.local/bin is not on your PATH yet", ui.YELLOW) + ": the commands above use ./bin/ from this")
+        lines.append("  directory. To use plain vmctl/vmtui everywhere: open a new login shell, or")
+        lines.append("    " + ui.style('export PATH="$HOME/.local/bin:$PATH"', ui.BOLD) + "   (add it to ~/.zshrc or ~/.bashrc)")
+        lines.append("")
+    lines.append("  " + ui.style(f"Print this again any time: {cmd} welcome", ui.CYAN))
+    lines.append("")
+    return "\n".join(lines)

@@ -3778,6 +3778,18 @@ def cmd_test_local(args: argparse.Namespace) -> int:
 
 # --- setup / clean -------------------------------------------------------------
 
+def cmd_welcome(args: argparse.Namespace) -> int:
+    """What to do next, with commands that work on this host: the last thing setup.sh prints."""
+    try:
+        profiles = len(config.load_config()["vms"])
+    except VMError:
+        profiles = 0
+    missing = [name for name in state.REQUIRED_COMMANDS if not host_setup.tool_present(name)]
+    print(host_setup.render_welcome(profiles=profiles, on_path=host_setup.vmctl_on_path(), kvm=host_setup.kvm_status(),
+                                    textual=host_setup.tool_present(host_setup.TEXTUAL), missing=missing))
+    return 0
+
+
 def cmd_setup(args: argparse.Namespace) -> int:
     install = getattr(args, "install", None)
     if install is not None:

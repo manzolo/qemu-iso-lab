@@ -39,7 +39,8 @@ If `~/.local/bin` is not in your PATH yet, run `./bin/vmctl web --open`. Prefer 
 if the browser does not open by itself.
 
 `./setup.sh` (or `make setup`) lists what it is about to install and asks first; it
-needs only `python3`, which every supported distribution ships. It uses `apt` or
+needs only `python3`, which every supported distribution ships, and ends with a welcome
+screen listing the first commands (`vmctl welcome` prints it again any time). It uses `apt` or
 `pacman` for QEMU, OVMF and the helpers, and puts Textual (the dashboard) in the
 repository's `.venv-tui` without sudo. Running it again only installs what is missing.
 

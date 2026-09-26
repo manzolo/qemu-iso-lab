@@ -112,3 +112,22 @@ class CliListNamesTests(BaseVmctlTestCase):
         with contextlib.redirect_stdout(out):
             self.assertEqual(args.func(args), 0)
         self.assertEqual(out.getvalue().splitlines(), [self.vm_name, "zeta"])
+
+
+class WelcomeTests(unittest.TestCase):
+    """`vmctl welcome` (the end of setup.sh): commands that work on this host, no make."""
+
+    def test_commands_use_the_shim_until_local_bin_is_on_path(self):
+        from vmctl import host_setup
+
+        off = host_setup.render_welcome(profiles=5, on_path=False, kvm=(True, "/dev/kvm"), textual=True, missing=[])
+        self.assertIn("./bin/vmctl web --open", off)
+        self.assertIn("./bin/vmtui", off)
+        self.assertIn("not on your PATH", off)
+        self.assertNotIn("make ", off)
+        on = host_setup.render_welcome(profiles=5, on_path=True, kvm=(False, "no kvm here"), textual=False, missing=["qemu-img"])
+        self.assertIn(" vmctl web --open", on)
+        self.assertNotIn("./bin/", on)
+        self.assertIn("no kvm here", on)
+        self.assertIn("still missing: qemu-img", on)
+        self.assertIn("Textual missing", on)

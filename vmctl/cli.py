@@ -22,7 +22,7 @@ COMMAND_HELP: dict[str, str] = {}
 # Every public subcommand must appear in exactly one group (enforced by tests).
 COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Discover", "what is configured, what exists on disk, what the host can run",
-     ["list", "status", "show", "setup"]),
+     ["list", "status", "show", "setup", "welcome"]),
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
@@ -401,6 +401,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--port", type=int, default=webui.DEFAULT_PORT, help=f"port on 127.0.0.1 (default: {webui.DEFAULT_PORT}; 0 picks a free one)")
     p.add_argument("--open", action="store_true", help="open the page in the default browser")
     p.set_defaults(func=webui.cmd_web)
+
+    p = _add(subparsers, "welcome", help="what to do next after setup: the first commands, with the paths that work on this host")
+    p.set_defaults(func=lifecycle.cmd_welcome)
 
     p = _add(subparsers, "setup", help="verify host prerequisites; --install installs the missing ones")
     p.add_argument("--install", nargs="*", metavar="NAME", default=None,

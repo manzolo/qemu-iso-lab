@@ -20,14 +20,4 @@ printf '  linked %s/bin/vmctl and vmtui -> %s/bin\n' "$PREFIX" "$ROOT"
 
 "$ROOT/bin/vmctl" setup --install "$@"
 
-run=""
-case ":$PATH:" in
-    *":$PREFIX/bin:"*) ;;
-    *)
-        run="./bin/"
-        printf '\n  \033[33m%s/bin is not in your PATH yet\033[0m: open a new login shell, or run\n' "$PREFIX"
-        printf '    source ~/.profile        (or add it: export PATH="%s/bin:$PATH" in ~/.zshrc / ~/.bashrc)\n' "$PREFIX"
-        ;;
-esac
-printf '\n  next: \033[1m%svmctl web --open\033[0m (the lab in your browser)  or  \033[1m%svmtui\033[0m (terminal dashboard)\n' "$run" "$run"
-printf '        \033[1m%svmctl bootstrap-preseed debian-server\033[0m installs a Debian VM with zero clicks\n' "$run"
+"$ROOT/bin/vmctl" welcome
