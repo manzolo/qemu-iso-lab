@@ -7,7 +7,7 @@
 **Linux, BSD and Windows virtual machines on QEMU/KVM, installed with zero clicks.**
 One JSON profile per VM describes the ISO (downloaded and checksummed), the
 disk, the firmware, the unattended install and the SSH provisioning. Manage it
-from the **web dashboard** (`make web`), the terminal dashboard (`vmtui`) or the
+from the **web dashboard** (`vmctl web`), the terminal dashboard (`vmtui`) or the
 CLI (`vmctl`), all sharing the same profiles, VM state and jobs.
 
 - **101 profiles**, 56 of them fully unattended: every Ubuntu LTS since 8.04, Debian,
@@ -29,12 +29,14 @@ CLI (`vmctl`), all sharing the same profiles, VM state and jobs.
 
 ```bash
 git clone https://github.com/manzolo/qemu-iso-lab.git && cd qemu-iso-lab
-./setup.sh     # links vmctl + vmtui into ~/.local/bin, installs what is missing, checks the host
-make web       # opens the browser dashboard; select a profile and install or boot it
+./setup.sh        # links vmctl + vmtui into ~/.local/bin, installs what is missing, checks the host
+vmctl web --open  # the browser dashboard: select a profile and install or boot it
 ```
 
-Prefer a terminal? Run `vmtui` for the TUI, or use `vmctl` directly. The web
-dashboard prints a token URL; use that URL if the browser does not open automatically.
+No `make` needed (a fresh Ubuntu has none): `make web` and `make setup` are just aliases.
+If `~/.local/bin` is not in your PATH yet, run `./bin/vmctl web --open`. Prefer a terminal?
+`vmtui` is the TUI, `vmctl` the CLI. The dashboard prints a URL with a token; open that URL
+if the browser does not open by itself.
 
 `./setup.sh` (or `make setup`) lists what it is about to install and asks first; it
 needs only `python3`, which every supported distribution ships. It uses `apt` or
@@ -117,9 +119,9 @@ Keys, video profiles and remote SPICE: [docs/VMTUI.md](docs/VMTUI.md).
 ## In the browser
 
 ```bash
-make web                  # open the dashboard on 127.0.0.1:8765
-make web PORT=9000        # use a different port
-# equivalent: vmctl web --open --port 9000
+vmctl web --open          # open the dashboard on 127.0.0.1:8765
+vmctl web --port 9000     # a different port (no browser; the URL with the token is printed)
+make web [PORT=9000]      # the same, for those who have make
 ```
 
 The web dashboard brings the catalog, VM controls and guest access into one page.
@@ -147,7 +149,7 @@ is available as a form that prepares a command to run in a terminal with sudo.
 
 The graphical console and browser SSH terminal load noVNC/xterm.js from a CDN;
 the dashboard and screenshot view need no external assets. After updating the code,
-restart `make web` and open its newly printed URL to load new API features.
+restart `vmctl web` and open its newly printed URL to load new API features.
 
 Details, shortcuts, local overrides and API: [Web dashboard guide](docs/WEB.md).
 
@@ -162,7 +164,7 @@ logins and a step-by-step runbook.
 | `netlab` | pfSense router, Pi-hole DNS, Lubuntu desktop client | `vmctl group install netlab` |
 | `proxmox-lab` | three Proxmox VE nodes clustered over ZFS mirrors, a Debian client with a browser | `vmctl group install proxmox-lab` |
 
-In `make web`, choose **Labs** to see each stack's members, addresses and live state.
+In the web dashboard, choose **Labs** to see each stack's members, addresses and live state.
 Start or stop the stack from its card, or right-click an individual VM for its actions.
 
 ![Web Labs view: netlab ready to install and all four Proxmox lab members running](docs/screenshots/web-labs.png)
