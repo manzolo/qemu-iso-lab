@@ -64,7 +64,7 @@ For other distributions, or to see exactly what `./setup.sh` would run:
 ```bash
 # Arch / CachyOS
 sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk ddrescue partclone util-linux
-# Debian / Ubuntu (on Ubuntu 22.04 drop virtiofsd: QEMU ships it)
+# Debian / Ubuntu (Ubuntu 22.04 has no virtiofsd package: ./setup.sh fetches the upstream build)
 sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 python3-venv openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk gddrescue partclone fdisk
 
 make install textual    # only the dashboard, into .venv-tui (or name any tool: make install xorriso)
@@ -74,6 +74,25 @@ vmctl setup             # check again (-v: one line per tool)
 Only `qemu-system-x86_64`, `qemu-img`, `python3` (3.10 or newer) and the OVMF
 firmware are required; every other tool serves one flow, and `vmctl setup` says
 which. Without Textual, `vmtui` opens the classic fzf/dialog menus.
+</details>
+
+<details>
+<summary>On Windows: inside WSL2</summary>
+
+vmctl needs Linux (KVM, `/proc`, Unix sockets), so on Windows 11 it runs inside a WSL2
+distribution, which gets `/dev/kvm` through nested virtualization. In PowerShell:
+
+```powershell
+wsl --install -d Ubuntu-24.04
+```
+
+Then, in the Ubuntu shell, the same Quick Start as above (`git clone`, `./setup.sh`,
+`vmctl web --open`), plus once `sudo usermod -aG kvm $USER` and a new shell if `setup`
+reports that `/dev/kvm` is not writable. WSL forwards localhost, so the dashboard opens in the
+Windows browser at the printed `http://127.0.0.1:8765/?token=…` URL; windows of
+*Boot with display* appear through WSLg. Flashing or importing a physical disk needs the disk
+attached to WSL first (`wsl --mount`, from an administrator PowerShell). This setup has not
+been through the validation matrix yet: reports are welcome.
 </details>
 
 ## What it installs
