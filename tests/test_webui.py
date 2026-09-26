@@ -133,6 +133,16 @@ class ServerTests(BaseVmctlTestCase):
         self.assertEqual(status, 200)
         self.assertTrue(any(entry["name"] == "start" for entry in json.loads(body)))
 
+    def test_percent_encoded_job_ids_are_decoded(self):
+        # The page encodes "vm:<name>" as "vm%3A<name>": the log of a VM's job was "Unknown job".
+        directory = vmctl.state.ROOT / "artifacts/testvm/runtime/tui-job"
+        directory.mkdir(parents=True)
+        (directory / "output.log").write_text("$ vmctl start testvm\n\nstarted\n")
+        (directory / "status").write_text("completed\n")
+        status, body = self.get("/api/jobs/vm%3Atestvm/log?offset=0")
+        self.assertEqual(status, 200)
+        self.assertIn("started", json.loads(body)["text"])
+
     def test_a_lab_map_is_served_only_for_a_plain_group_name(self):
         page = vmctl.state.ROOT / "artifacts/labs/netlab/network.html"
         page.parent.mkdir(parents=True)

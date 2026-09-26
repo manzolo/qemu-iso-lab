@@ -37,7 +37,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from vmctl import config, qemu, runtime, state, tui_jobs, ui
 from vmctl.errors import VMError
@@ -398,7 +398,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         url = urlparse(self.path)
-        path = url.path
+        # Percent-decoded: the page encodes each segment (a job id "vm:<name>" arrives as "vm%3A<name>").
+        path = unquote(url.path)
         if path in ("/", "/index.html"):
             self._send(HTTPStatus.OK, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
             return
@@ -465,7 +466,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         if not self._allowed():
             return
-        path = urlparse(self.path).path
+        path = unquote(urlparse(self.path).path)
         try:
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
