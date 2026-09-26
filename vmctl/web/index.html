@@ -803,8 +803,16 @@ function renderCommandForm() {
   if (c.terminal_only) loadDevices();
   $("cmd-form").querySelectorAll("input,select").forEach((el) => (el.oninput = () => {
     const arg = c.args[Number(el.dataset.arg)];
-    if (arg.flag === "--device") { const confirm = $("arg" + c.args.findIndex((x) => x.flag === "--confirm-device")); if (confirm) confirm.value = el.value.trim(); renderDeviceCards(); }
+    if (arg.flag === "--device") {
+      const confirm = $("arg" + c.args.findIndex((x) => x.flag === "--confirm-device")); if (confirm) confirm.value = el.value.trim();
+      // The CLI refuses a disk that already has partitions unless --force-target is given: set it
+      // for the chosen disk (the card says so), clear it for an empty one.
+      const force = $("arg" + c.args.findIndex((x) => x.flag === "--force-target")), disk = (deviceCache || []).find((d) => d.path === el.value.trim());
+      if (force && disk) { force.checked = (disk.children || []).length > 0; const adv = $("cmd-advanced"); if (adv && force.checked) adv.open = true; }
+      renderDeviceCards();
+    }
     if (el.type === "checkbox" && el.checked) (c.exclusive_groups || []).filter((g) => g.includes(arg.flag || arg.dest)).forEach((g) => c.args.forEach((other,i) => { if (i !== Number(el.dataset.arg) && g.includes(other.flag || other.dest)) $("arg" + i).checked = false; }));
+    if (arg.flag === "--force-target") renderDeviceCards();
     saveDraft(); preview();
   }));
   if ($("cmd-advanced")) $("cmd-advanced").ontoggle = saveDraft;
@@ -821,6 +829,7 @@ async function loadDevices() {
 }
 // The host's disks under the --device field: model, bus, partition table, every partition with its
 // size, filesystem, label and mount point, and the unallocated space. Click one to select it.
+function forceTargetSet() { const c = catalog.find((x) => x.name === pal.cmd), el = c && $("arg" + c.args.findIndex((a) => a.flag === "--force-target")); return !!(el && el.checked); }
 function renderDeviceCards() {
   const box = $("device-cards"), c = catalog.find((x) => x.name === pal.cmd);
   if (!box || !c || !deviceCache) return;
@@ -833,7 +842,7 @@ function renderDeviceCards() {
       || `<tr><td colspan="5" class="s-muted">No partitions: ${d.fstype ? esc(d.fstype) + " on the whole disk" : "empty disk"}</td></tr>`;
     return `<div class="disk-card${sel ? " sel" : ""}" data-device="${esc(d.path)}" role="button" tabindex="0" aria-pressed="${sel}">
       <div class="disk-head"><b class="mono">${esc(d.path)}</b><span>${esc(fmtBytes(d.size))}</span><span class="s-muted">${esc(d.model || "unknown model")}${d.tran ? " · " + esc(d.tran) : ""}${d.serial ? " · S/N " + esc(d.serial) : ""}</span>${mounted ? '<span class="chip warn">mounted</span>' : ""}</div>
-      ${sel ? `<table class="parts"><tr><th>Partition</th><th>Size</th><th>Type</th><th>Label</th><th>Mounted on</th></tr>${table}</table><div class="disk-foot">${parts[0]?.pttype ? "Partition table: " + esc(parts[0].pttype) + " · " : ""}everything on this disk is overwritten by flash</div>` : ""}</div>`;
+      ${sel ? `<table class="parts"><tr><th>Partition</th><th>Size</th><th>Type</th><th>Label</th><th>Mounted on</th></tr>${table}</table><div class="disk-foot">${parts[0]?.pttype ? "Partition table: " + esc(parts[0].pttype) + " · " : ""}${parts.length ? (forceTargetSet() ? "existing partitions: <b>--force-target</b> is set, they will be wiped" : "existing partitions: the CLI refuses it unless <b>--force-target</b> is set (Options)") : "empty disk"}</div>` : ""}</div>`;
   }).join("") : '<div class="help">No other disk found on the host (the system disk is never offered).</div>';
   box.querySelectorAll("[data-device]").forEach((card) => {
     const pick = () => { input.value = card.dataset.device; input.dispatchEvent(new Event("input", { bubbles: true })); };
