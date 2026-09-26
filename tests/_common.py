@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 
 import vmctl  # noqa: E402
 import vmctl.alpine  # noqa: E402
+import vmctl.haiku  # noqa: E402
 import vmctl.autoyast  # noqa: E402
 import vmctl.archinstall  # noqa: E402
 import vmctl.preseed  # noqa: E402
@@ -82,7 +83,7 @@ class _VmctlFacade:
         "REQUIRED_COMMANDS", "OPTIONAL_COMMANDS", "COMMON_OVMF_PAIRS",
     )
     _SEARCH_ORDER = (
-        vmctl.lifecycle, vmctl.libvirt, vmctl.freebsd, vmctl.proxmox, vmctl.nixos, vmctl.pearos, vmctl.pfsense, vmctl.reactos, vmctl.scheduler, vmctl.netlab, vmctl.report, vmctl.profiledoc, vmctl.ssh, vmctl.host_setup, vmctl.flash, vmctl.flash_allocated, vmctl.flash_progress, vmctl.tui_devices, vmctl.import_dev, vmctl.disk_inspect,
+        vmctl.lifecycle, vmctl.libvirt, vmctl.freebsd, vmctl.haiku, vmctl.proxmox, vmctl.nixos, vmctl.pearos, vmctl.pfsense, vmctl.reactos, vmctl.scheduler, vmctl.netlab, vmctl.report, vmctl.profiledoc, vmctl.ssh, vmctl.host_setup, vmctl.flash, vmctl.flash_allocated, vmctl.flash_progress, vmctl.tui_devices, vmctl.import_dev, vmctl.disk_inspect,
         vmctl.iso, vmctl.alpine, vmctl.autoyast, vmctl.windows, vmctl.windowsnt4, vmctl.windowsxp, vmctl.archinstall, vmctl.omarchy, vmctl.preseed, vmctl.kickstart, vmctl.cloud_init, vmctl.qemu, vmctl.config,
         vmctl.clone, vmctl.checkpoint, vmctl.vmstate, vmctl.runtime, vmctl.ui, vmctl.state, vmctl.errors,
     )

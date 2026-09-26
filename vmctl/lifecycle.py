@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
+from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -421,6 +421,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         return ("skip", "nixos_config without SSH post-install")
     if freebsd.freebsd_config(vm) is not None:
         return ("bootstrap-freebsd", "FreeBSD bsdinstall + SSH verification")
+    if haiku.haiku_config(vm) is not None:
+        return ("bootstrap-haiku", "Haiku live install driven over QMP + SSH verification")
     if proxmox.proxmox_config(vm) is not None:
         return ("bootstrap-proxmox", "Proxmox VE automated install + SSH verification")
     if pfsense.pfsense_config(vm) is not None:
@@ -538,7 +540,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -734,8 +736,9 @@ def run_local_test_vm(
         if prep_note is not None:
             detail = f"{detail}; {prep_note}"
         return ("passed", detail)
-    if mode in {"bootstrap-freebsd", "bootstrap-proxmox"}:
-        handler = cmd_bootstrap_freebsd if mode == "bootstrap-freebsd" else cmd_bootstrap_proxmox
+    if mode in {"bootstrap-freebsd", "bootstrap-haiku", "bootstrap-proxmox"}:
+        handler = {"bootstrap-freebsd": cmd_bootstrap_freebsd, "bootstrap-haiku": cmd_bootstrap_haiku,
+                   "bootstrap-proxmox": cmd_bootstrap_proxmox}[mode]
         try:
             handler(
                 argparse.Namespace(
@@ -1856,6 +1859,48 @@ def cmd_bootstrap_freebsd(args: argparse.Namespace) -> int:
     except VMError as exc:
         raise explain_failed_bootstrap(exc, freebsd.BOOTSTRAP_FAILED_TOKEN, "FreeBSD", serial_log) from exc
     vmstate.complete_install(args.vm, "bootstrap-freebsd", vm, dry_run=args.dry_run)
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
+    report.phase(args, "post-install")
+    run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
+    return 0
+
+
+def cmd_bootstrap_haiku(args: argparse.Namespace) -> int:
+    vm = resolved_vm(args, config.load_config())
+    haiku.check_profile(args.vm, vm)
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Haiku (live command line, driven over QMP): {args.vm}")
+    source = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-haiku", dry_run=args.dry_run)
+    seed = haiku.ensure_seed_iso(args.vm, vm, cloud_init._authorized_keys_for_vm(vm, dry_run=args.dry_run),
+                                 dry_run=args.dry_run)
+    command = qemu.common_args(vm, None, dry_run=args.dry_run,
+        accel=automation_accel(vm), headless=True, serial_stdio=True,
+        no_reboot=True, allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False, disk_bootindex=1, network_phase="install")
+    command += haiku.install_media_args(source, seed)
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    report.phase(args, "install")
+    pilot = haiku.Pilot(qemu.qmp_socket_path(vm), seed.parent)
+    if args.dry_run:
+        ui.print_note(f"Would drive the live session over QMP, then type: {haiku.typed_command().strip()}")
+    else:
+        stale = qemu.qmp_socket_path(vm)
+        stale.unlink(missing_ok=True)  # the pilot must not talk to a previous QEMU's socket
+        pilot.start()
+    try:
+        qemu.run_and_expect(command, expected_text=haiku.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=args.timeout, dry_run=args.dry_run, log_path=serial_log,
+            exit_grace_sec=haiku.SHUTDOWN_GRACE_SEC)
+    except VMError as exc:
+        if pilot.error:
+            raise VMError(f"Haiku install: {pilot.error}") from exc
+        raise explain_failed_bootstrap(exc, haiku.BOOTSTRAP_FAILED_TOKEN, "Haiku", serial_log) from exc
+    finally:
+        pilot.stop.set()
+    vmstate.complete_install(args.vm, "bootstrap-haiku", vm, dry_run=args.dry_run)
     start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
     report.phase(args, "post-install")
     run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
@@ -3135,6 +3180,8 @@ def ssh_poweroff_command(vm: dict[str, Any]) -> list[str] | None:
         return base + ["shutdown /s /t 0 /f"]
     if freebsd.freebsd_config(vm) is not None:
         return base + ["sudo", "shutdown", "-p", "now"]
+    if haiku.haiku_config(vm) is not None:
+        return base + ["shutdown", "-q"]
     if proxmox.proxmox_config(vm) is not None:
         return base + ["systemctl", "poweroff"]
     return base + ["sudo", "systemctl", "poweroff"]

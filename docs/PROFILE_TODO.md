@@ -390,22 +390,17 @@ The report keeps the timeline and English/Italian PDFs. Promoted only after this
 
 ## Haiku (2026-09-26)
 
-`haiku` (`vms/profiles/haiku.json`, `manual`): Haiku R1/beta6 of 2026-08-26, the x86_64 anyboot
-ISO from the RIT mirror, pinned to the SHA-256 published on haiku-os.org (matched on download).
-Checked live the same day: the medium boots under KVM on q35/BIOS in under 75 s to "Welcome to
-Haiku!" at 1280x800 on `-vga std`, the USB tablet drives the pointer, and DriveSetup (from the
-Installer's *Set up partitions…*) lists the 16 GiB SATA disk (`/dev/disk/scsi/0/0/0/raw`). The
-medium carries a BFS system partition (1.37 GiB, 536 MiB free) and a FAT32 ESP.
+`haiku` (`manual`) and `haiku-unattended` (`unattended`, SSH 2280, group `smoke`), both on Haiku
+R1/beta6 of 2026-08-26: the x86_64 anyboot ISO from the RIT mirror, pinned to the SHA-256
+published on haiku-os.org (matched on download).
 
-Not done yet, and why:
+`haiku-unattended` passed live on its first `check-vms` run, in 74 s from a clean disk
+(`artifacts/check-vms/20260926-102415/`): `bootstrap-haiku` boots the live medium, a QMP pilot
+clicks through to a Terminal and types one line, `install.sh` from the seed CD writes BFS over the
+whole SATA disk, copies the live volume and runs `makebootable`, and the installed system boots to
+its desktop with sshd running; the checks run over SSH as `user`. `vmctl stop` powers it off
+cleanly through ACPI. Flow and traps: `docs/UNATTENDED.md#haiku-bootstrap-haiku`.
 
-- **No boot-check.** The release build writes nothing to COM1 (the serial log stayed empty through
-  the whole boot), so `ci.expect` has no token to wait for.
-- **No unattended flow.** Haiku has no answer file; the Installer is graphical only. The idea to
-  try: the anyboot image is made to be written to a USB stick and boot read-write, so the host could
-  copy it onto the VM disk and grow the partition instead of driving the Installer, then a boot
-  script would write the completion token to the serial port and power off. Open questions: whether
-  a disk made that way still shows the live "Welcome" prompt, and whether `sshd` runs by default
-  (Haiku ships OpenSSH) and as which user.
-- Installing through e1000 and SATA is the conservative choice; virtio (Haiku has virtio block and
-  net drivers) is untested.
+Still open: the pilot's coordinates and colours belong to R1/beta6 at 1280x800 and must be
+measured again for a new release; UEFI (the medium has an ESP) and virtio disk/net are untested;
+the manual profile has no boot-check (the release build writes nothing to COM1 on its own).

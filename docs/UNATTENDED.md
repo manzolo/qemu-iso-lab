@@ -1278,6 +1278,42 @@ FreeBSD pgrep excludes ancestors by default: a check executed over SSH must use 
 to include the listener that is its ancestor ([vendor manual](https://man.freebsd.org/cgi/man.cgi?query=pgrep&sektion=1));
 otherwise a healthy daemon produces a false FAIL (confirmed live on 2026-09-14).
 
+## Haiku (`bootstrap-haiku`)
+
+`haiku-unattended` (SSH 2280) installs Haiku R1/beta6 although Haiku has no answer file and a
+graphical-only Installer: the live medium already carries every tool an install needs, so the host
+plays the user for the few steps that open a shell, and the rest is a script.
+
+1. `vmctl bootstrap-haiku haiku-unattended` boots the anyboot ISO headless (q35, BIOS, the disk on
+   the first AHCI port, the ISO and a `VMCTLSEED` seed CD after it) with COM1 on the serial log.
+2. The **pilot** (`haiku.Pilot`) watches the screen through QMP `screendump` and recognises each
+   state by a few pixels: the Welcome dialog, the desktop, the Deskbar menu, a Terminal. It clicks
+   *Try Haiku*, opens *Applications* from the Deskbar, selects Terminal by type-ahead and types one
+   line: `mountvolume VMCTLSEED && sh /VMCTLSEED/install.sh > /dev/ports/pc_serial0 2>&1`.
+3. `install.sh` writes BFS over the whole disk (no partition table), mounts it on `/vmctl-target`,
+   copies the real directories of the live volume with `copyattr` (the packages, the settings, the
+   home; not the packagefs views over them), installs the project's SSH key in
+   `~/config/settings/ssh/authorized_keys`, runs `makebootable`, syncs and unmounts, then prints
+   `==> Haiku installation complete!` on COM1 and powers off.
+4. The installed disk boots headless and the post-install checks run over SSH as `user` (Haiku's
+   only user, uid 0; sshd starts by itself).
+
+What cost a run each, verified live on 2026-09-26:
+
+- The new volume must not be mounted by name: the live medium is already called "Haiku", so
+  `mountvolume Haiku` put the new one on `/Haiku1`, the copy went to `/Haiku` (a directory in the
+  RAM root) and failed on the first package.
+- The live keymap is US-International: `'` `"` `` ` `` `~` `^` are dead keys, so the typed line
+  avoids them. Typing too fast lost keys and a shift release (the next word arrived in capitals):
+  the pilot waits between keys and taps shift alone after every shifted character.
+- The release build writes nothing to COM1 by itself; `/dev/ports/pc_serial0` does work from a
+  shell, which is how the script reports.
+
+Everything the pilot relies on (coordinates, colours, the 1280x800 mode) belongs to the pinned ISO;
+a new Haiku release means measuring them again (`haiku.WELCOME`, `DESKTOP`, `DESKBAR_MENU`,
+`TERMINAL`). A pilot that does not reach a screen within its time stops QEMU and the install fails
+with the name of the screen it waited for, not at the timeout.
+
 ## Proxmox VE (`bootstrap-proxmox`) and the Proxmox lab
 
 `proxmox-ve` installs Proxmox VE 9.2 with the vendor's own automated installer on a **ZFS RAID1

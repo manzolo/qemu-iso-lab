@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "agent", "attach"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -187,6 +187,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=1800, help="installer and SSH timeout in seconds (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_freebsd)
+
+    p = _add(subparsers, "bootstrap-haiku", help="Haiku install from the live command line, driven over QMP + SSH verification")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="installer and SSH timeout in seconds (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_haiku)
 
     p = _add(subparsers, "bootstrap-proxmox", help="Proxmox VE automated install (answer file on the ISO) + SSH verification")
     p.add_argument("vm", help=VM_HELP)
