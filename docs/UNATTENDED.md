@@ -1062,6 +1062,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `windows-retro` | Windows NT 4.0, 98, 2000 and XP. Windows 7, 10 and 11 stay in `windows` |
 | `netlab` | The network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab` |
 | `proxmox-lab` | The Proxmox lab: `proxmox-ve` (ZFS mirror over two disks) and `proxmox-lab-client` (Xfce + Firefox), joined by the `pve-lan` segment |
+| `hobby-os` | Hobby operating systems to boot and explore, all manual live systems: `kolibrios`, `redox`, `menuetos`. A `--group hobby-os` run records them as skipped (no unattended flow); boot one with `vmctl provision <name>` |
 | `smoke` | One profile per install flow that downloads its own medium, the lightest of each: `alpine-ci`, `ubuntu-server-ci`, `debian-server`, `almalinux-server`, `alpine-niri`, `arch-noctalia`, `opensuse-tumbleweed-autoyast`, `nixos-server`, `freebsd`. Run it before a full matrix: it answers "is every bootstrap flow still working" without the desktop installs |
 
 A group is a selector, like the bare `check-vms`, so it skips `experimental` profiles;

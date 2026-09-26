@@ -226,6 +226,22 @@ def download_file(url: str, destination: Path, dry_run: bool = False, vm: dict[s
     partial.replace(destination)
 
 
+# zip and 7z hold members (ReactOS's zip on SourceForge, KolibriOS's nightly .7z with kolibri.iso),
+# gzip and zstd are one compressed stream (pfSense's .iso.gz, Redox's .iso.zst).
+ARCHIVE_SUFFIX = {"zip": "zip", "gzip": "gz", "7z": "7z", "zstd": "zst"}
+
+
+def _extract_with(command: list[str], target: Path, what: str) -> None:
+    """Run an external extractor that writes the member to stdout (7z e -so, zstd -dc)."""
+    try:
+        with target.open("wb") as out:
+            result = subprocess.run(command, stdout=out, stderr=subprocess.PIPE, check=False)
+    except OSError as exc:
+        raise VMError(f"Unable to run {command[0]} to extract {what}: {exc}") from exc
+    if result.returncode:
+        raise VMError(f"{command[0]} failed on {what}: {result.stderr.decode(errors='replace').strip()[-400:]}")
+
+
 def archive_spec(vm: dict[str, Any]) -> dict[str, Any] | None:
     """``iso_archive``: the download is an archive holding the ISO. ``type`` is ``zip`` (with the
     ``member`` to extract: ReactOS ships its BootCD only as a zip on SourceForge) or ``gzip``
@@ -234,10 +250,10 @@ def archive_spec(vm: dict[str, Any]) -> dict[str, Any] | None:
     spec = vm.get("iso_archive")
     if spec is None:
         return None
-    if not isinstance(spec, dict) or spec.get("type") not in ("zip", "gzip"):
-        raise VMError("iso_archive needs type 'zip' or 'gzip'")
-    if spec["type"] == "zip" and not spec.get("member"):
-        raise VMError("iso_archive of type zip needs the member to extract")
+    if not isinstance(spec, dict) or spec.get("type") not in ARCHIVE_SUFFIX:
+        raise VMError(f"iso_archive needs type {', '.join(repr(k) for k in ARCHIVE_SUFFIX)}")
+    if spec["type"] in ("zip", "7z") and not spec.get("member"):
+        raise VMError(f"iso_archive of type {spec['type']} needs the member to extract")
     return spec
 
 
@@ -245,7 +261,7 @@ def download_archive(url: str, destination: Path, spec: dict[str, Any], dry_run:
                      vm: dict[str, Any] | None = None) -> None:
     """Fetch the archive next to the ISO, check its hash, extract the ISO, validate it and remove
     the archive: an interrupted run leaves no half file behind under the ISO's name."""
-    archive = destination.with_name(destination.name + "." + ("zip" if spec["type"] == "zip" else "gz"))
+    archive = destination.with_name(destination.name + "." + ARCHIVE_SUFFIX[spec["type"]])
     ui.print_header(f"Download ISO (inside a {spec['type']} archive)")
     ui.print_kv("source", ui.pretty_url(url))
     if spec.get("member"):
@@ -265,6 +281,15 @@ def download_archive(url: str, destination: Path, spec: dict[str, Any], dry_run:
                 with zipfile.ZipFile(archive) as bundle, bundle.open(str(spec["member"])) as source, \
                         partial.open("wb") as target:
                     shutil.copyfileobj(source, target)
+            elif spec["type"] == "7z":
+                seven = next((shutil.which(name) for name in ("7z", "7zz", "7za") if shutil.which(name)), None)
+                if not seven:
+                    raise VMError("7z is needed to unpack this ISO (Debian/Ubuntu: sudo apt install p7zip-full)")
+                _extract_with([seven, "e", "-so", str(archive), str(spec["member"])], partial, url)
+            elif spec["type"] == "zstd":
+                if not shutil.which("zstd"):
+                    raise VMError("zstd is needed to unpack this ISO (Debian/Ubuntu: sudo apt install zstd)")
+                _extract_with(["zstd", "-dc", str(archive)], partial, url)
             else:
                 with gzip.open(archive, "rb") as source, partial.open("wb") as target:
                     shutil.copyfileobj(source, target)
@@ -321,8 +346,11 @@ def missing_iso_message(vm: dict[str, Any], vm_name: str | None = None) -> str:
         guide = "Profile notes: " + str(vm["notes"]).strip()
     if guide:
         lines += ["", guide]
+    # Without the profile's key (ensure_iso gets only the resolved profile) the display name would
+    # read as a key to put in local.json ("set iso for 'MenuetOS 64 (your CD image)'"): say "this profile".
+    target = f"'{vm_name}'" if vm_name else "this profile"
     lines += ["", f"Save it as {ui.pretty_path(path)}, or keep it where it is and set \"iso\" for "
-              f"'{vm_name or name}' in vms/profiles/local.json (see local.json.example)."]
+              f"{target} in vms/profiles/local.json (see local.json.example)."]
     return "\n".join(lines)
 
 

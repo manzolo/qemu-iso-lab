@@ -10,14 +10,16 @@ disk, the firmware, the unattended install and the SSH provisioning. Manage it
 from the **web dashboard** (`vmctl web`), the terminal dashboard (`vmtui`) or the
 CLI (`vmctl`), all sharing the same profiles, VM state and jobs.
 
-- **101 profiles**, 56 of them fully unattended: every Ubuntu LTS since 8.04, Debian,
-  Fedora, Arch, NixOS, openSUSE, FreeBSD, ReactOS and Windows from 11 back to NT 4.
+- **105 profiles**, 57 of them fully unattended: every Ubuntu LTS since 8.04, Debian,
+  Fedora, Arch, NixOS, openSUSE, FreeBSD, Haiku, ReactOS and Windows from 11 back to NT 4,
+  plus hobby systems to boot and explore: KolibriOS, Redox OS, MenuetOS.
 - **Labs**: groups of VMs on a private network, installed and started as one stack,
   such as a pfSense + Pi-hole network or a three-node Proxmox VE cluster.
 - **In your browser**: live VM screens, interactive SSH, searchable commands,
   job logs and local profile customization, served on 127.0.0.1.
 - **Tested for real**: every unattended profile is reinstalled from scratch by a local
-  validation matrix; the last full run (2026-09-26) was 53 PASS, 0 FAIL.
+  validation matrix; the last full run (2026-09-26) was 58 PASS and one Haiku timeout that
+  passed when re-run alone.
 
 ![Web dashboard: searchable VM profiles, live state, resources, SSH access and console actions](docs/screenshots/web-dashboard.png)
 

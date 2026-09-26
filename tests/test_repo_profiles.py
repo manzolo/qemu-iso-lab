@@ -112,6 +112,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_proxmox_lab = {"proxmox-ve", "proxmox-ve-node2", "proxmox-ve-node3", "proxmox-lab-client"}
         # First live run of bootstrap-haiku: the QMP pilot, install.sh from the seed CD, SSH as user.
         verified_haiku = {"haiku"}
+        # Hobby systems booted live to their desktop on 2026-09-26 (docs/PROFILE_TODO.md); MenuetOS not yet.
+        verified_hobby = {"kolibrios", "redox"}
         # The full matrix of 2026-09-25/26 from clean disks (check-vms --parallel auto --timeout 3600,
         # artifacts/check-vms/20260925-223107/): 53 PASS, 0 FAIL; these are the tracked ones.
         verified_matrix_0926 = {
@@ -139,7 +141,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                              else "2026-09-15" if name in verified_nt4
                              else "2026-09-19" if name in verified_pearos | verified_nixos
                              else "2026-09-20" if name in verified_ubuntu_2604
-                             else "2026-09-26" if name in verified_proxmox_lab | verified_haiku else None)
+                             else "2026-09-26" if name in verified_proxmox_lab | verified_haiku | verified_hobby else None)
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
         # Promoted on 2026-09-09: verify-desktop reported an active local graphical session for
         # the autologin user on the live matrix, which is what the flavor recipe has to prove.

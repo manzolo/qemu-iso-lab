@@ -1,0 +1,162 @@
+{
+  "vms": {
+    "kolibrios": {
+      "name": "KolibriOS (latest nightly)",
+      "meta": {
+        "slug": "kolibrios",
+        "family": "kolibrios",
+        "role": "desktop",
+        "release_model": "rolling",
+        "status": "manual",
+        "groups": [
+          "hobby-os"
+        ],
+        "verified": "2026-09-26"
+      },
+      "iso": "isos/kolibrios-latest.iso",
+      "iso_url": "https://builds.kolibrios.org/en_US/latest-iso.7z",
+      "iso_archive": {
+        "type": "7z",
+        "member": "kolibri.iso"
+      },
+      "disk": {
+        "path": "artifacts/kolibrios/disk.qcow2",
+        "size": "2G",
+        "format": "qcow2",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 512,
+      "cpus": 1,
+      "network": "user",
+      "network_device": "e1000",
+      "audio": true,
+      "audio_device": "ac97",
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": false,
+      "notes": "KolibriOS, a whole graphical OS in assembly that boots in seconds from a ~100 MB CD. vmctl downloads the latest nightly (latest-iso.7z, a rolling name) and extracts kolibri.iso; no hash is pinned because the nightly is rebuilt under the same file name and builds.kolibrios.org's sha256sums.txt did not match the file it served (2026-09-26). vmctl provision kolibrios boots the live CD straight to its desktop in about 12 s (the e1000 network comes up by itself, verified 2026-09-26); it runs from RAM, and the disk is there for its own HDD installer (FAT32). No unattended install and no SSH."
+    },
+    "redox": {
+      "name": "Redox OS 0.9.0 (desktop, live)",
+      "meta": {
+        "slug": "redox",
+        "family": "redox",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "manual",
+        "groups": [
+          "hobby-os"
+        ],
+        "verified": "2026-09-26"
+      },
+      "iso": "isos/redox_desktop_x86_64_2024-09-07_1225_livedisk.iso",
+      "iso_url": "https://static.redox-os.org/releases/0.9.0/x86_64/redox_desktop_x86_64_2024-09-07_1225_livedisk.iso.zst",
+      "iso_archive": {
+        "type": "zstd",
+        "sha256": "0b63f7e138c7b0ad08e1d7f4c4779b20427673a01fe25603b93659605e029bc9"
+      },
+      "disk": {
+        "path": "artifacts/redox/disk.qcow2",
+        "size": "8G",
+        "format": "qcow2",
+        "interface": "sata"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "e1000",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "Redox OS 0.9.0, a microkernel OS written in Rust, desktop live image. vmctl downloads the .iso.zst from static.redox-os.org, checks it against the SHA256SUM published next to it (iso_archive.sha256) and unpacks it with zstd. vmctl provision redox boots it: the bootloader first lists the display modes and waits (Enter keeps the best one, 1280x800 here), then the graphical login has user already filled in and an empty password; the Orbital desktop follows (verified 2026-09-26, about 50 s). The disk is for Redox's own installer; no unattended install and no SSH yet."
+    },
+    "menuetos": {
+      "name": "MenuetOS 64 (your CD image)",
+      "meta": {
+        "slug": "menuetos",
+        "family": "menuetos",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "manual",
+        "groups": [
+          "hobby-os"
+        ]
+      },
+      "iso": "isos/menuetos-m64cd.iso",
+      "iso_help": "MenuetOS 64 is freeware distributed only from its own site, after you accept its license (m64l.txt), through Google Drive links that change with every release: vmctl cannot download it for you.\n\n1. Open https://www.menuetos.net/download.htm and read the license.\n2. Download the CD image, M64CD-<version>.ISO (about 80 MB, 'bootable CD'), then boot it with vmctl provision menuetos.",
+      "disk": {
+        "path": "artifacts/menuetos/disk.qcow2",
+        "size": "2G",
+        "format": "qcow2",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 1024,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "e1000",
+      "audio": false,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": false,
+      "notes": "MenuetOS 64, a 64-bit OS written entirely in assembly (GUI, SMP, networking). The medium is yours to download (see iso_help): no public stable URL, a license to accept, no checksum published. vmctl provision menuetos boots the CD; it runs from RAM. No unattended install and no SSH."
+    }
+  }
+}

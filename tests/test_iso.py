@@ -301,6 +301,39 @@ class IsoArchiveTests(BaseVmctlTestCase):
                 vmctl.iso.ensure_iso(bad)
         self.assertEqual(list((self.root / "isos").iterdir()), [])
 
+    def test_7z_and_zstd_archives_run_their_extractor_and_verify_the_iso(self):
+        # KolibriOS ships a nightly .7z holding kolibri.iso, Redox an .iso.zst: the tools are
+        # external, so the extractor is faked here and only the command line is checked.
+        calls = []
+
+        def fake_extract(command, target, what):
+            calls.append(command)
+            target.write_bytes(self.PAYLOAD)
+
+        for spec, tool in (({"type": "7z", "member": "kolibri.iso"}, "7z"), ({"type": "zstd"}, "zstd")):
+            with self.subTest(type=spec["type"]), \
+                 mock.patch.object(vmctl.iso, "_fetch", side_effect=self.fetch_writing(b"packed")), \
+                 mock.patch.object(vmctl.iso, "_extract_with", side_effect=fake_extract), \
+                 mock.patch.object(vmctl.iso.shutil, "which", side_effect=lambda name: f"/usr/bin/{name}"), \
+                 mock.patch("sys.stdout", new_callable=io.StringIO):
+                path = vmctl.iso.ensure_iso(self.vm(iso_archive=spec))
+                self.assertEqual(path.read_bytes(), self.PAYLOAD)
+                self.assertEqual(sorted(p.name for p in path.parent.iterdir()), ["test.iso"])  # archive removed
+                path.unlink()
+        self.assertEqual(calls[0][:3], ["/usr/bin/7z", "e", "-so"])
+        self.assertEqual(calls[0][-1], "kolibri.iso")
+        self.assertEqual(calls[1][:2], ["zstd", "-dc"])
+
+    def test_a_7z_archive_needs_its_member_and_a_missing_tool_is_named(self):
+        with self.assertRaisesRegex(VMError, "needs the member"):
+            vmctl.iso.archive_spec(self.vm(iso_archive={"type": "7z"}))
+        with mock.patch.object(vmctl.iso, "_fetch", side_effect=self.fetch_writing(b"packed")), \
+             mock.patch.object(vmctl.iso.shutil, "which", return_value=None), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            with self.assertRaisesRegex(VMError, "zstd is needed"):
+                vmctl.iso.ensure_iso(self.vm(iso_archive={"type": "zstd"}))
+        self.assertEqual(list((self.root / "isos").iterdir()), [])
+
     def test_a_missing_member_or_a_wrong_iso_leaves_nothing_behind(self):
         for vm, data, message in (
                 (self.vm(iso_archive={"type": "zip", "member": "other.iso"}), self.zip_bytes(), "not in the archive"),

@@ -20,6 +20,7 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `fedora-workstation` | `Fedora-Workstation-Live-42-1.1.x86_64.iso` | [Manifest](https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-42-1.1-x86_64-CHECKSUM) |
 | `fedora-xfce` | `Fedora-Xfce-Live-42-1.1.x86_64.iso` | [Manifest](https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Spins-42-1.1-x86_64-CHECKSUM) |
 | `freebsd-installer` | `FreeBSD-14.3-RELEASE-amd64-disc1.iso` | [Manifest](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64) |
+| `redox` | `redox_desktop_x86_64_2024-09-07_1225_livedisk.iso` (from its `.iso.zst`) | [SHA256SUM](https://static.redox-os.org/releases/0.9.0/x86_64/SHA256SUM), hash of the `.zst` archive in `iso_archive.sha256` |
 | `kali-live` | `kali-linux-2026.1-live-amd64.iso` | [Manifest](https://cdimage.kali.org/kali-2026.1/SHA256SUMS) |
 | `kubuntu-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `linuxmint-cinnamon` | `linuxmint-22.3-cinnamon-64bit.iso` | [Manifest](https://mirrors.edge.kernel.org/linuxmint/stable/22.3/sha256sum.txt) |
@@ -166,3 +167,13 @@ The ISO's `iso_sha256`, `441005f79ea0c155bc4b830a2b4207f8c0804cf7b075d2a6489c0a1
 (874,672,128 bytes), is derived: it is the hash of that vendor-verified archive once decompressed,
 and it matched the ISO the maintainer had used for every live pfSense run.
 `vmctl` checks the archive against the vendor hash before unpacking, then the ISO against its own.
+
+
+## Hobby systems (2026-09-26)
+
+`redox` pins the SHA-256 that Redox publishes for the compressed `.iso.zst` (vendor
+`SHA256SUM`, matched on download); the ISO unpacked from it is validated as ISO 9660 only.
+`kolibrios` follows the rolling nightly `latest-iso.7z` and pins nothing: the nightly is rebuilt
+under the same file name, and on 2026-09-26 the `sha256sums.txt` next to it did not match the
+archive the server returned. `menuetos` is a user-supplied medium (Google Drive links behind a
+license page, no checksum published).

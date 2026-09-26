@@ -404,3 +404,20 @@ cleanly through ACPI. Flow and traps: `docs/UNATTENDED.md#haiku-bootstrap-haiku`
 Still open: the pilot's coordinates and colours belong to R1/beta6 at 1280x800 and must be
 measured again for a new release; UEFI (the medium has an ESP) and virtio disk/net are untested;
 the manual profile has no boot-check (the release build writes nothing to COM1 on its own).
+
+
+## Hobby systems (2026-09-26): KolibriOS, Redox OS, MenuetOS
+
+Group `hobby-os`, all `manual` (live systems with no answer file and no SSH), in
+`vms/profiles/hobby.json`:
+
+| Profile | Medium | Live result |
+|---|---|---|
+| `kolibrios` | nightly `latest-iso.7z` → `kolibri.iso` (`iso_archive` type `7z`) | desktop in ~12 s on `pc`/IDE/BIOS, e1000 network up by itself (verified 2026-09-26) |
+| `redox` | 0.9.0 desktop `livedisk.iso.zst` (`iso_archive` type `zstd`, vendor hash) | bootloader waits for a display mode (Enter), graphical login `user` with an empty password, Orbital desktop in ~50 s (verified 2026-09-26) |
+| `menuetos` | user-supplied `M64CD-<version>.ISO` (`iso_help`) | not booted yet: no medium on this host |
+
+SerenityOS publishes no image: it has to be built from source (GCC 14, its own toolchain, then
+`Meta/serenity.sh image grub`, which needs root for the loop mounts). Being built in the
+`lubuntu22` builder VM (commit `cccf3076`); it needs a new kind of profile that boots a prepared
+disk image instead of an ISO.
