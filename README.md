@@ -21,7 +21,7 @@ CLI (`vmctl`), all sharing the same profiles, VM state and jobs.
 
 ![Web dashboard: searchable VM profiles, live state, resources, SSH access and console actions](docs/screenshots/web-dashboard.png)
 
-**Contents:** [Quick start](#quick-start) · [What it installs](#what-it-installs) ·
+**Contents:** [Quick start](#quick-start) · [From zero to a running VM](#from-zero-to-a-running-vm) · [What it installs](#what-it-installs) ·
 [In the browser](#in-the-browser) · [Terminal dashboard](#the-dashboard) · [Labs](#labs) · [Everyday commands](#everyday-commands) ·
 [Make it yours](#make-it-yours) · [Documentation](#documentation) · [Development](#development)
 
@@ -97,6 +97,21 @@ WSL forwards localhost, so the dashboard works in the Windows browser at the pri
 attached to WSL first (`wsl --mount`, from an administrator PowerShell). This setup has not
 been through the validation matrix yet: reports are welcome.
 </details>
+
+## From zero to a running VM
+
+A complete lifecycle in screenshots, shot on a clean Lubuntu 22.04: `git clone`, `./setup.sh`, then
+an Ubuntu 26.04 desktop downloaded, installed unattended, used through the browser console and SSH,
+checkpointed and stopped, all from the buttons of the web page, with the equivalent command for each step.
+
+| | | |
+|:-:|:-:|:-:|
+| [![The welcome screen at the end of setup.sh](docs/screenshots/first-vm/03-welcome.png)](docs/FIRST_VM.md#2-set-up-the-host) | [![Unattended install with the ISO ready](docs/screenshots/first-vm/07-iso-ready.png)](docs/FIRST_VM.md#5-download-the-iso) | [![The installer inside the browser console](docs/screenshots/first-vm/10-install-console.png)](docs/FIRST_VM.md#7-watch-the-install) |
+| setup ends with the next commands | download, then install unattended | watch the install in the page |
+| [![The Ubuntu 26.04 desktop in the browser](docs/screenshots/first-vm/13-console-desktop.png)](docs/FIRST_VM.md#8-use-the-desktop) | [![SSH in the browser](docs/screenshots/first-vm/15-ssh-browser.png)](docs/FIRST_VM.md#9-ssh) | [![A checkpoint written from the page](docs/screenshots/first-vm/20-checkpoint.png)](docs/FIRST_VM.md#10-save-it-stop-it) |
+| the desktop, in the browser | SSH, in the browser or on the host | checkpoint and stop |
+
+**[Read the step-by-step guide](docs/FIRST_VM.md)** · [download it as a PDF](docs/FIRST_VM.pdf) (14 pages)
 
 ## What it installs
 
@@ -240,6 +255,7 @@ Details: [docs/PROVISIONING.md](docs/PROVISIONING.md).
 | [UNATTENDED](docs/UNATTENDED.md) | how each unattended install works, and the validation matrix |
 | [PROVISIONING](docs/PROVISIONING.md) | your identity, packages and dotfiles in a fresh guest |
 | [VMTUI](docs/VMTUI.md) | the dashboard and the classic menus |
+| [FIRST_VM](docs/FIRST_VM.md) ([PDF](docs/FIRST_VM.pdf)) | from `git clone` to a running Ubuntu desktop, every screen of the lifecycle |
 | [WEB](docs/WEB.md) | the lab in a browser: actions, jobs, API, safety |
 | [LABS](docs/LABS.md) | the network lab and the Proxmox lab |
 | [guides/](docs/guides/README.md) | printable step-by-step guides in English and Italian (`make guides`) |

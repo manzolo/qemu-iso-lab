@@ -16,6 +16,7 @@ make install-cli                               # symlink vmctl + vmtui into ~/.l
 make web                                       # vmctl web --open: the lab in a browser on 127.0.0.1 (token in the URL), every command as a job
 ./setup.sh (= make setup)                      # first run, needs only sh + python3 (a fresh Ubuntu has no make): install-cli + vmctl setup --install (every missing dependency, Textual included, asks first) + host check; vmctl setup alone only checks (-v: one line per tool); ends with `vmctl welcome` (what to do next, `./bin/` paths while ~/.local/bin is not on PATH)
 make install [names]                           # vmctl setup --install: every missing host dependency, or only the named ones (make install textual growisofs); textual goes into .venv-tui
+python3 tools/build_doc_pdf.py docs/FIRST_VM.md  # the walkthrough PDF (tracked, unlike the guides): re-run after editing FIRST_VM.md or its screenshots/first-vm/
 make guides                                    # docs/guides/{it,en} -> pdf/<lang>/qemu-iso-lab-guide.pdf (manual) + pdf/<lang>/single|singole/ (markdown + weasyprint); keep both languages in sync
 make validate-vms                              # LOCAL ONLY (hours): check-vms --restore --report --parallel auto (packs VMs by free RAM/CPUs; PARALLEL=N fixes it) over every unattended profile, opens the HTML report
 # Slash commands for this checkout live in .claude/commands/: /vm-status, /vm-desktop, /vm-unattended, /vm-ssh, /vm-shot, /vm-stop

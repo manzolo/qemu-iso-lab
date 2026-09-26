@@ -5,7 +5,10 @@ make web            # or: vmctl web --open   (PORT=9000 make web / --port 9000; 
 ```
 
 `vmctl web` serves the lab in a browser on **127.0.0.1 only** and prints a URL with a random
-token. It drives the same backend as `vmctl` and `vmtui`:
+token. It drives the same backend as `vmctl` and `vmtui`. To see one VM through its whole
+lifecycle from the page, screen by screen, read [From zero to a running VM](FIRST_VM.md).
+
+What the page offers:
 
 - **Profiles**: every profile with its live state, search (`/`) and the filters of the dashboard
   (All, With disk, Running, Labs). The panel on the right shows the facts and the actions that make
