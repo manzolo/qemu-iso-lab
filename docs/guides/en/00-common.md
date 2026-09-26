@@ -12,7 +12,7 @@ sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvi
 sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk ddrescue partclone util-linux
 
 git clone git@github.com:manzolo/qemu-iso-lab.git && cd qemu-iso-lab
-make setup                # vmctl + vmtui into ~/.local/bin, installs what is missing (asks first), checks the host
+./setup.sh                # vmctl + vmtui into ~/.local/bin, installs what is missing (asks first), checks the host (make setup does the same)
 vmctl setup               # later: check only (-v lists every tool)
 ```
 

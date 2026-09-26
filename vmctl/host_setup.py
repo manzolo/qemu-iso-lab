@@ -304,6 +304,16 @@ def textual_venv_usable() -> bool:
     return probe.returncode == 0
 
 
+def python_has_ensurepip() -> bool:
+    """`python3 -m venv` needs ensurepip, which Debian/Ubuntu ship in python3-venv: ask for that
+    package only when it is really missing, or every setup would want sudo for nothing."""
+    try:
+        return subprocess.run(["python3", "-c", "import ensurepip"], stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL, timeout=60, check=False).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def textual_install_commands() -> list[list[str]]:
     venv = textual_venv()
     if textual_venv_usable():
@@ -338,7 +348,8 @@ def install_tools(names: list[str], *, assume_yes: bool = False, dry_run: bool =
         raise VMError(f"No package list for this distribution; install {', '.join(system)} with its package manager "
                       f"({' '.join(host_install_hints())})")
     # Debian and Ubuntu split ensurepip out of python3: `python3 -m venv` fails without python3-venv.
-    extra = ["python3-venv"] if TEXTUAL in wanted and manager == "apt" and not textual_venv_usable() else []
+    extra = (["python3-venv"] if TEXTUAL in wanted and manager == "apt" and not textual_venv_usable()
+             and not python_has_ensurepip() else [])
     commands = package_install_commands(system, manager, extra) if (system or extra) and manager else []
     if TEXTUAL in wanted:
         commands += textual_install_commands()

@@ -18,14 +18,8 @@ help: ## Show this help
 	@printf "\nVM lifecycle (list, provision, install, start, shell, bootstrap-*, clean...):\n"
 	@printf "  \033[1mvmctl --help\033[0m   or   \033[1mvmtui\033[0m\n"
 
-setup: install-cli ## First run: link vmctl/vmtui, install every missing dependency (Textual included, asks first), then check the host
-	@./bin/vmctl setup --install
-	@case ":$$PATH:" in \
-		*":$(PREFIX)/bin:"*) run=""; ;; \
-		*) run="./bin/"; \
-		   printf "\n  \033[33m%s/bin is not in your PATH yet\033[0m: open a new login shell, or run\n    source ~/.profile        (or add it: export PATH=\"%s/bin:\$$PATH\" in ~/.zshrc / ~/.bashrc)\n" "$(PREFIX)" "$(PREFIX)";; \
-	esac; \
-	printf "\n  next: \033[1m$${run}vmtui\033[0m (dashboard)  or  \033[1m$${run}vmctl bootstrap-preseed debian-server\033[0m (a Debian VM, zero clicks)\n"
+setup: ## First run: link vmctl/vmtui, install every missing dependency (Textual included, asks first), then check the host (same as ./setup.sh, which needs no make)
+	@./setup.sh
 
 install-cli: ## Symlink vmctl and vmtui into $(PREFIX)/bin (default ~/.local/bin)
 	@mkdir -p "$(PREFIX)/bin"

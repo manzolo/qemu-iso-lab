@@ -26,11 +26,12 @@ disk, the firmware, the unattended install and the SSH provisioning. One CLI,
 
 ```bash
 git clone https://github.com/manzolo/qemu-iso-lab.git && cd qemu-iso-lab
-make setup     # links vmctl + vmtui into ~/.local/bin, installs what is missing, checks the host
+./setup.sh     # links vmctl + vmtui into ~/.local/bin, installs what is missing, checks the host
 vmtui          # the dashboard: pick a profile, Enter installs or boots it
 ```
 
-`make setup` lists what it is about to install and asks first. It uses `apt` or
+`./setup.sh` (or `make setup`) lists what it is about to install and asks first; it
+needs only `python3`, which every supported distribution ships. It uses `apt` or
 `pacman` for QEMU, OVMF and the helpers, and puts Textual (the dashboard) in the
 repository's `.venv-tui` without sudo. Running it again only installs what is missing.
 
@@ -49,7 +50,7 @@ Times are from the last validation run on a desktop host with KVM.
 <details>
 <summary>Installing the host packages by hand</summary>
 
-For other distributions, or to see exactly what `make setup` would run:
+For other distributions, or to see exactly what `./setup.sh` would run:
 
 ```bash
 # Arch / CachyOS

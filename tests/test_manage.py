@@ -429,9 +429,10 @@ class ManageTests(BaseVmctlTestCase):
         self.assertIn("[missing] textual (the vmtui dashboard", output)
         self.assertIn("make install textual", output)
 
-    def _install(self, names, present=(), distro="ubuntu", apt_has=None, **kwargs):
+    def _install(self, names, present=(), distro="ubuntu", apt_has=None, ensurepip=False, **kwargs):
         with mock.patch.object(vmctl.host_setup, "tool_present", side_effect=lambda name: name in present), \
              mock.patch.object(vmctl.host_setup, "apt_available", return_value=apt_has), \
+             mock.patch.object(vmctl.host_setup, "python_has_ensurepip", return_value=ensurepip), \
              mock.patch.object(vmctl.host_setup, "read_os_release", return_value={"ID": distro}), \
              mock.patch.object(vmctl.runtime, "confirm_default_no", return_value=True) as confirm, \
              mock.patch.object(vmctl.runtime, "run") as run_cmd, \
@@ -491,6 +492,11 @@ class ManageTests(BaseVmctlTestCase):
         with mock.patch.object(vmctl.host_setup, "textual_venv_usable", return_value=True):
             executed, _, _ = self._install(["textual"])
         self.assertEqual([cmd[1:3] for cmd in executed], [["-m", "pip"]])
+
+    def test_setup_install_skips_python3_venv_when_ensurepip_is_there(self):
+        # python3-venv already installed: no sudo just to be told it is there (Lubuntu 22.04).
+        executed, _, _ = self._install(["textual"], ensurepip=True)
+        self.assertEqual([cmd[:3] for cmd in executed][0], ["python3", "-m", "venv"])
 
     def test_setup_install_rebuilds_a_venv_left_without_pip(self):
         # A venv created while python3-venv was missing has a python but no pip; reusing it
