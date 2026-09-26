@@ -3957,9 +3957,11 @@ def ensure_vm_quiescent(vm_name: str, vm: dict[str, Any], action: str) -> None:
     runtime_str, note = vm_runtime_status(vm_name, vm)
     if runtime_str.startswith(("tracked:", "hostfwd:", "running:")):
         raise VMError(f"Cannot {action} '{vm_name}' while it is running ({runtime_str}); stop it first (vmctl stop {vm_name})")
-    job = tui_jobs.status(tui_jobs.job_dir(state.ROOT, vm_name))
-    if job == "running":
-        raise VMError(f"Cannot {action} '{vm_name}': an installation is in progress (vmtui Installation Log / Cancel Installation)")
+    directory = tui_jobs.job_dir(state.ROOT, vm_name)
+    if tui_jobs.status(directory) == "running" and not tui_jobs.own_job(directory):
+        argv = tui_jobs.command(directory)
+        running = argv[1] if len(argv) > 1 else "a job"
+        raise VMError(f"Cannot {action} '{vm_name}': {running} is running for it (open its log, or cancel it, in vmtui or the web page)")
     if libvirt_domain_defined(vm_name):
         raise VMError(f"Cannot {action} '{vm_name}': it is defined in libvirt; vmctl unexport-libvirt {vm_name} first")
 

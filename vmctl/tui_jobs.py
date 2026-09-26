@@ -19,6 +19,20 @@ def job_dir(root: Path, name: str) -> Path:
     return root / "artifacts" / name / "runtime" / "tui-job"
 
 
+JOB_ENV = "VMCTL_JOB_DIR"
+
+
+def own_job(directory: Path) -> bool:
+    """True inside the command a job runs: its directory is the one being asked about."""
+    mine = os.environ.get(JOB_ENV)
+    if not mine:
+        return False
+    try:
+        return Path(mine) == directory.resolve()
+    except OSError:
+        return False
+
+
 def status(directory: Path) -> str:
     try:
         with (directory / "lock").open("rb") as lock:
@@ -78,7 +92,9 @@ def _start(root: Path, name: str, directory: Path, command: list[str]) -> Path:
                     cwd=root, stdin=subprocess.DEVNULL, stdout=log,
                     stderr=subprocess.STDOUT, start_new_session=True,
                     pass_fds=(lock.fileno(),),
-                    env={**os.environ, "PYTHONUNBUFFERED": "1"},
+                    # The command can tell its own job from another one on the same VM
+                    # (own_job): a checkpoint started from the web runs *in* the VM's job.
+                    env={**os.environ, "PYTHONUNBUFFERED": "1", JOB_ENV: str(directory.resolve())},
                 )
             except OSError:
                 (directory / "status").write_text("failed to start\n")

@@ -129,7 +129,15 @@ class CreateTests(CheckpointTestCase):
         with mock.patch.object(vmctl.lifecycle.tui_jobs, "status", return_value="running"):
             with self.assertRaises(self.vmctl.VMError) as ctx:
                 self.checkpoint()
-            self.assertIn("installation is in progress", str(ctx.exception))
+            self.assertIn("is running for it", str(ctx.exception))
+        # The web page runs "Checkpoint now" as the VM's own job: that job is not in the way.
+        directory = vmctl.lifecycle.tui_jobs.job_dir(vmctl.state.ROOT, self.vm_name)
+        with mock.patch.object(vmctl.lifecycle.tui_jobs, "status", return_value="running"), \
+             mock.patch.dict("os.environ", {vmctl.lifecycle.tui_jobs.JOB_ENV: str(directory.resolve())}):
+            self.checkpoint()
+        self.assertTrue(self.vmctl.checkpoint.checkpoints_dir(self.vm_name).exists())
+        import shutil
+        shutil.rmtree(self.vmctl.checkpoint.checkpoints_dir(self.vm_name))
         with mock.patch.object(vmctl.lifecycle, "libvirt_domain_defined", return_value=True):
             with self.assertRaises(self.vmctl.VMError) as ctx:
                 self.checkpoint()
