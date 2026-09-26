@@ -103,7 +103,7 @@ filterable, with the suggested next step preselected. Every action runs a
 `/` searches names, descriptions and families, so `windows` lists every
 Windows profile:
 
-![Search: the Windows profiles, with the unattended install ready for the selected one](docs/screenshots/vmtui-windows.png)
+![Search: the Windows profiles with their descriptions, Windows 11 installed and ready to boot](docs/screenshots/vmtui-windows.png)
 
 **Tools… / F4** opens global status, remote hosts and **Clean All**. Clean All
 asks for confirmation and affects every configured VM, regardless of filters;
