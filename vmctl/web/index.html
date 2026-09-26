@@ -88,6 +88,14 @@ tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
 .actions button:first-child { display:flex; justify-content:space-between; align-items:center; padding:12px; }
 .actions button:last-child { background:transparent; color:var(--accent); border:1px solid var(--line); margin-top:4px; }
 .actions kbd { border-color:#365b54; color:#21443c; }
+.al { display:inline-flex; align-items:center; gap:9px; min-width:0; }
+.ai { display:inline-flex; flex:0 0 17px; width:17px; height:17px; color:var(--ai,var(--muted)); }
+.ai svg { width:17px; height:17px; }
+.ai.ok { --ai:var(--ok); } .ai.warn { --ai:var(--warn); } .ai.bad { --ai:var(--bad); } .ai.info { --ai:#9ebdff; }
+.actions button { display:flex; align-items:center; }
+.actions button.primary .ai { --ai:#102c29; }
+button.warn { color:var(--warn); border-color:#5a4a2c; background:#2c2620; }
+button.warn:hover { background:#3a3128; border-color:#7a6440; }
 .note { background:var(--panel2); border-left:3px solid var(--warn); padding:10px 12px; border-radius:6px; white-space:pre-wrap; font-size:13px; margin:10px 0; }
 #jobs { margin:0 24px 24px; }
 .section-heading { display:flex; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); align-items:center; }
@@ -209,9 +217,10 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
 #profile-feedback { font-size:12px; color:var(--accent); white-space:pre-wrap; }
 #profile-feedback.error { color:var(--bad); }
 #vm-context { position:fixed; inset:auto; margin:0; width:260px; max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overflow:auto; padding:6px; background:#182537; border:1px solid #3d526b; color:var(--text); border-radius:12px; box-shadow:0 15px 50px #0008; }
-#vm-context button { display:block; width:100%; text-align:left; background:transparent; border-radius:6px; font-size:12px; padding:9px 10px; }
+#vm-context button { display:flex; align-items:center; gap:9px; width:100%; text-align:left; background:transparent; border-radius:6px; font-size:12px; padding:9px 10px; }
 #vm-context button:hover,#vm-context button:focus { background:#2b4157; }
 #vm-context button.danger { color:var(--bad); border:0; }
+#vm-context button.warn { color:var(--warn); border:0; background:transparent; }
 .context-title { padding:8px 10px; color:var(--accent); font:11px ui-monospace,monospace; border-bottom:1px solid var(--line); margin-bottom:4px; overflow-wrap:anywhere; }
 @media(min-width:1450px) { body > header, .overview,#toolbar,main,.labs { padding-left:max(24px,calc((100vw - 1450px)/2)); padding-right:max(24px,calc((100vw - 1450px)/2)); } #jobs { margin-left:max(24px,calc((100vw - 1450px)/2)); margin-right:max(24px,calc((100vw - 1450px)/2)); } }
 @media(max-width:1050px) { #rows td:nth-child(3),#list th:nth-child(3) { display:none; } .metric { min-width:85px; padding:10px 14px; } .palette { grid-template-columns:280px minmax(0,1fr); } }
@@ -378,34 +387,54 @@ function catalogIcon(key, large = false) {
 const shellQuote = (s) => /^[\w@%+=:,./-]+$/.test(s) ? s : "'" + s.replace(/'/g, "'\\''") + "'";
 const ram = (r) => (r.memory_mb >= 1024 ? (r.memory_mb / 1024) + "G" : r.memory_mb + "M") + " / " + r.cpus;
 
+// Action pictograms (original, CC0 like the catalog icons): the tone colours them by consequence.
+const actionIcons = {
+  console: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8m-4-4v4"/>',
+  log: '<path d="M5 6h14M5 11h14M5 16h8"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13" r="3"/>',
+  external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  power: '<path d="M12 3v9M6.3 7.3a8 8 0 1 0 11.4 0"/>',
+  play: '<path d="M7 4l13 8-13 8Z"/>',
+  display: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M10 7.5v5l4-2.5ZM8 20h8"/>',
+  bookmark: '<path d="M6 3h12v18l-6-4-6 4Z"/>',
+  disc: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/>',
+  wand: '<path d="M5 20 15 10m-3-3 2-2 5 5-2 2M5 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1Z"/>',
+  download: '<path d="M12 3v11m-4-4 4 4 4-4M4 17v3h16v-3"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+  list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  terminal: '<path d="m5 7 5 5-5 5M12 17h7"/>',
+  sliders: '<path d="M4 7h10m4 0h2M4 17h4m4 0h8M14 5v4M8 15v4"/>'
+};
+const actionIcon = (a) => a.icon ? `<span class="ai ${a.tone || ""}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${actionIcons[a.icon]}</svg></span>` : "";
 function actionsFor(r) {
   const n = r.name, a = [];
   if (r.job_status === "running") {
-    if (r.running && r.job_command === "start") a.push({ label:"Open console", console:true });
-    a.push({ label:installationJob(r) ? "Installation log" : `${activeJobLabel(r)} · job log`, job:"vm:" + n });
-    if (r.running && r.job_command !== "start") a.push({ label:"Open console", console:true });
-    if (r.running) a.push({ label:"Live screenshot", screen:true });
-    a.push({ label:"All commands for " + n + "…", form:n });
+    if (r.running && r.job_command === "start") a.push({ label:"Open console", console:true, icon:"console", tone:"info" });
+    a.push({ label:installationJob(r) ? "Installation log" : `${activeJobLabel(r)} · job log`, job:"vm:" + n, icon:"log", tone:"info" });
+    if (r.running && r.job_command !== "start") a.push({ label:"Open console", console:true, icon:"console", tone:"info" });
+    if (r.running) a.push({ label:"Live screenshot", screen:true, icon:"camera", tone:"info" });
+    a.push({ label:"All commands for " + n + "…", form:n, icon:"list" });
     return a;
   }
   if (r.running) {
-    if (r.job_status !== "running") a.push({ label: "Open console", console: true });
-    a.push({ label: "Live screenshot", screen: true });
-    a.push({ label: "Host viewer", args: ["attach", n] });
-    a.push({ label: "Stop", args: ["stop", n] });
-    a.push({ label: "Force stop", args: ["stop", n, "--force"], danger: true });
+    if (r.job_status !== "running") a.push({ label: "Open console", console: true, icon:"console", tone:"info" });
+    a.push({ label: "Live screenshot", screen: true, icon:"camera", tone:"info" });
+    a.push({ label: "Host viewer", args: ["attach", n], icon:"external", tone:"info" });
+    a.push({ label: "Stop", args: ["stop", n], icon:"stop", tone:"warn", warn:true });
+    a.push({ label: "Force stop", args: ["stop", n, "--force"], danger: true, icon:"power", tone:"bad" });
   } else if (r.installed) {
-    a.push({ label: "Boot headless", args: ["start", n, "--headless", "--background"] });
-    a.push({ label: "Boot with display (window on the host)", args: ["start", n] });
-    a.push({ label: "Checkpoint now", args: ["checkpoint", "create", n, "web-" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")] });
+    a.push({ label: "Boot headless", args: ["start", n, "--headless", "--background"], icon:"play", tone:"ok" });
+    a.push({ label: "Boot with display (window on the host)", args: ["start", n], icon:"display", tone:"ok" });
+    a.push({ label: "Checkpoint now", args: ["checkpoint", "create", n, "web-" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")], icon:"bookmark", tone:"info" });
   } else if (r.job_status !== "running") {
-    if (r.iso_source === "manual") a.push({ label: "Get the ISO…", help: true });
-    else if (r.unattended_flow) a.push({ label: "Unattended install", args: [r.unattended_flow, n] });
-    if (r.iso_source === "download") a.push({ label: "Download the ISO", args: ["fetch-iso", n] });
-    if (r.iso_source !== "manual") a.push({ label: "Manual install (window on the host)", args: ["provision", n] });
+    if (r.iso_source === "manual") a.push({ label: "Get the ISO…", help: true, icon:"disc", tone:"warn" });
+    else if (r.unattended_flow) a.push({ label: "Unattended install", args: [r.unattended_flow, n], icon:"wand", tone:"ok" });
+    if (r.iso_source === "download") a.push({ label: "Download the ISO", args: ["fetch-iso", n], icon:"download", tone:"info" });
+    if (r.iso_source !== "manual") a.push({ label: "Manual install (window on the host)", args: ["provision", n], icon:"display", tone:"ok" });
   }
-  if (!r.running && (r.prepared || r.installed)) a.push({ label: "Clean: delete the disk", args: ["clean", n], danger: true });
-  a.push({ label: "All commands for " + n + "…", form: n });
+  if (!r.running && (r.prepared || r.installed)) a.push({ label: "Clean: delete the disk", args: ["clean", n], danger: true, icon:"trash", tone:"bad" });
+  a.push({ label: "All commands for " + n + "…", form: n, icon:"list" });
   return a;
 }
 
@@ -449,7 +478,7 @@ function renderDetails() {
     <dl class="facts">${facts.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
     ${r.install_detail ? `<details class="install-details"><summary>Installation details</summary><p>${esc(r.install_detail)}</p></details>` : ""}
     ${r.iso_source === "manual" && !r.installed ? `<div class="note">${esc((r.iso_help || "").replace(/\\n/g, "\n"))}</div>` : ""}
-    <div class="actions">${actions.map((x,i) => `${x.danger ? '<div class="action-label">Power & maintenance</div>' : ""}<button data-action="${i}" class="${x.danger ? "danger" : i === 0 ? "primary main-action" : ""}">${esc(x.label)}${i === 0 ? "<kbd>Enter</kbd>" : ""}</button>`).join("")}</div>`;
+    <div class="actions">${actions.map((x,i) => `${x.danger ? '<div class="action-label">Power & maintenance</div>' : ""}<button data-action="${i}" class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${i === 0 ? "<kbd>Enter</kbd>" : ""}</button>`).join("")}</div>`;
   if ($("ssh-open")) $("ssh-open").onclick = () => openSsh(r);
   $("details").querySelectorAll("[data-action]").forEach((b) => (b.onclick = () => runAction(r, actions[+b.dataset.action])));
 }
@@ -890,10 +919,10 @@ function openContext(vm, x, y) {
   const originRow = [...container.querySelectorAll("[data-vm]")].find(row => row.dataset.vm === vm);
   contextOrigin = originRow?.querySelector("[data-member]") || originRow;
   const actions = actionsFor(r), menu = $("vm-context");
-  const entries = actions.map(a => ({label:a.label,danger:a.danger,run:()=>runAction(r,a)}));
-  if (r.ssh_port) entries.push({label:"SSH console…",run:()=>openSsh(r)});
-  entries.push({label:"Customize profile…",run:()=>openProfileEditor(r.name)});
-  menu.innerHTML = `<div class="context-title">${esc(vm)}</div>` + entries.map((a,i) => `<button role="menuitem" class="${a.danger ? "danger" : ""}" data-context="${i}">${esc(a.label)}</button>`).join("");
+  const entries = actions.map(a => ({label:a.label,danger:a.danger,warn:a.warn,icon:a.icon,tone:a.tone,run:()=>runAction(r,a)}));
+  if (r.ssh_port) entries.push({label:"SSH console…",icon:"terminal",tone:"info",run:()=>openSsh(r)});
+  entries.push({label:"Customize profile…",icon:"sliders",run:()=>openProfileEditor(r.name)});
+  menu.innerHTML = `<div class="context-title">${esc(vm)}</div>` + entries.map((a,i) => `<button role="menuitem" class="${a.danger ? "danger" : a.warn ? "warn" : ""}" data-context="${i}">${actionIcon(a)}${esc(a.label)}</button>`).join("");
   menu.showPopover();
   menu.style.left = Math.max(8, Math.min(x,innerWidth-menu.offsetWidth-8)) + "px";
   menu.style.top = Math.max(8, Math.min(y,innerHeight-menu.offsetHeight-8)) + "px";
