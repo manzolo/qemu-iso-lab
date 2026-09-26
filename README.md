@@ -80,16 +80,19 @@ which. Without Textual, `vmtui` opens the classic fzf/dialog menus.
 <summary>On Windows: inside WSL2</summary>
 
 vmctl needs Linux (KVM, `/proc`, Unix sockets), so on Windows 11 it runs inside a WSL2
-distribution, which gets `/dev/kvm` through nested virtualization. In PowerShell:
+distribution, which gets `/dev/kvm` through nested virtualization. `setup-windows.ps1` does
+it all: it installs WSL and Ubuntu 24.04 if missing, turns nested virtualization on in
+`.wslconfig`, clones the repository inside Ubuntu, runs `./setup.sh` there and adds you to the
+`kvm` group. Download [`setup-windows.ps1`](setup-windows.ps1) and, in PowerShell:
 
 ```powershell
-wsl --install -d Ubuntu-24.04
+powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1       # run it again after a reboot it asks for
+powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1 -Web  # the dashboard, opened in the Windows browser
 ```
 
-Then, in the Ubuntu shell, the same Quick Start as above (`git clone`, `./setup.sh`,
-`vmctl web --open`), plus once `sudo usermod -aG kvm $USER` and a new shell if `setup`
-reports that `/dev/kvm` is not writable. WSL forwards localhost, so the dashboard opens in the
-Windows browser at the printed `http://127.0.0.1:8765/?token=…` URL; windows of
+By hand it is `wsl --install -d Ubuntu-24.04`, then the Quick Start above in the Ubuntu shell.
+WSL forwards localhost, so the dashboard works in the Windows browser at the printed
+`http://127.0.0.1:8765/?token=…` URL; windows of
 *Boot with display* appear through WSLg. Flashing or importing a physical disk needs the disk
 attached to WSL first (`wsl --mount`, from an administrator PowerShell). This setup has not
 been through the validation matrix yet: reports are welcome.
