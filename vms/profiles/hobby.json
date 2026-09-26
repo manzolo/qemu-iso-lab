@@ -66,7 +66,19 @@
         "groups": [
           "hobby-os"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "logins": [
+          {
+            "user": "user",
+            "password": "",
+            "note": "the login screen has it filled in"
+          },
+          {
+            "user": "root",
+            "password": "password",
+            "note": "Redox book"
+          }
+        ]
       },
       "iso": "isos/redox_desktop_x86_64_2024-09-07_1225_livedisk.iso",
       "iso_url": "https://static.redox-os.org/releases/0.9.0/x86_64/redox_desktop_x86_64_2024-09-07_1225_livedisk.iso.zst",
@@ -169,13 +181,20 @@
         "groups": [
           "hobby-os"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "logins": [
+          {
+            "user": "anon",
+            "password": "foo",
+            "note": "logged in already; su gives root without a password"
+          }
+        ]
       },
       "disk_image": {
         "path": "isos/serenityos-grub-cccf3076.img",
         "format": "raw",
         "commit": "cccf3076aacd936569f1136c6a4523b1a32a2597",
-        "help": "SerenityOS publishes no ISO or disk image: it is built from source, and the build installs a GCC 14 toolchain, runs for 1-3 hours and needs root for the loop devices of the image step. Do it in a throwaway builder VM, not on the host:\n\n1. Install an Ubuntu 22.04+ or Debian 12+ VM (vmctl bootstrap-unattended ubuntu-26.04, or any Linux VM with 4+ vCPUs, 8+ GB of RAM and 40 GB of disk).\n2. Copy tools/build_serenityos.sh into it and run: sudo sh build_serenityos.sh ~/serenity-build cccf3076aacd936569f1136c6a4523b1a32a2597\n3. Copy the resulting serenityos-grub-cccf3076.img back to this host (scp, or the shared folder).\n\nThen: vmctl prep serenityos converts it into the VM's disk, vmctl start serenityos boots it."
+        "help": "SerenityOS publishes no ISO or disk image: it is built from source, and the build installs a GCC 14 toolchain, runs for 1-3 hours and needs root for the loop devices of the image step. Do it in a throwaway builder VM, not on the host:\n\n1. Install an Ubuntu 22.04+ or Debian 12+ VM (vmctl bootstrap-unattended ubuntu-26.04, or any Linux VM with 4+ vCPUs, 8+ GB of RAM and 40 GB of disk).\n2. Copy tools/build_serenityos.sh into it and run: sudo sh build_serenityos.sh ~/serenity-build cccf3076aacd936569f1136c6a4523b1a32a2597\n3. Copy the resulting serenityos-grub-cccf3076.img back to this host (scp, or the shared folder).\n\nThen: vmctl prep serenityos converts it into the VM's disk, vmctl start serenityos boots it. docs/SERENITYOS.md records the whole build as it was done, with the traps."
       },
       "disk": {
         "path": "artifacts/serenityos/disk.qcow2",

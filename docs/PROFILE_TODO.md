@@ -417,7 +417,8 @@ Group `hobby-os`, all `manual` (live systems with no answer file and no SSH), in
 | `redox` | 0.9.0 desktop `livedisk.iso.zst` (`iso_archive` type `zstd`, vendor hash) | bootloader waits for a display mode (Enter), graphical login `user` with an empty password, Orbital desktop in ~50 s (verified 2026-09-26) |
 | `menuetos` | user-supplied `M64CD-<version>.ISO` (`iso_help`) | not booted yet: no medium on this host |
 
-`serenityos` publishes no image and is built from source: `tools/build_serenityos.sh`, run as root
+`serenityos` publishes no image and is built from source ([SERENITYOS.md](SERENITYOS.md) is the
+step-by-step record of the build): `tools/build_serenityos.sh`, run as root
 in a disposable builder VM (here the `lubuntu22` VM, 6 vCPUs / 12 GB, Ubuntu 22.04 with GCC 14 from
 the toolchain PPA), builds the toolchain and the system at commit `cccf3076` (about 2 h) and the
 MBR + GRUB image (`Meta/build-image-grub.sh mbr`, ~1.4 GB). Three traps on 22.04, fixed by the

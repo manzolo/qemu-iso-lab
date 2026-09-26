@@ -87,6 +87,16 @@ class LabsTests(BaseVmctlTestCase):
         self.assertIn("<h2>Access</h2>", page)
         self.assertIn("vmctl attach proxmox-lab-client", page)
 
+    def test_logins_lists_the_vendor_accounts_or_the_profile_user(self):
+        cfg = self.tracked_config()
+        redox = labs.logins(config.get_vm(cfg, "redox"))
+        self.assertEqual([(a["user"], a["password"]) for a in redox], [("user", ""), ("root", "password")])
+        self.assertEqual([(a["user"], a["password"]) for a in labs.logins(config.get_vm(cfg, "serenityos"))],
+                         [("anon", "foo")])
+        client = labs.logins(config.get_vm(cfg, "proxmox-lab-client"))
+        self.assertEqual([(a["user"], a["password"]) for a in client], [("lab", "lab")])
+        self.assertEqual(labs.logins({"meta": {"logins": [{"password": "x"}, "junk"]}}), [])
+
     def test_map_is_self_contained_and_escapes_profile_text(self):
         cfg = self.tracked_config()
         lab = labs.model(cfg, "proxmox-lab")

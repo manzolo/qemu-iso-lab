@@ -660,7 +660,7 @@ from pathlib import Path
 
 sys.path.insert(0, sys.argv[1])
 
-from vmctl import clone, cloud_init, config, iso, lifecycle, runtime, state, tui_jobs, vmstate
+from vmctl import clone, cloud_init, config, iso, labs, lifecycle, runtime, state, tui_jobs, vmstate
 
 # A disk image with less than vmstate.DATA_MIN_BYTES allocated is "prepared" (created by
 # prep or an install that stopped early) and has no data on it; a fresh qcow2 allocates
@@ -772,6 +772,8 @@ def facts(name, vm):
         "has_disk_image": bool(vm.get("disk_image")),
         "has_unattended_flow": bool(unattended_flow),
         "ssh_port": str(ssh_cfg.get("ssh_host_port") or ""),
+        # Who logs in with what (meta.logins, or the profile's own user): shown in the web and the TUI.
+        "logins": labs.logins(vm),
         "has_ssh": bool(ssh_cfg),
         "has_autoinstall": has_section(vm, "autoinstall"),
         "has_archinstall": has_section(vm, "archinstall_config"),

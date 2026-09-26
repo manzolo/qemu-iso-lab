@@ -65,7 +65,7 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | `video` | Named QEMU argument sets, see [Video profiles](#video-profiles). Optional `headless` argument list replaces `-display none` for background/unattended boots; QMP and VNC are still added. |
 | `installer_boot` | `kernel` and `initrd` paths inside the ISO for the unattended flows, when they differ from the flow's default (CachyOS: `arch/boot/x86_64/vmlinuz-linux-cachyos`) |
 | `notes` | Free text shown by `vmctl show` |
-| `meta` | Classification, not behaviour: `slug`, `family` (one spelling per distro: `debian`, `arch`, `windows`...), `role` (`desktop`, `server`...), `release_model`, `status` and `verified` ([Profile status](#profile-status-and-live-verification)), plus `groups`. `family`, `role`, `status` and the install flow already act as categories for `vmctl check-vms --group`; `meta.groups` adds only the ones they cannot express, such as `ubuntu` (which spans a dozen slugs inside the `debian` family) or `smoke`. Group names are lowercase letters, digits and hyphens. `vmctl list --groups` lists them all; the catalogue of declared ones is in [UNATTENDED.md](UNATTENDED.md#running-one-category-instead-of-the-whole-matrix). |
+| `meta` | Classification, not behaviour: `slug`, `family` (one spelling per distro: `debian`, `arch`, `windows`...), `role` (`desktop`, `server`...), `release_model`, `status` and `verified` ([Profile status](#profile-status-and-live-verification)), plus `groups`. `family`, `role`, `status` and the install flow already act as categories for `vmctl check-vms --group`; `meta.groups` adds only the ones they cannot express, such as `ubuntu` (which spans a dozen slugs inside the `debian` family) or `smoke`. Group names are lowercase letters, digits and hyphens. `vmctl list --groups` lists them all; the catalogue of declared ones is in [UNATTENDED.md](UNATTENDED.md#running-one-category-instead-of-the-whole-matrix). `logins` (`[{"user", "password", "note"}]`) lists the accounts a system fixes itself and no install section can express (Redox: `user` with no password and `root`/`password`; SerenityOS: `anon`/`foo`): the dashboard and the Textual TUI show them in a *Login* row; without it they show the user the profile creates. |
 
 ## Guest agent
 
@@ -157,7 +157,8 @@ Profiles can define smarter sources without giving up a hardcoded fallback:
   `vmctl prep <vm>` converts the image into the profile's disk (origin `image` in `state.json`) and
   `vmctl start <vm>` boots it; `install`/`provision` refuse, and a missing image shows `help` like
   `iso_help`. The image is never validated as an ISO (that check deletes a file it does not
-  recognise). `tools/build_serenityos.sh` is the recipe for a disposable builder VM.
+  recognise). `tools/build_serenityos.sh` is the recipe for a disposable builder VM, and
+  [SERENITYOS.md](SERENITYOS.md) the whole procedure as it was done, traps included.
 
 ```json
 "iso_discovery": {

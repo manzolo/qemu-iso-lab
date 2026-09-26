@@ -629,6 +629,7 @@ function renderDetails() {
   const [s, c] = stateOf(r);
   const facts = [["Disk", r.prepared ? `${esc(r.disk_host || "?")} used <span class="s-muted">/ ${esc(r.disk_capacity || "?")}</span>` : "Not created yet"],
     ["ISO", { cached: "Ready to use", download: "Available to download", manual: "Provided manually" }[r.iso_source] || (r.iso_ready ? "Ready to use" : "Not cached")],
+    ...((r.logins || []).length ? [["Login", r.logins.map((l) => `<span class="mono">${esc(l.user)}</span> / ${l.password ? `<span class="mono">${esc(l.password)}</span>` : '<span class="s-muted">no password</span>'}${l.note ? ` <span class="s-muted">· ${esc(l.note)}</span>` : ""}`).join("<br>")]] : []),
     ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options" aria-label="Open SSH console options">&gt;_ SSH</button></span>` : "Not configured"]];
   const actions = actionsFor(r), memory = r.memory_mb >= 1024 ? `${r.memory_mb / 1024} GB` : `${r.memory_mb} MB`;
   const expandedDetails = $("details").dataset.vm === r.name ? [...$("details").querySelectorAll("details[open]")].map(el=>el.className) : [];

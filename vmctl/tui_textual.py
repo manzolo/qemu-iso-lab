@@ -115,6 +115,15 @@ class VMDetails(Vertical):
                      style="#86d5ab" if row["iso_ready"] else "#a6b4c8")
         facts.append("\n\nSSH\n", style="bold #84c9e7")
         facts.append(ssh)
+        accounts = row.get("logins") or []
+        if accounts:
+            facts.append("\n\nLOGIN\n", style="bold #84c9e7")
+            for n, account in enumerate(accounts):
+                facts.append(("\n" if n else "") + account["user"] + " / ")
+                facts.append(account["password"] or "no password",
+                             style="bold #dce5ef" if account["password"] else "#a6b4c8")
+                if account.get("note"):
+                    facts.append(f"  {account['note']}", style="#a6b4c8")
         self.query_one("#vm-facts", Static).update(facts)
         self.query_one("#vm-install", Static).update(row["install_detail"] if row["installed"] else "")
         actions = quick_actions(row)[:-1]

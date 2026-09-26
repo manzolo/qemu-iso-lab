@@ -59,6 +59,18 @@ def login(vm: dict[str, Any]) -> dict[str, str] | None:
     return None
 
 
+def logins(vm: dict[str, Any]) -> list[dict[str, str]]:
+    """Every account worth showing next to a machine. ``meta.logins`` lists the ones a vendor fixes
+    (Redox: user with no password, root/password; SerenityOS: anon/foo), which no install section
+    can express; otherwise the one login() derives from the profile's own user settings."""
+    declared = (vm.get("meta") or {}).get("logins")
+    if isinstance(declared, list):
+        return [{"user": str(e.get("user") or ""), "password": str(e.get("password") or ""),
+                 "note": str(e.get("note") or "")} for e in declared if isinstance(e, dict) and e.get("user")]
+    found = login(vm)
+    return [found] if found else []
+
+
 # Started first and stopped last: what the other members route through or run on, then the
 # services they resolve names with (the network lab installs pfsense -> pihole -> clients too).
 INFRA_ROLES = ("router", "pfsense", "hypervisor")

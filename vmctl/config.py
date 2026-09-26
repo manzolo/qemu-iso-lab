@@ -236,6 +236,12 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
                     for group in groups:
                         if not GROUP_RE.match(group):
                             err(f"meta.groups entry {group!r} must be lowercase letters, digits and hyphens")
+            if "logins" in meta:
+                logins = meta["logins"]
+                if not isinstance(logins, list) or not all(
+                        isinstance(e, dict) and isinstance(e.get("user"), str) and e["user"]
+                        and all(isinstance(e.get(k, ""), str) for k in ("password", "note")) for e in logins):
+                    err("meta.logins must be a list of {user, password?, note?} objects with string values")
 
     disk = vm.get("disk")
     if isinstance(disk, dict):

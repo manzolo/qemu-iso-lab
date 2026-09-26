@@ -51,6 +51,7 @@ The bilingual index is [guides/README.md](guides/README.md).
 | [CI_BOOT_STRATEGY.md](CI_BOOT_STRATEGY.md) | Why the CI smoke test boots Alpine under TCG and how its ISO is discovered |
 | [ARCH_GRUB_BOOT_FIX.md](ARCH_GRUB_BOOT_FIX.md) | Post-mortem of the Arch `grub rescue` bug behind the completion-token rule |
 | [PROFILE_TODO.md](PROFILE_TODO.md) | Profile coverage still missing |
+| [SERENITYOS.md](SERENITYOS.md) | Building the SerenityOS disk image in a builder VM, step by step |
 
 The agent-facing summary of all of this, kept in sync with the code, is
 [`CLAUDE.md`](../CLAUDE.md) at the repository root.
