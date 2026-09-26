@@ -429,8 +429,9 @@ class ManageTests(BaseVmctlTestCase):
         self.assertIn("[missing] textual (the vmtui dashboard", output)
         self.assertIn("make install textual", output)
 
-    def _install(self, names, present=(), distro="ubuntu", **kwargs):
+    def _install(self, names, present=(), distro="ubuntu", apt_has=None, **kwargs):
         with mock.patch.object(vmctl.host_setup, "tool_present", side_effect=lambda name: name in present), \
+             mock.patch.object(vmctl.host_setup, "apt_available", return_value=apt_has), \
              mock.patch.object(vmctl.host_setup, "read_os_release", return_value={"ID": distro}), \
              mock.patch.object(vmctl.runtime, "confirm_default_no", return_value=True) as confirm, \
              mock.patch.object(vmctl.runtime, "run") as run_cmd, \
@@ -444,6 +445,28 @@ class ManageTests(BaseVmctlTestCase):
                                     ["sudo", "apt", "install", "-y", "dvd+rw-tools", "cloud-image-utils", "gddrescue"]])
         self.assertIn("fzf is already installed", output)
         confirm.assert_called_once()
+
+    def test_setup_install_skips_packages_apt_does_not_have(self):
+        # Ubuntu 22.04: virtiofsd ships inside qemu-system-common, and one unknown package name
+        # made `apt install` refuse the whole list (reported from a Lubuntu host, 2026-09-26).
+        executed, _, output = self._install(["xorriso", "virtiofsd"], apt_has={"xorriso"})
+        self.assertEqual(executed[-1], ["sudo", "apt", "install", "-y", "xorriso"])
+        self.assertIn("virtiofsd: no apt package on this release, skipped", output)
+
+    def test_setup_install_textual_on_apt_brings_python3_venv(self):
+        venv = self.root / ".venv-tui"
+        executed, _, _ = self._install(["textual"])
+        self.assertEqual(executed[:3], [["sudo", "apt", "update"], ["sudo", "apt", "install", "-y", "python3-venv"],
+                                        ["python3", "-m", "venv", str(venv)]])
+
+    def test_apt_available_reads_the_candidates_of_apt_cache_policy(self):
+        policy = ("xorriso:\n  Installed: (none)\n  Candidate: 1.5.4-2\n  Version table:\n"
+                  "swtpm:\n  Installed: (none)\n  Candidate: (none)\n")
+        with mock.patch.object(shutil, "which", return_value="/usr/bin/apt-cache"), \
+             mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=policy)):
+            self.assertEqual(vmctl.host_setup.apt_available(["xorriso", "swtpm", "virtiofsd"]), {"xorriso"})
+        with mock.patch.object(shutil, "which", return_value=None):
+            self.assertIsNone(vmctl.host_setup.apt_available(["xorriso"]))
 
     def test_setup_install_without_names_installs_every_missing_tool_with_pacman(self):
         present = set(vmctl.host_setup.installable_names()) - {"sfdisk", "7z"}

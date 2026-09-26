@@ -246,8 +246,37 @@ def missing_tools() -> list[str]:
     return [name for name in installable_names() if not tool_present(name)]
 
 
-def package_install_commands(names: list[str], manager: str) -> list[list[str]]:
-    packages = list(dict.fromkeys(TOOL_PACKAGES[name][manager] for name in names))
+def apt_available(packages: list[str]) -> set[str] | None:
+    """The packages apt can install on this release (``apt-cache policy`` shows a candidate), or
+    None when that cannot be asked. Ubuntu 22.04 has no ``virtiofsd`` package (the daemon ships in
+    qemu-system-common), and one unknown name makes ``apt install`` refuse the whole list."""
+    if not packages or shutil.which("apt-cache") is None:
+        return None
+    try:
+        result = subprocess.run(["apt-cache", "policy", *packages], capture_output=True, text=True,
+                                stdin=subprocess.DEVNULL, timeout=60, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode:
+        return None
+    found: set[str] = set()
+    current = None
+    for line in result.stdout.splitlines():
+        if line and not line[0].isspace() and line.endswith(":"):
+            current = line[:-1]
+        elif current and line.strip().startswith("Candidate:") and line.split(":", 1)[1].strip() != "(none)":
+            found.add(current)
+    return found
+
+
+def package_install_commands(names: list[str], manager: str, extra: list[str] | None = None) -> list[list[str]]:
+    packages = list(dict.fromkeys([*(TOOL_PACKAGES[name][manager] for name in names), *(extra or [])]))
+    if manager == "apt":
+        available = apt_available(packages)
+        if available is not None:
+            for package in [package for package in packages if package not in available]:
+                ui.print_status("warn", f"{package}: no apt package on this release, skipped", ok=False)
+            packages = [package for package in packages if package in available]
     if not packages:
         return []
     if manager == "pacman":
@@ -283,7 +312,9 @@ def install_tools(names: list[str], *, assume_yes: bool = False, dry_run: bool =
     if system and manager is None:
         raise VMError(f"No package list for this distribution; install {', '.join(system)} with its package manager "
                       f"({' '.join(host_install_hints())})")
-    commands = package_install_commands(system, manager) if system and manager else []
+    # Debian and Ubuntu split ensurepip out of python3: `python3 -m venv` fails without python3-venv.
+    extra = ["python3-venv"] if TEXTUAL in wanted and manager == "apt" and not (textual_venv() / "bin/python").exists() else []
+    commands = package_install_commands(system, manager, extra) if (system or extra) and manager else []
     if TEXTUAL in wanted:
         commands += textual_install_commands()
 
