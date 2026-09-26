@@ -70,6 +70,10 @@ tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
 .lab-head > .chip { flex-shrink:0; }
 @media(max-width:420px) { .profile-identity { gap:8px; } .catalog-icon { width:28px; height:28px; flex-basis:28px; border-radius:8px; } #list td,#list th { padding-left:10px; padding-right:10px; } #list .profile-desc { max-width:170px; } }
 .profile-name { display:block; font-size:13px; font-weight:600; }
+#hover-shot { position:fixed; z-index:50; display:none; width:380px; max-width:calc(100vw - 24px); padding:6px; background:#0c131e; border:1px solid #3d526b; border-radius:10px; box-shadow:0 18px 50px #000a; pointer-events:none; }
+#hover-shot img { display:block; width:100%; min-height:40px; border-radius:6px; background:#05080d; }
+#hover-shot .hover-caption { padding:5px 2px 0; font:11px ui-monospace,monospace; color:var(--muted); }
+@media (hover:none) { #hover-shot { display:none !important; } }
 .style-tag { display:inline-block; margin-left:8px; padding:1px 6px; border-radius:5px; font:600 9.5px system-ui,sans-serif; letter-spacing:.04em; text-transform:uppercase; vertical-align:2px; color:var(--muted); border:1px solid var(--line); }
 .style-tag.auto { color:var(--ok); border-color:#2f5a52; background:#16302c; }
 .profile-desc { display:block; color:var(--muted); font-size:11px; margin-top:3px; max-width:300px; overflow:hidden; text-overflow:ellipsis; }
@@ -300,6 +304,7 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
 <dialog id="help-dialog"><header><h1 id="help-title">ISO needed</h1><button data-close>Close</button></header>
   <div class="body"><div class="note" id="help-text"></div></div></dialog>
 <div id="toast" role="status" popover="manual"></div>
+<div id="hover-shot" aria-hidden="true"><img alt=""><div class="hover-caption"></div></div>
 
 <script>
 "use strict";
@@ -1045,6 +1050,33 @@ window.addEventListener("resize",closeContext);
 // --- wiring
 document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
 document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll("[data-filter]").forEach((x) => (x.classList.toggle("active", x === b), x.setAttribute("aria-pressed", x === b))); render(); }));
+// Hovering a running machine shows its screen: a QMP screendump (or VNC for accelerated displays),
+// fetched after a short pause so sweeping the mouse across the list asks for nothing.
+const hover = { vm: null, timer: 0 };
+function hideHoverShot() { clearTimeout(hover.timer); hover.vm = null; $("hover-shot").style.display = "none"; }
+function placeHoverShot(x, y) {
+  const box = $("hover-shot"), w = box.offsetWidth || 380, h = box.offsetHeight || 260;
+  box.style.left = Math.max(8, Math.min(x + 18, innerWidth - w - 8)) + "px";
+  box.style.top = Math.max(8, Math.min(y + 18, innerHeight - h - 8)) + "px";
+}
+$("rows").addEventListener("mouseover", (e) => {
+  const tr = e.target.closest("tr[data-vm]"), vm = tr?.dataset.vm;
+  if (!tr || vm === hover.vm) return;
+  hideHoverShot();
+  const r = S.vms.find((x) => x.name === vm);
+  if (!r || !r.running) return;
+  hover.vm = vm;
+  hover.timer = setTimeout(() => {
+    const box = $("hover-shot"), img = box.querySelector("img");
+    box.querySelector(".hover-caption").textContent = `${vm} · live screen`;
+    img.onerror = () => { if (hover.vm === vm) box.querySelector(".hover-caption").textContent = `${vm} · no screen available (serial console only?)`; };
+    img.src = `/api/vm/${encodeURIComponent(vm)}/screen.png?token=${encodeURIComponent(TOKEN)}&t=${Math.floor(Date.now() / 5000)}`;
+    box.style.display = "block"; placeHoverShot(hover.x, hover.y);
+  }, 450);
+});
+$("rows").addEventListener("mousemove", (e) => { hover.x = e.clientX; hover.y = e.clientY; if (hover.vm && $("hover-shot").style.display === "block") placeHoverShot(e.clientX, e.clientY); });
+$("rows").addEventListener("mouseleave", hideHoverShot);
+$("rows").addEventListener("mousedown", hideHoverShot);
 $("rows").onclick = (e) => { const tr = e.target.closest("[data-vm]"); if (tr) { selected = tr.dataset.vm; localStorage.setItem("vmctl-selected", selected); render(); } };
 $("search").oninput = render;
 document.addEventListener("keydown", (e) => {
