@@ -485,6 +485,34 @@ class ManageTests(BaseVmctlTestCase):
         names = set(vmctl.host_setup.installable_names())
         self.assertLessEqual(set(vmctl.state.REQUIRED_COMMANDS) | set(vmctl.state.OPTIONAL_COMMANDS), names)
 
+    def test_setup_groups_cover_every_checked_tool_exactly_once(self):
+        grouped = [name for _, names in vmctl.host_setup.SETUP_GROUPS for name in names]
+        self.assertEqual(len(grouped), len(set(grouped)))
+        self.assertEqual(set(grouped), set(vmctl.state.REQUIRED_COMMANDS) | set(vmctl.state.OPTIONAL_COMMANDS))
+
+    def test_setup_prints_one_line_per_group_and_the_missing_tool_with_its_package(self):
+        self.write_config_dir()
+        with mock.patch.object(vmctl.host_setup, "tool_present", side_effect=lambda name: name != "growisofs"), \
+             mock.patch.object(vmctl.host_setup, "textual_python", return_value=str(self.root / ".venv-tui/bin/python")), \
+             mock.patch.object(vmctl.host_setup, "read_os_release", return_value={"ID": "ubuntu"}), \
+             mock.patch.object(vmctl.host_setup, "kvm_status", return_value=(True, "/dev/kvm")), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            self.assertEqual(self.vmctl.cmd_setup(argparse.Namespace()), 0)
+        output = stdout.getvalue()
+        self.assertIn("textual (.venv-tui) · fzf · dialog", output)
+        self.assertIn("partclone.{extfs,ntfs,fat,exfat}", output)
+        self.assertIn("[missing] growisofs (bootstrap-pfsense and bootstrap-freebsd (updates the ISO in place); dvd+rw-tools package)", output)
+        self.assertIn("make setup installs every missing one (one only: make install growisofs)", output)
+        self.assertEqual(sum("[ok]" in line for line in output.splitlines()), len(vmctl.host_setup.SETUP_GROUPS) + 3)
+
+    def test_kvm_status_explains_a_missing_or_unwritable_device(self):
+        with mock.patch.object(Path, "exists", return_value=False):
+            self.assertFalse(vmctl.host_setup.kvm_status()[0])
+        with mock.patch.object(Path, "exists", return_value=True), mock.patch.object(os, "access", return_value=False):
+            ok, detail = vmctl.host_setup.kvm_status()
+            self.assertFalse(ok)
+            self.assertIn("kvm group", detail)
+
     def test_cmd_setup_can_install_missing_packages_after_confirmation(self):
         self.vm_config["firmware"] = {
             "type": "efi",

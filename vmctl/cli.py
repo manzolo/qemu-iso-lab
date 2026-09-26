@@ -395,6 +395,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="install these tools (names as `vmctl setup` prints them, plus ovmf and textual), "
                         "or every missing one when none is named; asks first")
     p.add_argument("--yes", action="store_true", help="with --install: do not ask before running the install commands")
+    p.add_argument("--verbose", "-v", action="store_true", help="one line per tool, with what it is for, instead of one per group")
     p.set_defaults(func=lifecycle.cmd_setup)
 
     p = _add(subparsers, "clean", help="force-stop and remove artifacts for one VM (or all VMs); checkpoints are kept unless --checkpoints")

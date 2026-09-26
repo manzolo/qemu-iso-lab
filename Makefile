@@ -18,8 +18,9 @@ help: ## Show this help
 	@printf "\nVM lifecycle (list, provision, install, start, shell, bootstrap-*, clean...):\n"
 	@printf "  \033[1mvmctl --help\033[0m   or   \033[1mvmtui\033[0m\n"
 
-setup: ## Check host prerequisites (qemu, qemu-img, OVMF, dialog)
-	@./bin/vmctl setup
+setup: install-cli ## First run: link vmctl/vmtui, install every missing dependency (Textual included, asks first), then check the host
+	@./bin/vmctl setup --install
+	@printf "\n  next: \033[1mvmtui\033[0m (dashboard)  or  \033[1mvmctl bootstrap-preseed debian-server\033[0m (a Debian VM, zero clicks)\n"
 
 install-cli: ## Symlink vmctl and vmtui into $(PREFIX)/bin (default ~/.local/bin)
 	@mkdir -p "$(PREFIX)/bin"
@@ -40,8 +41,14 @@ install: ## Install host dependencies: every missing one, or only those named (m
 uninstall-cli: ## Remove the symlinks created by install-cli
 	@rm -f "$(PREFIX)/bin/vmctl" "$(PREFIX)/bin/vmtui"
 
-test: ## Run the unit tests (pytest)
+test: ## Run the unit tests (pytest), then the dashboard tests with .venv-tui's Textual
 	@python3 -m pytest -q tests/
+	@if [ -x .venv-tui/bin/python ]; then \
+		printf '  dashboard tests with .venv-tui (Textual):\n'; \
+		out=$$(.venv-tui/bin/python -m unittest tests.test_tui_textual 2>&1); status=$$?; \
+		printf '%s\n' "$$out" | grep -v -e '^Executing <Task' -e '^\.*Executing <Task' | tail -3; \
+		exit $$status; \
+	else printf '  skipped the dashboard tests (no .venv-tui: make install textual)\n'; fi
 
 lint: ## Type-check the vmctl package (mypy --strict; the Textual modules with .venv-tui when present)
 	@python3 -m mypy vmctl/ --strict --exclude 'vmctl/tui_(textual|widgets)\.py$$'

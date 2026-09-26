@@ -21,7 +21,7 @@ is importable: first from the repository's `.venv-tui`, then from `python3`
 (`VMTUI_TEXTUAL_PYTHON` names another interpreter). Install it once:
 
 ```bash
-make install textual   # python3 -m venv .venv-tui + pip install -e '.[tui]'
+make setup             # installs it with everything else (or only it: make install textual, into .venv-tui)
 vmtui                  # or: make tui
 ```
 

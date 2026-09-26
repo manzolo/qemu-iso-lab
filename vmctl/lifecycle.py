@@ -10,6 +10,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import re
 import shlex
 import sys
 import time
@@ -3753,33 +3754,48 @@ def cmd_setup(args: argparse.Namespace) -> int:
         args.install = None
         args._skip_prompt = True
     cfg = config.load_config()
+    verbose = getattr(args, "verbose", False)
+    required = set(state.REQUIRED_COMMANDS)
+    purposes = {**{name: "required" for name in state.REQUIRED_COMMANDS}, **state.OPTIONAL_COMMANDS}
     status_ok = True
+    missing_optional: list[str] = []
 
-    ui.print_header("Host dependency check")
-    for name in state.REQUIRED_COMMANDS:
-        present = shutil.which(name) is not None
-        marker = "ok" if present else "missing"
-        ui.print_status(marker, name, ok=present)
-        status_ok = status_ok and present
+    ui.print_header("Host check")
+    for group, names in host_setup.SETUP_GROUPS:
+        present = [name for name in names if host_setup.tool_present(name)]
+        absent = [name for name in names if name not in present]
+        shown = [f"textual ({host_setup.textual_location()})" if name == host_setup.TEXTUAL else name for name in present]
+        if verbose:
+            for name, label in zip(present, shown):
+                ui.print_status("ok", f"{label} ({purposes[name]})")
+        elif present:
+            ui.print_status("ok", f"{group:<19} {host_setup.compact_names(shown)}")
+        for name in absent:
+            ui.print_status("missing", f"{name} ({purposes[name]}; {host_setup.tool_package(name)})", ok=False)
+            if name in required:
+                status_ok = False
+            else:
+                missing_optional.append(name)
 
-    ui.print_header("Optional tools")
-    for name, note in state.OPTIONAL_COMMANDS.items():
-        present = host_setup.tool_present(name)
-        marker = "ok" if present else "missing"
-        ui.print_status(marker, f"{name} ({note})", ok=present)
+    kvm_ok, kvm_detail = host_setup.kvm_status()
+    ui.print_status("ok" if kvm_ok else "warn", f"{'KVM':<19} {kvm_detail}", ok=kvm_ok)
 
-    ui.print_header("Firmware check")
     efi_vms = [(name, vm) for name, vm in config.sorted_vm_items(cfg) if vm["firmware"]["type"] == "efi"]
     if not efi_vms:
-        ui.print_status("ok", "No EFI profiles configured")
+        ui.print_status("ok", f"{'Firmware':<19} no EFI profiles configured")
     else:
         try:
             _, details = qemu.firmware_status(efi_vms[0][1])
-            ui.print_status("ok", details)
+            code = re.search(r"code=(\S+)", details)
+            ui.print_status("ok", f"{'Firmware':<19} {code.group(1) if code else details}" if not verbose else details)
         except VMError as exc:
             ui.print_status("missing", str(exc), ok=False)
             ui.print_status("warn", f"Affected EFI profiles: {', '.join(name for name, _ in efi_vms)}", ok=False)
             status_ok = False
+
+    if missing_optional:
+        ui.print_note(f"{len(missing_optional)} optional tool(s) missing: make setup installs every missing one "
+                      f"(one only: make install {missing_optional[0]})")
 
     if status_ok:
         ui.print_status("ok", "Setup check passed.")

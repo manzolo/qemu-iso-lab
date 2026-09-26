@@ -21,17 +21,31 @@ CONFIG_DIR: Path = _ORIGINAL_CONFIG_DIR
 HTTP_USER_AGENT: str = "vmctl/1.0 (+https://github.com/manzolo/qemu-iso-lab)"
 
 REQUIRED_COMMANDS = ["qemu-system-x86_64", "qemu-img", "python3"]
-OPTIONAL_COMMANDS = {"ssh": "guest shell and SSH provisioning", "scp": "copying files during SSH provisioning", "ssh-keygen": "project-generated SSH keys", "dialog": "required only for the TUI fallback", "fzf": "preferred TUI picker", "textual": "the vmtui dashboard, else vmtui opens the fzf/dialog menus: make install textual", "remote-viewer": "required only by vmctl attach (virt-viewer package)", "virsh": "required only by export-libvirt and the libvirt network lab", "swtpm": "required only by Windows guests exported to libvirt", "sgdisk": "required only by flash/import GPT repair (gdisk package)", "7z": "required only by bootstrap-windows (unpacks the UDF Windows ISO)", "xorriso": "seed ISOs, ISO extraction, prompt-free Windows ISO, pfSense ISO patching", "cloud-localds": "preferred cloud-init seed builder (cloud-image-utils package)", "virtiofsd": "required only by profiles with shared_dir (host folder shared with the guest)", "growisofs": "required only by bootstrap-pfsense (dvd+rw-tools, updates the pfSense ISO in place)"}
-OPTIONAL_COMMANDS.update({
-    "ddrescue": "allocated-block imports (gddrescue on Debian/Ubuntu, ddrescue on Arch)",
-    "ddrescuelog": "verifying complete allocated-block imports (GNU ddrescue package)",
-    "partclone.extfs": "allocated-block imports of ext2/3/4 (partclone package)",
-    "partclone.ntfs": "allocated-block imports of NTFS (partclone package)",
-    "partclone.fat": "allocated-block imports of FAT (partclone package)",
-    "partclone.exfat": "allocated-block imports of exFAT (partclone package)",
-    "sfdisk": "partition geometry for allocated-block imports and NTFS growth after flash (fdisk on Debian/Ubuntu, util-linux on Arch)",
-    "ntfsresize": "optional NTFS expansion after flash (ntfs-3g package)",
-})
+OPTIONAL_COMMANDS = {
+    "ssh": "guest shell and SSH provisioning",
+    "scp": "copying files during SSH provisioning",
+    "ssh-keygen": "project-generated SSH keys",
+    "dialog": "the classic TUI menus without fzf",
+    "fzf": "the classic TUI menus",
+    "textual": "the vmtui dashboard; without it vmtui opens the fzf/dialog menus",
+    "remote-viewer": "vmctl attach",
+    "virsh": "export-libvirt and the libvirt network lab",
+    "swtpm": "Windows guests exported to libvirt",
+    "sgdisk": "GPT repair on flash/import",
+    "7z": "bootstrap-windows (unpacks the UDF Windows ISO)",
+    "xorriso": "seed ISOs, ISO extraction, Windows/pfSense/Proxmox ISO patching",
+    "cloud-localds": "preferred cloud-init seed builder",
+    "virtiofsd": "profiles with shared_dir (host folder shared with the guest)",
+    "growisofs": "bootstrap-pfsense and bootstrap-freebsd (updates the ISO in place)",
+    "ddrescue": "allocated-block imports",
+    "ddrescuelog": "verifying complete allocated-block imports",
+    "partclone.extfs": "allocated-block imports of ext2/3/4",
+    "partclone.ntfs": "allocated-block imports of NTFS",
+    "partclone.fat": "allocated-block imports of FAT",
+    "partclone.exfat": "allocated-block imports of exFAT",
+    "sfdisk": "partition geometry for imports and NTFS growth after flash",
+    "ntfsresize": "optional NTFS expansion after flash",
+}
 
 COMMON_OVMF_PAIRS = [
     ("/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd"),

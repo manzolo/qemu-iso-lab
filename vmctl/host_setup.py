@@ -44,6 +44,60 @@ TOOL_PACKAGES: dict[str, dict[str, str]] = {
 TEXTUAL = "textual"
 
 
+# How `vmctl setup` groups what it checks: one line per group when everything is there, and one
+# line per missing tool (purpose + package) underneath. Every name of REQUIRED_COMMANDS and
+# OPTIONAL_COMMANDS belongs to exactly one group (a test fails otherwise).
+SETUP_GROUPS: list[tuple[str, list[str]]] = [
+    ("Required", ["qemu-system-x86_64", "qemu-img", "python3"]),
+    ("Dashboard", ["textual", "fzf", "dialog"]),
+    ("SSH", ["ssh", "scp", "ssh-keygen"]),
+    ("Installers", ["xorriso", "cloud-localds", "7z", "growisofs", "virtiofsd"]),
+    ("Viewer, libvirt", ["remote-viewer", "virsh", "swtpm"]),
+    ("Disk import, flash", ["sgdisk", "sfdisk", "ntfsresize", "ddrescue", "ddrescuelog",
+                            "partclone.extfs", "partclone.ntfs", "partclone.fat", "partclone.exfat"]),
+]
+
+
+def compact_names(names: list[str]) -> str:
+    """``a · b · partclone.{extfs,ntfs}``: one family of tools shares its prefix."""
+    parts: list[str] = []
+    families: dict[str, list[str]] = {}
+    for name in names:
+        prefix, dot, suffix = name.partition(".")
+        if dot:
+            if prefix not in families:
+                families[prefix] = []
+                parts.append(prefix + ".")
+            families[prefix].append(suffix)
+        else:
+            parts.append(name)
+    return " · ".join(
+        f"{part}{{{','.join(families[part[:-1]])}}}" if part.endswith(".") and len(families[part[:-1]]) > 1
+        else f"{part}{families[part[:-1]][0]}" if part.endswith(".") else part
+        for part in parts)
+
+
+def tool_package(name: str) -> str:
+    if name == TEXTUAL:
+        return ".venv-tui, no sudo"
+    return TOOL_PACKAGES[name][package_manager() or "apt"] + " package"
+
+
+def textual_location() -> str:
+    python = textual_python()
+    return ".venv-tui" if python == str(textual_venv() / "bin/python") else str(python)
+
+
+def kvm_status() -> tuple[bool, str]:
+    """/dev/kvm usable by this user: without it every guest runs under TCG, many times slower."""
+    device = Path("/dev/kvm")
+    if not device.exists():
+        return False, "/dev/kvm missing: guests run without acceleration (enable virtualization in the firmware, load kvm_intel/kvm_amd)"
+    if not os.access(device, os.R_OK | os.W_OK):
+        return False, "/dev/kvm is not writable by this user: add yourself to the kvm group and log in again"
+    return True, "/dev/kvm"
+
+
 def read_os_release() -> dict[str, str]:
     os_release = Path("/etc/os-release")
     if not os_release.is_file():

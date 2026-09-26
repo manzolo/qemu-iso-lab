@@ -12,8 +12,8 @@ sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvi
 sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk ddrescue partclone util-linux
 
 git clone git@github.com:manzolo/qemu-iso-lab.git && cd qemu-iso-lab
-make install-cli          # symlink di vmctl e vmtui in ~/.local/bin
-vmctl setup               # controlla qemu, qemu-img, OVMF e i tool opzionali
+make setup                # vmctl + vmtui in ~/.local/bin, installa cio' che manca (chiede prima), controlla l'host
+vmctl setup               # in seguito: solo il controllo (-v elenca ogni tool)
 ```
 
 `vmctl setup` deve dire `Setup check passed`. I tool opzionali servono a flussi precisi:
