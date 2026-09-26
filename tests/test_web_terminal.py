@@ -1,6 +1,7 @@
 """Exercise the real PTY relay with a harmless local fixture process, never a guest."""
 import json
 import socket
+import struct
 import sys
 import threading
 import unittest
@@ -61,8 +62,33 @@ class TerminalRelayTests(unittest.TestCase):
             self.assertFalse(thread.is_alive())
             self.assertTrue(popen.call_args.kwargs['start_new_session'])
 
+    def test_ctrl_d_reports_a_normal_session_end(self):
+        client, reader, thread = self.relay("import sys; print('READY',flush=True); sys.stdin.read(); print('logout',flush=True)")
+        self.collect(reader, b'READY')
+        client.sendall(webui.ws_frame(1, json.dumps({'type': 'input', 'data': '\x04'}).encode()))
+        output, close = self.read_until_close(reader)
+        self.assertIn(b'logout', output)
+        self.assertEqual(struct.unpack('!H', close[:2])[0], 1000)
+        thread.join(timeout=5)
+
+    def test_ssh_failure_reports_an_abnormal_session_end(self):
+        _, reader, thread = self.relay("import sys; print('Permission denied',flush=True); sys.exit(255)")
+        output, close = self.read_until_close(reader)
+        self.assertIn(b'Permission denied', output)
+        self.assertEqual(struct.unpack('!H', close[:2])[0], 1011)
+        self.assertIn(b'255', close)
+        thread.join(timeout=5)
+
+    def read_until_close(self, reader):
+        output = b''
+        while True:
+            frame = webui.ws_read_frame(reader)
+            self.assertIsNotNone(frame)
+            if frame[0] == 8:
+                return output, frame[1]
+            output += frame[1]
+
     def test_resize_clamps_untrusted_dimensions(self):
-        import struct
         with mock.patch.object(web_terminal.fcntl, 'ioctl') as ioctl:
             web_terminal.resize(12, 99999, -2)
         self.assertEqual(struct.unpack('HHHH', ioctl.call_args.args[2]), (1, 500, 0, 0))

@@ -2071,6 +2071,50 @@ class GracefulStopTests(BaseVmctlTestCase):
         self.assertEqual(rc, 0)
         kill.assert_called_once_with(4242, signal.SIGTERM)
 
+    def test_stop_retries_powerdown_when_the_first_request_arrives_during_boot(self):
+        sock_path = self.root / "qmp.sock"
+        sock_path.write_text("")
+        clock = {"now": 0, "requests": 0}
+
+        def powerdown(*args):
+            clock["requests"] += 1
+            return True
+
+        def sleep(seconds):
+            clock["now"] += seconds
+
+        with mock.patch.object(vmctl.qemu, "qmp_command", side_effect=powerdown), \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=lambda pid: "qemu" if clock["requests"] < 2 else None), \
+             mock.patch.object(vmctl.lifecycle.time, "monotonic", side_effect=lambda: clock["now"]), \
+             mock.patch.object(vmctl.lifecycle.time, "sleep", side_effect=sleep), \
+             mock.patch.object(vmctl.lifecycle.os, "kill") as kill:
+            self.assertEqual(vmctl.lifecycle.stop_qemu_process(4242, "Stop", "VM", qmp_socket=sock_path, grace_sec=12), 0)
+        self.assertEqual(clock["requests"], 2)
+        self.assertLess(clock["now"], 12)
+        kill.assert_not_called()
+
+    def test_powerdown_retries_do_not_extend_the_grace_period(self):
+        import signal
+        sock_path = self.root / "qmp.sock"
+        sock_path.write_text("")
+        clock = {"now": 0, "alive": True}
+
+        def sleep(seconds):
+            clock["now"] += seconds
+
+        def signal_vm(pid, sig):
+            self.assertEqual((pid, sig), (4242, signal.SIGTERM))
+            self.assertEqual(clock["now"], 12)
+            clock["alive"] = False
+
+        with mock.patch.object(vmctl.qemu, "qmp_command", return_value=True) as qmp, \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=lambda pid: "qemu" if clock["alive"] else None), \
+             mock.patch.object(vmctl.lifecycle.time, "monotonic", side_effect=lambda: clock["now"]), \
+             mock.patch.object(vmctl.lifecycle.time, "sleep", side_effect=sleep), \
+             mock.patch.object(vmctl.lifecycle.os, "kill", side_effect=signal_vm):
+            self.assertEqual(vmctl.lifecycle.stop_qemu_process(4242, "Stop", "VM", qmp_socket=sock_path, grace_sec=12), 0)
+        self.assertEqual(qmp.call_count, 3)
+
     def test_stop_tries_ssh_poweroff_when_acpi_is_ignored(self):
         sock_path = self.root / "qmp.sock"; sock_path.write_text("")
         # the guest stays alive through the (1 s) ACPI grace period and dies only after the SSH request

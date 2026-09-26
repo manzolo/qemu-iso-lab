@@ -280,9 +280,16 @@ def stop_qemu_process(
         ui.print_note("Asking the guest to power off (ACPI, via QMP)...")
         if qemu.qmp_command(qmp_socket, "system_powerdown"):
             deadline = time.monotonic() + grace
+            next_powerdown = time.monotonic() + 5
             while time.monotonic() < deadline:
                 if process_cmdline(pid) is None:
                     return finalize_stop(f"Stopped {description} (guest powered off cleanly)")
+                # A power-button event sent during firmware/kernel boot may be lost.
+                # Retry within the original grace period, never extend its deadline.
+                if time.monotonic() >= next_powerdown:
+                    ui.print_note("Guest is still running; retrying the ACPI power-off...")
+                    qemu.qmp_command(qmp_socket, "system_powerdown")
+                    next_powerdown = time.monotonic() + 5
                 time.sleep(1)
             ui.print_status("warn", f"{description} ignored the ACPI power-off for {grace}s", ok=False)
         else:

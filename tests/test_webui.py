@@ -257,6 +257,18 @@ class ServerTests(BaseVmctlTestCase):
         handler._json({"example": True})
         self.assertTrue(handler.close_connection)
 
+    def test_local_distribution_sprite_is_public_and_contains_only_static_artwork(self):
+        import xml.etree.ElementTree as ET
+
+        status, body = self.get("/assets/distro-icons.svg", token=None)
+        self.assertEqual(status, 200)
+        root = ET.fromstring(body)
+        ids = {element.get("id") for element in root}
+        self.assertTrue({"arch", "alma", "cachyos", "debian"} <= ids)
+        for element in root.iter():
+            self.assertNotIn(element.tag.split("}")[-1], ("script", "foreignObject", "image"))
+            self.assertFalse(any(key.startswith("on") or "href" in key for key in element.attrib))
+
     def test_new_mutations_require_authentication(self):
         from unittest import mock
 

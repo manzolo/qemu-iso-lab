@@ -54,8 +54,23 @@ def bridge(handler: Any, command: list[str]) -> None:
         except OSError:
             pass
         finally:
-            with contextlib.suppress(OSError):
-                send(0x8, b"")
+            if not stopped.is_set():
+                # PTY EOF alone cannot distinguish logout from an SSH failure.
+                # Wait for the client so the browser only closes on a clean exit.
+                exit_code: int | None
+                try:
+                    exit_code = process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    exit_code = None
+                code = 1000 if exit_code == 0 else 1011
+                if exit_code == 0:
+                    reason = "SSH session ended"
+                elif exit_code is not None:
+                    reason = f"SSH exited with status {exit_code}"
+                else:
+                    reason = "SSH client did not exit"
+                with contextlib.suppress(OSError):
+                    send(0x8, struct.pack("!H", code) + reason.encode())
             with contextlib.suppress(OSError):
                 handler.connection.shutdown(socket.SHUT_RD)
 

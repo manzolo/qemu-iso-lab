@@ -70,15 +70,21 @@ tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
 .lab-head > .chip { flex-shrink:0; }
 @media(max-width:420px) { .profile-identity { gap:8px; } .catalog-icon { width:28px; height:28px; flex-basis:28px; border-radius:8px; } #list td,#list th { padding-left:10px; padding-right:10px; } #list .profile-desc { max-width:170px; } }
 .profile-name { display:block; font-size:13px; font-weight:600; }
-#hover-shot { position:fixed; z-index:50; display:none; width:380px; max-width:calc(100vw - 24px); padding:6px; background:#0c131e; border:1px solid #3d526b; border-radius:10px; box-shadow:0 18px 50px #000a; pointer-events:none; }
-#hover-shot img { display:block; width:100%; min-height:40px; border-radius:6px; background:#05080d; }
-#hover-shot .hover-caption { padding:5px 2px 0; font:11px ui-monospace,monospace; color:var(--muted); }
+#hover-shot { position:fixed; z-index:50; display:none; width:420px; max-width:calc(100vw - 24px); overflow:hidden; background:#101a28; border:1px solid #496078; border-radius:14px; box-shadow:0 18px 60px #000a; pointer-events:none; }
+.hover-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; }
+#hover-name { font:600 12px ui-monospace,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hover-display { aspect-ratio:4/3; max-height:55vh; display:grid; place-items:center; background:#03060b; border-block:1px solid var(--line); }
+#hover-shot img { display:block; width:100%; height:100%; min-height:0; object-fit:contain; }
+#hover-shot .hover-caption { padding:8px 12px; font-size:11px; color:var(--muted); }
 @media (hover:none) { #hover-shot { display:none !important; } }
 .style-tag { display:inline-block; margin-left:8px; padding:1px 6px; border-radius:5px; font:600 9.5px system-ui,sans-serif; letter-spacing:.04em; text-transform:uppercase; vertical-align:2px; color:var(--muted); border:1px solid var(--line); }
 .style-tag.auto { color:var(--ok); border-color:#2f5a52; background:#16302c; }
 .profile-desc { display:block; color:var(--muted); font-size:11px; margin-top:3px; max-width:300px; overflow:hidden; text-overflow:ellipsis; }
 #list { max-height:520px; overflow:auto; }
 .state { display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:600; border:1px solid currentColor; border-radius:6px; padding:3px 7px; }
+.state.busy::before { width:10px; height:10px; background:none; border:2px solid currentColor; border-right-color:transparent; animation:activity-spin 1.2s linear infinite; }
+button.state { background:transparent; text-align:left; }
+button.state:hover { background:#453c28; }
 .s-ok { color:var(--ok); } .s-warn { color:var(--warn); } .s-bad { color:var(--bad); } .s-info { color:#9ebdff; } .s-muted { color:var(--muted); }
 #details { padding:18px; }
 #details .name { font-size:20px; font-weight:600; margin:10px 0 3px; overflow-wrap:anywhere; letter-spacing:-.04em; }
@@ -111,6 +117,23 @@ button.warn:hover { background:#3a3128; border-color:#7a6440; }
 #jobs td { font-size:12px; }
 #jobs td:first-child { width:125px; }
 #jobs td:last-child { text-align:right; }
+#activity { display:flex; flex-shrink:0; }
+#activity-toggle { display:flex; align-items:center; gap:8px; padding:6px 10px; background:#172333; border:1px solid var(--line); border-radius:20px; font-size:11px; }
+#activity-toggle:hover,#activity-toggle[aria-expanded=true] { background:#233449; border-color:#496078; }
+#activity-symbol { display:grid; place-items:center; width:16px; height:16px; color:var(--ok); font-size:13px; }
+#activity[data-status=running] #activity-symbol { color:var(--warn); border:2px solid #efc58235; border-top-color:var(--warn); border-radius:50%; animation:activity-spin 1.2s linear infinite; }
+#activity[data-status=failed] #activity-symbol { color:var(--bad); }
+@keyframes activity-spin { to { transform:rotate(360deg); } }
+#activity-panel { position:fixed; inset:auto; margin:0; width:340px; max-width:calc(100vw - 24px); padding:0; color:var(--text); background:#162232; border:1px solid #3a4c63; border-radius:14px; box-shadow:0 16px 50px #0008; }
+.activity-copy { padding:18px; }
+.activity-copy .eyebrow { margin-bottom:8px; color:var(--muted); }
+#activity-status { display:block; font-size:15px; }
+#activity-command { display:block; margin-top:8px; font:11px/1.6 ui-monospace,monospace; color:var(--muted); overflow-wrap:anywhere; }
+#activity-panel .job-controls { padding:12px 18px; border-top:1px solid var(--line); background:#111c2b; }
+#activity-log { background:#25483f; color:#a0edd9; }
+#activity-dismiss { margin-left:auto; background:transparent; color:var(--muted); }
+.job-controls { display:flex; gap:8px; flex-wrap:wrap; }
+#jobs .job-command { white-space:normal; overflow-wrap:anywhere; min-width:180px; }
 .chip { display:inline-block; padding:3px 9px; border-radius:6px; font-size:11px; background:var(--btn); }
 .chip.running { background:#453c28; color:var(--warn); } .chip.completed { background:#203d37; color:var(--ok); }
 .chip.failed,.chip.interrupted,.chip.cancelled { background:#492c39; color:var(--bad); }
@@ -186,8 +209,10 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
 .lab .members div { display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding:3px 0; }
 .lab .buttons { display:flex; flex-wrap:wrap; gap:6px; }
 #screen img { max-width:100%; border-radius:6px; display:block; margin:0 auto; background:#000; }
-#toast { margin:0; inset:auto 20px 20px auto; position:fixed; bottom:20px; right:20px; background:var(--panel2); border:1px solid var(--line); padding:10px 14px; border-radius:8px; display:none; max-width:min(520px,90vw); white-space:pre-wrap; z-index:20; }
-#toast.err { border-color:var(--bad); color:var(--bad); }
+#toast { margin:0; inset:76px 20px auto auto; position:fixed; color:var(--text); background:#1a2b33; border:1px solid #36564e; padding:13px 16px 13px 42px; border-radius:12px; box-shadow:0 12px 36px #0005; display:none; max-width:min(400px,calc(100vw - 32px)); white-space:pre-wrap; font-size:12px; z-index:20; }
+#toast::before { content:"✓"; position:absolute; left:16px; color:var(--ok); font-weight:700; }
+#toast.err { background:#30212b; border-color:#70404d; }
+#toast.err::before { content:"!"; color:var(--bad); }
 .hidden { display:none !important; }
 
 .profile-top { display:flex; align-items:center; justify-content:space-between; }
@@ -245,23 +270,100 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
 #profile-base { font-size:11px; white-space:pre-wrap; overflow-wrap:anywhere; max-height:260px; overflow:auto; }
 #profile-feedback { font-size:12px; color:var(--accent); white-space:pre-wrap; }
 #profile-feedback.error { color:var(--bad); }
-#vm-context { position:fixed; inset:auto; margin:0; width:260px; max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overflow:auto; padding:6px; background:#182537; border:1px solid #3d526b; color:var(--text); border-radius:12px; box-shadow:0 15px 50px #0008; }
+#vm-context { position:fixed; inset:auto; margin:0; width:290px; max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overflow:auto; padding:6px; background:#182537; border:1px solid #3d526b; color:var(--text); border-radius:12px; box-shadow:0 15px 50px #0008; }
 #vm-context button { display:flex; align-items:center; gap:9px; width:100%; text-align:left; background:transparent; border-radius:6px; font-size:12px; padding:9px 10px; }
-#vm-context button:hover,#vm-context button:focus { background:#2b4157; }
 #vm-context button.danger { color:var(--bad); border:0; }
 #vm-context button.warn { color:var(--warn); border:0; background:transparent; }
+#vm-context button:is(:hover,:focus-visible) { background:#2b4157; }
+#vm-context button.warn:is(:hover,:focus-visible) { background:#433925; }
+#vm-context button.danger:is(:hover,:focus-visible) { background:#472c39; }
+#vm-context button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 .context-title { padding:8px 10px; color:var(--accent); font:11px ui-monospace,monospace; border-bottom:1px solid var(--line); margin-bottom:4px; overflow-wrap:anywhere; }
+.context-group { margin:4px 0 0; padding:7px 10px 3px; color:var(--muted); font-size:9px; font-weight:650; text-transform:uppercase; letter-spacing:.1em; border-top:1px solid var(--line); }
+.context-title + .context-group { border-top:0; }
 @media(min-width:1450px) { body > header, .overview,#toolbar,main,.labs { padding-left:max(24px,calc((100vw - 1450px)/2)); padding-right:max(24px,calc((100vw - 1450px)/2)); } #jobs { margin-left:max(24px,calc((100vw - 1450px)/2)); margin-right:max(24px,calc((100vw - 1450px)/2)); } }
 @media(max-width:1050px) { #rows td:nth-child(3),#list th:nth-child(3) { display:none; } .metric { min-width:85px; padding:10px 14px; } .palette { grid-template-columns:280px minmax(0,1fr); } }
 @media(max-width:720px) { header { padding:12px 16px; flex-wrap:wrap; } #summary,#version { display:none; } .overview { padding:22px 16px 16px; align-items:stretch; flex-direction:column; gap:16px; } .overview h2 { font-size:25px; } .metrics { gap:8px; } .metric { flex:1; } #toolbar { padding:0 16px 16px; gap:8px; } .search-box { flex-basis:100%; } .filters { flex:1; } .filters button { flex:1; padding:6px 8px; } main { padding:0 16px 16px; grid-template-columns:1fr; } main > section:last-child { position:static; } #list { max-height:320px; } #jobs { margin:0 16px 16px; } .palette { grid-template-columns:1fr; grid-template-rows: minmax(140px,32%) minmax(0,1fr); } .pal-list { border-right:0; border-bottom:1px solid var(--line); } .pal-tools { padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:8px; } .pal-tools select { margin:0; } #cmd-count { display:none; } .pal-group { margin-top:8px; } .pal-item { padding:8px; } #cmd-dialog header { gap:10px; padding:12px; } #cmd-dialog h1 { font-size:14px; } .dialog-subtitle { display:none; } .scope button { padding:6px 9px; font-size:11px; } .pal-fields { padding:16px; } #cmd-head h3 { font-size:20px; } .command-footer { padding:10px 16px; } #preview { max-height:65px; margin:5px 0 8px; padding:8px; } .command-buttons { flex-wrap:wrap; } #cmd-validation { min-width:100px; } .section-heading p { font-size:11px; } }
-@media(prefers-reduced-motion:reduce) { * { transition:none !important; } }
+/* Keep the machine's everyday controls visible, including in a smaller window. */
+main { grid-template-columns:minmax(0,1fr) minmax(290px,340px); }
+main > section { min-width:0; }
+.profile-top { justify-content:flex-start; gap:12px; margin-bottom:12px; }
+.profile-title { min-width:0; }
+#details .name { font-size:18px; margin:0 0 4px; line-height:1.25; }
+#details .desc { font-size:12px; margin:0; }
+.actions.primary-actions { border:0; padding:0; margin:14px 0; }
+.operation-note { margin:0 0 14px; color:var(--muted); font-size:11px; line-height:1.6; }
+.primary-actions button:last-child { background:var(--btn); color:var(--text); border:1px solid transparent; margin:0; }
+.primary-actions button.primary { background:var(--accent); color:#102c29; }
+.primary-actions button.warn { background:#2c2620; color:var(--warn); border-color:#5a4a2c; }
+.primary-actions button.danger { background:#30212e; color:var(--bad); border-color:#603846; }
+.resources { margin:14px 0; }
+.facts { margin:14px 0; gap:8px 12px; }
+.machine-tools { border-top:1px solid var(--line); margin-top:14px; padding-top:12px; }
+.machine-tools > summary { color:var(--muted); cursor:pointer; font-size:12px; }
+.machine-tools .actions { border:0; margin-top:10px; padding:0; }
+.machine-tools .actions button { grid-column:1/-1; margin:0; }
+.machine-tools .actions button.danger { color:var(--bad); border:1px solid #603846; background:#30212e; }
+@media (min-width:721px) and (max-width:1100px) {
+  body > header { padding:12px 20px; }
+  .overview { padding:20px 20px 16px; }
+  .overview h2 { font-size:24px; }
+  #toolbar { padding:0 20px 16px; gap:10px; }
+  main { padding:0 20px 18px; gap:14px; grid-template-columns:minmax(0,1fr) 300px; }
+  #details { padding:14px; }
+  #jobs { margin:0 20px 20px; }
+  #list table { table-layout:fixed; }
+  #list th:first-child { width:66%; }
+  #list td,#list th { padding:11px 12px; }
+  .profile-name { overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+  .profile-desc { max-width:100%; }
+  .style-tag { display:none; }
+  .profile-identity { gap:9px; }
+  .profile-text { flex:1; overflow:hidden; }
+  .state { font-size:10px; gap:5px; padding:3px 6px; }
+  .labs { padding:0 20px 18px; gap:14px; }
+}
+@media (max-width:720px) {
+  main { grid-template-columns:minmax(0,1fr); }
+  .overview { padding-top:16px; gap:12px; }
+  .overview h2 { font-size:24px; }
+  .metrics { gap:8px; }
+  .metric { display:flex; align-items:center; gap:8px; padding:8px 10px; min-width:0; }
+  .metric strong { font-size:20px; }
+  .metric span { font-size:10px; }
+  #list { max-height:280px; }
+  #list table { table-layout:fixed; }
+  #list th:first-child { width:65%; }
+  .profile-text { overflow:hidden; }
+  .profile-name { overflow:hidden; text-overflow:ellipsis; }
+  .style-tag { display:none; }
+  #activity-label { display:none; }
+  #activity-toggle { padding:7px; }
+  body > header { gap:10px; }
+  #toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; }
+  #toolbar .filters { grid-column:1/-1; grid-row:2; }
+  #toolbar .filters button { white-space:nowrap; }
+  #job-count { white-space:nowrap; }
+  #jobs .table-wrap { overflow:visible; }
+  #jobs table,#job-rows { display:block; }
+  #job-rows tr { display:grid; grid-template-columns:1fr auto; padding:12px; gap:8px; border-bottom:1px solid var(--line); }
+  #jobs td { display:block; border:0; padding:0; max-width:none; width:auto; }
+  #jobs .job-command { grid-column:1/-1; grid-row:2; min-width:0; }
+  #jobs td:last-child { grid-column:1/-1; }
+  .section-heading { padding:12px; }
+  #log-dialog header { flex-wrap:wrap; gap:10px; }
+  #log-title { font-size:14px; overflow-wrap:anywhere; }
+}
+@media(prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } }
 </style>
 </head>
 <body>
 <header>
   <span class="brand-mark" aria-hidden="true">&gt;_</span><h1>QEMU <b>ISO Lab</b></h1>
   <span id="summary">Reading VM state…</span>
-  <span id="connection" role="status">Connecting</span><span id="version" class="s-muted"></span>
+  <span id="connection" role="status">Connecting</span>
+  <div id="activity" class="hidden"><button id="activity-toggle" popovertarget="activity-panel" aria-label="Latest activity" aria-expanded="false"><span id="activity-symbol" aria-hidden="true"></span><span id="activity-label">Activity</span></button></div>
+  <span id="version" class="s-muted"></span>
 </header>
 <section class="overview" aria-label="Lab overview">
   <div><div class="eyebrow">Your local workspace</div><h2>Virtual machines</h2><p>Build, run and explore your lab.</p></div>
@@ -272,6 +374,7 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
   <div class="filters" role="group" aria-label="Profile filters"><button data-filter="all" class="active" aria-pressed="true">All</button><button data-filter="disk" aria-pressed="false">With disk</button><button data-filter="running" aria-pressed="false">Running</button><button data-filter="labs" aria-pressed="false">Labs</button></div>
   <button id="all-commands">Commands <kbd>C</kbd></button>
 </div>
+<div id="activity-panel" popover="auto" role="region" aria-label="Latest activity details"><div class="activity-copy"><div class="eyebrow">Latest activity</div><strong id="activity-status" role="status"></strong><span id="activity-command"></span></div><div class="job-controls"><button id="activity-log">View log</button><button id="activity-cancel" class="danger hidden">Cancel job</button><button id="activity-dismiss" class="hidden" aria-label="Dismiss completed activity" title="Keep in Recent activity">Dismiss</button></div></div>
 <main id="profiles-view">
   <section class="card"><h2 id="list-title">Profiles</h2>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
@@ -280,10 +383,10 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
 </main>
 <div id="labs-view" class="labs hidden"></div>
 <section id="jobs" class="card"><div class="section-heading"><div><h2>Recent activity</h2><p>Jobs from the web and TUI keep running when you close this page.</p></div><span id="job-count" class="chip">0 jobs</span></div>
-  <div class="table-wrap"><table aria-label="Recent jobs"><tbody id="job-rows"><tr><td colspan="3" class="s-muted">No jobs yet. Start a machine or run a command to see its progress here.</td></tr></tbody></table></div>
+  <div class="table-wrap"><table aria-label="Recent jobs"><tbody id="job-rows"><tr><td colspan="4" class="s-muted">No jobs yet. Start a machine or run a command to see its progress here.</td></tr></tbody></table></div>
 </section>
 
-<dialog id="log-dialog"><header><h1 id="log-title">Job</h1><span><button id="log-cancel" class="danger">Cancel job</button> <button data-close>Close</button></span></header>
+<dialog id="log-dialog" aria-labelledby="log-title"><header><h1 id="log-title">Job</h1><span><button id="log-cancel" class="danger hidden">Cancel job</button> <button data-close>Close</button></span></header>
   <div class="body"><pre class="log" id="log"></pre></div></dialog>
 <dialog id="cmd-dialog" aria-labelledby="cmd-title"><header><div><h1 id="cmd-title">Command center</h1><div class="dialog-subtitle">Choose a command, review its options, then run.</div></div><span class="scope"><button data-scope="vm" id="scope-vm">This VM</button><button data-scope="global">Global</button><button data-close aria-label="Close command center">Close</button></span></header>
   <div class="palette">
@@ -304,7 +407,7 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
 <dialog id="help-dialog"><header><h1 id="help-title">ISO needed</h1><button data-close>Close</button></header>
   <div class="body"><div class="note" id="help-text"></div></div></dialog>
 <div id="toast" role="status" popover="manual"></div>
-<div id="hover-shot" aria-hidden="true"><img alt=""><div class="hover-caption"></div></div>
+<div id="hover-shot" aria-hidden="true"><div class="hover-heading"><span id="hover-name"></span><span id="hover-status" class="state s-warn">Connecting</span></div><div class="hover-display"><img alt="Guest screen preview"></div><div class="hover-caption">Screen preview · refreshes every second</div></div>
 
 <script>
 "use strict";
@@ -324,14 +427,29 @@ async function api(path, body) {
 }
 function toast(msg, err) { const t = $("toast"); t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block"; t.showPopover?.(); clearTimeout(t._h); t._h = setTimeout(() => { t.hidePopover?.(); t.style.display = "none"; }, err ? 9000 : 3500); }
 
+const vmJobs = new Map(), submittingVms = new Set();
+function withVMJob(r) {
+  const job = vmJobs.get(r.name);
+  return job ? {...r, job_status:job.status, job_command:job.command} : r;
+}
+function stateBadge(r) {
+  r = withVMJob(r);
+  const [label, color] = stateOf(r), busy = r.job_status === "running";
+  return busy ? `<button class="state ${color} busy" data-state-job="${esc('vm:'+r.name)}" title="View operation log" aria-label="${esc(r.name + ': ' + label + '. View operation log')}">${esc(label)}</button>` : `<span class="state ${color}">${esc(label)}</span>`;
+}
+function bindStateLogs(container) {
+  container.querySelectorAll("[data-state-job]").forEach(button => { button.onclick = e => { e.stopPropagation(); openLog(button.dataset.stateJob, button.getAttribute("aria-label").replace('. View operation log','')); }; });
+}
 function installationJob(r) {
   return /^(bootstrap-|install(?:-|$))/.test(r.job_command || "") || ["provision", "post-install"].includes(r.job_command);
 }
 function activeJobLabel(r) {
+  if (cancellingJobs.has("vm:" + r.name)) return "Stopping now";
   if (installationJob(r)) return "Installing";
-  return ({start:r.running ? "Running" : "Starting", stop:"Stopping", "fetch-iso":"Downloading ISO", prep:"Preparing", checkpoint:"Checkpoint in progress", clone:"Cloning"})[r.job_command] || "Working";
+  return ({start:"Starting", stop:"Stopping", "fetch-iso":"Downloading ISO", prep:"Preparing", checkpoint:"Checkpoint in progress", clone:"Cloning"})[r.job_command] || "Working";
 }
 function stateOf(r) {
+  r = withVMJob(r);
   const job = r.job_status;
   if (job === "running") { const label = activeJobLabel(r); return [label, label === "Running" ? "s-ok" : "s-warn"]; }
   if (r.running) return ["Running", "s-ok"];
@@ -341,45 +459,43 @@ function stateOf(r) {
   return ({ verified:["Boot verified","s-ok"], installed:["Installed","s-info"], unverified:["Unverified","s-warn"], incomplete:["Incomplete","s-bad"], empty:["Empty disk","s-muted"], "no disk":["No disk","s-muted"] })[r.install_label] || ["Unknown","s-muted"];
 }
 const monitorIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 8l3 2-3 2m5 0h4"/></svg>';
-// Original catalog icon artwork: CC0-1.0, drawn for this project (vmctl/web/ICONS.md).
-// No third-party operating-system logo is reproduced here: a profile is told apart by its
-// family colour (colours are not protectable), a bold monogram, or a generic pictogram
-// (a window, a mountain, a snowflake, a shield, a rack of servers).
-const iconMonogram = (letters) => `<text x="12" y="12.6" text-anchor="middle" dominant-baseline="central" stroke="none" fill="currentColor" font-family="system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" font-size="${letters.length > 2 ? 10.5 : letters.length > 1 ? 12.5 : 16}" font-weight="800" letter-spacing="${letters.length > 2 ? -0.7 : letters.length > 1 ? -0.4 : 0}">${letters}</text>`;
+// Font Logos glyphs are vendored under Unlicense; generic fallbacks are original CC0 artwork.
+// Sources, pinned revision and trademark notice: vmctl/web/ICONS.md.
+const distroIconKeys = new Set("arch alma cachyos alpine centos debian endeavouros fedora freebsd kali neon kubuntu mint nixos opensuse popos rhel rocky linux ubuntu void".split(" "));
 const iconPicto = (d) => `<path d="${d}"/>`;
 const catalogIcons = {
-  arch: ["Arch Linux", "#1793d1", iconMonogram("A")],
-  cachyos: ["CachyOS", "#1cb1a4", iconMonogram("Ca")],
-  endeavouros: ["EndeavourOS", "#7f3fbf", iconMonogram("En")],
-  pearos: ["pearOS", "#6bbf59", iconMonogram("Pe")],
-  debian: ["Debian", "#d70a53", iconMonogram("D")],
-  ubuntu: ["Ubuntu", "#e95420", iconMonogram("U")],
-  lubuntu: ["Lubuntu", "#0068c8", iconMonogram("Lu")],
-  kubuntu: ["Kubuntu", "#0079c1", iconMonogram("Ku")],
-  xubuntu: ["Xubuntu", "#2a5ea8", iconMonogram("Xu")],
-  kali: ["Kali Linux", "#367bf0", iconMonogram("K")],
-  mint: ["Linux Mint", "#87cf3e", iconMonogram("M")],
-  popos: ["Pop!_OS", "#48b9c7", iconMonogram("Po")],
-  neon: ["KDE neon", "#27ae60", iconMonogram("Ne")],
-  fedora: ["Fedora", "#51a2da", iconMonogram("F")],
-  opensuse: ["openSUSE", "#73ba25", iconMonogram("S")],
+  arch: ["Arch Linux", "#1793d1", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  cachyos: ["CachyOS", "#1cb1a4", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  endeavouros: ["EndeavourOS", "#7f3fbf", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  pearos: ["pearOS", "#6bbf59", iconPicto("M12 3c3-2 5-1 5-1-1 3-3 3-5 3m0-2v4c-4 0-3 4-6 7-4 6 8 10 12 3 2-4-4-6-4-10")],
+  debian: ["Debian", "#d70a53", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  ubuntu: ["Ubuntu", "#e95420", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  lubuntu: ["Lubuntu", "#0068c8", iconPicto("M5 19c1-6 5-12 14-15-1 9-6 14-12 13m0 0L18 6m-8 7h5")],
+  kubuntu: ["Kubuntu", "#0079c1", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  xubuntu: ["Xubuntu", "#2a5ea8", iconPicto("M12 3v7m0-4C4 5 3 17 8 20c3 2 9 1 10-4 1-5-2-9-6-10Z M9 13h.01M15 13h.01")],
+  kali: ["Kali Linux", "#367bf0", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  mint: ["Linux Mint", "#87cf3e", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  popos: ["Pop!_OS", "#48b9c7", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  neon: ["KDE neon", "#27ae60", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  fedora: ["Fedora", "#51a2da", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  opensuse: ["openSUSE", "#73ba25", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
   alpine: ["Alpine Linux", "#0d597f", iconPicto("M3 19 9 8l3 5 2.5-3.5L21 19Z")],
   nixos: ["NixOS", "#5277c3", iconPicto("M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5")],
-  void: ["Void Linux", "#478061", iconMonogram("V")],
-  alma: ["AlmaLinux", "#0069da", iconMonogram("Al")],
-  rocky: ["Rocky Linux", "#10b981", iconMonogram("R")],
-  centos: ["CentOS", "#a14ea0", iconMonogram("C")],
-  rhel: ["RHEL family", "#ee0000", iconMonogram("RH")],
+  void: ["Void Linux", "#478061", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  alma: ["AlmaLinux", "#0069da", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  rocky: ["Rocky Linux", "#10b981", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  centos: ["CentOS", "#a14ea0", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
+  rhel: ["RHEL family", "#ee0000", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
   windows: ["Windows", "#0078d4", iconPicto("M4 5h16v14H4Z M12 5v14M4 12h16")],
-  freebsd: ["FreeBSD", "#ab2b28", iconMonogram("BSD")],
+  freebsd: ["FreeBSD", "#ab2b28", iconPicto("M4 5h16v13H4Z M8 9h8M8 13h5M9 21h6")],
   pfsense: ["pfSense", "#2d6db5", iconPicto("M12 3 4 6v6c0 4 4 7 8 9 4-2 8-5 8-9V6Z M8 10h8m-8 4h8m-4-4v4")],
   proxmox: ["Proxmox VE", "#e57000", iconPicto("M4 4h16v6H4Z M4 14h16v6H4Z M8 7h.01M11 7h5M8 17h.01M11 17h5")],
   haiku: ["Haiku", "#f0b400", iconPicto("M5 7.5h9M5 12h14M5 16.5h9")],
-  reactos: ["ReactOS", "#0088cc", iconMonogram("Re")],
-  kolibrios: ["KolibriOS", "#3f8ed8", iconMonogram("Ko")],
-  redox: ["Redox OS", "#c94a2b", iconMonogram("Rx")],
-  menuetos: ["MenuetOS", "#7a55b8", iconMonogram("Me")],
-  serenityos: ["SerenityOS", "#b8332e", iconMonogram("Se")],
+  reactos: ["ReactOS", "#0088cc", iconPicto("M3 12a9 5 0 1 0 18 0 9 5 0 1 0-18 0M12 3a5 9 0 1 0 0 18 5 9 0 1 0 0-18M12 11v2")],
+  kolibrios: ["KolibriOS", "#3f8ed8", iconPicto("M3 8l9 4 8-8-2 10-6 2-4 5 1-6Z")],
+  redox: ["Redox OS", "#c94a2b", iconPicto("M12 3l8 5v8l-8 5-8-5V8ZM12 8l4 2v4l-4 2-4-2v-4Z")],
+  menuetos: ["MenuetOS", "#7a55b8", iconPicto("M4 6h5v5H4ZM15 6h5v5h-5ZM4 15h5v5H4ZM15 15h5v5h-5Z")],
+  serenityos: ["SerenityOS", "#b8332e", iconPicto("M12 4a5 5 0 0 1 5 5c0 4-5 8-5 8s-5-4-5-8a5 5 0 0 1 5-5ZM5 20h14")],
   linux: ["Linux", "#f4b400", iconPicto("m5 6 6 6-6 6m8 0h6")],
   generic: ["Virtual machine", "#5c6b80", iconPicto("M3 4h18v13H3Z M8 21h8m-4-4v4M8 9h8m-8 3h5")],
   network: ["Network lab", "#2fa58f", iconPicto("M8 3h8v6H8Z M2 16h7v5H2Z M15 16h7v5h-7Z M12 9v4H5.5v3M12 13h6.5v3")],
@@ -416,9 +532,10 @@ function osIconKey(r) {
 function iconInk(hex) { const n = parseInt(hex.slice(1), 16); return (0.299*(n>>16&255) + 0.587*(n>>8&255) + 0.114*(n&255)) > 160 ? "#0f1722" : "#ffffff"; }
 function catalogIcon(key, large = false) {
   const [label,color,glyph] = catalogIcons[key] || catalogIcons.generic;
-  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}" style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(label)}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">${glyph}</svg></span>`;
+  const artwork = distroIconKeys.has(key) ? `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" focusable="false"><use href="/assets/distro-icons.svg#${esc(key)}" width="24" height="24"/></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">${glyph}</svg>`;
+  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}" style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(label)}" aria-hidden="true">${artwork}</span>`;
 }
-// End of CC0 catalog icon artwork.
+// End of catalog icon definitions.
 
 const shellQuote = (s) => /^[\w@%+=:,./-]+$/.test(s) ? s : "'" + s.replace(/'/g, "'\\''") + "'";
 const ram = (r) => (r.memory_mb >= 1024 ? (r.memory_mb / 1024) + "G" : r.memory_mb + "M") + " / " + r.cpus;
@@ -444,21 +561,15 @@ const actionIcons = {
 };
 const actionIcon = (a) => a.icon ? `<span class="ai ${a.tone || ""}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${actionIcons[a.icon]}</svg></span>` : "";
 function actionsFor(r) {
+  r = withVMJob(r);
   const n = r.name, a = [];
-  if (r.job_status === "running") {
-    if (r.running && r.job_command === "start") a.push({ label:"Open console", console:true, icon:"console", tone:"info" });
-    a.push({ label:installationJob(r) ? "Installation log" : `${activeJobLabel(r)} · job log`, job:"vm:" + n, icon:"log", tone:"info" });
-    if (r.running && r.job_command !== "start") a.push({ label:"Open console", console:true, icon:"console", tone:"info" });
-    if (r.running) a.push({ label:"Live screenshot", screen:true, icon:"camera", tone:"info" });
-    a.push({ label:"All commands for " + n + "…", form:n, icon:"list" });
-    return a;
-  }
+  const busy = r.job_status === "running";
   if (r.running) {
-    if (r.job_status !== "running") a.push({ label: "Open console", console: true, icon:"console", tone:"info" });
+    a.push({ label: "Open console", console: true, icon:"console", tone:"info" });
     a.push({ label: "Live screenshot", screen: true, icon:"camera", tone:"info" });
     a.push({ label: "Host viewer", args: ["attach", n], icon:"external", tone:"info" });
-    a.push({ label: "Stop", args: ["stop", n], icon:"stop", tone:"warn", warn:true });
-    a.push({ label: "Force stop", args: ["stop", n, "--force"], danger: true, icon:"power", tone:"bad" });
+    a.push({ label: "Stop", args: ["stop", n], disabled:busy, icon:"stop", tone:"warn", warn:true });
+    if (!busy) a.push({ label: "Force stop", args: ["stop", n, "--force"], danger: true, icon:"power", tone:"bad" });
   } else if (r.installed) {
     a.push({ label: "Boot headless", args: ["start", n, "--headless", "--background"], icon:"play", tone:"ok" });
     a.push({ label: "Boot with display (window on the host)", args: ["start", n], icon:"display", tone:"ok" });
@@ -473,7 +584,13 @@ function actionsFor(r) {
     if (r.iso_source === "download") a.push({ label: "Download the ISO", args: ["fetch-iso", n], icon:"download", tone:"info" });
     if (r.iso_source !== "manual") a.push({ label: "Manual install (window on the host)", args: ["provision", n], icon:"display", tone:"ok" });
   }
-  if (!r.running && (r.prepared || r.installed)) a.push({ label: "Clean: delete the disk", args: ["clean", n], danger: true, icon:"trash", tone:"bad" });
+  if (busy) {
+    a.forEach(action => { if (action.args) action.disabled = true; });
+    a.push({ label:installationJob(r) ? "Installation log" : "View operation log", job:"vm:" + n, icon:"log", tone:"info" });
+    const forceStop = ["start","stop"].includes(r.job_command);
+    a.push({ label:forceStop ? "Force stop" : "Cancel job", cancelJob:"vm:" + n, forceStop, primary:true, danger:forceStop, icon:"power", tone:"bad", disabled:submittingVms.has(n) || cancellingJobs.has("vm:"+n) });
+  }
+  if (!r.running && (r.prepared || r.installed)) a.push({ label: "Clean: delete the disk", args: ["clean", n], disabled:busy, danger: true, icon:"trash", tone:"bad" });
   a.push({ label: "All commands for " + n + "…", form: n, icon:"list" });
   return a;
 }
@@ -496,13 +613,14 @@ function render() {
   const rows = visible();
   $("list-title").textContent = `Profiles  ${rows.length} / ${all.length}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
-  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r))}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td><span class="state ${c}">${s}</span></td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r))}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`;
+  bindStateLogs($("rows"));
   renderDetails();
 }
 let detailsSignature = "", labsSignature = "";
 function renderDetails() {
-  const signature = JSON.stringify([selected, !!visible().length, S.vms.find((x) => x.name === selected)]);
+  const signature = JSON.stringify([selected, !!visible().length, S.vms.find((x) => x.name === selected), vmJobs.get(selected), submittingVms.has(selected), cancellingJobs.has("vm:"+selected)]);
   if (signature === detailsSignature) return;
   detailsSignature = signature;
   const r = S.vms.find((x) => x.name === selected);
@@ -513,17 +631,27 @@ function renderDetails() {
     ["ISO", { cached: "Ready to use", download: "Available to download", manual: "Provided manually" }[r.iso_source] || (r.iso_ready ? "Ready to use" : "Not cached")],
     ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options" aria-label="Open SSH console options">&gt;_ SSH</button></span>` : "Not configured"]];
   const actions = actionsFor(r), memory = r.memory_mb >= 1024 ? `${r.memory_mb / 1024} GB` : `${r.memory_mb} MB`;
-  $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<span class="state ${c}">${s}</span></div><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div>
+  const expandedDetails = $("details").dataset.vm === r.name ? [...$("details").querySelectorAll("details[open]")].map(el=>el.className) : [];
+  $("details").dataset.vm = r.name;
+  const secondary = a => !a.primary && (a.danger || a.form || a.screen || ["attach","checkpoint"].includes(a.args?.[0]));
+  const actionButton = (x,i) => `<button data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${i === 0 ? "<kbd>Enter</kbd>" : ""}</button>`;
+  const mainActions = actions.map((a,i) => secondary(a) ? "" : actionButton(a,i)).join("");
+  const extraActions = actions.map((a,i) => ({a,i})).filter(({a}) => secondary(a)).sort((x,y) => Number(!!x.a.danger)-Number(!!y.a.danger));
+  $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<div class="profile-title"><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div></div></div>${stateBadge(r)}
+    <div class="actions primary-actions">${mainActions}</div>
+    ${withVMJob(r).job_status === "running" && withVMJob(r).job_command === "stop" ? '<p class="operation-note">Waiting for the guest to shut down. Force stop powers it off immediately.</p>' : ""}
     <div class="resources"><div class="resource"><strong>${esc(memory)}</strong><span>Memory</span></div><div class="resource"><strong>${esc(r.cpus)}</strong><span>vCPUs</span></div><div class="resource"><strong>${esc(r.firmware)}</strong><span>Firmware</span></div></div>
     <dl class="facts">${facts.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
     ${r.install_detail ? `<details class="install-details"><summary>Installation details</summary><p>${esc(r.install_detail)}</p></details>` : ""}
     ${r.iso_source === "manual" && !r.installed ? `<div class="note">${esc((r.iso_help || "").replace(/\\n/g, "\n"))}</div>` : ""}
-    <div class="actions">${actions.map((x,i) => `${x.danger ? '<div class="action-label">Power & maintenance</div>' : ""}<button data-action="${i}" class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${i === 0 ? "<kbd>Enter</kbd>" : ""}</button>`).join("")}</div>`;
+    <details class="machine-tools"><summary>More actions & maintenance</summary><div class="actions">${extraActions.map(({a,i},index) => `${a.danger && !extraActions[index-1]?.a.danger ? '<div class="action-label">Destructive actions</div>' : ""}${actionButton(a,i)}`).join("")}</div></details>`;
+  $("details").querySelectorAll("details").forEach(el => { el.open = expandedDetails.includes(el.className); });
+  bindStateLogs($("details"));
   if ($("ssh-open")) $("ssh-open").onclick = () => openSsh(r);
   $("details").querySelectorAll("[data-action]").forEach((b) => (b.onclick = () => runAction(r, actions[+b.dataset.action])));
 }
 function renderLabs() {
-  const signature = JSON.stringify([S.labs, S.vms, $("search").value]);
+  const signature = JSON.stringify([S.labs, S.vms, [...vmJobs], $("search").value]);
   if (signature === labsSignature) return;
   labsSignature = signature;
   const byName = Object.fromEntries(S.vms.map((r) => [r.name, r]));
@@ -535,11 +663,12 @@ function renderLabs() {
     const cluster = members.some((m) => m.family === "proxmox");
     const btn = (label,args,cls="") => `<button class="${cls}" data-args='${esc(JSON.stringify(args))}'>${label}</button>`;
     const primary = installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab…",["group","install",lab.group],"primary");
-    return `<section class="card lab"><div class="lab-head"><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<h2>${esc(lab.group)}</h2></span><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
-      <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "Open profile →")}</span></span></button><span class="state ${c}">${s}</span></div>`; }).join("")}</div>
+    return `<section class="card lab" data-lab="${esc(lab.group)}"><div class="lab-head" tabindex="0" aria-label="${esc(lab.group)}. Right-click for stack actions."><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<h2>${esc(lab.group)}</h2></span><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
+      <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "Open profile →")}</span></span></button>${stateBadge(m)}</div>`; }).join("")}</div>
       <div class="buttons">${primary}${installed && up > 0 && up < members.length ? btn("Stop stack",["group","down",lab.group]) : ""}${btn("Status",["group","status",lab.group])}<button data-map="${esc(lab.group)}">Open map ↗</button></div>
       <details class="lab-secondary"><summary>More lab actions</summary><p class="lab-order">Start order: ${esc(names.join(" → "))}</p><div class="buttons">${installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group])}${up && !installed ? btn("Stop stack",["group","down",lab.group]) : ""}${cluster ? btn("Form cluster",["group","cluster",lab.group]) : ""}${btn("Generate map",["group","map",lab.group])}${btn("Clean lab…",["group","clean",lab.group],"danger")}</div></details></section>`;
   }).join("") || '<p class="s-muted">No matching labs.</p>';
+  bindStateLogs($("labs-view"));
   $("labs-view").querySelectorAll("[data-args]").forEach((b) => (b.onclick = () => run(JSON.parse(b.dataset.args))));
   $("labs-view").querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.map)}/map?token=${encodeURIComponent(TOKEN)}`, "_blank")));
   $("labs-view").querySelectorAll("[data-member]").forEach((b) => (b.onclick = () => { selected = b.dataset.member; $("search").value = ""; document.querySelector('[data-filter="all"]').click(); }));
@@ -564,16 +693,29 @@ async function run(args, danger) {
   const cmd = catalog.find((c) => c.name === args[0]);
   const destructive = danger || (cmd && (cmd.destructive || cmd.destructive_actions.includes(args[1]))) || (args[0] === "check-vms" && args.includes("--clean-first"));
   if (destructive && !await askConfirm({ title: "This deletes or overwrites data", message: "The command runs as a job and cannot be undone.", command: "vmctl " + args.join(" "), button: "Run it" })) return;
+  const vm = S.vms.find(r => r.name === args[1])?.name;
+  if (vm && submittingVms.has(vm)) return;
+  const previous = vm && vmJobs.get(vm);
+  if (vm) { submittingVms.add(vm); vmJobs.set(vm, {status:"running", command:args[0]}); jobsRevision++; render(); }
   try {
     const res = await api("/api/run", { args, confirmed: !!destructive });
+    clearTimeout($("toast")._h); $("toast").hidePopover?.(); $("toast").style.display = "none";
     rememberCommand(args[0]);
     if ($("cmd-dialog").open) $("cmd-dialog").close();
-    toast("Started: " + res.command);
-    openLog(res.job, res.command);
+    jobsRevision++;
+    activityJob = {id:res.job, command:res.command, status:"running"};
+    if (res.job.startsWith("vm:")) vmJobs.set(res.job.slice(3), {status:"running",command:args[0]});
+    else if (vm) { if (previous) vmJobs.set(vm, previous); else vmJobs.delete(vm); }
+    renderActivity();
     refresh(true); refreshJobs();
-  } catch (e) { toast(e.message, true); }
+  } catch (e) {
+    if (vm) { if (previous) vmJobs.set(vm, previous); else vmJobs.delete(vm); }
+    toast(e.message, true);
+  } finally { if (vm) submittingVms.delete(vm); render(); }
 }
 function runAction(r, a) {
+  if (a.disabled) return;
+  if (a.cancelJob) return cancelJob(a.cancelJob, a.forceStop);
   if (a.job) return openLog(a.job, (installationJob(r) ? "Installation" : r.job_command || "Job") + " · " + r.name);
   if (a.screen) return openScreen(r.name);
   if (a.console) return openConsole(r.name);
@@ -583,32 +725,116 @@ function runAction(r, a) {
 }
 
 // --- jobs and logs
+let activityJob = null, jobsRefreshing = false, jobsRevision = 0, logSession = 0, logTimer;
+const cancellingJobs = new Set();
+function renderActivity() {
+  if (!activityJob) return;
+  const j = activityJob, cancelling = cancellingJobs.has(j.id);
+  $("activity").classList.remove("hidden");
+  $("activity").dataset.status = j.status === "running" ? "running" : j.status === "completed" ? "completed" : "failed";
+  $("activity-symbol").textContent = j.status === "running" ? "" : j.status === "completed" ? "✓" : "!";
+  const action = j.command.split(/\s+/)[1];
+  $("activity-label").textContent = cancelling ? "Cancelling…" : j.status === "running" ? ({start:"Starting…",stop:"Stopping…","fetch-iso":"Downloading…",prep:"Preparing…"})[action] || "Working…" : j.status === "completed" ? "Completed" : "Needs attention";
+  $("activity-toggle").setAttribute("aria-label", `Latest activity: ${$("activity-label").textContent}. ${j.command}`);
+  $("activity-toggle").title = j.command;
+  $("activity-status").textContent = cancelling ? "Cancelling…" : ({running:"Running in background", completed:"Completed", cancelled:"Cancelled", interrupted:"Interrupted"})[j.status] || j.status;
+  $("activity-status").className = j.status === "running" ? "s-warn" : j.status === "completed" ? "s-ok" : "s-bad";
+  $("activity-command").textContent = j.command;
+  $("activity-cancel").classList.toggle("hidden", j.status !== "running");
+  $("activity-dismiss").classList.toggle("hidden", j.status === "running");
+  $("activity-cancel").disabled = cancelling;
+}
+$("activity-panel").addEventListener("beforetoggle", e => {
+  if (e.newState !== "open") return;
+  const rect = $("activity-toggle").getBoundingClientRect(), panel = $("activity-panel");
+  const width = Math.min(340, innerWidth-24);
+  panel.style.left = Math.max(12, Math.min(rect.right-width, innerWidth-width-12)) + "px";
+  panel.style.top = (rect.bottom+10) + "px";
+});
+$("activity-panel").addEventListener("toggle", e => {
+  $("activity-toggle").setAttribute("aria-expanded", e.newState === "open");
+  if (e.newState === "open") {
+    const rect = $("activity-toggle").getBoundingClientRect(), panel = $("activity-panel");
+    panel.style.left = Math.max(12, Math.min(rect.right-panel.offsetWidth, innerWidth-panel.offsetWidth-12)) + "px";
+    panel.style.top = Math.min(rect.bottom+10, innerHeight-panel.offsetHeight-12) + "px";
+  }
+});
+window.addEventListener("resize", () => $("activity-panel").hidePopover());
+$("activity-log").onclick = () => { $("activity-panel").hidePopover(); if (activityJob) openLog(activityJob.id, activityJob.command); };
+$("activity-cancel").onclick = () => { $("activity-panel").hidePopover(); if (activityJob) cancelJob(activityJob.id); };
+$("activity-dismiss").onclick = () => { $("activity-panel").hidePopover(); activityJob = null; $("activity").classList.add("hidden"); };
 async function refreshJobs() {
+  if (jobsRefreshing) return;
+  jobsRefreshing = true;
+  const revision = jobsRevision;
   try {
     const jobs = await api("/api/jobs");
+    if (revision !== jobsRevision) return;
+    let finished = false;
+    for (const job of jobs) {
+      if (!job.id.startsWith("vm:")) continue;
+      const vm = job.id.slice(3);
+      if (submittingVms.has(vm)) continue;
+      if (vmJobs.get(vm)?.status === "running" && job.status !== "running") finished = true;
+      vmJobs.set(vm, {status:job.status, command:job.command.split(/\s+/)[1] || ""});
+    }
+    render();
+    if (finished) refresh(true);
+    if (activityJob) activityJob = jobs.find(j => j.id === activityJob.id) || activityJob;
+    else activityJob = jobs.find(j => j.status === "running") || null;
+    renderActivity();
     $("job-count").textContent = `${jobs.length} jobs`;
-    $("job-rows").innerHTML = jobs.map((j) => `<tr class="row" data-job="${esc(j.id)}" data-cmd="${esc(j.command)}"><td><span class="chip ${esc(j.status.split(" ")[0])}">${esc(j.status)}</span></td><td class="mono">${esc(j.command)}</td><td class="s-muted">${new Date(j.updated * 1000).toLocaleTimeString()}</td></tr>`).join("")
-      || '<tr><td colspan="3" class="s-muted">No jobs yet.</td></tr>';
-    $("job-rows").querySelectorAll("[data-job]").forEach((t) => (t.onclick = () => openLog(t.dataset.job, t.dataset.cmd)));
+    const rows = jobs.map((j) => `<tr data-job="${esc(j.id)}" data-cmd="${esc(j.command)}"><td><span class="chip ${esc(j.status.split(" ")[0])}">${esc(j.status)}</span></td><td class="mono job-command">${esc(j.command)}</td><td class="s-muted">${new Date(j.updated * 1000).toLocaleTimeString()}</td><td><div class="job-controls"><button data-job-log>View log</button>${j.status === "running" ? `<button data-job-cancel class="danger" ${cancellingJobs.has(j.id) ? "disabled" : ""}>${cancellingJobs.has(j.id) ? "Cancelling…" : "Cancel job"}</button>` : ""}</div></td></tr>`).join("")
+      || '<tr><td colspan="4" class="s-muted">No jobs yet.</td></tr>';
+    if ($("job-rows")._rows !== rows) { $("job-rows").innerHTML = rows; $("job-rows")._rows = rows; }
   } catch (e) { /* the state refresh reports errors */ }
+  finally { jobsRefreshing = false; }
 }
-function openLog(job, title) { logJob = job; logOffset = 0; $("log").textContent = ""; $("log-title").textContent = title || job; $("log-dialog").showModal(); pollLog(); }
-async function pollLog() {
-  if (!logJob || !$("log-dialog").open) return;
+$("job-rows").onclick = (e) => {
+  const row = e.target.closest("[data-job]");
+  if (!row) return;
+  if (e.target.closest("[data-job-cancel]")) return cancelJob(row.dataset.job);
+  if (e.target.closest("[data-job-log]")) openLog(row.dataset.job, row.dataset.cmd);
+};
+function openLog(job, title) {
+  clearTimeout(logTimer); logSession++; logJob = job; logOffset = 0;
+  $("log").textContent = ""; $("log-title").textContent = title || job;
+  $("log-cancel").classList.add("hidden"); $("log-dialog").showModal(); pollLog(logSession);
+}
+$("log-dialog").addEventListener("close", () => { clearTimeout(logTimer); logSession++; });
+async function pollLog(session) {
+  if (session !== logSession || !logJob || !$("log-dialog").open) return;
   try {
     const d = await api(`/api/jobs/${encodeURIComponent(logJob)}/log?offset=${logOffset}`);
+    if (session !== logSession || !$("log-dialog").open) return;
     const pre = $("log"), atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;
     if (d.text) { pre.textContent += ansi(d.text); if (atEnd) pre.scrollTop = pre.scrollHeight; }
     logOffset = d.offset;
     $("log-cancel").classList.toggle("hidden", d.status !== "running");
-    if (d.offset < d.size) return setTimeout(pollLog, 50);
-  } catch (e) { $("log").textContent += "\n[" + e.message + "]"; return; }  // once, not every second
-  setTimeout(pollLog, 1000);
+    $("log-cancel").disabled = cancellingJobs.has(logJob);
+    if (d.offset < d.size) { logTimer = setTimeout(() => pollLog(session), 50); return; }
+    if (d.status !== "running") return;
+  } catch (e) { if (session === logSession) $("log").textContent += "\n[" + e.message + "]"; return; }
+  logTimer = setTimeout(() => pollLog(session), 1000);
 }
-$("log-cancel").onclick = async () => {
-  if (!await askConfirm({ eyebrow: "Job", title: "Cancel this job?", message: "A VM it started is stopped; disk and logs are kept.", button: "Cancel the job" })) return;
-  try { await api(`/api/jobs/${encodeURIComponent(logJob)}/cancel`, {}); toast("Cancelled"); refreshJobs(); } catch (e) { toast(e.message, true); }
-};
+async function cancelJob(job, forceStop = false) {
+  if (cancellingJobs.has(job)) return;
+  if (!await askConfirm({ eyebrow: "Job", title: forceStop ? "Force stop this VM?" : "Cancel this job?", message: forceStop ? "Stop the operation and power off the VM now. Unsaved guest changes may be lost; the disk and logs are kept." : job.startsWith("vm:") ? "The running operation and its VM will be stopped. Existing disk and logs are kept; changes already made are not undone." : "The running operation will be interrupted. Changes already made are not undone.", command: job, button: forceStop ? "Force stop" : "Cancel the job" })) return;
+  cancellingJobs.add(job); renderActivity(); render();
+  if (logJob === job) $("log-cancel").disabled = true;
+  $("job-rows").querySelectorAll("[data-job]").forEach(row => { if (row.dataset.job === job) { const b = row.querySelector("[data-job-cancel]"); if (b) b.disabled = true; } });
+  try {
+    const res = await api(`/api/jobs/${encodeURIComponent(job)}/cancel`, {});
+    toast(res.cancelled ? "Cancellation requested" : "Job is no longer running");
+    refresh(true);
+  } catch (e) { toast(e.message, true); }
+  finally {
+    cancellingJobs.delete(job); renderActivity(); render(); $("job-rows")._rows = null;
+    if (logJob === job) $("log-cancel").disabled = false;
+    refreshJobs();
+  }
+}
+$("log-cancel").onclick = () => logJob && cancelJob(logJob);
 
 // --- SSH: use the existing CLI in an interactive terminal on the host
 let sshVm = "";
@@ -667,12 +893,21 @@ async function openBrowserSsh(vm) {
     socket.onopen = () => { if (generation !== terminalGeneration) return; send({type:"resize",cols:term.cols,rows:term.rows}); terminalStatus("Session open","s-ok","Log in at the prompt if asked. Close disconnects SSH; the VM keeps running."); term.focus(); };
     socket.onmessage = e => { if (generation === terminalGeneration) term.write(typeof e.data === "string" ? e.data : new Uint8Array(e.data)); };
     socket.onerror = () => terminalStatus("Unavailable","s-bad","Could not open SSH. Check the VM and profile, and restart make web if the server was running before this update.");
-    socket.onclose = () => { if (generation !== terminalGeneration) return; terminalStatus("Disconnected","s-muted","SSH session ended. Read the terminal output or use Reconnect to try again."); };
+    socket.onclose = e => {
+      if (generation !== terminalGeneration) return;
+      if (e.code === 1000) { closeBrowserSsh(); return; }
+      terminalStatus("Disconnected","s-muted","SSH session ended. Read the terminal output or use Reconnect to try again.");
+    };
   } catch (e) { if (generation === terminalGeneration) terminalStatus("Unavailable","s-bad",e.message + ". You can still use the SSH terminal on the host."); }
 }
 $("ssh-browser").onclick = () => openBrowserSsh(sshVm);
 $("terminal-reconnect").onclick = () => openBrowserSsh(terminalVm);
-$("terminal-close").onclick = () => { ++terminalGeneration; disposeTerminal(); if (document.fullscreenElement) document.exitFullscreen().catch(()=>{}); $("terminal-dialog").close(); };
+function closeBrowserSsh() {
+  ++terminalGeneration; disposeTerminal();
+  if (document.fullscreenElement === $("terminal-shell")) document.exitFullscreen().catch(()=>{});
+  $("terminal-dialog").close();
+}
+$("terminal-close").onclick = closeBrowserSsh;
 $("terminal-dialog").addEventListener("cancel",e=>e.preventDefault());
 $("terminal-full").onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await $("terminal-shell").requestFullscreen(); } catch (e) { toast(e.message,true); } };
 
@@ -1026,30 +1261,51 @@ function openContext(vm, x, y) {
   const container = filter === "labs" ? $("labs-view") : $("rows");
   const originRow = [...container.querySelectorAll("[data-vm]")].find(row => row.dataset.vm === vm);
   contextOrigin = originRow?.querySelector("[data-member]") || originRow;
-  const actions = actionsFor(r), menu = $("vm-context");
-  const entries = actions.map(a => ({label:a.label,danger:a.danger,warn:a.warn,icon:a.icon,tone:a.tone,run:()=>runAction(r,a)}));
-  if (r.ssh_port) entries.push({label:"SSH console…",icon:"terminal",tone:"info",run:()=>openSsh(r)});
-  entries.push({label:"Customize profile…",icon:"sliders",run:()=>openProfileEditor(r.name)});
-  menu.innerHTML = `<div class="context-title">${esc(vm)}</div>` + entries.map((a,i) => `<button role="menuitem" class="${a.danger ? "danger" : a.warn ? "warn" : ""}" data-context="${i}">${actionIcon(a)}${esc(a.label)}</button>`).join("");
+  const entries = actionsFor(r).map(a => ({...a, group:a.danger ? "Danger zone" : a.job || a.cancelJob ? "Activity" : a.console || a.screen || a.args?.[0] === "attach" ? "Connect" : ["start","stop"].includes(a.args?.[0]) ? "Power" : "Manage", run:()=>runAction(r,a)}));
+  if (r.ssh_port) entries.push({label:"SSH console…",group:"Connect",icon:"terminal",tone:"info",run:()=>openSsh(r)});
+  entries.push({label:"Customize profile…",group:"Manage",icon:"sliders",run:()=>openProfileEditor(r.name)});
+  const groups = r.running ? ["Connect","Power","Activity","Manage","Danger zone"] : ["Power","Activity","Connect","Manage","Danger zone"];
+  entries.sort((a,b) => groups.indexOf(a.group)-groups.indexOf(b.group) || Number(!!a.form)-Number(!!b.form));
+  showContext(vm, entries, x, y, "VM actions");
+}
+function openLabContext(card, x, y) {
+  contextOrigin = card.querySelector(".lab-head");
+  // Use the same buttons/commands as the stack card so the two entry points stay in sync.
+  const entries = [...card.querySelectorAll("[data-args],[data-map]")].map(button => {
+    const args = button.dataset.args ? JSON.parse(button.dataset.args) : null, action = args?.[1];
+    const danger = ["clean","install"].includes(action) && (action === "clean" || button.classList.contains("danger"));
+    const group = danger ? "Danger zone" : ["up","down","install"].includes(action) ? "Power" : "Inspect & manage";
+    return {label:button.textContent, group, danger, warn:action === "down", icon:({up:"play",down:"stop",install:"wand",status:"list",map:"external",clean:"trash",cluster:"sliders"})[action] || "external", run:()=>button.click()};
+  });
+  const groups = ["Power","Inspect & manage","Danger zone"];
+  entries.sort((a,b) => groups.indexOf(a.group)-groups.indexOf(b.group));
+  showContext(card.dataset.lab, entries, x, y, "Stack actions");
+}
+function showContext(title, entries, x, y, label) {
+  hideHoverShot();
+  const menu = $("vm-context"); menu.setAttribute("aria-label", label);
+  menu.innerHTML = `<div class="context-title">${esc(title)}</div>` + entries.map((a,i) => `${i === 0 || a.group !== entries[i-1].group ? `<div class="context-group" role="presentation">${esc(a.group)}</div>` : ""}<button role="menuitem" ${a.disabled ? "disabled" : ""} class="${a.danger ? "danger" : a.warn ? "warn" : ""}" data-context="${i}">${actionIcon(a)}${esc(a.label)}</button>`).join("");
   menu.showPopover();
   menu.style.left = Math.max(8, Math.min(x,innerWidth-menu.offsetWidth-8)) + "px";
   menu.style.top = Math.max(8, Math.min(y,innerHeight-menu.offsetHeight-8)) + "px";
   menu.querySelectorAll("button").forEach(b => b.onclick = () => { closeContext(); entries[+b.dataset.context].run(); });
-  menu.querySelector("button")?.focus({preventScroll:true});
+  menu.querySelector("button:not(:disabled)")?.focus({preventScroll:true});
 }
 for (const container of [$("rows"), $("labs-view")]) {
   container.addEventListener("contextmenu", e => {
     const row = e.target.closest("[data-vm]");
     if (row) { e.preventDefault(); openContext(row.dataset.vm, e.clientX, e.clientY); }
+    else { const card = e.target.closest("[data-lab]"); if (card) { e.preventDefault(); openLabContext(card, e.clientX, e.clientY); } }
   });
   container.addEventListener("keydown", e => {
     if (e.key !== "ContextMenu" && !(e.shiftKey && e.key === "F10")) return;
     const row = e.target.closest("[data-vm]");
     if (row) { e.preventDefault(); const rect = row.getBoundingClientRect(); openContext(row.dataset.vm, rect.x + 30, rect.y + 20); }
+    else { const card = e.target.closest("[data-lab]"); if (card) { e.preventDefault(); const rect = card.getBoundingClientRect(); openLabContext(card, rect.x + 30, rect.y + 20); } }
   });
 }
 $("vm-context").addEventListener("keydown", e => {
-  const buttons=[...$("vm-context").querySelectorAll("button")], i=buttons.indexOf(document.activeElement);
+  const buttons=[...$("vm-context").querySelectorAll("button:not(:disabled)")], i=buttons.indexOf(document.activeElement);
   if (["ArrowDown","ArrowUp"].includes(e.key)) { e.preventDefault(); buttons[(i+(e.key === "ArrowDown" ? 1 : buttons.length-1))%buttons.length].focus(); }
   if (e.key === "Escape" || e.key === "Tab") { closeContext(); contextOrigin?.focus({preventScroll:true}); if (e.key === "Escape") e.preventDefault(); }
 });
@@ -1063,33 +1319,67 @@ document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { f
 // displays), fetched after a short pause so sweeping the mouse across the list asks for nothing.
 // Only the icon, so reading the list shows nothing; a right-click (the context menu) hides it
 // until the pointer leaves the icon.
-const hover = { vm: null, timer: 0, muted: null };
-function hideHoverShot() { clearTimeout(hover.timer); hover.vm = null; $("hover-shot").style.display = "none"; }
+const hover = { vm:null, timer:0, muted:null, session:0, controller:null, url:null, x:0, y:0 };
+function hideHoverShot() {
+  clearTimeout(hover.timer); hover.controller?.abort(); hover.session++; hover.vm = null;
+  $("hover-shot").style.display = "none";
+  $("hover-shot").querySelector("img").removeAttribute("src");
+  if (hover.url) URL.revokeObjectURL(hover.url); hover.url = null;
+}
 function placeHoverShot(x, y) {
-  const box = $("hover-shot"), w = box.offsetWidth || 380, h = box.offsetHeight || 260;
+  const box = $("hover-shot"), w = box.offsetWidth || 420, h = box.offsetHeight || 360;
   box.style.left = Math.max(8, Math.min(x + 18, innerWidth - w - 8)) + "px";
   box.style.top = Math.max(8, Math.min(y + 18, innerHeight - h - 8)) + "px";
 }
+async function refreshHoverShot(session) {
+  if (session !== hover.session || !hover.vm || document.hidden) return;
+  if (filter === "labs" || document.querySelector("dialog[open]")) { hideHoverShot(); return; }
+  const vm = hover.vm, box = $("hover-shot");
+  if (!S.vms.some(r => r.name === vm && r.running)) { hideHoverShot(); return; }
+  hover.controller = new AbortController();
+  let url;
+  try {
+    const response = await fetch(`/api/vm/${encodeURIComponent(vm)}/screen.png?t=${Date.now()}`, {headers:{"X-Vmctl-Token":TOKEN}, cache:"no-store", signal:hover.controller.signal});
+    if (!response.ok) throw new Error("Screen unavailable");
+    url = URL.createObjectURL(await response.blob());
+    const frame = new Image(); frame.src = url; await frame.decode();
+    if (session !== hover.session) { URL.revokeObjectURL(url); return; }
+    box.querySelector("img").src = url;
+    if (hover.url) URL.revokeObjectURL(hover.url); hover.url = url;
+    $("hover-status").textContent = "Live"; $("hover-status").className = "state s-ok";
+    box.querySelector(".hover-caption").textContent = "Screen preview · refreshes every second";
+  } catch (e) {
+    if (url) URL.revokeObjectURL(url);
+    if (session !== hover.session) return;
+    $("hover-status").textContent = "Reconnecting"; $("hover-status").className = "state s-warn";
+    box.querySelector(".hover-caption").textContent = hover.url ? "Last frame · retrying connection…" : "Screen unavailable · retrying…";
+  }
+  if (session === hover.session) hover.timer = setTimeout(() => refreshHoverShot(session), 1000);
+}
 $("rows").addEventListener("mouseover", (e) => {
   const icon = e.target.closest(".catalog-icon"), tr = icon?.closest("tr[data-vm]"), vm = tr?.dataset.vm;
-  if (!icon) { if (!e.target.closest("#hover-shot")) { hideHoverShot(); hover.muted = null; } return; }
+  if (!icon) { hideHoverShot(); hover.muted = null; return; }
   if (!tr || vm === hover.vm || vm === hover.muted) return;
   hideHoverShot();
-  const r = S.vms.find((x) => x.name === vm);
-  if (!r || !r.running) return;
-  hover.vm = vm;
+  if (!S.vms.some(r => r.name === vm && r.running)) return;
+  icon.removeAttribute("title");
+  hover.vm = vm; hover.x = e.clientX; hover.y = e.clientY;
+  const session = hover.session;
   hover.timer = setTimeout(() => {
-    const box = $("hover-shot"), img = box.querySelector("img");
-    box.querySelector(".hover-caption").textContent = `${vm} · live screen`;
-    img.onerror = () => { if (hover.vm === vm) box.querySelector(".hover-caption").textContent = `${vm} · no screen available (serial console only?)`; };
-    img.src = `/api/vm/${encodeURIComponent(vm)}/screen.png?token=${encodeURIComponent(TOKEN)}&t=${Math.floor(Date.now() / 5000)}`;
-    box.style.display = "block"; placeHoverShot(hover.x, hover.y);
+    const box = $("hover-shot"); $("hover-name").textContent = vm;
+    $("hover-status").textContent = "Connecting"; $("hover-status").className = "state s-warn";
+    box.querySelector(".hover-caption").textContent = "Loading screen preview…";
+    box.style.display = "block"; placeHoverShot(hover.x, hover.y); refreshHoverShot(session);
   }, 450);
 });
 $("rows").addEventListener("mousemove", (e) => { hover.x = e.clientX; hover.y = e.clientY; if (hover.vm && $("hover-shot").style.display === "block") placeHoverShot(e.clientX, e.clientY); });
-$("rows").addEventListener("mouseleave", hideHoverShot);
+$("rows").addEventListener("mouseleave", () => { hideHoverShot(); hover.muted = null; });
 $("rows").addEventListener("mousedown", hideHoverShot);
 $("rows").addEventListener("contextmenu", (e) => { hover.muted = e.target.closest("tr[data-vm]")?.dataset.vm || null; hideHoverShot(); });
+$("list").addEventListener("scroll", hideHoverShot);
+window.addEventListener("scroll", hideHoverShot, true);
+window.addEventListener("resize", hideHoverShot);
+document.addEventListener("visibilitychange", () => { if (document.hidden) hideHoverShot(); });
 $("rows").onclick = (e) => { const tr = e.target.closest("[data-vm]"); if (tr) { selected = tr.dataset.vm; localStorage.setItem("vmctl-selected", selected); render(); } };
 $("search").oninput = render;
 document.addEventListener("keydown", (e) => {

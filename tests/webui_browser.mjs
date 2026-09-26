@@ -12,10 +12,20 @@ const catalog = JSON.parse(execFileSync('python3', ['-c', 'import json; from vmc
 const machine = (name, extra = {}) => ({ name, label: 'Arch Linux + Noctalia 5', family:'arch', memory_mb:8192, cpus:4, firmware:'EFI', running:false, installed:true, prepared:true, install_label:'verified', install_detail:'Boot verified by post-install; installed by bootstrap-archinstall.', disk_host:'7.8G', disk_capacity:'32G', iso_source:'cached', ssh_port:2226, has_ssh:true, has_archinstall:true, unattended_flow:'bootstrap-archinstall', ...extra });
 const state = { version:'0.4.0', vms:[machine('arch-noctalia',{running:true}),machine('debian-server'),machine('proxmox-ve',{family:'proxmox'}),machine('proxmox-ve-node2',{family:'proxmox'}),machine('alpine-ci',{installed:false,prepared:false,install_label:'no disk'})], labs:[{group:'proxmox-lab', members:['proxmox-ve','proxmox-ve-node2'],start_order:['proxmox-ve','proxmox-ve-node2'],addresses:{'proxmox-ve':'10.10.10.2/24','proxmox-ve-node2':'10.10.10.3/24'}},{group:'new-lab',members:['alpine-ci'],start_order:['alpine-ci']}] };
 let requests = [], failRun = false, failState = false, sshLaunches = 0, overrideRevision = 1, savedOverride = {};
+let jobStatus = 'completed', jobCommand = 'vmctl start arch-noctalia --headless --background', cancelRequests = [], failCancel = false, cancelResult = true;
+let jobId = 'web:fixture', holdRun = false, releaseRun;
+let screenRequests = 0, failScreen = false;
 const profileBase = {name:'Arch Linux + Noctalia',memory_mb:8192,cpus:4};
 const server = createServer(async (req,res) => {
   if (req.url === '/' || req.url.startsWith('/?')) { res.setHeader('Content-Type','text/html'); return res.end(html); }
+  if (req.url === '/assets/distro-icons.svg') { res.setHeader('Content-Type','image/svg+xml'); return res.end(readFileSync(root+'vmctl/web/distro-icons.svg')); }
   res.setHeader('Content-Type','application/json');
+  if (req.url.includes('/screen.png?')) {
+    screenRequests++;
+    if (failScreen) { res.statusCode=503; return res.end('{}'); }
+    res.setHeader('Content-Type','image/svg+xml');
+    return res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768"><rect width="1024" height="768" fill="#111827"/><rect width="1024" height="38" fill="#263449"/><g fill="#bceedd" font-family="monospace" font-size="22"><text x="24" y="94">Arch Linux · console</text><text x="24" y="145">guest@arch-noctalia:~$ uptime</text><text x="24" y="186">Screen frame ${screenRequests}</text></g></svg>`);
+  }
   if (req.url.endsWith('/ssh-terminal')) { sshLaunches++; return res.end(JSON.stringify({terminal:'fixture'})); }
   if (req.url.endsWith('/override')) {
     if (req.method === 'POST') { let body=''; for await (const chunk of req) body+=chunk; const data=JSON.parse(body); assert.equal(data.revision,String(overrideRevision)); savedOverride=data.override; overrideRevision++; }
@@ -23,19 +33,30 @@ const server = createServer(async (req,res) => {
   }
   if (req.url.startsWith('/api/state')) { res.statusCode=failState ? 503 : 200; return res.end(JSON.stringify(failState ? {error:'fixture offline'} : state)); }
   if (req.url === '/api/commands') return res.end(JSON.stringify(catalog));
-  if (req.url === '/api/jobs') return res.end(JSON.stringify([{id:'web:fixture',status:'completed',command:'vmctl start arch-noctalia --headless --background',updated:1789900000}]));
-  if (req.url.includes('/log?')) return res.end(JSON.stringify({text:'Fixture job completed.\n',offset:23,size:23,status:'completed'}));
+  if (req.url === '/api/jobs') return res.end(JSON.stringify([{id:jobId,status:jobStatus,command:jobCommand,updated:1789900000}]));
+  if (req.url.includes('/log?')) {
+    const log = 'Fixture job output.\n', offset = Number(new URL(req.url,'http://fixture').searchParams.get('offset'));
+    return res.end(JSON.stringify({text:log.slice(offset),offset:log.length,size:log.length,status:jobStatus}));
+  }
+  if (req.url.endsWith('/cancel')) {
+    cancelRequests.push(req.url); res.statusCode = failCancel ? 500 : 200;
+    if (!failCancel) jobStatus = cancelResult ? 'cancelled' : 'completed';
+    if (!failCancel && jobId === 'vm:arch-noctalia') state.vms[0].running=false;
+    return res.end(JSON.stringify(failCancel ? {error:'Fixture cancellation failed'} : {cancelled:cancelResult}));
+  }
   if (req.url === '/api/run') {
     let body=''; for await (const chunk of req) body+=chunk;
+    if (holdRun) await new Promise(resolve=>releaseRun=resolve);
     requests.push(JSON.parse(body)); res.statusCode=failRun ? 400 : 200;
-    return res.end(JSON.stringify(failRun ? {error:'Fixture rejected the command'} : {job:'web:fixture',command:'fixture command'}));
+    if (!failRun) { jobStatus='running'; jobCommand='vmctl '+requests.at(-1).args.join(' '); }
+    return res.end(JSON.stringify(failRun ? {error:'Fixture rejected the command'} : {job:jobId,command:jobCommand}));
   }
   res.statusCode=404; res.end('{}');
 });
 await new Promise((resolve) => server.listen(0,'127.0.0.1',resolve));
 let browser;
 try {
-  browser = await chromium.launch({headless:true});
+  browser = await chromium.launch({headless:true, executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined});
   const context = await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});
   await context.route('https://cdn.jsdelivr.net/npm/@novnc/**', route => route.fulfill({contentType:'text/javascript',body:`export default class RFB extends EventTarget { constructor(el) { super(); el.innerHTML='<div class="console-empty">Fixture guest display</div>'; setTimeout(()=>this.dispatchEvent(new Event('connect')),20); } disconnect() {} focus() {} sendCtrlAltDel() { window.sentCAD=true; } }`}));
   if (!process.env.REAL_TERMINAL_ASSETS) await context.route('https://cdn.jsdelivr.net/npm/@xterm/**', route => {
@@ -45,7 +66,8 @@ try {
   });
   const page = await context.newPage(), errors=[];
   const terminalMessages=[];
-  await page.routeWebSocket(/\/api\/vm\/.*\/ssh\?/, ws=>{ws.onMessage(message=>{const value=JSON.parse(message);terminalMessages.push(value); if(value.type==='input')ws.send('fixture-user');});});
+  let sshSocket;
+  await page.routeWebSocket(/\/api\/vm\/.*\/ssh\?/, ws=>{sshSocket=ws;ws.onMessage(message=>{const value=JSON.parse(message);terminalMessages.push(value); if(value.type==='input') { if(value.data==='\x04' || value.data==='exit\r') ws.close({code:1000,reason:'SSH session ended'}); else ws.send('fixture-user'); }});});
   page.on('pageerror', e=>errors.push(e.message));
   const check = (label) => console.log('PASS',label);
   const shot = async (name) => page.screenshot({path:root+'artifacts/webui-review/'+name+'.png',fullPage:true});
@@ -55,11 +77,21 @@ try {
   assert.equal(await page.locator('#running-count').textContent(),'1');
   assert.equal(await page.locator('#details .name').textContent(),'arch-noctalia');
   await shot('dashboard'); check('dashboard and profile');
+  await page.locator('#rows [data-vm="arch-noctalia"] .catalog-icon').hover();
+  await page.waitForFunction(()=>document.getElementById('hover-status').textContent==='Live');
+  await page.waitForResponse(response=>response.url().includes('/screen.png?'));
+  assert(screenRequests>=2); await shot('live-preview');
+  failScreen=true; await page.waitForFunction(()=>document.getElementById('hover-status').textContent==='Reconnecting');
+  failScreen=false; await page.waitForFunction(()=>document.getElementById('hover-status').textContent==='Live');
+  await page.locator('body > header h1').hover();
+  const stoppedAt=screenRequests; await page.waitForTimeout(1200);
+  assert.equal(screenRequests,stoppedAt); assert(!(await page.locator('#hover-shot').isVisible()));
+  check('screen preview refreshes, reports disconnection, recovers and stops on mouse leave');
   const states = await page.evaluate(() => {
     const base = S.vms[0];
     return ['start','stop','bootstrap-archinstall','fetch-iso','show'].map(job_command => stateOf({...base,job_status:'running',job_command})[0]);
   });
-  assert.deepEqual(states,['Running','Stopping','Installing','Downloading ISO','Working']);
+  assert.deepEqual(states,['Starting','Stopping','Installing','Downloading ISO','Working']);
   assert.equal(await page.evaluate(()=>stateOf({...S.vms[0],job_status:'failed (1)',job_command:'show'})[0]),'Running');
   assert(await page.evaluate(()=>actionsFor({...S.vms[0],job_status:'running',job_command:'stop'}).every(a=>!a.label.includes('Installation'))));
   check('start and stop jobs are never mislabeled as installations');
@@ -69,9 +101,31 @@ try {
   await page.locator('#ssh-browser').click(); await page.waitForFunction(()=>document.getElementById('terminal-status').textContent==='Session open');
   await page.evaluate(()=>terminal.input('whoami\r')); await page.waitForFunction(()=>Array.from({length:terminal.buffer.active.length},(_,i)=>terminal.buffer.active.getLine(i)?.translateToString()).join(' ').includes('fixture-user'));
   assert(terminalMessages.some(m=>m.type==='input'&&m.data==='whoami\r')); assert(terminalMessages.some(m=>m.type==='resize'));
-  await shot('ssh-browser'); await page.locator('#terminal-close').click(); check('SSH host launch, copy and browser input/resize');
+  await shot('ssh-browser');
+  await page.evaluate(()=>terminal.input('\x04'));
+  await page.waitForFunction(()=>!document.getElementById('terminal-dialog').open);
+  assert(await page.evaluate(()=>terminal===null && terminalSocket===null));
+  await page.evaluate(()=>openBrowserSsh('arch-noctalia'));
+  await page.waitForFunction(()=>document.getElementById('terminal-status').textContent==='Session open');
+  sshSocket.send('Permission denied'); sshSocket.close({code:1011,reason:'SSH exited with status 255'});
+  await page.waitForFunction(()=>document.getElementById('terminal-status').textContent==='Disconnected');
+  assert(await page.locator('#terminal-dialog').evaluate(el=>el.open));
+  await page.locator('#terminal-reconnect').click();
+  await page.waitForFunction(()=>document.getElementById('terminal-status').textContent==='Session open');
+  await page.locator('#terminal-full').click();
+  await page.waitForFunction(()=>document.fullscreenElement?.id==='terminal-shell');
+  await page.evaluate(()=>terminal.input('exit\r'));
+  await page.waitForFunction(()=>!document.getElementById('terminal-dialog').open && !document.fullscreenElement);
+  check('SSH logout closes the terminal, including full screen; connection errors stay open with reconnect');
   await page.locator('#rows [data-vm="arch-noctalia"]').click({button:'right'});
   assert(await page.locator('#vm-context').isVisible());
+  const stopMenuItem=page.locator('#vm-context').getByRole('menuitem',{name:'Stop',exact:true});
+  await stopMenuItem.hover();
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('#vm-context button.warn:hover')).backgroundColor==='rgb(67, 57, 37)');
+  await stopMenuItem.focus(); await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowDown');
+  assert(await stopMenuItem.evaluate(el=>el.matches(':focus-visible')));
+  assert.equal(await stopMenuItem.evaluate(el=>getComputedStyle(el).outlineStyle),'solid');
+  check('warning menu actions highlight on hover and have a visible keyboard focus');
   await page.locator('#vm-context').getByRole('menuitem',{name:'Customize profile…'}).click();
   await page.locator('#profile-memory:not([disabled])').waitFor();
   await page.locator('#profile-memory').fill('12288'); await page.locator('#profile-cpus').fill('6');
@@ -108,6 +162,22 @@ try {
   await page.locator('#cmd-dialog [data-close]').click();
   assert.equal(requests.length,0);
   check('lab VM context menu handles names, addresses, status and keyboard, targeting the correct VM');
+  await page.locator('[data-lab="proxmox-lab"] .lab-head').click({button:'right'});
+  assert.equal(await page.locator('#vm-context').getAttribute('aria-label'),'Stack actions');
+  assert.equal(await page.locator('#vm-context .context-title').textContent(),'proxmox-lab');
+  assert.equal(await page.locator('#vm-context [role=menuitem]').last().textContent(),'Clean lab…');
+  await page.locator('#vm-context').getByRole('menuitem',{name:'Clean lab…',exact:true}).hover();
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('#vm-context button.danger:hover')).backgroundColor==='rgb(71, 44, 57)');
+  await shot('stack-actions');
+  await page.locator('#vm-context').getByRole('menuitem',{name:'Clean lab…',exact:true}).click();
+  await page.locator('#confirm-no').click(); assert.equal(requests.length,0);
+  await page.locator('[data-lab="proxmox-lab"] .lab-head').press('Shift+F10');
+  await page.locator('#vm-context').getByRole('menuitem',{name:'Status',exact:true}).click();
+  await page.waitForFunction(()=>document.getElementById('activity-command').textContent==='vmctl group status proxmox-lab');
+  assert.deepEqual(requests.at(-1).args,['group','status','proxmox-lab']);
+  assert(!(await page.locator('#log-dialog').evaluate(el=>el.open)));
+  requests=[];
+  check('stack context menu uses stack commands, keyboard access and destructive confirmation');
   await page.locator('[data-filter=all]').click();
   await page.locator('#rows [data-vm="arch-noctalia"]').click();
   await page.locator('#all-commands').click();
@@ -129,20 +199,69 @@ try {
   await page.locator('#cmd-advanced summary').click(); await page.locator('#arg5').check(); await page.locator('#arg6').check();
   assert(!(await page.locator('#arg5').isChecked())); assert(await page.locator('#arg6').isChecked());
   assert((await page.locator('#preview').textContent()).includes('--no-expand'));
-  await page.locator('#cmd-filter').press('Control+Enter'); assert.equal(requests.length,0); check('flash is copy-only, device confirmation and exclusive expansion flags');
+  await page.locator('#cmd-filter').press('Control+Enter'); await page.locator('#confirm-no').click(); assert.equal(requests.length,0); check('flash stays in the host terminal, device confirmation and exclusive expansion flags');
   await page.locator('#cmd-filter').fill('show'); await page.locator('#cmd-copy').click();
   assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'vmctl show arch-noctalia'); check('copy command');
   await page.locator('#cmd-filter').fill('does-not-exist'); assert(await page.locator('#cmd-run').isDisabled()); check('empty search');
   await page.locator('#cmd-filter').fill('checkpoint'); await page.locator('#arg0').selectOption('restore');
   assert(!(await page.locator('#cmd-warning').evaluate(el=>el.classList.contains('hidden'))));
-  page.once('dialog', d=>d.dismiss()); await page.locator('#cmd-run').click(); assert.equal(requests.length,0); check('destructive command confirmation');
+  await page.locator('#cmd-run').click(); await page.locator('#confirm-no').click(); assert.equal(requests.length,0); check('destructive command confirmation');
   await page.locator('#cmd-filter').fill('show'); failRun=true; await page.locator('#cmd-run').click();
   await page.waitForFunction(()=>!document.getElementById('cmd-run').disabled);
   assert(await page.locator('#cmd-dialog').evaluate(el=>el.open)); check('API failure keeps command and form open');
-  failRun=false; await page.locator('#cmd-run').click(); await page.locator('#log-dialog[open]').waitFor();
+  failRun=false; await page.locator('#cmd-run').click();
+  await page.waitForFunction(()=>!document.getElementById('cmd-dialog').open);
   assert.deepEqual(requests.at(-1).args,['show','arch-noctalia']);
-  await page.locator('#log-dialog [data-close]').click(); check('successful command opens job log');
-  await page.locator('#all-commands').click(); assert((await page.locator('#cmd-list').textContent()).includes('Recently used') === false); // show is already suggested, no duplicates
+  assert(!(await page.locator('#cmd-dialog').evaluate(el=>el.open)));
+  assert(!(await page.locator('#log-dialog').evaluate(el=>el.open)));
+  assert.equal(await page.locator('#activity-status').textContent(),'Running in background');
+  assert(!(await page.locator('#activity-panel').isVisible()));
+  assert(!(await page.locator('#toast').textContent()).startsWith('Started in background:'));
+  assert(await page.locator('#activity').evaluate(el=>!!el.closest('body > header')));
+  await page.locator('#activity-toggle').click();
+  const activityPanel=await page.locator('#activity-panel').boundingBox(), activityToggle=await page.locator('#activity-toggle').boundingBox();
+  assert(activityPanel.y>=activityToggle.y+activityToggle.height);
+  assert(activityPanel.x>0 && activityPanel.x+activityPanel.width<=1440);
+  await shot('activity-menu');
+  await page.locator('#activity-log').click(); await page.waitForFunction(()=>document.getElementById('log').textContent.includes('Fixture job output'));
+  await page.locator('#log-dialog [data-close]').click();
+  assert.equal(jobStatus,'running'); check('commands run without a modal; logs open on request and closing them keeps the job running');
+  await page.locator('#activity-toggle').click();
+  await page.locator('#activity-cancel').click(); await page.locator('#confirm-no').click(); assert.equal(cancelRequests.length,0);
+  failCancel=true;
+  await page.locator('#activity-toggle').click();
+  await page.locator('#activity-cancel').click(); await page.locator('#confirm-yes').click();
+  await page.waitForFunction(()=>document.getElementById('toast').textContent==='Fixture cancellation failed');
+  assert(!(await page.locator('#activity-cancel').isDisabled()));
+  failCancel=false;
+  await page.locator('#job-rows [data-job-cancel]').click(); await page.locator('#confirm-yes').click();
+  await page.waitForFunction(()=>document.getElementById('activity-status').textContent==='Cancelled');
+  assert.equal(cancelRequests.at(-1),'/api/jobs/web%3Afixture/cancel');
+  assert(!(await page.locator('#activity-cancel').isVisible()));
+  assert(!(await page.locator('#log-dialog').evaluate(el=>el.open))); check('inline cancellation requires confirmation, reports failures and updates status');
+  for (const command of ['start','stop']) {
+    await page.evaluate(command=>run([command,'debian-server']),command);
+    assert(!(await page.locator('#log-dialog').evaluate(el=>el.open)));
+    jobStatus=command==='start' ? 'completed' : 'failed (1)';
+    await page.evaluate(()=>refreshJobs());
+    await page.waitForFunction(status=>document.getElementById('activity-status').textContent===status,command==='start' ? 'Completed' : 'failed (1)');
+    assert(!(await page.locator('#activity-cancel').isVisible()));
+  }
+  check('start and stop report success or failure inline without opening logs');
+  await page.locator('#job-rows [data-job-log]').click();
+  await page.waitForFunction(()=>document.getElementById('log').textContent.includes('Fixture job output'));
+  assert(!(await page.locator('#log-cancel').isVisible()));
+  await page.locator('#log-dialog [data-close]').click();
+  await page.evaluate(()=>run(['show','arch-noctalia']));
+  cancelResult=false;
+  await page.locator('#activity-toggle').click();
+  await page.locator('#activity-cancel').click(); await page.locator('#confirm-yes').click();
+  await page.waitForFunction(()=>document.getElementById('toast').textContent==='Job is no longer running');
+  assert.equal(jobStatus,'completed'); cancelResult=true;
+  check('finished jobs retain accessible logs; cancellation races do not claim success');
+  await page.locator('#all-commands').click();
+  const listedCommands=await page.locator('#cmd-list [data-cmd]').evaluateAll(items=>items.map(el=>el.dataset.cmd));
+  assert.equal(new Set(listedCommands).size,listedCommands.length); // Recent and suggested commands do not duplicate each other.
   await page.locator('#cmd-filter').fill('start'); await page.locator('#cmd-advanced summary').click();
   await shot('commands');
   await page.locator('#cmd-dialog [data-close]').click();
@@ -154,9 +273,42 @@ try {
   await page.locator('#vnc-full').click(); await page.waitForFunction(()=>!document.fullscreenElement); await shot('console'); await page.locator('#vnc-close').click(); check('console controls, reconnect and full screen');
   failState=true; await page.evaluate(()=>refresh()); assert.equal(await page.locator('#connection').textContent(),'Disconnected · retrying');
   failState=false; await page.evaluate(()=>refresh()); assert.equal(await page.locator('#connection').textContent(),'Live'); check('connection recovery');
-  for (const width of [909,390]) {
+  const initialY=(await page.locator('#profiles-view').boundingBox()).y;
+  jobId='vm:arch-noctalia'; holdRun=true;
+  await page.locator('#details').getByRole('button',{name:'Stop',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#rows [data-vm="arch-noctalia"] .state')?.textContent==='Stopping');
+  assert(await page.locator('#rows [data-vm="arch-noctalia"] .state').evaluate(el=>el.classList.contains('busy')));
+  assert(await page.locator('#details').getByRole('button',{name:'Stop',exact:true}).isDisabled());
+  assert(await page.locator('#details').getByRole('button',{name:'Open console',exact:false}).isVisible());
+  assert.equal((await page.locator('#profiles-view').boundingBox()).y,initialY);
+  holdRun=false; releaseRun();
+  await page.waitForFunction(()=>!submittingVms.has('arch-noctalia'));
+  await page.evaluate(()=>refreshJobs()); await page.evaluate(()=>refresh());
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Stopping');
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(),'Boot verified');
+  await shot('vm-stopping');
+  await page.locator('#rows [data-vm="arch-noctalia"] .state').click();
+  await page.waitForFunction(()=>document.getElementById('log').textContent.includes('Fixture job output'));
+  await page.locator('#log-dialog [data-close]').click();
+  await page.locator('#details').getByRole('button',{name:'Force stop',exact:true}).click();
+  assert.equal(await page.locator('#confirm-title').textContent(),'Force stop this VM?');
+  await page.locator('#confirm-yes').click();
+  await page.waitForFunction(()=>!S.vms[0].running && vmJobs.get('arch-noctalia')?.status==='cancelled');
+  assert.equal(cancelRequests.at(-1),'/api/jobs/vm%3Aarch-noctalia/cancel');
+  assert(!(await page.locator('#rows [data-vm="arch-noctalia"] .state').evaluate(el=>el.classList.contains('busy'))));
+  assert(await page.locator('#details').getByRole('button',{name:'Boot headless',exact:false}).isVisible());
+  state.vms[0].running=true; jobId='web:fixture'; jobStatus='completed';
+  await page.evaluate(()=>{ vmJobs.clear(); }); await page.evaluate(()=>refresh());
+  check('row progress is immediate, survives stale snapshots, keeps controls visible and supports confirmed force stop');
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] use').getAttribute('href'),'/assets/distro-icons.svg#arch');
+  assert.equal(await page.locator('.catalog-icon text').count(),0);
+  check('distribution icons use the local SVG sprite, without monogram placeholders');
+  for (const width of [1440,1100,909,768,720,390]) {
     await page.setViewportSize({width,height:900});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    assert(await page.locator('#list').evaluate(el=>el.scrollWidth<=el.clientWidth));
+    const primary = await page.locator('#details .main-action').boundingBox();
+    if (width>720) assert(primary.y+primary.height<700);
     await shot('dashboard-'+width);
     await page.locator('#all-commands').click();
     await page.locator('#cmd-filter').fill('start');
@@ -165,6 +317,10 @@ try {
     assert(await page.locator('#cmd-dialog').evaluate(el=>el.scrollHeight<=el.clientHeight));
     await shot('commands-'+width); await page.locator('#cmd-dialog [data-close]').click();
   }
-  check('909px and mobile layouts keep execution footer visible');
+  check('six viewport sizes keep profiles, primary actions and execution footer within bounds');
+  await page.locator('#activity-toggle').click();
+  await page.locator('#activity-dismiss').click(); assert(!(await page.locator('#activity').isVisible()));
+  assert(await page.locator('#job-rows [data-job-log]').isVisible());
+  check('completed activity can be dismissed while its log remains available');
   assert.deepEqual(errors,[]); check('no browser JavaScript errors');
 } finally { if (browser) await browser.close(); server.closeAllConnections(); await new Promise(resolve=>server.close(resolve)); }
