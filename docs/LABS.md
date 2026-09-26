@@ -43,6 +43,34 @@ a **runbook** walks through the lab step by step (each block marked *run*, *chec
 
 ![Map of the network lab: pfSense in front, Pi-hole and Lubuntu behind it, forwards through the router's WAN](screenshots/lab-map-netlab.png)
 
+## Temporary links between running VMs (`vmctl link`)
+
+A lab needs profiles that declare a segment. Two machines that are simply running, each on its
+own slirp network, cannot see each other — until they are linked:
+
+```bash
+vmctl link kali debian-server           # both get a hot-plugged NIC on the "session" segment and a 10.99.0.x address
+vmctl link almalinux-server             # one more VM on the same segment
+vmctl link                              # who is linked, with the addresses
+vmctl link --off                        # unplug everyone (or name the VMs to unplug)
+vmctl link a b --segment backend        # a second, separate segment (10.99.<n>.0/24)
+```
+
+In the dashboard, **drag a running machine's icon onto another running machine**: the same
+command runs after a confirmation, the machine's panel shows a *Linked* row with the address and
+its peers (and an *Unlink* button), and the segment appears under **Labs** as a temporary lab
+until the machines stop.
+
+What happens: the NIC is added to the running QEMU over QMP (`netdev_add` on the multicast
+socket the labs use, `device_add`) with a MAC that is stable per segment and VM; Linux and
+FreeBSD guests with SSH get the address set by vmctl (the interface is found by its MAC), other
+guests are told which address to set. Nothing is written to the profiles: the record of a segment
+is `artifacts/labs/links/<segment>.json`, valid only while the QEMU processes it names run.
+Limits: the VMs must be running in the background (*Boot headless*, `vmctl start --headless`),
+because only those have a QMP socket; a q35 machine needs the two empty PCIe root ports that
+headless boots carry since vmctl 0.9, so a VM booted earlier has to be restarted once; two
+segments per VM. For a permanent LAN, declare `networks` in the profiles (Customize) instead.
+
 ## Going further
 
 - How groups, start order and maps work: [UNATTENDED.md](UNATTENDED.md#groups-as-stacks-and-the-lab-map-vmctl-group).

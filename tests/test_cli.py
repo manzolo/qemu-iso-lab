@@ -117,6 +117,30 @@ class CliListNamesTests(BaseVmctlTestCase):
 class WelcomeTests(unittest.TestCase):
     """`vmctl welcome` (the end of setup.sh): commands that work on this host, no make."""
 
+    def test_the_menu_runs_the_chosen_step_and_enter_runs_nothing(self):
+        from vmctl import host_setup
+
+        choices = host_setup.welcome_choices(on_path=False)
+        self.assertEqual([c[0] for c in choices], ["1", "2", "3", "4"])
+        self.assertEqual(choices[0][2], ["./bin/vmctl", "web", "--open"])
+        self.assertEqual(choices[1][2], ["./bin/vmtui"])
+        self.assertEqual(host_setup.welcome_choices(on_path=True)[0][2], ["vmctl", "web", "--open"])
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+            self.assertEqual(host_setup.welcome_menu(choices, ask=lambda prompt: " 2 "), ["./bin/vmtui"])
+            self.assertIsNone(host_setup.welcome_menu(choices, ask=lambda prompt: ""))
+            self.assertIsNone(host_setup.welcome_menu(choices, ask=lambda prompt: "x"))
+            self.assertIsNone(host_setup.welcome_menu(choices, ask=mock.Mock(side_effect=EOFError)))
+        self.assertIn("Open the lab in your browser", out.getvalue())
+
+    def test_welcome_asks_only_on_a_terminal(self):
+        from vmctl import host_setup, lifecycle
+
+        with mock.patch.object(host_setup, "welcome_menu") as menu, mock.patch("sys.stdout", new_callable=io.StringIO), \
+                mock.patch.object(host_setup, "kvm_status", return_value=(True, "")), \
+                mock.patch("sys.stdin.isatty", return_value=False):
+            self.assertEqual(lifecycle.cmd_welcome(argparse.Namespace(no_menu=False)), 0)
+        menu.assert_not_called()
+
     def test_commands_use_the_shim_until_local_bin_is_on_path(self):
         from vmctl import host_setup
 

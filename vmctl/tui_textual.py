@@ -124,6 +124,10 @@ class VMDetails(Vertical):
                              style="bold #dce5ef" if account["password"] else "#a6b4c8")
                 if account.get("note"):
                     facts.append(f"  {account['note']}", style="#a6b4c8")
+        for link in row.get("links") or []:
+            facts.append(f"\n\nLINK · {link['segment']}\n", style="bold #84c9e7")
+            facts.append(f"{link['address']}", style="bold #dce5ef")
+            facts.append("  with " + ", ".join(f"{p['name']} {p['address']}" for p in link["peers"]), style="#a6b4c8")
         self.query_one("#vm-facts", Static).update(facts)
         self.query_one("#vm-install", Static).update(row["install_detail"] if row["installed"] else "")
         actions = quick_actions(row)[:-1]

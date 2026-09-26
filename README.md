@@ -213,7 +213,10 @@ Start or stop the stack from its card, or right-click an individual VM for its a
 
 ![Map of the Proxmox lab: three nodes and the client on the pve-lan segment](docs/screenshots/lab-map-proxmox.png)
 
-Members, commands and both maps: [docs/LABS.md](docs/LABS.md).
+Members, commands and both maps: [docs/LABS.md](docs/LABS.md). Two machines that are simply
+running can be connected on the spot, without a profile: `vmctl link kali debian-server`, or
+drag one running machine's icon onto the other in the dashboard — a NIC is hot-plugged into
+both and they get an address on a private segment, a temporary lab that ends when they stop.
 
 ## Everyday commands
 

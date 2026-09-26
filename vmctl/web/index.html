@@ -61,6 +61,10 @@ tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
 .profile-text { display:block; min-width:0; }
 .catalog-icon { --icon-color:var(--accent); --icon-ink:#fff; display:inline-flex; align-items:center; justify-content:center; flex:0 0 34px; width:34px; height:34px; border-radius:10px; color:var(--icon-ink); background:linear-gradient(160deg, color-mix(in srgb,var(--icon-color) 92%,#fff), color-mix(in srgb,var(--icon-color) 78%,#0b1220)); box-shadow:inset 0 0 0 1px color-mix(in srgb,#fff 18%,transparent), 0 1px 2px rgba(0,0,0,.35); vertical-align:middle; }
 .catalog-icon svg { display:block; width:22px; height:22px; pointer-events:none; }
+.catalog-icon[draggable=true] { cursor:grab; }
+#rows.linking tr[data-vm] { opacity:.55; }
+#rows.linking tr.drop-target { opacity:1; outline:2px solid var(--accent); outline-offset:-2px; background:#1c3a33; }
+.lab.session .lab-order { margin:0 0 12px; }
 .catalog-icon.large { width:46px; height:46px; flex-basis:46px; border-radius:13px; }
 .catalog-icon.large svg { width:30px; height:30px; }
 .lab .members button[data-member] { display:flex; align-items:center; gap:10px; min-width:0; }
@@ -530,10 +534,10 @@ function osIconKey(r) {
 }
 // Dark ink on a light badge (Haiku yellow, Mint green), white on the others.
 function iconInk(hex) { const n = parseInt(hex.slice(1), 16); return (0.299*(n>>16&255) + 0.587*(n>>8&255) + 0.114*(n&255)) > 160 ? "#0f1722" : "#ffffff"; }
-function catalogIcon(key, large = false) {
+function catalogIcon(key, large = false, drag = false) {
   const [label,color,glyph] = catalogIcons[key] || catalogIcons.generic;
   const artwork = distroIconKeys.has(key) ? `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" focusable="false"><use href="/assets/distro-icons.svg#${esc(key)}" width="24" height="24"/></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">${glyph}</svg>`;
-  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}" style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(label)}" aria-hidden="true">${artwork}</span>`;
+  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}"${drag ? ' draggable="true"' : ""} style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(drag ? label + " · drag onto another running machine to link them" : label)}" aria-hidden="true">${artwork}</span>`;
 }
 // End of catalog icon definitions.
 
@@ -613,7 +617,7 @@ function render() {
   const rows = visible();
   $("list-title").textContent = `Profiles  ${rows.length} / ${all.length}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
-  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r))}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r), false, !!r.running)}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`;
   bindStateLogs($("rows"));
   renderDetails();
@@ -630,6 +634,7 @@ function renderDetails() {
   const facts = [["Disk", r.prepared ? `${esc(r.disk_host || "?")} used <span class="s-muted">/ ${esc(r.disk_capacity || "?")}</span>` : "Not created yet"],
     ["ISO", { cached: "Ready to use", download: "Available to download", manual: "Provided manually" }[r.iso_source] || (r.iso_ready ? "Ready to use" : "Not cached")],
     ...((r.logins || []).length ? [["Login", r.logins.map((l) => `<span class="mono">${esc(l.user)}</span> / ${l.password ? `<span class="mono">${esc(l.password)}</span>` : '<span class="s-muted">no password</span>'}${l.note ? ` <span class="s-muted">· ${esc(l.note)}</span>` : ""}`).join("<br>")]] : []),
+    ...((r.links || []).map((l) => ["Linked", `<span class="mono">${esc(l.address)}</span> <span class="s-muted">on ${esc(l.segment)} with</span> ${l.peers.map((p) => `${esc(p.name)} <span class="mono">${esc(p.address)}</span>`).join(", ")} <button class="ssh-shortcut" data-unlink="${esc(l.segment)}" title="Unplug this machine from the segment">Unlink</button>`])),
     ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options" aria-label="Open SSH console options">&gt;_ SSH</button></span>` : "Not configured"]];
   const actions = actionsFor(r), memory = r.memory_mb >= 1024 ? `${r.memory_mb / 1024} GB` : `${r.memory_mb} MB`;
   const expandedDetails = $("details").dataset.vm === r.name ? [...$("details").querySelectorAll("details[open]")].map(el=>el.className) : [];
@@ -659,6 +664,10 @@ function renderLabs() {
   const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
   $("labs-view").innerHTML = S.labs.filter((lab) => words.every((w) => (lab.group + " " + lab.members.join(" ")).toLowerCase().includes(w))).map((lab) => {
     const names = lab.start_order || lab.members, members = names.map((n) => byName[n]).filter(Boolean);
+    if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="chip completed">temporary · ${members.length} linked</span></div>
+      <p class="lab-order">Made with <span class="mono">vmctl link</span> (or by dropping one running machine on another). Private segment 10.99.x.0/24 between running VMs; it ends when they stop and touches no profile.</p>
+      <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "")}</span></span></button>${stateBadge(m)}</div>`).join("")}</div>
+      <div class="buttons"><button data-args='${esc(JSON.stringify(["link", "--status", "--segment", lab.segment]))}'>Status</button><button class="danger" data-args='${esc(JSON.stringify(["link", "--off", "--segment", lab.segment]))}'>Unlink all</button></div></section>`;
     const up = members.filter((m) => m.running).length;
     const installed = names.length > 0 && names.every((n) => byName[n]?.installed);
     const cluster = members.some((m) => m.family === "proxmox");
@@ -1378,6 +1387,38 @@ $("rows").addEventListener("mouseleave", () => { hideHoverShot(); hover.muted = 
 $("rows").addEventListener("mousedown", hideHoverShot);
 $("rows").addEventListener("contextmenu", (e) => { hover.muted = e.target.closest("tr[data-vm]")?.dataset.vm || null; hideHoverShot(); });
 $("list").addEventListener("scroll", hideHoverShot);
+
+// Drag a running machine's icon onto another running machine: `vmctl link a b`, a private segment for this session.
+let dragVm = null;
+$("rows").addEventListener("dragstart", (e) => {
+  const tr = e.target.closest?.("tr[data-vm]"), vm = tr?.dataset.vm;
+  if (!vm || !S.vms.some(r => r.name === vm && r.running)) { e.preventDefault(); return; }
+  dragVm = vm; hideHoverShot(); hover.muted = vm;
+  e.dataTransfer.setData("text/plain", vm); e.dataTransfer.effectAllowed = "link";
+  $("rows").classList.add("linking");
+});
+$("rows").addEventListener("dragover", (e) => {
+  const tr = e.target.closest("tr[data-vm]"), vm = tr?.dataset.vm;
+  const ok = dragVm && vm && vm !== dragVm && S.vms.some(r => r.name === vm && r.running);
+  $("rows").querySelectorAll("tr.drop-target").forEach((row) => { if (row !== tr) row.classList.remove("drop-target"); });
+  if (!ok) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = "link"; tr.classList.add("drop-target");
+});
+$("rows").addEventListener("dragleave", (e) => { const tr = e.target.closest?.("tr[data-vm]"); if (tr && !tr.contains(e.relatedTarget)) tr.classList.remove("drop-target"); });
+$("rows").addEventListener("dragend", () => { dragVm = null; hover.muted = null; $("rows").classList.remove("linking"); $("rows").querySelectorAll("tr.drop-target").forEach((row) => row.classList.remove("drop-target")); });
+$("rows").addEventListener("drop", async (e) => {
+  const target = e.target.closest("tr[data-vm]")?.dataset.vm, source = dragVm;
+  e.preventDefault(); dragVm = null; $("rows").classList.remove("linking"); $("rows").querySelectorAll("tr.drop-target").forEach((row) => row.classList.remove("drop-target"));
+  if (!source || !target || source === target) return;
+  const ok = await askConfirm({ eyebrow: "Session link", title: `Link ${source} and ${target}?`, button: "Link them",
+    message: "Both machines get a hot-plugged NIC on a private segment (10.99.0.0/24) for this session and, where vmctl can reach the guest over SSH, its address. Nothing is saved in the profiles: the link ends when the machines stop.",
+    command: `vmctl link ${source} ${target}` });
+  if (ok) run(["link", source, target]);
+});
+$("details").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-unlink]"); if (!b || !selected) return;
+  run(["link", "--off", "--segment", b.dataset.unlink, selected]);
+});
 window.addEventListener("scroll", hideHoverShot, true);
 window.addEventListener("resize", hideHoverShot);
 document.addEventListener("visibilitychange", () => { if (document.hidden) hideHoverShot(); });

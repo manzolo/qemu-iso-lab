@@ -28,7 +28,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
      ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
-     ["start", "stop", "shell", "console", "agent", "attach"]),
+     ["start", "stop", "shell", "console", "agent", "attach", "link"]),
     ("Libvirt", "hand an installed VM to virt-manager",
      ["export-libvirt", "unexport-libvirt"]),
     ("Network lab", "pfSense router + Pi-hole DNS + clients on an isolated LAN segment",
@@ -297,6 +297,28 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true", help="skip the graceful power-off and signal QEMU directly (SIGTERM, then SIGKILL)")
     p.set_defaults(func=lifecycle.cmd_stop)
 
+    p = _add(subparsers, "link", help="connect running VMs on a private network segment, without restarting them (a temporary lab)",
+             epilog="""examples:
+  vmctl link kali freebsd                 both get a hot-plugged NIC on segment "session" and an address in 10.99.0.0/24
+  vmctl link debian-server                add one more VM to the same segment
+  vmctl link                              who is linked, with the addresses (also: --status)
+  vmctl link --off                        unplug every VM from the segment (or name the ones to unplug)
+  vmctl link a b --segment backend        a second, separate segment (10.99.<n>.0/24)
+
+The VMs must be running in the background (Boot headless / vmctl start --headless): the NIC is
+added over QMP, on the multicast socket the labs use, so the profiles are not touched and the
+link lasts as long as the VMs run. Linux and FreeBSD guests with SSH get the address set by
+vmctl; other guests are told which address to set. q35 machines need the hot-plug slots that
+headless boots carry since vmctl 0.9: a VM booted earlier has to be restarted once.
+The dashboard does the same when a running machine's icon is dropped on another one.""")
+    p.add_argument("vm", nargs="?", help="a running VM")
+    p.add_argument("peers", nargs="*", help="the other running VMs to put on the same segment")
+    p.add_argument("--segment", help="segment name (default: session)")
+    p.add_argument("--mcast", help="multicast group:port of the segment instead of the one derived from its name")
+    p.add_argument("--status", action="store_true", help="show the linked VMs and their addresses")
+    p.add_argument("--off", action="store_true", help="unplug the named VMs (or every VM) from the segment")
+    p.set_defaults(func=lifecycle.cmd_link)
+
     p = _add(subparsers, "cancel-install", help="cancel a TUI background installation and stop its VM, preserving disk and logs")
     p.add_argument("vm", help=VM_HELP)
     p.set_defaults(func=lifecycle.cmd_cancel_install)
@@ -402,7 +424,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--open", action="store_true", help="open the page in the default browser")
     p.set_defaults(func=webui.cmd_web)
 
-    p = _add(subparsers, "welcome", help="what to do next after setup: the first commands, with the paths that work on this host")
+    p = _add(subparsers, "welcome", help="what to do next after setup: the first commands, with the paths that work on this host; in a terminal it then asks which one to run (--no-menu: print only)")
+    p.add_argument("--no-menu", action="store_true", help="print the screen without asking what to run next")
     p.set_defaults(func=lifecycle.cmd_welcome)
 
     p = _add(subparsers, "setup", help="verify host prerequisites; --install installs the missing ones")

@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
 
 from vmctl import qemu, runtime, state, ui
 from vmctl.errors import VMError
@@ -504,3 +505,30 @@ def render_welcome(*, profiles: int, on_path: bool, kvm: tuple[bool, str], textu
     lines += step("·", "All commands (README.md and docs/ for the rest)", f"{cmd} --help")
     lines += ["  " + ui.style(f"This screen again: {cmd} welcome", ui.CYAN), ""]
     return "\n".join(lines)
+
+
+def welcome_choices(on_path: bool) -> list[tuple[str, str, list[str]]]:
+    """The menu under the welcome screen: (key, what it does, the command), the same numbers as the steps."""
+    cmd = "vmctl" if on_path else "./bin/vmctl"
+    tui = "vmtui" if on_path else "./bin/vmtui"
+    return [("1", "Open the lab in your browser", [cmd, "web", "--open"]),
+            ("2", "Terminal dashboard", [tui]),
+            ("3", "Install debian-server with zero clicks (~10 min)", [cmd, "bootstrap-preseed", "debian-server"]),
+            ("4", "List every profile", [cmd, "list"])]
+
+
+def welcome_menu(choices: list[tuple[str, str, list[str]]], ask: Callable[[str], str] = input) -> list[str] | None:
+    """Ask which of *choices* to run now; Enter (or anything else) is none. Only for a terminal."""
+    from vmctl import ui
+
+    for key, label, _ in choices:
+        print(f"  {ui.style(key, ui.BOLD, ui.CYAN)}  {label}")
+    try:
+        answer = ask("  What now? [1-4, Enter for nothing] ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+    for key, _, command in choices:
+        if answer == key:
+            return command
+    return None

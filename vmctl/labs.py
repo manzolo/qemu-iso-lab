@@ -54,8 +54,7 @@ def login(vm: dict[str, Any]) -> dict[str, str] | None:
         if hash_key and cfg.get(hash_key) == TRACKED_LAB_HASH:
             return {"user": user, "password": "lab", "note": where or "tracked default"}
         return {"user": user, "password": "",
-                "note": (where + "; " if where else "") + "password set in vms/profiles/local.json (stored as a hash; "
-                        "add meta.password_hint there to show it here)"}
+                "note": (where + "; " if where else "") + "your own (a hash in local.json; meta.password_hint there shows it)"}
     return None
 
 

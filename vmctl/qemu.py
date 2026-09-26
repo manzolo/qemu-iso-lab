@@ -700,13 +700,24 @@ class UnixSocketBridge:
 def qmp_command(sock_path: Path, command: str, timeout: float = 5.0, *, arguments: dict[str, Any] | None = None) -> bool:
     """Send one QMP command (after the capabilities handshake); True if QEMU acknowledged it."""
     try:
+        qmp_execute(sock_path, command, timeout=timeout, arguments=arguments)
+    except VMError:
+        return False
+    return True
+
+
+def qmp_execute(sock_path: Path, command: str, *, arguments: dict[str, Any] | None = None, timeout: float = 5.0) -> Any:
+    """Send one QMP command and return its ``return`` value; a QEMU error or a dead socket is a VMError
+    carrying QEMU's own description (``vmctl link`` shows why a hot-plug was refused)."""
+    try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
             sock.settimeout(timeout)
             sock.connect(str(sock_path))
             stream = sock.makefile("rwb", buffering=0)
             greeting = json.loads(stream.readline() or b"{}")
             if "QMP" not in greeting:
-                return False
+                raise VMError(f"{sock_path} did not greet as a QMP socket")
+            result: Any = None
             for execute in ("qmp_capabilities", command):
                 payload: dict[str, Any] = {"execute": execute}
                 if execute == command and arguments is not None:
@@ -715,15 +726,32 @@ def qmp_command(sock_path: Path, command: str, timeout: float = 5.0, *, argument
                 while True:  # skip asynchronous events until the reply arrives
                     line = stream.readline()
                     if not line:
-                        return False
+                        raise VMError(f"QEMU closed the QMP socket while answering {command}")
                     reply = json.loads(line)
                     if "error" in reply:
-                        return False
+                        raise VMError(f"QMP {command}: {reply['error'].get('desc') or reply['error']}")
                     if "return" in reply:
+                        result = reply["return"]
                         break
-            return True
-    except (OSError, ValueError):
-        return False
+            return result
+    except (OSError, ValueError) as exc:
+        raise VMError(f"QMP {command} on {sock_path}: {exc}") from exc
+
+
+HOTPLUG_PORTS = ("hotplug0", "hotplug1")
+
+
+def hotplug_port_args(vm: dict[str, Any]) -> list[str]:
+    """Empty PCIe root ports on a q35 machine, so that a NIC can be hot-plugged into a running VM
+    (``vmctl link``): pcie.0 itself refuses device_add ("does not support hotplugging"), while the
+    i440fx ``pc`` root bus takes it directly. Appended after every other device, so nothing that
+    was already there changes its PCI address (guests name interfaces after it)."""
+    if str(vm.get("machine")) != "q35":
+        return []
+    args: list[str] = []
+    for index, port in enumerate(HOTPLUG_PORTS):
+        args += ["-device", f"pcie-root-port,id={port},chassis={200 + index}"]
+    return args
 
 
 def common_args(
@@ -794,6 +822,8 @@ def common_args(
         # hands these arguments to Popen; it exits by itself when this QEMU goes away.
         ensure_virtiofsd(vm, dry_run=dry_run)
         args += shared_device
+    if headless and spice_port is None:
+        args += hotplug_port_args(vm)
     if no_reboot:
         args += ["-no-reboot"]
     return args

@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp
+from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -2399,6 +2399,8 @@ def cmd_group(args: argparse.Namespace) -> int:
                 entry["addresses"] = {member["name"]: [nic["address"] for nic in member["nics"] if nic["type"] == "segment"]
                                       for member in labs.model(cfg, group)["members"]}
             entries.append(entry)
+        # Running VMs joined by `vmctl link` are a lab too, for as long as they run.
+        entries += vmlink.session_labs()
         if args.json:
             print(json.dumps(entries, indent=2))
         else:
@@ -3222,6 +3224,87 @@ def cmd_cancel_install(args: argparse.Namespace) -> int:
     return 0
 
 
+def running_background_pid(name: str, vm: dict[str, Any]) -> int | None:
+    """PID of *name*'s background QEMU: the tracked one, else the one holding its SSH forward (with proof)."""
+    running, pid, _ = is_bootstrap_vm_running(name)
+    if running and pid is not None:
+        return pid
+    port = vm_ssh_host_port(vm)
+    if port is not None:
+        found, _ = find_qemu_process_by_hostfwd_port(port, vm_owner_paths(name, vm))
+        if found is not None:
+            return found
+    return None
+
+
+def cmd_link(args: argparse.Namespace) -> int:
+    """``vmctl link <vm> [<vm>...]``: a private segment between running VMs, hot-plugged, for this session."""
+    cfg = config.load_config()
+    segment = str(args.segment or vmlink.DEFAULT_SEGMENT)
+    names = [n for n in [args.vm, *(args.peers or [])] if n]
+    if args.off:
+        if not names:
+            names = [n for r in vmlink.all_records() if r["segment"] == segment for n in r["members"]]
+        if not names:
+            ui.print_status("ok", f"Nothing is linked on segment {segment}")
+            return 0
+        for name in names:
+            vm = config.get_vm(cfg, name)
+            if args.dry_run:
+                ui.print_note(f"Would unplug {name} from segment {segment}")
+            elif vmlink.unlink(vm, name, segment):
+                ui.print_status("ok", f"{name} left segment {segment}")
+            else:
+                ui.print_status("warn", f"{name} was not on segment {segment}", ok=False)
+        return 0
+    if not names or args.status:
+        labs_now = vmlink.session_labs()
+        if not labs_now:
+            ui.print_status("ok", "No running VM is linked (vmctl link <vm> <vm> connects two running VMs)")
+            return 0
+        for lab in labs_now:
+            ui.print_header(f"Segment {lab['segment']} ({len(lab['members'])} VMs, temporary)")
+            for name in lab["members"]:
+                ui.print_note(f"{name:<22} {lab['addresses'][name][0]}")
+        return 0
+    if len(names) == 1 and not vmlink.load_record(segment)["members"]:
+        raise VMError("vmctl link needs two running VMs (or one to add to a segment that already has members)")
+    results: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+    for name in names:
+        vm = config.get_vm(cfg, name)
+        pid = vmlink_running_pid(name, vm)
+        member = vmlink.link(vm, name, pid, segment, dry_run=args.dry_run, mcast=args.mcast)
+        results.append((name, vm, member))
+        if args.dry_run:
+            continue
+        if member.get("already"):
+            ui.print_status("ok", f"{name} is already on segment {segment} as {member['address']}")
+        elif member.get("configured"):
+            ui.print_status("ok", f"{name}: {member['interface']} {member['address']} on segment {segment}")
+        elif member.get("error"):
+            ui.print_status("warn", f"{name}: NIC plugged, but {member['error']}", ok=False)
+            ui.print_note(vmlink.manual_hint(vm, member["address"]))
+        else:
+            ui.print_status("ok", f"{name}: NIC {member['mac']} plugged, address {member['address']} to set by hand")
+            ui.print_note(vmlink.manual_hint(vm, member["address"]))
+    if args.dry_run:
+        return 0
+    record = vmlink.load_record(segment)
+    others = {n: m["address"] for n, m in record["members"].items()}
+    ui.print_header(f"Segment {segment}: {', '.join(f'{n} {a}' for n, a in others.items())}")
+    if len(others) >= 2:
+        first, second = list(others.items())[:2]
+        ui.print_note(f"try: vmctl shell {first[0]}, then ping -c 3 {second[1].split('/')[0]}  (the link ends when the VMs stop)")
+    return 0
+
+
+def vmlink_running_pid(name: str, vm: dict[str, Any]) -> int:
+    pid = running_background_pid(name, vm)
+    if pid is None:
+        raise VMError(f"{name} is not running in the background (boot it headless first, then link)")
+    return pid
+
+
 def cmd_stop(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -3811,9 +3894,17 @@ def cmd_welcome(args: argparse.Namespace) -> int:
     except VMError:
         profiles = 0
     missing = [name for name in state.REQUIRED_COMMANDS if not host_setup.tool_present(name)]
-    print(host_setup.render_welcome(profiles=profiles, on_path=host_setup.vmctl_on_path(), kvm=host_setup.kvm_status(),
+    on_path = host_setup.vmctl_on_path()
+    print(host_setup.render_welcome(profiles=profiles, on_path=on_path, kvm=host_setup.kvm_status(),
                                     textual=host_setup.tool_present(host_setup.TEXTUAL), missing=missing))
-    return 0
+    # Straight after ./setup.sh the next step is one keypress away; a pipe or a script gets the screen only.
+    if getattr(args, "no_menu", False) or not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return 0
+    command = host_setup.welcome_menu(host_setup.welcome_choices(on_path))
+    if command is None:
+        return 0
+    executable = state.ROOT / "bin" / Path(command[0]).name
+    return subprocess.call([str(executable), *command[1:]], cwd=state.ROOT)
 
 
 def cmd_setup(args: argparse.Namespace) -> int:
