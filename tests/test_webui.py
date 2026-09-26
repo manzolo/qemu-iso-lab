@@ -122,6 +122,22 @@ class RequestTests(BaseVmctlTestCase):
         self.assertNotIn("abort. ran", aborted.stdout)  # EOF at the prompt: never ran
         self.assertEqual(aborted.returncode, 130)
 
+    def test_open_without_a_graphical_browser_says_so(self):
+        from unittest import mock
+
+        with mock.patch.dict("os.environ", {"DISPLAY": ":0"}), \
+             mock.patch.object(webui.shutil, "which", return_value="/usr/bin/xdg-open"), \
+             mock.patch.object(webui, "default_browser", return_value=None), \
+             mock.patch.object(webui.subprocess, "Popen") as popen:
+            self.assertFalse(webui.open_browser("http://127.0.0.1:1/"))
+        popen.assert_not_called()  # xdg-open would fall back to w3m, detached and invisible
+        with mock.patch.dict("os.environ", {"DISPLAY": ":0"}), \
+             mock.patch.object(webui.shutil, "which", return_value="/usr/bin/xdg-open"), \
+             mock.patch.object(webui, "default_browser", return_value="firefox_firefox.desktop"), \
+             mock.patch.object(webui.subprocess, "Popen") as popen:
+            self.assertTrue(webui.open_browser("http://127.0.0.1:1/"))
+        popen.assert_called_once()
+
     def test_host_ssh_rejects_missing_config_or_desktop(self):
         from unittest import mock
 

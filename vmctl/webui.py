@@ -624,18 +624,34 @@ def make_server(port: int, token: str) -> ThreadingHTTPServer:
     return server
 
 
-def open_browser(url: str) -> None:
+def default_browser() -> str | None:
+    """The desktop's handler for http links, or None: a fresh Lubuntu 22.04 has none (Firefox is
+    a snap that is not installed) and xdg-open then falls back to w3m, detached and invisible."""
+    query = shutil.which("xdg-mime")
+    if not query:
+        return None
+    try:
+        result = subprocess.run([query, "query", "default", "x-scheme-handler/http"], capture_output=True,
+                                text=True, timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout.strip() or None
+
+
+def open_browser(url: str) -> bool:
     """The browser's own chatter (Chrome's Wayland/Vulkan/GCM warnings) must not land in the
-    terminal the server prints to: start it detached with its output discarded."""
-    import shutil
+    terminal the server prints to: start it detached with its output discarded. False when
+    there is no graphical browser to open: the caller says so instead of failing silently."""
     import webbrowser
 
     opener = shutil.which("xdg-open")
-    if opener:
+    if opener and (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        if not default_browser():
+            return False
         subprocess.Popen([opener, url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True)
-    else:
-        webbrowser.open(url)
+        return True
+    return bool(webbrowser.open(url))
 
 
 def cmd_web(args: argparse.Namespace) -> int:
@@ -649,8 +665,10 @@ def cmd_web(args: argparse.Namespace) -> int:
     ui.print_kv("open", url)
     ui.print_note("Jobs started here keep running after Ctrl-C; the TUI shows them too.")
     sys.stdout.flush()  # the URL carries the token: it must reach a log even without a terminal
-    if getattr(args, "open", False):
-        open_browser(url)
+    if getattr(args, "open", False) and not open_browser(url):
+        ui.print_status("warn", "No graphical browser found: open the URL above in one "
+                        "(on Ubuntu: sudo snap install firefox).", ok=False)
+        sys.stdout.flush()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -149,6 +149,38 @@ def iso_url_candidates(vm: dict[str, Any], allow_discovery: bool = True) -> list
     return deduped
 
 
+def copy_with_progress(source: Any, target: Any, total: int | None, label: str = "downloaded") -> None:
+    """Copy a download and say how far it is. On a terminal one line rewritten in place; in a job
+    log (the web page, the TUI) a line every 10 %, or every 256 MiB when the size is unknown,
+    because a 3 GB ISO otherwise shows nothing for minutes."""
+    import sys
+    import time
+
+    tty = sys.stdout.isatty()
+    done, last_step, last_draw, started = 0, -1, 0.0, time.monotonic()
+    while True:
+        chunk = source.read(1024 * 1024)
+        if not chunk:
+            break
+        target.write(chunk)
+        done += len(chunk)
+        now = time.monotonic()
+        rate = done / max(now - started, 0.001) / 1e6
+        if tty:
+            if now - last_draw >= 0.5:
+                share = f"{done * 100 // total:3d}% " if total else ""
+                print(f"\r  {label:<10} {share}{done / 1e9:.2f} / {(total or 0) / 1e9:.2f} GB  {rate:.0f} MB/s ", end="", flush=True)
+                last_draw = now
+            continue
+        step = done * 10 // total if total else done // (256 * 1024 * 1024)
+        if step != last_step and step > 0:
+            share = f"{step * 10}% · " if total else ""
+            print(f"  {label:<10} {share}{done / 1e9:.2f} GB · {rate:.0f} MB/s", flush=True)
+            last_step = step
+    if tty:
+        print(f"\r  {label:<10} {done / 1e9:.2f} GB in {time.monotonic() - started:.0f} s" + " " * 20, flush=True)
+
+
 def download_file(url: str, destination: Path, dry_run: bool = False, vm: dict[str, Any] | None = None) -> None:
     ui.print_header("Download ISO")
     ui.print_kv("source", ui.pretty_url(url))
@@ -168,7 +200,7 @@ def download_file(url: str, destination: Path, dry_run: bool = False, vm: dict[s
             if "text/html" in content_type.lower():
                 raise VMError(f"Refusing HTML response for ISO download: {url}")
             expected_length = response.headers.get("Content-Length")
-            shutil.copyfileobj(response, fh)
+            copy_with_progress(response, fh, int(expected_length) if (expected_length or "").isdigit() else None)
         if expected_length:
             actual_length = partial.stat().st_size
             try:
@@ -257,7 +289,7 @@ def _fetch(url: str, destination: Path) -> None:
             if "text/html" in response.headers.get("Content-Type", "").lower():
                 raise VMError(f"Refusing HTML response for download: {url}")
             expected_length = response.headers.get("Content-Length")
-            shutil.copyfileobj(response, fh)
+            copy_with_progress(response, fh, int(expected_length) if (expected_length or "").isdigit() else None)
         if expected_length and destination.stat().st_size != int(expected_length):
             raise VMError(f"Incomplete download from '{url}': got {destination.stat().st_size} bytes, expected {expected_length}")
     except VMError:

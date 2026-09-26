@@ -383,7 +383,7 @@ class ManageTests(BaseVmctlTestCase):
         self.assertIn("[missing] qemu-img", output)
         self.assertIn("Unable to locate OVMF firmware files for EFI guest.", output)
         self.assertIn("Affected EFI profiles: testvm", output)
-        self.assertIn("sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk", output)
+        self.assertIn("sudo env NEEDRESTART_MODE=l apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvirt-clients libvirt-daemon-system make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip-full dvd+rw-tools python3-bcrypt swtpm gdisk", output)
         self.assertIn("[missing] virtiofsd", output)
         self.assertIn("[missing] 7z", output)
 
@@ -443,7 +443,7 @@ class ManageTests(BaseVmctlTestCase):
     def test_setup_install_named_tools_maps_them_to_packages_once(self):
         executed, confirm, output = self._install(["growisofs", "cloud-localds", "ddrescue", "ddrescuelog", "fzf"], present={"fzf"})
         self.assertEqual(executed, [["sudo", "apt", "update"],
-                                    ["sudo", "apt", "install", "-y", "dvd+rw-tools", "cloud-image-utils", "gddrescue"]])
+                                    ["sudo", "env", "NEEDRESTART_MODE=l", "apt", "install", "-y", "dvd+rw-tools", "cloud-image-utils", "gddrescue"]])
         self.assertIn("fzf is already installed", output)
         confirm.assert_called_once()
 
@@ -451,7 +451,7 @@ class ManageTests(BaseVmctlTestCase):
         # Ubuntu 22.04: one unknown package name made `apt install` refuse the whole list
         # (reported from a Lubuntu host, 2026-09-26).
         executed, _, output = self._install(["xorriso", "swtpm"], apt_has={"xorriso"})
-        self.assertEqual(executed[-1], ["sudo", "apt", "install", "-y", "xorriso"])
+        self.assertEqual(executed[-1], ["sudo", "env", "NEEDRESTART_MODE=l", "apt", "install", "-y", "xorriso"])
         self.assertIn("swtpm: no apt package on this release, skipped", output)
 
     def test_setup_install_brings_the_upstream_virtiofsd_where_apt_has_none(self):
@@ -459,12 +459,12 @@ class ManageTests(BaseVmctlTestCase):
         with mock.patch.object(vmctl.host_setup, "install_upstream_virtiofsd") as upstream:
             executed, _, output = self._install(["xorriso", "virtiofsd"], apt_has={"xorriso"})
         upstream.assert_called_once()
-        self.assertEqual(executed[-1], ["sudo", "apt", "install", "-y", "xorriso"])
+        self.assertEqual(executed[-1], ["sudo", "env", "NEEDRESTART_MODE=l", "apt", "install", "-y", "xorriso"])
         self.assertIn("virtiofsd <- upstream static build", output)
         with mock.patch.object(vmctl.host_setup, "install_upstream_virtiofsd") as upstream:
             executed, _, _ = self._install(["virtiofsd"], apt_has={"virtiofsd"})
         upstream.assert_not_called()
-        self.assertEqual(executed[-1], ["sudo", "apt", "install", "-y", "virtiofsd"])
+        self.assertEqual(executed[-1], ["sudo", "env", "NEEDRESTART_MODE=l", "apt", "install", "-y", "virtiofsd"])
 
     def test_legacy_c_virtiofsd_is_not_used(self):
         def fake_run(cmd, **kwargs):
@@ -482,7 +482,7 @@ class ManageTests(BaseVmctlTestCase):
     def test_setup_install_textual_on_apt_brings_python3_venv(self):
         venv = self.root / ".venv-tui"
         executed, _, _ = self._install(["textual"])
-        self.assertEqual(executed[:3], [["sudo", "apt", "update"], ["sudo", "apt", "install", "-y", "python3-venv"],
+        self.assertEqual(executed[:3], [["sudo", "apt", "update"], ["sudo", "env", "NEEDRESTART_MODE=l", "apt", "install", "-y", "python3-venv"],
                                         ["python3", "-m", "venv", str(venv)]])
 
     def test_apt_available_reads_the_candidates_of_apt_cache_policy(self):
@@ -531,7 +531,7 @@ class ManageTests(BaseVmctlTestCase):
         (venv / "bin/python").write_text("", encoding="utf-8")
         with mock.patch.object(vmctl.host_setup, "textual_venv_usable", return_value=False):
             executed, _, _ = self._install(["textual"])
-        self.assertEqual(executed[1], ["sudo", "apt", "install", "-y", "python3-venv"])
+        self.assertEqual(executed[1], ["sudo", "env", "NEEDRESTART_MODE=l", "apt", "install", "-y", "python3-venv"])
         self.assertEqual(executed[2], ["python3", "-m", "venv", "--clear", str(venv)])
         self.assertEqual(executed[3][1:4], ["-m", "pip", "install"])
 
@@ -554,7 +554,7 @@ class ManageTests(BaseVmctlTestCase):
         confirm.assert_not_called()
         executed, confirm, _ = self._install(["xorriso"], dry_run=True)
         confirm.assert_not_called()
-        self.assertEqual(executed[-1], ["sudo", "apt", "install", "-y", "xorriso"])
+        self.assertEqual(executed[-1], ["sudo", "env", "NEEDRESTART_MODE=l", "apt", "install", "-y", "xorriso"])
 
     def test_setup_install_names_everything_setup_checks(self):
         names = set(vmctl.host_setup.installable_names())
@@ -624,7 +624,7 @@ class ManageTests(BaseVmctlTestCase):
         self.assertEqual(executed[0], ["sudo", "apt", "update"])
         self.assertEqual(
             executed[1],
-            ["sudo", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "openssh-client", "libvirt-clients", "libvirt-daemon-system", "make", "dialog", "fzf", "cloud-image-utils", "xorriso", "virtiofsd", "virt-viewer", "p7zip-full", "dvd+rw-tools", "python3-bcrypt", "swtpm", "gdisk", "gddrescue", "partclone", "fdisk"],
+            ["sudo", "env", "NEEDRESTART_MODE=l", "apt", "install", "-y", "qemu-system-x86", "qemu-utils", "ovmf", "python3", "openssh-client", "libvirt-clients", "libvirt-daemon-system", "make", "dialog", "fzf", "cloud-image-utils", "xorriso", "virtiofsd", "virt-viewer", "p7zip-full", "dvd+rw-tools", "python3-bcrypt", "swtpm", "gdisk", "gddrescue", "partclone", "fdisk"],
         )
 
     def test_cmd_setup_passes_when_requirements_and_firmware_are_available(self):

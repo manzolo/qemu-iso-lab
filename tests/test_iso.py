@@ -336,3 +336,22 @@ class IsoArchiveTests(BaseVmctlTestCase):
                 with self.subTest(profile=name):
                     has_source = vm.get("iso_url") or vm.get("iso_urls") or vm.get("iso_discovery")
                     self.assertTrue(has_source or vm.get("iso_help"), f"{name}: no download source and no iso_help")
+
+
+class DownloadProgressTests(unittest.TestCase):
+    """A job log (the web page, the TUI) has no terminal: the download says how far it is anyway."""
+
+    def test_a_job_log_gets_a_line_every_ten_percent(self):
+        import contextlib
+        import io
+
+        from vmctl import iso
+
+        data = b"x" * (10 * 1024 * 1024)
+        out, target = io.StringIO(), io.BytesIO()
+        with contextlib.redirect_stdout(out):
+            iso.copy_with_progress(io.BytesIO(data), target, len(data))
+        self.assertEqual(target.getvalue(), data)
+        lines = out.getvalue().splitlines()
+        self.assertEqual([line.split()[1] for line in lines], [f"{n}%" for n in range(10, 101, 10)])
+        self.assertNotIn("\r", out.getvalue())

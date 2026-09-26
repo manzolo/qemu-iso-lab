@@ -183,10 +183,7 @@ def host_install_commands() -> list[list[str]] | None:
         return [
             ["sudo", "apt", "update"],
             [
-                "sudo",
-                "apt",
-                "install",
-                "-y",
+                *APT_INSTALL,
                 "qemu-system-x86",
                 "qemu-utils",
                 "ovmf",
@@ -284,6 +281,13 @@ def apt_available(packages: list[str]) -> set[str] | None:
     return found or None
 
 
+# Ubuntu 22.04's needrestart opens a full-screen "Daemons using outdated libraries" dialog in the
+# middle of `apt install` and waits for Enter (verified on a fresh Lubuntu 22.04, 2026-09-26):
+# mode "l" only lists the services instead. `env` because sudo refuses VAR=value arguments
+# that are not in its env_keep list.
+APT_INSTALL = ["sudo", "env", "NEEDRESTART_MODE=l", "apt", "install", "-y"]
+
+
 def package_install_commands(names: list[str], manager: str, extra: list[str] | None = None) -> list[list[str]]:
     packages = list(dict.fromkeys([*(TOOL_PACKAGES[name][manager] for name in names), *(extra or [])]))
     if manager == "apt":
@@ -296,7 +300,7 @@ def package_install_commands(names: list[str], manager: str, extra: list[str] | 
         return []
     if manager == "pacman":
         return [["sudo", "pacman", "-S", "--needed", *packages]]
-    return [["sudo", "apt", "update"], ["sudo", "apt", "install", "-y", *packages]]
+    return [["sudo", "apt", "update"], [*APT_INSTALL, *packages]]
 
 
 def textual_venv_usable() -> bool:
