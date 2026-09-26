@@ -67,7 +67,23 @@ pre.log { background: #0b1016; border: 1px solid var(--line); border-radius: 8px
 .form label { color: var(--muted); font-size: 13px; }
 .form input[type=text], .form select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
 .help { grid-column: 2; color: var(--muted); font-size: 12px; margin-top: -4px; }
-#preview { margin: 14px 0; padding: 8px 10px; background: #0b1016; border-radius: 6px; }
+#preview { margin: 14px 0; padding: 8px 10px; background: #0b1016; border-radius: 6px; word-break: break-all; }
+.palette { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 60vh; max-height: calc(90vh - 60px); }
+.pal-list { border-right: 1px solid var(--line); padding: 12px; overflow: auto; }
+.pal-list input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; margin-bottom: 8px; }
+.pal-group { color: var(--accent); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin: 10px 4px 4px; }
+.pal-item { padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.pal-item:hover { background: #1b2735; }
+.pal-item.sel { background: #285269; }
+.pal-item b { font-family: ui-monospace, monospace; font-weight: 500; font-size: 13px; }
+.pal-item span { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal-item.sel span { color: #cfe3ee; }
+.pal-form { padding: 16px; overflow: auto; }
+#cmd-head h3 { margin: 0 0 4px; font-family: ui-monospace, monospace; font-size: 16px; }
+#cmd-head p { margin: 0 0 14px; color: var(--muted); }
+.scope button { margin-right: 4px; }
+.fixed { display: inline-block; background: var(--btn); border-radius: 6px; padding: 3px 8px; font-family: ui-monospace, monospace; }
+@media (max-width: 720px) { .palette { grid-template-columns: 1fr; } .pal-list { border-right: 0; border-bottom: 1px solid var(--line); max-height: 35vh; } }
 .labs { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; padding: 0 20px 16px; }
 .lab { padding: 0 16px 16px; }
 .lab .members { margin: 8px 0 12px; font-size: 13px; }
@@ -107,9 +123,12 @@ pre.log { background: #0b1016; border: 1px solid var(--line); border-radius: 8px
 
 <dialog id="log-dialog"><header><h1 id="log-title">Job</h1><span><button id="log-cancel" class="danger">Cancel job</button> <button data-close>Close</button></span></header>
   <div class="body"><pre class="log" id="log"></pre></div></dialog>
-<dialog id="cmd-dialog"><header><h1>Run a vmctl command</h1><button data-close>Close</button></header>
-  <div class="body"><div class="form" id="cmd-form"></div><div id="preview" class="mono"></div>
-  <button id="cmd-run" class="primary">Run</button></div></dialog>
+<dialog id="cmd-dialog" style="width:min(1100px,96vw)"><header><h1 id="cmd-title">Commands</h1><span class="scope"><button data-scope="vm" id="scope-vm">For this VM</button><button data-scope="global">Global</button> <button data-close>Close</button></span></header>
+  <div class="palette">
+    <div class="pal-list"><input id="cmd-filter" placeholder="Filter commands…" autocomplete="off"><div id="cmd-list"></div></div>
+    <div class="pal-form"><div id="cmd-head"></div><div class="form" id="cmd-form"></div><div id="preview" class="mono"></div>
+      <button id="cmd-run" class="primary">Run</button></div>
+  </div></dialog>
 <dialog id="screen-dialog"><header><h1 id="screen-title">Screen</h1><button data-close>Close</button></header>
   <div class="body" id="screen"><img id="screen-img" alt="VM screen"><p class="s-muted" id="screen-note">A screenshot every 2 s through QMP. For keyboard and mouse use "Open viewer on the host".</p></div></dialog>
 <dialog id="vnc-dialog" style="width:min(1400px,96vw)"><header><h1 id="vnc-title">Console</h1><span><button id="vnc-cad">Ctrl+Alt+Del</button> <button id="vnc-full">Full screen</button> <button id="vnc-close">Close</button></span></header>
@@ -300,37 +319,69 @@ $("vnc-dialog").addEventListener("cancel", (e) => e.preventDefault());  // Esc b
 $("vnc-cad").onclick = () => rfb && rfb.sendCtrlAltDel();
 $("vnc-full").onclick = () => $("vnc-screen").requestFullscreen?.();
 
-// --- the generic command form, built from the argparse catalog
-function openCommands(vm) {
-  const groups = [...new Set(catalog.map((c) => c.group))];
-  const form = $("cmd-form");
-  form.innerHTML = `<label>Command</label><select id="cmd-name">${groups.map((g) => `<optgroup label="${esc(g)}">${catalog.filter((c) => c.group === g).map((c) => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("")}</optgroup>`).join("")}</select><div class="help" id="cmd-help"></div><div id="cmd-args" style="display:contents"></div>`;
-  const pick = () => {
-    const c = catalog.find((x) => x.name === $("cmd-name").value);
-    $("cmd-help").textContent = c.help;
-    $("cmd-args").innerHTML = c.args.map((a, i) => {
-      const id = "arg" + i, label = a.flag || a.dest;
-      let input;
-      if (a.kind === "flag") input = `<input type="checkbox" id="${id}">`;
-      else if (a.choices.length) input = `<select id="${id}">${a.required ? "" : '<option value=""></option>'}${a.choices.map((o) => `<option>${esc(o)}</option>`).join("")}</select>`;
-      else if (a.dest === "vm" || a.dest === "vms") input = `<input type="text" id="${id}" list="vm-names" value="${a.dest === "vm" ? esc(vm || "") : ""}" placeholder="${a.kind === "list" ? "names separated by spaces" : ""}">`;
-      else if (a.dest === "group") input = `<input type="text" id="${id}" list="group-names">`;
-      else input = `<input type="text" id="${id}" placeholder="${esc(a.default ?? "")}">`;
-      return `<label for="${id}">${esc(label)}${a.required && !a.flag ? " *" : ""}</label>${input}<div class="help">${esc(a.help)}</div>`;
-    }).join("") + `<datalist id="vm-names">${S.vms.map((r) => `<option value="${esc(r.name)}">`).join("")}</datalist><datalist id="group-names">${[...new Set(S.labs.map((l) => l.group))].map((g) => `<option value="${esc(g)}">`).join("")}</datalist>`;
-    $("cmd-args").querySelectorAll("input,select").forEach((el) => (el.oninput = preview));
-    preview();
-  };
-  $("cmd-name").onchange = pick;
-  $("cmd-name").value = vm ? (catalog.find((c) => c.args.some((a) => a.dest === "vm")) || catalog[0]).name : catalog[0].name;
-  if (vm) $("cmd-name").value = "show";
-  pick();
+// --- the command palette: the commands that make sense for this VM (or the global ones), then their options
+let pal = { vm: "", scope: "vm", cmd: null };
+const takesVm = (c) => c.args.some((a) => a.dest === "vm" && !a.flag);
+function relevant(c, r) {
+  // Only the profile's own install flow among the 19 bootstrap-* and the flow-specific installers.
+  if (c.name.startsWith("bootstrap-")) return c.name === r.unattended_flow;
+  const flag = { "install-archinstall": "has_archinstall", "install-omarchy": "has_omarchy", "install-unattended": "has_autoinstall",
+                 "post-install": "has_ssh", lab: "has_netlab" }[c.name];
+  return !flag || !!r[flag];
+}
+function paletteCommands() {
+  const r = S.vms.find((x) => x.name === pal.vm);
+  const words = $("cmd-filter").value.toLowerCase().split(/\s+/).filter(Boolean);
+  return catalog.filter((c) => (pal.scope === "vm" && r ? takesVm(c) && relevant(c, r) : !takesVm(c))
+    && words.every((w) => (c.name + " " + c.help + " " + c.group).toLowerCase().includes(w)));
+}
+function openCommands(vm, scope) {
+  pal = { vm: vm || "", scope: vm ? (scope || "vm") : "global", cmd: null };
+  $("scope-vm").textContent = vm ? "For " + vm : "For a VM";
+  $("scope-vm").disabled = !vm;
+  $("cmd-filter").value = "";
+  renderPalette();
   $("cmd-dialog").showModal();
+  $("cmd-filter").focus();
+}
+function renderPalette() {
+  document.querySelectorAll("[data-scope]").forEach((b) => b.classList.toggle("active", b.dataset.scope === pal.scope));
+  $("cmd-title").textContent = pal.scope === "vm" ? "Commands for " + pal.vm : "Global commands";
+  const list = paletteCommands();
+  if (!list.find((c) => c.name === pal.cmd)) pal.cmd = list.length ? list[0].name : null;
+  let group = "";
+  $("cmd-list").innerHTML = list.map((c) => {
+    const head = c.group !== group ? `<div class="pal-group">${esc((group = c.group))}</div>` : "";
+    return head + `<div class="pal-item${c.name === pal.cmd ? " sel" : ""}" data-cmd="${esc(c.name)}"><b>${esc(c.name)}</b><span>${esc(c.help)}</span></div>`;
+  }).join("") || '<p class="s-muted">No command matches.</p>';
+  $("cmd-list").querySelectorAll("[data-cmd]").forEach((el) => (el.onclick = () => { pal.cmd = el.dataset.cmd; renderPalette(); }));
+  renderCommandForm();
+}
+function renderCommandForm() {
+  const c = catalog.find((x) => x.name === pal.cmd);
+  $("cmd-run").disabled = !c;
+  if (!c) { $("cmd-head").innerHTML = ""; $("cmd-form").innerHTML = ""; $("preview").textContent = ""; return; }
+  $("cmd-head").innerHTML = `<h3>${esc(c.name)}</h3><p>${esc(c.help)}</p>`;
+  $("cmd-form").innerHTML = c.args.map((a, i) => {
+    const id = "arg" + i, label = a.flag || a.dest;
+    if (a.dest === "vm" && !a.flag && pal.scope === "vm") return `<label>vm</label><span><span class="fixed">${esc(pal.vm)}</span><input type="hidden" id="${id}" value="${esc(pal.vm)}"></span>`;
+    let input;
+    if (a.kind === "flag") input = `<label style="display:flex;gap:8px;align-items:center;color:var(--text)"><input type="checkbox" id="${id}"> ${esc(a.help)}</label>`;
+    else if (a.choices.length) input = `<select id="${id}">${a.required ? "" : '<option value=""></option>'}${a.choices.map((o) => `<option>${esc(o)}</option>`).join("")}</select>`;
+    else if (a.dest === "vm" || a.dest === "vms") input = `<input type="text" id="${id}" list="vm-names" placeholder="${a.kind === "list" ? "names separated by spaces" : "profile"}">`;
+    else if (a.dest === "group") input = `<input type="text" id="${id}" list="group-names" placeholder="group">`;
+    else input = `<input type="text" id="${id}" placeholder="${esc(a.default ?? "")}">`;
+    const help = a.kind === "flag" ? "" : `<div class="help">${esc(a.help)}</div>`;
+    return `<label for="${id}">${esc(label)}${a.required && !a.flag ? " *" : ""}</label>${input}${help}`;
+  }).join("") + `<datalist id="vm-names">${S.vms.map((r) => `<option value="${esc(r.name)}">`).join("")}</datalist><datalist id="group-names">${[...new Set(S.labs.map((l) => l.group))].map((g) => `<option value="${esc(g)}">`).join("")}</datalist>`;
+  $("cmd-form").querySelectorAll("input,select").forEach((el) => (el.oninput = preview));
+  preview();
 }
 function buildArgs() {
-  const c = catalog.find((x) => x.name === $("cmd-name").value), args = [c.name], opts = [];
+  const c = catalog.find((x) => x.name === pal.cmd), args = [c.name], opts = [];
   c.args.forEach((a, i) => {
     const el = $("arg" + i);
+    if (!el) return;
     if (a.kind === "flag") { if (el.checked) opts.push(a.flag); return; }
     const v = el.value.trim();
     if (!v) return;
@@ -339,7 +390,14 @@ function buildArgs() {
   });
   return [...args, ...opts];
 }
-function preview() { $("preview").textContent = "vmctl " + buildArgs().map((a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`)).join(" "); }
+function preview() { if (pal.cmd) $("preview").textContent = "vmctl " + buildArgs().map((a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`)).join(" "); }
+$("cmd-filter").oninput = renderPalette;
+$("cmd-filter").onkeydown = (e) => {
+  const list = paletteCommands(), i = list.findIndex((c) => c.name === pal.cmd);
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const c = list[Math.max(0, Math.min(list.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (c) { pal.cmd = c.name; renderPalette(); } }
+  if (e.key === "Enter" && pal.cmd) { e.preventDefault(); $("cmd-dialog").close(); run(buildArgs()); }
+};
+document.querySelectorAll("[data-scope]").forEach((b) => (b.onclick = () => { pal.scope = b.dataset.scope; renderPalette(); }));
 $("cmd-run").onclick = () => { $("cmd-dialog").close(); run(buildArgs()); };
 $("all-commands").onclick = () => openCommands(selected);
 
@@ -366,6 +424,8 @@ async function refresh(fresh) {
   await refresh(); refreshJobs();
   const wanted = decodeURIComponent((location.hash.match(/^#console=(.+)$/) || [])[1] || "");
   if (wanted) { selected = wanted; render(); openConsole(wanted); }
+  const cmds = decodeURIComponent((location.hash.match(/^#commands=(.*)$/) || [])[1] || "");
+  if (location.hash.startsWith("#commands=")) { if (cmds) { selected = cmds; render(); } openCommands(cmds); }
   setInterval(refresh, 5000); setInterval(refreshJobs, 3000);
 })();
 </script>

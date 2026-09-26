@@ -20,9 +20,13 @@ token. It drives the same backend as `vmctl` and `vmtui`:
   `…/#console=<vm>` after the URL opens a VM's console directly. The noVNC client is the one
   file fetched from outside (cdn.jsdelivr.net, `@novnc/novnc@1.7.0`); the screenshot view needs
   nothing.
-- **All commands…**: every `vmctl` subcommand, grouped as in `vmctl --help`, with a form built
-  from the CLI's own argument parser (choices, flags, the VM prefilled) and the command line it
-  will run. A new subcommand appears there without any web code.
+- **All commands…**: a palette in two panes. *For this VM* lists only the commands that make
+  sense for the selected profile (of the 19 `bootstrap-*` only its own flow, `install-archinstall`
+  only on Arch profiles, `post-install` only with SSH...), *Global* the ones that take no VM
+  (`status`, `setup`, `check-vms`, `group`...). The filter takes the keyboard (arrows, Enter runs);
+  on the right, the chosen command's options built from the CLI's own parser, with the VM fixed
+  and the command line it will run. A new subcommand appears there without any web code.
+  `…/#commands=<vm>` opens it directly.
 - **Labs**: each lab with its members, and install, start, stop, status, cluster, network map
   (opened in a new tab) and clean.
 - **Jobs**: everything runs as a detached job with its log followed live. A job started for a VM
