@@ -44,6 +44,8 @@ BOOTSTRAP_FAILED_TOKEN = "==> Windows 98 installation FAILED"
 SHUTDOWN_GRACE_SEC = 180
 INSTALL_ISO_NAME = "install.iso"
 ANSWER_PATH = "/MSBATCH.INF"
+# Outside the f-string: a backslash inside its braces is a SyntaxError before Python 3.12.
+DEFAULT_INSTALL_DIR = "c:\\windows"
 SCRIPT_PATH = "/VMCTL.BAT"
 BOOT_IMAGE_PATH = "/BOOT.IMG"
 CD_DRIVE_ID = "w98cd0"
@@ -185,7 +187,7 @@ def render_msbatch(vm_name: str, vm: dict[str, Any]) -> str:
         "",
         "[Setup]",
         "Express=1",
-        f'InstallDir="{_ini_value(cfg.get("install_dir", "c:\\windows"))}"',
+        f'InstallDir="{_ini_value(cfg.get("install_dir", DEFAULT_INSTALL_DIR))}"',
         "InstallType=3",
         "EBD=0",
         "ShowEula=0",

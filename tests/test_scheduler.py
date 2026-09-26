@@ -12,14 +12,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import vmctl.scheduler as scheduler  # noqa: E402
+from _common import enter_context  # noqa: E402
 
 
 class SchedulerTests(unittest.TestCase):
     def setUp(self):
         # Every scheduler test supplies its own samples, regardless of host pressure.
         self.read_host_resources = scheduler.host_resources
-        self.enterContext(mock.patch.object(scheduler, "host_resources", side_effect=AssertionError("unexpected host probe")))
-        self.monotonic = self.enterContext(mock.patch.object(scheduler.time, "monotonic", return_value=0.0))
+        enter_context(self, mock.patch.object(scheduler, "host_resources", side_effect=AssertionError("unexpected host probe")))
+        self.monotonic = enter_context(self, mock.patch.object(scheduler.time, "monotonic", return_value=0.0))
 
     def run_controlled(self, sched, jobs, completions, worker=lambda name: name):
         """Finish selected futures without threads or timing-dependent admission checks."""
@@ -108,7 +109,7 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(sched.peak_running, 2)
 
     def test_host_resources_reads_meminfo(self):
-        meminfo = Path(self.enterContext(__import__("tempfile").TemporaryDirectory())) / "meminfo"
+        meminfo = Path(enter_context(self, __import__("tempfile").TemporaryDirectory())) / "meminfo"
         meminfo.write_text("MemTotal:       31717732 kB\nMemFree:        10855868 kB\nMemAvailable:   21177144 kB\n")
         # Exercise the parser itself, while every scheduler below remains isolated.
         res = self.read_host_resources(meminfo)

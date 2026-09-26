@@ -14,8 +14,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Every Python from pyproject's requires-python up: an f-string with a backslash inside its
+  # braces is valid only from 3.12 and broke `make setup` on an Ubuntu 22.04 host (Python 3.10).
   test:
+    name: test (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - name: Checkout
@@ -24,7 +31,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
+
+      - name: Compile every module
+        run: |
+          python -m compileall -q vmctl tests tools
+          python -m py_compile bin/vmctl bin/vmtui-textual
 
       - name: Run unit tests
         run: python -m unittest discover -s tests -v

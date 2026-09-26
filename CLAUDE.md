@@ -221,6 +221,10 @@ If a future change appears to need either of these relaxed (e.g. "speed up the b
 
 Tests mock `vmctl.runtime.run` (for subprocess calls) and `shutil.which` (for tool detection). Patch the submodule directly (`mock.patch.object(vmctl.runtime, "run")`), not through the facade.
 
+#### Python 3.10 floor
+
+`pyproject.toml` says `requires-python = ">=3.10"` (Ubuntu 22.04's system Python), and CI runs the suite on every version from 3.10 to 3.14 (`test_python_support.py` ties the matrix to that floor). Nothing newer is allowed in `vmctl/`, `bin/` or `tests/`: no backslash inside an f-string's braces (3.12; it broke `make setup` on a Lubuntu 22.04 host, 2026-09-26), no `tomllib` or `TestCase.enterContext` (3.11; tests use `_common.enter_context` and skip the TOML check without `tomllib`). To reproduce: `docker run --rm -v "$PWD":/src:ro ubuntu:22.04 ...` with `python3 openssh-client cpio`, then `python3 -m unittest discover -s tests` on a copy of the checkout.
+
 #### Host isolation (a test must pass identically on the developer's host and in the bare CI runner)
 
 The CI `test` job has no QEMU, no `qemu-img`, no `fzf`, no ISOs and no installed VMs; the developer's host has all of them. A test that reads any of that passes only on one side. Rules:

@@ -3,7 +3,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 from unittest import mock
 
-from _common import BaseVmctlTestCase
+from _common import BaseVmctlTestCase, enter_context
 from vmctl import cli, libvirt, lifecycle, qemu, runtime
 from vmctl.errors import VMError
 
@@ -15,10 +15,10 @@ class LibvirtTests(BaseVmctlTestCase):
 
     def setUp(self):
         super().setUp()
-        self.enterContext(mock.patch.object(lifecycle, "running_qemu_pid", return_value=None))
-        self.enterContext(mock.patch.object(qemu, "qmp_command", return_value=False))
-        self.enterContext(mock.patch("shutil.which", return_value="/fake/virsh"))
-        self.run = self.enterContext(mock.patch.object(runtime, "run"))
+        enter_context(self, mock.patch.object(lifecycle, "running_qemu_pid", return_value=None))
+        enter_context(self, mock.patch.object(qemu, "qmp_command", return_value=False))
+        enter_context(self, mock.patch("shutil.which", return_value="/fake/virsh"))
+        self.run = enter_context(self, mock.patch.object(runtime, "run"))
 
     def test_bios_sata_xml(self):
         self.vm_config["disk"].update(interface="sata", format="vhd")

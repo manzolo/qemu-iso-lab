@@ -61,6 +61,13 @@ import vmctl.windowsnt4  # noqa: E402
 import vmctl.windowsxp  # noqa: E402
 
 
+def enter_context(test: unittest.TestCase, manager):
+    """``TestCase.enterContext`` arrived in Python 3.11; the project supports 3.10."""
+    result = manager.__enter__()
+    test.addCleanup(manager.__exit__, None, None, None)
+    return result
+
+
 class _VmctlFacade:
     """Test compatibility shim that flattens the vmctl package surface.
 

@@ -1,6 +1,9 @@
 from _common import *
 import ipaddress
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10: the parser arrived in 3.11
+    tomllib = None
 from vmctl.errors import VMError
 from vmctl import checkpoint, lifecycle, libvirt, proxmox, qemu
 
@@ -14,6 +17,7 @@ class ProxmoxTests(BaseVmctlTestCase):
         self.assertEqual(lifecycle.local_test_mode(self.profile())[0], 'bootstrap-proxmox')
         self.assertEqual(lifecycle.local_test_mode(self.profile('proxmox-lab-client'))[0], 'bootstrap-preseed')
 
+    @unittest.skipIf(tomllib is None, "tomllib needs Python 3.11")
     def test_answer_file_is_valid_toml_with_zfs_mirror_over_both_disks(self):
         answer = tomllib.loads(proxmox.render_answer('proxmox-ve', self.profile(), ['ssh-ed25519 TEST']))
         self.assertEqual(answer['disk-setup'], {'filesystem': 'zfs', 'disk-list': ['vda', 'vdb'],
