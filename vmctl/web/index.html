@@ -608,7 +608,7 @@ function actionsFor(r) {
 const FKEYS = [
   ["F2", "Boot headless", (a) => a.args?.[0] === "start" && a.args.includes("--headless")],
   ["F3", "Open console", (a) => a.console],
-  ["F4", "SSH", null],
+  ["F4", "SSH in the browser", null],
   ["F6", "Live screenshot", (a) => a.screen],
   ["F7", "Checkpoint now", (a) => a.args?.[0] === "checkpoint"],
   ["F8", "Stop", (a) => a.args?.[0] === "stop" && !a.args.includes("--force")],
@@ -881,6 +881,7 @@ function openSsh(r) {
   $("ssh-description").textContent = r.running ? "Connect to this machine in a terminal window on the host." : "This machine is stopped. Start it before connecting via SSH.";
   $("ssh-command").textContent = "bin/vmctl shell " + shellQuote(r.name);
   $("ssh-browser").disabled = !r.running; $("ssh-launch").disabled = !r.running; $("ssh-result").textContent = ""; $("ssh-dialog").showModal();
+  if (r.running) $("ssh-browser").focus();  // Enter opens the terminal in the page, no mouse needed
 }
 $("ssh-launch").onclick = async () => {
   $("ssh-launch").disabled = true;
@@ -1461,7 +1462,7 @@ document.addEventListener("keydown", (e) => {
     if (e.key === "F10") { e.preventDefault(); return openCommands(selected); }
     const r = S.vms.find((x) => x.name === selected);
     if (!r) return;
-    if (e.key === "F4") { if (r.ssh_port) { e.preventDefault(); openSsh(r); } return; }
+    if (e.key === "F4") { if (r.ssh_port) { e.preventDefault(); if (r.running) { sshVm = r.name; openBrowserSsh(r.name); } else openSsh(r); } return; }
     const action = actionsFor(r).find((a) => fkeyOf(a) === e.key);
     if (action && !action.disabled) { e.preventDefault(); runAction(r, action); }
     return;

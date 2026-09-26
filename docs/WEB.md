@@ -39,7 +39,7 @@ What the page offers:
   from cdn.jsdelivr.net (`@novnc/novnc@1.7.0`); the screenshot view needs no external assets.
 - **Keyboard**: typing anywhere filters the list (Esc clears), ↑/↓ select, Enter runs the main
   action, and function keys run one kind of action whatever the state offers: `F2` boot
-  headless, `F3` console, `F4` SSH, `F6` screenshot, `F7` checkpoint, `F8` stop, `F9` job log,
+  headless, `F3` console, `F4` SSH in the browser, `F6` screenshot, `F7` checkpoint, `F8` stop, `F9` job log,
   `F10` (or `Ctrl+K`) the commands palette, `Shift+F10` the machine's menu, `F1` the list of
   keys. The buttons show their key.
 - **Commands** (`F10`, `Ctrl+K`): a palette in two panes. *This VM* lists only the commands that make
