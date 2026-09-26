@@ -304,7 +304,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         self.assertEqual(reactos["meta"]["status"], "unattended")
         self.assertEqual(reactos["reactos_config"]["password"], "lab")
         self.assertIn("UnattendSetupEnabled = yes", vmctl.reactos.render_unattend("reactos", reactos))
-        self.assertNotIn("iso_url", reactos)
+        # SourceForge ships the BootCD only inside a zip: vmctl fetches the zip and extracts it.
+        self.assertIn("sourceforge.net", reactos["iso_url"])
+        self.assertEqual(reactos["iso_archive"], {"type": "zip", "member": "ReactOS-0.4.16-i386.iso"})
 
         # Windows 7: BIOS, e1000e (no NetKVM needed), no SSH (no OpenSSH on 7), generic identity.
         w7 = cfg["vms"]["windows7-unattended"]
@@ -321,7 +323,10 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         router = cfg["vms"]["pfsense-lab"]
         self.assertEqual(router["pfsense_config"]["username"], "lab")
         self.assertEqual(router["firmware"]["type"], "bios")
-        self.assertNotIn("iso_url", router)
+        # Netgate's mirror has the .iso.gz and its hash: the archive is pinned, then the ISO.
+        self.assertTrue(router["iso_url"].endswith("pfSense-CE-2.7.2-RELEASE-amd64.iso.gz"))
+        self.assertEqual(router["iso_archive"]["type"], "gzip")
+        self.assertRegex(router["iso_archive"]["sha256"], r"^[0-9a-f]{64}$")
         top = vmctl.netlab.topology(cfg, "pfsense-lab")
         self.assertEqual(top["lan"]["name"], "lab-lan")
         self.assertEqual(top["dns_ip"], "192.168.0.10")
@@ -342,6 +347,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         self.assertEqual(win["disk"]["interface"], "virtio")
         self.assertEqual(win["windows_config"]["driver_flavor"], "w11")
         self.assertNotIn("iso_url", win)
+        self.assertIn("microsoft.com/software-download/windows11", win["iso_help"])
         self.assertEqual(cfg["vms"]["windows11-template"]["meta"]["role"], "import-template")
         w10 = cfg["vms"]["windows10-unattended"]
         self.assertEqual(w10["windows_config"]["driver_flavor"], "w10")

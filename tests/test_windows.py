@@ -781,7 +781,7 @@ class WindowsBootstrapTests(BaseVmctlTestCase):
         self.vm_config.pop("iso_url")
         note = self.vmctl.local_test_prereq_skip(self.vm_name, self.vm_config)
         self.assertIsNotNone(note)
-        self.assertIn("no download source", note)
+        self.assertIn("vmctl cannot download it", note)
         self.vm_config["iso_url"] = "https://example.invalid/test.iso"
         self.assertIsNone(self.vmctl.local_test_prereq_skip(self.vm_name, self.vm_config))
 

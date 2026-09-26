@@ -660,7 +660,7 @@ from pathlib import Path
 
 sys.path.insert(0, sys.argv[1])
 
-from vmctl import clone, cloud_init, config, lifecycle, runtime, state, tui_jobs, vmstate
+from vmctl import clone, cloud_init, config, iso, lifecycle, runtime, state, tui_jobs, vmstate
 
 # A disk image with less than vmstate.DATA_MIN_BYTES allocated is "prepared" (created by
 # prep or an install that stopped early) and has no data on it; a fresh qcow2 allocates
@@ -709,6 +709,17 @@ def facts(name, vm):
         iso_ready = lifecycle.iso_status(vm) == "ready"
     except Exception:
         iso_ready = False
+    try:
+        # cached / download / manual: a manual ISO that is missing is the one thing the user must do first.
+        iso_source = "cached" if iso_ready else iso.iso_source_kind(vm)
+        iso_help = iso.missing_iso_message(vm, name).replace("\n", "\\n") if iso_source == "manual" else ""
+    except Exception:
+        iso_source, iso_help = "download", ""
+    try:
+        flow = lifecycle.local_test_mode(vm)[0]
+    except Exception:
+        flow = ""
+    unattended_flow = flow if flow.startswith("bootstrap-") else ""
     ssh_cfg = cloud_init.ssh_access_config(vm) or {}
     meta = vm.get("meta") or {}
     video = vm.get("video") or {}
@@ -751,6 +762,13 @@ def facts(name, vm):
         "runtime": runtime_str,
         "runtime_note": "" if note in ("-", None) else str(note),
         "iso_ready": iso_ready,
+        "iso_source": iso_source,
+        "iso_help": iso_help,
+        "unattended_flow": unattended_flow,
+        # has_* flags travel with each dashboard row (context hints), so the Alt-U hint of the
+        # list names the same first step as the VM menu.
+        "has_manual_iso": iso_source == "manual",
+        "has_unattended_flow": bool(unattended_flow),
         "ssh_port": str(ssh_cfg.get("ssh_host_port") or ""),
         "has_ssh": bool(ssh_cfg),
         "has_autoinstall": has_section(vm, "autoinstall"),
@@ -1109,7 +1127,11 @@ emit_action() {
 # Main install entry for the profile's flow (also the recommendation when the
 # VM has no disk yet).
 primary_install_action() {
-    if [[ "${FACTS[has_omarchy]:-0}" == "1" ]]; then
+    # First step only while there is nothing installed: on a disk with data the reinstall flow
+    # itself says what is missing, and the everyday actions (boot, SSH) need no ISO at all.
+    if [[ "${FACTS[has_manual_iso]:-0}" == "1" && "${FACTS[installed]:-0}" != "1" ]]; then
+        printf '%s\n' "Get the ISO"
+    elif [[ "${FACTS[has_omarchy]:-0}" == "1" ]]; then
         printf '%s\n' "Omarchy Bootstrap"
     elif [[ "${FACTS[has_archinstall]:-0}" == "1" ]]; then
         printf '%s\n' "Arch Bootstrap"
@@ -1135,6 +1157,8 @@ primary_install_action() {
         printf '%s\n' "Full Bootstrap"
     elif [[ "${FACTS[has_autoinstall]:-0}" == "1" ]]; then
         printf '%s\n' "Unattended Install"
+    elif [[ "${FACTS[has_unattended_flow]:-0}" == "1" ]]; then
+        printf '%s\n' "Unattended Bootstrap"
     elif [[ "${FACTS[has_cloud_init]:-0}" == "1" ]]; then
         printf '%s\n' "Cloud-Init Flow"
     else
@@ -1383,6 +1407,8 @@ emit_install_actions() {
     [[ "${FACTS[installed]:-0}" == "1" ]] && again="Reinstall: "
     local has_ssh="${FACTS[has_ssh]:-0}"
     local has_cloud_init="${FACTS[has_cloud_init]:-0}"
+    # vmctl cannot download this medium: say how to get it before any install that would fail.
+    [[ "${FACTS[has_manual_iso]:-0}" == "1" ]] && emit_action "Get the ISO" "The ISO is missing and has no public download: how to get it"
     if [[ "${FACTS[has_omarchy]:-0}" == "1" ]]; then
         emit_action "Omarchy Bootstrap" "${again}Official cidata install + NVIDIA post-install"
         emit_action "Omarchy Unattended Install" "Install from the official ISO and stop after reboot"
@@ -1420,6 +1446,9 @@ emit_install_actions() {
         emit_action "Cloud-Init Flow" "Manual installer with first-boot handoff"
     elif [[ "${FACTS[has_autoinstall]:-0}" == "1" ]]; then
         emit_action "Unattended Install" "${again}Run the configured Ubuntu autoinstall flow"
+        emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
+    elif [[ "${FACTS[has_unattended_flow]:-0}" == "1" ]]; then
+        emit_action "Unattended Bootstrap" "${again}vmctl ${FACTS[unattended_flow]}: install without interaction"
         emit_action "Guided Provision" "Fetch ISO, prepare artifacts, boot installer"
     elif [[ $has_cloud_init == "1" ]]; then
         emit_action "Cloud-Init Flow" "${again}Manual installer with first-boot handoff"
@@ -1936,6 +1965,8 @@ resolve_action() {
         "Proxmox Bootstrap") printf '%s\n' bootstrap-proxmox ;;
         "pfSense Bootstrap") printf '%s\n' bootstrap-pfsense ;;
         "ReactOS Bootstrap") printf '%s\n' bootstrap-reactos ;;
+        "Unattended Bootstrap") printf '%s\n' unattended-bootstrap ;;
+        "Get the ISO") printf '%s\n' iso-help ;;
         "Network Lab Plan") printf '%s\n' lab-plan ;;
         "Full Bootstrap") printf '%s\n' bootstrap-unattended ;;
         "Guided Install"|"Guided Provision") printf '%s\n' provision ;;
@@ -2121,6 +2152,16 @@ run_action() {
             ;;
         lab-plan)
             run_vmctl lab plan "$current_vm" || true
+            ;;
+        iso-help)
+            msg_box "ISO needed: $current_vm" "${FACTS[iso_help]:-Put the ISO of this profile in place first (vmctl show $current_vm).}"
+            ;;
+        unattended-bootstrap)
+            # Every flow without a dedicated entry above (Haiku, NixOS, pearOS, the retro Windows...):
+            # the one check-vms would run for this profile.
+            if confirm_box "Unattended Bootstrap" "Run 'vmctl ${FACTS[unattended_flow]} $current_vm'?\n\nIt installs the VM without any interaction and, where the profile has SSH provisioning, verifies it over SSH. Watch it with Attach Display."; then
+                run_vmctl "${FACTS[unattended_flow]}" "$current_vm" || true
+            fi
             ;;
         bootstrap-autoyast)
             if confirm_box "AutoYaST Bootstrap" "Run the fully automated openSUSE AutoYaST bootstrap for VM '$current_vm'?\n\nThis will:\n- download the ISO if missing\n- create disk and firmware artifacts\n- boot the openSUSE DVD headless via serial console\n- run the AutoYaST profile (partitioning, patterns, chroot script)\n- start the installed VM and run SSH post-install\n\nExpected time: ~40 min depending on download speed."; then

@@ -34,6 +34,7 @@ class VmtuiTests(unittest.TestCase):
                 "test-ssh": {
                     "name": "Test SSH VM",
                     "iso": "isos/test.iso",
+                    "iso_url": "https://example.invalid/test.iso",  # downloadable: not an "ISO needed" profile
                     "disk": {
                         "path": "artifacts/test-ssh/disk.qcow2",
                         "size": "16G",
@@ -885,6 +886,11 @@ MENU_NO_TAGS=1 MENU_STYLED=1 MENU_CONTEXT_HINTS=1 fzf_pick T H '' \
                            ("arch-noctalia", "Arch Bootstrap"),
                            ("alpine-ci", "Guided Provision")):
             for installed in (False, True):
+                if vm == "windows11-unattended" and not installed:
+                    # No ISO in the test root and no public download: the first step is getting it.
+                    action = "Get the ISO"
+                elif vm == "windows11-unattended":
+                    action = "Windows Bootstrap"
                 with self.subTest(vm=vm, installed=installed):
                     if installed:
                         self.mark_installed(vm)
@@ -1071,6 +1077,11 @@ run_dashboard_hotkey alt-u {vm}
         output = self._unified_menu("windows11-unattended")
         self.assertIn("Windows Bootstrap", output)
         self.assertNotIn("Alpine Bootstrap", output)
+        result = self.run_bash("source bin/vmtui; load_vm_facts windows11-unattended; recommended_action")
+        self.assertEqual(result.stdout.strip(), "Get the ISO")  # Microsoft has no stable URL
+        iso = self.bindir / "isos" / "windows11.iso"
+        iso.parent.mkdir(parents=True, exist_ok=True)
+        iso.write_bytes(b"CD001" + b"\0" * 4091)
         result = self.run_bash("source bin/vmtui; load_vm_facts windows11-unattended; recommended_action")
         self.assertEqual(result.stdout.strip(), "Windows Bootstrap")
         # the import templates keep the manual flow
@@ -1360,6 +1371,23 @@ done
         for title in ("Restore checkpoint", "Delete checkpoint", "Delete clone", "Confirm Clean",
                       "Import Disk", "Confirm Clean All", "Confirm Delete ISO", "Clean the network lab"):
             self.assertIn(f'CONFIRM_DEFAULT=no confirm_box "{title}" ', source)
+
+    def test_install_entry_asks_for_a_manual_iso_and_knows_every_flow(self):
+        cases = (("[has_manual_iso]=1 [has_windows]=1", "Get the ISO", "iso-help"),
+                 ("[has_manual_iso]=1 [installed]=1 [has_windows]=1", "Windows Bootstrap", "bootstrap-windows"),
+                 ("[has_unattended_flow]=1 [unattended_flow]=bootstrap-haiku", "Unattended Bootstrap", "unattended-bootstrap"),
+                 ("[has_freebsd]=1 [has_unattended_flow]=1", "FreeBSD Bootstrap", "bootstrap-freebsd"))
+        for facts, entry, command in cases:
+            with self.subTest(entry=entry):
+                result = self.run_bash(f'source bin/vmtui; declare -A FACTS=({facts}); a=$(primary_install_action); '
+                                       'printf "%s\\n" "$a" "$(resolve_action "$a")"')
+                self.assertEqual(result.stdout.splitlines(), [entry, command])
+
+    def test_unattended_bootstrap_runs_the_profiles_flow_after_confirmation(self):
+        result = self.run_bash(
+            'source bin/vmtui; current_vm=test-ssh; declare -A FACTS=([unattended_flow]=bootstrap-haiku); '
+            'confirm_box() { return 0; }; run_vmctl() { printf "%s\\n" "$*"; }; run_action "Unattended Bootstrap"')
+        self.assertEqual(result.stdout.strip(), "bootstrap-haiku test-ssh")
 
     def test_clean_all_requires_confirmation_and_ignores_current_profile(self):
         for answer, expected in ((1, ""), (0, "clean --all")):

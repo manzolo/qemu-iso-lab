@@ -33,6 +33,8 @@ def status_label(row: Facts) -> tuple[str, str]:
         return ("Installing", "#e8be78") if job == "running" else (job.capitalize(), "#f08a8a")
     if row["running"]:
         return "Running", "#86d5ab"
+    if row["install_label"] == "no disk" and row.get("iso_source") == "manual":
+        return "ISO needed", "#e8be78"
     labels = {
         "verified": ("Boot verified", "#86d5ab"),
         "installed": ("Installed", "#84c9e7"),
@@ -51,7 +53,10 @@ def primary_action(row: Facts) -> tuple[str, str]:
         return "Open display", "alt-a"
     if row["installed"]:
         return "Boot desktop", "alt-d"
-    unattended = any(value for key, value in row.items() if key in {
+    if row.get("iso_source") == "manual":
+        # The medium has no public download and is missing: an install could only fail.
+        return "Get the ISO…", "Get the ISO"
+    unattended = bool(row.get("unattended_flow")) or any(value for key, value in row.items() if key in {
         "has_autoinstall", "has_archinstall", "has_omarchy", "has_preseed",
         "has_kickstart", "has_autoyast", "has_alpine", "has_windows",
         "has_freebsd", "has_proxmox", "has_pfsense", "has_reactos",
@@ -141,7 +146,7 @@ class ClassicBridge:
 
     def run(self, name: str, action: str) -> int:
         if action not in {"menu", "tools", "classic", "alt-l", "alt-a", "alt-d", "alt-u",
-                          "alt-h", "alt-s", "alt-x", "Profile Details", "Video Profile"}:
+                          "alt-h", "alt-s", "alt-x", "Profile Details", "Video Profile", "Get the ISO"}:
             raise ValueError(f"Unsupported dashboard action: {action}")
         # Values are positional arguments, never interpolated into shell code.
         script = '''source "$1"
@@ -152,6 +157,8 @@ case "$3" in
     menu) current_vm="$2"; state_set last-vm "$current_vm"; vm_menu_loop ;;
     "Profile Details"|"Video Profile")
         current_vm="$2"; load_vm_facts "$current_vm"; run_vm_menu_action "$3" ;;
+    "Get the ISO")
+        current_vm="$2"; load_vm_facts "$current_vm"; run_action "Get the ISO" ;;
     *) run_dashboard_hotkey "$3" "$2" ;;
 esac
 '''

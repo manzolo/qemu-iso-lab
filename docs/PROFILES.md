@@ -142,7 +142,16 @@ Profiles can define smarter sources without giving up a hardcoded fallback:
 - `iso_discovery` reads a release index and extracts candidate ISO URLs with a
   regular expression, so a profile can follow "latest" without edits;
 - `iso_urls` lists additional mirrors to try in order;
-- `iso_url` remains the final fallback and keeps older profiles working.
+- `iso_url` remains the final fallback and keeps older profiles working;
+- `iso_archive` says the download is an archive holding the ISO: `{"type": "zip", "member":
+  "ReactOS-0.4.16-i386.iso"}` or `{"type": "gzip", "sha256": "<hash of the .gz>"}` (pfSense's
+  `.iso.gz`). `vmctl` checks the archive's `sha256` when given (for vendors who publish that one),
+  extracts the ISO, validates it against `iso_sha256` and deletes the archive;
+- `iso_help` is for a medium `vmctl` cannot download at all (Windows, whose links expire; retro
+  media and keys you own; pearOS's signed links): what to get, from where, and what to set in
+  `local.json`. `vmctl fetch-iso`, every bootstrap and the dashboard ("ISO needed", *Get the ISO…*)
+  show it instead of failing later. A tracked profile needs a download source or `iso_help`
+  (a test enforces it).
 
 ```json
 "iso_discovery": {

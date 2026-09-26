@@ -84,8 +84,11 @@ and runs the profile's SSH provisioning. Every profile also has a manual install
 `vmctl provision <vm>` boots the ISO on a fresh disk. `vmctl list` shows each
 profile's status and the date of its last live verification.
 
-Windows media have no public download URL: put your own ISO in `isos/` (the retro
-versions also need your product key in `local.json`).
+`vmctl` downloads and checksums every ISO that has a public source, archives
+included (ReactOS's zip, pfSense's `.iso.gz`). Where there is none (Windows, whose
+download links expire; the retro versions, which need your own media and key; pearOS's
+signed links), `vmctl fetch-iso <vm>` and the dashboard ("ISO needed") say exactly
+what to get and where to put it.
 
 ## The dashboard
 

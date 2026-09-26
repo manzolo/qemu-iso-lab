@@ -86,7 +86,8 @@
       "shared_dir": {
         "source": "shared",
         "tag": "shared"
-      }
+      },
+      "iso_help": "Microsoft gives out only temporary, per-session links. Open https://www.microsoft.com/software-download/windows10ISO from Linux (the page offers the ISO directly there; on Windows it pushes the Media Creation Tool), choose Windows 10 (multi-edition ISO), your language and 64-bit, and download it (the link lasts 24 hours). The image name in install.wim must match windows_config.edition."
     },
     "windows11-unattended": {
       "name": "Windows 11 (unattended)",
@@ -174,7 +175,8 @@
       "shared_dir": {
         "source": "shared",
         "tag": "shared"
-      }
+      },
+      "iso_help": "Microsoft gives out only temporary, per-session links. Open https://www.microsoft.com/software-download/windows11, choose 'Download Windows 11 Disk Image (ISO) for x64 devices', the edition 'Windows 11 (multi-edition ISO for x64 devices)' and your language, and download it (the link lasts 24 hours). The image name in install.wim must match windows_config.edition: 'Windows 11 Pro' on Microsoft's ISO."
     },
     "windows10-template": {
       "name": "Windows 10 Template",
@@ -222,7 +224,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_help": "Microsoft gives out only temporary, per-session links: download the Windows 10 x64 ISO from https://www.microsoft.com/software-download/windows10ISO (open the page from Linux to get the ISO directly)."
     },
     "windows11-template": {
       "name": "Windows 11 Template",
@@ -270,7 +273,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_help": "Microsoft gives out only temporary, per-session links: download the Windows 11 x64 ISO from https://www.microsoft.com/software-download/windows11 (multi-edition ISO, your language)."
     },
     "windows7-unattended": {
       "name": "Windows 7 Ultimate (unattended)",
@@ -348,7 +352,8 @@
         "install_guest_tools": false,
         "install_openssh": false,
         "setup_commands": []
-      }
+      },
+      "iso_help": "Microsoft no longer distributes Windows 7: use your own installation medium (x64, Ultimate or Professional; the answer file uses the edition in windows_config.edition). Make an ISO from the DVD with: dd if=/dev/sr0 of=windows7.iso bs=2048 status=progress"
     }
   }
 }

@@ -59,7 +59,7 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 
 Discovery remains enabled for `alpine-niri` and `fedora-niri-dms`; neither is a pinned image even though its fallback URL contains a version. They intentionally have no static checksum. Rolling/current images (Arch, CachyOS, openSUSE, KDE neon and NixOS) are unchanged. The `ubuntu-*-desktop` and `ubuntu-*-unattended` history profiles were pinned on 2026-09-12 from the same vendor manifests (old-releases.ubuntu.com for the EOL releases).
 
-`reactos` is user-supplied media: SourceForge ships `ReactOS-0.4.16-i386.zip` (unzip it into `isos/`) and publishes no SHA-256 for the ISO inside. Its `iso_sha256` (`6f15ca6e…6855` for the 406,847,488-byte ISO, zip `e5851510…4ce2a`) was measured from that download on 2026-09-12: a repository content pin, not a vendor checksum.
+`reactos` downloads itself since 2026-09-26: `iso_url` is SourceForge's `ReactOS-0.4.16-i386.zip` and `iso_archive` names the ISO inside it (`vmctl` unzips it and removes the zip). SourceForge publishes no SHA-256 for either. The ISO's `iso_sha256` (`6f15ca6e…6855`, 406,847,488 bytes) was measured from that download on 2026-09-12 and matched again from a fresh download of the zip (`e5851510…4ce2a`) on 2026-09-26: a repository content pin, not a vendor checksum. The zip is not pinned: the ISO extracted from it is.
 
 Windows and pfSense use user-supplied media without a vendor checksum source in the catalog. EndeavourOS is also supplied locally. Omarchy retains its existing pinned checksum.
 
@@ -155,3 +155,14 @@ MISSING void-live-x86_64-20250202-xfce.iso
 `f564822bc72d420d1e1a6faacb72f6056d828fcf539dfafd52e08503ef5fab68`
 from the [release manifest](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64),
 re-fetched and matched on 2026-09-14, as already recorded for the manual `freebsd` profile. Generated install media carry no vendor hash.
+
+## Archives: pfSense CE and ReactOS (2026-09-26)
+
+`pfsense-lab` downloads `pfSense-CE-2.7.2-RELEASE-amd64.iso.gz` from Netgate's own mirror
+(`atxfiles.netgate.com/mirror/downloads/`). `iso_archive.sha256` is the vendor's hash of that
+archive, `883fb7bc64fe548442ed007911341dd34e178449f8156ad65f7381a02b7cd9e4`, from the
+[.sha256 file next to it](https://atxfiles.netgate.com/mirror/downloads/pfSense-CE-2.7.2-RELEASE-amd64.iso.gz.sha256).
+The ISO's `iso_sha256`, `441005f79ea0c155bc4b830a2b4207f8c0804cf7b075d2a6489c0a136cbc5d51`
+(874,672,128 bytes), is derived: it is the hash of that vendor-verified archive once decompressed,
+and it matched the ISO the maintainer had used for every live pfSense run.
+`vmctl` checks the archive against the vendor hash before unpacking, then the ISO against its own.

@@ -513,7 +513,7 @@ def local_test_prereq_skip(vm_name: str, vm: dict[str, Any]) -> str | None:
     # Windows and other ISOs without a public download URL: nothing to fetch, nothing to test.
     iso_path = runtime.resolve_path(vm["iso"])
     if not iso_path.exists() and not iso.iso_url_candidates(vm, allow_discovery=False):
-        return f"skipped: ISO {iso_path.name} is not present and the profile has no download source"
+        return f"skipped: ISO {iso_path.name} is not present and vmctl cannot download it (see iso_help: vmctl fetch-iso {vm_name})"
 
     ci = vm.get("ci", {})
     if not isinstance(ci, dict):
@@ -1820,7 +1820,7 @@ def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
 
 
 def pfsense_source_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
-    """The retail pfSense CE ISO: Netgate publishes no stable URL, so it is a local file (local.json may point at it)."""
+    """The pfSense CE ISO: an existing file (local.json may point at it), else the .iso.gz from Netgate's mirror."""
     iso_path = runtime.resolve_path(vm["iso"])
     if iso_path.is_file():
         return iso_path
@@ -1829,10 +1829,7 @@ def pfsense_source_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) 
     if dry_run:
         ui.print_status("warn", f"ISO {ui.pretty_path(iso_path)} is missing: dry-run continues with the path", ok=False)
         return iso_path
-    raise VMError(
-        f"pfSense ISO not found: {iso_path}. Download pfSense CE 2.7.2 (amd64, DVD image) from Netgate, "
-        f"then put it there or set \"iso\" for '{vm_name}' in vms/profiles/local.json"
-    )
+    raise VMError(iso.missing_iso_message(vm, vm_name))
 
 
 def cmd_bootstrap_freebsd(args: argparse.Namespace) -> int:
@@ -2015,10 +2012,7 @@ def reactos_source_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) 
     if dry_run:
         ui.print_status("warn", f"ISO {ui.pretty_path(iso_path)} is missing: dry-run continues with the path", ok=False)
         return iso_path
-    raise VMError(
-        f"ReactOS ISO not found: {iso_path}. Download the release zip from https://reactos.org/download/, "
-        f"unzip the .iso there or set \"iso\" for '{vm_name}' in vms/profiles/local.json"
-    )
+    raise VMError(iso.missing_iso_message(vm, vm_name))
 
 
 def cmd_bootstrap_reactos(args: argparse.Namespace) -> int:
@@ -2075,10 +2069,7 @@ def windowsxp_source_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False
     """The retail/OEM medium: no public URL, so it is the profile's path or a local.json override."""
     source = runtime.resolve_path(str(vm["iso"]))
     if not source.is_file() and not dry_run:
-        raise VMError(
-            f"Windows XP ISO not found: {ui.pretty_path(source)}. Microsoft publishes no URL for it; "
-            f"point vms/profiles/local.json at your own copy (see local.json.example)."
-        )
+        raise VMError(iso.missing_iso_message(vm, vm_name))
     return source
 
 
@@ -2148,10 +2139,7 @@ def cmd_bootstrap_windows98(args: argparse.Namespace) -> int:
 
     source = runtime.resolve_path(str(vm["iso"]))
     if not source.is_file() and not args.dry_run:
-        raise VMError(
-            f"Windows 98 ISO not found: {ui.pretty_path(source)}. Microsoft publishes no URL for it; "
-            f"point vms/profiles/local.json at your own copy (see local.json.example)."
-        )
+        raise VMError(iso.missing_iso_message(vm, args.vm))
     # Not ensure_vm_disk: Setup neither partitions nor formats, so the host hands it a disk that is
     # already a FAT32 volume with boot code that steps aside until Windows owns it.
     windows98.prepare_disk(vm, dry_run=args.dry_run)
@@ -2202,10 +2190,7 @@ def cmd_bootstrap_windowsnt4(args: argparse.Namespace) -> int:
 
     source = runtime.resolve_path(str(vm["iso"]))
     if not source.is_file() and not args.dry_run:
-        raise VMError(
-            f"Windows NT 4.0 ISO not found: {ui.pretty_path(source)}. Microsoft publishes no URL for it; "
-            f"point vms/profiles/local.json at your own copy (see local.json.example)."
-        )
+        raise VMError(iso.missing_iso_message(vm, args.vm))
     windowsnt4.ensure_dos_pieces(vm, dry_run=args.dry_run)
     # Not ensure_vm_disk: WINNT.EXE runs from DOS and copies onto a C: that must already be a
     # FAT16 volume, with boot code that steps aside until the NT loader owns the disk.

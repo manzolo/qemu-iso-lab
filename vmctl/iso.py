@@ -1,12 +1,14 @@
 """ISO download, discovery, validation, and extraction."""
 from __future__ import annotations
 
+import gzip
 import hashlib
 import re
 import shutil
 import subprocess
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -192,6 +194,106 @@ def download_file(url: str, destination: Path, dry_run: bool = False, vm: dict[s
     partial.replace(destination)
 
 
+def archive_spec(vm: dict[str, Any]) -> dict[str, Any] | None:
+    """``iso_archive``: the download is an archive holding the ISO. ``type`` is ``zip`` (with the
+    ``member`` to extract: ReactOS ships its BootCD only as a zip on SourceForge) or ``gzip``
+    (pfSense CE, ``.iso.gz`` on Netgate's mirror). ``sha256`` optionally pins the archive itself,
+    for vendors who publish that hash and not the ISO's; ``iso_sha256`` still pins the ISO."""
+    spec = vm.get("iso_archive")
+    if spec is None:
+        return None
+    if not isinstance(spec, dict) or spec.get("type") not in ("zip", "gzip"):
+        raise VMError("iso_archive needs type 'zip' or 'gzip'")
+    if spec["type"] == "zip" and not spec.get("member"):
+        raise VMError("iso_archive of type zip needs the member to extract")
+    return spec
+
+
+def download_archive(url: str, destination: Path, spec: dict[str, Any], dry_run: bool = False,
+                     vm: dict[str, Any] | None = None) -> None:
+    """Fetch the archive next to the ISO, check its hash, extract the ISO, validate it and remove
+    the archive: an interrupted run leaves no half file behind under the ISO's name."""
+    archive = destination.with_name(destination.name + "." + ("zip" if spec["type"] == "zip" else "gz"))
+    ui.print_header(f"Download ISO (inside a {spec['type']} archive)")
+    ui.print_kv("source", ui.pretty_url(url))
+    if spec.get("member"):
+        ui.print_kv("member", str(spec["member"]))
+    ui.print_kv("target", ui.pretty_path(destination))
+    runtime.ensure_parent(destination)
+    if dry_run:
+        return
+    partial = destination.with_name(destination.name + ".part")
+    try:
+        _fetch(url, archive)
+        expected = spec.get("sha256")
+        if expected and sha256_file(archive).lower() != str(expected).lower():
+            raise VMError(f"Archive from '{url}' does not match iso_archive.sha256 {expected}")
+        try:
+            if spec["type"] == "zip":
+                with zipfile.ZipFile(archive) as bundle, bundle.open(str(spec["member"])) as source, \
+                        partial.open("wb") as target:
+                    shutil.copyfileobj(source, target)
+            else:
+                with gzip.open(archive, "rb") as source, partial.open("wb") as target:
+                    shutil.copyfileobj(source, target)
+        except KeyError as exc:
+            raise VMError(f"'{spec['member']}' is not in the archive downloaded from '{url}'") from exc
+        except (zipfile.BadZipFile, gzip.BadGzipFile, EOFError, OSError) as exc:
+            raise VMError(f"Unable to extract the ISO from '{url}': {exc}") from exc
+        problems = validate_iso_file(partial, vm)
+        if problems:
+            raise VMError(f"Invalid ISO extracted from '{url}': {'; '.join(problems)}")
+        partial.replace(destination)
+    finally:
+        archive.unlink(missing_ok=True)
+        partial.unlink(missing_ok=True)
+
+
+def _fetch(url: str, destination: Path) -> None:
+    """Stream *url* into *destination*, refusing an HTML page and a short read."""
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": state.HTTP_USER_AGENT})
+        with urllib.request.urlopen(request) as response, destination.open("wb") as fh:
+            if "text/html" in response.headers.get("Content-Type", "").lower():
+                raise VMError(f"Refusing HTML response for download: {url}")
+            expected_length = response.headers.get("Content-Length")
+            shutil.copyfileobj(response, fh)
+        if expected_length and destination.stat().st_size != int(expected_length):
+            raise VMError(f"Incomplete download from '{url}': got {destination.stat().st_size} bytes, expected {expected_length}")
+    except VMError:
+        destination.unlink(missing_ok=True)
+        raise
+    except (OSError, ValueError, urllib.error.URLError) as exc:
+        destination.unlink(missing_ok=True)
+        raise VMError(f"Failed to download '{url}': {exc}") from exc
+
+
+def iso_source_kind(vm: dict[str, Any]) -> str:
+    """``cached`` (the file is there), ``download`` (vmctl can fetch it) or ``manual`` (only the
+    user can provide it: Windows media, signed vendor links). No network is used to decide."""
+    if runtime.resolve_path(vm["iso"]).is_file():
+        return "cached"
+    if iso_url_candidates(vm, allow_discovery=False) or vm.get("iso_discovery"):
+        return "download"
+    return "manual"
+
+
+def missing_iso_message(vm: dict[str, Any], vm_name: str | None = None) -> str:
+    """What to do when a profile's ISO is missing and vmctl cannot download it: the profile's own
+    ``iso_help`` (where to get the medium, what to name it), then where it has to end up."""
+    path = runtime.resolve_path(vm["iso"])
+    name = vm_name or str(vm.get("name") or "this profile")
+    lines = [f"{name} needs an ISO that vmctl cannot download: {ui.pretty_path(path)}"]
+    guide = str(vm.get("iso_help") or "").strip()
+    if not guide and str(vm.get("notes") or "").strip():
+        guide = "Profile notes: " + str(vm["notes"]).strip()
+    if guide:
+        lines += ["", guide]
+    lines += ["", f"Save it as {ui.pretty_path(path)}, or keep it where it is and set \"iso\" for "
+              f"'{vm_name or name}' in vms/profiles/local.json (see local.json.example)."]
+    return "\n".join(lines)
+
+
 def ensure_iso(vm: dict[str, Any], dry_run: bool = False) -> Path:
     iso_path = runtime.resolve_path(vm["iso"])
     if iso_path.is_file():
@@ -210,16 +312,16 @@ def ensure_iso(vm: dict[str, Any], dry_run: bool = False) -> Path:
 
     candidates = iso_url_candidates(vm, allow_discovery=not dry_run)
     if not candidates:
-        message = f"ISO not found and no ISO download source configured: {iso_path}"
-        notes = str(vm.get("notes") or "").strip()
-        if notes:
-            message += f"\n\nProfile notes: {notes}"
-        raise VMError(message)
+        raise VMError(missing_iso_message(vm))
 
     failures: list[str] = []
+    archive = archive_spec(vm)
     for url in candidates:
         try:
-            download_file(url, iso_path, dry_run=dry_run, vm=vm)
+            if archive is not None:
+                download_archive(url, iso_path, archive, dry_run=dry_run, vm=vm)
+            else:
+                download_file(url, iso_path, dry_run=dry_run, vm=vm)
             return iso_path
         except VMError as exc:
             failures.append(f"{ui.pretty_url(url)}: {exc}")

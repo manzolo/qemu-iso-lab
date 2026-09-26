@@ -65,7 +65,12 @@
         },
         "run_once": []
       },
-      "notes": "ReactOS 0.4.16 BootCD from the SourceForge zip (unzip it into isos/). bootstrap-reactos rebuilds it with unattend.inf (both Setup stages answered, AutoPartition + FAT format, Administrator password 'lab') and Setup as the default boot entry, then waits for the GuiRunOnce token on COM1 and the guest's shutdown. Install only: no SSH server exists for ReactOS. vmctl install still boots the plain ISO (LiveCD by default, Setup in the boot menu)."
+      "notes": "ReactOS 0.4.16 BootCD: vmctl downloads the release zip from SourceForge, extracts ReactOS-0.4.16-i386.iso and checks it against iso_sha256 (the zip itself is not pinned: the ISO inside it is). bootstrap-reactos rebuilds it with unattend.inf (both Setup stages answered, AutoPartition + FAT format, Administrator password 'lab') and Setup as the default boot entry, then waits for the GuiRunOnce token on COM1 and the guest's shutdown. Install only: no SSH server exists for ReactOS. vmctl install still boots the plain ISO (LiveCD by default, Setup in the boot menu).",
+      "iso_url": "https://sourceforge.net/projects/reactos/files/ReactOS/0.4.16/ReactOS-0.4.16-i386.zip/download",
+      "iso_archive": {
+        "type": "zip",
+        "member": "ReactOS-0.4.16-i386.iso"
+      }
     }
   }
 }

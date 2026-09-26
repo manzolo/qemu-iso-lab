@@ -161,7 +161,7 @@ class ReactOSTests(BaseVmctlTestCase):
     def test_cmd_bootstrap_reactos_explains_a_missing_iso_and_tolerates_it_in_dry_run(self):
         self.write_config_dir()
         args = argparse.Namespace(vm=self.vm_name, timeout=900, dry_run=False)
-        with self.assertRaisesRegex(vmctl.errors.VMError, "reactos.org/download"):
+        with self.assertRaisesRegex(vmctl.errors.VMError, "needs an ISO that vmctl cannot download"):
             self.vmctl.cmd_bootstrap_reactos(args)
         args.dry_run = True
         with mock.patch.object(vmctl.runtime, "require_command"):

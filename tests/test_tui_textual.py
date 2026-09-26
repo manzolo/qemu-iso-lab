@@ -30,6 +30,22 @@ def profile(name, **changes):
 
 
 class DashboardDataTests(unittest.TestCase):
+    def test_a_missing_iso_only_the_user_can_provide_comes_first(self):
+        # ReactOS on a fresh host started an install that could only fail ("Failed (1)"): a medium
+        # vmctl cannot download is now the first thing the dashboard asks for.
+        row = profile("windows11", iso_ready=False, iso_source="manual", unattended_flow="bootstrap-windows")
+        self.assertEqual(status_label(row)[0], "ISO needed")
+        self.assertEqual(primary_action(row), ("Get the ISO…", "Get the ISO"))
+        cached = dict(row, iso_ready=True, iso_source="cached")
+        self.assertEqual(primary_action(cached), ("Unattended install…", "alt-u"))
+        self.assertEqual(status_label(cached)[0], "No disk")
+
+    def test_any_known_unattended_flow_is_offered_not_only_the_listed_ones(self):
+        # Haiku, NixOS, pearOS and the retro Windows had no has_* flag: Boot ISO… was offered.
+        self.assertEqual(primary_action(profile("haiku", unattended_flow="bootstrap-haiku")),
+                         ("Unattended install…", "alt-u"))
+        self.assertEqual(primary_action(profile("manual"))[0], "Boot ISO…")
+
     def test_printed_commands_roundtrip_shell_arguments(self):
         import io
         import shlex

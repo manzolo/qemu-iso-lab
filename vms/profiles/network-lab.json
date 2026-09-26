@@ -77,7 +77,7 @@
           ]
         }
       },
-      "notes": "Unattended pfSense via bootstrap-pfsense: the offline CE 2.7.2 installer is scripted (bsdinstall, ZFS on vtbd0, BIOS) and the whole config.xml is rendered from network_lab. Netgate publishes no stable download URL: put the DVD ISO at isos/pfSense-CE-2.7.2-RELEASE-amd64.iso or point 'iso' at it in local.json. WAN = vtnet0 (slirp, DHCP), LAN = vtnet1 (segment lab-lan, 192.168.0.1). From the host: web GUI http://127.0.0.1:8080/ (WAN rules allow GUI + SSH from the WAN side), SSH 127.0.0.1:2237; 8081/2238/2239 are NAT forwards to Pi-hole web and to the members' SSH. Not a Linux guest: no ssh_provision post-install, the account below is created by the installer.",
+      "notes": "Unattended pfSense via bootstrap-pfsense: the offline CE 2.7.2 installer is scripted (bsdinstall, ZFS on vtbd0, BIOS) and the whole config.xml is rendered from network_lab. vmctl downloads pfSense-CE-2.7.2-RELEASE-amd64.iso.gz from Netgate's mirror, checks it against the hash Netgate publishes (iso_archive.sha256) and unpacks the ISO (iso_sha256); an ISO of your own still wins when 'iso' points at it in local.json. WAN = vtnet0 (slirp, DHCP), LAN = vtnet1 (segment lab-lan, 192.168.0.1). From the host: web GUI http://127.0.0.1:8080/ (WAN rules allow GUI + SSH from the WAN side), SSH 127.0.0.1:2237; 8081/2238/2239 are NAT forwards to Pi-hole web and to the members' SSH. Not a Linux guest: no ssh_provision post-install, the account below is created by the installer.",
       "ssh_provision": {
         "hostname": "firewall",
         "user": "lab",
@@ -105,7 +105,13 @@
           "end": "192.168.0.199",
           "lease_hours": 24
         }
-      }
+      },
+      "iso_url": "https://atxfiles.netgate.com/mirror/downloads/pfSense-CE-2.7.2-RELEASE-amd64.iso.gz",
+      "iso_archive": {
+        "type": "gzip",
+        "sha256": "883fb7bc64fe548442ed007911341dd34e178449f8156ad65f7381a02b7cd9e4"
+      },
+      "iso_sha256": "441005f79ea0c155bc4b830a2b4207f8c0804cf7b075d2a6489c0a136cbc5d51"
     },
     "pihole-lab": {
       "name": "Pi-hole v6 on Ubuntu 22.04 (network lab DNS)",

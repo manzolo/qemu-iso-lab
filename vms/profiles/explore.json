@@ -108,7 +108,8 @@
         }
       },
       "usb_tablet": true,
-      "notes": "Arch Linux based, macOS-like KDE Plasma 6 desktop on Wayland. Interactive Calamares installation requires an internet connection; no unattended path. User-supplied medium: every /iso/ URL now needs a signed link, so the plain URL in the vendor index answers 302 to a download-expired page and vmctl cannot fetch it. Download the ISO from https://pearos.xyz/download/ (the pay-what-you-want gate mints a free signed link) and save it as isos/pearOS-NiceC0re-2026.09-x86_64.iso. The size and SHA-256 pinned here come from the vendor release index https://pearos.xyz/assets/data/nicecore-versions.json; a fresh ISO is built monthly and older builds are retired, so refreshing the pin is maintenance."
+      "notes": "Arch Linux based, macOS-like KDE Plasma 6 desktop on Wayland. Interactive Calamares installation requires an internet connection; no unattended path. User-supplied medium: every /iso/ URL now needs a signed link, so the plain URL in the vendor index answers 302 to a download-expired page and vmctl cannot fetch it. Download the ISO from https://pearos.xyz/download/ (the pay-what-you-want gate mints a free signed link) and save it as isos/pearOS-NiceC0re-2026.09-x86_64.iso. The size and SHA-256 pinned here come from the vendor release index https://pearos.xyz/assets/data/nicecore-versions.json; a fresh ISO is built monthly and older builds are retired, so refreshing the pin is maintenance.",
+      "iso_help": "pearOS hands out signed, expiring download links, so vmctl cannot fetch the ISO: open https://pearos.xyz/download/, take the free option of the pay-what-you-want page and download NiceC0re 2026.09 (x86_64). vmctl checks the file against the size and SHA-256 pinned in the profile (from the vendor index https://pearos.xyz/assets/data/nicecore-versions.json); a newer monthly build needs a new pin."
     },
     "pearos-nicecore-unattended": {
       "name": "pearOS NiceC0re (unattended)",
@@ -199,7 +200,8 @@
           "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager pacman --package pearos-settings"
         ]
       },
-      "notes": "Unattended counterpart of pearos-nicecore, on the same user-supplied ISO (see that profile for where to download it). pearOS installs with Calamares in unpackfs mode, which has no answer file: bootstrap-pearos reproduces what its own Calamares configuration and alg-* helpers do, unpacking the live squashfs onto the disk and configuring it, so no package is downloaded during the install."
+      "notes": "Unattended counterpart of pearos-nicecore, on the same user-supplied ISO (see that profile for where to download it). pearOS installs with Calamares in unpackfs mode, which has no answer file: bootstrap-pearos reproduces what its own Calamares configuration and alg-* helpers do, unpacking the live squashfs onto the disk and configuring it, so no package is downloaded during the install.",
+      "iso_help": "pearOS hands out signed, expiring download links, so vmctl cannot fetch the ISO: open https://pearos.xyz/download/, take the free option of the pay-what-you-want page and download NiceC0re 2026.09 (x86_64). vmctl checks the file against the size and SHA-256 pinned in the profile (from the vendor index https://pearos.xyz/assets/data/nicecore-versions.json); a newer monthly build needs a new pin."
     },
     "endeavouros": {
       "name": "EndeavourOS Titan",

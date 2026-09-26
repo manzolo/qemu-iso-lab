@@ -1,4 +1,9 @@
 import argparse
+import gzip
+import hashlib
+import io
+import json
+import zipfile
 import shutil
 import sys
 import unittest
@@ -12,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 import vmctl.iso  # noqa: E402
 import vmctl.runtime  # noqa: E402
+from vmctl.errors import VMError  # noqa: E402
 
 from tests._common import BaseVmctlTestCase  # noqa: E402
 
@@ -220,7 +226,7 @@ class IsoTests(BaseVmctlTestCase):
             self.vmctl.ensure_iso(self.vm_config)
 
         message = str(ctx.exception)
-        self.assertIn("no ISO download source configured", message)
+        self.assertIn("needs an ISO that vmctl cannot download", message)
         self.assertIn("Profile notes: Put this vendor ISO under isos/example.iso.", message)
 
 
@@ -251,3 +257,82 @@ class ArchIsoBootArtifactTests(BaseVmctlTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IsoArchiveTests(BaseVmctlTestCase):
+    """ISOs shipped inside an archive (ReactOS zip, pfSense .iso.gz) and ISOs only the user has."""
+
+    PAYLOAD = b"CD001" + b"\0" * 4091
+
+    def vm(self, **extra):
+        vm = {"name": "Test OS", "iso": "isos/test.iso", "iso_url": "https://example.invalid/test.bin",
+              "iso_sha256": hashlib.sha256(self.PAYLOAD).hexdigest(), "disk": {"path": "artifacts/t/disk.qcow2"}}
+        vm.update(extra)
+        return vm
+
+    def fetch_writing(self, data):
+        return lambda url, destination: destination.write_bytes(data)
+
+    def zip_bytes(self, member="test.iso"):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as bundle:
+            bundle.writestr(member, self.PAYLOAD)
+        return buffer.getvalue()
+
+    def test_zip_member_is_extracted_verified_and_the_archive_removed(self):
+        vm = self.vm(iso_archive={"type": "zip", "member": "test.iso"})
+        with mock.patch.object(vmctl.iso, "_fetch", side_effect=self.fetch_writing(self.zip_bytes())), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            path = vmctl.iso.ensure_iso(vm)
+        self.assertEqual(path.read_bytes(), self.PAYLOAD)
+        self.assertEqual(sorted(p.name for p in path.parent.iterdir()), ["test.iso"])
+
+    def test_gzip_archive_hash_is_checked_before_extracting(self):
+        packed = gzip.compress(self.PAYLOAD)
+        good = self.vm(iso_archive={"type": "gzip", "sha256": hashlib.sha256(packed).hexdigest()})
+        with mock.patch.object(vmctl.iso, "_fetch", side_effect=self.fetch_writing(packed)), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(vmctl.iso.ensure_iso(good).read_bytes(), self.PAYLOAD)
+        (self.root / "isos/test.iso").unlink()
+        bad = self.vm(iso_archive={"type": "gzip", "sha256": "0" * 64})
+        with mock.patch.object(vmctl.iso, "_fetch", side_effect=self.fetch_writing(packed)), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            with self.assertRaisesRegex(VMError, "does not match iso_archive.sha256"):
+                vmctl.iso.ensure_iso(bad)
+        self.assertEqual(list((self.root / "isos").iterdir()), [])
+
+    def test_a_missing_member_or_a_wrong_iso_leaves_nothing_behind(self):
+        for vm, data, message in (
+                (self.vm(iso_archive={"type": "zip", "member": "other.iso"}), self.zip_bytes(), "not in the archive"),
+                (self.vm(iso_archive={"type": "zip", "member": "test.iso"}, iso_sha256="0" * 64), self.zip_bytes(), "Invalid ISO extracted")):
+            with self.subTest(message=message), \
+                 mock.patch.object(vmctl.iso, "_fetch", side_effect=self.fetch_writing(data)), \
+                 mock.patch("sys.stdout", new_callable=io.StringIO):
+                with self.assertRaisesRegex(VMError, message):
+                    vmctl.iso.ensure_iso(vm)
+                self.assertEqual(list((self.root / "isos").iterdir()), [])
+
+    def test_source_kind_and_the_message_for_an_iso_only_the_user_has(self):
+        manual = {"name": "Windows XP", "iso": "isos/xp.iso", "iso_help": "Use your own CD and its key."}
+        self.assertEqual(vmctl.iso.iso_source_kind(manual), "manual")
+        self.assertEqual(vmctl.iso.iso_source_kind(self.vm()), "download")
+        with self.assertRaises(VMError) as raised:
+            vmctl.iso.ensure_iso(manual)
+        text = str(raised.exception)
+        self.assertIn("cannot download: isos/xp.iso", text)
+        self.assertIn("Use your own CD and its key.", text)
+        self.assertIn('set "iso"', text)
+        (self.root / "isos").mkdir(exist_ok=True)
+        (self.root / "isos/xp.iso").write_bytes(self.PAYLOAD)
+        self.assertEqual(vmctl.iso.iso_source_kind(manual), "cached")
+
+    def test_every_tracked_profile_can_get_its_iso_or_says_how(self):
+        # The rule this commit set: vmctl downloads what has a public source, and a medium only
+        # the user can provide carries iso_help (Windows, the retro media, pearOS's signed links).
+        for path in (ROOT / "vms/profiles").glob("*.json"):
+            if path.name.startswith("local"):
+                continue
+            for name, vm in json.loads(path.read_text())["vms"].items():
+                with self.subTest(profile=name):
+                    has_source = vm.get("iso_url") or vm.get("iso_urls") or vm.get("iso_discovery")
+                    self.assertTrue(has_source or vm.get("iso_help"), f"{name}: no download source and no iso_help")
