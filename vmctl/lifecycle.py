@@ -3580,6 +3580,55 @@ def resolve_group_selection(cfg: dict[str, Any], groups: list[str]) -> list[str]
     return list(dict.fromkeys(selected))
 
 
+def cluster_row_id(cluster: str) -> str:
+    return f"cluster-{cluster}"
+
+
+def run_cluster_checks(cfg: dict[str, Any], selected_names: list[str],
+                       results: list[tuple[str, str, str]], args: argparse.Namespace) -> None:
+    """The cross-VM step the rows cannot see: a Proxmox cluster whose nodes were all in this run
+    is formed on their fresh disks (runtime NICs, like ``vmctl group install``) and must reach
+    quorum, as one more row. A run naming only some nodes has no cluster to check; a node that
+    did not pass makes the row a skip, not a second failure."""
+    outcomes = {name: status for name, status, _ in results}
+    selected = set(selected_names)
+    for cluster, entry in pvecluster.clusters(cfg, config.sorted_vm_names(cfg)).items():
+        nodes = entry["nodes"]
+        if not selected.issuperset(nodes):
+            continue
+        row = cluster_row_id(cluster)
+        primary = config.get_vm(cfg, entry["primary"])
+        label = f"Proxmox cluster {cluster} ({' + '.join(nodes)})"
+        ui.print_header(f"Test cluster: {cluster}")
+        not_passed = [name for name in nodes if outcomes.get(name) != "passed"]
+        if not_passed:
+            detail = f"skipped: {', '.join(not_passed)} did not pass"
+            ui.print_status("skip", f"{row}: {detail}")
+            results.append((row, "skipped", detail))
+            report.record_group_row(row, label, primary, args, "skipped", detail, 0.0, "group cluster")
+            continue
+        started = time.monotonic()
+        try:
+            states = group_states(cfg, nodes)
+            for name in nodes:
+                if not states[name]["running"]:
+                    cmd_start(argparse.Namespace(vm=name, headless=True, background=True, video=None,
+                                                 cloud_init=False, spice_port=None, dry_run=args.dry_run))
+            pvecluster.form(cfg, nodes, args.timeout, dry_run=args.dry_run)
+            status, detail = "passed", f"{len(nodes)} nodes, quorate"
+        except (VMError, subprocess.SubprocessError, OSError) as exc:
+            status, detail = "failed", str(exc)
+        finally:
+            for name in reversed(nodes):
+                try:
+                    cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+                except VMError as exc:
+                    ui.print_status("warn", f"{name}: {exc}", ok=False)
+        ui.print_status("ok" if status == "passed" else "fail", f"{row}: {detail}", ok=status == "passed")
+        results.append((row, status, detail))
+        report.record_group_row(row, label, primary, args, status, detail, time.monotonic() - started, "group cluster")
+
+
 def cmd_test_local(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     named = list(dict.fromkeys(getattr(args, "vms", None) or []))
@@ -3666,6 +3715,8 @@ def cmd_test_local(args: argparse.Namespace) -> int:
                     print(output, end="" if output.endswith("\n") else "\n")
                 results.append((vm_name, status, detail))
             ui.print_kv("peak concurrency", str(matrix_scheduler.peak_running))
+        # On the rows' own disks, before --restore puts the stashed ones back.
+        run_cluster_checks(cfg, selected_names, results, args)
     finally:
         if stashed:
             ui.print_header("Restore stashed artifacts")

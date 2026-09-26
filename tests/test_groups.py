@@ -11,7 +11,10 @@ from pathlib import Path
 from unittest import mock
 
 import vmctl.config
+import vmctl.errors
 import vmctl.lifecycle
+import vmctl.pvecluster
+import vmctl.report
 import vmctl.state
 from _common import BaseVmctlTestCase
 
@@ -143,6 +146,65 @@ class GroupSelectionTests(BaseVmctlTestCase):
     def test_without_names_or_groups_the_whole_catalog_runs(self):
         self.catalog()
         self.assertEqual(sorted(self.run_matrix()), ["outsider", "steady", self.vm_name])
+
+
+class ClusterCheckTests(BaseVmctlTestCase):
+    """check-vms forms a Proxmox cluster whose nodes all passed, as one more row."""
+
+    def setUp(self):
+        super().setUp()
+        def node(port):
+            profile = json.loads(json.dumps(self.vm_config))
+            profile["ssh_provision"] = {"user": "root", "ssh_host_port": port}
+            return profile
+        self.write_extra_profile("nodes.json", {"vms": {"node-a": node(2301), "node-b": node(2302)}})
+        self.entry = {"pve-lab": {"primary": "node-a", "nodes": ["node-a", "node-b"]}}
+
+    def run_checks(self, selected, outcomes, form_error=None):
+        cfg = vmctl.config.load_config()
+        results = [(name, status, "-") for name, status in outcomes.items()]
+        args = argparse.Namespace(timeout=300, dry_run=False)
+        events = []
+        with mock.patch.object(vmctl.pvecluster, "clusters", return_value=self.entry), \
+             mock.patch.object(vmctl.pvecluster, "form", side_effect=form_error or (lambda cfg, nodes, *a, **k: events.append(("form", nodes)))) as form, \
+             mock.patch.object(vmctl.lifecycle, "group_states", side_effect=lambda cfg, names: {n: {"running": False} for n in names}), \
+             mock.patch.object(vmctl.lifecycle, "cmd_start", side_effect=lambda a: events.append(("start", a.vm))), \
+             mock.patch.object(vmctl.lifecycle, "cmd_stop", side_effect=lambda a: events.append(("stop", a.vm))), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            vmctl.lifecycle.run_cluster_checks(cfg, selected, results, args)
+        return results[len(outcomes):], events, form
+
+    def test_a_cluster_whose_nodes_passed_is_formed_and_the_nodes_stopped(self):
+        rows, events, _ = self.run_checks(["node-a", "node-b"], {"node-a": "passed", "node-b": "passed"})
+        self.assertEqual(rows, [("cluster-pve-lab", "passed", "2 nodes, quorate")])
+        self.assertEqual(events, [("start", "node-a"), ("start", "node-b"), ("form", ["node-a", "node-b"]),
+                                  ("stop", "node-b"), ("stop", "node-a")])
+
+    def test_a_node_that_did_not_pass_skips_the_cluster_row(self):
+        rows, events, form = self.run_checks(["node-a", "node-b"], {"node-a": "passed", "node-b": "failed"})
+        self.assertEqual(rows, [("cluster-pve-lab", "skipped", "skipped: node-b did not pass")])
+        form.assert_not_called()
+        self.assertEqual(events, [])
+
+    def test_a_run_naming_only_some_nodes_has_no_cluster_row(self):
+        rows, events, form = self.run_checks(["node-a"], {"node-a": "passed"})
+        self.assertEqual(rows, [])
+        form.assert_not_called()
+
+    def test_a_cluster_that_fails_is_a_failed_row_and_the_nodes_still_stop(self):
+        rows, events, _ = self.run_checks(["node-a", "node-b"], {"node-a": "passed", "node-b": "passed"},
+                                          form_error=vmctl.errors.VMError("no quorum"))
+        self.assertEqual(rows, [("cluster-pve-lab", "failed", "no quorum")])
+        self.assertEqual(events[-2:], [("stop", "node-b"), ("stop", "node-a")])
+
+    def test_the_report_row_is_not_demoted_for_having_no_screenshot(self):
+        directory = Path(self.tempdir.name) / "report"
+        (directory / "results").mkdir(parents=True)
+        args = argparse.Namespace(dry_run=False, _report_dir=str(directory))
+        vmctl.report.record_group_row("cluster-pve-lab", "Proxmox cluster pve-lab", {"meta": {"status": "unattended"}},
+                                      args, "passed", "2 nodes, quorate", 12.0, "group cluster")
+        result = json.loads((directory / "results" / "cluster-pve-lab.json").read_text())
+        self.assertEqual((result["status"], result["phase"], result["screenshot"]), ("PASS", "cluster", None))
 
 
 class RepositoryGroupTests(unittest.TestCase):

@@ -1335,6 +1335,14 @@ Only node 1 carries the LXC apps: a node joining a cluster must hold no guests. 
 second run changed nothing; the client reached the three GUIs and both apps. Each node has 3 GB,
 so the lab needs about 12 GB with the client.
 
+`check-vms` checks the cluster too: when a run includes all three nodes (the full matrix, `--group
+proxmox-lab`, or the three names), the rows install and verify each node alone, then
+`lifecycle.run_cluster_checks` starts the nodes with their runtime NICs on those fresh disks, runs
+`pvecluster.form`, stops them again and records one more row, `cluster-pve-lab` (PASS at quorum,
+FAIL otherwise, SKIP when a node did not pass). It runs before `--restore` puts the stashed disks
+back. A run naming only some nodes has no cluster row. The lab was promoted to `unattended` on
+2026-09-26 (four PASS from clean disks, then a quorate three-node cluster).
+
 The map page (`vmctl group map proxmox-lab --open`) ends with a **runbook** generated from the
 same profiles, in the order a person would run it, with a table of contents. Every block is marked
 *run* (changes something), *check* (read-only) or *try* (a reversible experiment) and carries the

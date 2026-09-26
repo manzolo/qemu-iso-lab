@@ -591,6 +591,24 @@ def record(vm_name: str, vm: dict[str, Any], args: argparse.Namespace, status: s
     destination.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
 
 
+def record_group_row(row_id: str, name: str, primary: dict[str, Any], args: argparse.Namespace,
+                     status: str, detail: str, seconds: float, flow: str) -> None:
+    """A row that belongs to several profiles (a cluster check): no framebuffer of its own, so a
+    missing screenshot does not demote it, and the profile fields are the primary node's."""
+    directory = getattr(args, "_report_dir", None)
+    if not directory or args.dry_run:
+        return
+    result = {"id": row_id, "name": name, "flow": flow,
+              "profile_status": primary.get("meta", {}).get("status", "manual"),
+              "profile_verified": primary.get("meta", {}).get("verified"),
+              "status": {"passed": "PASS", "failed": "FAIL", "skipped": "SKIP"}.get(status, "WARN"),
+              "phase": "cluster", "seconds": round(seconds, 3), "detail": detail,
+              "screenshot": None, "timeline": []}
+    destination = Path(directory) / "results" / f"{row_id}.json"
+    runtime.ensure_parent(destination)
+    destination.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+
+
 def render_html(results: list[dict[str, Any]], metadata: dict[str, str], directory: Path) -> str:
     def esc(value: object) -> str:
         return html.escape(str(value), quote=True)
