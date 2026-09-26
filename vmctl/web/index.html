@@ -59,8 +59,8 @@ tr.row.sel td { background:#203b42; }
 tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
 .profile-identity,.lab-identity { display:flex; align-items:center; gap:12px; min-width:0; }
 .profile-text { display:block; min-width:0; }
-.catalog-icon { --icon-color:var(--accent); display:inline-flex; align-items:center; justify-content:center; flex:0 0 34px; width:34px; height:34px; border:1px solid color-mix(in srgb,var(--icon-color) 30%,transparent); border-radius:10px; color:var(--icon-color); background:color-mix(in srgb,var(--icon-color) 9%,#111a27); vertical-align:middle; }
-.catalog-icon svg { display:block; width:23px; height:23px; pointer-events:none; }
+.catalog-icon { --icon-color:var(--accent); --icon-ink:#fff; display:inline-flex; align-items:center; justify-content:center; flex:0 0 34px; width:34px; height:34px; border-radius:10px; color:var(--icon-ink); background:linear-gradient(160deg, color-mix(in srgb,var(--icon-color) 92%,#fff), color-mix(in srgb,var(--icon-color) 78%,#0b1220)); box-shadow:inset 0 0 0 1px color-mix(in srgb,#fff 18%,transparent), 0 1px 2px rgba(0,0,0,.35); vertical-align:middle; }
+.catalog-icon svg { display:block; width:22px; height:22px; pointer-events:none; }
 .catalog-icon.large { width:46px; height:46px; flex-basis:46px; border-radius:13px; }
 .catalog-icon.large svg { width:30px; height:30px; }
 .lab .members button[data-member] { display:flex; align-items:center; gap:10px; min-width:0; }
@@ -301,42 +301,45 @@ function stateOf(r) {
   return ({ verified:["Boot verified","s-ok"], installed:["Installed","s-info"], unverified:["Unverified","s-warn"], incomplete:["Incomplete","s-bad"], empty:["Empty disk","s-muted"], "no disk":["No disk","s-muted"] })[r.install_label] || ["Unknown","s-muted"];
 }
 const monitorIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 8l3 2-3 2m5 0h4"/></svg>';
-// Original catalog icon artwork: CC0-1.0. See vmctl/web/ICONS.md.
-// These are project pictograms and monograms, not third-party operating-system logos.
-const iconMonogram = (letters) => `<path d="M7 3H4v3m13-3h3v3M4 18v3h3m13-3v3h-3"/><text x="12" y="15.8" text-anchor="middle" fill="currentColor" stroke="none" font-family="system-ui,sans-serif" font-size="${letters.length > 2 ? 8 : letters.length > 1 ? 10 : 14}" font-weight="700">${letters}</text>`;
+// Original catalog icon artwork: CC0-1.0, drawn for this project (vmctl/web/ICONS.md).
+// No third-party operating-system logo is reproduced here: a profile is told apart by its
+// family colour (colours are not protectable), a bold monogram, or a generic pictogram
+// (a window, a mountain, a snowflake, a shield, a rack of servers).
+const iconMonogram = (letters) => `<text x="12" y="12.6" text-anchor="middle" dominant-baseline="central" stroke="none" fill="currentColor" font-family="system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" font-size="${letters.length > 2 ? 10.5 : letters.length > 1 ? 12.5 : 16}" font-weight="800" letter-spacing="${letters.length > 2 ? -0.7 : letters.length > 1 ? -0.4 : 0}">${letters}</text>`;
+const iconPicto = (d) => `<path d="${d}"/>`;
 const catalogIcons = {
-  arch: ["Arch Linux", "#7acbf0", iconMonogram("Ar")],
-  cachyos: ["CachyOS", "#73dac5", iconMonogram("Ca")],
-  endeavouros: ["EndeavourOS", "#bda0f4", iconMonogram("En")],
-  pearos: ["pearOS", "#b7dda3", iconMonogram("Pe")],
-  debian: ["Debian", "#efa1b6", iconMonogram("De")],
-  ubuntu: ["Ubuntu", "#f2b08b", iconMonogram("Ub")],
-  lubuntu: ["Lubuntu", "#9bcbf4", iconMonogram("Lu")],
-  kubuntu: ["Kubuntu", "#8ac7ec", iconMonogram("Ku")],
-  xubuntu: ["Xubuntu", "#adc4f7", iconMonogram("Xu")],
-  kali: ["Kali Linux", "#a8b9ed", iconMonogram("Ka")],
-  mint: ["Linux Mint", "#b6da8c", iconMonogram("Mi")],
-  popos: ["Pop!_OS", "#98d5df", iconMonogram("Po")],
-  neon: ["KDE neon", "#98dec4", iconMonogram("Ne")],
-  fedora: ["Fedora", "#a3bdf9", iconMonogram("Fe")],
-  opensuse: ["openSUSE", "#a7dc8b", iconMonogram("Su")],
-  alpine: ["Alpine Linux", "#91cfdd", iconMonogram("Al")],
-  nixos: ["NixOS", "#a7c9f0", iconMonogram("Nx")],
-  void: ["Void Linux", "#b3d3a3", iconMonogram("Vo")],
-  alma: ["AlmaLinux", "#e2ca95", iconMonogram("Am")],
-  rocky: ["Rocky Linux", "#9adebc", iconMonogram("Ro")],
-  centos: ["CentOS", "#d2afe1", iconMonogram("Ce")],
-  rhel: ["RHEL family", "#e8a5a5", iconMonogram("RH")],
-  windows: ["Windows", "#8ecafa", '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18m-8 4 3 2-3 2M6 6.5h.01m3 0h.01"/>'],
-  freebsd: ["FreeBSD", "#edb0a0", iconMonogram("BSD")],
-  pfsense: ["pfSense", "#a4cde9", '<path d="M12 3 4 6v6c0 4 4 7 8 9 4-2 8-5 8-9V6Z"/><path d="M8 10h8m-8 4h8m-4-4v4"/>'],
-  proxmox: ["Proxmox VE", "#edba87", '<rect x="4" y="3" width="16" height="7" rx="2"/><rect x="4" y="14" width="16" height="7" rx="2"/><path d="M8 6.5h.01m3 0h5M8 17.5h.01m3 0h5M12 10v4"/>'],
-  haiku: ["Haiku", "#e8d397", iconMonogram("Ha")],
-  reactos: ["ReactOS", "#b7b7ec", iconMonogram("Re")],
-  linux: ["Linux", "#dcc799", '<path d="m5 6 6 6-6 6m8 0h6M15 5h4"/>'],
-  generic: ["Virtual machine", "#a8b6ca", '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M8 9h8m-8 3h5"/>'],
-  network: ["Network lab", "#87d8c6", '<rect x="8" y="3" width="8" height="6" rx="1.5"/><rect x="2" y="16" width="7" height="5" rx="1.5"/><rect x="15" y="16" width="7" height="5" rx="1.5"/><path d="M12 9v4H5.5v3M12 13h6.5v3"/>'],
-  cluster: ["Virtualization cluster", "#efbd8d", '<rect x="8" y="2" width="8" height="5" rx="1.5"/><rect x="2" y="16" width="8" height="5" rx="1.5"/><rect x="14" y="16" width="8" height="5" rx="1.5"/><path d="M12 7v4m-6 5v-5h12v5M10 18.5h4"/>']
+  arch: ["Arch Linux", "#1793d1", iconMonogram("A")],
+  cachyos: ["CachyOS", "#1cb1a4", iconMonogram("Ca")],
+  endeavouros: ["EndeavourOS", "#7f3fbf", iconMonogram("En")],
+  pearos: ["pearOS", "#6bbf59", iconMonogram("Pe")],
+  debian: ["Debian", "#d70a53", iconMonogram("D")],
+  ubuntu: ["Ubuntu", "#e95420", iconMonogram("U")],
+  lubuntu: ["Lubuntu", "#0068c8", iconMonogram("Lu")],
+  kubuntu: ["Kubuntu", "#0079c1", iconMonogram("Ku")],
+  xubuntu: ["Xubuntu", "#2a5ea8", iconMonogram("Xu")],
+  kali: ["Kali Linux", "#367bf0", iconMonogram("K")],
+  mint: ["Linux Mint", "#87cf3e", iconMonogram("M")],
+  popos: ["Pop!_OS", "#48b9c7", iconMonogram("Po")],
+  neon: ["KDE neon", "#27ae60", iconMonogram("Ne")],
+  fedora: ["Fedora", "#51a2da", iconMonogram("F")],
+  opensuse: ["openSUSE", "#73ba25", iconMonogram("S")],
+  alpine: ["Alpine Linux", "#0d597f", iconPicto("M3 19 9 8l3 5 2.5-3.5L21 19Z")],
+  nixos: ["NixOS", "#5277c3", iconPicto("M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5")],
+  void: ["Void Linux", "#478061", iconMonogram("V")],
+  alma: ["AlmaLinux", "#0069da", iconMonogram("Al")],
+  rocky: ["Rocky Linux", "#10b981", iconMonogram("R")],
+  centos: ["CentOS", "#a14ea0", iconMonogram("C")],
+  rhel: ["RHEL family", "#ee0000", iconMonogram("RH")],
+  windows: ["Windows", "#0078d4", iconPicto("M4 5h16v14H4Z M12 5v14M4 12h16")],
+  freebsd: ["FreeBSD", "#ab2b28", iconMonogram("BSD")],
+  pfsense: ["pfSense", "#2d6db5", iconPicto("M12 3 4 6v6c0 4 4 7 8 9 4-2 8-5 8-9V6Z M8 10h8m-8 4h8m-4-4v4")],
+  proxmox: ["Proxmox VE", "#e57000", iconPicto("M4 4h16v6H4Z M4 14h16v6H4Z M8 7h.01M11 7h5M8 17h.01M11 17h5")],
+  haiku: ["Haiku", "#f0b400", iconPicto("M5 7.5h9M5 12h14M5 16.5h9")],
+  reactos: ["ReactOS", "#0088cc", iconMonogram("Re")],
+  linux: ["Linux", "#f4b400", iconPicto("m5 6 6 6-6 6m8 0h6")],
+  generic: ["Virtual machine", "#5c6b80", iconPicto("M3 4h18v13H3Z M8 21h8m-4-4v4M8 9h8m-8 3h5")],
+  network: ["Network lab", "#2fa58f", iconPicto("M8 3h8v6H8Z M2 16h7v5H2Z M15 16h7v5h-7Z M12 9v4H5.5v3M12 13h6.5v3")],
+  cluster: ["Virtualization cluster", "#d98a3c", iconPicto("M8 2h8v5H8Z M2 16h8v5H2Z M14 16h8v5h-8Z M12 7v4m-6 5v-5h12v5M10 18.5h4")]
 };
 // Match the profile identity first, then its display name, and finally the broader family.
 // In particular, the Debian client of proxmox-lab is not a Proxmox hypervisor.
@@ -364,9 +367,11 @@ function osIconKey(r) {
   const family = String(r.family || "").toLowerCase();
   return ({arch:"arch", debian:"debian", alpine:"alpine", fedora:"fedora", opensuse:"opensuse", nix:"nixos", nixos:"nixos", mint:"mint", void:"void", rhel:"rhel", kali:"kali", bsd:"freebsd", proxmox:"proxmox", windows:"windows", reactos:"reactos", haiku:"haiku", linux:"linux"})[family] || "generic";
 }
+// Dark ink on a light badge (Haiku yellow, Mint green), white on the others.
+function iconInk(hex) { const n = parseInt(hex.slice(1), 16); return (0.299*(n>>16&255) + 0.587*(n>>8&255) + 0.114*(n&255)) > 160 ? "#0f1722" : "#ffffff"; }
 function catalogIcon(key, large = false) {
   const [label,color,glyph] = catalogIcons[key] || catalogIcons.generic;
-  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}" style="--icon-color:${color}" title="${esc(label)}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false">${glyph}</svg></span>`;
+  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}" style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(label)}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">${glyph}</svg></span>`;
 }
 // End of CC0 catalog icon artwork.
 
