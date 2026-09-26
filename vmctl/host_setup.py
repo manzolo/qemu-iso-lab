@@ -253,8 +253,11 @@ def apt_available(packages: list[str]) -> set[str] | None:
     if not packages or shutil.which("apt-cache") is None:
         return None
     try:
+        # LC_ALL=C: the labels are translated ("Candidato:" on an Italian host, which made every
+        # package look unavailable and the install skip them all).
         result = subprocess.run(["apt-cache", "policy", *packages], capture_output=True, text=True,
-                                stdin=subprocess.DEVNULL, timeout=60, check=False)
+                                stdin=subprocess.DEVNULL, timeout=60, check=False,
+                                env={**os.environ, "LC_ALL": "C", "LANGUAGE": ""})
     except (OSError, subprocess.TimeoutExpired):
         return None
     if result.returncode:
@@ -266,7 +269,9 @@ def apt_available(packages: list[str]) -> set[str] | None:
             current = line[:-1]
         elif current and line.strip().startswith("Candidate:") and line.split(":", 1)[1].strip() != "(none)":
             found.add(current)
-    return found
+    # Nothing recognised at all is an output this parser does not understand, not a release
+    # without QEMU: install the list unfiltered and let apt say what it lacks.
+    return found or None
 
 
 def package_install_commands(names: list[str], manager: str, extra: list[str] | None = None) -> list[list[str]]:

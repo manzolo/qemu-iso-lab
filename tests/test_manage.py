@@ -468,6 +468,14 @@ class ManageTests(BaseVmctlTestCase):
         with mock.patch.object(shutil, "which", return_value=None):
             self.assertIsNone(vmctl.host_setup.apt_available(["xorriso"]))
 
+    def test_apt_available_asks_in_english_and_never_filters_everything(self):
+        # An Italian host prints "Candidato:": every package looked missing and none was installed.
+        translated = "xorriso:\n  Installato: (nessuno)\n  Candidato: 1.5.4-2\n"
+        with mock.patch.object(shutil, "which", return_value="/usr/bin/apt-cache"), \
+             mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=translated)) as run:
+            self.assertIsNone(vmctl.host_setup.apt_available(["xorriso"]))
+        self.assertEqual(run.call_args.kwargs["env"]["LC_ALL"], "C")
+
     def test_setup_install_without_names_installs_every_missing_tool_with_pacman(self):
         present = set(vmctl.host_setup.installable_names()) - {"sfdisk", "7z"}
         executed, _, _ = self._install([], present=present, distro="arch")
