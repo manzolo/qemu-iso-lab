@@ -1,0 +1,51 @@
+{
+  "vms": {
+    "haiku": {
+      "name": "Haiku R1/beta6",
+      "meta": {
+        "slug": "haiku",
+        "family": "haiku",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "manual"
+      },
+      "iso": "isos/haiku-r1beta6-x86_64-anyboot.iso",
+      "iso_url": "https://mirrors.rit.edu/haiku/r1beta6/haiku-r1beta6-x86_64-anyboot.iso",
+      "iso_sha256": "bb7743474fd175aea511be1799764ba054465285bbdf54c4722ca61d1fb4f5c9",
+      "disk": {
+        "path": "artifacts/haiku/disk.qcow2",
+        "size": "16G",
+        "format": "qcow2",
+        "interface": "sata"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "network_device": "e1000",
+      "audio": false,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "Haiku R1/beta6 (2026-08-26), anyboot ISO with the checksum published on haiku-os.org. Manual install: vmctl provision haiku boots the live medium, choose Install Haiku, partition the disk with DriveSetup (Intel partition map, one Be File System partition), then install and reboot. Haiku has no unattended installer."
+    }
+  }
+}

@@ -387,3 +387,25 @@ The snapshot shared only the project's ISO cache and artifacts. Installer comple
 in under its 120 s shutdown grace; the disk boot passed lab identity, sshd process
 and service, FreeBSD 14.3-RELEASE and passwordless sudo, then powered off cleanly.
 The report keeps the timeline and English/Italian PDFs. Promoted only after this PASS.
+
+## Haiku (2026-09-26)
+
+`haiku` (`vms/profiles/haiku.json`, `manual`): Haiku R1/beta6 of 2026-08-26, the x86_64 anyboot
+ISO from the RIT mirror, pinned to the SHA-256 published on haiku-os.org (matched on download).
+Checked live the same day: the medium boots under KVM on q35/BIOS in under 75 s to "Welcome to
+Haiku!" at 1280x800 on `-vga std`, the USB tablet drives the pointer, and DriveSetup (from the
+Installer's *Set up partitions…*) lists the 16 GiB SATA disk (`/dev/disk/scsi/0/0/0/raw`). The
+medium carries a BFS system partition (1.37 GiB, 536 MiB free) and a FAT32 ESP.
+
+Not done yet, and why:
+
+- **No boot-check.** The release build writes nothing to COM1 (the serial log stayed empty through
+  the whole boot), so `ci.expect` has no token to wait for.
+- **No unattended flow.** Haiku has no answer file; the Installer is graphical only. The idea to
+  try: the anyboot image is made to be written to a USB stick and boot read-write, so the host could
+  copy it onto the VM disk and grow the partition instead of driving the Installer, then a boot
+  script would write the completion token to the serial port and power off. Open questions: whether
+  a disk made that way still shows the live "Welcome" prompt, and whether `sshd` runs by default
+  (Haiku ships OpenSSH) and as which user.
+- Installing through e1000 and SATA is the conservative choice; virtio (Haiku has virtio block and
+  net drivers) is untested.
