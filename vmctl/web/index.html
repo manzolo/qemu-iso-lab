@@ -138,6 +138,18 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
 .field { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .field > label { font-size:12px; font-weight:600; }
 .field input[type=text],.field select { width:100%; }
+.disk-cards { display:grid; gap:8px; margin-top:4px; }
+.disk-card { border:1px solid var(--line); border-radius:8px; padding:9px 11px; background:var(--panel2); cursor:pointer; }
+.disk-card:hover { border-color:#4a607a; } .disk-card.sel { border-color:var(--accent); background:#1a2d33; }
+.disk-head { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; font-size:12px; }
+.disk-head b { font-size:13px; } .disk-head .s-muted { flex:1 1 auto; }
+.disk-card .chip.warn { background:#453c28; color:var(--warn); }
+.parts { width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; }
+.parts th { text-align:left; color:var(--muted); font-weight:500; padding:3px 8px 5px 0; border-bottom:1px solid var(--line); }
+.parts td { padding:4px 8px 4px 0; border-bottom:1px solid #22304244; vertical-align:top; }
+.parts td:nth-child(2),.parts th:nth-child(2) { text-align:right; padding-right:14px; white-space:nowrap; }
+.parts tr.free td { color:var(--ok); } .parts .s-muted { color:var(--muted); }
+.disk-foot { margin-top:6px; font-size:11px; color:var(--muted); }
 .field label.check { display:flex; gap:10px; align-items:center; font-weight:400; color:var(--text); cursor:pointer; }
 .help { color:var(--muted); font-size:12px; }
 .required { color:var(--accent); font-size:10px; margin-left:7px; font-weight:400; }
@@ -773,7 +785,7 @@ function renderCommandForm() {
     else if (a.choices.length) input = `<select ${attr}>${a.required ? "" : `<option value="">Default${a.default != null ? ": " + esc(a.default) : ""}</option>`}${a.choices.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}</select>`;
     else if (a.dest === "vm" || a.dest === "vms") input = `<input type="text" ${attr} list="vm-names" placeholder="${a.kind === "list" ? "Names separated by spaces" : "Select a profile"}">`;
     else if (a.dest === "group") input = `<input type="text" ${attr} list="group-names" placeholder="Select a group">`;
-    else if (c.terminal_only && a.flag === "--device") input = `<input type="text" ${attr} list="host-devices" placeholder="Pick a disk, e.g. /dev/sdb" autocomplete="off">`;
+    else if (c.terminal_only && a.flag === "--device") input = `<input type="text" ${attr} list="host-devices" placeholder="Pick a disk below, or type /dev/sdb" autocomplete="off"><div id="device-cards" class="disk-cards"></div>`;
     else if (c.terminal_only && a.flag === "--confirm-device") input = `<input type="text" ${attr} placeholder="Filled from --device" autocomplete="off">`;
     else input = `<input type="text" ${attr} placeholder="${esc(a.default != null ? "Default: " + a.default : a.kind === "list" ? "Values separated by spaces" : label)}">`;
     return `<div class="field"><label for="${id}">${esc(label)}${a.required ? '<span class="required">Required</span>' : ""}</label>${input}<div id="help${i}" class="help">${a.kind === "flag" ? "" : esc(a.help)}</div></div>`;
@@ -791,7 +803,7 @@ function renderCommandForm() {
   if (c.terminal_only) loadDevices();
   $("cmd-form").querySelectorAll("input,select").forEach((el) => (el.oninput = () => {
     const arg = c.args[Number(el.dataset.arg)];
-    if (arg.flag === "--device") { const confirm = $("arg" + c.args.findIndex((x) => x.flag === "--confirm-device")); if (confirm) confirm.value = el.value.trim(); }
+    if (arg.flag === "--device") { const confirm = $("arg" + c.args.findIndex((x) => x.flag === "--confirm-device")); if (confirm) confirm.value = el.value.trim(); renderDeviceCards(); }
     if (el.type === "checkbox" && el.checked) (c.exclusive_groups || []).filter((g) => g.includes(arg.flag || arg.dest)).forEach((g) => c.args.forEach((other,i) => { if (i !== Number(el.dataset.arg) && g.includes(other.flag || other.dest)) $("arg" + i).checked = false; }));
     saveDraft(); preview();
   }));
@@ -803,8 +815,30 @@ function renderCommandForm() {
 let deviceCache = null;
 async function loadDevices() {
   const fill = (devices) => { const list = $("host-devices"); if (list) list.innerHTML = devices.filter((d) => !d.is_root_disk).map((d) => `<option value="${esc(d.path)}">${esc(fmtBytes(d.size))} · ${esc(d.model || "?")}${d.tran ? " · " + esc(d.tran) : ""}${d.mountpoints?.length ? " · mounted" : ""}</option>`).join(""); };
-  if (deviceCache) return fill(deviceCache);
-  try { deviceCache = await api("/api/devices"); fill(deviceCache); } catch (e) { /* the field stays free text */ }
+  if (deviceCache) { fill(deviceCache); renderDeviceCards(); return; }
+  const box = $("device-cards"); if (box) box.innerHTML = '<div class="help">Reading the host\'s disks…</div>';
+  try { deviceCache = await api("/api/devices"); fill(deviceCache); renderDeviceCards(); } catch (e) { if (box) box.innerHTML = `<div class="help">${esc(e.message)}</div>`; }
+}
+// The host's disks under the --device field: model, bus, partition table, every partition with its
+// size, filesystem, label and mount point, and the unallocated space. Click one to select it.
+function renderDeviceCards() {
+  const box = $("device-cards"), c = catalog.find((x) => x.name === pal.cmd);
+  if (!box || !c || !deviceCache) return;
+  const input = $("arg" + c.args.findIndex((a) => a.flag === "--device")), current = input ? input.value.trim() : "";
+  const disks = deviceCache.filter((d) => !d.is_root_disk);
+  box.innerHTML = disks.length ? disks.map((d) => {
+    const sel = d.path === current, parts = d.children || [], mounted = parts.some((p) => p.mountpoints?.length) || d.mountpoints?.length;
+    const table = parts.map((p) => `<tr><td class="mono">${esc(p.path)}</td><td>${esc(fmtBytes(p.size))}</td><td>${esc(p.fstype || (p.type === "part" ? "no filesystem" : p.type || "?"))}</td><td>${esc(p.label || "")}</td><td>${p.mountpoints?.length ? esc(p.mountpoints.join(", ")) : '<span class="s-muted">—</span>'}</td></tr>`).join("")
+      + (d.unallocated_bytes > 1e6 ? `<tr class="free"><td>free</td><td>${esc(fmtBytes(d.unallocated_bytes))}</td><td colspan="3">unallocated</td></tr>` : "")
+      || `<tr><td colspan="5" class="s-muted">No partitions: ${d.fstype ? esc(d.fstype) + " on the whole disk" : "empty disk"}</td></tr>`;
+    return `<div class="disk-card${sel ? " sel" : ""}" data-device="${esc(d.path)}" role="button" tabindex="0" aria-pressed="${sel}">
+      <div class="disk-head"><b class="mono">${esc(d.path)}</b><span>${esc(fmtBytes(d.size))}</span><span class="s-muted">${esc(d.model || "unknown model")}${d.tran ? " · " + esc(d.tran) : ""}${d.serial ? " · S/N " + esc(d.serial) : ""}</span>${mounted ? '<span class="chip warn">mounted</span>' : ""}</div>
+      ${sel ? `<table class="parts"><tr><th>Partition</th><th>Size</th><th>Type</th><th>Label</th><th>Mounted on</th></tr>${table}</table><div class="disk-foot">${parts[0]?.pttype ? "Partition table: " + esc(parts[0].pttype) + " · " : ""}everything on this disk is overwritten by flash</div>` : ""}</div>`;
+  }).join("") : '<div class="help">No other disk found on the host (the system disk is never offered).</div>';
+  box.querySelectorAll("[data-device]").forEach((card) => {
+    const pick = () => { input.value = card.dataset.device; input.dispatchEvent(new Event("input", { bubbles: true })); };
+    card.onclick = pick; card.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+  });
 }
 const fmtBytes = (n) => n >= 1e12 ? (n / 1e12).toFixed(1) + " TB" : n >= 1e9 ? Math.round(n / 1e9) + " GB" : Math.round(n / 1e6) + " MB";
 function buildArgs() {

@@ -68,8 +68,10 @@ The page can delete disks and start anything `vmctl` can, so:
   drops it from the address bar);
 - commands that need a terminal or sudo cannot run as detached jobs: `shell`, `console`, `flash`,
   `import-device` (and `web` itself). **Flash** and **import-device** are terminal-only forms:
-  pick the target disk from the host's disks (`/api/devices` = `vmctl list-target-devices --json`,
-  the system disk left out; `--confirm-device` is filled from it), then **Open in a terminal**
+  the host's disks are listed under `--device` (`/api/devices` = `vmctl list-target-devices --json`,
+  the system disk left out) as cards, and the selected one shows its partitions with size,
+  filesystem, label, mount point and the unallocated space; `--confirm-device` is filled from
+  the choice. Then **Open in a terminal**
   starts the command in a terminal window on the host (`/api/terminal`, validated by the
   subcommand's own parser, only those two commands), where sudo asks for your password and the
   CLI keeps its disk checks and its questions (expansion, resume); the window stays open at the
