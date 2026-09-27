@@ -17,7 +17,7 @@ let jobId = 'web:fixture', holdRun = false, releaseRun;
 let hideJobs = false, recording = null, recordingExports = [], failExport = false;
 let screenDelay = 700;
 let screenRequests = 0, failScreen = false, holdState = false, stateWaiters = [], dynamicVmJobs = false;
-const profileBase = {name:'Arch Linux + Noctalia',memory_mb:8192,cpus:4};
+const profileBase = {name:'Arch Linux + Noctalia',memory_mb:8192,cpus:4,post_install:{commands:Array.from({length:35},(_,i)=>'echo catalog step '+i)}};
 const server = createServer(async (req,res) => {
   if (req.url === '/' || req.url.startsWith('/?')) { res.setHeader('Content-Type','text/html'); return res.end(html); }
   if (req.url === '/assets/distro-icons.svg') { res.setHeader('Content-Type','image/svg+xml'); return res.end(readFileSync(root+'vmctl/web/distro-icons.svg')); }
@@ -102,6 +102,15 @@ try {
   await shot('dashboard'); check('dashboard and profile');
   await page.locator('#search').fill('debian');
   assert.equal(await page.locator('#rows [data-vm]').count(),1);
+  await page.locator('#search').press('Enter');
+  await page.waitForTimeout(100);
+  assert.equal(requests.length,0);
+  await page.locator('#rows [data-vm="debian-server"]').focus(); await page.keyboard.press('Enter');
+  await page.waitForTimeout(100);
+  assert.equal(requests.length,0);
+  assert(!(await page.locator('dialog[open]').count()));
+  assert(!(await page.locator('#details kbd').allTextContents()).includes('Enter'));
+  check('Enter in search or on a row never starts a VM; action hints only show function keys');
   await page.locator('#search-clear').click();
   assert.equal(await page.locator('#search').inputValue(),'');
   assert(await page.locator('#search').evaluate(el=>el===document.activeElement));
@@ -212,14 +221,58 @@ try {
   check('warning menu actions highlight on hover and have a visible keyboard focus');
   await page.locator('#vm-context').getByRole('menuitem',{name:'Customize profile…'}).click();
   await page.locator('#profile-memory:not([disabled])').waitFor();
+  assert(await page.locator('#profile-save').isDisabled());
+  assert.equal(await page.locator('#memory-origin').textContent(),'Catalog value');
+  await page.locator('[data-resource="memory"][data-value="4096"]').click();
+  assert.equal(await page.locator('#profile-memory').inputValue(),'4096');
+  assert.equal(await page.locator('#memory-origin').textContent(),'Local value');
+  await page.locator('[data-resource="memory"][data-value=""]').click();
+  assert.equal(await page.locator('#profile-memory').inputValue(),'');
+  assert(await page.locator('#profile-save').isDisabled());
+  await page.locator('#profile-memory').fill('0'); await page.locator('#profile-cpus').fill('6');
+  assert(await page.locator('#profile-save').isDisabled());
   await page.locator('#profile-memory').fill('12288'); await page.locator('#profile-cpus').fill('6');
   await page.locator('#profile-save').click(); await page.waitForFunction(()=>document.getElementById('profile-feedback').textContent.startsWith('Saved locally'));
   assert.deepEqual(savedOverride,{memory_mb:12288,cpus:6});
-  await page.locator('#profile-advanced summary').click(); await page.locator('#profile-json').fill('{oops'); assert(await page.locator('#profile-save').isDisabled());
+  await page.locator('#profile-tab-advanced').click(); await page.locator('#profile-json').fill('{oops'); assert(await page.locator('#profile-save').isDisabled());
   await page.locator('#profile-json').fill('{"memory_mb":12288,"cpus":6,"audio":false}'); assert(!(await page.locator('#profile-save').isDisabled()));
   await page.locator('#profile-save').click(); await page.waitForFunction(()=>document.getElementById('profile-feedback').textContent.startsWith('Saved locally')); assert.equal(savedOverride.audio,false);
+  await page.locator('#profile-tab-resources').click();
+  assert.equal(await page.locator('#profile-memory').inputValue(),'12288');
+  assert.equal(await page.locator('#profile-cpus').inputValue(),'6');
+  await page.locator('[data-resource="memory"][data-value=""]').click();
+  assert.deepEqual(await page.locator('#profile-json').evaluate(el=>JSON.parse(el.value)),{cpus:6,audio:false});
+  await page.locator('#profile-tab-resources').focus(); await page.keyboard.press('ArrowRight');
+  assert.equal(await page.locator('#profile-tab-advanced').getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('#profile-tab-advanced').getAttribute('tabindex'),'0');
+  await page.keyboard.press('End');
+  assert(await page.locator('#profile-base').isVisible());
+  // A long catalog and the JSON editor never push tabs, feedback or save out of view.
+  for (const viewport of [{width:1440,height:1000},{width:912,height:909},{width:390,height:844},{width:740,height:420}]) {
+    await page.setViewportSize(viewport);
+    for (const tab of ['resources','advanced','catalog']) {
+      await page.locator('#profile-tab-'+tab).click();
+      const dialog=await page.locator('#profile-dialog').boundingBox();
+      for (const id of ['profile-save','profile-feedback','profile-tab-resources']) {
+        const box=await page.locator('#'+id).boundingBox();
+        assert(box.y>=dialog.y && box.y+box.height<=dialog.y+dialog.height);
+        assert(box.x>=0 && box.x+box.width<=viewport.width);
+      }
+      assert(await page.locator('#profile-dialog').evaluate(el=>el.scrollHeight<=el.clientHeight && el.scrollWidth<=el.clientWidth));
+      assert(await page.locator('#profile-dialog .body').evaluate(el=>el.scrollWidth<=el.clientWidth));
+      await shot('profile-'+tab+'-'+viewport.width);
+    }
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  await page.locator('#profile-tab-resources').click();
   await shot('profile-editor'); await page.locator('#profile-reset').click(); await page.locator('#profile-save').click(); await page.waitForFunction(()=>document.getElementById('profile-feedback').textContent.startsWith('Saved locally')); assert.deepEqual(savedOverride,{});
-  await page.locator('#profile-dialog [data-close]').click(); check('context menu, resource overrides, JSON validation, save and reset');
+  await page.locator('#profile-dialog [data-close]').click();
+  await page.locator('#profile-edit').click(); await page.locator('#profile-memory:not([disabled])').waitFor();
+  assert.equal(await page.locator('#profile-tab-resources').getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('#profile-memory').inputValue(),'');
+  assert(await page.locator('#profile-save').isDisabled());
+  await page.locator('#profile-dialog [data-close]').click();
+  check('profile tabs, presets, per-field inheritance, validation, save/reset and fixed footer at four viewport sizes');
   await page.locator('.install-details summary').click();
   await page.evaluate(()=>render());
   assert.equal(await page.locator('.install-details').getAttribute('open'),''); check('polling preserves expanded profile');
@@ -227,6 +280,57 @@ try {
   assert.equal(await page.locator('.lab').first().locator('.buttons button').first().textContent(),'Start stack');
   assert.equal(await page.locator('.lab').nth(1).locator('.buttons button').first().textContent(),'Install lab…');
   await shot('labs'); check('installed and new labs have different primary actions');
+  for (const width of [1440,912,390]) {
+    await page.setViewportSize({width,height:909});
+    await page.locator('#search').fill('proxmox');
+    const labMenu=page.locator('[data-lab-menu="proxmox-lab"]');
+    await labMenu.click();
+    assert.equal(await page.locator('#vm-context').getAttribute('aria-label'),'Stack actions');
+    assert.equal(await labMenu.getAttribute('aria-expanded'),'true');
+    await page.keyboard.press('Escape');
+    assert.equal(await labMenu.getAttribute('aria-expanded'),'false');
+    assert(await labMenu.evaluate(el=>el===document.activeElement));
+    const memberMenu=page.locator('[data-member-menu="proxmox-ve-node2"]');
+    await memberMenu.focus(); await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#vm-context .context-title').textContent(),'proxmox-ve-node2');
+    assert(await page.locator('#labs-view').isVisible());
+    // Full-page capture can resize the mobile viewport and dismiss the menu.
+    await page.screenshot({path:root+'artifacts/webui-review/lab-visible-actions-'+width+'.png'});
+    await page.keyboard.press('Escape');
+    assert(await memberMenu.evaluate(el=>el===document.activeElement));
+    await page.locator('[data-member="proxmox-ve-node2"]').click();
+    assert.equal(await page.locator('[data-filter].active').getAttribute('data-filter'),'labs');
+    assert.equal(await page.locator('#lab-origin').textContent(),'proxmox-lab');
+    assert.equal(await page.locator('#lab-current-vm').textContent(),'proxmox-ve-node2');
+    assert.equal(await page.locator('#details .name').textContent(),'proxmox-ve-node2');
+    assert.deepEqual(await page.locator('#rows [data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['proxmox-ve','proxmox-ve-node2']);
+    assert.equal(await page.locator('#rows .sel').getAttribute('data-vm'),'proxmox-ve-node2');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('vmctl-selected')),'proxmox-ve-node2');
+    assert(await page.locator('#details .name').isVisible());
+    const details=await page.locator('#machine-panel').boundingBox(), back=await page.locator('#back-to-labs').boundingBox();
+    assert(details.y>=0 && details.y<909 && back.y>=0 && back.y<909);
+    if (width===390) assert(details.y<(await page.locator('#list').boundingBox()).y);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await page.evaluate(()=>refresh(true));
+    assert.equal(await page.locator('#rows .sel').getAttribute('data-vm'),'proxmox-ve-node2');
+    await shot('lab-profile-'+width);
+    await page.locator('#rows [data-vm="proxmox-ve"] .profile-name').click();
+    assert.equal(await page.locator('#lab-current-vm').textContent(),'proxmox-ve');
+    await page.locator('#back-to-labs').click();
+    assert.equal(await page.locator('#search').inputValue(),'proxmox');
+    assert(await page.locator('#labs-view').isVisible());
+    assert.equal(await page.evaluate(()=>document.activeElement.dataset.member),'proxmox-ve');
+    assert(!(await page.locator('#lab-navigation').isVisible()));
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  await page.locator('#search-clear').click();
+  await page.locator('[data-member="proxmox-ve-node2"]').click();
+  await page.locator('[data-filter=all]').click();
+  assert.equal(await page.locator('#rows [data-vm]').count(),state.vms.length);
+  assert(!(await page.locator('#lab-navigation').isVisible()));
+  await page.locator('[data-filter=labs]').click();
+  assert.equal(requests.length,0);
+  check('visible lab/VM menus work with click and keyboard; lab navigation preserves scope, selection and return search on desktop/mobile without running commands');
   await page.evaluate(() => document.addEventListener('contextmenu', e => window.labContextPrevented = e.defaultPrevented, {once:true}));
   await page.locator('[data-member="proxmox-ve-node2"] .member-address').click({button:'right'});
   assert(await page.evaluate(()=>window.labContextPrevented));
@@ -455,7 +559,8 @@ try {
   assert(!(await page.locator('#job-bar').isVisible()));
   // A successful command with an unexpected state must eventually explain the mismatch.
   await page.keyboard.press('F8'); await page.waitForFunction(()=>!submittingVms.size);
-  jobStatus='completed'; await page.evaluate(()=>refreshJobs()); await page.waitForFunction(()=>stateRefresh===null);
+  jobStatus='completed'; await page.waitForFunction(()=>!jobsRefreshing); await page.evaluate(()=>refreshJobs());
+  await page.waitForFunction(()=>vmJobs.get('arch-noctalia')?.confirming && stateRefresh===null && !jobsRefreshing);
   await page.evaluate(()=>{vmJobs.get('arch-noctalia').finishedAt=Date.now()-31000;});
   await page.evaluate(()=>refresh(true));
   assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Still running');

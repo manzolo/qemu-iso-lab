@@ -9,7 +9,7 @@
 * { box-sizing:border-box; }
 body { margin:0; background:radial-gradient(ellipse at 80% 0%,#19283b 0,transparent 55%),var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; min-height:100vh; }
 code,pre,.mono { font-family:ui-monospace,"Cascadia Code",monospace; }
-button,input,select { font:inherit; }
+button,input,select,textarea { font:inherit; }
 button { background:var(--btn); color:var(--text); border:1px solid transparent; border-radius:8px; padding:9px 13px; font-size:13px; cursor:pointer; transition:background .15s,border-color .15s; }
 button:hover { background:#30435f; border-color:#4a607a; }
 button:disabled { opacity:.45; cursor:default; }
@@ -18,7 +18,7 @@ button.primary:hover { background:#a0edd9; }
 button.danger { color:var(--bad); border-color:#603846; background:#30212e; }
 button.link { background:none; color:var(--accent); padding:0; }
 :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
-input[type=text],input:not([type]),select { background:#101825; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-width:0; }
+input[type=text],input[type=number],input:not([type]),select,textarea { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-width:0; }
 input[type=checkbox] { accent-color:var(--accent); width:16px; height:16px; flex-shrink:0; }
 header { display:flex; align-items:center; gap:14px; padding:16px 24px; border-bottom:1px solid var(--line); }
 header h1 { font-size:17px; margin:0; font-weight:650; letter-spacing:-.025em; }
@@ -50,6 +50,15 @@ kbd { font:11px ui-monospace,monospace; color:var(--muted); border:1px solid var
 .filters button.active { color:var(--text); background:#2b3b52; }
 main { display:grid; grid-template-columns:minmax(0,1fr) minmax(310px,370px); gap:18px; padding:0 24px 20px; align-items:start; }
 main > section:last-child { position:sticky; top:16px; }
+.lab-navigation { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; min-width:0; color:var(--muted); font-size:13px; }
+.lab-navigation .mono { overflow-wrap:anywhere; min-width:0; }
+.lab-navigation [aria-current] { color:var(--text); font-weight:600; }
+.lab-navigation button { flex-shrink:0; }
+#machine-panel { scroll-margin-top:16px; }
+@media(max-width:720px) {
+  main.lab-profile > #machine-panel { grid-row:2; }
+  main.lab-profile > section:first-of-type { grid-row:3; }
+}
 .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; box-shadow:0 8px 30px #00000012; }
 .card h2 { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:0; padding:17px 18px; border-bottom:1px solid var(--line); }
 table { width:100%; border-collapse:collapse; }
@@ -141,7 +150,7 @@ button.state:hover { background:#453c28; }
 .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
 .actions button { text-align:left; font-size:12px; }
 .actions button:first-child,.actions button:last-child { grid-column:1/-1; }
-.actions button:first-child { display:flex; justify-content:space-between; align-items:center; padding:12px; }
+
 .actions button:last-child { background:transparent; color:var(--accent); border:1px solid var(--line); margin-top:4px; }
 .actions kbd { border-color:#365b54; color:#21443c; }
 .actions button:not(.primary) kbd { margin-left:auto; border-color:#3d526b; color:var(--muted); }
@@ -150,7 +159,7 @@ button.state:hover { background:#453c28; }
 .ai { display:inline-flex; flex:0 0 17px; width:17px; height:17px; color:var(--ai,var(--muted)); }
 .ai svg { width:17px; height:17px; }
 .ai.ok { --ai:var(--ok); } .ai.warn { --ai:var(--warn); } .ai.bad { --ai:var(--bad); } .ai.info { --ai:#9ebdff; }
-.actions button { display:flex; align-items:center; }
+.actions button { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:40px; padding:10px 12px; }
 .actions button.primary .ai { --ai:#102c29; }
 button.warn { color:var(--warn); border-color:#5a4a2c; background:#2c2620; }
 button.warn:hover { background:#3a3128; border-color:#7a6440; }
@@ -197,7 +206,7 @@ dialog { background:var(--panel); color:var(--text); border:1px solid #3b4e66; b
 #confirm-dialog .eyebrow.bad { color:var(--bad); }
 dialog::backdrop { background:#030812bb; backdrop-filter:blur(5px); }
 dialog header { justify-content:space-between; padding:16px 20px; flex-shrink:0; }
-dialog .body { padding:16px; overflow:auto; max-height:calc(90dvh - 80px); }
+dialog .body { padding:20px; overflow:auto; max-height:calc(90dvh - 80px); }
 /* The job log reads like the terminal it came from: a dark console, a small monospace face, lines
    broken only where they must be, and the markers vmctl prints (==>, [ok], ::, $) in colour. */
 pre.log { background:#05080d; color:#c9d4e3; border:1px solid #1f2b3d; border-radius:8px; padding:12px 14px; margin:0; height:64vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.5 ui-monospace,"Cascadia Code","JetBrains Mono","DejaVu Sans Mono",Menlo,monospace; tab-size:4; }
@@ -221,7 +230,7 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .pal-item b { font-family:ui-monospace,monospace; font-weight:600; font-size:12px; }
 .pal-item span { display:block; color:var(--muted); font-size:11px; line-height:1.5; margin-top:4px; }
 .pal-form { display:flex; flex-direction:column; min-height:0; min-width:0; }
-.pal-fields { overflow:auto; padding:24px; flex:1; min-height:0; }
+.pal-fields { overflow:auto; padding:20px; flex:1; min-height:0; }
 #cmd-head h3 { margin:7px 0; font-family:ui-monospace,monospace; font-size:24px; letter-spacing:-.04em; overflow-wrap:anywhere; }
 #cmd-head p { margin:0 0 24px; color:var(--muted); font-size:13px; }
 .form-fields { display:grid; gap:16px; }
@@ -247,7 +256,7 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .advanced summary { cursor:pointer; padding:16px 0; color:var(--muted); font-size:13px; }
 .advanced[open] summary { color:var(--text); }
 .fixed { display:inline-block; background:#203b42; color:var(--accent); border:1px solid #35534f; border-radius:7px; padding:8px 12px; font-family:ui-monospace,monospace; }
-.command-footer { border-top:1px solid var(--line); padding:16px 24px; background:#111a28; flex-shrink:0; }
+.command-footer { border-top:1px solid var(--line); padding:16px 20px; background:var(--panel); flex-shrink:0; }
 .preview-label { font-size:10px; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; }
 #preview { margin:8px 0 12px; padding:12px; background:#090f18; border:1px solid var(--line); border-radius:8px; overflow-wrap:anywhere; white-space:pre-wrap; max-height:100px; overflow:auto; font-size:12px; }
 .command-buttons { display:flex; align-items:center; gap:8px; }
@@ -277,12 +286,19 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .install-details p { margin:8px 0 0; overflow-wrap:anywhere; }
 .action-label { color:var(--muted); text-transform:uppercase; font-size:10px; letter-spacing:.1em; grid-column:1/-1; margin-top:6px; }
 .actions .main-action { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; }
-.lab-head { display:flex; align-items:center; justify-content:space-between; padding:18px 0; }
+.lab-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; padding:18px 0; }
+.lab-controls { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.lab-menu { padding:6px 9px; border:1px solid var(--line); background:transparent; font-size:12px; }
 .lab-head h2 { border:0; padding:0; color:var(--text); font-size:15px; text-transform:none; letter-spacing:0; }
 .lab-progress { height:4px; background:var(--btn); border-radius:4px; margin-bottom:16px; overflow:hidden; }
 .lab-progress span { display:block; height:100%; background:var(--accent); }
 .lab .members div { padding:10px 0; align-items:center; gap:10px; }
 .lab .members button { background:none; padding:0; text-align:left; color:var(--text); }
+.lab .members button[data-member] { flex:1; }
+.lab .members .state { flex-shrink:0; }
+.lab .members .member-menu { display:grid; place-items:center; flex:0 0 32px; width:32px; height:32px; border:1px solid var(--line); border-radius:8px; color:var(--muted); font-size:20px; line-height:1; }
+.lab-menu:hover,.lab .members .member-menu:hover,.lab-menu[aria-expanded=true],.lab .members .member-menu[aria-expanded=true] { background:var(--btn); border-color:var(--muted); color:var(--text); }
+.member-address { overflow-wrap:anywhere; }
 .member-address { display:block; font:11px ui-monospace,monospace; color:var(--muted); margin-top:3px; }
 .lab .buttons { padding-top:8px; }
 .lab-secondary { border-top:1px solid var(--line); margin-top:14px; padding-top:12px; }
@@ -327,15 +343,45 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 #terminal-frame { flex:1; min-height:0; display:flex; background:#0b111b; padding:12px; }
 #terminal-screen { flex:1; min-height:0; overflow:hidden; background:#0b111b; padding:0; }
 #terminal-note { color:var(--muted); font-size:12px; margin:0; }
-#profile-dialog { width:min(780px,94vw); }
+#profile-dialog { width:min(820px,94vw); height:min(640px,90dvh); overflow:hidden; }
 #profile-dialog[open] { display:flex; flex-direction:column; }
-#profile-dialog .body { min-height:0; }
-.profile-resources { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-.profile-resources input { width:100%; background:var(--bg); color:var(--text); padding:10px; border:1px solid var(--line); border-radius:8px; }
-#profile-json { width:100%; background:#0b1320; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:12px; resize:vertical; font:12px/1.6 ui-monospace,monospace; tab-size:2; }
-#profile-base { font-size:11px; white-space:pre-wrap; overflow-wrap:anywhere; max-height:260px; overflow:auto; }
-#profile-feedback { font-size:12px; color:var(--accent); white-space:pre-wrap; }
+#profile-dialog header h1 { overflow-wrap:anywhere; }
+#profile-dialog header > div { min-width:0; }
+#profile-dialog header > button { flex-shrink:0; }
+.profile-tabs { display:flex; gap:20px; padding:0 20px; border-bottom:1px solid var(--line); flex-shrink:0; }
+.profile-tabs button { transition:none; border:0; border-bottom:2px solid transparent; border-radius:0; padding:12px 0; background:transparent; color:var(--muted); }
+.profile-tabs button[aria-selected=true] { color:var(--accent); border-bottom-color:var(--accent); }
+.profile-tabs button:focus-visible { outline-offset:-3px; }
+#profile-dialog .body { flex:1; min-height:0; max-height:none; }
+.profile-pane > h2 { font-size:15px; font-weight:600; margin:0 0 6px; }
+.profile-pane > p { margin:0 0 20px; color:var(--muted); font-size:13px; }
+.profile-resources { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+.profile-resources input { width:100%; }
+.profile-resources .field { gap:10px; }
+.resource-label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.resource-label label { font-size:13px; font-weight:600; }
+.resource-origin { color:var(--muted); font-size:11px; }
+.resource-origin.custom { color:var(--accent); }
+.resource-presets { display:flex; gap:6px; flex-wrap:wrap; }
+.resource-presets button { padding:5px 10px; border:1px solid var(--line); background:transparent; font-size:12px; }
+.resource-presets button[aria-pressed=true] { border-color:var(--accent); color:var(--accent); }
+.resource-default { display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.resource-default button { font-size:12px; }
+#profile-advanced { height:100%; min-height:260px; display:flex; flex-direction:column; }
+#profile-json { flex:1; min-height:140px; width:100%; resize:none; padding:12px; font:12px/1.6 ui-monospace,monospace; tab-size:2; }
+#profile-base { font:12px/1.6 ui-monospace,monospace; white-space:pre-wrap; overflow-wrap:anywhere; margin:0; padding:12px; background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+#profile-feedback { font-size:12px; color:var(--muted); white-space:pre-wrap; margin:0 0 12px; }
 #profile-feedback.error { color:var(--bad); }
+#profile-dialog .command-buttons { justify-content:flex-end; flex-wrap:wrap; }
+#profile-reset { margin-right:auto; }
+#profile-dialog .command-footer > .help { margin:12px 0 0; font-size:11px; }
+@media(max-width:540px) {
+  #profile-dialog { height:min(740px,94dvh); max-height:94dvh; }
+  .profile-resources { grid-template-columns:1fr; gap:24px; }
+  .profile-tabs { gap:16px; padding:0 16px; }
+  #profile-dialog header,#profile-dialog .body,#profile-dialog .command-footer { padding:16px; }
+  #profile-dialog .command-buttons button { flex:1; }
+}
 #vm-context { position:fixed; inset:auto; margin:0; width:290px; max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overflow:auto; padding:6px; background:#182537; border:1px solid #3d526b; color:var(--text); border-radius:12px; box-shadow:0 15px 50px #0008; }
 #vm-context button { display:flex; align-items:center; gap:9px; width:100%; text-align:left; background:transparent; border-radius:6px; font-size:12px; padding:9px 10px; }
 #vm-context button.danger { color:var(--bad); border:0; }
@@ -452,12 +498,13 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <div id="activity-panel" popover="auto" role="region" aria-label="Latest activity details"><div class="activity-copy"><div class="eyebrow">Latest activity</div><strong id="activity-status" role="status"></strong><span id="activity-command"></span></div><div class="job-controls"><button id="activity-log">View log</button><button id="activity-cancel" class="danger hidden">Cancel job</button><button id="activity-dismiss" class="hidden" aria-label="Dismiss completed activity" title="Keep in Recent activity">Dismiss</button></div></div>
 <div id="recording-controls" class="hidden"><span id="recording-status" role="status"></span><button id="recording-stop">Stop recording</button><button id="recording-open" class="hidden">Download recording</button></div>
 <main id="profiles-view">
+  <nav id="lab-navigation" class="lab-navigation hidden" aria-label="Lab navigation"><button id="back-to-labs">← Labs</button><span aria-hidden="true">/</span><span id="lab-origin" class="mono"></span><span aria-hidden="true">/</span><span id="lab-current-vm" class="mono" aria-current="page"></span></nav>
   <section class="card"><h2 id="list-title">Profiles</h2>
     <p id="selection-hint">Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
     <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
-  <section class="card"><div class="profile-heading"><h2>Machine details</h2><button id="profile-mine" class="hidden" aria-label="Add to My VMs">☆</button><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
+  <section class="card" id="machine-panel" tabindex="-1" aria-label="Machine details"><div class="profile-heading"><h2>Machine details</h2><button id="profile-mine" class="hidden" aria-label="Add to My VMs">☆</button><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
 </main>
 <div id="labs-view" class="labs hidden"></div>
 <section id="jobs" class="card"><div class="section-heading"><div><h2>Recent activity</h2><p>Jobs from the web and TUI keep running when you close this page.</p></div><span id="job-count" class="chip">0 jobs</span></div>
@@ -480,7 +527,49 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <dialog id="confirm-dialog" aria-labelledby="confirm-title"><div class="body"><div class="eyebrow bad" id="confirm-eyebrow">Confirm</div><h1 id="confirm-title">Are you sure?</h1><p id="confirm-message"></p><pre id="confirm-command" class="hidden"></pre><dl id="confirm-facts" class="hidden"></dl><div class="confirm-buttons"><button id="confirm-no">Cancel</button><button id="confirm-yes" class="danger">Continue</button></div></div></dialog>
 <dialog id="ssh-dialog" aria-labelledby="ssh-title"><header><div><div class="eyebrow">Terminal access</div><h1 id="ssh-title">SSH console</h1></div><button data-close>Close</button></header><div class="body"><p id="ssh-description" class="s-muted"></p><pre id="ssh-command"></pre><p class="help">Run from the project directory. Uses the profile’s SSH user, port and key.</p><div class="command-buttons"><button id="ssh-browser" class="primary">Open in browser</button><button id="ssh-launch">Open SSH terminal on host ↗</button><button id="ssh-copy">Copy command</button></div><p id="ssh-result" class="help" role="status"></p></div></dialog>
 <dialog id="terminal-dialog" aria-labelledby="terminal-title"><div id="terminal-shell"><header><div><div class="eyebrow">SSH terminal</div><h1 id="terminal-title">SSH</h1></div><div class="console-toolbar"><span id="terminal-status" class="state s-warn" role="status">Connecting</span><button id="terminal-reconnect">Reconnect</button><button id="terminal-full">Full screen</button><button id="terminal-close">Close</button></div></header><div id="terminal-frame"><div id="terminal-screen"></div></div><div class="console-footer"><p id="terminal-note">Interactive SSH to the guest. Closing this terminal disconnects SSH; the VM keeps running.</p></div></div></dialog>
-<dialog id="profile-dialog" aria-labelledby="profile-title"><header><div><div class="eyebrow">Local customization</div><h1 id="profile-title">Customize profile</h1></div><button data-close>Close</button></header><div class="body"><p class="s-muted" id="profile-intro">Loading profile…</p><div class="profile-resources"><div class="field"><label for="profile-memory">Memory (MiB)</label><input id="profile-memory" type="number" min="1" step="1"><span id="memory-default" class="help"></span></div><div class="field"><label for="profile-cpus">vCPUs</label><input id="profile-cpus" type="number" min="1" step="1"><span id="cpus-default" class="help"></span></div></div><details class="advanced" id="profile-advanced"><summary>Advanced JSON override</summary><p class="help">Only add fields you want to customize. Objects merge recursively; arrays append to the catalog arrays. Remove a field to inherit it again.</p><textarea id="profile-json" aria-label="Local profile override JSON" spellcheck="false" rows="12"></textarea></details><details class="advanced"><summary>View catalog template</summary><pre id="profile-base"></pre></details><p id="profile-feedback" role="status"></p></div><div class="command-footer"><p class="help">Saved in vms/profiles/local.json. Resource changes apply on the next VM start. Disk size changes do not resize an existing disk.</p><div class="command-buttons"><button id="profile-reset">Restore catalog values</button><button id="profile-save" class="primary">Save local override</button></div></div></dialog>
+<dialog id="profile-dialog" aria-labelledby="profile-title">
+  <header><div><div class="eyebrow">Local customization</div><h1 id="profile-title">Customize profile</h1></div><button data-close>Close</button></header>
+  <div class="profile-tabs" role="tablist" aria-label="Profile settings">
+    <button id="profile-tab-resources" role="tab" aria-selected="true" aria-controls="profile-resources" data-profile-tab="resources">Resources</button>
+    <button id="profile-tab-advanced" role="tab" aria-selected="false" aria-controls="profile-advanced" data-profile-tab="advanced" tabindex="-1">Advanced JSON</button>
+    <button id="profile-tab-catalog" role="tab" aria-selected="false" aria-controls="profile-catalog" data-profile-tab="catalog" tabindex="-1">Catalog template</button>
+  </div>
+  <div class="body">
+    <section id="profile-resources" class="profile-pane" role="tabpanel" aria-labelledby="profile-tab-resources">
+      <h2>Memory &amp; processors</h2><p id="profile-intro">Loading profile…</p>
+      <div class="profile-resources">
+        <div class="field">
+          <div class="resource-label"><label for="profile-memory">Memory (MiB)</label><span class="resource-origin" id="memory-origin"></span></div>
+          <input id="profile-memory" type="number" min="1" step="1" aria-describedby="memory-default">
+          <div class="resource-presets" role="group" aria-label="Memory presets">
+            <button data-resource="memory" data-value="2048">2 GiB</button><button data-resource="memory" data-value="4096">4 GiB</button><button data-resource="memory" data-value="8192">8 GiB</button><button data-resource="memory" data-value="16384">16 GiB</button>
+          </div>
+          <div class="resource-default"><span id="memory-default" class="help"></span><button class="link" data-resource="memory" data-value="">Use catalog</button></div>
+        </div>
+        <div class="field">
+          <div class="resource-label"><label for="profile-cpus">Processors (vCPUs)</label><span class="resource-origin" id="cpus-origin"></span></div>
+          <input id="profile-cpus" type="number" min="1" step="1" aria-describedby="cpus-default">
+          <div class="resource-presets" role="group" aria-label="Processor presets">
+            <button data-resource="cpus" data-value="1">1</button><button data-resource="cpus" data-value="2">2</button><button data-resource="cpus" data-value="4">4</button><button data-resource="cpus" data-value="8">8</button>
+          </div>
+          <div class="resource-default"><span id="cpus-default" class="help"></span><button class="link" data-resource="cpus" data-value="">Use catalog</button></div>
+        </div>
+      </div>
+    </section>
+    <section id="profile-advanced" class="profile-pane hidden" role="tabpanel" aria-labelledby="profile-tab-advanced">
+      <h2>Local override</h2><p id="profile-json-help">Edit only the values you want to change. Objects merge; arrays append to the catalog. Remove a field to inherit it again.</p>
+      <textarea id="profile-json" aria-label="Local profile override JSON" aria-describedby="profile-json-help" spellcheck="false"></textarea>
+    </section>
+    <section id="profile-catalog" class="profile-pane hidden" role="tabpanel" aria-labelledby="profile-tab-catalog" tabindex="0">
+      <h2>Catalog template</h2><p>Read-only defaults for this machine. Your local changes are saved separately.</p><pre id="profile-base"></pre>
+    </section>
+  </div>
+  <div class="command-footer">
+    <p id="profile-feedback" role="status" aria-live="polite"></p>
+    <div class="command-buttons"><button id="profile-reset">Restore all defaults</button><button id="profile-save" class="primary">Save changes</button></div>
+    <p class="help">Changes apply on the next VM start. Changing disk size in JSON does not resize an existing disk.</p>
+  </div>
+</dialog>
 <div id="vm-context" popover="manual" role="menu" aria-label="VM actions"></div>
 <dialog id="unlink-dialog" aria-labelledby="unlink-title"><header><h1 id="unlink-title">Choose network to unlink</h1><button data-close>Close</button></header><div class="body"><p id="unlink-members" class="mono"></p><p>These machines share multiple networks. Choose the network to disconnect.</p><label for="unlink-segment">Network</label><select id="unlink-segment"></select><p class="help">Only the listed machines will be removed from this network.</p><button id="unlink-review">Review unlink…</button></div></dialog>
 <dialog id="link-dialog" aria-labelledby="link-title"><header><h1 id="link-title">Network connection</h1><button data-close>Close</button></header><div class="body"><p id="link-source" class="mono"></p><label for="link-target">Connect to</label><select id="link-target"></select><p class="help">Link to a machine, or unlink an existing connection. Stopped machines join new links at their next start.</p><button id="link-review" class="primary">Review link…</button></div></dialog>
@@ -636,11 +725,36 @@ async function setMine(action, names) {
     await refresh(true);
   } catch (e) { toast(e.message, true); }
 }
+let labProfile = null;
 function setFilter(name, settled = true) {
+  if (name !== "lab") labProfile = null;
   filter = name; filterSettled ||= settled; checkedVms.clear(); selectionAnchor = "";
-  document.querySelectorAll("[data-filter]").forEach((x) => (x.classList.toggle("active", x.dataset.filter === name), x.setAttribute("aria-pressed", x.dataset.filter === name)));
+  document.querySelectorAll("[data-filter]").forEach((x) => (x.classList.toggle("active", x.dataset.filter === (name === "lab" ? "labs" : name)), x.setAttribute("aria-pressed", x.dataset.filter === (name === "lab" ? "labs" : name))));
   render();
 }
+
+function openLabProfile(group, vm) {
+  if (!S.labs.some(lab => lab.group === group && lab.members.includes(vm))) return;
+  labProfile = {group, search:$("search").value};
+  selected = vm; localStorage.setItem("vmctl-selected", vm);
+  $("search").value = ""; setFilter("lab");
+  const row = [...$("rows").querySelectorAll("[data-vm]")].find(el => el.dataset.vm === vm);
+  if (row) {
+    const list = $("list");
+    list.scrollTop += row.getBoundingClientRect().top - list.getBoundingClientRect().top - list.clientHeight / 2 + row.offsetHeight / 2;
+  }
+  $("machine-panel").focus({preventScroll:true});
+  $("lab-navigation").scrollIntoView({block:"nearest"});
+}
+$("back-to-labs").onclick = () => {
+  if (!labProfile) return;
+  const {group, search} = labProfile, vm = selected;
+  $("search").value = search; setFilter("labs");
+  const card = [...$("labs-view").querySelectorAll("[data-lab]")].find(el => el.dataset.lab === group);
+  const member = [...(card?.querySelectorAll("[data-member]") || [])].find(el => el.dataset.member === vm);
+  (member || card?.querySelector("button") || document.querySelector('[data-filter="labs"]')).focus({preventScroll:true});
+  (card || $("toolbar")).scrollIntoView({block:"nearest"});
+};
 
 // Function keys: one per kind of action, whatever the machine's state offers right now (the
 // buttons show them). F5/F11/F12 stay with the browser; Shift+F10 is the context menu.
@@ -657,7 +771,7 @@ const FKEYS = [
 const fkeyOf = (action) => FKEYS.find(([, , match]) => match && match(action))?.[0] || "";
 function openKeyboardHelp() {
   $("help-title").textContent = "Keyboard";
-  $("help-text").textContent = ["Type anywhere        filter the machines (Esc clears)", "↑ ↓                  select a machine", "Enter                the machine's main action",
+  $("help-text").textContent = ["Type anywhere        filter the machines (Esc clears)", "↑ ↓                  select a machine",
     ...FKEYS.map(([key, label]) => `${key.padEnd(21)}${label}`), "Shift+F10            the machine's menu (right-click)", "/                    the search box", "F1                   this list",
     "Ctrl / ⌘ + click    toggle multiple selection", "F2 / F8 (selection)  start / stop every selected machine", "Shift + click        select a range", "Click a VM icon      toggle selection (also Enter / Space when focused)", "Mouse: hover a distribution icon for a live preview. Click the network button to choose a VM to link, or drag that button onto another machine. A stopped VM joins at its next start."].join("\n");
   $("help-dialog").showModal();
@@ -762,7 +876,8 @@ function selectRow(name, event) {
 
 function visible() {
   const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
-  return S.vms.filter((r) => words.every((w) => (r.name + " " + r.label + " " + r.family).toLowerCase().includes(w))
+  const members = filter === "lab" ? S.labs.find(lab => lab.group === labProfile?.group)?.members || [] : null;
+  return S.vms.filter((r) => (!members || members.includes(r.name)) && words.every((w) => (r.name + " " + r.label + " " + r.family).toLowerCase().includes(w))
     && (filter !== "disk" || r.prepared) && (filter !== "running" || r.running)
     // My VMs: the chosen profiles plus whatever runs right now (a running VM never hides).
     && (filter !== "mine" || r.mine || r.running))
@@ -796,14 +911,23 @@ function render() {
   $("summary").textContent = `${withData} installed · ${S.labs.length} labs`;
   $("total-count").textContent = all.length; $("running-count").textContent = running;
   $("disk-count").textContent = all.filter((r) => r.prepared).length;
-  const labs = filter === "labs";
+  const labs = filter === "labs", inLab = filter === "lab" && !!labProfile;
+  $("profiles-view").classList.toggle("lab-profile", inLab);
+  $("lab-navigation").classList.toggle("hidden", !inLab);
+  $("search").placeholder = inLab ? "Search machines in this lab…" : "Search profiles or distributions…";
+  $("search").setAttribute("aria-label", inLab ? "Search lab machines" : "Search profiles");
   $("profiles-view").classList.toggle("hidden", labs);
   $("labs-view").classList.toggle("hidden", !labs);
   renderSelection();
   if (labs) return renderLabs();
   const rows = visible();
-  $("list-title").textContent = `${filter === "mine" ? "My VMs" : "Profiles"}  ${rows.length} / ${all.length}`;
+  const total = inLab ? S.labs.find(lab => lab.group === labProfile.group)?.members.length || 0 : all.length;
+  $("list-title").textContent = `${inLab ? "Lab machines" : filter === "mine" ? "My VMs" : "Profiles"}  ${rows.length} / ${total}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
+  if (inLab) {
+    $("lab-origin").textContent = labProfile.group;
+    $("lab-current-vm").textContent = rows.length ? selected : "No matching machine";
+  }
   // Never rebuild the rows during a drag: the dragged icon would be destroyed and Chromium then
   // aborts the drop silently (the 5 s state poll did exactly that on a drag longer than a few seconds).
   if (dragVm || dragState.start) return;
@@ -841,7 +965,7 @@ function renderDetails() {
   $("details").dataset.vm = r.name;
   // The panel: All commands… stays in sight; the My VMs entry is the ★ button of the heading (the context menu keeps both).
   const secondary = a => !a.primary && (a.danger || a.screen || ["attach","checkpoint"].includes(a.args?.[0]));
-  const actionButton = (x,i) => `<button aria-label="${esc(x.label)}" data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${i === 0 ? "<kbd>Enter</kbd>" : ""}${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
+  const actionButton = (x,i) => `<button aria-label="${esc(x.label)}" data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
   const mainActions = actions.map((a,i) => secondary(a) || a.mine ? "" : actionButton(a,i)).join("");
   const extraActions = actions.map((a,i) => ({a,i})).filter(({a}) => secondary(a)).sort((x,y) => Number(!!x.a.danger)-Number(!!y.a.danger));
   $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<div class="profile-title"><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div></div></div>${stateBadge(r)}
@@ -862,27 +986,34 @@ function renderLabs() {
   if (signature === labsSignature) return;
   labsSignature = signature;
   const byName = Object.fromEntries(S.vms.map((r) => [r.name, r]));
+  const menuButton = (kind, name) => `<button class="${kind === "lab" ? "lab-menu" : "member-menu"}" data-${kind}-menu="${esc(name)}" aria-label="Actions for ${kind === "lab" ? "lab " : ""}${esc(name)}" title="${kind === "lab" ? "Lab actions" : "VM actions"}" aria-haspopup="menu" aria-controls="vm-context" aria-expanded="false">${kind === "lab" ? "Actions " : ""}⋯</button>`;
   const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
   $("labs-view").innerHTML = S.labs.filter((lab) => words.every((w) => (lab.group + " " + lab.members.join(" ")).toLowerCase().includes(w))).map((lab) => {
     const names = lab.start_order || lab.members, members = names.map((n) => byName[n]).filter(Boolean);
-    if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="chip completed">session · ${members.length} linked${(lab.pending || []).length ? ` · ${lab.pending.length} off` : ""}</span></div>
+    if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="lab-controls"><span class="chip completed">session · ${members.length} linked${(lab.pending || []).length ? ` · ${lab.pending.length} off` : ""}</span>${menuButton("lab",lab.group)}</span></div>
       <p class="lab-order">Made with <span class="mono">vmctl link</span> (or using the network buttons / multiple selection). A private /24 segment: stopped members join at their next start; it touches no profile and lasts until Unlink all.</p>
-      <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "")}</span></span></button>${stateBadge(m)}</div>`).join("")}</div>
+      <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "")}</span></span></button>${stateBadge(m)}${menuButton("member",m.name)}</div>`).join("")}</div>
       <div class="buttons"><button data-args='${esc(JSON.stringify(["link", "--status", "--segment", lab.segment]))}'>Status</button><button class="danger" data-args='${esc(JSON.stringify(["link", "--off", "--segment", lab.segment]))}'>Unlink all</button></div></section>`;
     const up = members.filter((m) => m.running).length;
     const installed = names.length > 0 && names.every((n) => byName[n]?.installed);
     const cluster = members.some((m) => m.family === "proxmox");
     const btn = (label,args,cls="") => `<button class="${cls}" data-args='${esc(JSON.stringify(args))}'>${label}</button>`;
     const primary = installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab…",["group","install",lab.group],"primary");
-    return `<section class="card lab" data-lab="${esc(lab.group)}"><div class="lab-head" tabindex="0" aria-label="${esc(lab.group)}. Right-click for stack actions."><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<h2>${esc(lab.group)}</h2></span><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
-      <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "Open profile →")}</span></span></button>${stateBadge(m)}</div>`; }).join("")}</div>
+    return `<section class="card lab" data-lab="${esc(lab.group)}"><div class="lab-head" tabindex="0" aria-label="${esc(lab.group)}. Right-click for stack actions."><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<h2>${esc(lab.group)}</h2></span><span class="lab-controls"><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span>${menuButton("lab",lab.group)}</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
+      <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "Open profile →")}</span></span></button>${stateBadge(m)}${menuButton("member",m.name)}</div>`; }).join("")}</div>
       <div class="buttons">${primary}${installed && up > 0 && up < members.length ? btn("Stop stack",["group","down",lab.group]) : ""}${btn("Status",["group","status",lab.group])}<button data-map="${esc(lab.group)}">Open map ↗</button></div>
       <details class="lab-secondary"><summary>More lab actions</summary><p class="lab-order">Start order: ${esc(names.join(" → "))}</p><div class="buttons">${installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group])}${up && !installed ? btn("Stop stack",["group","down",lab.group]) : ""}${cluster ? btn("Form cluster",["group","cluster",lab.group]) : ""}${btn("Generate map",["group","map",lab.group])}${btn("Clean lab…",["group","clean",lab.group],"danger")}</div></details></section>`;
   }).join("") || '<p class="s-muted">No matching labs.</p>';
   bindStateLogs($("labs-view"));
+  $("labs-view").querySelectorAll("[data-lab-menu],[data-member-menu]").forEach(button => { button.onclick = () => {
+    const rect = button.getBoundingClientRect();
+    if (button.hasAttribute("data-lab-menu")) openLabContext(button.closest("[data-lab]"), rect.left, rect.bottom + 6);
+    else openContext(button.dataset.memberMenu, rect.left, rect.bottom + 6);
+    contextOrigin = button; contextTrigger = button; button.setAttribute("aria-expanded", "true");
+  }; });
   $("labs-view").querySelectorAll("[data-args]").forEach((b) => (b.onclick = () => run(JSON.parse(b.dataset.args))));
   $("labs-view").querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.map)}/map?token=${encodeURIComponent(TOKEN)}`, "_blank")));
-  $("labs-view").querySelectorAll("[data-member]").forEach((b) => (b.onclick = () => { selected = b.dataset.member; $("search").value = ""; document.querySelector('[data-filter="all"]').click(); }));
+  $("labs-view").querySelectorAll("[data-member]").forEach((b) => (b.onclick = () => openLabProfile(b.closest("[data-lab]").dataset.lab, b.dataset.member)));
 }
 
 // A styled confirmation instead of window.confirm: the command, what it touches, one red button.
@@ -1571,64 +1702,134 @@ $("cmd-copy").onclick = async () => { try { await navigator.clipboard.writeText(
 $("all-commands").onclick = () => openCommands(selected);
 
 // --- local profile editor
-let profileEdit = null;
+let profileEdit = null, profileGeneration = 0;
+const profileResources = [["memory", "memory_mb"], ["cpus", "cpus"]];
 function profileFeedback(message, error = false) { $("profile-feedback").textContent = message; $("profile-feedback").className = error ? "error" : ""; }
+function selectProfileTab(name, focus = false) {
+  document.querySelectorAll("[data-profile-tab]").forEach(button => {
+    const active = button.dataset.profileTab === name;
+    button.setAttribute("aria-selected", active); button.tabIndex = active ? 0 : -1;
+    $("profile-" + button.dataset.profileTab).classList.toggle("hidden", !active);
+    if (active && focus) button.focus();
+  });
+  $("profile-dialog").querySelector(".body").scrollTop = 0;
+}
+const profileTabs = [...document.querySelectorAll("[data-profile-tab]")];
+profileTabs.forEach((button, index) => {
+  button.onclick = () => selectProfileTab(button.dataset.profileTab);
+  button.onkeydown = e => {
+    const next = {ArrowRight:(index + 1) % profileTabs.length, ArrowLeft:(index + profileTabs.length - 1) % profileTabs.length, Home:0, End:profileTabs.length - 1}[e.key];
+    if (next !== undefined) { e.preventDefault(); selectProfileTab(profileTabs[next].dataset.profileTab, true); }
+  };
+});
 function profileOverride() {
-  const value = JSON.parse($("profile-json").value);
+  let value;
+  try { value = JSON.parse($("profile-json").value); }
+  catch (e) { throw new Error("Check Advanced JSON: " + e.message); }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("The override must be a JSON object.");
-  for (const key of ["memory_mb", "cpus"]) if (key in value && (!Number.isInteger(value[key]) || value[key] < 1)) throw new Error(key + " must be a positive integer.");
+  for (const key of ["memory_mb", "cpus"]) if (key in value && (!Number.isSafeInteger(value[key]) || value[key] < 1)) throw new Error(key + " must be a positive whole number.");
   return value;
 }
+function updateResourceLabels(value) {
+  for (const [id, key] of profileResources) {
+    const custom = Object.hasOwn(value, key), origin = $(id + "-origin");
+    origin.textContent = custom ? "Local value" : profileEdit?.local_only ? "Default" : "Catalog value";
+    origin.classList.toggle("custom", custom);
+    document.querySelectorAll(`[data-resource="${id}"][data-value]:not([data-value=""])`).forEach(button => {
+      button.setAttribute("aria-pressed", Number(button.dataset.value) === (value[key] ?? profileEdit?.base?.[key]));
+    });
+  }
+}
 function syncProfileResources(value) {
-  $("profile-memory").value = value.memory_mb ?? ""; $("profile-cpus").value = value.cpus ?? "";
+  for (const [id, key] of profileResources) $("profile-" + id).value = value[key] ?? "";
+  updateResourceLabels(value);
+}
+function profileControls(disabled) {
+  ["profile-memory", "profile-cpus", "profile-json", "profile-save", "profile-reset"].forEach(id => $(id).disabled = disabled);
+  document.querySelectorAll("[data-resource]").forEach(button => { button.disabled = disabled || (button.dataset.value === "" && profileEdit?.local_only); });
+  $("profile-reset").disabled = disabled || !!profileEdit?.local_only;
+}
+function profileChanged(value) {
+  const dirty = JSON.stringify(value) !== JSON.stringify(profileEdit.override);
+  $("profile-save").disabled = !dirty;
+  profileFeedback(dirty ? "Unsaved changes" : "No unsaved changes");
 }
 async function openProfileEditor(vm = selected) {
+  const generation = ++profileGeneration;
   profileEdit = null; $("profile-title").textContent = "Customize · " + vm;
   $("profile-intro").textContent = "Loading profile…";
-  ["profile-memory", "profile-cpus", "profile-json", "profile-save", "profile-reset"].forEach(id => $(id).disabled = true);
-  $("profile-json").value = ""; $("profile-base").textContent = ""; profileFeedback("");
+  profileControls(true); selectProfileTab("resources");
+  $("profile-json").value = ""; $("profile-base").textContent = ""; syncProfileResources({}); profileFeedback("Loading profile…");
+  for (const [id] of profileResources) { $("profile-" + id).placeholder = ""; $(id + "-default").textContent = ""; }
   $("profile-dialog").showModal();
   try {
     const data = await api(`/api/vm/${encodeURIComponent(vm)}/override`);
-    if (!$("profile-dialog").open) return;
+    if (generation !== profileGeneration || !$("profile-dialog").open) return;
     profileEdit = data;
-    $("profile-intro").textContent = data.local_only ? "This profile exists only locally. Edit its local definition below." : "Use the catalog as your template. Save only your changes here; leave resource fields blank to inherit the catalog values.";
+    $("profile-intro").textContent = data.local_only ? "This machine uses a local profile. Edit its resources here or its full definition in Advanced JSON." : "Choose a preset or enter a value. Empty fields use the catalog defaults.";
     $("profile-json").value = JSON.stringify(data.override,null,2); syncProfileResources(data.override);
     $("profile-base").textContent = data.base ? JSON.stringify(data.base,null,2) : "No catalog template: this profile was created locally.";
-    $("profile-memory").placeholder = data.base?.memory_mb ?? data.effective.memory_mb;
-    $("profile-cpus").placeholder = data.base?.cpus ?? data.effective.cpus;
-    $("memory-default").textContent = "Catalog: " + (data.base?.memory_mb ?? "—") + " MiB";
-    $("cpus-default").textContent = "Catalog: " + (data.base?.cpus ?? "—");
-    ["profile-memory", "profile-cpus", "profile-json", "profile-save"].forEach(id => $(id).disabled = false);
-    $("profile-reset").disabled = data.local_only;
-    $("profile-memory").focus();
-  } catch (e) { profileFeedback(e.message,true); }
+    for (const [id, key] of profileResources) {
+      $("profile-" + id).placeholder = data.base?.[key] ?? data.effective[key];
+      $(id + "-default").textContent = data.local_only ? "Local profile" : "Catalog: " + (data.base?.[key] ?? "—") + (id === "memory" ? " MiB" : " vCPUs");
+    }
+    profileControls(false); profileChanged(data.override);
+    $("profile-memory").focus({preventScroll:true});
+  } catch (e) { if (generation === profileGeneration) profileFeedback(e.message,true); }
 }
+$("profile-dialog").addEventListener("close", () => { profileGeneration++; });
 $("profile-edit").onclick = () => openProfileEditor();
-for (const [id,key] of [["profile-memory","memory_mb"],["profile-cpus","cpus"]]) $(id).oninput = () => {
+for (const [id] of profileResources) $("profile-" + id).oninput = () => {
   try {
-    const value = profileOverride(), text = $(id).value;
-    if ($(id).validity.badInput || (text && (!Number.isInteger(Number(text)) || Number(text) < 1))) throw new Error("Enter a positive whole number or leave the field blank.");
-    if (text === "") delete value[key]; else value[key] = Number(text);
-    $("profile-json").value = JSON.stringify(value,null,2); $("profile-save").disabled = false; profileFeedback("Unsaved changes");
+    const value = profileOverride();
+    // Validate both fields together so a second edit cannot save an invalid first field.
+    for (const [resource, key] of profileResources) {
+      const input = $("profile-" + resource), text = input.value;
+      if (!input.validity.valid || (text && (!Number.isSafeInteger(Number(text)) || Number(text) < 1))) throw new Error("Enter a positive whole number for " + (resource === "memory" ? "memory." : "processors."));
+      if (text === "") delete value[key]; else value[key] = Number(text);
+    }
+    $("profile-json").value = JSON.stringify(value,null,2); updateResourceLabels(value); profileChanged(value);
   } catch (e) { $("profile-save").disabled = true; profileFeedback(e.message,true); }
 };
-$("profile-json").oninput = () => { try { syncProfileResources(profileOverride()); $("profile-save").disabled = false; profileFeedback("Unsaved changes"); } catch (e) { $("profile-save").disabled = true; profileFeedback(e.message,true); } };
-$("profile-reset").onclick = () => { $("profile-json").value = "{}"; syncProfileResources({}); $("profile-save").disabled = false; profileFeedback("Catalog values restored in this draft. Save to remove the local override."); };
+document.querySelectorAll("[data-resource]").forEach(button => { button.onclick = () => {
+  const input = $("profile-" + button.dataset.resource);
+  input.value = button.dataset.value; input.dispatchEvent(new Event("input"));
+}; });
+$("profile-json").oninput = () => {
+  try { const value = profileOverride(); syncProfileResources(value); profileChanged(value); }
+  catch (e) { $("profile-save").disabled = true; profileFeedback(e.message,true); }
+};
+$("profile-reset").onclick = () => {
+  $("profile-json").value = "{}"; syncProfileResources({}); profileChanged({});
+  if (!$("profile-save").disabled) profileFeedback("Defaults restored in this draft. Save to apply.");
+};
 $("profile-save").onclick = async () => {
-  if (!profileEdit) return;
-  ["profile-save","profile-reset","profile-memory","profile-cpus","profile-json"].forEach(id=>$(id).disabled=true);
+  if (!profileEdit || $("profile-save").disabled) return;
+  const generation = profileGeneration, editing = profileEdit;
+  profileControls(true); profileFeedback("Saving changes…");
   try {
-    const saved = await api(`/api/vm/${encodeURIComponent(profileEdit.name)}/override`, {override:profileOverride(),revision:profileEdit.revision});
-    profileEdit = saved; profileFeedback("Saved locally. The catalog is unchanged. Resource changes apply at the next start.");
+    const saved = await api(`/api/vm/${encodeURIComponent(editing.name)}/override`, {override:profileOverride(),revision:editing.revision});
+    if (generation !== profileGeneration) return;
+    profileEdit = saved;
+    $("profile-json").value = JSON.stringify(saved.override,null,2); syncProfileResources(saved.override);
+    profileFeedback("Saved locally. Changes apply at the next start.");
     await refresh(true);
-  } catch (e) { profileFeedback(e.message,true); }
-  finally { ["profile-save","profile-memory","profile-cpus","profile-json"].forEach(id=>$(id).disabled=false); $("profile-reset").disabled = profileEdit.local_only; }
+  } catch (e) { if (generation === profileGeneration) profileFeedback(e.message,true); }
+  finally {
+    if (generation === profileGeneration) {
+      profileControls(false);
+      try { $("profile-save").disabled = JSON.stringify(profileOverride()) === JSON.stringify(profileEdit.override); }
+      catch { $("profile-save").disabled = true; }
+    }
+  }
 };
 
 // --- profile rows and lab members share the same VM context menu
-let contextOrigin = null;
-function closeContext() { $("vm-context").hidePopover(); }
+let contextOrigin = null, contextTrigger = null;
+function closeContext() {
+  $("vm-context").hidePopover();
+  contextTrigger?.setAttribute("aria-expanded", "false"); contextTrigger = null;
+}
 function openContext(vm, x, y) {
   const r = S.vms.find(row => row.name === vm); if (!r) return;
   if (filter !== "labs" && checkedVms.size > 1 && checkedVms.has(vm)) return openSelectionContext(vm, x, y);
@@ -1676,7 +1877,7 @@ function openLabContext(card, x, y) {
   showContext(card.dataset.lab, entries, x, y, "Stack actions");
 }
 function showContext(title, entries, x, y, label, description = "") {
-  hideHoverShot();
+  closeContext(); hideHoverShot();
   const menu = $("vm-context"); menu.setAttribute("aria-label", label);
   menu.innerHTML = `<div class="context-title">${esc(title)}</div>${description ? `<div class="context-selection">${esc(description)}</div>` : ""}` + entries.map((a,i) => `${i === 0 || a.group !== entries[i-1].group ? `<div class="context-group" role="presentation">${esc(a.group)}</div>` : ""}<button role="menuitem" aria-label="${esc(a.label)}" ${a.disabled ? "disabled" : ""} class="${a.danger ? "danger" : a.warn ? "warn" : ""}" data-context="${i}">${actionIcon(a)}${esc(a.label)}${a.key || fkeyOf(a) ? `<kbd>${a.key || fkeyOf(a)}</kbd>` : ""}</button>`).join("");
   menu.showPopover();
@@ -1897,10 +2098,9 @@ document.addEventListener("keydown", (e) => {
   // Typing anywhere filters the list: the search box takes focus on the first letter.
   if (e.key.length === 1 && e.key !== " " && plain && !inField) { $("search").focus(); return; }
   if (/BUTTON|A|SUMMARY/.test(document.activeElement.tagName)) return;
-  if (document.activeElement === $("search") && e.key !== "Enter" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  if (document.activeElement === $("search") && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
   const rows = visible(), i = rows.findIndex((r) => r.name === selected);
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const r = rows[Math.max(0, Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (r) { selected = r.name; render(); document.querySelector("tr.sel")?.scrollIntoView({ block: "nearest" }); } }
-  if (e.key === "Enter" && rows[i]) { e.preventDefault(); runAction(rows[i], actionsFor(rows[i])[0]); }
 });
 let stateRefresh = null, freshRequested = false;
 async function refresh(fresh = false) {

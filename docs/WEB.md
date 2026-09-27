@@ -21,14 +21,18 @@ What the page offers:
   sense for the selected VM: *Unattended install* (the flow `check-vms` would run), *Get the ISO…*
   for a medium only you can provide, *Download the ISO*, *Boot headless*, *Boot with display*
   (a QEMU window on the host), *Console*, *Screenshot*, *Open viewer on the host*, *Stop*,
-  *Checkpoint now*, *Clean*. Enter runs the first one. Right-click a row (or Shift+F10)
+  *Checkpoint now*, *Clean*. F2 boots the selected machine headlessly. Right-click a row (or Shift+F10)
   to open the same actions, SSH access and profile customization. This also works on VM
   names, addresses and state badges inside lab cards.
-- **Customize**: change memory and vCPUs, or edit a partial JSON override. The catalog stays
+- **Customize**: three tabs separate **Resources**, **Advanced JSON** and the read-only
+  **Catalog template**. Memory and vCPUs have presets, editable values and **Use catalog**
+  buttons to restore each field independently. Empty fields inherit the catalog; local values
+  are labelled. Validation and **Save changes** stay visible while scrolling. The catalog stays
   unchanged; edits go to the ignored `vms/profiles/local.json`, with the previous document in
   `local.json.bak`. The complete candidate configuration is validated before writing, and an
   editor opened before another change cannot overwrite it. Objects merge recursively and
-  arrays append, matching the CLI. Restore catalog values removes only this VM's override;
+  arrays append, matching the CLI. **Restore all defaults** clears this VM's draft override;
+  **Save changes** applies the reset. Other overrides are preserved by per-field resets;
   profiles created entirely locally can be edited but have no catalog defaults to restore.
   Resource changes apply at the next VM start; editing disk size does not resize existing disks.
 - **SSH**: the button beside the SSH address opens a browser terminal, a terminal window on
@@ -54,8 +58,8 @@ What the page offers:
   disconnects, the web server exits, or it reaches 1 hour / 512 MiB of frames. `ffmpeg` is required
   on the host. Actual capture speed depends on host load and guest resolution. Frames and exports remain in `artifacts/.web-recordings/<id>/`, independently of
   VM cleanup. **Done** clears the current download panel so another recording can be started.
-- **Keyboard**: typing anywhere filters the list (Esc clears), ↑/↓ select, Enter runs the main
-  action, and function keys run one kind of action whatever the state offers: `F2` boot
+- **Keyboard**: typing anywhere filters the list (Esc clears), ↑/↓ select, and function keys
+  run one kind of action whatever the state offers: `F2` boot
   headless, `F3` console, `F4` SSH in the browser, `F6` screenshot, `F7` checkpoint, `F8` stop, `F9` job log,
   `F10` (or `Ctrl+K`) the commands palette, `Shift+F10` the machine's menu, `F1` the list of
   keys. The buttons show their key.
@@ -72,6 +76,12 @@ What the page offers:
 - **Labs**: each lab with its members, and install, start, stop, status, cluster, network map
   (opened in a new tab) and clean. An installed lab offers **Start stack** first (or **Stop stack**
   when all members are running); a lab with missing installations offers **Install lab**.
+  **Actions ⋯** on each lab opens its stack menu; **⋯** beside each member opens that VM's
+  actions. Both work with click, touch and keyboard; right-click and Shift+F10 remain available.
+  Clicking a VM's name opens its details alongside only that lab's machines. The breadcrumb
+  shows **Labs / lab / VM** and **← Labs** returns to the original lab search and member.
+  On small screens, the machine's details appear before the member list. Choose **All** to
+  return to the full catalog.
 - **Multiple selection**: Ctrl/Cmd+click toggles machines, Shift+click selects a range. Clicking a distribution icon
   toggles it too (Enter/Space when focused). Selected rows have a teal edge and a check badge
   on the icon. Right-click a selected row for a menu scoped to the entire selection; right-click

@@ -306,10 +306,12 @@ Tab completion: `echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc` (bash works 
 ## Make it yours
 
 In the web dashboard, select a VM and choose **Customize** (also available by
-right-clicking its row). Set RAM and vCPUs, or expand **Advanced JSON override**
-for other fields. Changes are validated and saved in `vms/profiles/local.json`,
-with a backup; the catalog files stay unchanged. **Restore catalog values** removes
-that VM's override. Resource changes take effect at the next start.
+right-clicking its row). The **Resources** tab sets RAM and vCPUs with presets
+(**Use catalog** puts one field back), **Advanced JSON** edits any other field and
+**Catalog template** shows the defaults. Changes are validated and saved in
+`vms/profiles/local.json`, with a backup; the catalog files stay unchanged.
+**Restore all defaults** followed by **Save changes** removes that VM's override.
+Resource changes take effect at the next start.
 
 Tracked profiles use a generic guest user, `lab` with password `lab`. Your user
 name, SSH key, dotfiles and extra commands go in `vms/profiles/local.json`, which
