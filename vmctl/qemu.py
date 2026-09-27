@@ -597,6 +597,10 @@ def serial_console(sock_path: Path, escape: bytes = CONSOLE_ESCAPE) -> None:
         os.write(sys.stdout.fileno(), b"\r\n")
 
 
+# QMP serves one client at a time: every in-process screendump (report timeline, recorder) takes it.
+QMP_LOCK = threading.Lock()
+
+
 def qmp_socket_path(vm: dict[str, Any]) -> Path:
     """QMP control socket of a headless VM, next to its runtime PID file."""
     return runtime.resolve_path(vm["disk"]["path"]).parent / "runtime" / "qmp.sock"

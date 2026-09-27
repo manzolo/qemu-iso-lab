@@ -368,22 +368,29 @@ drag it onto another machine) and from a multiple selection (Link network).""")
     p.add_argument("vm", help=VM_HELP)
     p.set_defaults(func=lifecycle.cmd_shell)
 
-    p = _add(subparsers, "record", help="time-lapse of a VM's screen (also during a bootstrap) as MP4, and GIF: one screendump per second until the VM is gone",
+    p = _add(subparsers, "record", help="time-lapse of a VM's screen (also during a bootstrap) as a small GIF, and an MP4 on request: one screendump per second until the VM is gone",
              epilog="""examples:
   vmctl bootstrap-reactos reactos &          # any bootstrap or headless VM: the recorder follows its QMP socket
-  vmctl record reactos --gif                 # frames under artifacts/reactos/recording/<stamp>/, then recording.mp4 + .gif
-  vmctl record debian-server --duration 120  # two minutes of a running VM
+  vmctl record reactos                       # frames under artifacts/reactos/recording/<stamp>/, then recording.gif
+  vmctl record debian-server --mp4           # the GIF plus the full MP4 (every frame, H.264) and its poster
+  vmctl record --from artifacts/reactos/recording/latest --gif-seconds 20   # re-encode an earlier recording
+  vmctl check-vms --record --group smoke     # one recording per row of the matrix
 
-Identical consecutive screens are kept once; a screen that stayed for minutes is shown for
---max-hold seconds, which is what makes an install a short video. The recording survives the
-power-off between an installer and the first boot (--grace), so one run covers install, boot
-and desktop; it ends when the VM has been gone for that long, at --duration, or at Ctrl-C.""")
-    p.add_argument("vm", help=VM_HELP)
+The GIF samples --gif-seconds × 2 frames evenly over the whole recording (480 px, a few hundred
+KB): what a README or the catalog site carries. The MP4 keeps every stored screen, a screen that
+stayed for minutes shown for --max-hold seconds. Identical consecutive screens are kept once. The
+recording survives the power-off between an installer and the first boot (--grace), so one run
+covers install, boot and desktop; it ends when the VM has been gone for that long, at
+--duration, or at Ctrl-C.""")
+    p.add_argument("vm", nargs="?", help=VM_HELP)
+    p.add_argument("--from", dest="from_dir", metavar="DIR", help="re-encode the frames of an earlier recording instead of recording")
     p.add_argument("--fps", type=float, default=1.0, help="screendumps per second (default: 1)")
     p.add_argument("--max-hold", type=float, default=4.0, help="longest time one screen stays in the video, seconds (default: 4)")
     p.add_argument("--grace", type=float, default=30.0, help="seconds without the VM before the recording ends (default: 30)")
     p.add_argument("--duration", type=float, help="stop after this many seconds")
-    p.add_argument("--gif", action="store_true", help="also a 640px GIF for a README or the catalog")
+    p.add_argument("--mp4", action="store_true", help="also the full MP4 (H.264) with its poster, for a video player")
+    p.add_argument("--no-gif", action="store_true", help="skip the GIF (with --mp4)")
+    p.add_argument("--gif-seconds", type=float, default=30.0, help="length of the GIF loop, seconds (default: 30)")
     p.add_argument("--out", help="directory for this recording (default: artifacts/<vm>/recording/<stamp>)")
     p.set_defaults(func=lifecycle.cmd_record)
 
@@ -435,6 +442,9 @@ and desktop; it ends when the VM has been gone for that long, at --duration, or 
     p.add_argument("--document", action="store_true",
                    help="with --report: keep a screenshot timeline of every row (one frame every 30 s, changed screens only) "
                         "and write one PDF per profile, in English and Italian, under <report>/pdf/")
+    p.add_argument("--record", action="store_true",
+                   help="record every row's screen with vmctl record (one screendump a second, a 30 s GIF per profile under "
+                        "artifacts/<vm>/recording/latest/; tools/collect_media.py copies them into docs/media/)")
     p.set_defaults(func=lifecycle.cmd_test_local)
 
     p = _add(subparsers, "report-pdf", help="one PDF per profile (facts, outcome, screenshot timeline) from a check-vms report")
@@ -449,6 +459,7 @@ and desktop; it ends when the VM has been gone for that long, at --duration, or 
     p.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
     p.add_argument("--report-dir", dest="_report_dir", help=argparse.SUPPRESS)
     p.add_argument("--document", action="store_true", help=argparse.SUPPRESS)
+    p.add_argument("--record", action="store_true", help=argparse.SUPPRESS)
     p.set_defaults(func=lifecycle.cmd_check_vm)
 
     p = _add(subparsers, "flash", help="copy a VM disk, repair GPT and offer optional NTFS expansion (DESTRUCTIVE; requires sudo)")

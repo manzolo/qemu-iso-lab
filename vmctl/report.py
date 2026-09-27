@@ -29,7 +29,7 @@ TIMELINE_INTERVAL_SEC = 30.0
 TIMELINE_MAX_FRAMES = 40
 # QMP accepts one client at a time: the timeline thread, the final capture and the installer
 # watcher all go through this lock so none of them makes another one's command fail.
-_QMP_LOCK = threading.Lock()
+_QMP_LOCK = qemu.QMP_LOCK  # shared with the recorder
 
 
 def ppm_to_png(data: bytes) -> bytes:

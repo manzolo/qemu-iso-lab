@@ -80,8 +80,8 @@ init-local-profile: ## Create vms/profiles/local.json from the example
 		printf "  edit YOUR_USER, the password/hash and the SSH/dotfile paths before using personal profile overrides\n"; \
 	fi
 
-validate-vms: ## Local-only matrix: reinstall every unattended profile from scratch (experimental ones are reported as skipped), restore the installed disks, write the HTML report (hours; GROUP="ubuntu rhel" runs one category, VMS="a b" names profiles, PARALLEL=auto (default) packs VMs by free RAM/CPUs or PARALLEL=N fixes the count, TIMEOUT=3600 s per phase)
-	@./bin/vmctl check-vms $(VMS) $(foreach group,$(GROUP),--group $(group)) --restore --no-clean-first --report --parallel $(or $(PARALLEL),auto) --timeout $(TIMEOUT) --open
+validate-vms: ## Local-only matrix: reinstall every unattended profile from scratch (experimental ones are reported as skipped), restore the installed disks, write the HTML report (hours; GROUP="ubuntu rhel" runs one category, VMS="a b" names profiles, PARALLEL=auto (default) packs VMs by free RAM/CPUs or PARALLEL=N fixes the count, TIMEOUT=3600 s per phase, RECORD=1 records a GIF per row into the report)
+	@./bin/vmctl check-vms $(VMS) $(foreach group,$(GROUP),--group $(group)) --restore --no-clean-first --report $(if $(RECORD),--record,) --parallel $(or $(PARALLEL),auto) --timeout $(TIMEOUT) --open
 
 groups: ## List the profile categories check-vms --group accepts (also: vmctl list --groups)
 	@./bin/vmctl list --groups

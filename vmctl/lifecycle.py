@@ -1003,7 +1003,13 @@ def run_local_test_once(vm_name: str, vm: dict[str, Any], args: argparse.Namespa
     # The phase names the timeline frames until a flow says otherwise ("post-install").
     report.phase(args, "boot" if mode == "boot-check" else "install")
     try:
-        with report.watch_timeline(vm_name, vm, args):
+        # --restore wipes the row's artifacts afterwards, so the recording goes with the report
+        # (or under artifacts/check-vms/recordings/ when there is none), never under artifacts/<vm>/.
+        recordings = (runtime.resolve_path(str(args._report_dir)) if getattr(args, "_report_dir", None)
+                      else runtime.resolve_path("artifacts/check-vms")) / "recordings" / vm_name
+        with report.watch_timeline(vm_name, vm, args), \
+                recorder.record_in_background(vm_name, vm, enabled=bool(getattr(args, "record", False)) and not args.dry_run,
+                                              grace=45.0, out_dir=recordings):
             status, detail = run_local_test_vm(vm_name, vm, args)
     except (VMError, OSError, subprocess.CalledProcessError) as exc:
         status = "failed"
@@ -1062,6 +1068,8 @@ def run_local_test_vm_subprocess(vm_name: str, args: argparse.Namespace) -> tupl
         cmd += ["--report-dir", str(args._report_dir)]
     if getattr(args, "document", False):
         cmd.append("--document")
+    if getattr(args, "record", False):
+        cmd.append("--record")
     result = subprocess.run(
         cmd,
         check=False,
@@ -3612,10 +3620,17 @@ def wait_for_interrupt() -> None:
 
 def cmd_record(args: argparse.Namespace) -> int:
     """``vmctl record <vm>``: a time-lapse of the screen from the QMP socket, encoded with ffmpeg."""
+    if args.from_dir:
+        recorder.reencode(Path(args.from_dir), max_hold=args.max_hold, gif=not args.no_gif, mp4=args.mp4,
+                          gif_seconds=args.gif_seconds, dry_run=args.dry_run)
+        return 0
+    if not args.vm:
+        raise VMError("vmctl record needs a VM (or --from DIR)")
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
     recorder.record(args.vm, vm, fps=args.fps, max_hold=args.max_hold, grace=args.grace, duration=args.duration,
-                    gif=args.gif, out_dir=Path(args.out) if args.out else None, dry_run=args.dry_run)
+                    gif=not args.no_gif, mp4=args.mp4, gif_seconds=args.gif_seconds,
+                    out_dir=Path(args.out) if args.out else None, dry_run=args.dry_run)
     return 0
 
 

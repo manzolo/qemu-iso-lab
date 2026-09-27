@@ -1,29 +1,35 @@
-"""``vmctl record``: a time-lapse of a VM's screen, from its QMP socket, as MP4 (and GIF).
+"""``vmctl record``: a time-lapse of a VM's screen, from its QMP socket, as a GIF (and an MP4 on request).
 
 One ``screendump`` per period (default 1 s) while ``artifacts/<vm>/runtime/qmp.sock`` answers,
 so it works during a bootstrap and on any background VM. Identical consecutive frames are not
-stored twice: a frame carries the time it stayed on screen, and the encoder caps that hold at
-``max_hold`` seconds, which is what turns a twenty-minute install into a minute of video without
-losing a screen. The recording survives the gap between an installer's power-off and the first
-boot of the installed disk (``grace``), so one run covers install, first boot and desktop; it ends
-when the VM has been gone for that long, at ``duration``, or at Ctrl-C. Frames are PNG (written
-here, no dependency), the video needs ``ffmpeg``. Output under ``artifacts/<vm>/recording/<stamp>/``
-with ``latest`` pointing at the newest.
+stored twice: a frame carries the time it stayed on screen. The GIF is the default and the
+lightweight product: ``gif_seconds`` × ``gif_fps`` frames sampled evenly over the whole recording
+(the first and the last always), 480 px wide, so a twenty-minute install is a 30 s loop of a few
+hundred kilobytes that a README, the catalog site and a git repository can carry. The MP4
+(``mp4=True``) keeps every stored frame, its hold capped at ``max_hold`` seconds, H.264 for a
+player; it comes with a ``poster.png``. The recording survives the gap between an installer's
+power-off and the first boot of the installed disk (``grace``), so one run covers install, first
+boot and desktop; it ends when the VM has been gone for that long, at ``duration``, at Ctrl-C or
+when the caller's ``stop`` event is set (``check-vms --record`` runs one recorder per row in a
+thread, ``record_in_background``). Frames are PNG (written here, no dependency); the encodes need
+``ffmpeg``. Output under ``artifacts/<vm>/recording/<stamp>/`` with ``latest`` pointing at the
+newest; ``reencode()`` produces new outputs from the frames of an old recording.
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
 import hashlib
 import os
 import re
 import shutil
 import struct
-import subprocess
 import tempfile
+import threading
 import time
 import zlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from vmctl import qemu, runtime, ui
 from vmctl.errors import VMError
@@ -31,8 +37,10 @@ from vmctl.errors import VMError
 DEFAULT_FPS = 1.0
 DEFAULT_MAX_HOLD = 4.0
 DEFAULT_GRACE = 30.0
-GIF_WIDTH = 640
-GIF_FPS = 4
+GIF_WIDTH = 480
+GIF_FPS = 2
+GIF_SECONDS = 30.0
+FRAMES_LIST = "frames.ffconcat"
 
 
 def recording_dir(vm_name: str) -> Path:
@@ -69,13 +77,15 @@ def ppm_to_png(ppm: bytes) -> tuple[bytes, int, int]:
 
 
 def capture(sock: Path) -> bytes | None:
-    """One screendump as PPM bytes, or None when QEMU is not there (socket gone or refused)."""
+    """One screendump as PPM bytes, or None when QEMU is not there (socket gone or refused).
+    QMP serves one client at a time: the lock is shared with the report's screenshots."""
     if not sock.exists():
         return None
     fd, temporary = tempfile.mkstemp(prefix="vmctl-record-", suffix=".ppm", dir="/tmp")
     os.close(fd)
     try:
-        qemu.qmp_execute(sock, "screendump", arguments={"filename": temporary}, timeout=10.0)
+        with qemu.QMP_LOCK:
+            qemu.qmp_execute(sock, "screendump", arguments={"filename": temporary}, timeout=10.0)
         for _ in range(20):  # QEMU writes the file after answering; a partial read is a black frame
             data = Path(temporary).read_bytes()
             header = parse_ppm_header(data)
@@ -130,58 +140,131 @@ class Recording:
             lines.append(f"file '{self.frames[-1][0].name}'")
         return "\n".join(lines) + "\n"
 
+    def sample(self, count: int) -> list[Path]:
+        """Up to *count* frames spread evenly over the recording, the first and the last always."""
+        if count <= 0 or not self.frames:
+            return []
+        if len(self.frames) <= count:
+            return [path for path, _ in self.frames]
+        last = len(self.frames) - 1
+        picked = sorted({round(i * last / (count - 1)) for i in range(count)})
+        return [self.frames[i][0] for i in picked]
 
-def encode(recording: Recording, max_hold: float, period: float, gif: bool, dry_run: bool = False) -> dict[str, Path]:
-    """The MP4 (H.264, plays everywhere), optionally the GIF, and a poster (the last frame)."""
+    def gif_list(self, seconds: float, fps: int) -> str:
+        frames = self.sample(max(2, int(seconds * fps)))
+        lines = ["ffconcat version 1.0"]
+        for path in frames:
+            lines.append(f"file '{path.name}'")
+            lines.append(f"duration {1 / fps:.3f}")
+        if frames:
+            lines.append(f"file '{frames[-1].name}'")
+        return "\n".join(lines) + "\n"
+
+    def save_list(self, max_hold: float, period: float) -> Path:
+        listing = self.frames_dir / FRAMES_LIST
+        listing.write_text(self.concat_list(max_hold, period), encoding="utf-8")
+        return listing
+
+    @classmethod
+    def load(cls, directory: Path) -> "Recording":
+        """A recording from its frames directory (what ``save_list`` wrote): for re-encoding."""
+        rec = cls(directory)
+        listing = rec.frames_dir / FRAMES_LIST
+        if not listing.is_file():
+            raise VMError(f"no {FRAMES_LIST} under {ui.pretty_path(rec.frames_dir)}: not a recording")
+        current: Path | None = None
+        seen: list[tuple[Path, float]] = []
+        for line in listing.read_text(encoding="utf-8").splitlines():
+            if line.startswith("file '"):
+                current = rec.frames_dir / line[6:-1]
+            elif line.startswith("duration ") and current is not None:
+                seen.append((current, float(line.split()[1])))
+                current = None
+        rec.frames = seen
+        rec.captures = len(seen)
+        return rec
+
+
+def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: float = 1.0, gif: bool = True,
+           mp4: bool = False, gif_seconds: float = GIF_SECONDS, gif_fps: int = GIF_FPS, gif_width: int = GIF_WIDTH,
+           dry_run: bool = False) -> dict[str, Path]:
+    """The GIF (sampled, small), the MP4 (every frame, H.264, plays everywhere) with its poster."""
     out: dict[str, Path] = {}
     if not recording.frames:
         raise VMError("nothing recorded: no frame came back from the VM")
+    if not gif and not mp4:
+        raise VMError("nothing to encode: choose the GIF, the MP4 or both")
     runtime.require_command("ffmpeg")
-    listing = recording.frames_dir / "frames.ffconcat"
     if not dry_run:
-        listing.write_text(recording.concat_list(max_hold, period), encoding="utf-8")
-    mp4 = recording.directory / "recording.mp4"
-    runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
-                 "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p", "-fps_mode", "vfr",
-                 "-c:v", "libx264", "-crf", "22", "-preset", "medium", "-movflags", "+faststart", str(mp4)],
-                dry_run=dry_run, quiet=True)
-    out["mp4"] = mp4
-    poster = recording.directory / "poster.png"
-    if not dry_run:
-        shutil.copy2(recording.frames[-1][0], poster)
-    out["poster"] = poster
+        recording.save_list(max_hold, period)
     if gif:
+        gif_list = recording.frames_dir / "gif.ffconcat"
+        if not dry_run:
+            gif_list.write_text(recording.gif_list(gif_seconds, gif_fps), encoding="utf-8")
         gif_path = recording.directory / "recording.gif"
-        filters = (f"fps={GIF_FPS},scale={GIF_WIDTH}:-1:flags=lanczos,split[a][b];"
+        filters = (f"scale={gif_width}:-1:flags=lanczos,split[a][b];"
                    "[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle")
-        runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(mp4), "-vf", filters, "-loop", "0", str(gif_path)],
-                    dry_run=dry_run, quiet=True)
+        runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(gif_list),
+                     "-vf", filters, "-loop", "0", str(gif_path)], dry_run=dry_run, quiet=True)
         out["gif"] = gif_path
+    if mp4:
+        listing = recording.frames_dir / FRAMES_LIST
+        mp4_path = recording.directory / "recording.mp4"
+        runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
+                     "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p", "-fps_mode", "vfr",
+                     "-c:v", "libx264", "-crf", "22", "-preset", "medium", "-movflags", "+faststart", str(mp4_path)],
+                    dry_run=dry_run, quiet=True)
+        out["mp4"] = mp4_path
+        poster = recording.directory / "poster.png"
+        if not dry_run:
+            shutil.copy2(recording.frames[-1][0], poster)
+        out["poster"] = poster
     return out
 
 
+def _point_latest(directory: Path) -> None:
+    latest = directory.parent / "latest"
+    try:
+        if latest.is_symlink() or latest.exists():
+            latest.unlink()
+        latest.symlink_to(directory.name)
+    except OSError:
+        pass
+
+
 def record(vm_name: str, vm: dict[str, Any], *, fps: float = DEFAULT_FPS, max_hold: float = DEFAULT_MAX_HOLD,
-           grace: float = DEFAULT_GRACE, duration: float | None = None, gif: bool = False,
-           out_dir: Path | None = None, dry_run: bool = False) -> dict[str, Path]:
-    """Capture until the VM is gone for *grace* seconds (or *duration*, or Ctrl-C), then encode."""
+           grace: float = DEFAULT_GRACE, duration: float | None = None, gif: bool = True, mp4: bool = False,
+           gif_seconds: float = GIF_SECONDS, out_dir: Path | None = None, dry_run: bool = False,
+           stop: threading.Event | None = None, wait_for_socket: bool = False, quiet: bool = False) -> dict[str, Path]:
+    """Capture until the VM is gone for *grace* seconds (or *duration*, Ctrl-C, *stop*), then encode.
+    With *wait_for_socket* the recorder waits for the socket to appear first (a row of check-vms
+    downloads its ISO before QEMU starts)."""
     if fps <= 0:
         raise VMError("--fps must be positive")
     period = 1.0 / fps
     sock = qemu.qmp_socket_path(vm)
     stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     directory = out_dir or recording_dir(vm_name) / stamp
+    say = (lambda text: None) if quiet else ui.print_note
     if dry_run:
         print(f"  would record {ui.pretty_path(sock)} every {period:g}s into {ui.pretty_path(directory)} "
-              f"(holds capped at {max_hold:g}s, ends {grace:g}s after the VM is gone"
-              + (f" or after {duration:g}s" if duration else "") + (", then a GIF too" if gif else "") + ")")
+              f"(ends {grace:g}s after the VM is gone" + (f" or after {duration:g}s" if duration else "")
+              + f"; GIF of {gif_seconds:g}s" + (" and MP4" if mp4 else "") + ")")
         return {}
-    if not sock.exists():
+    if wait_for_socket:
+        while not sock.exists():
+            if stop is not None and stop.wait(period):
+                raise VMError(f"{vm_name}: the VM never started, nothing recorded")
+            if stop is None:
+                time.sleep(period)
+    elif not sock.exists():
         raise VMError(f"{vm_name} has no QMP socket ({ui.pretty_path(sock)}): start it headless, or a bootstrap, first")
     directory.mkdir(parents=True, exist_ok=True)
     recording = Recording(directory)
-    ui.print_header(f"Recording {vm_name}")
-    ui.print_kv("frames", ui.pretty_path(recording.frames_dir))
-    ui.print_note(f"one screendump every {period:g}s; Ctrl-C ends the recording and encodes what was captured")
+    if not quiet:
+        ui.print_header(f"Recording {vm_name}")
+        ui.print_kv("frames", ui.pretty_path(recording.frames_dir))
+        ui.print_note(f"one screendump every {period:g}s; Ctrl-C ends the recording and encodes what was captured")
     started = time.monotonic()
     last_seen = started
     stored = 0
@@ -194,25 +277,63 @@ def record(vm_name: str, vm: dict[str, Any], *, fps: float = DEFAULT_FPS, max_ho
                 if recording.add(ppm, now):
                     stored += 1
                     if stored % 10 == 0:
-                        ui.print_note(f"{stored} frames kept of {recording.captures} captures, {now - started:.0f}s")
+                        say(f"{stored} frames kept of {recording.captures} captures, {now - started:.0f}s")
             elif now - last_seen > grace:
-                ui.print_note(f"the VM has been gone for {grace:g}s: recording ends")
+                say(f"the VM has been gone for {grace:g}s: recording ends")
                 break
             if duration is not None and now - started >= duration:
-                ui.print_note(f"{duration:g}s reached: recording ends")
+                say(f"{duration:g}s reached: recording ends")
+                break
+            if stop is not None and stop.is_set():
                 break
             time.sleep(max(0.0, period - (time.monotonic() - now)))
     except KeyboardInterrupt:
-        ui.print_note("interrupted: encoding what was captured")
-    ui.print_status("ok", f"{stored} frames kept of {recording.captures} captures ({recording.size[0]}x{recording.size[1]})")
-    outputs = encode(recording, max_hold, period, gif)
-    latest = directory.parent / "latest"
-    try:
-        if latest.is_symlink() or latest.exists():
-            latest.unlink()
-        latest.symlink_to(directory.name)
-    except OSError:
-        pass
+        say("interrupted: encoding what was captured")
+    if not quiet:
+        ui.print_status("ok", f"{stored} frames kept of {recording.captures} captures ({recording.size[0]}x{recording.size[1]})")
+    outputs = encode(recording, max_hold=max_hold, period=period, gif=gif, mp4=mp4, gif_seconds=gif_seconds)
+    if out_dir is None:
+        _point_latest(directory)
+    if not quiet:
+        for kind, path in outputs.items():
+            ui.print_kv(kind, ui.pretty_path(path))
+    return outputs
+
+
+def reencode(directory: Path, *, max_hold: float = DEFAULT_MAX_HOLD, gif: bool = True, mp4: bool = False,
+             gif_seconds: float = GIF_SECONDS, dry_run: bool = False) -> dict[str, Path]:
+    """New outputs from the frames of an earlier recording (``artifacts/<vm>/recording/<stamp>``)."""
+    recording = Recording.load(directory)
+    outputs = encode(recording, max_hold=max_hold, gif=gif, mp4=mp4, gif_seconds=gif_seconds, dry_run=dry_run)
     for kind, path in outputs.items():
         ui.print_kv(kind, ui.pretty_path(path))
     return outputs
+
+
+@contextlib.contextmanager
+def record_in_background(vm_name: str, vm: dict[str, Any], enabled: bool = True, **options: Any) -> Iterator[None]:
+    """A recorder thread for one check-vms row: waits for the row's QEMU, records until the row
+    ends (or the VM is gone), encodes on the way out. A failure is a note, never the row's."""
+    if not enabled:
+        yield
+        return
+    stop = threading.Event()
+    outcome: dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            outcome.update(record(vm_name, vm, stop=stop, wait_for_socket=True, quiet=True, **options))
+        except (VMError, OSError) as exc:  # pragma: no cover - depends on the live VM
+            outcome["error"] = str(exc)
+
+    thread = threading.Thread(target=run, name=f"record-{vm_name}", daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join(timeout=600)
+        if outcome.get("error"):
+            ui.print_note(f"{vm_name}: recording skipped: {outcome['error']}")
+        elif outcome:
+            ui.print_kv("recording", ", ".join(ui.pretty_path(p) for p in outcome.values() if isinstance(p, Path)))
