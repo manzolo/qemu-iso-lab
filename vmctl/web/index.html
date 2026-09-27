@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QEMU ISO Lab</title>
 <style>
-:root { color-scheme: dark; --bg:#0c111b; --panel:#141d2b; --panel2:#1b2738; --line:#2a374a; --text:#e6edf7; --muted:#9caec5; --accent:#7ddfc5; --ok:#7ddfc5; --warn:#efc582; --bad:#ff9aab; --btn:#223047; }
+:root { color-scheme: dark; --bg:#0c111b; --panel:#141d2b; --panel2:#1b2738; --line:#2a374a; --text:#e6edf7; --muted:#9caec5; --accent:#7ddfc5; --ok:#7ddfc5; --warn:#efc582; --bad:#ff9aab; --live:#5ee08e; --btn:#223047; }
 * { box-sizing:border-box; }
 body { margin:0; background:radial-gradient(ellipse at 80% 0%,#19283b 0,transparent 55%),var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; min-height:100vh; }
 code,pre,.mono { font-family:ui-monospace,"Cascadia Code",monospace; }
@@ -118,8 +118,14 @@ body.dragging { user-select:none; cursor:grabbing; }
 .state { display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:600; border:1px solid currentColor; border-radius:6px; padding:3px 7px; }
 .state.busy::before { width:10px; height:10px; background:none; border:2px solid currentColor; border-right-color:transparent; animation:activity-spin 1.2s linear infinite; }
 button.state { background:transparent; text-align:left; }
+/* Running is the one state that is filled (its dot sits on the icon): installation states stay outlined. */
+.state.s-live { background:var(--live); border-color:var(--live); color:#0b2616; }
+.state.s-live::before { display:none; }
+/* Stopped machines have a dimmed icon; running ones keep full colour and a green dot on it. */
+tr.row:not(.on) .vm-select .catalog-icon { filter:saturate(.35) brightness(.78); }
+tr.row.on .vm-select::before { content:""; position:absolute; top:-3px; right:-3px; width:9px; height:9px; border:2px solid var(--panel); border-radius:50%; background:var(--live); box-shadow:0 0 6px var(--live); pointer-events:none; z-index:1; }
 button.state:hover { background:#453c28; }
-.s-ok { color:var(--ok); } .s-warn { color:var(--warn); } .s-bad { color:var(--bad); } .s-info { color:#9ebdff; } .s-muted { color:var(--muted); }
+.s-ok { color:var(--ok); } .s-live { color:var(--live); } .s-warn { color:var(--warn); } .s-bad { color:var(--bad); } .s-info { color:#9ebdff; } .s-muted { color:var(--muted); }
 #details { padding:18px; }
 #details .name { font-size:20px; font-weight:600; margin:10px 0 3px; overflow-wrap:anywhere; letter-spacing:-.04em; }
 #details .desc { color:var(--muted); font-size:13px; margin-bottom:16px; }
@@ -519,7 +525,7 @@ function stateOf(r) {
   if (job === "running") { const label = activeJobLabel(r); return [label, r.job_command === "start" ? "s-info" : "s-warn"]; }
   const tracked = vmJobs.get(r.name);
   if (tracked?.unconfirmed) return [r.running ? "Still running" : "Start not confirmed", "s-warn"];
-  if (r.running) return ["Running", "s-ok"];
+  if (r.running) return ["Running", "s-live"];
   if (job === "completed" && r.job_command === "stop") return ["Stopped", "s-muted"];
   // A failed show/stop/etc. is a job outcome, not an installation state.
   if (job && job !== "completed" && installationJob(r)) return [job[0].toUpperCase() + job.slice(1), "s-bad"];
@@ -820,7 +826,7 @@ function render() {
   if (dragVm || dragState.start) return;
   const focused = document.activeElement, focusedVm = focused.closest?.("#rows [data-vm]")?.dataset.vm;
   const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : null;
-  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`);
   bindStateLogs($("rows"));
   if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
