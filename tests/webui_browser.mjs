@@ -525,6 +525,17 @@ try {
   await page.evaluate(()=>{vmJobs.clear();});
   state.vms[0].running=false; state.vms[1].running=false;
   await page.evaluate(()=>refresh(true));
+  // F2/F8 act on the selection, through the same confirmation as the toolbar.
+  await page.evaluate(()=>document.activeElement?.blur());
+  await page.keyboard.press('F2');
+  assert.equal(await page.locator('#confirm-title').textContent(),'Start 3 machines?');
+  assert.match(await page.locator('#confirm-command').textContent(),/vmctl start debian-server --headless --background/);
+  await page.locator('#confirm-no').click();
+  const countBeforeF8=requests.length;
+  await page.evaluate(()=>document.activeElement?.blur());
+  await page.keyboard.press('F8');  // nothing selected is running: a notice, no dialog, no request
+  assert(!(await page.locator('#confirm-dialog').isVisible()));
+  assert.equal(requests.length,countBeforeF8);
   await page.locator('#selection-start').click();
   const countBeforeStart=requests.length;
   await page.locator('#confirm-yes').click(); await page.waitForFunction(()=>!bulkBusy);
@@ -549,7 +560,7 @@ try {
   assert.equal(await page.locator('#vm-context .context-title').textContent(),'proxmox-ve-node2');
   assert.equal(await page.evaluate(()=>checkedVms.size),0);
   await page.keyboard.press('Escape'); await row('arch-noctalia').click();
-  check('icon selection and Ctrl/Cmd/Shift work without checkboxes; mouse and keyboard context menus target the selection, outside clicks reset the scope');
+  check('icon selection and Ctrl/Cmd/Shift work without checkboxes; F2/F8 start/stop the selection; mouse and keyboard context menus target the selection, outside clicks reset the scope');
   assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] use').getAttribute('href'),'/assets/distro-icons.svg#arch');
   assert.equal(await page.locator('.catalog-icon text').count(),0);
   check('distribution icons use the local SVG sprite, without monogram placeholders');

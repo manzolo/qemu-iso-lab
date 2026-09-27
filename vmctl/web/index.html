@@ -432,7 +432,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <main id="profiles-view">
   <section class="card"><h2 id="list-title">Profiles</h2>
     <p id="selection-hint">Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
-    <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start">Start</button><button id="selection-stop">Stop</button><button id="selection-link">Link network</button><button id="selection-clear">Clear</button></div>
+    <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-link">Link network</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
   <section class="card"><div class="profile-heading"><h2>Machine details</h2><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
@@ -688,7 +688,7 @@ function openKeyboardHelp() {
   $("help-title").textContent = "Keyboard";
   $("help-text").textContent = ["Type anywhere        filter the machines (Esc clears)", "↑ ↓                  select a machine", "Enter                the machine's main action",
     ...FKEYS.map(([key, label]) => `${key.padEnd(21)}${label}`), "Shift+F10            the machine's menu (right-click)", "/                    the search box", "F1                   this list",
-    "Ctrl / ⌘ + click    toggle multiple selection", "Shift + click        select a range", "Click a VM icon      toggle selection (also Enter / Space when focused)", "Mouse: hover a distribution icon for a live preview. Click the network button to choose a VM to link, or drag that button onto another machine. A stopped VM joins at its next start."].join("\n");
+    "Ctrl / ⌘ + click    toggle multiple selection", "F2 / F8 (selection)  start / stop every selected machine", "Shift + click        select a range", "Click a VM icon      toggle selection (also Enter / Space when focused)", "Mouse: hover a distribution icon for a live preview. Click the network button to choose a VM to link, or drag that button onto another machine. A stopped VM joins at its next start."].join("\n");
   $("help-dialog").showModal();
 }
 
@@ -1760,6 +1760,15 @@ document.addEventListener("keydown", (e) => {
   if (/^F\d+$/.test(e.key) && plain && !e.shiftKey) {
     if (e.key === "F1") { e.preventDefault(); return openKeyboardHelp(); }
     if (e.key === "F10") { e.preventDefault(); return openCommands(selected); }
+    // With a multiple selection, F2/F8 start/stop the selection (the toolbar's buttons, same
+    // confirmation); every other key keeps acting on the machine in the details panel.
+    if (checkedVms.size && (e.key === "F2" || e.key === "F8")) {
+      e.preventDefault();
+      const action = e.key === "F2" ? "start" : "stop";
+      if (!bulkBusy && !bulkTargets(action).length) toast(`No selected machine can be ${action === "start" ? "started" : "stopped"} now.`, true);
+      else runSelection(action);
+      return;
+    }
     const r = S.vms.find((x) => x.name === selected);
     if (!r) return;
     if (e.key === "F4") { if (r.ssh_port) { e.preventDefault(); if (r.running) { sshVm = r.name; openBrowserSsh(r.name); } else openSsh(r); } return; }

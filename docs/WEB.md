@@ -65,7 +65,8 @@ What the page offers:
   choose one before confirming; other members of that network remain connected. Dragging the
   network button onto an already linked peer, or choosing that peer in the picker, also offers
   **Unlink**, scoped to those two machines. Search/filter changes clear the selection.
-  Function keys continue to act on the machine shown in the details panel.
+  With a selection, **F2** starts and **F8** stops the selected machines (same confirmation as
+  the toolbar); the other function keys act on the machine shown in the details panel.
 - **Link**: use the network button shown on hover, focus or the selected row: click it to choose
   another VM, or drag the network button onto another machine to connect them on a private
   segment (`vmctl link`, confirmed first): a running one gets a hot-plugged NIC, a stopped one
