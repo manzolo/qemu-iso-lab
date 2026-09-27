@@ -6,6 +6,8 @@ phase, `vmctl group install` (cumulative, then down + up), a cross-VM step once 
 and `vmctl group map` with its Access table and run/check/try runbook
 (see [UNATTENDED.md](UNATTENDED.md#groups-as-stacks-and-the-lab-map-vmctl-group)).
 Sizes are chosen to fit the 30 GB host next to nothing else.
+The plan to port eight qlab labs (vpn, ssh, pxe, pam, mysql, lvm, docker, apache) is
+[QLAB_IMPORT.md](QLAB_IMPORT.md).
 
 ## Recommended order
 

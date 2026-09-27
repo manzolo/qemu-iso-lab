@@ -88,3 +88,4 @@ NIC goes with the next stop. For a permanent LAN, declare `networks` in the prof
 - How groups, start order and maps work: [UNATTENDED.md](UNATTENDED.md#groups-as-stacks-and-the-lab-map-vmctl-group).
 - The network lab on libvirt instead of plain QEMU: [NETWORK-LAB.md](NETWORK-LAB.md#libvirt-road).
 - The next labs (k3s, multi-segment routing, highly available web, Samba AD): [LAB_IDEAS.md](LAB_IDEAS.md).
+- The qlab labs to port (vpn, ssh, pxe, pam, mysql, lvm, docker, apache): [QLAB_IMPORT.md](QLAB_IMPORT.md).
