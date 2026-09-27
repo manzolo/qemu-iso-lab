@@ -195,7 +195,11 @@ dialog { background:var(--panel); color:var(--text); border:1px solid #3b4e66; b
 dialog::backdrop { background:#030812bb; backdrop-filter:blur(5px); }
 dialog header { justify-content:space-between; padding:16px 20px; flex-shrink:0; }
 dialog .body { padding:16px; overflow:auto; max-height:calc(90dvh - 80px); }
-pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; padding:12px; margin:0; height:60vh; overflow:auto; white-space:pre-wrap; word-break:break-word; font-size:12.5px; }
+/* The job log reads like the terminal it came from: a dark console, a small monospace face, lines
+   broken only where they must be, and the markers vmctl prints (==>, [ok], ::, $) in colour. */
+pre.log { background:#05080d; color:#c9d4e3; border:1px solid #1f2b3d; border-radius:8px; padding:12px 14px; margin:0; height:64vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.5 ui-monospace,"Cascadia Code","JetBrains Mono","DejaVu Sans Mono",Menlo,monospace; tab-size:4; }
+pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:#5ee08e; } pre.log .l-warn { color:var(--warn); } pre.log .l-bad { color:var(--bad); } pre.log .l-cmd { color:#9ebdff; } pre.log .l-note { color:#8fb3c9; } pre.log .l-dim { color:#7d8a9c; }
+#log-dialog { width:min(1100px,96vw); }
 #cmd-dialog { width:min(1180px,96vw); height:min(820px,90dvh); max-height:90dvh; overflow:hidden; }
 #cmd-dialog[open] { display:flex; flex-direction:column; }
 .dialog-subtitle { font-size:12px; color:var(--muted); margin-top:3px; }
@@ -1023,17 +1027,39 @@ $("job-rows").onclick = (e) => {
 };
 function openLog(job, title) {
   clearTimeout(logTimer); logSession++; logJob = job; logOffset = 0;
-  $("log").textContent = ""; $("log-title").textContent = title || job;
+  $("log").textContent = ""; logPending = ""; $("log-title").textContent = title || job;
   $("log-cancel").classList.add("hidden"); $("log-dialog").showModal(); pollLog(logSession);
 }
 $("log-dialog").addEventListener("close", () => { clearTimeout(logTimer); logSession++; });
+// Console colouring by line: vmctl's own markers first, then the words that mean trouble. A chunk
+// can end mid-line, so the last partial line stays plain text until its end arrives.
+let logPending = "";
+function logLineClass(line) {
+  if (/^==> /.test(line)) return "l-head";
+  if (/^\s*\[ok\]|^Command completed/.test(line)) return "l-ok";
+  if (/^\s*\[(warn|skip)\]|\bWARN(ING)?\b/.test(line)) return "l-warn";
+  if (/\b(error|failed|fatal|traceback|exception)\b|^Command failed|\[error\]/i.test(line)) return "l-bad";
+  if (/^\$ /.test(line)) return "l-cmd";
+  if (/^:: /.test(line)) return "l-note";
+  if (/^\s*(start|finish):\s/.test(line)) return "l-dim";
+  return "";
+}
+function appendLog(pre, text) {
+  const tail = pre.lastChild && pre.lastChild.nodeType === 3 ? pre.lastChild : null;
+  if (tail) pre.removeChild(tail);
+  const lines = (logPending + text).split("\n");
+  logPending = lines.pop();
+  const html = lines.map((line) => { const cls = logLineClass(line); return (cls ? `<span class="${cls}">${esc(line)}</span>` : esc(line)) + "\n"; }).join("");
+  if (html) pre.insertAdjacentHTML("beforeend", html);
+  if (logPending) pre.appendChild(document.createTextNode(logPending));
+}
 async function pollLog(session) {
   if (session !== logSession || !logJob || !$("log-dialog").open) return;
   try {
     const d = await api(`/api/jobs/${encodeURIComponent(logJob)}/log?offset=${logOffset}`);
     if (session !== logSession || !$("log-dialog").open) return;
     const pre = $("log"), atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;
-    if (d.text) { pre.textContent += ansi(d.text); if (atEnd) pre.scrollTop = pre.scrollHeight; }
+    if (d.text) { appendLog(pre, ansi(d.text)); if (atEnd) pre.scrollTop = pre.scrollHeight; }
     logOffset = d.offset;
     $("log-cancel").classList.toggle("hidden", d.status !== "running");
     $("log-cancel").disabled = cancellingJobs.has(logJob);
