@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, catalog, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
+from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -3608,6 +3608,15 @@ def wait_for_interrupt() -> None:
             time.sleep(1)
     except KeyboardInterrupt:
         pass
+
+
+def cmd_record(args: argparse.Namespace) -> int:
+    """``vmctl record <vm>``: a time-lapse of the screen from the QMP socket, encoded with ffmpeg."""
+    cfg = config.load_config()
+    vm = config.get_vm(cfg, args.vm)
+    recorder.record(args.vm, vm, fps=args.fps, max_hold=args.max_hold, grace=args.grace, duration=args.duration,
+                    gif=args.gif, out_dir=Path(args.out) if args.out else None, dry_run=args.dry_run)
+    return 0
 
 
 def cmd_attach(args: argparse.Namespace) -> int:

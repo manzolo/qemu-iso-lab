@@ -9,6 +9,7 @@ on:
     paths:
       - "vms/profiles/**"
       - "vms/profiles.lock"
+      - "docs/media/**"
       - "tools/build_catalog_site.py"
       - "vmctl/web/icons.js"
       - "vmctl/web/distro-icons.svg"

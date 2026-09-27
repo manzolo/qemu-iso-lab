@@ -5,8 +5,8 @@ repository, run the setup, open the web dashboard, then **download, install, use
 an Ubuntu 26.04 desktop VM without typing a single vmctl command**. Each step also gives the
 equivalent command, for the terminal or a script.
 
-The profile is `ubuntu-26.04`; the screenshots were taken just before a rename and show its
-previous name, `ubuntu-26.04-unattended`, which still works as an alias.
+The profile is `ubuntu-26.04`. The screenshots are from vmctl 0.10: the dashboard opens on the
+whole catalog because nothing is chosen yet (see *My VMs* in the README once you have favourites).
 
 Times are the ones measured for these screenshots: a Lubuntu VM with 6 vCPUs and 12 GB of RAM,
 itself running under KVM, on a fast connection. A physical host is faster.

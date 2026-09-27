@@ -172,6 +172,22 @@ details p, details ul { margin:6px 0 0; }
 .history .v { color:#9ebdff; font-family:ui-monospace,monospace; margin-right:6px; }
 .catalog-icon { --icon-color:var(--accent); --icon-ink:#fff; display:inline-flex; align-items:center; justify-content:center; flex:0 0 40px; width:40px; height:40px; border-radius:11px; color:var(--icon-ink); background:linear-gradient(160deg, color-mix(in srgb,var(--icon-color) 92%,#fff), color-mix(in srgb,var(--icon-color) 78%,#0b1220)); box-shadow:inset 0 0 0 1px color-mix(in srgb,#fff 18%,transparent), 0 1px 2px rgba(0,0,0,.35); }
 .catalog-icon svg { width:24px; height:24px; }
+.clip { position:relative; border-radius:10px; overflow:hidden; background:#000; border:1px solid var(--line); aspect-ratio:16/10; }
+.clip img, .clip video { display:block; width:100%; height:100%; object-fit:contain; background:#000; }
+.clip .play { position:absolute; inset:0; display:grid; place-items:center; background:linear-gradient(180deg,transparent 40%,#000a); color:#fff; cursor:pointer; border:0; padding:0; }
+.clip .play span { width:58px; height:58px; border-radius:50%; background:#ff0000e6; display:grid; place-items:center; box-shadow:0 4px 18px #0008; }
+.clip .play span::after { content:""; border-style:solid; border-width:11px 0 11px 20px; border-color:transparent transparent transparent #fff; margin-left:5px; }
+.clip .play b { position:absolute; left:10px; bottom:8px; font:600 11px system-ui; text-shadow:0 1px 2px #000; }
+.clip .tag { position:absolute; top:8px; left:8px; font:600 10px system-ui; letter-spacing:.06em; text-transform:uppercase; color:#fff; background:#0009; padding:2px 6px; border-radius:4px; }
+.clip .len { position:absolute; right:8px; bottom:8px; font:600 11px ui-monospace,monospace; color:#fff; background:#000b; padding:1px 5px; border-radius:3px; }
+dialog#player { background:#0b0f16; color:var(--text); border:1px solid #2a374a; border-radius:14px; padding:0; width:min(1100px,94vw); box-shadow:0 30px 100px #000c; }
+dialog#player::backdrop { background:#000c; }
+dialog#player header { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid #1f2b3d; }
+dialog#player header .t { font-weight:600; } dialog#player header .s { color:var(--muted); font-size:12px; }
+dialog#player header button { margin-left:auto; }
+dialog#player video { display:block; width:100%; max-height:76vh; background:#000; }
+dialog#player footer { padding:10px 16px; color:var(--muted); font-size:12px; display:flex; gap:14px; flex-wrap:wrap; }
+dialog#player footer a { color:var(--accent); }
 #basket { position:fixed; left:0; right:0; bottom:0; z-index:6; background:#16283a; border-top:1px solid var(--accent); padding:12px 24px; display:none; gap:12px; align-items:center; flex-wrap:wrap; }
 #basket.on { display:flex; }
 #basket .cmd { flex:1 1 320px; background:#0f1622; border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-size:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
@@ -203,6 +219,7 @@ vmctl web --open        # the dashboard: install, boot, use, checkpoint from the
   <div id="list"></div>
   <footer>Generated from <a href="__REPO__/tree/main/vms/profiles">vms/profiles</a> and <a href="__REPO__/blob/main/vms/profiles.lock">profiles.lock</a> by <code>tools/build_catalog_site.py</code>. Versions: a <i>patch</i> is a fix to the recipe, a <i>minor</i> adds something, a <i>major</i> means an installed VM is no longer comparable. "Verified live" is the last date the maintainer's validation matrix reinstalled the profile from scratch and it passed.</footer>
 </main>
+<dialog id="player"><header><span class="t" id="player-title"></span><span class="s" id="player-sub"></span><button id="player-close">Close</button></header><video id="player-video" controls playsinline preload="metadata"></video><footer><span>Unattended install recorded with <code>vmctl record</code>: one frame a second, idle screens shortened.</span><a id="player-download" download>Download MP4</a><a id="player-gif" download>GIF</a></footer></dialog>
 <div id="basket"><span id="basket-count"></span><div class="cmd mono" id="basket-cmd"></div><button class="primary" id="basket-copy">Copy</button><button id="basket-clear">Clear</button><small>Run it in your checkout: the profiles land in My VMs (vms/profiles/local.json) and the dashboards open on them. Nothing is downloaded until you install one.</small></div>
 __SPRITE__
 <script>window.ICON_SPRITE = "";</script>
@@ -223,6 +240,22 @@ function visible() {
   return DATA.profiles.filter(p => words.every(w => (p.name + " " + p.label + " " + p.family + " " + p.family_label + " " + p.groups.join(" ") + " " + p.notes).toLowerCase().includes(w))
     && (!kind || p.status === kind) && (!role || roleGroup(p) === role) && (!family || p.family === family));
 }
+function clipBlock(p) {
+  const c = p.clip; if (!c) return "";
+  const style = DATA.clip_style, parts = [];
+  if ((style === "gif" || style === "both") && c.gif) parts.push(`<div class="clip"><span class="tag">install · gif</span><img src="${esc(c.gif)}" alt="Time-lapse of the ${esc(p.name)} install" loading="lazy"></div>`);
+  if ((style === "video" || style === "both") && c.mp4) parts.push(`<div class="clip"><span class="tag">install · video</span><img src="${esc(c.poster || c.gif || "")}" alt="" loading="lazy"><button class="play" data-play="${esc(p.name)}" aria-label="Play the install of ${esc(p.name)}"><span></span><b>Watch the install</b></button></div>`);
+  return parts.join("");
+}
+function openPlayer(name) {
+  const p = DATA.profiles.find(x => x.name === name); if (!p || !p.clip || !p.clip.mp4) return;
+  $("player-title").textContent = p.name; $("player-sub").textContent = p.label + " · unattended install";
+  const v = $("player-video"); v.src = p.clip.mp4; v.poster = p.clip.poster || "";
+  $("player-download").href = p.clip.mp4; $("player-gif").href = p.clip.gif || ""; $("player-gif").style.display = p.clip.gif ? "" : "none";
+  $("player").showModal(); v.play().catch(() => {});
+}
+$("player-close").onclick = () => $("player").close();
+$("player").addEventListener("close", () => { const v = $("player-video"); v.pause(); v.removeAttribute("src"); v.load(); });
 function card(p) {
   const badges = [`<span class="badge b-${p.status}">${p.status === "unattended" ? "installs itself" : p.status}</span>`];
   if (p.version) badges.push(`<span class="badge b-version" title="Profile version">v${esc(p.version)}</span>`);
@@ -235,6 +268,7 @@ function card(p) {
   const help = p.iso_help ? `<details><summary>Which medium</summary><p>${esc(p.iso_help)}</p></details>` : "";
   return `<article class="card${picked.has(p.name) ? " picked" : ""}" data-name="${esc(p.name)}">
     <div class="card-head">${catalogIcon(osIconKey(p))}<div class="text"><div class="name mono">${esc(p.name)}</div><div class="desc">${esc(p.label)}</div></div><button class="pick" data-pick="${esc(p.name)}" title="${picked.has(p.name) ? "Remove from" : "Add to"} the command below" aria-pressed="${picked.has(p.name)}">${picked.has(p.name) ? "✓" : "+"}</button></div>
+    ${clipBlock(p)}
     <div class="badges">${badges.join("")}</div>
     <div class="facts">${facts.map(f => `<span>${f}</span>`).join("")}</div>
     <div class="cmds"><pre>${p.commands.map(esc).join("\n")}</pre><button data-copy="${esc(p.commands.join("\n"))}">Copy</button></div>
@@ -263,6 +297,7 @@ document.addEventListener("click", (e) => {
   const pick = e.target.closest("[data-pick]"), copyButton = e.target.closest("[data-copy]");
   if (pick) { const n = pick.dataset.pick; picked.has(n) ? picked.delete(n) : picked.add(n); const c = pick.closest(".card"); c.classList.toggle("picked", picked.has(n)); pick.textContent = picked.has(n) ? "✓" : "+"; pick.setAttribute("aria-pressed", picked.has(n)); renderBasket(); }
   if (copyButton) copy(copyButton.dataset.copy, copyButton);
+  const play = e.target.closest("[data-play]"); if (play) openPlayer(play.dataset.play);
 });
 for (const group of ["kind", "role"]) $(group).addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; [...$(group).children].forEach(x => x.classList.toggle("active", x === b)); if (group === "kind") kind = b.dataset.v; else role = b.dataset.v; render(); });
 $("family").addEventListener("change", () => { family = $("family").value; render(); });
@@ -277,9 +312,32 @@ render();
 """
 
 
-def build(root: Path, out: Path) -> dict[str, Any]:
+def collect_media(root: Path, out: Path, media: Path | None, names: list[str]) -> dict[str, dict[str, str]]:
+    """Per profile, the install clip files found under ``<media>/<vm>/`` (``vmctl record`` output:
+    recording.mp4, recording.gif, poster.png), copied to ``<out>/media/<vm>/``; site-relative paths."""
+    source = media if media is not None else root / "docs" / "media"
+    found: dict[str, dict[str, str]] = {}
+    for name in names:
+        entry: dict[str, str] = {}
+        for kind, filename in (("mp4", "recording.mp4"), ("gif", "recording.gif"), ("poster", "poster.png")):
+            path = source / name / filename
+            if path.is_file():
+                target = out / "media" / name / filename
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, target)
+                entry[kind] = f"media/{name}/{filename}"
+        if entry:
+            found[name] = entry
+    return found
+
+
+def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "video") -> dict[str, Any]:
     data = catalog_data(root)
     out.mkdir(parents=True, exist_ok=True)
+    clips = collect_media(root, out, media, [p["name"] for p in data["profiles"]])
+    for profile in data["profiles"]:
+        profile["clip"] = clips.get(profile["name"])
+    data["clip_style"] = clip_style
     (out / "catalog.json").write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     web = root / "vmctl" / "web"
     shutil.copy2(web / "icons.js", out / "icons.js")
@@ -296,9 +354,11 @@ def build(root: Path, out: Path) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", type=Path, default=ROOT / "site", help="output directory (default: site/)")
+    parser.add_argument("--media", type=Path, default=None, help="directory with <vm>/recording.mp4|recording.gif|poster.png (default: docs/media)")
+    parser.add_argument("--clip-style", choices=["gif", "video", "both"], default="both", help="how a profile's install clip is shown on its card (default: video)")
     parser.add_argument("--root", type=Path, default=ROOT, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
-    data = build(args.root, args.out)
+    data = build(args.root, args.out, media=args.media, clip_style=args.clip_style)
     print(f"{args.out}: {data['counts']['profiles']} profiles, {data['counts']['unattended']} unattended, {data['counts']['verified']} verified")
     return 0
 

@@ -28,7 +28,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
      ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
-     ["start", "stop", "shell", "console", "agent", "attach", "link"]),
+     ["start", "stop", "shell", "console", "agent", "attach", "link", "record"]),
     ("Libvirt", "hand an installed VM to virt-manager",
      ["export-libvirt", "unexport-libvirt"]),
     ("Network lab", "pfSense router + Pi-hole DNS + clients on an isolated LAN segment",
@@ -367,6 +367,25 @@ drag it onto another machine) and from a multiple selection (Link network).""")
     p = _add(subparsers, "shell", help="SSH into a running VM")
     p.add_argument("vm", help=VM_HELP)
     p.set_defaults(func=lifecycle.cmd_shell)
+
+    p = _add(subparsers, "record", help="time-lapse of a VM's screen (also during a bootstrap) as MP4, and GIF: one screendump per second until the VM is gone",
+             epilog="""examples:
+  vmctl bootstrap-reactos reactos &          # any bootstrap or headless VM: the recorder follows its QMP socket
+  vmctl record reactos --gif                 # frames under artifacts/reactos/recording/<stamp>/, then recording.mp4 + .gif
+  vmctl record debian-server --duration 120  # two minutes of a running VM
+
+Identical consecutive screens are kept once; a screen that stayed for minutes is shown for
+--max-hold seconds, which is what makes an install a short video. The recording survives the
+power-off between an installer and the first boot (--grace), so one run covers install, boot
+and desktop; it ends when the VM has been gone for that long, at --duration, or at Ctrl-C.""")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--fps", type=float, default=1.0, help="screendumps per second (default: 1)")
+    p.add_argument("--max-hold", type=float, default=4.0, help="longest time one screen stays in the video, seconds (default: 4)")
+    p.add_argument("--grace", type=float, default=30.0, help="seconds without the VM before the recording ends (default: 30)")
+    p.add_argument("--duration", type=float, help="stop after this many seconds")
+    p.add_argument("--gif", action="store_true", help="also a 640px GIF for a README or the catalog")
+    p.add_argument("--out", help="directory for this recording (default: artifacts/<vm>/recording/<stamp>)")
+    p.set_defaults(func=lifecycle.cmd_record)
 
     p = _add(subparsers, "attach", help="open the screen of a running headless VM in a VNC viewer (also during a bootstrap)")
     p.add_argument("vm", help=VM_HELP)
