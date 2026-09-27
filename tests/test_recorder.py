@@ -51,9 +51,23 @@ class FramesTests(BaseVmctlTestCase):
         self.assertEqual([p.name for p in rec.sample(4)], ["00000.png", "00003.png", "00006.png", "00009.png"])
         self.assertEqual(len(rec.sample(50)), 10)
         self.assertEqual(rec.sample(0), [])
-        gif = rec.gif_list(seconds=2, fps=2)  # 4 frames of half a second, the last repeated
+        gif = rec.gif_list(seconds=2, fps=2, final_hold=0)  # 4 frames of half a second, the last repeated
         self.assertEqual(gif.count("duration 0.500"), 4)
         self.assertTrue(gif.rstrip().endswith("file '00009.png'"))
+
+    def test_the_gif_ends_on_the_richest_late_screen_held_longer_not_on_the_power_off(self):
+        rec = recorder.Recording(self.root / "rec")
+        for i in range(10):  # a long install: 100 s of small frames
+            rec.add(ppm(2, 2, (i, 0, 0)), float(i * 10))
+        rec.add(ppm(40, 40, (1, 2, 3)) + b"", 100.0)  # the desktop: a bigger PNG
+        (rec.frames[-1][0]).write_bytes(rec.frames[-1][0].read_bytes() + b"\0" * 4096)
+        rec.add(ppm(2, 2, (0, 0, 0)), 130.0)  # the power-off screen
+        rec.add(ppm(2, 2, (0, 0, 1)), 140.0)
+        self.assertEqual(rec.final_index(), 10)
+        gif = rec.gif_list(seconds=2, fps=2)
+        self.assertTrue(gif.rstrip().endswith("file '00010.png'"))
+        self.assertIn("file '00010.png'\nduration 4.000", gif)
+        self.assertNotIn("00011.png", gif)
 
     def test_encode_makes_the_gif_by_default_and_the_mp4_with_poster_on_request(self):
         rec = recorder.Recording(self.root / "rec")

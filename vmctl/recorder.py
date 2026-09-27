@@ -40,6 +40,14 @@ DEFAULT_GRACE = 30.0
 GIF_WIDTH = 480
 GIF_FPS = 2
 GIF_SECONDS = 30.0
+# How the GIF ends: on the richest screen of the last FINAL_WINDOW seconds (the desktop, not the
+# power-off spinner the check-vms stop leaves at the very end), held FINAL_HOLD seconds, so the
+# result stays readable even when most of the install was a scrolling text log.
+FINAL_WINDOW = 90.0
+FINAL_HOLD = 4.0
+# What the repository and the catalog site carry per profile: above this the GIF is re-encoded
+# with fewer frames (a scrolling installer log makes every frame different and heavy).
+GIF_TARGET_KB = 900
 FRAMES_LIST = "frames.ffconcat"
 
 
@@ -150,12 +158,35 @@ class Recording:
         picked = sorted({round(i * last / (count - 1)) for i in range(count)})
         return [self.frames[i][0] for i in picked]
 
-    def gif_list(self, seconds: float, fps: int) -> str:
-        frames = self.sample(max(2, int(seconds * fps)))
+    def final_index(self, window: float = FINAL_WINDOW) -> int:
+        """The frame the GIF ends on: among the detailed screens of the last *window* seconds (PNG at
+        least half the size of the largest there: a desktop, not a spinner), the one that stayed the
+        longest, the latest on a tie: a settled desktop rather than the fade that led to it."""
+        if not self.frames:
+            return -1
+        total = sum(held for _, held in self.frames)
+        start, candidates = 0.0, []
+        for i, (path, held) in enumerate(self.frames):
+            if start >= total - window:
+                candidates.append(i)
+            start += held
+        candidates = candidates or [len(self.frames) - 1]
+        size = {i: self.frames[i][0].stat().st_size if self.frames[i][0].is_file() else 0 for i in candidates}
+        rich = [i for i in candidates if size[i] * 2 >= max(size.values())]
+        return max(rich, key=lambda i: (max(self.frames[i][1], 1.0), i))  # the last frame has no hold yet
+
+    def gif_list(self, seconds: float, fps: int, final_hold: float = FINAL_HOLD) -> str:
+        final = self.final_index()
+        kept, self.frames = self.frames, self.frames[:final + 1]
+        try:
+            frames = self.sample(max(2, int(seconds * fps)))
+        finally:
+            self.frames = kept
         lines = ["ffconcat version 1.0"]
-        for path in frames:
+        for n, path in enumerate(frames):
             lines.append(f"file '{path.name}'")
-            lines.append(f"duration {1 / fps:.3f}")
+            last = n == len(frames) - 1
+            lines.append(f"duration {max(1 / fps, final_hold) if last else 1 / fps:.3f}")
         if frames:
             lines.append(f"file '{frames[-1].name}'")
         return "\n".join(lines) + "\n"
@@ -187,7 +218,8 @@ class Recording:
 
 def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: float = 1.0, gif: bool = True,
            mp4: bool = False, gif_seconds: float = GIF_SECONDS, gif_fps: int = GIF_FPS, gif_width: int = GIF_WIDTH,
-           dry_run: bool = False, realtime_gif: bool = False, mp4_fps: int | None = None) -> dict[str, Path]:
+           dry_run: bool = False, realtime_gif: bool = False, mp4_fps: int | None = None,
+           gif_target_kb: int | None = GIF_TARGET_KB) -> dict[str, Path]:
     """The GIF (sampled, small), the MP4 (every frame, H.264, plays everywhere) with its poster."""
     out: dict[str, Path] = {}
     if not recording.frames:
@@ -199,16 +231,24 @@ def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: 
         recording.save_list(max_hold, period)
     if gif:
         gif_list = recording.frames_dir / "gif.ffconcat"
-        if not dry_run:
-            gif_list.write_text(recording.concat_list(max_hold, period) if realtime_gif
-                                else recording.gif_list(gif_seconds, gif_fps), encoding="utf-8")
         gif_path = recording.directory / "recording.gif"
+        # stats_mode=full: the palette weighs every frame, so the held final screen keeps its colours
+        # (diff let a long text log decide the palette and turned the Ubuntu desktop yellow).
         filters = (f"scale={gif_width}:-1:flags=lanczos,split[a][b];"
-                   "[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle")
+                   "[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle")
         if realtime_gif:
             filters = f"fps={gif_fps}:eof_action=pass," + filters
-        runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(gif_list),
-                     "-vf", filters, "-loop", "0", str(gif_path)], dry_run=dry_run, quiet=True)
+        seconds = gif_seconds
+        for attempt in range(4):
+            if not dry_run:
+                gif_list.write_text(recording.concat_list(max_hold, period) if realtime_gif
+                                    else recording.gif_list(seconds, gif_fps), encoding="utf-8")
+            runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(gif_list),
+                         "-vf", filters, "-loop", "0", str(gif_path)], dry_run=dry_run, quiet=True)
+            if (dry_run or realtime_gif or not gif_target_kb or not gif_path.is_file()
+                    or gif_path.stat().st_size <= gif_target_kb * 1024):
+                break
+            seconds *= 0.7
         out["gif"] = gif_path
     if mp4:
         listing = recording.frames_dir / FRAMES_LIST
