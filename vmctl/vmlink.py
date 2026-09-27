@@ -1,4 +1,4 @@
-"""``vmctl link``: connect running VMs on a private segment, without restarting them.
+"""``vmctl link``: connect VMs on a private segment, running or stopped, without editing their profiles.
 
 Every VM booted on its own has an isolated slirp network (the same 10.0.2.15 in each guest), so
 two running machines cannot talk. A link hot-plugs a NIC into each of them over QMP, on the
