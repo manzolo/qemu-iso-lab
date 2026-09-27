@@ -17,6 +17,9 @@ artifacts/*/runtime/
 # Local ISO images and partial downloads
 isos/
 
+# The catalog site (built by tools/build_catalog_site.py, published by GitHub Pages)
+site/
+
 # Local overrides
 .env
 .env.*

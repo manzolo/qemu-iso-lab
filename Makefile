@@ -88,3 +88,6 @@ groups: ## List the profile categories check-vms --group accepts (also: vmctl li
 
 guides: ## Render docs/guides/{it,en} into docs/guides/pdf/<lang>/ (one manual + single PDFs; needs python markdown + weasyprint)
 	python3 tools/build_guides.py
+
+site: ## Build the catalog site into site/ (what GitHub Pages publishes; open site/index.html)
+	python3 tools/build_catalog_site.py --out site

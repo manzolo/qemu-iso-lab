@@ -1,0 +1,54 @@
+name: Catalog site
+
+# The catalog as a static page (https://manzolo.github.io/qemu-iso-lab/): every tracked profile,
+# its version and history, the commands to run. Built by tools/build_catalog_site.py from the
+# profiles and the lock, nothing else; needs no VM, ISO or QEMU. Pages source: GitHub Actions.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "vms/profiles/**"
+      - "vms/profiles.lock"
+      - "tools/build_catalog_site.py"
+      - "vmctl/web/icons.js"
+      - "vmctl/web/distro-icons.svg"
+      - "vmctl/__init__.py"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Build the site
+        run: python3 tools/build_catalog_site.py --out site
+      - name: Upload
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

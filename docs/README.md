@@ -8,6 +8,7 @@ essential steps in Italian for the terminal-at-hand case.
 
 | Page | Read it when | One line |
 |---|---|---|
+| [Catalog site](https://manzolo.github.io/qemu-iso-lab/) | you want to browse the profiles before cloning | Every profile, its version and history, what to run; tick the ones you want and copy the `vmctl catalog add` line |
 | [PROFILES.md](PROFILES.md) | you look at `vms/profiles/*.json` for the first time, or add a VM | The profile model: core fields, ISO sources and discovery, disk, EFI/BIOS, video variants, `networks`, `shared_dir`, artifacts, Windows import templates |
 | [UNATTENDED.md](UNATTENDED.md) | you run any `vmctl bootstrap-*` | Every unattended installer step by step (Ubuntu, Debian, RHEL/Fedora, Arch/CachyOS, Omarchy, Alpine, Windows, pfSense), the completion-token rule, `boot-check` and `check-vms` |
 | [PROVISIONING.md](PROVISIONING.md) | you want your dotfiles, packages or commands in a fresh guest | `cloud_init`, `ssh_provision`, `autoinstall`, `copy_from_host`, `post_install_run`, sudo, guest identity and `local.json` |

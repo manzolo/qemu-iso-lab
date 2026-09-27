@@ -284,6 +284,10 @@ tools/bump_profile.py --history ubuntu-26.04
 tools/bump_profile.py --init        # a new profile: 1.0.0 and its lock entry
 ```
 
+The whole catalog, with versions and history, is browsable at
+[manzolo.github.io/qemu-iso-lab](https://manzolo.github.io/qemu-iso-lab/) (`make site` builds
+the same page locally; GitHub Pages rebuilds it on every push to `main`).
+
 A new release of a distribution is a new profile, not a major bump. Every install records the
 catalog version it used in `state.json` (`install.profile_version`, with `vmctl_version`), and
 `vmctl status`, `vmctl list` (`VERSION`), the TUI and the web panel say when the disk carries an

@@ -20,6 +20,7 @@ const profileBase = {name:'Arch Linux + Noctalia',memory_mb:8192,cpus:4};
 const server = createServer(async (req,res) => {
   if (req.url === '/' || req.url.startsWith('/?')) { res.setHeader('Content-Type','text/html'); return res.end(html); }
   if (req.url === '/assets/distro-icons.svg') { res.setHeader('Content-Type','image/svg+xml'); return res.end(readFileSync(root+'vmctl/web/distro-icons.svg')); }
+  if (req.url === '/assets/icons.js') { res.setHeader('Content-Type','text/javascript'); return res.end(readFileSync(root+'vmctl/web/icons.js')); }
   res.setHeader('Content-Type','application/json');
   if (req.url.includes('/screen.png?')) {
     screenRequests++;
