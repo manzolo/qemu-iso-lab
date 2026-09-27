@@ -12,7 +12,8 @@
         "groups": [
           "proxmox-lab"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/proxmox-ve_9.2-1.iso",
       "iso_url": "https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso",
@@ -168,7 +169,8 @@
         "groups": [
           "proxmox-lab"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/proxmox-ve_9.2-1.iso",
       "iso_url": "https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso",
@@ -295,7 +297,8 @@
         "groups": [
           "proxmox-lab"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/proxmox-ve_9.2-1.iso",
       "iso_url": "https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso",
@@ -422,7 +425,8 @@
         "groups": [
           "proxmox-lab"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",

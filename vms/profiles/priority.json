@@ -7,7 +7,8 @@
         "family": "mint",
         "role": "desktop",
         "release_model": "stable",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/linuxmint-22.3-cinnamon-64bit.iso",
       "iso_url": "https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
@@ -55,7 +56,8 @@
         "family": "rhel",
         "role": "server",
         "release_model": "stable",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
       "iso_url": "https://repo.almalinux.org/vault/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
@@ -107,7 +109,8 @@
         "groups": [
           "smoke"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
       "iso_url": "https://repo.almalinux.org/vault/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
@@ -179,7 +182,8 @@
         "family": "kali",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/kali-linux-2026.1-live-amd64.iso",
       "iso_url": "https://cdimage.kali.org/kali-2026.1/kali-linux-2026.1-live-amd64.iso",
@@ -228,7 +232,8 @@
         "role": "server",
         "release_model": "stable",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/Rocky-9.8-x86_64-minimal.iso",
       "iso_url": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-minimal.iso",

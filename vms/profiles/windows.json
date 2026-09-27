@@ -8,7 +8,8 @@
         "role": "desktop",
         "release_model": "custom",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/windows10.iso",
       "disk": {
@@ -97,7 +98,8 @@
         "role": "desktop",
         "release_model": "custom",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/windows11.iso",
       "disk": {
@@ -186,7 +188,8 @@
         "role": "import-template",
         "release_model": "custom",
         "status": "manual",
-        "verified": "2026-09-06"
+        "verified": "2026-09-06",
+        "version": "1.0.0"
       },
       "iso": "isos/windows-10-installer.iso",
       "disk": {
@@ -235,7 +238,8 @@
         "role": "import-template",
         "release_model": "custom",
         "status": "manual",
-        "verified": "2026-09-06"
+        "verified": "2026-09-06",
+        "version": "1.0.0"
       },
       "iso": "isos/windows-11-installer.iso",
       "disk": {
@@ -284,7 +288,8 @@
         "role": "desktop",
         "release_model": "legacy",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/windows7.iso",
       "disk": {

@@ -699,7 +699,8 @@ def facts(name, vm):
     except Exception:
         known = {"has_data": False, "host_bytes": 0, "virtual_bytes": None, "label": vmstate.LABEL_NO_DISK,
                  "detail": "", "install_state": "none", "install_flow": None, "install_at": None,
-                 "verified": False, "verify_kind": None, "verify_at": None}
+                 "verified": False, "verify_kind": None, "verify_at": None,
+                 "profile_version": None, "catalog_version": None}
     # "installed" keeps its historical meaning for the menu: the disk has data on it.
     installed = prepared and bool(known["has_data"])
     try:
@@ -754,6 +755,9 @@ def facts(name, vm):
         "verified": bool(known["verified"]),
         "verify_kind": known["verify_kind"] or "",
         "verify_at": (known["verify_at"] or "")[:10],
+        # The catalog's version of the recipe, and the one recorded when this disk was installed.
+        "profile_version": str(meta.get("version") or ""),
+        "installed_version": str(known.get("profile_version") or ""),
         "state_word": state_word(known),
         "can_regenerate_identity": clone.identity_support(vm)[0],
         "clone_of": str(meta.get("clone_of") or ""),

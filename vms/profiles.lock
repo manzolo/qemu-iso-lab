@@ -1,0 +1,1170 @@
+{
+  "profiles": {
+    "almalinux-minimal": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:3da15320ad5d6cf6f051b430af2a6cd1454f5396ae5278fa7fa4bd0b1136cb5d",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "almalinux-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d86d496d5f8d5447c2aaf267ccbe158566754f6815dcc47b2b454e7db3d36350",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "alpine-ci": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:baec5e2a8d696eba05498efbbd2a0721411e9a23790869f9b496846374a5307c",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "alpine-ci-installed": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d222975a41f863ca6e99d040991c0af3077c76e2e90f21894294ce357cc0822a",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "alpine-niri": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:0a4a6a3ecf93abd162e385a62ef6e8fc0e9cc8bb32e96c7903b0f14e3b3f02a0",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "arch": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:a197c7d8edf607835d321bc8cc33eb841f04108e27399ea61ed6f5c2811c9e66",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "arch-dms": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:ad7c41ab5b425db1d5a51a4531cb624de7453b91309567be4cc2961211f5049d",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "arch-dms-nvidia": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:050d04f13317099aac3eef881591ffcb232663866069471a43b4f0645c412424",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "arch-noctalia": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:3711ae2b0de88bd04fa0ea1a50074b34f9f9a029d1682ddbecf1bd51d18068c4",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "arch-omarchy-nvidia": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:53a3eed8c2fb6e8461d59257759372853c6c321e0fbf967dac169b846e072ef9",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "cachyos-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:1965ecc17ab4cd0db8cd8b27460bbb0580f1dc321e9666cd5e30b2f984a69a32",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "cachyos-live": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:92b1b30978fa3e6a718e5a7a2aa3c1af7afc6cb80113614e2e5628e24b3f8760",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "cachyos-nvidia": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:60afcb8ee2c0ff59f775a118a82a2f179f0065c077d5e2153e9429672e0b58dc",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "centos-stream-10": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:3ec43dcd16001f9ec247b905fc7cb8e82aef25f50c09a34e57c88937a518004e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-bios": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:ab7442d5c2574c0d162b93a1e8475aabe4f5351e80aac31ecd2af44d5d7baebe",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-efi": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:bdd5258bcb6573b08c68e9e0357758a556fb8935d59f1e33b1a58843ea66f171",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-gnome": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c504ad9880859964f09df815e3e1a94657607eafe993a14a8011dad486950f30",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-gnome-live": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:483eef36823ff330f0abaf81098eef907e4817ad3c8029d1c59ab0ca363bfc90",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-kde": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:6a75acb1596a829565e1e66dba81af8a8a7e7b1b855f2b51e3fb43157c37046b",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-netinst": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:5f67479de1a75f8200ca59185107683a367697f47064996607fc09bc12492349",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:59f74e2396d8686478366eb1332bdf771b0806cfd5da55c0be912d493c13fc8a",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-xfce": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f40c4b3c520369fcefd1a2162a76fb97025e07239b56a4b4d73935d41f34802c",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "edubuntu-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:33e690d11db5ed4cf142a8e63517fe583e1806fde8b3485adca62fcf0ad80a40",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "endeavouros": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f2bef043e856fd863b8d26fc51704a0503763e97f75d09b94d21d18fc8192e6c",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "fedora-cinnamon": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:698b42129f47539eb29d2752f210dc6e8a4aa5ba812b5ee7fb15a5703e4dbc7e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "fedora-kde": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:6fb3d2127ae3c62797aab132a515f2383d343a5720ab8c002377fa9e49c3c7b7",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "fedora-kinoite": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:b50cf341284dd4a40a1b3e493331186f673c830df8acb251dc3438f70bc504fb",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "fedora-niri-dms": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f9627f0cae7ffc36dc7c63fa12bd0f2984cf1e3d5f6e03b55ad1c042b26be529",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "fedora-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c24742d87c61f521aff4762e843b30b0c0ef0084c180bc28915b0dad61f4a50e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "fedora-server-efi": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:15dd59a77dd664533b89ef290b0df03d3f9534b708a9774718b528b603f2ec17",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "fedora-silverblue": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:59fdfad3ce7b65c9138753a43fc129b76e619c1db80427a83a9ea18ebf044fbd",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "fedora-workstation": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d75ed0cc7aedb0852932091e162af139084b650bcce61f49fe26fd8564dc8a1f",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "fedora-xfce": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:df9a1a797cb5dce9af2241f7fd33b6b88fc5ed45ba56baa9e29b22c424a12278",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "freebsd": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:101586007693194fb21dcac0ff63ae1ff932d54698c945af4081366927262bbb",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "freebsd-installer": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:a9e2039d6159d7d4287d97cbf32df09057a3f9c3d91be9f242156a89e96cb455",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "haiku": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d54c8525d3c88aa88c15e7bc5d8eb925994cb91b9e3b55594739008c0eb219af",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "haiku-installer": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:55c9f23091be6f7c75632b17277b86901d9aa76dd0354efc21fe00f5cfd74765",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kali": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:0f5e65ceebac5369900be4986b4944401c3d4e7c7ddc5499c9458311d1721311",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kali-live": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:18ca96f4982db9fb1d23f1893cdd85eaf4a28f4cd552b3c777a615bb9ed6f3aa",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kde-neon-user": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:53a63417f185b4800d34e38aab94750862fe2e8944088d16660d3407cf28d11b",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kolibrios": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:6a1091a110d6e01750c8bab861f9986f7cd0a90789d843110e33fc7d159d5698",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kubuntu-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:2162da93d3796221569af70df3b49df9e3cbfec170f77c91e6b0e72e05edefd5",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "linuxmint-cinnamon": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:92cfe55f648480bb883124bcfea8ad3c1193771ce3982e76ca26068d3d526eff",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "lubuntu-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c47609ecce410c8ffa7eacb5b3fedab9b473716e6027c3a0ea0b5f0756af4b74",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "lubuntu-lab": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:ae18bb36e777abaa4373a7f3a4285d5b723868ec4c2a1ca29010f2dfac1f6926",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "menuetos": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f6448ec3df8f06484d6fd21a61559f9dac2234e32525d10909a9829c953120b4",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "nixos-gnome": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:7cac8cc4899f25a20ac6a8bbddb80f0f245ed42e6225c1c0e68af733465734e8",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "nixos-graphical": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:a1a6125531706f0c346e48e37d097980bfefaa93f3672aae7a1e8fc11ceb9b5b",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "nixos-minimal": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d6dd6a27802feddeff3b50911a481d9cac88ef6ef39b2173312f8a1a413e61eb",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "nixos-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:647234274f9ed9ef68f2b88c418195da446778dd21a123699910af6a9c45b3ea",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "opensuse-slowroll": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:b9bf5e5194947005af4d0b18afa23aff009f368a7a796ad4e1914b98427a7fe0",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "opensuse-tumbleweed-autoyast": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:ba40bada0f4fe2229e92f7166ee42a93ce4e7cd7cce9773a6ce486f7d0245798",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "opensuse-tumbleweed-kde": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:fa988ea8a00567e839d8dacc456ff47eb770d50bffeae942a3376fb858d47b6e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "opensuse-tumbleweed-net": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:bd37264a95783afa378b0c10e83d91f4fe3e7f8dbd56a92a1bc3ab08f2ec5c9d",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "pearos-nicecore": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:0b351d619d47f4250a87be1e21acb72526fcc8161d60037cdca2d0f2145cebda",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "pearos-nicecore-installer": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:300454b8cc601ca2d9e75b9adbb78099a170ac2e58f9217ab78e8d3094568ad3",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "pfsense-lab": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:54258fd7763aa5f85701ce4ca47aafc38893eed516c46fc46dcb8c177812d45e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "pihole-lab": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:a439a215ed828e14e5392129aef7585eab343a723f47f21255588ef9f81a38d2",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "popos-cosmic": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f528eae62759d85690bb225709ea27803fbe770266d576afe1c2eec383ad0b67",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "proxmox-lab-client": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:14d70031eacd910bb4dcf5baf677cb4576ae67d7f1f853bd5693a39ef123f9c5",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "proxmox-ve": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:ba095ab0f8f198909d2104b60d03945dcba2c42f05ad7a0c7554f2d1e545090d",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "proxmox-ve-node2": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c1994a6cceccf873fffc7f3d12226c9ae191f1f7714aa4ba7ff261a951844fe7",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "proxmox-ve-node3": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:9900e55ce931a1e5267ee0ce8e468d7951194b67cf9a24a4438d4e0b75c136f4",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "reactos": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c2507bfee538ffdeeca10fbf591485de3f30a76bb4b4c721fa2611d2c179b185",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "redox": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:514c3757287d19f43dd15693a0358ebd4cdea76263183ff678f9405f851c9c2e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "rocky-9": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:ad3cc107a58ca6b4f75d2a15e89c5274e1fb17c8192ca295f9e5494bceb63259",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "serenityos": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f9e81055818eb2efadab681522127b038501b9be7336e9493d0a3b1952d71bee",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-10.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:a557cec423e71e07039aadb7eb1233dab0bf669c071505f80a4e3f7213bb3614",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-10.04-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f9f470e64ac2294c78a7a238dd90a94fa85f397bff3a030c1a2a2a0a4745a0b5",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-12.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:3cafc7d08bbe90f3475b7820ed19f1efc48ee4f7d12ffce657d91641ee3f9b1e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-12.04-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:3c17f35aee3860319792b2df95452f55599f347e67a726993382ec82abdfd7ed",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-14.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:48ffdc2deaa318a855b582e91da3294eb285336fcd195a6f3115ab0e74eab276",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-14.04-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:456b4e0757c56bfbf136a57913261de8a07e82033c7608e1b328f9c4ef16ee23",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-16.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f3ef1d3bfe7faeb93e69276b098c0357093048b30d3996d1ff1e691f1d904770",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-16.04-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:dd93906259b3fa0e9116ea88c32b71cdc9ebee3e980d673f74dc377c40def860",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-18.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:fd068f11e299d85beb765d724a07cc25b715a94a917b530ea224abe7857bb4e7",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-18.04-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:faf2971a0d0dac5e5a428c11ef05f5687930fc2fcfea829d854fd7aeeae968e1",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-20.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:42f3504a6add03edde0ae418928a9a07cf66efded2fd7423cfb78aabfbe56dfa",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-20.04-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:374fb9d8fbb795e0893bbb19d8ae47bc8fad2d4b38faa179897e605f253ec52e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-22.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:47207e6ffd0cfc094ec2d9ed62f94f18ed1959c6b25f68cf02935ef1835bceda",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-22.04-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:645ad67d7d66bdd0bef5e29a930956352586c9531ed192b9ce5b6544126da296",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-24.04-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:7b2eb071683d0c34617cdfcf18946c1ac44bb3fb04b75f304c40677c5f35d407",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-26.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:100b947931634be4ea9ffe2e924df3f802e1483ebf3bb1a55a1b47198424234e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-8.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:133bed0020727c29069c98a9d4e43bca4eeaacd6019d69ec0732c0cf83494b44",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-8.04-desktop": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f4c36f66cea967a4fd4f7038a4f6bbc9ae423e6f93c447e12329422007b8d9a2",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-budgie-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:cf35a05003d73a2a00a8d30724c9ccce84493900c9664360f5bafd61c50ae8fd",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-cinnamon-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:cdad90d4462627c36084e76f0c90212288a5bd9f337facd2ff4450edaf89fe7b",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-desktop-live": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:cd4510abfd1d9688039aaf4064bcd20a1483cc85e9d5b8b740c8e23d3c1ef96b",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-gnome-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:1bb8c7caa0a072327d2b72662da32d47be339839af288049cf1938bdeabe6e52",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-mate-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:6270272c03135ef5d2b59facf739b3eaee4ada43feeda2cf7a3ce9a526d5e5cb",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-niri": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:cd7729c7f3c0ed409a19a5633a2a308caa45eb5a90e57ef0d18764fa20ec7aae",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-server-ci": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:6cd53f170ca903a45204e7b3bf02a12213ea229691ad26eb37d5c6da600f67eb",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-server-live": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:63dbc5569c91eb04fdea14caec200f76dad03b9ff0a9486b17f9b48d0b5872ff",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-unity-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:190719ef9110c3f52861f2f05b835291524ae3c4ff67115f8e8ba6f172b50c49",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntustudio-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:583247b4a837ff5d5fc545c060fab4904c693ae780943edb34b0f7ca2ecf196c",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "void-xfce": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:6cbd7dfd0402f52bbeb83299052385507b20543e49df665ad0f12c0bf12b0ce9",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "windows-10": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:71ea52bd7ae835d7d9e2b92c73179e32f3befc3f9df9d5b0e26408115a9111c4",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "windows-10-installer": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:6a551edb5a1375e8816ea94511f1372799c2429091e537c8db9b3148a4fa732d",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "windows-11": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:1487e2c80b2b643ef1c3d39566cea45612bad324dbe03c6eeb111437bd0764ea",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "windows-11-installer": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:03c4d8f025afdb618917c19d2e8a9e7f5d1aba377dfc246817ea801319342f64",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "windows-2000": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:cd03e7973408b4038c885e5aa06ecdef6fc58901532e4b4a9ce5ac35331a9079",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "windows-7": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:8b5a4ba16f86efe272b19382f849c416dc8535c2f7da4bcd1beacae4ec0b7676",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "windows-98": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:896e1a7755fff800b40ae19383862a42df83fb7f300d56f33053055d77775455",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "windows-nt4": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:672380928b850832725e31a45da9606736972711fa31e3437c46468529a19899",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "windows-xp": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f497789906449d84402d5894016f736e5c3e43407b8b7970dbfdf0b7551ec3bd",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "xubuntu-24.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:719a24080e1f94fd7bf5b3310a637be84c42f9ef0337b21b5516deb03f3a817f",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    }
+  }
+}

@@ -32,7 +32,7 @@ Every tracked profile has `meta.status`:
 - `unattended`: an automated installation/provisioning recipe exists; this is not a claim that this revision passed a live test.
 - `experimental`: a known incomplete or unsettled flow. Currently the package-only Ubuntu niri recipes, the custom Omarchy/NVIDIA flow, `windows-98` and, since 2026-09-16, `windows-nt4`, demoted after failing reproducibly outside the matrix with its documented cause excluded (its `verified` keeps the 09-15 date: the field records the last live PASS, it does not certify the current code). A full `check-vms` (no profile names) reports them as skipped instead of running them; `check-vms <name>` runs one on purpose, which is how it gets promoted (2026-09-14).
 
-`meta.verified` is the last live PASS date supplied by the maintainer. It is omitted when no date is recorded, and is never updated by unit tests or dry runs. A historical date does not certify subsequent profile changes. The list and HTML report show both fields separately from the current run's PASS/FAIL result.
+`meta.verified` is the last live PASS date supplied by the maintainer. It is omitted when no date is recorded, and is never updated by unit tests or dry runs. A historical date does not certify subsequent profile changes: since 2026-09-27 `meta.version` and `vms/profiles.lock` say whether the recipe changed after that date (a bump without a new `verified` date means "changed, not re-verified"; see [PROFILES.md](PROFILES.md#profile-versions)). The list and HTML report show both fields separately from the current run's PASS/FAIL result.
 
 Recorded dates:
 

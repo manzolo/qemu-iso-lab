@@ -12,7 +12,8 @@
           "ubuntu",
           "ubuntu-flavors"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -129,7 +130,8 @@
           "ubuntu",
           "ubuntu-flavors"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -246,7 +248,8 @@
           "ubuntu",
           "ubuntu-flavors"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -363,7 +366,8 @@
           "ubuntu",
           "ubuntu-flavors"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -480,7 +484,8 @@
           "ubuntu",
           "ubuntu-flavors"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -598,7 +603,8 @@
           "ubuntu-flavors",
           "ubuntu-releases"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -710,7 +716,8 @@
           "ubuntu",
           "ubuntu-flavors"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -821,7 +828,8 @@
           "ubuntu",
           "ubuntu-flavors"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -932,7 +940,8 @@
           "ubuntu",
           "ubuntu-flavors"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
@@ -1043,7 +1052,8 @@
           "ubuntu",
           "ubuntu-flavors"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",

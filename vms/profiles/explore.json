@@ -7,7 +7,8 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/pop-os_24.04_amd64_generic_22.iso",
       "iso_url": "https://iso.pop-os.org/24.04/amd64/generic/22/pop-os_24.04_amd64_generic_22.iso",
@@ -62,7 +63,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/pearOS-NiceC0re-2026.09-x86_64.iso",
       "iso_size": 3395530752,
@@ -119,7 +121,8 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/pearOS-NiceC0re-2026.09-x86_64.iso",
       "iso_size": 3395530752,
@@ -210,7 +213,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/EndeavourOS_Titan-2026.03.06.iso",
       "iso_urls": [
@@ -267,7 +271,8 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "rolling-desktop",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/neon-user-current.iso",
       "iso_url": "https://files.kde.org/neon/images/user/current/neon-user-current.iso",
@@ -321,7 +326,8 @@
         "family": "void",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/void-live-x86_64-20250202-xfce.iso",
       "iso_url": "https://repo-default.voidlinux.org/live/current/void-live-x86_64-20250202-xfce.iso",
@@ -370,7 +376,8 @@
         "family": "opensuse",
         "role": "desktop",
         "release_model": "slow-rolling",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/openSUSE-Slowroll-DVD-x86_64-Media.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",

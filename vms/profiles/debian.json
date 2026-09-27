@@ -10,7 +10,8 @@
         "status": "manual",
         "groups": [
           "debian-only"
-        ]
+        ],
+        "version": "1.0.0"
       },
       "iso": "isos/debian-live-13.4.0-amd64-gnome.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
@@ -61,7 +62,8 @@
         "status": "manual",
         "groups": [
           "debian-only"
-        ]
+        ],
+        "version": "1.0.0"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -109,7 +111,8 @@
         "status": "manual",
         "groups": [
           "debian-only"
-        ]
+        ],
+        "version": "1.0.0"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -164,7 +167,8 @@
         "status": "manual",
         "groups": [
           "debian-only"
-        ]
+        ],
+        "version": "1.0.0"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -218,7 +222,8 @@
           "debian-only",
           "smoke"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -308,7 +313,8 @@
         "status": "manual",
         "groups": [
           "ubuntu"
-        ]
+        ],
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-26.04-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-desktop-amd64.iso",
@@ -363,7 +369,8 @@
         "status": "manual",
         "groups": [
           "ubuntu"
-        ]
+        ],
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -419,7 +426,8 @@
         "groups": [
           "smoke",
           "ubuntu"
-        ]
+        ],
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -471,7 +479,11 @@
         "keyboard_layout": "us",
         "storage_layout": "direct",
         "install_ssh": true,
-        "apt": {"disable_suites": ["security"]}
+        "apt": {
+          "disable_suites": [
+            "security"
+          ]
+        }
       },
       "cloud_init": {
         "hostname": "ubuntu-server-ci",
@@ -521,7 +533,8 @@
           "ubuntu"
         ],
         "slug": "ubuntu",
-        "verified": "2026-09-09"
+        "verified": "2026-09-09",
+        "version": "1.0.0"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
@@ -641,7 +654,8 @@
         "groups": [
           "debian-only"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -749,7 +763,8 @@
         "groups": [
           "debian-only"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -856,7 +871,8 @@
         "groups": [
           "debian-only"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -963,7 +979,8 @@
         "groups": [
           "kali"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/kali-linux-2026.2-installer-netinst-amd64.iso",
       "iso_url": "https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-installer-netinst-amd64.iso",

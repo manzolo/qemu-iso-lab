@@ -49,7 +49,7 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | Field | Meaning |
 |-------|---------|
 | `name` | Human title shown by `vmctl list` and the TUI |
-| `meta` | `family` drives grouping; `role` and `release_model` describe the guest. `status` is `manual`, `unattended` or `experimental`; optional `verified` is the last maintainer-reported live PASS date (`YYYY-MM-DD`). `vmctl list` and HTML reports show status and verification separately from current test results. |
+| `meta` | `family` drives grouping; `role` and `release_model` describe the guest. `status` is `manual`, `unattended` or `experimental`; `version` is the recipe's version (see [Profile versions](#profile-versions)); optional `verified` is the last maintainer-reported live PASS date (`YYYY-MM-DD`). `vmctl list` and HTML reports show status and verification separately from current test results. |
 | `iso`, `iso_url`, `iso_urls`, `iso_discovery`, `iso_size`, `iso_sha256` | See [ISO sources](#iso-sources) |
 | `disk` | See [Disk](#disk) |
 | `firmware` | `efi` or `bios`, see [Firmware](#firmware) |
@@ -266,6 +266,30 @@ artifacts/<vm>/
 `vmctl status` reports these together with runtime state (tracked background
 QEMU processes and SSH forward ports). `vmctl clean-stale` removes dead PID files.
 
+### Profile versions
+
+Every tracked profile carries `meta.version` (`MAJOR.MINOR.PATCH`) and `vms/profiles.lock`
+remembers, per profile, that version, a fingerprint of the recipe and the history of bumps with
+a note each. The fingerprint is what an install depends on: the entry without `name`, `meta`
+and help texts, plus the bytes of every `vms/profile-files/` file it copies into the guest.
+`make check` compares catalog and lock (`tools/bump_profile.py --check`): a recipe changed
+without a bump fails and names the profile, while a new `meta.verified` date or a reworded
+description never needs one.
+
+```bash
+tools/bump_profile.py ubuntu-26.04 patch -m "gdm autologin drop-in"   # fix: reinstalling is optional
+tools/bump_profile.py ubuntu-26.04 minor -m "shared folder"           # something more
+tools/bump_profile.py ubuntu-26.04 major -m "user and SSH port"       # an installed VM is no longer comparable
+tools/bump_profile.py --history ubuntu-26.04
+tools/bump_profile.py --init        # a new profile: 1.0.0 and its lock entry
+```
+
+A new release of a distribution is a new profile, not a major bump. Every install records the
+catalog version it used in `state.json` (`install.profile_version`, with `vmctl_version`), and
+`vmctl status`, `vmctl list` (`VERSION`), the TUI and the web panel say when the disk carries an
+older recipe than the catalog: a reason to reinstall, not a fault. Clones and local-only
+profiles are not versioned (`meta.version` is dropped from a clone).
+
 ### What is known about the disk (`state.json`, `vmctl status`, the TUI)
 
 Three facts are kept apart because they come from three different places:
@@ -314,7 +338,8 @@ your copy in `local.json`, together with your `edition`/`language` (multi-editio
 
 1. Copy the ISO under `isos/`, or define `iso_url` (and ideally
    `iso_discovery` so the profile follows new releases).
-2. Add a VM object to the family file in `vms/profiles/`, or create a new file.
+2. Add a VM object to the family file in `vms/profiles/`, or create a new file,
+   then `tools/bump_profile.py --init` (1.0.0 and its lock entry; a test fails otherwise).
    Use the generic guest user `lab` and the `{{user}}` placeholder; never a
    real name, password or hash (the repository is public).
 3. Choose disk format, firmware type and runtime settings.

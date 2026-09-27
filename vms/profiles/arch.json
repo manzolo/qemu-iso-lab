@@ -7,7 +7,8 @@
         "family": "arch",
         "role": "baseline",
         "release_model": "rolling",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -60,7 +61,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {
@@ -122,7 +124,8 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {
@@ -297,7 +300,8 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {
@@ -480,7 +484,8 @@
         "groups": [
           "smoke"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -686,7 +691,8 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -895,7 +901,8 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -1120,7 +1127,8 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "experimental",
-        "verified": "2026-09-09"
+        "verified": "2026-09-09",
+        "version": "1.0.0"
       },
       "iso": "isos/omarchy-4.0.2.iso",
       "iso_url": "https://iso.omarchy.org/omarchy-4.0.2.iso",

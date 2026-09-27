@@ -219,6 +219,8 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
         else:
             if "status" in meta and meta["status"] not in ("manual", "unattended", "experimental"):
                 err("meta.status must be manual, unattended or experimental")
+            if "version" in meta and not (isinstance(meta["version"], str) and re.fullmatch(r"\d+\.\d+\.\d+", meta["version"])):
+                err("meta.version must be MAJOR.MINOR.PATCH (tools/bump_profile.py keeps it)")
             if "verified" in meta:
                 verified = meta["verified"]
                 try:

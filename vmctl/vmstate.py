@@ -41,7 +41,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from vmctl import runtime
+from vmctl import profile_versions, runtime
 
 STATE_FILE = "state.json"
 STATE_VERSION = 1
@@ -123,12 +123,19 @@ def copy_record(src_vm: str, dst_vm: str, dry_run: bool = False) -> None:
 
 # --- writers ---------------------------------------------------------------------------
 
+def _versions(vm_name: str) -> dict[str, Any]:
+    """What installed this disk: the catalog's version of the profile (None for a clone or a
+    local-only VM) and vmctl's own, so the dashboards can say which recipe the disk carries."""
+    import vmctl  # the package: __version__ (lazy, vmctl/__init__ imports the CLI)
+    return {"profile_version": profile_versions.catalog_version(vm_name), "vmctl_version": vmctl.__version__}
+
+
 def begin_install(vm_name: str, flow: str, interactive: bool = False, dry_run: bool = False) -> None:
     """A new installation starts on this disk: whatever the record said no longer holds."""
     record = {
         "origin": {"kind": "install", "flow": flow, "at": now()},
         "install": {"flow": flow, "started_at": now(), "completed_at": None,
-                    "mode": FLOW_INTERACTIVE if interactive else "unattended"},
+                    "mode": FLOW_INTERACTIVE if interactive else "unattended", **_versions(vm_name)},
         "verify": None,
     }
     save(vm_name, record, dry_run=dry_run)
@@ -143,7 +150,7 @@ def complete_install(vm_name: str, flow: str, vm: dict[str, Any] | None = None, 
     if install is None or install.get("flow") != flow:
         # A completion without its start (a flow that did not call begin_install): record
         # what is known rather than dropping the fact.
-        install = {"flow": flow, "started_at": None, "mode": "unattended"}
+        install = {"flow": flow, "started_at": None, "mode": "unattended", **_versions(vm_name)}
     install["completed_at"] = now()
     if vm is not None:
         facts = disk_facts(vm)
@@ -221,10 +228,10 @@ def summary(vm_name: str, vm: dict[str, Any]) -> dict[str, Any]:
     started and never sent its token) < ``installed`` (token arrived) < ``verified``
     (booted and checked). ``detail`` spells the same out in one sentence.
     """
-    return describe(load(vm_name), disk_facts(vm))
+    return describe(load(vm_name), disk_facts(vm), catalog_version=(vm.get("meta") or {}).get("version"))
 
 
-def describe(record: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
+def describe(record: dict[str, Any], facts: dict[str, Any], catalog_version: str | None = None) -> dict[str, Any]:
     """`summary` for a record and image facts that do not belong to a live VM (a checkpoint)."""
     install = record.get("install") if isinstance(record.get("install"), dict) else None
     verify = record.get("verify") if isinstance(record.get("verify"), dict) else None
@@ -248,11 +255,14 @@ def describe(record: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
         "origin_source": origin.get("source") if origin else None,
         "origin_at": origin.get("at") if origin else None,
         "stale": False,
+        "profile_version": None, "vmctl_version": None, "catalog_version": catalog_version,
     }
 
     if install:
         out["install_flow"] = install.get("flow")
         out["install_interactive"] = install.get("mode") == FLOW_INTERACTIVE
+        out["profile_version"] = install.get("profile_version")
+        out["vmctl_version"] = install.get("vmctl_version")
         if install.get("completed_at"):
             out["install_state"] = "completed"
             out["install_at"] = install.get("completed_at")
@@ -292,6 +302,12 @@ def describe(record: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
     else:
         out["label"] = LABEL_UNVERIFIED
         out["detail"] = "disk has data but no installation record (pre-existing disk); run a boot-check or post-install to verify it"
+    if facts["has_data"] and out["profile_version"] and out["install_state"]:
+        # The recipe on the disk vs the catalog's: a newer catalog is a reason to reinstall, not a fault.
+        out["detail"] += f" (profile {out['profile_version']}"
+        if catalog_version and catalog_version != out["profile_version"]:
+            out["detail"] += f", the catalog is at {catalog_version} now"
+        out["detail"] += ")"
     return out
 
 

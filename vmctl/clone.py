@@ -144,6 +144,7 @@ def derive_profile(cfg: dict[str, Any], src: str, vm: dict[str, Any], dst: str, 
     meta["clone_of"] = src
     meta["cloned_at"] = vmstate.now()
     meta.pop("verified", None)  # the maintainer's live PASS is about the recipe, not this copy
+    meta.pop("version", None)  # so is the catalog version: a clone is its own, unversioned recipe
     profile["meta"] = meta
 
     taken = used_host_ports(cfg)

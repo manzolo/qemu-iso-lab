@@ -8,7 +8,8 @@
         "role": "server",
         "release_model": "rolling",
         "status": "unattended",
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/CentOS-Stream-10-20260914.0-x86_64-boot.iso",
       "iso_url": "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/CentOS-Stream-10-20260914.0-x86_64-boot.iso",

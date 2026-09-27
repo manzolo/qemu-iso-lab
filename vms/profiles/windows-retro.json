@@ -11,7 +11,8 @@
         "groups": [
           "windows-retro"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/windowsxp.iso",
       "disk": {
@@ -82,7 +83,8 @@
         "status": "experimental",
         "groups": [
           "windows-retro"
-        ]
+        ],
+        "version": "1.0.0"
       },
       "iso": "isos/windows98.iso",
       "disk": {
@@ -144,7 +146,8 @@
         "groups": [
           "windows-retro"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/windows2000.iso",
       "disk": {
@@ -214,7 +217,8 @@
         "groups": [
           "windows-retro"
         ],
-        "verified": "2026-09-15"
+        "verified": "2026-09-15",
+        "version": "1.0.0"
       },
       "iso": "isos/windowsnt4.iso",
       "disk": {

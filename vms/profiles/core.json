@@ -11,7 +11,8 @@
         "groups": [
           "smoke"
         ],
-        "verified": "2026-09-26"
+        "verified": "2026-09-26",
+        "version": "1.0.0"
       },
       "iso": "isos/alpine-virt-3.24.1-x86_64.iso",
       "iso_url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
@@ -64,7 +65,8 @@
         "family": "alpine",
         "role": "ci-installed",
         "release_model": "stable",
-        "status": "manual"
+        "status": "manual",
+        "version": "1.0.0"
       },
       "iso": "isos/alpine-virt-3.24.1-x86_64.iso",
       "iso_url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
