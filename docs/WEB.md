@@ -11,7 +11,7 @@ lifecycle from the page, screen by screen, read [From zero to a running VM](FIRS
 What the page offers:
 
 - **Profiles**: every profile with its live state, search (`/`) and the filters of the dashboard
-  (My VMs, All, With disk, Running, Labs).
+  (My VMs, All, With disk, Running, Labs). The × in the search box clears the text and keeps the current filter.
 - **My VMs**: the profiles you chose out of the catalog (plus whatever is running right now,
   so a running VM never hides). Choose them with *Add to My VMs* (right-click a row,
   the ☆ button of the details panel, or a multiple selection), and the page opens on that view
@@ -40,9 +40,20 @@ What the page offers:
   runs headless: `Boot headless`, and every unattended install while it runs (*Watch the install*).
   The server bridges a WebSocket to the VM's `runtime/vnc.sock`, the socket `vmctl attach` uses.
   The toolbar has fit-to-window/actual-size, reconnect, Ctrl+Alt+Del and full screen controls.
-  The connection status stays visible; Esc goes to the VM, so the dialog closes with *Close*.
+  Full screen gives the entire display to the guest; move the pointer to the top edge or click
+  **Controls** to reveal the toolbar. The guest is asked to resize when supported; otherwise
+  fit-to-window preserves its aspect ratio, which can leave bars. Esc goes to the VM outside
+  browser full screen, so the dialog closes with *Close*.
   `…/#console=<vm>` after the URL opens a VM's console directly. The noVNC client is loaded
   from cdn.jsdelivr.net (`@novnc/novnc@1.7.0`); the screenshot view needs no external assets.
+- **Recording**: **Record** in the console captures on the host at **10 fps** by default; choose 1, 5, 10 or 15 fps before starting. **Stop recording**
+  opens a download dialog where you choose GIF or MP4, and can download both. GIF keeps the timeline at **1 fps**
+  and up to 1280 px wide; MP4 uses the selected frame rate and original resolution (rounded down to even dimensions for H.264).
+  Closing the console leaves recording active; the dashboard shows its status and Stop button.
+  Reloading the same tab reconnects to it while the server is running. Capture stops when the VM
+  disconnects, the web server exits, or it reaches 1 hour / 512 MiB of frames. `ffmpeg` is required
+  on the host. Actual capture speed depends on host load and guest resolution. Frames and exports remain in `artifacts/.web-recordings/<id>/`, independently of
+  VM cleanup. **Done** clears the current download panel so another recording can be started.
 - **Keyboard**: typing anywhere filters the list (Esc clears), ↑/↓ select, Enter runs the main
   action, and function keys run one kind of action whatever the state offers: `F2` boot
   headless, `F3` console, `F4` SSH in the browser, `F6` screenshot, `F7` checkpoint, `F8` stop, `F9` job log,
@@ -87,6 +98,9 @@ What the page offers:
   a running job alone does not mean an installation is taking place. Starting/stopping stays
   visible until a fresh VM state confirms completion; a delayed or disconnected refresh does
   not briefly re-enable the old controls. An unexpected state is reported explicitly.
+  **Force stop** skips guest shutdown, signals QEMU directly and escalates to SIGKILL after
+  2 seconds if necessary. **Clean** shows *Cleaning disk* and logs removed paths; its own
+  log, lock and completion status survive cleanup, along with checkpoints unless explicitly removed.
   The bottom bar shows the latest active job with **View job** and **Cancel job**. It remains
   during the final state check, disappears on completion, and leaves the log in Recent activity.
   Hovering a distribution icon only previews the live screen; linking uses the network button.

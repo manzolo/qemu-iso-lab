@@ -224,6 +224,25 @@ class RequestTests(BaseVmctlTestCase):
         with self.assertRaises(VMError):
             webui.job_directory("web:../etc")
 
+    def test_force_stop_still_stops_vm_when_job_has_just_finished(self):
+        from unittest import mock
+
+        with mock.patch.object(webui.tui_jobs, "cancel", return_value=False), \
+             mock.patch.object(webui.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+            self.assertFalse(webui.cancel_job("vm:testvm", force_stop=True))
+            self.assertEqual(run.call_args.args[0][1:], ["stop", "testvm", "--force"])
+            run.reset_mock()
+            self.assertFalse(webui.cancel_job("vm:testvm"))
+            run.assert_not_called()
+
+    def test_force_stop_failure_is_reported(self):
+        from unittest import mock
+
+        with mock.patch.object(webui.tui_jobs, "cancel", side_effect=lambda root, name, stop: stop()), \
+             mock.patch.object(webui.subprocess, "run", return_value=subprocess.CompletedProcess([], 1, "", "QEMU did not stop")):
+            with self.assertRaisesRegex(VMError, "QEMU did not stop"):
+                webui.cancel_job("vm:testvm", force_stop=True)
+
 
 class ServerTests(BaseVmctlTestCase):
     def setUp(self):
@@ -283,6 +302,34 @@ class ServerTests(BaseVmctlTestCase):
                 conn.close()
                 terminal.assert_not_called()
                 save.assert_not_called()
+
+    def test_recording_endpoints_require_token_and_pass_selected_frame_rate(self):
+        from unittest import mock
+
+        manager = self.server.RequestHandlerClass.recordings
+        session = mock.Mock()
+        session.stop.return_value = {"status": "stopped"}
+        session.export.return_value = b"GIF89a"
+        with mock.patch.object(manager, "start", return_value={"id": "capture", "fps": 15}) as start, \
+             mock.patch.object(manager, "get", return_value=session):
+            for token in (None, "secret-token"):
+                for path, body in (("/api/recordings", {"vm": "testvm", "fps": 15}),
+                                   ("/api/recordings/capture/stop", {}),
+                                   ("/api/recordings/capture/export", {"format": "gif"})):
+                    conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+                    headers = {"X-Vmctl-Token": token} if token else {}
+                    conn.request("POST", path, body=json.dumps(body), headers=headers)
+                    response = conn.getresponse()
+                    self.assertEqual(response.status, 200 if token else 401)
+                    data = response.read()
+                    if token and path.endswith("/export"):
+                        self.assertEqual(response.getheader("Content-Type"), "image/gif")
+                        self.assertEqual(data, b"GIF89a")
+                    conn.close()
+            self.assertEqual(start.call_count, 1)
+            self.assertEqual(start.call_args.args[-1], 15)
+            session.stop.assert_called_once()
+            session.export.assert_called_once_with("gif")
 
     def test_override_endpoint_saves_and_invalidates_cached_state(self):
         status, body = self.get('/api/vm/testvm/override')

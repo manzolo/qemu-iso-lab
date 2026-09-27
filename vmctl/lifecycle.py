@@ -317,7 +317,7 @@ def stop_qemu_process(
     except OSError as exc:
         raise VMError(f"Failed to stop process {pid}: {exc}") from exc
 
-    deadline = time.monotonic() + 15
+    deadline = time.monotonic() + (2 if force else 15)
     while time.monotonic() < deadline:
         if process_cmdline(pid) is None:
             return finalize_stop(f"Stopped {description}")
@@ -4207,6 +4207,21 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 
 def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: bool = False) -> None:
+    # A web/TUI clean is itself a job under runtime/. Keep its open log and lock
+    # reachable until the supervisor writes the result (also prevents a new job racing it).
+    job = tui_jobs.job_dir(state.ROOT, name)
+
+    def remove_tree(path: Path) -> None:
+        if tui_jobs.own_job(job) and (path == job or path in job.parents):
+            if path != job:
+                for child in path.iterdir():
+                    if child.is_dir() and not child.is_symlink():
+                        remove_tree(child)
+                    else:
+                        child.unlink()
+            return
+        shutil.rmtree(path)
+
     disk_path = runtime.resolve_path(vm["disk"]["path"])
     fw = vm["firmware"]
     vars_path = runtime.resolve_path(fw["vars_path"]) if fw["type"] == "efi" else None
@@ -4238,7 +4253,7 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: 
         if subdir.exists():
             ui.print_note(f"Removing {subdir}")
             if not dry_run:
-                shutil.rmtree(subdir)
+                remove_tree(subdir)
     # Everything else under artifacts/<vm>/ is generated too: the media the flows rebuild
     # (freebsd/, reactos/, windowsxp/, install-media/, autoyast/, nixos/, pearos/, haiku/...),
     # an exported libvirt XML. The explicit list above missed those (5.4 GB left on 2026-09-26),
@@ -4250,7 +4265,7 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: 
             ui.print_note(f"Removing {entry}")
             if not dry_run:
                 if entry.is_dir() and not entry.is_symlink():
-                    shutil.rmtree(entry)
+                    remove_tree(entry)
                 else:
                     entry.unlink()
     # Checkpoints are the way back from a clean: they stay unless --checkpoints says otherwise.
@@ -4288,9 +4303,6 @@ def cmd_clean(args: argparse.Namespace) -> int:
     cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
     clean_vm(name, vm, dry_run=args.dry_run, checkpoints=remove_profile or checkpoints)
     if remove_profile:
-        base = runtime.vm_artifact_base(name)
-        if base.exists() and not args.dry_run:
-            shutil.rmtree(base, ignore_errors=True)
         clone.delete_local_profile(name, dry_run=args.dry_run)
     return 0
 

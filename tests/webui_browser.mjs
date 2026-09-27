@@ -14,6 +14,7 @@ const state = { version:'0.4.0', vms:[machine('arch-noctalia',{running:true}),ma
 let requests = [], failRun = false, failState = false, sshLaunches = 0, overrideRevision = 1, savedOverride = {};
 let jobStatus = 'completed', jobCommand = 'vmctl start arch-noctalia --headless --background', cancelRequests = [], failCancel = false, cancelResult = true;
 let jobId = 'web:fixture', holdRun = false, releaseRun;
+let hideJobs = false, recording = null, recordingExports = [], failExport = false;
 let screenDelay = 700;
 let screenRequests = 0, failScreen = false, holdState = false, stateWaiters = [], dynamicVmJobs = false;
 const profileBase = {name:'Arch Linux + Noctalia',memory_mb:8192,cpus:4};
@@ -36,7 +37,20 @@ const server = createServer(async (req,res) => {
   }
   if (req.url.startsWith('/api/state')) { const body=JSON.stringify(failState ? {error:'fixture offline'} : state); if (holdState) await new Promise(resolve=>stateWaiters.push(resolve)); res.statusCode=failState ? 503 : 200; return res.end(body); }
   if (req.url === '/api/commands') return res.end(JSON.stringify(catalog));
-  if (req.url === '/api/jobs') return res.end(JSON.stringify([{id:jobId,status:jobStatus,command:jobCommand,updated:1789900000}]));
+  if (req.url === '/api/jobs') return res.end(JSON.stringify(hideJobs ? [] : [{id:jobId,status:jobStatus,command:jobCommand,updated:1789900000}]));
+  if (req.url === '/api/recordings') {
+    let body=''; for await (const chunk of req) body+=chunk;
+    const data=JSON.parse(body); recording={id:'fixture-recording',vm:data.vm,fps:data.fps,status:'recording',frames:1,error:''};
+    return res.end(JSON.stringify(recording));
+  }
+  if (req.url === '/api/recordings/fixture-recording') return res.end(JSON.stringify(recording));
+  if (req.url === '/api/recordings/fixture-recording/stop') { recording.status='stopped'; return res.end(JSON.stringify(recording)); }
+  if (req.url === '/api/recordings/fixture-recording/export') {
+    let body=''; for await (const chunk of req) body+=chunk;
+    if (failExport) { res.statusCode=400; return res.end(JSON.stringify({error:'Fixture encoding failed; frames preserved'})); }
+    const {format}=JSON.parse(body); recordingExports.push(format);
+    res.setHeader('Content-Type',format==='gif'?'image/gif':'video/mp4'); return res.end('fixture recording');
+  }
   if (req.url.includes('/log?')) {
     const log = 'Fixture job output.\n', offset = Number(new URL(req.url,'http://fixture').searchParams.get('offset'));
     return res.end(JSON.stringify({text:log.slice(offset),offset:log.length,size:log.length,status:jobStatus}));
@@ -86,6 +100,15 @@ try {
   assert.equal(await page.locator('#running-count').textContent(),'1');
   assert.equal(await page.locator('#details .name').textContent(),'arch-noctalia');
   await shot('dashboard'); check('dashboard and profile');
+  await page.locator('#search').fill('debian');
+  assert.equal(await page.locator('#rows [data-vm]').count(),1);
+  await page.locator('#search-clear').click();
+  assert.equal(await page.locator('#search').inputValue(),'');
+  assert(await page.locator('#search').evaluate(el=>el===document.activeElement));
+  assert(!(await page.locator('#search-clear').isVisible()));
+  assert.equal(await page.locator('#rows [data-vm]').count(),state.vms.length);
+  await page.locator('#rows [data-vm="arch-noctalia"] .profile-name').click();
+  check('clear search button resets text and restores rows and input focus');
   await page.locator('#rows [data-vm="arch-noctalia"] .catalog-icon').hover();
   await page.locator('#hover-shot .hover-loading').waitFor({state:'visible'});
   assert(!(await page.locator('#hover-shot img').isVisible()));
@@ -331,7 +354,34 @@ try {
   await page.locator('#vnc-cad').click(); assert(await page.evaluate(()=>window.sentCAD));
   await page.locator('#vnc-reconnect').click(); await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
   await page.locator('#vnc-full').click(); await page.waitForFunction(()=>document.fullscreenElement?.id==='console-shell');
-  await page.locator('#vnc-full').click(); await page.waitForFunction(()=>!document.fullscreenElement); await shot('console'); await page.locator('#vnc-close').click(); check('console controls, reconnect and full screen');
+  await page.evaluate(()=>document.activeElement.blur());
+  await page.mouse.move(700,500);
+  await page.waitForFunction(()=>document.querySelector('#console-shell > header').getBoundingClientRect().bottom<=1);
+  const screenBox=await page.locator('#vnc-screen').boundingBox();
+  assert.equal(screenBox.y,0); assert.equal(screenBox.height,1000); assert.equal(screenBox.width,1440);
+  await page.locator('#console-tools').click();
+  await page.locator('#vnc-full').click(); await page.waitForFunction(()=>!document.fullscreenElement); await shot('console');
+  await page.locator('#vnc-record-fps').selectOption('15');
+  await page.locator('#vnc-record').click();
+  await page.waitForFunction(()=>document.getElementById('vnc-record').textContent.includes('Stop recording'));
+  assert.equal(recording.fps,15);
+  await page.locator('#vnc-close').click();
+  assert(await page.locator('#recording-stop').isVisible());
+  await page.reload(); await page.locator('#recording-stop').waitFor();
+  await page.locator('#recording-stop').click();
+  await page.locator('#record-dialog').waitFor();
+  failExport=true; await page.locator('#record-download').click();
+  await page.waitForFunction(()=>document.getElementById('toast').textContent.includes('frames preserved'));
+  failExport=false;
+  for (const format of ['gif','mp4']) {
+    await page.locator('#record-format').selectOption(format);
+    const downloadEvent=page.waitForEvent('download'); await page.locator('#record-download').click();
+    const download=await downloadEvent; assert(download.suggestedFilename().endsWith('.'+format));
+  }
+  assert.deepEqual(recordingExports,['gif','mp4']);
+  await page.locator('#record-new').click();
+  assert(!(await page.locator('#recording-controls').isVisible()));
+  check('fullscreen uses the whole viewport; recording survives console close and reload and offers GIF/MP4 with retry');
   failState=true; await page.evaluate(()=>refresh()); assert.equal(await page.locator('#connection').textContent(),'Disconnected · retrying');
   failState=false; await page.evaluate(()=>refresh()); assert.equal(await page.locator('#connection').textContent(),'Live'); check('connection recovery');
   const initialY=(await page.locator('#profiles-view').boundingBox()).y;
@@ -361,6 +411,15 @@ try {
   state.vms[0].running=true; jobId='web:fixture'; jobStatus='completed';
   await page.evaluate(()=>{ vmJobs.clear(); }); await page.evaluate(()=>refresh());
   check('row progress is immediate, survives stale snapshots, keeps controls visible and supports confirmed force stop');
+  hideJobs=true;
+  await page.evaluate(()=>{ vmJobs.set('arch-noctalia',{status:'running',command:'clean'}); activityJob={id:'vm:arch-noctalia',status:'running',command:'vmctl clean arch-noctalia'}; render(); });
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Cleaning disk');
+  await page.evaluate(()=>refreshJobs());
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Running');
+  assert(!(await page.locator('#job-bar').isVisible()));
+  assert(!(await page.locator('#activity-label').textContent()).includes('Working'));
+  hideJobs=false; await page.evaluate(()=>vmJobs.clear());
+  check('a removed clean job cannot leave a permanent Working state or active job bar');
   // Completion must not expose controls based on a snapshot taken before completion.
   jobId='vm:arch-noctalia';
   await page.keyboard.press('F8'); await page.waitForFunction(()=>!submittingVms.size);

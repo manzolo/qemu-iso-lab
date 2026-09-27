@@ -187,7 +187,7 @@ class Recording:
 
 def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: float = 1.0, gif: bool = True,
            mp4: bool = False, gif_seconds: float = GIF_SECONDS, gif_fps: int = GIF_FPS, gif_width: int = GIF_WIDTH,
-           dry_run: bool = False) -> dict[str, Path]:
+           dry_run: bool = False, realtime_gif: bool = False, mp4_fps: int | None = None) -> dict[str, Path]:
     """The GIF (sampled, small), the MP4 (every frame, H.264, plays everywhere) with its poster."""
     out: dict[str, Path] = {}
     if not recording.frames:
@@ -200,18 +200,24 @@ def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: 
     if gif:
         gif_list = recording.frames_dir / "gif.ffconcat"
         if not dry_run:
-            gif_list.write_text(recording.gif_list(gif_seconds, gif_fps), encoding="utf-8")
+            gif_list.write_text(recording.concat_list(max_hold, period) if realtime_gif
+                                else recording.gif_list(gif_seconds, gif_fps), encoding="utf-8")
         gif_path = recording.directory / "recording.gif"
         filters = (f"scale={gif_width}:-1:flags=lanczos,split[a][b];"
                    "[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle")
+        if realtime_gif:
+            filters = f"fps={gif_fps}:eof_action=pass," + filters
         runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(gif_list),
                      "-vf", filters, "-loop", "0", str(gif_path)], dry_run=dry_run, quiet=True)
         out["gif"] = gif_path
     if mp4:
         listing = recording.frames_dir / FRAMES_LIST
         mp4_path = recording.directory / "recording.mp4"
+        filters = "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p"
+        if mp4_fps:
+            filters = f"fps={mp4_fps}," + filters
         runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
-                     "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p", "-fps_mode", "vfr",
+                     "-vf", filters, "-fps_mode", "vfr",
                      "-c:v", "libx264", "-crf", "22", "-preset", "medium", "-movflags", "+faststart", str(mp4_path)],
                     dry_run=dry_run, quiet=True)
         out["mp4"] = mp4_path

@@ -5,6 +5,8 @@ import io
 import json
 import shutil
 import subprocess
+import sys
+import time
 from pathlib import Path
 from unittest import mock
 
@@ -212,6 +214,30 @@ class VmstateHookTests(BaseVmctlTestCase):
         with mock.patch("sys.stdout", new_callable=io.StringIO):
             self.vmctl.clean_vm(self.vm_name, vm)
         self.assertFalse(self.vmctl.vmstate.state_path(self.vm_name).exists())
+
+    def test_clean_job_keeps_its_log_lock_and_completion_status(self):
+        from vmctl import tui_jobs
+
+        self.create_disk()
+        vm = self.vmctl.get_vm(self.vmctl.load_config(), self.vm_name)
+        directory = tui_jobs.job_dir(self.root, self.vm_name)
+        directory.parent.mkdir(parents=True, exist_ok=True)
+        (directory.parent / "stale.sock").touch()
+        source = str(Path(__file__).resolve().parent.parent)
+        command = [sys.executable, "-c", (
+            f"import sys; sys.path.insert(0, {source!r}); from pathlib import Path; "
+            f"from vmctl import state, lifecycle; state.ROOT = Path({str(self.root)!r}); "
+            f"lifecycle.clean_vm({self.vm_name!r}, {vm!r})"
+        )]
+        tui_jobs.start(self.root, self.vm_name, command)
+        deadline = time.monotonic() + 10
+        while tui_jobs.status(directory) == "running" and time.monotonic() < deadline:
+            time.sleep(.02)
+        self.assertEqual(tui_jobs.status(directory), "completed")
+        self.assertTrue((directory / "lock").exists())
+        self.assertIn("Command completed", (directory / "output.log").read_text())
+        self.assertFalse((directory.parent / "stale.sock").exists())
+        self.assertFalse((self.root / self.vm_config["disk"]["path"]).exists())
 
     def test_status_shows_install_column_and_json_facts(self):
         path = self.root / self.vm_config["disk"]["path"]

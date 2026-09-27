@@ -187,6 +187,15 @@ class GuestAgentTests(BaseVmctlTestCase):
             self.assertEqual(args.func(args), 0)
         self.assertTrue(stop.call_args.kwargs["force"])
 
+    def test_force_escalates_to_sigkill_after_short_grace(self):
+        with mock.patch.object(lifecycle, "process_cmdline", side_effect=["qemu", "qemu", None]), \
+             mock.patch.object(lifecycle.os, "kill") as kill, \
+             mock.patch.object(lifecycle.time, "monotonic", side_effect=[0, 1, 3, 3, 4]), \
+             mock.patch.object(lifecycle.time, "sleep"):
+            self.assertEqual(lifecycle.stop_qemu_process(123, "Stop", "VM", force=True), 0)
+        self.assertEqual(kill.call_args_list, [mock.call(123, lifecycle.signal.SIGTERM),
+                                               mock.call(123, lifecycle.signal.SIGKILL)])
+
     def test_stop_dry_run_does_not_contact_agent(self):
         with mock.patch.object(guest_agent, "shutdown") as shutdown, \
              mock.patch.object(lifecycle, "process_cmdline", return_value="qemu"):

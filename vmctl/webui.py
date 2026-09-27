@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import catalog, config, profile_overrides, qemu, runtime, state, tui_jobs, ui
+from vmctl import catalog, config, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_recording
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
@@ -212,15 +212,27 @@ def read_log(job_id: str, offset: int) -> dict[str, Any]:
             "status": tui_jobs.status(directory) or "unknown"}
 
 
-def cancel_job(job_id: str) -> bool:
+def cancel_job(job_id: str, force_stop: bool = False) -> bool:
     kind, _, name = job_id.partition(":")
     if kind == "vm":
         vmctl = str(state.ROOT / "bin" / "vmctl")
 
         def stop_vm() -> None:
-            subprocess.run([vmctl, "stop", name, "--force"], stdin=subprocess.DEVNULL, capture_output=True, check=False)
+            result = subprocess.run([vmctl, "stop", name, "--force"], stdin=subprocess.DEVNULL,
+                                    capture_output=True, text=True, check=False)
+            if result.returncode:
+                raise VMError(result.stderr.strip() or result.stdout.strip() or "Force stop failed")
 
-        return tui_jobs.cancel(state.ROOT, name, stop_vm)
+        cancelled = tui_jobs.cancel(state.ROOT, name, stop_vm)
+        if force_stop and not cancelled:
+            # The job may have just finished starting QEMU. The confirmed force stop
+            # still applies, even though there is no longer a worker to cancel.
+            directory = tui_jobs.job_dir(state.ROOT, name)
+            with tui_jobs.control_lock(directory):
+                if tui_jobs.status(directory) == "running":
+                    raise VMError("A new operation started; retry Force stop")
+                stop_vm()
+        return cancelled
     directory = job_directory(job_id)
     if tui_jobs.status(directory) != "running":
         return False
@@ -443,6 +455,7 @@ class Handler(BaseHTTPRequestHandler):
     token = ""
     port = DEFAULT_PORT
     snapshot = Snapshot()
+    recordings = web_recording.Recordings()
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - BaseHTTPRequestHandler API
         return
@@ -504,6 +517,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(profile_overrides.read_override(path[len("/api/vm/"):-len("/override")]))
             elif path == "/api/jobs":
                 self._json(list_jobs())
+            elif path.startswith("/api/recordings/"):
+                self._json(self.recordings.get(path[len("/api/recordings/"):]).info())
             elif path.startswith("/api/jobs/") and path.endswith("/log"):
                 job_id = path[len("/api/jobs/"):-len("/log")]
                 self._json(read_log(job_id, int((query.get("offset") or ["0"])[0])))
@@ -586,13 +601,26 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
             if not isinstance(body, dict):
                 raise VMError("Request body must be a JSON object")
-            if path == "/api/run":
+            if path == "/api/recordings":
+                name = str(body.get("vm", ""))
+                profile = config.get_vm(config.load_config(), name)
+                self._json(self.recordings.start(name, qemu.qmp_socket_path(profile),
+                                                state.ROOT / "artifacts" / ".web-recordings", body.get("fps", 10)))
+            elif path.startswith("/api/recordings/") and path.endswith("/stop"):
+                self._json(self.recordings.get(path[len("/api/recordings/"):-len("/stop")]).stop())
+            elif path.startswith("/api/recordings/") and path.endswith("/export"):
+                session = self.recordings.get(path[len("/api/recordings/"):-len("/export")])
+                kind = str(body.get("format", ""))
+                data = session.export(kind)
+                self._send(HTTPStatus.OK, data, "image/gif" if kind == "gif" else "video/mp4")
+            elif path == "/api/run":
                 command, vm = prepare_command(list(body.get("args") or []), bool(body.get("confirmed")))
                 job_id = start_job(command, vm)
                 self.snapshot.get(fresh=True)
                 self._json({"job": job_id, "command": shlex.join(["vmctl", *command[1:]])})
             elif path.startswith("/api/jobs/") and path.endswith("/cancel"):
-                self._json({"cancelled": cancel_job(path[len("/api/jobs/"):-len("/cancel")])})
+                self._json({"cancelled": cancel_job(path[len("/api/jobs/"):-len("/cancel")],
+                                                   force_stop=bool(body.get("force_stop")))})
             elif path == "/api/terminal":
                 command = prepare_terminal_command(list(body.get("args") or []))
                 self._json({"terminal": open_host_terminal(command, hold=True),
@@ -633,7 +661,8 @@ def _version() -> str:
 
 
 def make_server(port: int, token: str) -> ThreadingHTTPServer:
-    handler: type[Handler] = type("BoundHandler", (Handler,), {"token": token, "port": port, "snapshot": Snapshot()})
+    handler: type[Handler] = type("BoundHandler", (Handler,), {"token": token, "port": port, "snapshot": Snapshot(),
+                                                              "recordings": web_recording.Recordings()})
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     server.daemon_threads = True
     handler.port = server.server_address[1]  # --port 0: the Host check needs the port actually bound
@@ -690,5 +719,7 @@ def cmd_web(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        handler_class: Any = server.RequestHandlerClass
+        handler_class.recordings.close()
         server.server_close()
     return 0
