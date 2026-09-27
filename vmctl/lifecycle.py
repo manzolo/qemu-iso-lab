@@ -3905,7 +3905,10 @@ def cmd_welcome(args: argparse.Namespace) -> int:
     if command is None:
         return 0
     executable = state.ROOT / "bin" / Path(command[0]).name
-    return subprocess.call([str(executable), *command[1:]], cwd=state.ROOT)
+    # Replace this process instead of waiting on a child: Ctrl-C then goes to the chosen command
+    # alone (vmctl web ends cleanly on it), not to a parent that would die with a traceback.
+    os.chdir(state.ROOT)
+    os.execv(str(executable), [str(executable), *command[1:]])
 
 
 def cmd_setup(args: argparse.Namespace) -> int:
