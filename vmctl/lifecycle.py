@@ -3273,7 +3273,8 @@ def cmd_link(args: argparse.Namespace) -> int:
     for name in names:
         vm = config.get_vm(cfg, name)
         pid = vmlink_running_pid(name, vm)
-        member = vmlink.link(vm, name, pid, segment, dry_run=args.dry_run, mcast=args.mcast)
+        member = vmlink.link(vm, name, pid, segment, dry_run=args.dry_run, mcast=args.mcast,
+                             subnet_base=vmlink.parse_subnet(args.subnet) if args.subnet else None)
         results.append((name, vm, member))
         if args.dry_run:
             continue

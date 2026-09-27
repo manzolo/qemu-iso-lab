@@ -49,11 +49,11 @@ A lab needs profiles that declare a segment. Two machines that are simply runnin
 own slirp network, cannot see each other — until they are linked:
 
 ```bash
-vmctl link kali debian-server           # both get a hot-plugged NIC on the "session" segment and a 10.99.0.x address
+vmctl link kali debian-server           # both get a hot-plugged NIC on the "session" segment and a 192.168.100.x address
 vmctl link almalinux-server             # one more VM on the same segment
 vmctl link                              # who is linked, with the addresses
 vmctl link --off                        # unplug everyone (or name the VMs to unplug)
-vmctl link a b --segment backend        # a second, separate segment (10.99.<n>.0/24)
+vmctl link a b --segment backend        # a second, separate segment (192.168.<n>.0/24, or --subnet 172.16.5.0/24)
 ```
 
 In the dashboard, **drag a running machine's icon onto another running machine**: the same

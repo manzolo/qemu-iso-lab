@@ -35,25 +35,30 @@ class HotplugSlotTests(BaseVmctlTestCase):
 
 class RecordTests(BaseVmctlTestCase):
     def test_addresses_and_macs_are_stable_and_never_collide_on_a_segment(self):
-        record = {"segment": "session", "members": {"a": {"address": "10.99.0.1/24", "pid": 1}}}
-        self.assertEqual(vmlink.next_address(record), "10.99.0.2/24")
-        self.assertEqual(vmlink.subnet("session"), "10.99.0")
-        self.assertRegex(vmlink.subnet("backend"), r"^10\.99\.\d+$")
-        self.assertNotEqual(vmlink.subnet("backend"), "10.99.0")
+        record = {"segment": "session", "members": {"a": {"address": "192.168.100.1/24", "pid": 1}}}
+        self.assertEqual(vmlink.next_address(record), "192.168.100.2/24")
+        self.assertEqual(vmlink.subnet("session"), "192.168.100")
+        self.assertRegex(vmlink.subnet("backend"), r"^192\.168\.\d+$")
+        self.assertNotEqual(vmlink.subnet("backend"), "192.168.100")
+        self.assertEqual(vmlink.parse_subnet("172.16.5.0/24"), "172.16.5")
+        with self.assertRaisesRegex(VMError, "expected something like"):
+            vmlink.parse_subnet("172.16.5.0/16")
+        custom = {"segment": "backend", "subnet": "172.16.5", "members": {}}
+        self.assertEqual(vmlink.next_address(custom), "172.16.5.1/24")
         self.assertEqual(vmlink.nic_mac("session", "kali"), vmlink.nic_mac("session", "kali"))
         self.assertNotEqual(vmlink.nic_mac("session", "kali"), vmlink.nic_mac("session", "freebsd"))
         self.assertTrue(vmlink.nic_mac("session", "kali").startswith("52:54:01:"))
 
     def test_dead_members_are_pruned_and_an_empty_segment_is_forgotten(self):
-        vmlink.save_record({"segment": "session", "members": {"a": {"address": "10.99.0.1/24", "pid": 1}, "b": {"address": "10.99.0.2/24", "pid": 2}}})
+        vmlink.save_record({"segment": "session", "members": {"a": {"address": "192.168.100.1/24", "pid": 1}, "b": {"address": "192.168.100.2/24", "pid": 2}}})
         with mock.patch.object(vmlink, "qemu_alive", side_effect=lambda pid: pid == 2):
             self.assertEqual(list(vmlink.load_record("session")["members"]), ["a", "b"])
-            self.assertEqual(vmlink.links_of("b"), [{"segment": "session", "address": "10.99.0.2/24", "peers": []}])
+            self.assertEqual(vmlink.links_of("b"), [{"segment": "session", "address": "192.168.100.2/24", "peers": []}])
             self.assertEqual(vmlink.links_of("a"), [])
             labs = vmlink.session_labs()
         self.assertEqual(labs[0]["members"], ["b"])
         self.assertTrue(labs[0]["session"] and labs[0]["lab"])
-        self.assertEqual(labs[0]["addresses"], {"b": ["10.99.0.2/24"]})
+        self.assertEqual(labs[0]["addresses"], {"b": ["192.168.100.2/24"]})
         with mock.patch.object(vmlink, "qemu_alive", return_value=False):
             self.assertEqual(vmlink.all_records(), [])
         self.assertFalse(vmlink.record_path("session").exists())
@@ -82,7 +87,7 @@ class LinkTests(BaseVmctlTestCase):
         self.assertEqual(calls[0][1]["mcast"], vmctl.qemu.segment_endpoint("session"))
         self.assertEqual(calls[1][1]["bus"], "hotplug0")
         self.assertEqual(calls[1][1]["mac"], vmlink.nic_mac("session", "kali"))
-        self.assertEqual((member["address"], member["interface"], member["configured"], member["already"]), ("10.99.0.1/24", "enp1s0", True, False))
+        self.assertEqual((member["address"], member["interface"], member["configured"], member["already"]), ("192.168.100.1/24", "enp1s0", True, False))
         self.assertTrue(again["already"])
         configure.assert_called_once()
         self.assertEqual(vmlink.load_record("session")["members"]["kali"]["pid"], 4242)
@@ -99,7 +104,7 @@ class LinkTests(BaseVmctlTestCase):
         self.assertEqual([a["bus"] for a in device_adds[1:]], ["hotplug0", "hotplug1"])
         self.assertEqual(vmlink.links_of("kali"), [
             {"segment": "backend", "address": vmlink.subnet("backend") + ".1/24", "peers": []},
-            {"segment": "session", "address": "10.99.0.2/24", "peers": [{"name": "old", "address": "10.99.0.1/24"}]}])
+            {"segment": "session", "address": "192.168.100.2/24", "peers": [{"name": "old", "address": "192.168.100.1/24"}]}])
 
     def test_a_refused_device_add_removes_the_netdev_and_explains_an_old_boot(self):
         calls = []
@@ -141,23 +146,23 @@ class LinkTests(BaseVmctlTestCase):
 
 class GuestScriptTests(unittest.TestCase):
     def test_linux_and_freebsd_find_the_interface_by_mac_and_windows_is_left_to_the_user(self):
-        linux = vmlink.guest_script("debian", "52:54:01:aa:bb:cc", "10.99.0.1/24")
+        linux = vmlink.guest_script("debian", "52:54:01:aa:bb:cc", "192.168.100.1/24")
         self.assertIn("ip -o link", linux)
-        self.assertIn("ip addr replace 10.99.0.1/24", linux)
+        self.assertIn("ip addr replace 192.168.100.1/24", linux)
         self.assertIn("52:54:01:aa:bb:cc", linux)
-        bsd = vmlink.guest_script("freebsd", "52:54:01:aa:bb:cc", "10.99.0.1/24")
-        self.assertIn("ifconfig \"$IF\" inet 10.99.0.1/24 up", bsd)
-        self.assertIsNone(vmlink.guest_script("windows", "52:54:01:aa:bb:cc", "10.99.0.1/24"))
-        self.assertIn("netsh", vmlink.manual_hint({"meta": {"family": "windows"}}, "10.99.0.1/24"))
+        bsd = vmlink.guest_script("freebsd", "52:54:01:aa:bb:cc", "192.168.100.1/24")
+        self.assertIn("ifconfig \"$IF\" inet 192.168.100.1/24 up", bsd)
+        self.assertIsNone(vmlink.guest_script("windows", "52:54:01:aa:bb:cc", "192.168.100.1/24"))
+        self.assertIn("netsh", vmlink.manual_hint({"meta": {"family": "windows"}}, "192.168.100.1/24"))
 
     def test_configure_guest_skips_guests_without_ssh_or_a_known_family(self):
-        self.assertIsNone(vmlink.configure_guest({"meta": {"family": "debian"}}, "52:54:01:00:00:01", "10.99.0.1/24"))
-        self.assertIsNone(vmlink.configure_guest({"meta": {"family": "windows"}, "ssh_provision": {"user": "lab", "ssh_host_port": 2}}, "52:54:01:00:00:01", "10.99.0.1/24"))
+        self.assertIsNone(vmlink.configure_guest({"meta": {"family": "debian"}}, "52:54:01:00:00:01", "192.168.100.1/24"))
+        self.assertIsNone(vmlink.configure_guest({"meta": {"family": "windows"}, "ssh_provision": {"user": "lab", "ssh_host_port": 2}}, "52:54:01:00:00:01", "192.168.100.1/24"))
 
 
 class CommandTests(BaseVmctlTestCase):
     def namespace(self, **kw):
-        base = dict(vm=None, peers=[], segment=None, mcast=None, status=False, off=False, dry_run=False)
+        base = dict(vm=None, peers=[], segment=None, mcast=None, subnet=None, status=False, off=False, dry_run=False)
         base.update(kw)
         return argparse.Namespace(**base)
 

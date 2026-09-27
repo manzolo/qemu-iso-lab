@@ -57,7 +57,7 @@ What the page offers:
   when all members are running); a lab with missing installations offers **Install lab**.
 - **Link**: drag the icon of a running machine onto another running machine to connect them
   on a private segment for this session (`vmctl link`, confirmed first): a NIC is hot-plugged
-  into both, Linux and FreeBSD guests get their 10.99.0.x address over SSH, the panel shows a
+  into both, Linux and FreeBSD guests get their 192.168.100.x address over SSH, the panel shows a
   *Linked* row with an *Unlink* button, and the segment is listed under Labs as a temporary lab
   while they run. Details and limits: [LABS.md](LABS.md#temporary-links-between-running-vms-vmctl-link).
 - **Jobs**: everything runs as a detached job with its log followed live. A job started for a VM

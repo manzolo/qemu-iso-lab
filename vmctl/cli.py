@@ -299,11 +299,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = _add(subparsers, "link", help="connect running VMs on a private network segment, without restarting them (a temporary lab)",
              epilog="""examples:
-  vmctl link kali freebsd                 both get a hot-plugged NIC on segment "session" and an address in 10.99.0.0/24
+  vmctl link kali freebsd                 both get a hot-plugged NIC on segment "session" and an address in 192.168.100.0/24
   vmctl link debian-server                add one more VM to the same segment
   vmctl link                              who is linked, with the addresses (also: --status)
   vmctl link --off                        unplug every VM from the segment (or name the ones to unplug)
-  vmctl link a b --segment backend        a second, separate segment (10.99.<n>.0/24)
+  vmctl link a b --segment backend        a second, separate segment (192.168.<n>.0/24, or --subnet 172.16.5.0/24)
 
 The VMs must be running in the background (Boot headless / vmctl start --headless): the NIC is
 added over QMP, on the multicast socket the labs use, so the profiles are not touched and the
@@ -315,6 +315,7 @@ The dashboard does the same when a running machine's icon is dropped on another 
     p.add_argument("peers", nargs="*", help="the other running VMs to put on the same segment")
     p.add_argument("--segment", help="segment name (default: session)")
     p.add_argument("--mcast", help="multicast group:port of the segment instead of the one derived from its name")
+    p.add_argument("--subnet", help="the segment's /24 when its first member joins, e.g. 192.168.50.0/24 (default: 192.168.100.0/24 for 'session', 192.168.<n>.0/24 otherwise)")
     p.add_argument("--status", action="store_true", help="show the linked VMs and their addresses")
     p.add_argument("--off", action="store_true", help="unplug the named VMs (or every VM) from the segment")
     p.set_defaults(func=lifecycle.cmd_link)

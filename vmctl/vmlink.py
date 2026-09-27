@@ -3,7 +3,7 @@
 Every VM booted on its own has an isolated slirp network (the same 10.0.2.15 in each guest), so
 two running machines cannot talk. A link hot-plugs a NIC into each of them over QMP, on the
 multicast socket of a shared segment (the same transport the labs use), gives it a stable MAC
-and an address in ``10.99.<segment>.0/24`` configured over SSH where the guest is a Linux or
+and an address in a private /24 (192.168.100.0/24 for the default segment) configured over SSH where the guest is a Linux or
 FreeBSD system vmctl can reach. Nothing is written to the profiles: the record of who is on a
 segment lives in ``artifacts/labs/links/<segment>.json`` and is only as alive as the QEMU
 processes it names, so the temporary lab disappears when the VMs stop.
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shlex
 import subprocess
 from pathlib import Path
@@ -93,11 +94,23 @@ def links_of(name: str) -> list[dict[str, Any]]:
     return found
 
 
+SUBNET_RE = re.compile(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.0/24$")
+
+
 def subnet(segment: str) -> str:
-    """``10.99.<x>`` per segment: the default one is 10.99.0, others hash into 1-254."""
+    """The first three octets of a segment's /24: 192.168.100 for the default one, other names hash
+    into 192.168.101-254 (10.0.2.x is slirp, 192.168.0.x and 10.10.10.x are the tracked labs)."""
     if segment == DEFAULT_SEGMENT:
-        return "10.99.0"
-    return f"10.99.{1 + hashlib.sha256(segment.encode()).digest()[0] % 254}"
+        return "192.168.100"
+    return f"192.168.{101 + hashlib.sha256(segment.encode()).digest()[0] % 154}"
+
+
+def parse_subnet(text: str) -> str:
+    """``--subnet A.B.C.0/24`` (the only prefix length the links use) -> ``A.B.C``."""
+    match = SUBNET_RE.match(text.strip())
+    if not match or any(int(octet) > 255 for octet in match.groups()):
+        raise VMError(f"--subnet {text!r}: expected something like 192.168.50.0/24")
+    return ".".join(match.groups())
 
 
 def nic_mac(segment: str, name: str) -> str:
@@ -108,7 +121,7 @@ def nic_mac(segment: str, name: str) -> str:
 
 def next_address(record: dict[str, Any]) -> str:
     taken = {str(m.get("address", "")).split("/")[0] for m in record["members"].values()}
-    base = subnet(str(record["segment"]))
+    base = str(record.get("subnet") or subnet(str(record["segment"])))
     for host in range(1, 255):
         candidate = f"{base}.{host}"
         if candidate not in taken:
@@ -201,9 +214,12 @@ def configure_guest(vm: dict[str, Any], mac: str, address: str, dry_run: bool = 
 
 
 def link(vm: dict[str, Any], name: str, pid: int, segment: str = DEFAULT_SEGMENT, dry_run: bool = False,
-         mcast: str | None = None) -> dict[str, Any]:
-    """Put *name* (running as *pid*) on *segment*: plug, record, configure. Idempotent for a VM already there."""
+         mcast: str | None = None, subnet_base: str | None = None) -> dict[str, Any]:
+    """Put *name* (running as *pid*) on *segment*: plug, record, configure. Idempotent for a VM already there.
+    *subnet_base* (A.B.C) is honoured for a segment's first member; later ones follow the record."""
     record = prune(load_record(segment))
+    if subnet_base and not record["members"]:
+        record["subnet"] = subnet_base
     member: dict[str, Any] | None = record["members"].get(name)
     if member and int(member.get("pid") or 0) == pid:
         member["already"] = True

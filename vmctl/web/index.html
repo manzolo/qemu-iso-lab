@@ -695,7 +695,7 @@ function renderLabs() {
   $("labs-view").innerHTML = S.labs.filter((lab) => words.every((w) => (lab.group + " " + lab.members.join(" ")).toLowerCase().includes(w))).map((lab) => {
     const names = lab.start_order || lab.members, members = names.map((n) => byName[n]).filter(Boolean);
     if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="chip completed">temporary · ${members.length} linked</span></div>
-      <p class="lab-order">Made with <span class="mono">vmctl link</span> (or by dropping one running machine on another). Private segment 10.99.x.0/24 between running VMs; it ends when they stop and touches no profile.</p>
+      <p class="lab-order">Made with <span class="mono">vmctl link</span> (or by dropping one running machine on another). Private /24 segment between running VMs; it ends when they stop and touches no profile.</p>
       <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "")}</span></span></button>${stateBadge(m)}</div>`).join("")}</div>
       <div class="buttons"><button data-args='${esc(JSON.stringify(["link", "--status", "--segment", lab.segment]))}'>Status</button><button class="danger" data-args='${esc(JSON.stringify(["link", "--off", "--segment", lab.segment]))}'>Unlink all</button></div></section>`;
     const up = members.filter((m) => m.running).length;
@@ -1464,14 +1464,19 @@ document.addEventListener("pointerup", async (e) => {
   endDrag();
   if (!target) return;
   const ok = await askConfirm({ eyebrow: "Session link", title: `Link ${d.vm} and ${target}?`, button: "Link them",
-    message: "Both machines get a hot-plugged NIC on a private segment (10.99.0.0/24) for this session and, where vmctl can reach the guest over SSH, its address. Nothing is saved in the profiles: the link ends when the machines stop.",
+    message: "Both machines get a hot-plugged NIC on a private segment (192.168.100.0/24) for this session and, where vmctl can reach the guest over SSH, its address. Nothing is saved in the profiles: the link ends when the machines stop.",
     command: `vmctl link ${d.vm} ${target}` });
   if (ok) run(["link", d.vm, target]);
 });
 document.addEventListener("pointercancel", () => { if (dragState.start) endDrag(); });
-$("details").addEventListener("click", (e) => {
+$("details").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-unlink]"); if (!b || !selected) return;
-  run(["link", "--off", "--segment", b.dataset.unlink, selected]);
+  const vm = selected, segment = b.dataset.unlink;
+  b.disabled = true; b.textContent = "Unlinking…";
+  await run(["link", "--off", "--segment", segment, vm]);
+  // The state poll confirms in a few seconds; the row goes now (it comes back if the job failed).
+  const row = S.vms.find((r) => r.name === vm); if (row?.links) row.links = row.links.filter((l) => l.segment !== segment);
+  detailsSignature = ""; render();
 });
 window.addEventListener("scroll", hideHoverShot, true);
 window.addEventListener("resize", hideHoverShot);
