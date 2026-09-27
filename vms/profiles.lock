@@ -462,6 +462,17 @@
         }
       ]
     },
+    "linuxmint": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:64eeb4b6e09c766836380a7752397042e4b5d378124253c1bffd521dc6b2928c",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "linuxmint-cinnamon": {
       "version": "1.0.0",
       "fingerprint": "sha256:92cfe55f648480bb883124bcfea8ad3c1193771ce3982e76ca26068d3d526eff",

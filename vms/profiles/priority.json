@@ -49,6 +49,94 @@
       "usb_tablet": true,
       "iso_sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4"
     },
+    "linuxmint": {
+      "name": "Linux Mint 22.3 Cinnamon (unattended, Ubiquity)",
+      "meta": {
+        "slug": "linux-mint",
+        "family": "mint",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "unattended",
+        "verified": "2026-09-27",
+        "version": "1.0.0"
+      },
+      "iso": "isos/linuxmint-22.3-cinnamon-64bit.iso",
+      "iso_url": "https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
+      "iso_sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4",
+      "installer_boot": {
+        "kernel": "casper/vmlinuz",
+        "initrd": "casper/initrd.lz"
+      },
+      "disk": {
+        "path": "artifacts/linuxmint/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/linuxmint/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "guest_agent": true,
+      "clipboard": true,
+      "ubiquity_config": {
+        "username": "lab",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "hostname": "linuxmint",
+        "timezone": "UTC",
+        "locale": "en_US.UTF-8",
+        "keyboard_layout": "us",
+        "packages": [
+          "openssh-server",
+          "qemu-guest-agent"
+        ],
+        "session": "cinnamon"
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2281,
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service lightdm.service --package-manager dpkg --package cinnamon --process cinnamon"
+        ]
+      },
+      "notes": "Linux Mint 22.3 Cinnamon installed by Ubiquity in automatic mode: a d-i style seed and a late script are grafted on a per-VM copy of the ISO (/preseed/), casper boots with only-ubiquity automatic-ubiquity, the late script (ubiquity/success_command) installs openssh-server and the guest agent in the target, adds the project key, passwordless sudo, LightDM autologin into cinnamon and a serial getty, then unmounts, flushes and prints the token. Same medium as linuxmint-cinnamon (the manual live install)."
+    },
     "almalinux-minimal": {
       "name": "AlmaLinux 10.1 Minimal",
       "meta": {

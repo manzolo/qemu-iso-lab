@@ -21,7 +21,7 @@ VM installed, booted in the background and provisioned over SSH. Every
 ## The common shape
 
 1. Render the answer file from the profile section (`autoinstall`,
-   `preseed_config`, `kickstart_config`, `archinstall_config`, `omarchy_config`,
+   `preseed_config`, `ubiquity_config`, `kickstart_config`, `archinstall_config`, `omarchy_config`,
    `alpine_config`, `windows_config`)
    and pack it into a small seed ISO under `artifacts/<vm>/`.
 2. Extract the kernel and initrd from the distro ISO (`xorriso` or `bsdtar`)
@@ -212,6 +212,37 @@ Ubuntu Server 24.04.4 ISO, the desktop chosen by the metapackage in
 manager that flavor ships (`/etc/sddm.conf.d/` for Lubuntu and Kubuntu,
 `/etc/lightdm/lightdm.conf.d/` for the other three) plus a `serial-getty@ttyS0`.
 Another version or another desktop is a profile, not a patch.
+
+## Linux Mint: Ubiquity in automatic mode
+
+```bash
+vmctl bootstrap-ubiquity linuxmint
+```
+
+Mint 22 still installs with **Ubiquity** on a casper live ISO, and Ubiquity has no autoinstall:
+what it has is d-i style preseeding plus an *automatic* mode. `vmctl/ubiquity.py` renders a
+seed from `ubiquity_config` (locale, keyboard, timezone, whole-disk `partman-auto` on
+`/dev/vda`, the user with the profile's password hash, no summary page, no updates, no codecs
+page) and a late script, grafts both under `/preseed/` in a per-VM copy of the vendor ISO
+(`artifacts/<vm>/ubiquity/install.iso`, `xorriso -boot_image any keep`: a new session, the boot
+records untouched, cached by a stamp of source + rendering) and boots `casper/vmlinuz` +
+`casper/initrd.lz` straight from the ISO with
+`boot=casper only-ubiquity automatic-ubiquity noprompt file=/cdrom/preseed/vmctl.seed`: casper
+applies the seed with `debconf-set-selections` at boot, `only-ubiquity` runs the installer instead
+of the live desktop. Ubiquity works on the framebuffer, so the serial console shows the kernel
+and a `mint login:` getty only (`vmctl attach` shows the installer); the late script is
+`ubiquity/success_command`, run in the live system with `/target` still mounted, and reports on
+ttyS0 while it configures the target in a chroot: `openssh-server` and `packages` from the
+mirror (`apt-get`, with the live `resolv.conf` lent to the target for the duration), the project
+SSH key, passwordless sudo, `UseDNS no`, `ssh` + `serial-getty@ttyS0` enabled, `graphical.target`,
+a LightDM autologin drop-in into `session` (`cinnamon`), then `late_commands`. It ends the only
+way an unattended flow may: umount → `sync` → `blockdev --flushbufs` → the token → `poweroff -f`;
+a failed step prints `==> Ubiquity install FAILED: <step>` and powers off, which
+`explain_failed_bootstrap` turns into the error. The post-install is the usual one:
+`verify-desktop --service lightdm.service --process cinnamon` over SSH on port 2281.
+
+`linuxmint-cinnamon` (manual, the same medium as a live session) and `linuxmint` (unattended)
+share the ISO; a Mint edition (Xfce, MATE) or LMDE is a profile with its own `session`.
 
 ## Arch: pacstrap script
 
@@ -1048,7 +1079,7 @@ joins them the moment it is written:
 | `meta.family` | `debian`, `arch`, `fedora`, `rhel`, `windows`, `bsd`, `nix`, `alpine`, `opensuse`, `reactos`, `kali`, `mint`, `void` |
 | `meta.status` | `unattended`, `manual`, `experimental` |
 | `meta.role` | `desktop`, `server`, `router`, `installer`, `ci`, `minimal`, `import-template`... |
-| install flow | `bootstrap-preseed`, `bootstrap-kickstart`, `bootstrap-windows`, `boot-check`... |
+| install flow | `bootstrap-preseed`, `bootstrap-ubiquity`, `bootstrap-kickstart`, `bootstrap-windows`, `boot-check`... |
 
 The rest are declared by hand in `meta.groups`, because no other field expresses them:
 

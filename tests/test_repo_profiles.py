@@ -96,6 +96,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # pearOS NiceC0re: bootstrap-pearos installed and provisioned it on the first live run
         # (verify-desktop reported an active graphical session for the autologin user).
         verified_pearos = {"pearos-nicecore"}
+        # Linux Mint: bootstrap-ubiquity installed and provisioned it on its first live run
+        # (verify-desktop: cinnamon running in the autologin session).
+        verified_mint = {"linuxmint"}
         # NixOS: both rode bootstrap-nixos live on 2026-09-19 (server verified over SSH,
         # GNOME through verify-desktop on the autologin session).
         verified_nixos = {"nixos-server", "nixos-gnome"}
@@ -141,7 +144,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                              else "2026-09-15" if name in verified_nt4
                              else "2026-09-19" if name in verified_pearos | verified_nixos
                              else "2026-09-20" if name in verified_ubuntu_2604
-                             else "2026-09-26" if name in verified_proxmox_lab | verified_haiku | verified_hobby else None)
+                             else "2026-09-26" if name in verified_proxmox_lab | verified_haiku | verified_hobby
+                             else "2026-09-27" if name in verified_mint else None)
             self.assertEqual(vm["meta"].get("verified"), expected_date, name)
         # Promoted on 2026-09-09: verify-desktop reported an active local graphical session for
         # the autologin user on the live matrix, which is what the flavor recipe has to prove.

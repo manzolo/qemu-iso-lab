@@ -127,6 +127,9 @@ produces isolated per-VM artifacts.
   installer with it attached.
 - `vmctl bootstrap-omarchy foo` uses the official ISO's `cidata` format,
   waits for its unattended install to reboot, then starts SSH post-install.
+- `./bin/vmctl bootstrap-ubiquity <name>` is Linux Mint: a d-i style seed and a late
+  script grafted on a copy of the live ISO (`artifacts/<vm>/ubiquity/install.iso`), Ubiquity
+  in automatic mode, the token from the late script on ttyS0, then SSH post-install.
 - `./bin/vmctl bootstrap-preseed <name>` is the Debian preseed path. It builds
   preseed artifacts under `artifacts/<vm>/preseed/`, boots headless via serial,
   waits for the completion token, then starts the installed disk for SSH

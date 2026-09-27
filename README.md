@@ -151,6 +151,7 @@ the catalog. Details: [docs/PROFILES.md](docs/PROFILES.md#profile-versions).
 | Debian, Kali | server, GNOME, KDE, Xfce, Kali | `bootstrap-preseed` |
 | Fedora, RHEL | Workstation, KDE, Silverblue, Kinoite, AlmaLinux, Rocky, CentOS Stream | `bootstrap-kickstart` |
 | Arch family | Arch with niri, DMS or Noctalia, CachyOS, Omarchy, pearOS, NVIDIA recipes | `bootstrap-archinstall`, `bootstrap-omarchy`, `bootstrap-pearos` |
+| Linux Mint | 22.3 Cinnamon (Ubiquity in automatic mode) | `bootstrap-ubiquity` |
 | More Linux | openSUSE Tumbleweed, NixOS, Alpine | `bootstrap-autoyast`, `bootstrap-nixos`, `bootstrap-alpine` |
 | BSD and others | FreeBSD, pfSense, ReactOS, Proxmox VE, Haiku | `bootstrap-freebsd`, `bootstrap-pfsense`, `bootstrap-reactos`, `bootstrap-proxmox`, `bootstrap-haiku` |
 | Windows | 11 and 10 (OpenSSH, virtio drivers, shared folder), 7 | `bootstrap-windows` |

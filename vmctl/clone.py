@@ -227,7 +227,7 @@ echo "==> identity regenerated: $(cat /etc/hostname 2>/dev/null || hostname) $(c
 
 def guest_hostname(vm: dict[str, Any]) -> str | None:
     for section in ("ssh_provision", "cloud_init", "autoinstall", "archinstall_config", "preseed_config",
-                    "kickstart_config", "alpine_config", "autoyast_config", "omarchy_config", "pearos_config"):
+                    "kickstart_config", "alpine_config", "autoyast_config", "omarchy_config", "pearos_config", "ubiquity_config"):
         sec = vm.get(section)
         if isinstance(sec, dict) and sec.get("hostname"):
             return str(sec["hostname"])

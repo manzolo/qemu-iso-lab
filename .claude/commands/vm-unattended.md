@@ -11,7 +11,7 @@ allowed-tools:
 Install the VM `$ARGUMENTS` unattended, the way the maintainer does it by hand:
 
 1. Pick the flow from the profile: `./bin/vmctl show <vm> --json` and the section it carries:
-   `autoinstall` -> `bootstrap-unattended`, `preseed_config` -> `bootstrap-preseed`,
+   `autoinstall` -> `bootstrap-unattended`, `preseed_config` -> `bootstrap-preseed`, `ubiquity_config` -> `bootstrap-ubiquity`,
    `kickstart_config` -> `bootstrap-kickstart`, `autoyast_config` -> `bootstrap-autoyast`,
    `archinstall_config` -> `bootstrap-archinstall`, `alpine_config` -> `bootstrap-alpine`,
    `omarchy_config` -> `bootstrap-omarchy`, `windows_config` -> `bootstrap-windows`,

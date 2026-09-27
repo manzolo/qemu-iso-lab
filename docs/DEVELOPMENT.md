@@ -46,6 +46,7 @@ make check
 make ci
 vmctl --dry-run bootstrap-preseed debian-server        # when touching unattended flows
 vmctl --dry-run bootstrap-kickstart almalinux-server
+vmctl --dry-run bootstrap-ubiquity linuxmint
 vmctl --dry-run install-unattended ubuntu-niri
 ```
 

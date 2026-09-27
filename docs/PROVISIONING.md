@@ -43,6 +43,7 @@ order. Output goes to `artifacts/<vm>/logs/post-install.*.log`.
 | `autoinstall` (Ubuntu) | `hostname`, `username`, `realname`, `password_hash`, `timezone`, `keyboard_layout`, `storage_layout`, `install_ssh`, `packages`, `apt` (curtin apt configuration passed through; `{"disable_suites": ["security"]}` skips the security upgrade that `updates` cannot turn off, used by `ubuntu-server-ci` to keep the TCG install in CI under its timeout), `late_commands` (subiquity late-commands: the way to install packages the live-server CD does not carry on 20.04, whose subiquity resolves `packages` against the CD pool only, e.g. `curtin in-target --target=/target -- apt-get install -y ubuntu-desktop`) |
 | `archinstall_config` (Arch, CachyOS) | `hostname`, `username`, `password`, `timezone`, `keyboard_layout`, `locale_lang`, `locale_enc`, `bootloader`, `kernels`, `audio`, `packages`, `bootstrap_chroot_commands`, `inherit_live_pacman_conf`, `live_login_prompt`, `live_shell_prompt`, `live_kernel_append` (derivatives; see [UNATTENDED.md](UNATTENDED.md#cachyos-on-the-same-flow)) |
 | `preseed_config` (Debian) | `hostname`, `domain`, `username`, `fullname`, `password_hash` or `password`, `timezone`, `keyboard_layout`, `locale`, `language`, `country`, `mirror_hostname`, `mirror_directory`, `tasks`, `packages`, `late_commands`, `disk_device` |
+| `ubiquity_config` (Linux Mint) | `hostname`, `domain`, `username`, `fullname`, `password_hash` or `password`, `timezone`, `keyboard_layout`, `locale`, `language`, `packages` (`openssh-server` always), `session` (LightDM autologin session, `cinnamon`), `autologin`, `late_commands`, `disk_device`, `extra` (raw seed lines) |
 | `kickstart_config` (AlmaLinux/RHEL/Fedora) | `hostname`, `username`, `fullname`, `password_hash` or `password`, `timezone`, `keyboard_layout`, `locale`, `inst_repo` (`cdrom` or a repository URL), `ignore_missing_packages`, `packages`, `post_commands`, `disk_device`, `selinux`, `firewall` |
 | `alpine_config` (Alpine) | `hostname`, `username`, `password_hash`, `timezone`, `keyboard_layout`, `keyboard_variant`, `user_groups`, `ntp`, `disk_device`, `kernel_flavor` (`lts` or `virt`), `kernel_opts`, `packages`, `optional_packages`, `chroot_commands` |
 | `omarchy_config` | `hostname`, `username`, `password_hash`, `timezone`, `keyboard_layout`, `locale`, `disk_device`, `encrypt` |
@@ -110,7 +111,7 @@ Tracked profiles are generic on purpose:
   writes the placeholder `{{user}}`. At load time `vmctl` replaces it with the
   identity declared by the profile (`ssh_provision.user`, `cloud_init.user`,
   `autoinstall.username`, `archinstall_config.username`,
-  `omarchy_config.username`, `preseed_config.username`,
+  `omarchy_config.username`, `preseed_config.username`, `ubiquity_config.username`,
   `kickstart_config.username`, `alpine_config.username`,
   `autoyast_config.username`, `nixos_config.username`, `pearos_config.username`,
   `windows_config.username`; they must agree).

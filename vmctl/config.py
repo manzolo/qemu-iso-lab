@@ -92,6 +92,7 @@ USER_IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
     ("archinstall_config", "username"),
     ("omarchy_config", "username"),
     ("preseed_config", "username"),
+    ("ubiquity_config", "username"),
     ("kickstart_config", "username"),
     ("alpine_config", "username"),
     ("autoyast_config", "username"),

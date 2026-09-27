@@ -24,6 +24,7 @@ TRACKED_LAB_HASH = "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpK
 LOGIN_SECTIONS = (
     ("proxmox_config", None, "root_password", "root_password_hash"),
     ("preseed_config", "username", None, "password_hash"),
+    ("ubiquity_config", "username", None, "password_hash"),
     ("autoinstall", "username", None, "password_hash"),
     ("kickstart_config", "username", None, "password_hash"),
     ("archinstall_config", "username", "password", "password_hash"),

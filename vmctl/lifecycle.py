@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, catalog, checkpoint, clone, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
+from vmctl import alpine, archinstall, autoyast, catalog, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -416,6 +416,10 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-preseed", "preseed + post-install")
         return ("skip", "preseed without SSH post-install")
+    if ubiquity.ubiquity_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-ubiquity", "Ubiquity automatic install + post-install")
+        return ("skip", "ubiquity_config without SSH post-install")
     if kickstart.kickstart_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-kickstart", "kickstart + post-install")
@@ -557,7 +561,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -777,6 +781,25 @@ def run_local_test_vm(
     if mode == "bootstrap-alpine":
         try:
             cmd_bootstrap_alpine(
+                argparse.Namespace(
+                    vm=vm_name,
+                    timeout=args.timeout,
+                    dry_run=args.dry_run,
+                    _vm_override=prepared_vm,
+                    _report_parent=args,
+                )
+            )
+            args._report_phase = "post-install"
+        finally:
+            report.capture(vm_name, prepared_vm, args)
+            cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+        detail = f"{note}; stopped after check-vms"
+        if prep_note is not None:
+            detail = f"{detail}; {prep_note}"
+        return ("passed", detail)
+    if mode == "bootstrap-ubiquity":
+        try:
+            cmd_bootstrap_ubiquity(
                 argparse.Namespace(
                     vm=vm_name,
                     timeout=args.timeout,
@@ -1653,6 +1676,65 @@ def cmd_bootstrap_alpine(args: argparse.Namespace) -> int:
         ui.print_kv("pid", str(pid))
 
     report.phase(args, "post-install")
+    run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
+    return 0
+
+
+def cmd_bootstrap_ubiquity(args: argparse.Namespace) -> int:
+    """Linux Mint (Ubiquity on a casper live ISO): seed + late script grafted on a copy of the ISO,
+    the installer booted straight from the medium in automatic mode, the token on ttyS0."""
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    problems = ubiquity.check_profile(args.vm, vm)
+    if problems:
+        raise VMError("; ".join(problems))
+
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Ubiquity (automatic install): {args.vm}")
+
+    source_iso = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-ubiquity", dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+
+    install_iso = ubiquity.ensure_install_iso(args.vm, vm, source_iso, dry_run=args.dry_run)
+    kernel_path, initrd_path = ubiquity.extract_boot_artifacts(vm, source_iso, dry_run=args.dry_run)
+
+    install_qemu_args = qemu.common_args(
+        vm,
+        None,
+        dry_run=args.dry_run,
+        accel=automation_accel(vm),
+        headless=True,
+        serial_stdio=True,
+        no_reboot=True,
+        allow_missing_disk=args.dry_run and not disk_exists,
+        enable_clipboard=False,
+        network_phase="install",
+    )
+    install_qemu_args += ["-cdrom", str(install_iso)]
+    install_qemu_args += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", ubiquity.kernel_append(vm)]
+
+    ui.print_note("Booting the live medium with Ubiquity in automatic mode — the installer works on the framebuffer, "
+                  "the late script reports on the serial console...")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    try:
+        qemu.run_and_expect(
+            install_qemu_args,
+            expected_text=ubiquity.BOOTSTRAP_COMPLETE_TOKEN,
+            timeout_sec=getattr(args, "timeout", 1800),
+            dry_run=args.dry_run,
+            log_path=serial_log,
+        )
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, ubiquity.BOOTSTRAP_FAILED_TOKEN, "Ubiquity", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-ubiquity", vm, dry_run=args.dry_run)
+    ui.print_status("ok", "Installation complete — starting installed VM for post-install")
+
+    report.phase(args, "post-install")
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
     run_post_install(args.vm, vm, getattr(args, "timeout", 300), dry_run=args.dry_run)
     ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0
