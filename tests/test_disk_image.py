@@ -57,7 +57,9 @@ class DiskImageTests(BaseVmctlTestCase):
         image = self.root / "isos/os.img"
         image.parent.mkdir(parents=True, exist_ok=True)
         image.write_bytes(b"\0" * 4096)
-        with mock.patch.object(vmctl.runtime, "run") as run, mock.patch("sys.stdout", new_callable=io.StringIO):
+        # The CI runner has no qemu-img: the conversion is only recorded, never run.
+        with mock.patch.object(vmctl.runtime, "run") as run, mock.patch.object(vmctl.runtime, "require_command"), \
+                mock.patch("sys.stdout", new_callable=io.StringIO):
             vmctl.lifecycle.ensure_vm_disk(self.image_vm(), vm_name=self.vm_name)
         command = run.call_args.args[0]
         self.assertEqual(command[:2], ["qemu-img", "convert"])
