@@ -53,16 +53,37 @@ table { width:100%; border-collapse:collapse; }
 th { text-align:left; font-weight:500; color:var(--muted); font-size:11px; padding:10px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel); }
 td { padding:12px 16px; border-bottom:1px solid #253145; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:360px; }
 tr:last-child td { border-bottom:0; }
-tr.row { cursor:pointer; }
+tr.row { cursor:pointer; user-select:none; }
+.vm-select { position:relative; display:inline-flex; flex:0 0 34px; width:34px; height:34px; padding:0; background:none; border:0; border-radius:10px; }
+.vm-select:hover { background:none; }
+.vm-select[aria-pressed=true] { outline:2px solid var(--accent); outline-offset:3px; }
+.vm-select[aria-pressed=true]::after { content:"✓"; position:absolute; bottom:-5px; right:-5px; display:grid; place-items:center; width:16px; height:16px; border:2px solid #163537; border-radius:50%; background:var(--accent); color:#102c29; font-size:11px; font-weight:800; pointer-events:none; }
+@media(max-width:420px) { .vm-select { flex-basis:28px; width:28px; height:28px; } }
+#selection-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px 18px; border-bottom:1px solid var(--line); background:#1b303b; }
+#selection-count { margin-right:auto; font-size:12px; color:var(--accent); }
+.context-selection { padding:8px 12px; max-height:90px; overflow:auto; overflow-wrap:anywhere; font-size:11px; color:var(--accent); border-bottom:1px solid var(--line); }
+#selection-hint { padding:8px 18px; margin:0; font-size:11px; color:var(--muted); }
 tr.row:hover td { background:#1e2b3e; }
-tr.row.sel td { background:#203b42; }
-tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
+tr.row.sel td { background:#1d2c3d; }
+tr.row.sel td:first-child { box-shadow:inset 3px 0 #7894b4; }
+tr.row.multi td { background:#193b3e; border-bottom-color:#305658; }
+tr.row.multi:hover td { background:#21494b; }
+tr.row.multi td:first-child { box-shadow:inset 3px 0 var(--accent); }
+tr.row.multi .profile-name { color:#c2ffed; }
 .profile-identity,.lab-identity { display:flex; align-items:center; gap:12px; min-width:0; }
 .profile-text { display:block; min-width:0; }
 .catalog-icon { --icon-color:var(--accent); --icon-ink:#fff; display:inline-flex; align-items:center; justify-content:center; flex:0 0 34px; width:34px; height:34px; border-radius:10px; color:var(--icon-ink); background:linear-gradient(160deg, color-mix(in srgb,var(--icon-color) 92%,#fff), color-mix(in srgb,var(--icon-color) 78%,#0b1220)); box-shadow:inset 0 0 0 1px color-mix(in srgb,#fff 18%,transparent), 0 1px 2px rgba(0,0,0,.35); vertical-align:middle; }
 .catalog-icon svg { display:block; width:22px; height:22px; pointer-events:none; }
-.catalog-icon[data-drag] { cursor:grab; touch-action:none; }
+.link-handle { flex:0 0 30px; width:30px; height:30px; padding:5px; margin-left:auto; color:var(--accent); background:transparent; border:1px solid var(--line); opacity:0; cursor:grab; touch-action:none; }
+.link-handle svg { width:18px; height:18px; pointer-events:none; }
+.row:hover .link-handle,.row.sel .link-handle,.row:focus-within .link-handle { opacity:1; }
+.link-handle:hover { background:#25453f; border-color:var(--accent); }
+@media (hover:none) { .link-handle { opacity:1; } }
+#link-dialog,#unlink-dialog { width:480px; }
+#selection-link.warn { color:var(--warn); }
+#link-target,#unlink-segment { width:100%; margin:10px 0 20px; }
 body.dragging { user-select:none; cursor:grabbing; }
+#drag-ghost .link-handle { opacity:1; }
 #drag-ghost { position:fixed; z-index:60; display:flex; align-items:center; gap:8px; padding:4px 10px 4px 4px; background:#182537; border:1px solid #3d526b; border-radius:12px; box-shadow:0 10px 30px #0008; pointer-events:none; font-size:12px; }
 #rows.linking tr[data-vm] { opacity:.55; }
 #rows.linking tr.drop-target { opacity:1; outline:2px solid var(--accent); outline-offset:-2px; background:#1c3a33; }
@@ -80,6 +101,10 @@ body.dragging { user-select:none; cursor:grabbing; }
 .hover-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; }
 #hover-name { font:600 12px ui-monospace,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hover-display { aspect-ratio:4/3; max-height:55vh; display:grid; place-items:center; background:#03060b; border-block:1px solid var(--line); }
+#hover-shot img:not([src]) { display:none; }
+.hover-display > * { grid-area:1/1; }
+.hover-loading { color:var(--muted); padding:24px; text-align:center; }
+.hover-loading .state { border:0; font-weight:400; }
 #hover-shot img { display:block; width:100%; height:100%; min-height:0; object-fit:contain; }
 #hover-shot .hover-caption { padding:8px 12px; font-size:11px; color:var(--muted); }
 @media (hover:none) { #hover-shot { display:none !important; } }
@@ -303,6 +328,7 @@ main > section { min-width:0; }
 .profile-title { min-width:0; }
 #details .name { font-size:18px; margin:0 0 4px; line-height:1.25; }
 #details .desc { font-size:12px; margin:0; }
+.primary-actions button { grid-column:1/-1; }
 .actions.primary-actions { border:0; padding:0; margin:14px 0; }
 .operation-note { margin:0 0 14px; color:var(--muted); font-size:11px; line-height:1.6; }
 .primary-actions button:last-child { background:var(--btn); color:var(--text); border:1px solid transparent; margin:0; }
@@ -366,6 +392,13 @@ main > section { min-width:0; }
   #log-dialog header { flex-wrap:wrap; gap:10px; }
   #log-title { font-size:14px; overflow-wrap:anywhere; }
 }
+#job-bar { position:fixed; bottom:0; left:0; right:0; z-index:40; display:flex; align-items:center; gap:16px; padding:12px 24px; border-top:1px solid #466578; background:#162536; box-shadow:0 -8px 30px #0004; }
+body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
+.job-bar-copy { flex:1; min-width:0; }
+#job-bar-command { display:block; font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#job-bar .state { border:0; padding:0; margin-bottom:3px; font-size:13px; }
+#job-bar .job-controls { flex-shrink:0; }
+@media(max-width:600px) { #job-bar { padding:10px 16px; gap:8px; flex-wrap:wrap; } .job-bar-copy { flex-basis:100%; } body:has(#job-bar:not(.hidden)) { padding-bottom:140px; } }
 @media(prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } }
 </style>
 </head>
@@ -389,9 +422,11 @@ main > section { min-width:0; }
 <div id="activity-panel" popover="auto" role="region" aria-label="Latest activity details"><div class="activity-copy"><div class="eyebrow">Latest activity</div><strong id="activity-status" role="status"></strong><span id="activity-command"></span></div><div class="job-controls"><button id="activity-log">View log</button><button id="activity-cancel" class="danger hidden">Cancel job</button><button id="activity-dismiss" class="hidden" aria-label="Dismiss completed activity" title="Keep in Recent activity">Dismiss</button></div></div>
 <main id="profiles-view">
   <section class="card"><h2 id="list-title">Profiles</h2>
+    <p id="selection-hint">Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
+    <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start">Start</button><button id="selection-stop">Stop</button><button id="selection-link">Link network</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
-  <section class="card"><div class="profile-heading"><h2>Selected machine</h2><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
+  <section class="card"><div class="profile-heading"><h2>Machine details</h2><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
 </main>
 <div id="labs-view" class="labs hidden"></div>
 <section id="jobs" class="card"><div class="section-heading"><div><h2>Recent activity</h2><p>Jobs from the web and TUI keep running when you close this page.</p></div><span id="job-count" class="chip">0 jobs</span></div>
@@ -416,10 +451,13 @@ main > section { min-width:0; }
 <dialog id="terminal-dialog" aria-labelledby="terminal-title"><div id="terminal-shell"><header><div><div class="eyebrow">SSH terminal</div><h1 id="terminal-title">SSH</h1></div><div class="console-toolbar"><span id="terminal-status" class="state s-warn" role="status">Connecting</span><button id="terminal-reconnect">Reconnect</button><button id="terminal-full">Full screen</button><button id="terminal-close">Close</button></div></header><div id="terminal-frame"><div id="terminal-screen"></div></div><div class="console-footer"><p id="terminal-note">Interactive SSH to the guest. Closing this terminal disconnects SSH; the VM keeps running.</p></div></div></dialog>
 <dialog id="profile-dialog" aria-labelledby="profile-title"><header><div><div class="eyebrow">Local customization</div><h1 id="profile-title">Customize profile</h1></div><button data-close>Close</button></header><div class="body"><p class="s-muted" id="profile-intro">Loading profile…</p><div class="profile-resources"><div class="field"><label for="profile-memory">Memory (MiB)</label><input id="profile-memory" type="number" min="1" step="1"><span id="memory-default" class="help"></span></div><div class="field"><label for="profile-cpus">vCPUs</label><input id="profile-cpus" type="number" min="1" step="1"><span id="cpus-default" class="help"></span></div></div><details class="advanced" id="profile-advanced"><summary>Advanced JSON override</summary><p class="help">Only add fields you want to customize. Objects merge recursively; arrays append to the catalog arrays. Remove a field to inherit it again.</p><textarea id="profile-json" aria-label="Local profile override JSON" spellcheck="false" rows="12"></textarea></details><details class="advanced"><summary>View catalog template</summary><pre id="profile-base"></pre></details><p id="profile-feedback" role="status"></p></div><div class="command-footer"><p class="help">Saved in vms/profiles/local.json. Resource changes apply on the next VM start. Disk size changes do not resize an existing disk.</p><div class="command-buttons"><button id="profile-reset">Restore catalog values</button><button id="profile-save" class="primary">Save local override</button></div></div></dialog>
 <div id="vm-context" popover="manual" role="menu" aria-label="VM actions"></div>
+<dialog id="unlink-dialog" aria-labelledby="unlink-title"><header><h1 id="unlink-title">Choose network to unlink</h1><button data-close>Close</button></header><div class="body"><p id="unlink-members" class="mono"></p><p>These machines share multiple networks. Choose the network to disconnect.</p><label for="unlink-segment">Network</label><select id="unlink-segment"></select><p class="help">Only the listed machines will be removed from this network.</p><button id="unlink-review">Review unlink…</button></div></dialog>
+<dialog id="link-dialog" aria-labelledby="link-title"><header><h1 id="link-title">Network connection</h1><button data-close>Close</button></header><div class="body"><p id="link-source" class="mono"></p><label for="link-target">Connect to</label><select id="link-target"></select><p class="help">Link to a machine, or unlink an existing connection. Stopped machines join new links at their next start.</p><button id="link-review" class="primary">Review link…</button></div></dialog>
 <dialog id="help-dialog"><header><h1 id="help-title">ISO needed</h1><button data-close>Close</button></header>
   <div class="body"><div class="note" id="help-text"></div></div></dialog>
+<aside id="job-bar" class="hidden" aria-label="Active job"><div class="job-bar-copy"><span id="job-bar-status" class="state busy s-warn" role="status"></span><span id="job-bar-command" class="mono"></span></div><div class="job-controls"><button id="job-bar-log">View job</button><button id="job-bar-cancel" class="danger">Cancel job</button></div></aside>
 <div id="toast" role="status" popover="manual"></div>
-<div id="hover-shot" aria-hidden="true"><div class="hover-heading"><span id="hover-name"></span><span id="hover-status" class="state s-warn">Connecting</span></div><div class="hover-display"><img alt="Guest screen preview"></div><div class="hover-caption">Screen preview · refreshes every second</div></div>
+<div id="hover-shot" aria-hidden="true"><div class="hover-heading"><span id="hover-name"></span><span id="hover-status" class="state s-warn">Connecting</span></div><div class="hover-display"><div class="hover-loading"><span class="state busy s-info">Loading live preview…</span></div><img alt="Guest screen preview"></div><div class="hover-caption">Screen preview · refreshes every second</div></div>
 
 <script>
 "use strict";
@@ -427,7 +465,7 @@ const params = new URLSearchParams(location.search);
 if (params.get("token")) { sessionStorage.setItem("vmctl-token", params.get("token")); history.replaceState(null, "", "/" + location.hash); }
 const TOKEN = sessionStorage.getItem("vmctl-token") || "";
 let S = { vms: [], labs: [] }, catalog = [], filter = "all", selected = localStorage.getItem("vmctl-selected") || "", logJob = null, logOffset = 0;
-let dragVm = null;  // the running machine whose icon is being dragged onto another one (vmctl link)
+let dragVm = null;  // the machine whose network handle is being dragged (vmctl link)
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const ansi = (s) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r(?!\n)/g, "\n");
@@ -440,15 +478,26 @@ async function api(path, body) {
 }
 function toast(msg, err) { const t = $("toast"); t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block"; t.showPopover?.(); clearTimeout(t._h); t._h = setTimeout(() => { t.hidePopover?.(); t.style.display = "none"; }, err ? 9000 : 3500); }
 
-const vmJobs = new Map(), submittingVms = new Set();
+const vmJobs = new Map(), submittingVms = new Set(), checkedVms = new Set();
+let selectionAnchor = "", bulkBusy = false;
 function withVMJob(r) {
   const job = vmJobs.get(r.name);
-  return job ? {...r, job_status:job.status, job_command:job.command} : r;
+  return job ? {...r, job_status:job.confirming ? "running" : job.status, job_command:job.command} : r;
 }
 function stateBadge(r) {
   r = withVMJob(r);
   const [label, color] = stateOf(r), busy = r.job_status === "running";
   return busy ? `<button class="state ${color} busy" data-state-job="${esc('vm:'+r.name)}" title="View operation log" aria-label="${esc(r.name + ': ' + label + '. View operation log')}">${esc(label)}</button>` : `<span class="state ${color}">${esc(label)}</span>`;
+}
+function operationNote(r) {
+  const job = vmJobs.get(r.name), current = withVMJob(r);
+  let note = "";
+  if (job?.unconfirmed) note = "The command finished, but the requested VM state was not confirmed. Check the operation log before trying again.";
+  else if (job?.confirming) note = "Command finished · checking the VM state. Controls will update when confirmed.";
+  else if (current.job_status === "running" && current.job_command === "start") note = "Starting the VM · waiting for the process to start. The guest OS may still be booting when it shows Running.";
+  else if (current.job_status === "running" && current.job_command === "stop") note = "Waiting for the guest to shut down. Force stop powers it off immediately.";
+  else if (job && ["start","stop"].includes(job.command) && !["running","completed"].includes(job.status)) note = "Operation " + job.status + ". Check the operation log; the VM state is shown above.";
+  return note ? `<p class="operation-note" role="status">${esc(note)}</p>` : "";
 }
 function bindStateLogs(container) {
   container.querySelectorAll("[data-state-job]").forEach(button => { button.onclick = e => { e.stopPropagation(); openLog(button.dataset.stateJob, button.getAttribute("aria-label").replace('. View operation log','')); }; });
@@ -464,8 +513,11 @@ function activeJobLabel(r) {
 function stateOf(r) {
   r = withVMJob(r);
   const job = r.job_status;
-  if (job === "running") { const label = activeJobLabel(r); return [label, label === "Running" ? "s-ok" : "s-warn"]; }
+  if (job === "running") { const label = activeJobLabel(r); return [label, r.job_command === "start" ? "s-info" : "s-warn"]; }
+  const tracked = vmJobs.get(r.name);
+  if (tracked?.unconfirmed) return [r.running ? "Still running" : "Start not confirmed", "s-warn"];
   if (r.running) return ["Running", "s-ok"];
+  if (job === "completed" && r.job_command === "stop") return ["Stopped", "s-muted"];
   // A failed show/stop/etc. is a job outcome, not an installation state.
   if (job && job !== "completed" && installationJob(r)) return [job[0].toUpperCase() + job.slice(1), "s-bad"];
   if (r.install_label === "no disk" && r.iso_source === "manual") return ["ISO needed", "s-warn"];
@@ -543,10 +595,10 @@ function osIconKey(r) {
 }
 // Dark ink on a light badge (Haiku yellow, Mint green), white on the others.
 function iconInk(hex) { const n = parseInt(hex.slice(1), 16); return (0.299*(n>>16&255) + 0.587*(n>>8&255) + 0.114*(n&255)) > 160 ? "#0f1722" : "#ffffff"; }
-function catalogIcon(key, large = false, drag = false) {
+function catalogIcon(key, large = false) {
   const [label,color,glyph] = catalogIcons[key] || catalogIcons.generic;
   const artwork = distroIconKeys.has(key) ? `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" focusable="false"><use href="/assets/distro-icons.svg#${esc(key)}" width="24" height="24"/></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">${glyph}</svg>`;
-  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}"${drag ? ' data-drag="1"' : ""} style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(drag ? label + " · drag onto another machine to link them" : label)}" aria-hidden="true">${artwork}</span>`;
+  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}" style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(label)}" aria-hidden="true">${artwork}</span>`;
 }
 // End of catalog icon definitions.
 
@@ -570,6 +622,7 @@ const actionIcons = {
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
   list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
   terminal: '<path d="m5 7 5 5-5 5M12 17h7"/>',
+  network: '<rect x="9" y="3" width="6" height="5" rx="1"/><path d="M12 8v5M5 16v-3h14v3"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/>',
   sliders: '<path d="M4 7h10m4 0h2M4 17h4m4 0h8M14 5v4M8 15v4"/>'
 };
 const actionIcon = (a) => a.icon ? `<span class="ai ${a.tone || ""}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${actionIcons[a.icon]}</svg></span>` : "";
@@ -601,7 +654,8 @@ function actionsFor(r) {
     a.forEach(action => { if (action.args) action.disabled = true; });
     a.push({ label:installationJob(r) ? "Installation log" : "View operation log", job:"vm:" + n, icon:"log", tone:"info" });
     const forceStop = ["start","stop"].includes(r.job_command);
-    a.push({ label:forceStop ? "Force stop" : "Cancel job", cancelJob:"vm:" + n, forceStop, primary:true, danger:forceStop, icon:"power", tone:"bad", disabled:submittingVms.has(n) || cancellingJobs.has("vm:"+n) });
+    if (vmJobs.get(n)?.confirming) a.push({label:"Force stop", args:["stop",n,"--force"], danger:true, primary:true, icon:"power", tone:"bad"});
+    else a.push({ label:forceStop ? "Force stop" : "Cancel job", cancelJob:"vm:" + n, forceStop, primary:true, danger:forceStop, icon:"power", tone:"bad", disabled:submittingVms.has(n) || cancellingJobs.has("vm:"+n) });
   }
   if (!r.running && (r.prepared || r.installed)) a.push({ label: "Clean: delete the disk", args: ["clean", n], disabled:busy, danger: true, icon:"trash", tone:"bad" });
   a.push({ label: "All commands for " + n + "…", form: n, icon:"list" });
@@ -625,8 +679,96 @@ function openKeyboardHelp() {
   $("help-title").textContent = "Keyboard";
   $("help-text").textContent = ["Type anywhere        filter the machines (Esc clears)", "↑ ↓                  select a machine", "Enter                the machine's main action",
     ...FKEYS.map(([key, label]) => `${key.padEnd(21)}${label}`), "Shift+F10            the machine's menu (right-click)", "/                    the search box", "F1                   this list",
-    "Mouse: drag the icon of a machine onto another one to link them (vmctl link); a stopped one joins when it starts."].join("\n");
+    "Ctrl / ⌘ + click    toggle multiple selection", "Shift + click        select a range", "Click a VM icon      toggle selection (also Enter / Space when focused)", "Mouse: hover a distribution icon for a live preview. Click the network button to choose a VM to link, or drag that button onto another machine. A stopped VM joins at its next start."].join("\n");
   $("help-dialog").showModal();
+}
+
+function eligibleForBulk(r, action) {
+  return withVMJob(r).job_status !== "running" && !submittingVms.has(r.name)
+    && (action === "start" ? r.installed && !r.running : action === "stop" ? r.running : r.running || r.installed);
+}
+function bulkTargets(action) {
+  return S.vms.filter(r => checkedVms.has(r.name) && eligibleForBulk(r, action));
+}
+function networkFor(names) {
+  const rows = names.map(name => S.vms.find(r => r.name === name));
+  if (rows.some(r => !r)) return {action:"link", segments:[]};
+  const segments = rows.length ? [...new Set((rows[0].links || []).map(link => link.segment))]
+    .filter(segment => rows.every(r => (r.links || []).some(link => link.segment === segment))).sort() : [];
+  return {action:segments.length ? "unlink" : "link", segments};
+}
+function selectedNetwork() { return networkFor([...checkedVms]); }
+function runSelectedNetwork(names = [...checkedVms]) {
+  const {action, segments} = networkFor(names);
+  if (action === "link") return runSelection("link", null, names);
+  if (segments.length === 1) return runSelection("unlink", segments[0], names);
+  $("unlink-members").textContent = names.join(" · ");
+  $("unlink-segment").innerHTML = segments.map(segment => `<option value="${esc(segment)}">${esc(segment)}</option>`).join("");
+  $("unlink-review").onclick = () => { const segment = $("unlink-segment").value; $("unlink-dialog").close(); runSelection("unlink", segment, names); };
+  $("unlink-dialog").showModal(); $("unlink-segment").focus();
+}
+function renderSelection() {
+  $("selection-bar").classList.toggle("hidden", !checkedVms.size);
+  $("selection-count").textContent = `${checkedVms.size} selected`;
+  for (const action of ["start", "stop", "link"]) {
+    const operation = action === "link" ? selectedNetwork().action : action;
+    const targets = bulkTargets(operation), button = $("selection-" + action);
+    button.textContent = ({start:"Start",stop:"Stop",link:"Link network",unlink:"Unlink network"})[operation] + ` (${targets.length})`;
+    button.classList.toggle("warn", operation === "unlink");
+    button.disabled = bulkBusy || targets.length < (operation === "link" ? 2 : 1);
+  }
+  // Keep an open selection menu in sync with job updates and confirmation dismissal.
+  const menu = $("vm-context");
+  if (menu.matches(":popover-open") && menu.getAttribute("aria-label") === "Selected machines actions") {
+    selectionContextEntries().forEach((entry,i) => {
+      const button = menu.querySelector(`[data-context="${i}"]`);
+      if (!button) return;
+      button.disabled = !!entry.disabled; button.setAttribute("aria-label", entry.label);
+      button.classList.toggle("warn", !!entry.warn);
+      button.innerHTML = actionIcon(entry) + esc(entry.label);
+    });
+  }
+}
+async function runSelection(action, segment = null, names = [...checkedVms]) {
+  if (bulkBusy) return;
+  if (action === "unlink" && !networkFor(names).segments.includes(segment)) {
+    toast("The shared network changed. Review the selection again.", true); return;
+  }
+  const targets = S.vms.filter(r => names.includes(r.name) && eligibleForBulk(r, action)).map(r => r.name);
+  if (targets.length < (action === "link" ? 2 : 1)) return;
+  bulkBusy = true; renderSelection();
+  try {
+    const skipped = names.length - targets.length;
+    const commands = action === "unlink" ? [["link", "--off", "--segment", segment, ...targets]] : action === "link" ? [["link", ...targets]] : targets.map(name => action === "start" ? ["start",name,"--headless","--background"] : ["stop",name]);
+    if (!await askConfirm({eyebrow:"Selected machines", title:`${({start:"Start",stop:"Stop",link:"Link",unlink:"Unlink"})[action]} ${targets.length} machines?`,
+      message:(action === "unlink" ? `Disconnect the listed machines from network "${segment}". Other members stay connected. These machines will no longer rejoin this network at their next start.` : action === "link" ? "Connect these machines to a private network. Stopped machines join at their next start." : action === "stop" ? "Request a normal shutdown for each running machine listed below." : "Start each machine listed below in the background.") + (skipped ? ` ${skipped} selected machine(s) are busy or not eligible and will be skipped.` : ""),
+      command:commands.map(args => "vmctl " + args.join(" ")).join("\n"), button:({start:"Start machines",stop:"Stop machines",link:"Link machines",unlink:"Unlink machines"})[action]})) return;
+    for (const args of commands) {
+      // State can change while reviewing. Recheck before submitting each operation.
+      const names = args[0] === "link" ? targets : [args[1]];
+      if (!names.every(name => S.vms.some(r => r.name === name && eligibleForBulk(r, action) && (action !== "unlink" || (r.links || []).some(link => link.segment === segment))))) {
+        toast("VM state changed during review. Remaining commands were not submitted; review the selection again.", true); break;
+      }
+      if (!await run(args)) break;
+    }
+  } finally { bulkBusy = false; renderSelection(); }
+}
+for (const action of ["start","stop"]) $("selection-"+action).onclick = () => runSelection(action);
+$("selection-link").onclick = () => runSelectedNetwork();
+$("selection-clear").onclick = () => { checkedVms.clear(); selectionAnchor = ""; render(); };
+function selectRow(name, event) {
+  const toggle = event.ctrlKey || event.metaKey || event.target.closest(".vm-select");
+  if (event.shiftKey) {
+    const names = visible().map(r => r.name), from = names.indexOf(selectionAnchor || selected), to = names.indexOf(name);
+    if (!event.ctrlKey && !event.metaKey) checkedVms.clear();
+    names.slice(Math.min(from < 0 ? to : from,to), Math.max(from,to)+1).forEach(n => checkedVms.add(n));
+  } else if (toggle) {
+    if (!checkedVms.size && !event.target.closest(".vm-select") && selected) checkedVms.add(selected);
+    if (checkedVms.has(name)) checkedVms.delete(name); else checkedVms.add(name);
+    selectionAnchor = name;
+  } else { checkedVms.clear(); selectionAnchor = name; }
+  selected = name; localStorage.setItem("vmctl-selected", selected); render();
+  if (event.target.closest(".vm-select")) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === name)?.querySelector(".vm-select")?.focus({preventScroll:true});
 }
 
 function visible() {
@@ -634,6 +776,28 @@ function visible() {
   return S.vms.filter((r) => words.every((w) => (r.name + " " + r.label + " " + r.family).toLowerCase().includes(w))
     && (filter !== "disk" || r.prepared) && (filter !== "running" || r.running))
     .sort((x, y) => (y.running - x.running) || (y.installed - x.installed) || (y.prepared - x.prepared) || x.name.localeCompare(y.name, undefined, { numeric: true }));
+}
+function updateProfileRows(html) {
+  // Polling must not replace the button under a stationary pointer: doing so resets
+  // hover/tooltips and can interrupt a gesture. Reuse rows and unchanged cells.
+  const template = document.createElement("template");
+  template.innerHTML = `<table><tbody>${html}</tbody></table>`;
+  const body = $("rows"), existing = new Map([...body.children].map(row => [row.dataset.vm || "", row]));
+  [...template.content.querySelector("tbody").children].forEach((next, index) => {
+    const key = next.dataset.vm || "", row = existing.get(key) || next;
+    existing.delete(key);
+    if (row !== next) {
+      for (const attr of next.attributes) if (row.getAttribute(attr.name) !== attr.value) row.setAttribute(attr.name, attr.value);
+      [...next.cells].forEach((cell, i) => {
+        if (row.cells[i]._source !== cell.innerHTML) {
+          row.cells[i].innerHTML = cell.innerHTML;
+          row.cells[i]._source = cell.innerHTML;
+        }
+      });
+    } else for (const cell of row.cells) cell._source = cell.innerHTML;
+    if (body.children[index] !== row) body.insertBefore(row, body.children[index] || null);
+  });
+  for (const row of existing.values()) row.remove();
 }
 function render() {
   const all = S.vms, withData = all.filter((r) => r.installed).length, running = all.filter((r) => r.running).length;
@@ -643,16 +807,20 @@ function render() {
   const labs = filter === "labs";
   $("profiles-view").classList.toggle("hidden", labs);
   $("labs-view").classList.toggle("hidden", !labs);
+  renderSelection();
   if (labs) return renderLabs();
   const rows = visible();
   $("list-title").textContent = `Profiles  ${rows.length} / ${all.length}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
   // Never rebuild the rows during a drag: the dragged icon would be destroyed and Chromium then
   // aborts the drop silently (the 5 s state poll did exactly that on a drag longer than a few seconds).
-  if (dragVm) return;
-  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r), false, !!(r.running || r.installed))}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
-    || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`;
+  if (dragVm || dragState.start) return;
+  const focused = document.activeElement, focusedVm = focused.closest?.("#rows [data-vm]")?.dataset.vm;
+  const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : null;
+  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+    || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`);
   bindStateLogs($("rows"));
+  if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
   renderDetails();
 }
 let detailsSignature = "", labsSignature = "";
@@ -673,12 +841,12 @@ function renderDetails() {
   const expandedDetails = $("details").dataset.vm === r.name ? [...$("details").querySelectorAll("details[open]")].map(el=>el.className) : [];
   $("details").dataset.vm = r.name;
   const secondary = a => !a.primary && (a.danger || a.form || a.screen || ["attach","checkpoint"].includes(a.args?.[0]));
-  const actionButton = (x,i) => `<button data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${i === 0 ? "<kbd>Enter</kbd>" : ""}${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
+  const actionButton = (x,i) => `<button aria-label="${esc(x.label)}" data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${i === 0 ? "<kbd>Enter</kbd>" : ""}${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
   const mainActions = actions.map((a,i) => secondary(a) ? "" : actionButton(a,i)).join("");
   const extraActions = actions.map((a,i) => ({a,i})).filter(({a}) => secondary(a)).sort((x,y) => Number(!!x.a.danger)-Number(!!y.a.danger));
   $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<div class="profile-title"><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div></div></div>${stateBadge(r)}
     <div class="actions primary-actions">${mainActions}</div>
-    ${withVMJob(r).job_status === "running" && withVMJob(r).job_command === "stop" ? '<p class="operation-note">Waiting for the guest to shut down. Force stop powers it off immediately.</p>' : ""}
+    ${operationNote(r)}
     <div class="resources"><div class="resource"><strong>${esc(memory)}</strong><span>Memory</span></div><div class="resource"><strong>${esc(r.cpus)}</strong><span>vCPUs</span></div><div class="resource"><strong>${esc(r.firmware)}</strong><span>Firmware</span></div></div>
     <dl class="facts">${facts.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
     ${r.install_detail ? `<details class="install-details"><summary>Installation details</summary><p>${esc(r.install_detail)}</p></details>` : ""}
@@ -698,7 +866,7 @@ function renderLabs() {
   $("labs-view").innerHTML = S.labs.filter((lab) => words.every((w) => (lab.group + " " + lab.members.join(" ")).toLowerCase().includes(w))).map((lab) => {
     const names = lab.start_order || lab.members, members = names.map((n) => byName[n]).filter(Boolean);
     if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="chip completed">session · ${members.length} linked${(lab.pending || []).length ? ` · ${lab.pending.length} off` : ""}</span></div>
-      <p class="lab-order">Made with <span class="mono">vmctl link</span> (or by dropping one machine on another). A private /24 segment: stopped members join at their next start; it touches no profile and lasts until Unlink all.</p>
+      <p class="lab-order">Made with <span class="mono">vmctl link</span> (or using the network buttons / multiple selection). A private /24 segment: stopped members join at their next start; it touches no profile and lasts until Unlink all.</p>
       <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "")}</span></span></button>${stateBadge(m)}</div>`).join("")}</div>
       <div class="buttons"><button data-args='${esc(JSON.stringify(["link", "--status", "--segment", lab.segment]))}'>Status</button><button class="danger" data-args='${esc(JSON.stringify(["link", "--off", "--segment", lab.segment]))}'>Unlink all</button></div></section>`;
     const up = members.filter((m) => m.running).length;
@@ -735,7 +903,8 @@ function askConfirm({ eyebrow = "Destructive command", title, message, command, 
 async function run(args, danger) {
   const cmd = catalog.find((c) => c.name === args[0]);
   const destructive = danger || (cmd && (cmd.destructive || cmd.destructive_actions.includes(args[1]))) || (args[0] === "check-vms" && args.includes("--clean-first"));
-  if (destructive && !await askConfirm({ title: "This deletes or overwrites data", message: "The command runs as a job and cannot be undone.", command: "vmctl " + args.join(" "), button: "Run it" })) return;
+  const forceStop = args[0] === "stop" && args.includes("--force");
+  if (destructive && !await askConfirm({ title: forceStop ? "Force stop this VM?" : "This deletes or overwrites data", message: forceStop ? "Power off the VM immediately. Unsaved guest changes may be lost; the disk and logs are kept." : "The command runs as a job and cannot be undone.", command: "vmctl " + args.join(" "), button: forceStop ? "Force stop" : "Run it" })) return;
   const vm = S.vms.find(r => r.name === args[1])?.name;
   if (vm && submittingVms.has(vm)) return;
   const previous = vm && vmJobs.get(vm);
@@ -746,14 +915,16 @@ async function run(args, danger) {
     rememberCommand(args[0]);
     if ($("cmd-dialog").open) $("cmd-dialog").close();
     jobsRevision++;
-    activityJob = {id:res.job, command:res.command, status:"running"};
+    activityJob = {id:res.job, command:res.command, status:"running", updated:Date.now()/1000};
     if (res.job.startsWith("vm:")) vmJobs.set(res.job.slice(3), {status:"running",command:args[0]});
     else if (vm) { if (previous) vmJobs.set(vm, previous); else vmJobs.delete(vm); }
     renderActivity();
     refresh(true); refreshJobs();
+    return true;
   } catch (e) {
     if (vm) { if (previous) vmJobs.set(vm, previous); else vmJobs.delete(vm); }
     toast(e.message, true);
+    return false;
   } finally { if (vm) submittingVms.delete(vm); render(); }
 }
 function runAction(r, a) {
@@ -770,9 +941,37 @@ function runAction(r, a) {
 // --- jobs and logs
 let activityJob = null, jobsRefreshing = false, jobsRevision = 0, logSession = 0, logTimer;
 const cancellingJobs = new Set();
+let knownJobs = [], barJob = null;
+function renderJobBar() {
+  const jobs = [...knownJobs.filter(j => j.id !== activityJob?.id), ...(activityJob ? [activityJob] : [])];
+  barJob = jobs.filter(j => j.status === "running" || (j.id.startsWith("vm:") && vmJobs.get(j.id.slice(3))?.confirming))
+    .sort((a,b) => b.updated - a.updated)[0] || null;
+  $("job-bar").classList.toggle("hidden", !barJob);
+  if (!barJob) return;
+  const vm = barJob.id.startsWith("vm:") ? barJob.id.slice(3) : "";
+  const tracked = vmJobs.get(vm), command = barJob.command.split(/\s+/)[1];
+  const cancelling = cancellingJobs.has(barJob.id);
+  const label = cancelling ? "Cancelling…" : tracked?.confirming ? "Checking VM state…" : ({start:"Starting…",stop:"Stopping…","fetch-iso":"Downloading ISO…",prep:"Preparing…"})[command] || "Job in progress…";
+  $("job-bar-status").textContent = label + (vm ? " · " + vm : "");
+  $("job-bar-status").className = "state busy " + (command === "start" ? "s-info" : "s-warn");
+  $("job-bar-command").textContent = barJob.command;
+  $("job-bar-command").title = barJob.command;
+  $("job-bar-cancel").textContent = tracked?.confirming ? "Force stop" : cancelling ? "Cancelling…" : "Cancel job";
+  $("job-bar-cancel").disabled = cancelling;
+}
+$("job-bar-log").onclick = () => { if (barJob) openLog(barJob.id, barJob.command); };
+$("job-bar-cancel").onclick = () => {
+  if (!barJob) return;
+  const vm = barJob.id.startsWith("vm:") && barJob.id.slice(3);
+  if (vmJobs.get(vm)?.confirming) run(["stop",vm,"--force"], true);
+  else cancelJob(barJob.id);
+};
 function renderActivity() {
+  renderJobBar();
   if (!activityJob) return;
-  const j = activityJob, cancelling = cancellingJobs.has(j.id);
+  const tracked = activityJob.id.startsWith("vm:") && vmJobs.get(activityJob.id.slice(3));
+  const j = tracked?.confirming ? {...activityJob, status:"running"} : tracked?.unconfirmed ? {...activityJob, status:"unconfirmed"} : activityJob;
+  const cancelling = cancellingJobs.has(j.id);
   $("activity").classList.remove("hidden");
   $("activity").dataset.status = j.status === "running" ? "running" : j.status === "completed" ? "completed" : "failed";
   $("activity-symbol").textContent = j.status === "running" ? "" : j.status === "completed" ? "✓" : "!";
@@ -780,10 +979,10 @@ function renderActivity() {
   $("activity-label").textContent = cancelling ? "Cancelling…" : j.status === "running" ? ({start:"Starting…",stop:"Stopping…","fetch-iso":"Downloading…",prep:"Preparing…"})[action] || "Working…" : j.status === "completed" ? "Completed" : "Needs attention";
   $("activity-toggle").setAttribute("aria-label", `Latest activity: ${$("activity-label").textContent}. ${j.command}`);
   $("activity-toggle").title = j.command;
-  $("activity-status").textContent = cancelling ? "Cancelling…" : ({running:"Running in background", completed:"Completed", cancelled:"Cancelled", interrupted:"Interrupted"})[j.status] || j.status;
+  $("activity-status").textContent = tracked?.confirming ? "Command finished · checking VM state" : cancelling ? "Cancelling…" : ({running:"Running in background", completed:"Completed", cancelled:"Cancelled", interrupted:"Interrupted"})[j.status] || j.status;
   $("activity-status").className = j.status === "running" ? "s-warn" : j.status === "completed" ? "s-ok" : "s-bad";
   $("activity-command").textContent = j.command;
-  $("activity-cancel").classList.toggle("hidden", j.status !== "running");
+  $("activity-cancel").classList.toggle("hidden", j.status !== "running" || !!tracked?.confirming);
   $("activity-dismiss").classList.toggle("hidden", j.status === "running");
   $("activity-cancel").disabled = cancelling;
 }
@@ -813,13 +1012,22 @@ async function refreshJobs() {
   try {
     const jobs = await api("/api/jobs");
     if (revision !== jobsRevision) return;
+    knownJobs = jobs;
     let finished = false;
     for (const job of jobs) {
       if (!job.id.startsWith("vm:")) continue;
       const vm = job.id.slice(3);
       if (submittingVms.has(vm)) continue;
       if (vmJobs.get(vm)?.status === "running" && job.status !== "running") finished = true;
-      vmJobs.set(vm, {status:job.status, command:job.command.split(/\s+/)[1] || ""});
+      const previous = vmJobs.get(vm), command = job.command.split(/\s+/)[1] || "";
+      const lifecycle = ["start", "stop"].includes(command);
+      // A completed command and a cached VM snapshot are separate observations.
+      // Keep the transition until a fresh snapshot requested after completion confirms it.
+      const confirming = lifecycle && job.status === "completed" && previous?.command === command
+        && (previous.status === "running" || previous.confirming);
+      vmJobs.set(vm, {status:job.status, command, confirming,
+        finishedAt:confirming ? previous.finishedAt || Date.now() : 0,
+        unconfirmed:previous?.command === command && previous?.unconfirmed && job.status === "completed"});
     }
     render();
     if (finished) refresh(true);
@@ -1301,6 +1509,9 @@ let contextOrigin = null;
 function closeContext() { $("vm-context").hidePopover(); }
 function openContext(vm, x, y) {
   const r = S.vms.find(row => row.name === vm); if (!r) return;
+  if (filter !== "labs" && checkedVms.size > 1 && checkedVms.has(vm)) return openSelectionContext(vm, x, y);
+  // Right-click outside the selection establishes a single-machine scope.
+  if (!checkedVms.has(vm)) { checkedVms.clear(); selectionAnchor = vm; }
   selected = vm; localStorage.setItem("vmctl-selected",vm); render();
   const container = filter === "labs" ? $("labs-view") : $("rows");
   const originRow = [...container.querySelectorAll("[data-vm]")].find(row => row.dataset.vm === vm);
@@ -1311,6 +1522,21 @@ function openContext(vm, x, y) {
   const groups = r.running ? ["Connect","Power","Activity","Manage","Danger zone"] : ["Power","Activity","Connect","Manage","Danger zone"];
   entries.sort((a,b) => groups.indexOf(a.group)-groups.indexOf(b.group) || Number(!!a.form)-Number(!!b.form));
   showContext(vm, entries, x, y, "VM actions");
+}
+function selectionContextEntries() {
+  const entries = ["start", "stop", "link"].map(action => {
+    const operation = action === "link" ? selectedNetwork().action : action;
+    const count = bulkTargets(operation).length;
+    return {label:({start:"Start selected",stop:"Stop selected",link:"Link selected on a network",unlink:"Unlink selected from network"})[operation] + ` (${count})`,
+      group:"Selection actions", icon:({start:"play",stop:"stop",link:"network"})[action], warn:["stop","unlink"].includes(operation),
+      disabled:bulkBusy || count < (operation === "link" ? 2 : 1), run:()=>action === "link" ? runSelectedNetwork() : runSelection(action)};
+  });
+  entries.push({label:"Clear selection", group:"Selection", icon:"list", run:()=>$("selection-clear").click()});
+  return entries;
+}
+function openSelectionContext(vm, x, y) {
+  contextOrigin = [...$("rows").querySelectorAll("[data-vm]")].find(row => row.dataset.vm === vm);
+  showContext(`${checkedVms.size} machines selected`, selectionContextEntries(), x, y, "Selected machines actions", [...checkedVms].join(" · "));
 }
 function openLabContext(card, x, y) {
   contextOrigin = card.querySelector(".lab-head");
@@ -1325,10 +1551,10 @@ function openLabContext(card, x, y) {
   entries.sort((a,b) => groups.indexOf(a.group)-groups.indexOf(b.group));
   showContext(card.dataset.lab, entries, x, y, "Stack actions");
 }
-function showContext(title, entries, x, y, label) {
+function showContext(title, entries, x, y, label, description = "") {
   hideHoverShot();
   const menu = $("vm-context"); menu.setAttribute("aria-label", label);
-  menu.innerHTML = `<div class="context-title">${esc(title)}</div>` + entries.map((a,i) => `${i === 0 || a.group !== entries[i-1].group ? `<div class="context-group" role="presentation">${esc(a.group)}</div>` : ""}<button role="menuitem" ${a.disabled ? "disabled" : ""} class="${a.danger ? "danger" : a.warn ? "warn" : ""}" data-context="${i}">${actionIcon(a)}${esc(a.label)}${a.key || fkeyOf(a) ? `<kbd>${a.key || fkeyOf(a)}</kbd>` : ""}</button>`).join("");
+  menu.innerHTML = `<div class="context-title">${esc(title)}</div>${description ? `<div class="context-selection">${esc(description)}</div>` : ""}` + entries.map((a,i) => `${i === 0 || a.group !== entries[i-1].group ? `<div class="context-group" role="presentation">${esc(a.group)}</div>` : ""}<button role="menuitem" aria-label="${esc(a.label)}" ${a.disabled ? "disabled" : ""} class="${a.danger ? "danger" : a.warn ? "warn" : ""}" data-context="${i}">${actionIcon(a)}${esc(a.label)}${a.key || fkeyOf(a) ? `<kbd>${a.key || fkeyOf(a)}</kbd>` : ""}</button>`).join("");
   menu.showPopover();
   menu.style.left = Math.max(8, Math.min(x,innerWidth-menu.offsetWidth-8)) + "px";
   menu.style.top = Math.max(8, Math.min(y,innerHeight-menu.offsetHeight-8)) + "px";
@@ -1358,7 +1584,7 @@ window.addEventListener("resize",closeContext);
 
 // --- wiring
 document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
-document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll("[data-filter]").forEach((x) => (x.classList.toggle("active", x === b), x.setAttribute("aria-pressed", x === b))); render(); }));
+document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { filter = b.dataset.filter; checkedVms.clear(); selectionAnchor = ""; document.querySelectorAll("[data-filter]").forEach((x) => (x.classList.toggle("active", x === b), x.setAttribute("aria-pressed", x === b))); render(); }));
 // Hovering the icon of a running machine shows its screen: a QMP screendump (or VNC for accelerated
 // displays), fetched after a short pause so sweeping the mouse across the list asks for nothing.
 // Only the icon, so reading the list shows nothing; a right-click (the context menu) hides it
@@ -1368,6 +1594,8 @@ function hideHoverShot() {
   clearTimeout(hover.timer); hover.controller?.abort(); hover.session++; hover.vm = null;
   $("hover-shot").style.display = "none";
   $("hover-shot").querySelector("img").removeAttribute("src");
+  $("hover-shot").querySelector(".hover-loading").classList.remove("hidden");
+  $("hover-shot").querySelector(".hover-loading span").textContent = "Loading live preview…";
   if (hover.url) URL.revokeObjectURL(hover.url); hover.url = null;
 }
 function placeHoverShot(x, y) {
@@ -1389,12 +1617,14 @@ async function refreshHoverShot(session) {
     const frame = new Image(); frame.src = url; await frame.decode();
     if (session !== hover.session) { URL.revokeObjectURL(url); return; }
     box.querySelector("img").src = url;
+    box.querySelector(".hover-loading").classList.add("hidden");
     if (hover.url) URL.revokeObjectURL(hover.url); hover.url = url;
     $("hover-status").textContent = "Live"; $("hover-status").className = "state s-ok";
     box.querySelector(".hover-caption").textContent = "Screen preview · refreshes every second";
   } catch (e) {
     if (url) URL.revokeObjectURL(url);
     if (session !== hover.session) return;
+    if (!hover.url) box.querySelector(".hover-loading span").textContent = "Screen unavailable · retrying…";
     $("hover-status").textContent = "Reconnecting"; $("hover-status").className = "state s-warn";
     box.querySelector(".hover-caption").textContent = hover.url ? "Last frame · retrying connection…" : "Screen unavailable · retrying…";
   }
@@ -1402,6 +1632,7 @@ async function refreshHoverShot(session) {
 }
 $("rows").addEventListener("mouseover", (e) => {
   const icon = e.target.closest(".catalog-icon"), tr = icon?.closest("tr[data-vm]"), vm = tr?.dataset.vm;
+  if (dragVm || dragState.start || document.querySelector("dialog[open]")) return;
   if (!icon) { hideHoverShot(); hover.muted = null; return; }
   if (!tr || vm === hover.vm || vm === hover.muted) return;
   hideHoverShot();
@@ -1422,9 +1653,25 @@ $("rows").addEventListener("mousedown", hideHoverShot);
 $("rows").addEventListener("contextmenu", (e) => { hover.muted = e.target.closest("tr[data-vm]")?.dataset.vm || null; hideHoverShot(); });
 $("list").addEventListener("scroll", hideHoverShot);
 
-// Drag a running machine's icon onto another running machine: `vmctl link a b`, a private segment for
+// Drag a machine's network button onto another machine: `vmctl link a b`, a private segment for
 // this session. Pointer events, not the browser's native drag and drop: Chromium on Wayland loses the
 // drop (the rows dimmed, nothing happened), and pointers also work on touch screens.
+const networkGlyph = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="5" rx="1"/><path d="M12 8v5M5 16v-3h14v3"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/></svg>';
+function linkHandle(r) {
+  return r.running || r.installed ? `<button class="link-handle" aria-label="Network connections for ${esc(r.name)}" title="Network · click to choose a VM, or drag to link / unlink">${networkGlyph}</button>` : "";
+}
+let suppressLinkClick = false;
+function openLinkPicker(source) {
+  hideHoverShot();
+  const targets = S.vms.filter(r => r.name !== source && (r.running || r.installed));
+  $("link-source").textContent = source;
+  $("link-target").innerHTML = targets.map(r => `<option value="${esc(r.name)}">${esc(r.name)} · ${networkFor([source, r.name]).action === "unlink" ? "Already linked" : r.running ? "Running" : "Stopped"}</option>`).join("");
+  $("link-target").onchange = () => { $("link-review").textContent = networkFor([source, $("link-target").value]).action === "unlink" ? "Review unlink…" : "Review link…"; };
+  $("link-target").onchange();
+  $("link-review").disabled = !targets.length;
+  $("link-review").onclick = () => { const target = $("link-target").value; $("link-dialog").close(); confirmLink(source, target); };
+  $("link-dialog").showModal(); $("link-target").focus();
+}
 const dragState = { start: null, ghost: null };
 function endDrag() {
   dragVm = null; dragState.start = null; hover.muted = null;
@@ -1441,7 +1688,7 @@ function dropTargetAt(x, y, source) {
 $("rows").addEventListener("dragstart", (e) => e.preventDefault());  // no native image drag of the icon
 $("rows").addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
-  const icon = e.target.closest(".catalog-icon[data-drag]"), vm = icon?.closest("tr[data-vm]")?.dataset.vm;
+  const icon = e.target.closest(".link-handle"), vm = icon?.closest("tr[data-vm]")?.dataset.vm;
   if (!vm || !S.vms.some((r) => r.name === vm && (r.running || r.installed))) return;
   dragState.start = { vm, x: e.clientX, y: e.clientY, icon };
 });
@@ -1465,13 +1712,23 @@ document.addEventListener("pointerup", async (e) => {
   if (!dragVm) { dragState.start = null; return; }  // a plain click on the icon
   const target = dropTargetAt(e.clientX, e.clientY, d.vm)?.dataset.vm;
   endDrag();
-  if (!target) return;
-  const ok = await askConfirm({ eyebrow: "Session link", title: `Link ${d.vm} and ${target}?`, button: "Link them",
-    message: "Both machines join a private segment (192.168.100.0/24): a running one gets a hot-plugged NIC now, a stopped one gets it at its next start; where vmctl reaches the guest over SSH it also sets the address. Nothing is saved in the profiles, and the link lasts until you unlink it.",
-    command: `vmctl link ${d.vm} ${target}` });
-  if (ok) run(["link", d.vm, target]);
+  suppressLinkClick = true;
+  setTimeout(() => { suppressLinkClick = false; }, 0);
+  if (target) confirmLink(d.vm, target);
 });
+async function confirmLink(source, target) {
+  const names = [source, target];
+  if (networkFor(names).action === "unlink") return runSelectedNetwork(names);
+  const ok = await askConfirm({ eyebrow: "Session link", title: `Link ${source} and ${target}?`, button: "Link them",
+    message: "Both machines join a private segment (192.168.100.0/24): a running one gets a hot-plugged NIC now, a stopped one gets it at its next start; where vmctl reaches the guest over SSH it also sets the address. Nothing is saved in the profiles, and the link lasts until you unlink it.",
+    command: `vmctl link ${source} ${target}` });
+  if (!ok) return;
+  if (networkFor(names).action === "unlink") { toast("The machines are already linked. Review the connection again to unlink them.", true); return; }
+  run(["link", source, target]);
+}
 document.addEventListener("pointercancel", () => { if (dragState.start) endDrag(); });
+window.addEventListener("blur", () => { if (dragState.start) endDrag(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && dragState.start) { e.preventDefault(); endDrag(); } });
 $("details").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-unlink]"); if (!b || !selected) return;
   const vm = selected, segment = b.dataset.unlink;
@@ -1484,8 +1741,8 @@ $("details").addEventListener("click", async (e) => {
 window.addEventListener("scroll", hideHoverShot, true);
 window.addEventListener("resize", hideHoverShot);
 document.addEventListener("visibilitychange", () => { if (document.hidden) hideHoverShot(); });
-$("rows").onclick = (e) => { const tr = e.target.closest("[data-vm]"); if (tr) { selected = tr.dataset.vm; localStorage.setItem("vmctl-selected", selected); render(); } };
-$("search").oninput = render;
+$("rows").onclick = (e) => { if (suppressLinkClick) return; if (e.target.closest(".link-handle")) { openLinkPicker(e.target.closest("[data-vm]").dataset.vm); return; } const tr = e.target.closest("[data-vm]"); if (tr) selectRow(tr.dataset.vm, e); };
+$("search").oninput = () => { checkedVms.clear(); selectionAnchor = ""; render(); };
 $("search").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); $("search").value = ""; render(); $("search").blur(); } });
 document.addEventListener("keydown", (e) => {
   if (document.querySelector("dialog[open]")) return;
@@ -1511,9 +1768,33 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const r = rows[Math.max(0, Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (r) { selected = r.name; render(); document.querySelector("tr.sel")?.scrollIntoView({ block: "nearest" }); } }
   if (e.key === "Enter" && rows[i]) { e.preventDefault(); runAction(rows[i], actionsFor(rows[i])[0]); }
 });
-async function refresh(fresh) {
-  try { S = await api("/api/state" + (fresh ? "?fresh=1" : "")); $("version").textContent = "vmctl " + S.version; $("connection").textContent = "Live"; $("connection").className = ""; $("connection").removeAttribute("title"); render(); }
-  catch (e) { $("connection").textContent = "Disconnected · retrying"; $("connection").className = "s-warn"; $("connection").title = e.message; }
+let stateRefresh = null, freshRequested = false;
+async function refresh(fresh = false) {
+  freshRequested ||= fresh === true || [...vmJobs.values()].some(j => j.confirming || j.unconfirmed);
+  if (stateRefresh) return stateRefresh;
+  stateRefresh = (async () => {
+    do {
+      const force = freshRequested, revision = jobsRevision;
+      freshRequested = false;
+      const pending = new Map([...vmJobs].filter(([,j]) => j.confirming || j.unconfirmed));
+      try {
+        const next = await api("/api/state" + (force ? "?fresh=1" : ""));
+        if (revision !== jobsRevision) { freshRequested = true; continue; }
+        S = next;
+        if (force) for (const [name, job] of pending) {
+          const current = vmJobs.get(name), row = S.vms.find(r => r.name === name);
+          if (!row || !(current?.confirming || current?.unconfirmed) || current.finishedAt !== job.finishedAt) continue;
+          const confirmed = row.running === (job.command === "start");
+          if (confirmed || (current.confirming && Date.now() - job.finishedAt > 30000)) {
+            current.confirming = false; current.unconfirmed = !confirmed;
+          }
+        }
+        $("version").textContent = "vmctl " + S.version; $("connection").textContent = "Live";
+        $("connection").className = ""; $("connection").removeAttribute("title"); render(); renderActivity();
+      } catch (e) { $("connection").textContent = "Disconnected · retrying"; $("connection").className = "s-warn"; $("connection").title = e.message; }
+    } while (freshRequested);
+  })();
+  try { await stateRefresh; } finally { stateRefresh = null; }
 }
 (async () => {
   if (!TOKEN) { $("connection").textContent = "Token required"; $("summary").textContent = "No token: open the URL that `vmctl web` printed."; return; }

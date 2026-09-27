@@ -55,17 +55,34 @@ What the page offers:
 - **Labs**: each lab with its members, and install, start, stop, status, cluster, network map
   (opened in a new tab) and clean. An installed lab offers **Start stack** first (or **Stop stack**
   when all members are running); a lab with missing installations offers **Install lab**.
-- **Link**: drag the icon of a machine onto another machine to connect them on a private
+- **Multiple selection**: Ctrl/Cmd+click toggles machines, Shift+click selects a range. Clicking a distribution icon
+  toggles it too (Enter/Space when focused). Selected rows have a teal edge and a check badge
+  on the icon. Right-click a selected row for a menu scoped to the entire selection; right-click
+  outside it for single-machine actions. The selection toolbar offers **Start**, **Stop** and
+  **Link network**, with the eligible count for each action. Review the machine names before
+  submitting; busy or ineligible VMs are skipped. When all selected machines share a temporary
+  network, the toolbar and context menu offer **Unlink** instead. If they share several networks,
+  choose one before confirming; other members of that network remain connected. Dragging the
+  network button onto an already linked peer, or choosing that peer in the picker, also offers
+  **Unlink**, scoped to those two machines. Search/filter changes clear the selection.
+  Function keys continue to act on the machine shown in the details panel.
+- **Link**: use the network button shown on hover, focus or the selected row: click it to choose
+  another VM, or drag the network button onto another machine to connect them on a private
   segment (`vmctl link`, confirmed first): a running one gets a hot-plugged NIC, a stopped one
   gets it at its next start; Linux and FreeBSD guests get their 192.168.100.x address over SSH,
   the panel shows a *Linked* row (*at next start* while pending) with an *Unlink* button, and the
-  segment is listed under Labs as a session lab. Details and limits: [LABS.md](LABS.md#temporary-links-between-running-vms-vmctl-link).
+  segment is listed under Labs as a session lab. Details and limits: [LABS.md](LABS.md#temporary-links-between-vms-vmctl-link).
 - **Jobs**: everything runs as a detached job with its log followed live. A job started for a VM
   uses the same `artifacts/<vm>/runtime/tui-job` as the TUI, so `vmtui` shows installs started
   in the browser and the other way round; jobs keep running when the page or the server closes.
   A running job can be cancelled (a VM it started is stopped; disk and logs are kept).
   VM badges distinguish starting, running, stopping and installing using the recorded command;
-  a running job alone does not mean an installation is taking place.
+  a running job alone does not mean an installation is taking place. Starting/stopping stays
+  visible until a fresh VM state confirms completion; a delayed or disconnected refresh does
+  not briefly re-enable the old controls. An unexpected state is reported explicitly.
+  The bottom bar shows the latest active job with **View job** and **Cancel job**. It remains
+  during the final state check, disappears on completion, and leaves the log in Recent activity.
+  Hovering a distribution icon only previews the live screen; linking uses the network button.
 
 ![vmctl web: profiles, the selected VM's actions, jobs](screenshots/web-dashboard.png)
 

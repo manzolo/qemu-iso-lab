@@ -43,7 +43,7 @@ a **runbook** walks through the lab step by step (each block marked *run*, *chec
 
 ![Map of the network lab: pfSense in front, Pi-hole and Lubuntu behind it, forwards through the router's WAN](screenshots/lab-map-netlab.png)
 
-## Temporary links between running VMs (`vmctl link`)
+## Temporary links between VMs (`vmctl link`)
 
 A lab needs profiles that declare a segment. Two machines started on their own, each on its
 own slirp network, cannot see each other — until they are linked, running or not:
@@ -56,7 +56,9 @@ vmctl link --off                        # unplug everyone (or name the VMs to un
 vmctl link a b --segment backend        # a second, separate segment (192.168.<n>.0/24, or --subnet 172.16.5.0/24)
 ```
 
-In the dashboard, **drag a machine's icon onto another machine** (running or stopped): the same
+In the dashboard, **click a machine's network button** to choose a peer, or **drag that button
+onto another machine** (running or stopped). To connect several, select them with Ctrl/Cmd+click
+or Shift+click and choose **Link network**. The same
 command runs after a confirmation, the machine's panel shows a *Linked* row with the address,
 its peers and an *Unlink* button, and the segment appears under **Labs** as a session lab.
 

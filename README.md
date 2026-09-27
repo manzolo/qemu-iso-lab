@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/manzolo/qemu-iso-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/manzolo/qemu-iso-lab/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)
-![Profiles](https://img.shields.io/badge/profiles-101-84c9e7)
+![Profiles](https://img.shields.io/badge/profiles-100%2B-84c9e7)
 
 **Linux, BSD and Windows virtual machines on QEMU/KVM, installed with zero clicks.**
 One JSON profile per VM describes the ISO (downloaded and checksummed), the
@@ -10,12 +10,13 @@ disk, the firmware, the unattended install and the SSH provisioning. Manage it
 from the **web dashboard** (`vmctl web`), the terminal dashboard (`vmtui`) or the
 CLI (`vmctl`), all sharing the same profiles, VM state and jobs.
 
-- **106 profiles**, 57 of them fully unattended: every Ubuntu LTS since 8.04, Debian,
+- **100+ profiles**, more than half of them fully unattended: every Ubuntu LTS since 8.04, Debian,
   Fedora, Arch, NixOS, openSUSE, FreeBSD, Haiku, ReactOS and Windows from 11 back to NT 4,
   plus hobby systems to boot and explore: KolibriOS, Redox OS, MenuetOS and SerenityOS
   (built from source in a VM by `tools/build_serenityos.sh`).
 - **Labs**: groups of VMs on a private network, installed and started as one stack,
-  such as a pfSense + Pi-hole network or a three-node Proxmox VE cluster.
+  such as a pfSense + Pi-hole network or a three-node Proxmox VE cluster, or any VMs
+  linked on the spot so they can talk to each other.
 - **In your browser**: live VM screens, interactive SSH, searchable commands,
   job logs and local profile customization, served on 127.0.0.1.
 - **Tested for real**: every unattended profile is reinstalled from scratch by a local
@@ -172,11 +173,13 @@ the access token.
 | From the dashboard | What you can do |
 |--------------------|-----------------|
 | **Profiles** | Search and filter by state, inspect RAM/CPU/disk, and install, boot or stop a VM. Right-click a row for its actions. |
+| **Multiple selection** | Ctrl/Cmd+click or Shift+click several VMs to start, stop, link or unlink them together. |
 | **Live console** | Use the guest's screen, keyboard and mouse in the browser, with fit/actual-size, reconnect and full screen. |
 | **SSH** | Open an interactive terminal in the browser or on the host, or copy the connection command. |
 | **Commands** | Browse suggestions and recent commands, filter by category, edit parameters, then copy or run the preview. |
 | **Customize** | Change RAM, CPU or other JSON settings in a local override, keeping the catalog as a template. |
 | **Labs** | Install a new lab or start an installed stack, inspect its members and open its network map. |
+| **Link** | Connect two or more VMs on a private network from a machine's network button (click or drag). |
 | **Recent activity** | Follow job output live; jobs are shared with the TUI and keep running when you close the page. |
 
 Choose **Boot headless**, then **Open console** to interact with a desktop without
@@ -213,10 +216,25 @@ Start or stop the stack from its card, or right-click an individual VM for its a
 
 ![Map of the Proxmox lab: three nodes and the client on the pve-lan segment](docs/screenshots/lab-map-proxmox.png)
 
-Members, commands and both maps: [docs/LABS.md](docs/LABS.md). Any two machines can be connected
-on the spot, without a profile: `vmctl link kali debian-server`, or drag one machine's icon onto
-the other in the dashboard — a running one gets a hot-plugged NIC, a stopped one gets it when it
-starts, and they get addresses on a private segment until you unlink them.
+Members, commands and both maps: [docs/LABS.md](docs/LABS.md).
+
+### Linking any VMs
+
+Any VMs can be put on the same private network on the spot, without editing a profile, so
+they can talk to each other:
+
+```bash
+vmctl link kali debian-server   # both get a NIC on the session segment (192.168.100.x)
+vmctl link --status             # who is linked, with which address
+vmctl link --off                # unplug everyone
+```
+
+In the web dashboard, click a machine's network button to pick a peer, drag it onto another
+machine, or select several VMs (Ctrl/Cmd+click, Shift+click) and choose **Link network**.
+A running VM gets a hot-plugged NIC, a stopped one gets it at its next start; Linux and FreeBSD
+guests are given their address over SSH. The linked VMs appear under **Labs** as a *session*
+lab, with **Status** and **Unlink all**, until you unlink them. Details:
+[docs/LABS.md](docs/LABS.md#temporary-links-between-vms-vmctl-link).
 
 ## Everyday commands
 

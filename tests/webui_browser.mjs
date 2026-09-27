@@ -14,7 +14,8 @@ const state = { version:'0.4.0', vms:[machine('arch-noctalia',{running:true}),ma
 let requests = [], failRun = false, failState = false, sshLaunches = 0, overrideRevision = 1, savedOverride = {};
 let jobStatus = 'completed', jobCommand = 'vmctl start arch-noctalia --headless --background', cancelRequests = [], failCancel = false, cancelResult = true;
 let jobId = 'web:fixture', holdRun = false, releaseRun;
-let screenRequests = 0, failScreen = false;
+let screenDelay = 700;
+let screenRequests = 0, failScreen = false, holdState = false, stateWaiters = [], dynamicVmJobs = false;
 const profileBase = {name:'Arch Linux + Noctalia',memory_mb:8192,cpus:4};
 const server = createServer(async (req,res) => {
   if (req.url === '/' || req.url.startsWith('/?')) { res.setHeader('Content-Type','text/html'); return res.end(html); }
@@ -22,6 +23,7 @@ const server = createServer(async (req,res) => {
   res.setHeader('Content-Type','application/json');
   if (req.url.includes('/screen.png?')) {
     screenRequests++;
+    if (screenDelay) await new Promise(resolve=>setTimeout(resolve,screenDelay));
     if (failScreen) { res.statusCode=503; return res.end('{}'); }
     res.setHeader('Content-Type','image/svg+xml');
     return res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768"><rect width="1024" height="768" fill="#111827"/><rect width="1024" height="38" fill="#263449"/><g fill="#bceedd" font-family="monospace" font-size="22"><text x="24" y="94">Arch Linux · console</text><text x="24" y="145">guest@arch-noctalia:~$ uptime</text><text x="24" y="186">Screen frame ${screenRequests}</text></g></svg>`);
@@ -31,7 +33,7 @@ const server = createServer(async (req,res) => {
     if (req.method === 'POST') { let body=''; for await (const chunk of req) body+=chunk; const data=JSON.parse(body); assert.equal(data.revision,String(overrideRevision)); savedOverride=data.override; overrideRevision++; }
     return res.end(JSON.stringify({name:'arch-noctalia',base:profileBase,effective:{...profileBase,...savedOverride},override:savedOverride,revision:String(overrideRevision),local_only:false}));
   }
-  if (req.url.startsWith('/api/state')) { res.statusCode=failState ? 503 : 200; return res.end(JSON.stringify(failState ? {error:'fixture offline'} : state)); }
+  if (req.url.startsWith('/api/state')) { const body=JSON.stringify(failState ? {error:'fixture offline'} : state); if (holdState) await new Promise(resolve=>stateWaiters.push(resolve)); res.statusCode=failState ? 503 : 200; return res.end(body); }
   if (req.url === '/api/commands') return res.end(JSON.stringify(catalog));
   if (req.url === '/api/jobs') return res.end(JSON.stringify([{id:jobId,status:jobStatus,command:jobCommand,updated:1789900000}]));
   if (req.url.includes('/log?')) {
@@ -48,7 +50,7 @@ const server = createServer(async (req,res) => {
     let body=''; for await (const chunk of req) body+=chunk;
     if (holdRun) await new Promise(resolve=>releaseRun=resolve);
     requests.push(JSON.parse(body)); res.statusCode=failRun ? 400 : 200;
-    if (!failRun) { jobStatus='running'; jobCommand='vmctl '+requests.at(-1).args.join(' '); }
+    if (!failRun) { if (dynamicVmJobs && ['start','stop'].includes(requests.at(-1).args[0])) jobId='vm:'+requests.at(-1).args[1]; jobStatus='running'; jobCommand='vmctl '+requests.at(-1).args.join(' '); }
     return res.end(JSON.stringify(failRun ? {error:'Fixture rejected the command'} : {job:jobId,command:jobCommand}));
   }
   res.statusCode=404; res.end('{}');
@@ -78,15 +80,67 @@ try {
   assert.equal(await page.locator('#details .name').textContent(),'arch-noctalia');
   await shot('dashboard'); check('dashboard and profile');
   await page.locator('#rows [data-vm="arch-noctalia"] .catalog-icon').hover();
+  await page.locator('#hover-shot .hover-loading').waitFor({state:'visible'});
+  assert(!(await page.locator('#hover-shot img').isVisible()));
+  await shot('preview-loading');
   await page.waitForFunction(()=>document.getElementById('hover-status').textContent==='Live');
+  screenDelay=0;
+  assert(!(await page.locator('#hover-shot .hover-loading').isVisible()));
+  assert(await page.locator('#hover-shot img').isVisible());
   await page.waitForResponse(response=>response.url().includes('/screen.png?'));
   assert(screenRequests>=2); await shot('live-preview');
   failScreen=true; await page.waitForFunction(()=>document.getElementById('hover-status').textContent==='Reconnecting');
+  assert(await page.locator('#hover-shot img').isVisible());
+  assert(!(await page.locator('#hover-shot .hover-loading').isVisible()));
   failScreen=false; await page.waitForFunction(()=>document.getElementById('hover-status').textContent==='Live');
   await page.locator('body > header h1').hover();
   const stoppedAt=screenRequests; await page.waitForTimeout(1200);
   assert.equal(screenRequests,stoppedAt); assert(!(await page.locator('#hover-shot').isVisible()));
   check('screen preview refreshes, reports disconnection, recovers and stops on mouse leave');
+  const network=page.locator('#rows [data-vm="arch-noctalia"] .link-handle');
+  await network.hover(); await page.waitForTimeout(600);
+  assert(!(await page.locator('#hover-shot').isVisible()));
+  await network.evaluate(el=>{
+    window.stationaryNetwork=el; window.networkEnters=0;
+    el.addEventListener('pointerenter',()=>window.networkEnters++);
+  });
+  // Both polls, other row changes and this VM's badge updates preserve the hovered handle.
+  state.vms[1].label='Changed description';
+  await page.evaluate(async()=>{
+    await refresh(true); await refreshJobs(); await refresh(true);
+    vmJobs.set('arch-noctalia',{status:'running',command:'stop'}); render();
+  });
+  assert(await network.evaluate(el=>el===window.stationaryNetwork && el.matches(':hover')));
+  assert.equal(await page.evaluate(()=>window.networkEnters),0);
+  await page.evaluate(()=>{vmJobs.clear(); render();});
+  await page.waitForTimeout(5500); // Cross a real periodic state refresh without moving the mouse.
+  assert(await network.evaluate(el=>el===window.stationaryNetwork && el.matches(':hover')));
+  assert.equal(await page.evaluate(()=>window.networkEnters),0);
+  assert(!(await page.locator('#hover-shot').isVisible()));
+  state.vms[1].label='Arch Linux + Noctalia 5';
+  check('stationary network handle and tooltip survive state/job polling and unrelated VM changes without hover re-entry');
+  await network.focus(); await page.keyboard.press('Enter');
+  assert(await page.locator('#link-dialog').isVisible());
+  await page.locator('#link-target').selectOption('debian-server');
+  await page.locator('#link-review').click();
+  assert.equal(await page.locator('#confirm-command').textContent(),'vmctl link arch-noctalia debian-server');
+  await page.locator('#confirm-no').click();
+  assert.equal(requests.length,0);
+  const startHandle=await network.boundingBox(), targetIcon=await page.locator('#rows [data-vm="debian-server"] .catalog-icon').boundingBox();
+  await page.mouse.move(startHandle.x+10,startHandle.y+10); await page.mouse.down();
+  await page.mouse.move(targetIcon.x+10,targetIcon.y+10,{steps:8});
+  await page.waitForTimeout(600);
+  assert(!(await page.locator('#hover-shot').isVisible()));
+  await page.evaluate(()=>refresh());
+  assert(await page.locator('#rows [data-vm="debian-server"]').evaluate(el=>el.classList.contains('drop-target')));
+  await page.mouse.up();
+  assert.equal(await page.locator('#confirm-command').textContent(),'vmctl link arch-noctalia debian-server');
+  await page.locator('#confirm-no').click();
+  await network.hover(); await page.mouse.down(); await page.mouse.move(targetIcon.x+10,targetIcon.y+10,{steps:8});
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  assert(!(await page.locator('#drag-ghost').count()));
+  assert.equal(requests.length,0);
+  check('network picker supports keyboard; dedicated drag survives polling, suppresses preview and cancels with Escape');
   const states = await page.evaluate(() => {
     const base = S.vms[0];
     return ['start','stop','bootstrap-archinstall','fetch-iso','show'].map(job_command => stateOf({...base,job_status:'running',job_command})[0]);
@@ -222,7 +276,7 @@ try {
   const activityPanel=await page.locator('#activity-panel').boundingBox(), activityToggle=await page.locator('#activity-toggle').boundingBox();
   assert(activityPanel.y>=activityToggle.y+activityToggle.height);
   assert(activityPanel.x>0 && activityPanel.x+activityPanel.width<=1440);
-  await shot('activity-menu');
+  await page.screenshot({path:root+'artifacts/webui-review/activity-menu.png'});
   await page.locator('#activity-log').click(); await page.waitForFunction(()=>document.getElementById('log').textContent.includes('Fixture job output'));
   await page.locator('#log-dialog [data-close]').click();
   assert.equal(jobStatus,'running'); check('commands run without a modal; logs open on request and closing them keeps the job running');
@@ -300,6 +354,202 @@ try {
   state.vms[0].running=true; jobId='web:fixture'; jobStatus='completed';
   await page.evaluate(()=>{ vmJobs.clear(); }); await page.evaluate(()=>refresh());
   check('row progress is immediate, survives stale snapshots, keeps controls visible and supports confirmed force stop');
+  // Completion must not expose controls based on a snapshot taken before completion.
+  jobId='vm:arch-noctalia';
+  await page.keyboard.press('F8'); await page.waitForFunction(()=>!submittingVms.size);
+  await page.evaluate(()=>refreshJobs());
+  assert(await page.locator('#job-bar').isVisible());
+  assert((await page.locator('#job-bar-status').textContent()).includes('Stopping'));
+  await page.locator('#job-bar-log').click();
+  await page.waitForFunction(()=>document.getElementById('log').textContent.includes('Fixture job output'));
+  await page.locator('#log-dialog [data-close]').click();
+  holdState=true; jobStatus='completed';
+  await page.evaluate(()=>refreshJobs());
+  await page.waitForFunction(()=>vmJobs.get('arch-noctalia')?.confirming);
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Stopping');
+  assert(await page.locator('#details').getByRole('button',{name:'Stop',exact:true}).isDisabled());
+  assert((await page.locator('#job-bar-status').textContent()).includes('Checking'));
+  await shot('job-bar-confirming');
+  await page.locator('#job-bar-cancel').click();
+  assert.equal(await page.locator('#confirm-title').textContent(),'Force stop this VM?');
+  await page.locator('#confirm-no').click();
+  state.vms[0].running=false; holdState=false; stateWaiters.splice(0).forEach(resolve=>resolve());
+  await page.waitForFunction(()=>stateRefresh===null);
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Stopping');
+  await page.evaluate(()=>refresh(true));
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Stopped');
+  assert(!(await page.locator('#job-bar').isVisible()));
+  await page.keyboard.press('F2'); await page.waitForFunction(()=>!submittingVms.size);
+  jobStatus='completed'; failState=true;
+  await page.evaluate(()=>refreshJobs()); await page.waitForFunction(()=>stateRefresh===null);
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Starting');
+  assert(await page.locator('#job-bar').isVisible());
+  failState=false; state.vms[0].running=true; await page.evaluate(()=>refresh(true));
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Running');
+  assert(!(await page.locator('#job-bar').isVisible()));
+  // A successful command with an unexpected state must eventually explain the mismatch.
+  await page.keyboard.press('F8'); await page.waitForFunction(()=>!submittingVms.size);
+  jobStatus='completed'; await page.evaluate(()=>refreshJobs()); await page.waitForFunction(()=>stateRefresh===null);
+  await page.evaluate(()=>{vmJobs.get('arch-noctalia').finishedAt=Date.now()-31000;});
+  await page.evaluate(()=>refresh(true));
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Still running');
+  assert(!(await page.locator('#job-bar').isVisible()));
+  await page.evaluate(()=>refreshJobs());
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Still running');
+  check('F2/F8 retain transitions through stale snapshots and connection failures; completion hides the job bar and unexpected states are explicit');
+  await page.evaluate(()=>{vmJobs.clear();});
+  await page.keyboard.press('F8'); await page.waitForFunction(()=>!submittingVms.size);
+  await page.locator('#job-bar-cancel').click(); await page.locator('#confirm-no').click();
+  const beforeCancel=cancelRequests.length;
+  await page.locator('#job-bar-cancel').click(); await page.locator('#confirm-yes').click();
+  await page.waitForFunction(()=>!document.getElementById('job-bar').offsetHeight);
+  assert.equal(cancelRequests.length,beforeCancel+1);
+  state.vms[0].running=true; jobStatus='completed'; jobId='web:fixture';
+  await page.evaluate(()=>{vmJobs.clear();}); await page.evaluate(()=>refresh());
+  check('bottom job bar opens logs, confirms cancellation and disappears when the job ends');
+  const row=name=>page.locator(`#rows [data-vm="${name}"] .profile-name`);
+  await row('arch-noctalia').click();
+  await row('debian-server').click({modifiers:['Control']});
+  assert.equal(await page.locator('#selection-count').textContent(),'2 selected');
+  await row('proxmox-ve').click({modifiers:['Shift']});
+  assert.deepEqual(await page.evaluate(()=>[...checkedVms]),['debian-server','proxmox-ve']);
+  await row('arch-noctalia').click({modifiers:['Meta']});
+  assert.equal(await page.locator('#selection-count').textContent(),'3 selected');
+  await page.evaluate(()=>refresh());
+  assert.equal(await page.locator('#rows .vm-select[aria-pressed="true"]').count(),3);
+  assert.equal(await page.locator('#rows input[type=checkbox]').count(),0);
+  await row('debian-server').click({button:'right'});
+  assert.equal(await page.locator('#vm-context .context-title').textContent(),'3 machines selected');
+  assert.equal(await page.locator('#vm-context').getAttribute('aria-label'),'Selected machines actions');
+  assert((await page.locator('#vm-context .context-selection').textContent()).includes('arch-noctalia'));
+  assert.equal(await page.locator('#vm-context').getByRole('menuitem',{name:'Customize profile…'}).count(),0);
+  await page.screenshot({path:root+'artifacts/webui-review/selection-context.png'});
+  await page.locator('#vm-context').getByRole('menuitem',{name:'Link selected on a network (3)',exact:true}).click();
+  const countBeforeLink=requests.length;
+  assert.equal(await page.locator('#confirm-command').textContent(),'vmctl link arch-noctalia debian-server proxmox-ve');
+  await page.locator('#confirm-no').click(); assert.equal(requests.length,countBeforeLink);
+  await page.locator('#rows [data-vm="arch-noctalia"]').press('Shift+F10');
+  assert.equal(await page.locator('#vm-context .context-title').textContent(),'3 machines selected');
+  await page.locator('#vm-context').getByRole('menuitem',{name:'Link selected on a network (3)',exact:true}).click();
+  await page.locator('#confirm-yes').click();
+  await page.waitForFunction(()=>!bulkBusy);
+  assert.deepEqual(requests.at(-1).args,['link','arch-noctalia','debian-server','proxmox-ve']);
+  jobStatus='completed'; await page.evaluate(()=>refreshJobs());
+  // Existing links replace the network action, even in an already open context menu.
+  await row('arch-noctalia').click({button:'right'});
+  const linkRecord=segment=>({segment,address:'192.168.100.1/24',up:false,peers:[]});
+  for (const vm of state.vms.slice(0,4)) vm.links=[linkRecord('session')];
+  await page.evaluate(()=>refresh(true));
+  assert.equal(await page.locator('#selection-link').textContent(),'Unlink network (3)');
+  const unlinkMenu=page.locator('#vm-context').getByRole('menuitem',{name:'Unlink selected from network (3)',exact:true});
+  assert(await unlinkMenu.isVisible());
+  await unlinkMenu.click();
+  const unlinkBefore=requests.length;
+  assert.equal(await page.locator('#confirm-command').textContent(),'vmctl link --off --segment session arch-noctalia debian-server proxmox-ve');
+  assert((await page.locator('#confirm-message').textContent()).includes('Other members stay connected'));
+  await page.locator('#confirm-no').click(); await page.waitForFunction(()=>!bulkBusy);
+  assert.equal(requests.length,unlinkBefore);
+  await page.locator('#selection-link').click();
+  // A changed membership while reviewing must abort instead of unlinking stale targets.
+  state.vms[2].links=[]; await page.evaluate(()=>refresh(true));
+  await page.locator('#confirm-yes').click(); await page.waitForFunction(()=>!bulkBusy);
+  assert.equal(requests.length,unlinkBefore);
+  assert.equal(await page.locator('#selection-link').textContent(),'Link network (3)');
+  for (const vm of state.vms.slice(0,3)) vm.links=[linkRecord('session'),linkRecord('backend')];
+  await page.evaluate(()=>refresh(true));
+  await page.locator('#selection-link').click();
+  assert(await page.locator('#unlink-dialog').isVisible());
+  await page.locator('#unlink-segment').selectOption('backend');
+  await page.locator('#unlink-review').click();
+  assert.equal(await page.locator('#confirm-command').textContent(),'vmctl link --off --segment backend arch-noctalia debian-server proxmox-ve');
+  await page.locator('#confirm-yes').click(); await page.waitForFunction(()=>!bulkBusy);
+  assert.deepEqual(requests.at(-1).args,['link','--off','--segment','backend','arch-noctalia','debian-server','proxmox-ve']);
+  assert(!requests.at(-1).args.includes('proxmox-ve-node2'));
+  for (const vm of state.vms.slice(0,3)) vm.links=[];
+  jobStatus='completed'; await page.evaluate(()=>refreshJobs()); await page.evaluate(()=>refresh(true));
+  assert.equal(await page.locator('#selection-link').textContent(),'Link network (3)');
+  state.vms[3].links=[];
+  // Drag uses the same existing-network decision, and only acts on the dragged pair.
+  for (const vm of state.vms.slice(0,4)) vm.links=[linkRecord('session')];
+  await page.evaluate(()=>refresh(true));
+  const dragPair=async()=>{
+    const from=await page.locator('#rows [data-vm="arch-noctalia"] .link-handle').boundingBox();
+    const to=await page.locator('#rows [data-vm="debian-server"] .catalog-icon').boundingBox();
+    await page.mouse.move(from.x+10,from.y+10); await page.mouse.down();
+    await page.mouse.move(to.x+10,to.y+10,{steps:8}); await page.mouse.up();
+  };
+  const beforePair=requests.length;
+  await dragPair();
+  assert.equal(await page.locator('#confirm-title').textContent(),'Unlink 2 machines?');
+  assert.equal(await page.locator('#confirm-command').textContent(),'vmctl link --off --segment session arch-noctalia debian-server');
+  await page.locator('#confirm-no').click(); await page.waitForFunction(()=>!bulkBusy);
+  assert.equal(requests.length,beforePair);
+  await dragPair(); await page.locator('#confirm-yes').click(); await page.waitForFunction(()=>!bulkBusy);
+  assert.deepEqual(requests.at(-1).args,['link','--off','--segment','session','arch-noctalia','debian-server']);
+  assert.equal(await page.evaluate(()=>checkedVms.size),3);
+  jobStatus='completed'; await page.evaluate(()=>refreshJobs());
+  for (const vm of state.vms.slice(0,2)) vm.links.push(linkRecord('backend'));
+  await page.evaluate(()=>refresh(true));
+  await page.locator('#rows [data-vm="arch-noctalia"] .link-handle').click();
+  await page.locator('#link-target').selectOption('debian-server');
+  assert.equal(await page.locator('#link-review').textContent(),'Review unlink…');
+  await page.locator('#link-review').click();
+  assert(await page.locator('#unlink-dialog').isVisible());
+  assert.equal(await page.locator('#unlink-members').textContent(),'arch-noctalia · debian-server');
+  await page.locator('#unlink-segment').selectOption('backend');
+  await page.locator('#unlink-review').click();
+  assert.equal(await page.locator('#confirm-command').textContent(),'vmctl link --off --segment backend arch-noctalia debian-server');
+  await page.locator('#confirm-yes').click(); await page.waitForFunction(()=>!bulkBusy);
+  assert.deepEqual(requests.at(-1).args,['link','--off','--segment','backend','arch-noctalia','debian-server']);
+  for (const vm of state.vms.slice(0,4)) vm.links=[];
+  jobStatus='completed'; await page.evaluate(()=>refreshJobs()); await page.evaluate(()=>refresh(true));
+  check('drag and picker offer unlink for existing peers, preserve the wider selection and disconnect only the pair on the chosen network');
+  check('shared links offer unlink in toolbar and live context menu; cancellation, stale membership, multiple segments and explicit VM scope are handled');
+  state.vms[1].running=true; await page.evaluate(()=>refresh(true));
+  dynamicVmJobs=true;
+  await row('arch-noctalia').click({button:'right'});
+  await page.locator('#vm-context').getByRole('menuitem',{name:'Stop selected (2)',exact:true}).click();
+  assert.equal(await page.locator('#confirm-command').textContent(),'vmctl stop arch-noctalia\nvmctl stop debian-server');
+  assert((await page.locator('#confirm-message').textContent()).includes('1 selected machine(s)'));
+  const countBeforeStop=requests.length;
+  await page.locator('#confirm-yes').click(); await page.waitForFunction(()=>!bulkBusy);
+  assert.deepEqual(requests.slice(countBeforeStop).map(r=>r.args),[['stop','arch-noctalia'],['stop','debian-server']]);
+  await shot('multi-selection');
+  await page.setViewportSize({width:390,height:844});
+  const mobileBar=await page.locator('#job-bar').boundingBox();
+  assert(mobileBar.x>=0 && mobileBar.x+mobileBar.width<=390 && mobileBar.y+mobileBar.height<=844);
+  assert(await page.locator('#job-bar-cancel').isVisible());
+  await shot('multi-selection-mobile');
+  await page.setViewportSize({width:1440,height:1000});
+  // Starting a selected group submits only stopped, eligible machines.
+  await page.evaluate(()=>{vmJobs.clear();});
+  state.vms[0].running=false; state.vms[1].running=false;
+  await page.evaluate(()=>refresh(true));
+  await page.locator('#selection-start').click();
+  const countBeforeStart=requests.length;
+  await page.locator('#confirm-yes').click(); await page.waitForFunction(()=>!bulkBusy);
+  assert.deepEqual(requests.slice(countBeforeStart).map(r=>r.args),[
+    ['start','arch-noctalia','--headless','--background'],
+    ['start','debian-server','--headless','--background'],
+    ['start','proxmox-ve','--headless','--background']]);
+  state.vms[0].running=true;
+  await page.locator('#search').fill('arch');
+  assert(!(await page.locator('#selection-bar').isVisible()));
+  await page.locator('#search').fill('');
+  await page.evaluate(()=>{vmJobs.clear(); knownJobs=[]; activityJob=null;});
+  state.vms[1].running=false; jobId='web:fixture'; jobStatus='completed'; dynamicVmJobs=false;
+  await page.evaluate(()=>refresh()); await page.evaluate(()=>refreshJobs());
+  await row('arch-noctalia').click();
+  await page.locator('#rows [data-vm="arch-noctalia"] .vm-select').click();
+  await page.locator('#rows [data-vm="debian-server"] .vm-select').focus(); await page.keyboard.press('Space');
+  assert.equal(await page.locator('#rows .vm-select[aria-pressed="true"]').count(),2);
+  await page.evaluate(()=>refresh());
+  assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'Deselect debian-server');
+  await row('proxmox-ve-node2').click({button:'right'});
+  assert.equal(await page.locator('#vm-context .context-title').textContent(),'proxmox-ve-node2');
+  assert.equal(await page.evaluate(()=>checkedVms.size),0);
+  await page.keyboard.press('Escape'); await row('arch-noctalia').click();
+  check('icon selection and Ctrl/Cmd/Shift work without checkboxes; mouse and keyboard context menus target the selection, outside clicks reset the scope');
   assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] use').getAttribute('href'),'/assets/distro-icons.svg#arch');
   assert.equal(await page.locator('.catalog-icon text').count(),0);
   check('distribution icons use the local SVG sprite, without monogram placeholders');
@@ -318,6 +568,7 @@ try {
     await shot('commands-'+width); await page.locator('#cmd-dialog [data-close]').click();
   }
   check('six viewport sizes keep profiles, primary actions and execution footer within bounds');
+  await page.evaluate(()=>{activityJob={id:'web:fixture',command:'vmctl show arch-noctalia',status:'completed'};renderActivity();});
   await page.locator('#activity-toggle').click();
   await page.locator('#activity-dismiss').click(); assert(!(await page.locator('#activity').isVisible()));
   assert(await page.locator('#job-rows [data-job-log]').isVisible());
