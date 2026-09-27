@@ -216,6 +216,40 @@ class Recording:
         return rec
 
 
+def png_size(path: Path) -> tuple[int, int]:
+    """Width and height from a PNG's IHDR (0, 0 when unreadable)."""
+    try:
+        head = path.read_bytes()[:24]
+    except OSError:
+        return (0, 0)
+    if len(head) < 24 or not head.startswith(b"\x89PNG"):
+        return (0, 0)
+    width, height = struct.unpack(">II", head[16:24])
+    return (int(width), int(height))
+
+
+def canvas(recording: Recording, width: int | None = None) -> tuple[int, int]:
+    """One output size for a whole clip, from the frame it ends on (even numbers for H.264).
+
+    A guest changes resolution while it installs (ReactOS: 720x400 text Setup, 640x480, 800x600,
+    1024x768), and every change made ffmpeg rebuild the filter graph: the palette was computed
+    again from what followed and 55 of 61 GIF frames were lost. Each frame is fitted into this
+    canvas instead, with -reinit_filter 0.
+    """
+    w, h = png_size(recording.frames[recording.final_index()][0]) if recording.frames else (0, 0)
+    if not w or not h:
+        w, h = recording.size if all(recording.size) else (640, 480)
+    if width:
+        w, h = width, round(width * h / w)
+    return (max(2, w // 2 * 2), max(2, h // 2 * 2))
+
+
+def fit(size: tuple[int, int]) -> str:
+    w, h = size
+    return (f"scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos,"
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2")
+
+
 def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: float = 1.0, gif: bool = True,
            mp4: bool = False, gif_seconds: float = GIF_SECONDS, gif_fps: int = GIF_FPS, gif_width: int = GIF_WIDTH,
            dry_run: bool = False, realtime_gif: bool = False, mp4_fps: int | None = None,
@@ -234,7 +268,7 @@ def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: 
         gif_path = recording.directory / "recording.gif"
         # stats_mode=full: the palette weighs every frame, so the held final screen keeps its colours
         # (diff let a long text log decide the palette and turned the Ubuntu desktop yellow).
-        filters = (f"scale={gif_width}:-1:flags=lanczos,split[a][b];"
+        filters = (fit(canvas(recording, gif_width)) + ",split[a][b];"
                    "[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle")
         if realtime_gif:
             filters = f"fps={gif_fps}:eof_action=pass," + filters
@@ -243,8 +277,8 @@ def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: 
             if not dry_run:
                 gif_list.write_text(recording.concat_list(max_hold, period) if realtime_gif
                                     else recording.gif_list(seconds, gif_fps), encoding="utf-8")
-            runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(gif_list),
-                         "-vf", filters, "-loop", "0", str(gif_path)], dry_run=dry_run, quiet=True)
+            runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-reinit_filter", "0", "-f", "concat", "-safe", "0",
+                         "-i", str(gif_list), "-vf", filters, "-loop", "0", str(gif_path)], dry_run=dry_run, quiet=True)
             if (dry_run or realtime_gif or not gif_target_kb or not gif_path.is_file()
                     or gif_path.stat().st_size <= gif_target_kb * 1024):
                 break
@@ -253,11 +287,11 @@ def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: 
     if mp4:
         listing = recording.frames_dir / FRAMES_LIST
         mp4_path = recording.directory / "recording.mp4"
-        filters = "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p"
+        filters = fit(canvas(recording)) + ",format=yuv420p"
         if mp4_fps:
             filters = f"fps={mp4_fps}," + filters
-        runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
-                     "-vf", filters, "-fps_mode", "vfr",
+        runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-reinit_filter", "0", "-f", "concat", "-safe", "0",
+                     "-i", str(listing), "-vf", filters, "-fps_mode", "vfr",
                      "-c:v", "libx264", "-crf", "22", "-preset", "medium", "-movflags", "+faststart", str(mp4_path)],
                     dry_run=dry_run, quiet=True)
         out["mp4"] = mp4_path

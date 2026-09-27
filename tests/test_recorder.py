@@ -55,6 +55,15 @@ class FramesTests(BaseVmctlTestCase):
         self.assertEqual(gif.count("duration 0.500"), 4)
         self.assertTrue(gif.rstrip().endswith("file '00009.png'"))
 
+    def test_one_canvas_for_a_clip_whose_guest_changes_resolution(self):
+        rec = recorder.Recording(self.root / "rec")
+        rec.add(ppm(720, 400, (1, 1, 1)), 0.0)
+        rec.add(ppm(1024, 768, (2, 2, 2)), 1.0)
+        self.assertEqual(recorder.png_size(rec.frames[0][0]), (720, 400))
+        self.assertEqual(recorder.canvas(rec), (1024, 768))  # the frame it ends on
+        self.assertEqual(recorder.canvas(rec, 480), (480, 360))
+        self.assertIn("pad=480:360", recorder.fit((480, 360)))
+
     def test_the_gif_ends_on_the_richest_late_screen_held_longer_not_on_the_power_off(self):
         rec = recorder.Recording(self.root / "rec")
         for i in range(10):  # a long install: 100 s of small frames
@@ -78,6 +87,8 @@ class FramesTests(BaseVmctlTestCase):
             out = recorder.encode(rec)
             self.assertEqual(list(out), ["gif"])
             self.assertIn("palettegen", " ".join(calls[0]))
+            self.assertIn("-reinit_filter", calls[0])  # a resolution change must not rebuild the graph
+            self.assertIn("scale=480:480:force_original_aspect_ratio=decrease", " ".join(calls[0]))
             self.assertTrue(str(calls[0][-1]).endswith("recording.gif"))
             self.assertTrue((rec.frames_dir / "gif.ffconcat").is_file())
             self.assertTrue((rec.frames_dir / recorder.FRAMES_LIST).is_file())
