@@ -188,9 +188,17 @@ def guest_script(family: str, mac: str, address: str) -> str | None:
                 f"[ -n \"$IF\" ] && break; sleep 1; done; [ -n \"$IF\" ] || {{ echo 'no interface with {mac}' >&2; exit 3; }}; "
                 f"ifconfig \"$IF\" inet {address} up && echo \"$IF\"")
     if family in LINUX_LIKE:
+        # A NetworkManager guest (Kali, desktops) grabs the new interface, tries DHCP on it and
+        # flushes the address `ip` set once that fails (verified live: eth1 "disconnected", no
+        # address, a minute after the link worked). There the address is a manual connection.
+        nm = (f"nmcli -t -f DEVICE,STATE dev 2>/dev/null | grep \"^$IF:\" | grep -qv unmanaged")
         return (f"for i in $(seq 1 30); do IF=$(ip -o link | awk '/{mac}/{{sub(\":\",\"\",$2); print $2; exit}}'); "
                 f"[ -n \"$IF\" ] && break; sleep 1; done; [ -n \"$IF\" ] || {{ echo 'no interface with {mac}' >&2; exit 3; }}; "
-                f"ip link set \"$IF\" up && ip addr replace {address} dev \"$IF\" && echo \"$IF\"")
+                f"if command -v nmcli >/dev/null 2>&1 && {nm}; then "
+                f"nmcli con delete \"vmctl-link-$IF\" >/dev/null 2>&1; "
+                f"nmcli con add type ethernet ifname \"$IF\" con-name \"vmctl-link-$IF\" ipv4.method manual ipv4.addresses {address} "
+                f"ipv6.method disabled autoconnect yes >/dev/null && nmcli con up \"vmctl-link-$IF\" >/dev/null; "
+                f"else ip link set \"$IF\" up && ip addr replace {address} dev \"$IF\"; fi && echo \"$IF\"")
     return None
 
 

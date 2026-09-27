@@ -149,6 +149,8 @@ class GuestScriptTests(unittest.TestCase):
         linux = vmlink.guest_script("debian", "52:54:01:aa:bb:cc", "192.168.100.1/24")
         self.assertIn("ip -o link", linux)
         self.assertIn("ip addr replace 192.168.100.1/24", linux)
+        self.assertIn("nmcli con add type ethernet", linux)  # NetworkManager guests keep the address this way
+        self.assertIn("ipv4.addresses 192.168.100.1/24", linux)
         self.assertIn("52:54:01:aa:bb:cc", linux)
         bsd = vmlink.guest_script("freebsd", "52:54:01:aa:bb:cc", "192.168.100.1/24")
         self.assertIn("ifconfig \"$IF\" inet 192.168.100.1/24 up", bsd)
