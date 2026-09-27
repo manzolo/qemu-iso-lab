@@ -175,6 +175,9 @@ details p, details ul { margin:6px 0 0; }
 .clip { position:relative; border-radius:10px; overflow:hidden; background:#000; border:1px solid var(--line); aspect-ratio:16/10; }
 .clip img, .clip video { display:block; width:100%; height:100%; object-fit:contain; background:#000; }
 .clip .play { position:absolute; inset:0; display:grid; place-items:center; background:linear-gradient(180deg,transparent 40%,#000a); color:#fff; cursor:pointer; border:0; padding:0; }
+.clip .play.mini { inset:auto 8px 8px auto; display:inline-flex; align-items:center; gap:6px; background:#ff0000e6; color:#fff; border-radius:999px; padding:5px 11px 5px 8px; font:600 11.5px system-ui; box-shadow:0 3px 12px #0009; }
+.clip .play.mini::before { content:""; border-style:solid; border-width:6px 0 6px 10px; border-color:transparent transparent transparent #fff; }
+.clip .play.mini:hover { background:#ff2b2b; }
 .clip .play span { width:58px; height:58px; border-radius:50%; background:#ff0000e6; display:grid; place-items:center; box-shadow:0 4px 18px #0008; }
 .clip .play span::after { content:""; border-style:solid; border-width:11px 0 11px 20px; border-color:transparent transparent transparent #fff; margin-left:5px; }
 .clip .play b { position:absolute; left:10px; bottom:8px; font:600 11px system-ui; text-shadow:0 1px 2px #000; }
@@ -243,6 +246,11 @@ function visible() {
 function clipBlock(p) {
   const c = p.clip; if (!c) return "";
   const style = DATA.clip_style, parts = [];
+  if (style === "combo") {
+    if (c.gif) return `<div class="clip"><span class="tag">install</span><img src="${esc(c.gif)}" alt="Time-lapse of the ${esc(p.name)} install" loading="lazy">${c.mp4 ? `<button class="play mini" data-play="${esc(p.name)}" aria-label="Play the install video of ${esc(p.name)}">Video</button>` : ""}</div>`;
+    if (c.mp4) return `<div class="clip"><span class="tag">install · video</span><img src="${esc(c.poster || "")}" alt="" loading="lazy"><button class="play" data-play="${esc(p.name)}" aria-label="Play the install of ${esc(p.name)}"><span></span><b>Watch the install</b></button></div>`;
+    return "";
+  }
   if ((style === "gif" || style === "both") && c.gif) parts.push(`<div class="clip"><span class="tag">install · gif</span><img src="${esc(c.gif)}" alt="Time-lapse of the ${esc(p.name)} install" loading="lazy"></div>`);
   if ((style === "video" || style === "both") && c.mp4) parts.push(`<div class="clip"><span class="tag">install · video</span><img src="${esc(c.poster || c.gif || "")}" alt="" loading="lazy"><button class="play" data-play="${esc(p.name)}" aria-label="Play the install of ${esc(p.name)}"><span></span><b>Watch the install</b></button></div>`);
   return parts.join("");
@@ -331,7 +339,7 @@ def collect_media(root: Path, out: Path, media: Path | None, names: list[str]) -
     return found
 
 
-def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "video") -> dict[str, Any]:
+def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "combo") -> dict[str, Any]:
     data = catalog_data(root)
     out.mkdir(parents=True, exist_ok=True)
     clips = collect_media(root, out, media, [p["name"] for p in data["profiles"]])
@@ -355,7 +363,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", type=Path, default=ROOT / "site", help="output directory (default: site/)")
     parser.add_argument("--media", type=Path, default=None, help="directory with <vm>/recording.mp4|recording.gif|poster.png (default: docs/media)")
-    parser.add_argument("--clip-style", choices=["gif", "video", "both"], default="both", help="how a profile's install clip is shown on its card (default: video)")
+    parser.add_argument("--clip-style", choices=["combo", "gif", "video", "both"], default="combo", help="how a profile's install clip is shown on its card: combo = the GIF loops in the card and a small button opens the video player (default), gif, video (poster + play), both")
     parser.add_argument("--root", type=Path, default=ROOT, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     data = build(args.root, args.out, media=args.media, clip_style=args.clip_style)
