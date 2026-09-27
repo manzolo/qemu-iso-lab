@@ -91,9 +91,9 @@ What the page offers:
   during the final state check, disappears on completion, and leaves the log in Recent activity.
   Hovering a distribution icon only previews the live screen; linking uses the network button.
 
-![vmctl web: profiles, the selected VM's actions, jobs](screenshots/web-dashboard.png)
+![vmctl web: My VMs, two of them running, the selected VM's actions and facts](screenshots/web-dashboard.png)
 
-![Labs in the web dashboard: member addresses, live VM states and stack controls](screenshots/web-labs.png)
+![Labs in the web dashboard: member addresses, live VM states, stack controls and a session lab](screenshots/web-labs.png)
 
 ## Safety
 

@@ -19,7 +19,7 @@ as one more row (`cluster-pve-lab`).
 `vmtui`, then **Labs** (or F2): each lab with its members and their state. Enter runs the
 suggested step: install what is missing, start the stack, or open its map.
 
-![vmtui, Labs filter: the Proxmox lab running, with the network map as the default action](screenshots/vmtui-labs.png)
+![vmtui, Labs filter: the network lab and the Proxmox lab ready to install, and a session lab of two linked machines](screenshots/vmtui-labs.png)
 
 ## From the command line
 

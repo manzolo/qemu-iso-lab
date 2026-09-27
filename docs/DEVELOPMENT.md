@@ -107,3 +107,21 @@ one VM: the `vmctl check-vms` default of 300 s only fits boot checks, a real ins
 takes 10 to 60 minutes depending on the mirror, and a too-short value shows up as
 `Timed out after 300s` on every profile rather than as a real regression. GitHub
 Actions only runs the dry-runs and the small TCG guests.
+
+## Screenshots for the README and the docs
+
+They are shot from a clean lab, not from the maintainer's host: a Lubuntu VM with KVM where
+the checkout has a handful of profiles chosen (`vmctl catalog add`) and two of them installed.
+
+- **Web dashboard**: run `vmctl web --port 18765` in the VM and forward the same port
+  (`ssh -N -L 18765:127.0.0.1:18765 vm`: the server checks the `Host` header, so both ends
+  must use one port), then drive the page with Playwright at `deviceScaleFactor: 2`
+  (`page.goto(url-with-token)`, click a row, open the console, take `page.screenshot()`).
+- **Textual dashboard**: `.venv-tui/bin/python tools/shoot_tui.py --out vmtui-dashboard.svg
+  [--filter labs] [--select vm]` renders the live dashboard headless to SVG; a browser turns
+  the SVG into a PNG (`page.setContent(svg)` + element screenshot at scale 2).
+- **Catalog site**: `tools/build_catalog_site.py --out DIR`, then a screenshot of
+  `DIR/index.html` (the icon sprite is inlined, so `file://` works).
+
+Keep the existing file names (`docs/screenshots/web-*.png`, `vmtui-*.png`,
+`catalog-site.png`) so README and docs pick the new pictures up unchanged.
