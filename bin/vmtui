@@ -660,7 +660,7 @@ from pathlib import Path
 
 sys.path.insert(0, sys.argv[1])
 
-from vmctl import clone, cloud_init, config, iso, labs, lifecycle, runtime, state, tui_jobs, vmlink, vmstate
+from vmctl import catalog, clone, cloud_init, config, iso, labs, lifecycle, runtime, state, tui_jobs, vmlink, vmstate
 
 # A disk image with less than vmstate.DATA_MIN_BYTES allocated is "prepared" (created by
 # prep or an install that stopped early) and has no data on it; a fresh qcow2 allocates
@@ -672,6 +672,7 @@ INSTALLED_MIN_ALLOCATED = vmstate.DATA_MIN_BYTES
 state.ROOT = Path(sys.argv[1])
 state.CONFIG_DIR = Path(sys.argv[2])
 VMS = config.load_config()["vms"]
+MINE = set(catalog.selected())  # My VMs: the names chosen in local.json ("catalog")
 
 
 def ellipsize(text, width):
@@ -730,6 +731,7 @@ def facts(name, vm):
         memory_mb = 0
     return {
         "name": name,
+        "mine": name in MINE,
         "job_status": tui_jobs.status(tui_jobs.job_dir(state.ROOT, name)),
         "label": str(vm.get("name", name)),
         "family": str(meta.get("family", "")),
@@ -859,8 +861,9 @@ load_vm_facts() {
 }
 
 # list_dashboard_items MODE VALUE
-#   MODE: all | installed | running | family | find
-# First line: "__summary<TAB>total<TAB>installed<TAB>running<TAB>shown",
+#   MODE: auto | mine | all | installed | running | family | find (auto: mine when My VMs
+#   has names, else all; the mode chosen is the last field of the summary line)
+# First line: "__summary<TAB>total<TAB>installed<TAB>running<TAB>shown<TAB>mode",
 # then tag/description pairs, one per line.
 list_dashboard_items() {
     python3 -c "$PY_COMMON
@@ -901,7 +904,12 @@ total = len(rows)
 installed = sum(1 for f in rows if f["installed"] or f["running"])
 running = sum(1 for f in rows if f["running"])
 
-if mode == "installed":
+if mode == "auto":
+    mode = "mine" if any(f["mine"] for f in rows) else "all"
+if mode == "mine":
+    # My VMs, plus whatever runs right now: a running VM never hides.
+    rows = [f for f in rows if f["mine"] or f["running"]]
+elif mode == "installed":
     rows = [f for f in rows if f["prepared"] or f["installed"] or f["running"]]
 elif mode == "running":
     rows = [f for f in rows if f["running"]]
@@ -911,7 +919,7 @@ elif mode == "find":
     rows = [f for f in rows if value in f["name"].lower() or value in f["label"].lower()]
 
 rows.sort(key=lambda f: (0 if f["running"] else 1 if f["installed"] else 2 if f["prepared"] else 3, natural_key(f["name"])))
-print(f"__summary\t{total}\t{installed}\t{running}\t{len(rows)}")
+print(f"__summary\t{total}\t{installed}\t{running}\t{len(rows)}\t{mode}")
 for f in rows:
     if f["running"]:
         status = "running"
@@ -1395,6 +1403,11 @@ build_vm_menu_items() {
         emit_action "Physical Disks..." "Flash the VM disk to a device, or import a device into the VM"
     fi
     emit_action "Profile Details" "Review this VM configuration"
+    if [[ "${FACTS[mine]:-0}" == "1" ]]; then
+        emit_action "Remove from My VMs" "Drop it from your selection (the VM and its disk stay)"
+    else
+        emit_action "Add to My VMs" "Keep it in the My VMs filter of the dashboards (saved in local.json)"
+    fi
 
     if [[ $running != "1" ]]; then
         emit_section "ADVANCED"
@@ -1957,6 +1970,8 @@ resolve_action() {
         "Export to libvirt") printf '%s\n' export-libvirt ;;
         "Remove from libvirt") printf '%s\n' unexport-libvirt ;;
         "Profile Details") printf '%s\n' show ;;
+        "Add to My VMs") printf '%s\n' catalog-add ;;
+        "Remove from My VMs") printf '%s\n' catalog-remove ;;
         "Back") printf '%s\n' back ;;
         "Arch Bootstrap") printf '%s\n' bootstrap-archinstall ;;
         "Omarchy Bootstrap") printf '%s\n' bootstrap-omarchy ;;
@@ -2071,6 +2086,12 @@ run_action() {
             ;;
         show)
             run_vmctl show "$current_vm" || true
+            ;;
+        catalog-add)
+            run_vmctl catalog add "$current_vm" || true
+            ;;
+        catalog-remove)
+            run_vmctl catalog remove "$current_vm" || true
             ;;
         video-profile)
             choose_video >/dev/null || true
@@ -2633,12 +2654,13 @@ lab_menu_loop() {
 # Dashboard (main screen)
 # ---------------------------------------------------------------------------
 
-dash_mode="all"
+dash_mode="auto"  # the first listing picks My VMs when the selection has names
 dash_value=""
 
 dash_filter_label() {
     case "$dash_mode" in
-        all) printf 'all VMs\n' ;;
+        auto|all) printf 'all VMs\n' ;;
+        mine) printf 'My VMs\n' ;;
         installed) printf 'installed only\n' ;;
         running) printf 'running only\n' ;;
         family) printf 'family = %s\n' "$dash_value" ;;
@@ -2650,11 +2672,13 @@ choose_filter() {
     local selected
     selected=$(MENU_CANCEL_LABEL="Back" menu_choose \
         "Filter" "Which VMs should the dashboard list?" \
+        "My VMs"    "The profiles you chose (vmctl catalog add), plus whatever is running" \
         "All"       "Every profile in the catalog" \
         "Installed" "Only VMs that have a disk image (installed or just prepared)" \
         "Running"   "Only VMs running right now" \
         "Family"    "Pick a distro family (arch, debian, fedora, ...)") || return 0
     case "$selected" in
+        "My VMs") dash_mode="mine"; dash_value="" ;;
         All) dash_mode="all"; dash_value="" ;;
         Installed) dash_mode="installed"; dash_value="" ;;
         Running) dash_mode="running"; dash_value="" ;;
@@ -2704,8 +2728,9 @@ dashboard_loop() {
         local context_hints=0
         [[ "$UI_BACKEND" == "fzf" ]] && context_hints=1
         mapfile -t rows < <(MENU_CONTEXT_HINTS="$context_hints" list_dashboard_items "$dash_mode" "$dash_value")
-        local total installed running shown
-        IFS=$'\t' read -r _ total installed running shown <<<"${rows[0]}"
+        local total installed running shown effective_mode
+        IFS=$'\t' read -r _ total installed running shown effective_mode <<<"${rows[0]}"
+        [[ -n "$effective_mode" ]] && dash_mode="$effective_mode"
         rows=("${rows[@]:1}")
 
         local -a items=(

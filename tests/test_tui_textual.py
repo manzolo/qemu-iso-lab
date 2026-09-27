@@ -65,6 +65,9 @@ class DashboardDataTests(unittest.TestCase):
                          ["ubuntu", "alpine", "vm2", "vm10"])
         self.assertEqual([r["name"] for r in visible_rows(rows, "ALP server", "disk")], ["alpine"])
         self.assertEqual(visible_rows(rows, "alpine", "running"), [])
+        # My VMs: the chosen rows plus whatever runs; a disk alone does not count.
+        rows[1]["mine"] = True
+        self.assertEqual([r["name"] for r in visible_rows(rows, "", "mine")], ["ubuntu", "vm2"])
 
     def test_iso_availability_never_implies_an_installed_vm(self):
         for ready in (True, False):
@@ -388,6 +391,27 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(table.row_count, 1)
             self.assertEqual(app.selected, "alpine")
             self.assertEqual(app.query_one("#details", VMDetails).row["name"], "alpine")
+
+    async def test_a_selection_opens_the_dashboard_on_my_vms(self):
+        app = self.make_app()
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            self.assertEqual(app.mode, "all")  # nothing chosen: the whole catalog
+        app = self.make_app()
+        app.bridge.snapshot.return_value = [profile("alpine", mine=True), profile("debian", installed=True, prepared=True),
+                                            profile("ubuntu", running=True, prepared=True)]
+        async with app.run_test(size=(120, 44)) as pilot:
+            await self.ready(app, pilot)
+            self.assertEqual(app.mode, "mine")
+            self.assertTrue(app.query_one("#mine", Button).has_class("active"))
+            self.assertEqual([r["name"] for r in app.filtered], ["ubuntu", "alpine"])
+            self.assertIn("1 in My VMs", str(app.query_one("#summary", Static).content))
+            await pilot.click("#all")
+            await pilot.pause()
+            self.assertEqual(len(app.filtered), 3)
+            app.action_refresh()
+            await self.ready(app, pilot)
+            self.assertEqual(app.mode, "all")  # the opening choice is made once, not on every refresh
 
     def lab_app(self):
         app = self.make_app()

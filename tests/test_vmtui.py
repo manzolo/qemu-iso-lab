@@ -976,7 +976,8 @@ run_dashboard_hotkey alt-u {vm}
         lines = result.stdout.splitlines()
         summary = lines[0].split("\t")
         self.assertEqual(summary[0], "__summary")
-        total, installed, running, shown = map(int, summary[1:])
+        total, installed, running, shown = map(int, summary[1:5])
+        self.assertEqual(summary[5], "all")  # the mode in effect (auto resolves to mine or all)
         self.assertEqual(total, shown)
         self.assertGreaterEqual(installed, 1)
         self.assertGreaterEqual(running, 0)
@@ -1013,6 +1014,21 @@ run_dashboard_hotkey alt-u {vm}
         self.assertNotIn("ubuntu-niri", tags)
         result = self.run_bash("source bin/vmtui; list_family_menu_items")
         self.assertIn("alpine", result.stdout.splitlines()[0::2])
+
+    def test_dashboard_my_vms_mode_and_the_auto_opening_choice(self):
+        result = self.run_bash("source bin/vmtui; list_dashboard_items auto ''")
+        self.assertEqual(result.stdout.splitlines()[0].split("\t")[5], "all")  # nothing chosen
+        (self.config_dir / "profiles" / "local.json").write_text(json.dumps({"vms": {}, "catalog": {"selected": ["alpine-ci"]}}), encoding="utf-8")
+        self.mark_installed("test-ssh")
+        result = self.run_bash("source bin/vmtui; list_dashboard_items auto ''")
+        lines = result.stdout.splitlines()
+        self.assertEqual(lines[0].split("\t")[5], "mine")
+        self.assertEqual(lines[1::2], ["alpine-ci"])  # a disk alone does not count
+        result = self.run_bash("source bin/vmtui; load_vm_facts alpine-ci; echo ${FACTS[mine]}; load_vm_facts test-ssh; echo ${FACTS[mine]}")
+        self.assertEqual(result.stdout.split(), ["1", "0"])
+        result = self.run_bash("source bin/vmtui; list_vm_menu_items_unified test-ssh | grep 'My VMs'")
+        self.assertIn("Add to My VMs", result.stdout)
+        self.assertNotIn("Remove from My VMs", result.stdout)
 
     def test_video_preference_is_remembered_and_validated(self):
         result = self.run_bash(

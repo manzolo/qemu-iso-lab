@@ -33,11 +33,13 @@ opens the classic menus too, including tools and the network lab.
 
 ## The Textual dashboard
 
-A search field, All / With disk / Running filters, the profile table, the selected
+A search field, My VMs / All / With disk / Running filters, the profile table, the selected
 profile's details and quick actions, and installation activity. It reads the same
 snapshot as the classic menus and refreshes every 15 seconds (or with F5),
 preserving the selected profile and search. ISO availability is shown separately
-from the disk's installation state. With disk includes empty prepared disks.
+from the disk's installation state. With disk includes empty prepared disks. My VMs is the
+selection of `vmctl catalog` (plus whatever is running) and is the opening view
+while it has names; *All actions… → Add to My VMs* chooses a profile from either dashboard.
 
 The details panel grows with the terminal, and wide tables include profile
 descriptions. Below 140 columns, search and filters use separate rows; below

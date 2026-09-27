@@ -11,7 +11,13 @@ lifecycle from the page, screen by screen, read [From zero to a running VM](FIRS
 What the page offers:
 
 - **Profiles**: every profile with its live state, search (`/`) and the filters of the dashboard
-  (All, With disk, Running, Labs). The panel on the right shows the facts and the actions that make
+  (My VMs, All, With disk, Running, Labs).
+- **My VMs**: the profiles you chose out of the catalog (plus whatever is running right now,
+  so a running VM never hides). Choose them with *Add to My VMs* (right-click a row,
+  the ☆ button of the details panel, or a multiple selection), and the page opens on that view
+  from then on; the chosen profiles carry a ★ in every view. The selection is
+  `vmctl catalog add|remove|set|clear` and lives in `vms/profiles/local.json` under `catalog`
+  (`POST /api/catalog`). An empty selection is the whole catalog. The panel on the right shows the facts and the actions that make
   sense for the selected VM: *Unattended install* (the flow `check-vms` would run), *Get the ISO…*
   for a medium only you can provide, *Download the ISO*, *Boot headless*, *Boot with display*
   (a QEMU window on the host), *Console*, *Screenshot*, *Open viewer on the host*, *Stop*,

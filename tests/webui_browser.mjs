@@ -46,6 +46,12 @@ const server = createServer(async (req,res) => {
     if (!failCancel && jobId === 'vm:arch-noctalia') state.vms[0].running=false;
     return res.end(JSON.stringify(failCancel ? {error:'Fixture cancellation failed'} : {cancelled:cancelResult}));
   }
+  if (req.url === '/api/catalog') {
+    let body=''; for await (const chunk of req) body+=chunk; const data=JSON.parse(body); requests.push({catalog:data});
+    const added=[], removed=[];
+    for (const vm of state.vms) { const named=data.names.includes(vm.name); if (data.action==='add' && named && !vm.mine) { vm.mine=true; added.push(vm.name); } if (data.action==='remove' && named && vm.mine) { vm.mine=false; removed.push(vm.name); } }
+    return res.end(JSON.stringify({selected:state.vms.filter(v=>v.mine).map(v=>v.name), added, removed}));
+  }
   if (req.url === '/api/run') {
     let body=''; for await (const chunk of req) body+=chunk;
     if (holdRun) await new Promise(resolve=>releaseRun=resolve);
@@ -584,5 +590,32 @@ try {
   await page.locator('#activity-dismiss').click(); assert(!(await page.locator('#activity').isVisible()));
   assert(await page.locator('#job-rows [data-job-log]').isVisible());
   check('completed activity can be dismissed while its log remains available');
+  // My VMs: nothing chosen opens on All; choosing from the context menu stars the row, the filter
+  // shows the choice plus whatever runs, the details button and the selection bar toggle it.
+  assert.equal(await page.locator('[data-filter].active').getAttribute('data-filter'),'all');
+  assert.equal(await page.locator('#rows .mine-mark').count(),0);
+  await row('debian-server').click({button:'right'});
+  await page.locator('#vm-context button', {hasText:'Add to My VMs'}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('#rows .mine-mark').length===1);
+  assert.deepEqual(requests.at(-1),{catalog:{action:'add',names:['debian-server']}});
+  await page.locator('[data-filter="mine"]').click();
+  assert.deepEqual(await page.locator('#rows [data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia','debian-server']);
+  assert.match(await page.locator('#list-title').textContent(),/^My VMs/);
+  await row('debian-server').click();
+  assert.equal(await page.locator('#profile-mine').textContent(),'★');
+  await page.locator('#profile-mine').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#rows .mine-mark').length===0);
+  assert.deepEqual(requests.at(-1),{catalog:{action:'remove',names:['debian-server']}});
+  assert.equal(await page.locator('[data-filter].active').getAttribute('data-filter'),'all');  // an empty selection leaves My VMs
+  await page.locator('#rows [data-vm="debian-server"] .vm-select').click();
+  await page.locator('#rows [data-vm="proxmox-ve"] .vm-select').click();
+  assert.equal(await page.locator('#selection-mine').textContent(),'Add to My VMs (2)');
+  await page.locator('#selection-mine').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#rows .mine-mark').length===2);
+  assert.deepEqual(requests.at(-1).catalog,{action:'add',names:['debian-server','proxmox-ve']});
+  await page.evaluate(()=>{ for (const v of state.vms) v.mine=false; }).catch(()=>{}); state.vms.forEach(v=>v.mine=false);
+  await page.locator('#selection-clear').click();
+  await page.evaluate(()=>refresh(true));
+  check('My VMs: context menu, filter, details button and selection bar');
   assert.deepEqual(errors,[]); check('no browser JavaScript errors');
 } finally { if (browser) await browser.close(); server.closeAllConnections(); await new Promise(resolve=>server.close(resolve)); }

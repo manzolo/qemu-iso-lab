@@ -20,7 +20,9 @@ def visible_rows(rows: list[Facts], query: str, mode: str) -> list[Facts]:
                 if all(word in f"{row['name']} {row['label']} {row['family']}".casefold()
                        for word in words)
                 and (mode != "disk" or row["prepared"])
-                and (mode != "running" or row["running"])]
+                and (mode != "running" or row["running"])
+                # My VMs: the selection, plus whatever runs right now (a running VM never hides).
+                and (mode != "mine" or row.get("mine") or row["running"])]
     return sorted(selected, key=lambda row: (
         not row["running"], not row["installed"], not row["prepared"],
         natural_key(row["name"]),

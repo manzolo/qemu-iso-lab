@@ -149,8 +149,8 @@ its display while it runs. The panel on the right has the other actions, and
 **All actions…** the full menu. Every action is a `vmctl` command, shown so you
 can copy it.
 
-- `/` searches names, descriptions and families; **All**, **With disk**, **Running**
-  and **Labs** (F2) filter the list.
+- `/` searches names, descriptions and families; **My VMs**, **All**, **With disk**,
+  **Running** and **Labs** (F2) filter the list.
 - **Tools… (F4)**: status of everything, remote hosts, and **Clean All** (asks first).
 - F8, or `vmtui --classic`: the fzf/dialog menus, for terminals without Textual.
 
@@ -173,6 +173,7 @@ the access token.
 | From the dashboard | What you can do |
 |--------------------|-----------------|
 | **Profiles** | Search and filter by state, inspect RAM/CPU/disk, and install, boot or stop a VM. Right-click a row for its actions. |
+| **My VMs** | Pick the profiles you care about out of the 100+ (right-click → *Add to My VMs*, or `vmctl catalog add`): the dashboards then open on them (plus whatever is running). |
 | **Multiple selection** | Ctrl/Cmd+click or Shift+click several VMs to start, stop, link or unlink them together. |
 | **Live console** | Use the guest's screen, keyboard and mouse in the browser, with fit/actual-size, reconnect and full screen. |
 | **SSH** | Open an interactive terminal in the browser or on the host, or copy the connection command. |
@@ -253,6 +254,14 @@ Every command accepts `--dry-run`, and `vmctl --help` lists them all by task.
 Tab completion: `echo 'eval "$(vmctl completion zsh)"' >> ~/.zshrc` (bash works too).
 
 ## Make it yours
+
+The catalog is large on purpose; you do not have to look at all of it. Choose the profiles you
+want and both dashboards open on **My VMs** (your choice, plus whatever is running):
+
+```bash
+vmctl catalog add ubuntu-26.04 kali debian-server   # or right-click a row → Add to My VMs
+vmctl catalog                                       # what is chosen; remove, set, clear
+```
 
 In the web dashboard, select a VM and choose **Customize** (also available by
 right-clicking its row). Set RAM and vCPUs, or expand **Advanced JSON override**

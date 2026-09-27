@@ -111,6 +111,7 @@ body.dragging { user-select:none; cursor:grabbing; }
 #hover-shot img { display:block; width:100%; height:100%; min-height:0; object-fit:contain; }
 #hover-shot .hover-caption { padding:8px 12px; font-size:11px; color:var(--muted); }
 @media (hover:none) { #hover-shot { display:none !important; } }
+.mine-mark { margin-left:6px; color:var(--warn); font-size:11px; vertical-align:1px; }
 .style-tag { display:inline-block; margin-left:8px; padding:1px 6px; border-radius:5px; font:600 9.5px system-ui,sans-serif; letter-spacing:.04em; text-transform:uppercase; vertical-align:2px; color:var(--muted); border:1px solid var(--line); }
 .style-tag.auto { color:var(--ok); border-color:#2f5a52; background:#16302c; }
 .profile-desc { display:block; color:var(--muted); font-size:11px; margin-top:3px; max-width:300px; overflow:hidden; text-overflow:ellipsis; }
@@ -297,6 +298,8 @@ pre.log { background:#0a101a; border:1px solid var(--line); border-radius:8px; p
 .profile-heading { display:flex; align-items:center; justify-content:space-between; padding-right:16px; border-bottom:1px solid var(--line); }
 .profile-heading h2 { border:0; }
 .profile-heading button { background:transparent; color:var(--accent); font-size:11px; padding:5px 8px; border:1px solid var(--line); }
+#profile-mine { margin-right:6px; padding:4px 9px; font-size:13px; line-height:1; color:var(--warn); }
+#profile-mine.chosen { background:#3a3320; border-color:#6b5a2a; }
 #terminal-dialog { width:min(1200px,96vw); height:85dvh; overflow:hidden; }
 #terminal-dialog[open],#terminal-shell { display:flex; flex-direction:column; }
 #terminal-shell { flex:1; min-height:0; background:var(--panel); }
@@ -425,17 +428,17 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 </section>
 <div id="toolbar">
   <div class="search-box"><input id="search" aria-label="Search profiles" placeholder="Search profiles or distributions…" autocomplete="off"><kbd>/</kbd></div>
-  <div class="filters" role="group" aria-label="Profile filters"><button data-filter="all" class="active" aria-pressed="true">All</button><button data-filter="disk" aria-pressed="false">With disk</button><button data-filter="running" aria-pressed="false">Running</button><button data-filter="labs" aria-pressed="false">Labs</button></div>
+  <div class="filters" role="group" aria-label="Profile filters"><button data-filter="mine" aria-pressed="false" title="The profiles you chose (plus whatever is running)">My VMs</button><button data-filter="all" class="active" aria-pressed="true">All</button><button data-filter="disk" aria-pressed="false">With disk</button><button data-filter="running" aria-pressed="false">Running</button><button data-filter="labs" aria-pressed="false">Labs</button></div>
   <button id="all-commands">Commands <kbd>F10</kbd></button>
 </div>
 <div id="activity-panel" popover="auto" role="region" aria-label="Latest activity details"><div class="activity-copy"><div class="eyebrow">Latest activity</div><strong id="activity-status" role="status"></strong><span id="activity-command"></span></div><div class="job-controls"><button id="activity-log">View log</button><button id="activity-cancel" class="danger hidden">Cancel job</button><button id="activity-dismiss" class="hidden" aria-label="Dismiss completed activity" title="Keep in Recent activity">Dismiss</button></div></div>
 <main id="profiles-view">
   <section class="card"><h2 id="list-title">Profiles</h2>
     <p id="selection-hint">Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
-    <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-link">Link network</button><button id="selection-clear">Clear</button></div>
+    <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
-  <section class="card"><div class="profile-heading"><h2>Machine details</h2><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
+  <section class="card"><div class="profile-heading"><h2>Machine details</h2><button id="profile-mine" class="hidden" aria-label="Add to My VMs">☆</button><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
 </main>
 <div id="labs-view" class="labs hidden"></div>
 <section id="jobs" class="card"><div class="section-heading"><div><h2>Recent activity</h2><p>Jobs from the web and TUI keep running when you close this page.</p></div><span id="job-count" class="chip">0 jobs</span></div>
@@ -473,7 +476,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 const params = new URLSearchParams(location.search);
 if (params.get("token")) { sessionStorage.setItem("vmctl-token", params.get("token")); history.replaceState(null, "", "/" + location.hash); }
 const TOKEN = sessionStorage.getItem("vmctl-token") || "";
-let S = { vms: [], labs: [] }, catalog = [], filter = "all", selected = localStorage.getItem("vmctl-selected") || "", logJob = null, logOffset = 0;
+let S = { vms: [], labs: [] }, catalog = [], filter = "all", filterSettled = false, selected = localStorage.getItem("vmctl-selected") || "", logJob = null, logOffset = 0;
 let dragVm = null;  // the machine whose network handle is being dragged (vmctl link)
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -632,7 +635,8 @@ const actionIcons = {
   list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
   terminal: '<path d="m5 7 5 5-5 5M12 17h7"/>',
   network: '<rect x="9" y="3" width="6" height="5" rx="1"/><path d="M12 8v5M5 16v-3h14v3"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/>',
-  sliders: '<path d="M4 7h10m4 0h2M4 17h4m4 0h8M14 5v4M8 15v4"/>'
+  sliders: '<path d="M4 7h10m4 0h2M4 17h4m4 0h8M14 5v4M8 15v4"/>',
+  star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>'
 };
 const actionIcon = (a) => a.icon ? `<span class="ai ${a.tone || ""}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${actionIcons[a.icon]}</svg></span>` : "";
 function actionsFor(r) {
@@ -667,8 +671,24 @@ function actionsFor(r) {
     else a.push({ label:forceStop ? "Force stop" : "Cancel job", cancelJob:"vm:" + n, forceStop, primary:true, danger:forceStop, icon:"power", tone:"bad", disabled:submittingVms.has(n) || cancellingJobs.has("vm:"+n) });
   }
   if (!r.running && (r.prepared || r.installed)) a.push({ label: "Clean: delete the disk", args: ["clean", n], disabled:busy, danger: true, icon:"trash", tone:"bad" });
+  a.push({ label: r.mine ? "Remove from My VMs" : "Add to My VMs", mine: r.mine ? "remove" : "add", icon:"star", tone:"info" });
   a.push({ label: "All commands for " + n + "…", form: n, icon:"list" });
   return a;
+}
+// My VMs: the personal selection (vmctl catalog), saved in local.json by the server.
+async function setMine(action, names) {
+  try {
+    const result = await api("/api/catalog", { action, names });
+    const changed = [...result.added, ...result.removed];
+    toast(changed.length ? `${result.added.length ? "Added to" : "Removed from"} My VMs: ${changed.join(", ")}` : "My VMs unchanged.");
+    if (!result.selected.length && filter === "mine") setFilter("all");
+    await refresh(true);
+  } catch (e) { toast(e.message, true); }
+}
+function setFilter(name, settled = true) {
+  filter = name; filterSettled ||= settled; checkedVms.clear(); selectionAnchor = "";
+  document.querySelectorAll("[data-filter]").forEach((x) => (x.classList.toggle("active", x.dataset.filter === name), x.setAttribute("aria-pressed", x.dataset.filter === name)));
+  render();
 }
 
 // Function keys: one per kind of action, whatever the machine's state offers right now (the
@@ -726,6 +746,9 @@ function renderSelection() {
     button.classList.toggle("warn", operation === "unlink");
     button.disabled = bulkBusy || targets.length < (operation === "link" ? 2 : 1);
   }
+  const [mineAction, mineNames] = selectionMine();
+  $("selection-mine").textContent = `${mineAction === "add" ? "Add to" : "Remove from"} My VMs (${mineNames.length})`;
+  $("selection-mine").disabled = !mineNames.length;
   // Keep an open selection menu in sync with job updates and confirmation dismissal.
   const menu = $("vm-context");
   if (menu.matches(":popover-open") && menu.getAttribute("aria-label") === "Selected machines actions") {
@@ -764,6 +787,12 @@ async function runSelection(action, segment = null, names = [...checkedVms]) {
 }
 for (const action of ["start","stop"]) $("selection-"+action).onclick = () => runSelection(action);
 $("selection-link").onclick = () => runSelectedNetwork();
+$("selection-mine").onclick = () => { const [action, names] = selectionMine(); if (names.length) setMine(action, names); };
+// Add while any selected machine is not chosen yet; remove when all of them are.
+function selectionMine() {
+  const rows = S.vms.filter(r => checkedVms.has(r.name)), missing = rows.filter(r => !r.mine).map(r => r.name);
+  return missing.length ? ["add", missing] : ["remove", rows.map(r => r.name)];
+}
 $("selection-clear").onclick = () => { checkedVms.clear(); selectionAnchor = ""; render(); };
 function selectRow(name, event) {
   const toggle = event.ctrlKey || event.metaKey || event.target.closest(".vm-select");
@@ -783,7 +812,9 @@ function selectRow(name, event) {
 function visible() {
   const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
   return S.vms.filter((r) => words.every((w) => (r.name + " " + r.label + " " + r.family).toLowerCase().includes(w))
-    && (filter !== "disk" || r.prepared) && (filter !== "running" || r.running))
+    && (filter !== "disk" || r.prepared) && (filter !== "running" || r.running)
+    // My VMs: the chosen profiles plus whatever runs right now (a running VM never hides).
+    && (filter !== "mine" || r.mine || r.running))
     .sort((x, y) => (y.running - x.running) || (y.installed - x.installed) || (y.prepared - x.prepared) || x.name.localeCompare(y.name, undefined, { numeric: true }));
 }
 function updateProfileRows(html) {
@@ -819,15 +850,15 @@ function render() {
   renderSelection();
   if (labs) return renderLabs();
   const rows = visible();
-  $("list-title").textContent = `Profiles  ${rows.length} / ${all.length}`;
+  $("list-title").textContent = `${filter === "mine" ? "My VMs" : "Profiles"}  ${rows.length} / ${all.length}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
   // Never rebuild the rows during a drag: the dragged icon would be destroyed and Chromium then
   // aborts the drop silently (the 5 s state poll did exactly that on a drag longer than a few seconds).
   if (dragVm || dragState.start) return;
   const focused = document.activeElement, focusedVm = focused.closest?.("#rows [data-vm]")?.dataset.vm;
   const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : null;
-  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
-    || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`);
+  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+    || `<tr><td colspan="4" class="s-muted">${filter === "mine" && !$("search").value ? "Nothing in My VMs yet. Choose All, then right-click a profile (or select several) and Add to My VMs." : "No matching profiles."}</td></tr>`);
   bindStateLogs($("rows"));
   if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
   renderDetails();
@@ -839,6 +870,12 @@ function renderDetails() {
   detailsSignature = signature;
   const r = S.vms.find((x) => x.name === selected);
   $("profile-edit").disabled = !r || !visible().length;
+  $("profile-mine").classList.toggle("hidden", !r || !visible().length);
+  if (r) {
+    const b = $("profile-mine"); b.textContent = r.mine ? "★" : "☆"; b.classList.toggle("chosen", !!r.mine);
+    b.title = b.ariaLabel = r.mine ? "In My VMs · click to remove" : "Add to My VMs";
+    b.onclick = () => setMine(r.mine ? "remove" : "add", [r.name]);
+  }
   if (!r || !visible().length) { $("details").innerHTML = '<p class="s-muted">Select a profile.</p>'; return; }
   const [s, c] = stateOf(r);
   const facts = [["Disk", r.prepared ? `${esc(r.disk_host || "?")} used <span class="s-muted">/ ${esc(r.disk_capacity || "?")}</span>` : "Not created yet"],
@@ -944,6 +981,7 @@ function runAction(r, a) {
   if (a.console) return openConsole(r.name);
   if (a.help) { $("help-title").textContent = "ISO needed: " + r.name; $("help-text").textContent = (r.iso_help || "").replace(/\\n/g, "\n"); return $("help-dialog").showModal(); }
   if (a.form) return openCommands(a.form);
+  if (a.mine) return setMine(a.mine, [r.name]);
   run(a.args, a.danger);
 }
 
@@ -1540,6 +1578,8 @@ function selectionContextEntries() {
       group:"Selection actions", icon:({start:"play",stop:"stop",link:"network"})[action], warn:["stop","unlink"].includes(operation),
       disabled:bulkBusy || count < (operation === "link" ? 2 : 1), run:()=>action === "link" ? runSelectedNetwork() : runSelection(action)};
   });
+  const [mineAction, mineNames] = selectionMine();
+  entries.push({label:`${mineAction === "add" ? "Add selected to" : "Remove selected from"} My VMs (${mineNames.length})`, group:"Selection actions", icon:"star", disabled:!mineNames.length, run:()=>$("selection-mine").click()});
   entries.push({label:"Clear selection", group:"Selection", icon:"list", run:()=>$("selection-clear").click()});
   return entries;
 }
@@ -1593,7 +1633,7 @@ window.addEventListener("resize",closeContext);
 
 // --- wiring
 document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
-document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { filter = b.dataset.filter; checkedVms.clear(); selectionAnchor = ""; document.querySelectorAll("[data-filter]").forEach((x) => (x.classList.toggle("active", x === b), x.setAttribute("aria-pressed", x === b))); render(); }));
+document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { setFilter(b.dataset.filter); }));
 // Hovering the icon of a running machine shows its screen: a QMP screendump (or VNC for accelerated
 // displays), fetched after a short pause so sweeping the mouse across the list asks for nothing.
 // Only the icon, so reading the list shows nothing; a right-click (the context menu) hides it
@@ -1799,6 +1839,8 @@ async function refresh(fresh = false) {
         const next = await api("/api/state" + (force ? "?fresh=1" : ""));
         if (revision !== jobsRevision) { freshRequested = true; continue; }
         S = next;
+        // The first snapshot decides the opening view: My VMs while the selection has names.
+        if (!filterSettled) { filterSettled = true; if (S.vms.some(r => r.mine)) setFilter("mine"); }
         if (force) for (const [name, job] of pending) {
           const current = vmJobs.get(name), row = S.vms.find(r => r.name === name);
           if (!row || !(current?.confirming || current?.unconfirmed) || current.finishedAt !== job.finishedAt) continue;

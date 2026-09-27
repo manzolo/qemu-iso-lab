@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, checkpoint, clone, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
+from vmctl import alpine, archinstall, autoyast, catalog, checkpoint, clone, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -1067,6 +1067,12 @@ def cmd_list(args: argparse.Namespace) -> int:
     if getattr(args, "groups", False):
         return print_groups(cfg, args)
 
+    if getattr(args, "mine", False):
+        # The dashboards' My VMs view: the selection plus whatever is running right now.
+        chosen = set(catalog.selected())
+        cfg = {"vms": {name: vm for name, vm in cfg["vms"].items()
+                       if name in chosen or running_qemu_pid(name, vm) is not None}}
+
     if getattr(args, "names", False):
         for name in config.sorted_vm_names(cfg):
             print(name)
@@ -1187,6 +1193,56 @@ def style_status_cell(value: str, width: int, align: str = "<") -> str:
     if not codes:
         return padded
     return ui.style(padded, *codes)
+
+
+def cmd_catalog(args: argparse.Namespace) -> int:
+    """``vmctl catalog [list|add|remove|set|clear] [vm...]``: My VMs, the personal selection."""
+    cfg = config.load_config()
+    action = args.action
+    if action == "list":
+        if args.vms:
+            raise VMError("catalog list takes no profile names (did you mean: vmctl catalog add ...?)")
+        chosen = catalog.selected()
+        known = [name for name in chosen if name in cfg["vms"]]
+        gone = [name for name in chosen if name not in cfg["vms"]]
+        if args.json:
+            print(json.dumps({"selected": chosen, "missing": gone}, indent=2))
+            return 0
+        if args.names:
+            for name in known:
+                print(name)
+            return 0
+        if not chosen:
+            print("My VMs: nothing chosen, the dashboards show the whole catalog.")
+            print("  vmctl catalog add <vm> [<vm>...] to choose; vmctl list --names shows every profile.")
+            return 0
+        ui.print_header(f"My VMs ({len(known)} of {len(cfg['vms'])} profiles)")
+        for name in known:
+            vm = cfg["vms"][name]
+            print(f"  {name:<32} {str(vm.get('name', name))}")
+        for name in gone:
+            print(f"  {name:<32} (not in the catalog any more: vmctl catalog remove {name})")
+        return 0
+    if args.names:
+        raise VMError("--names goes with catalog list")
+    if getattr(args, "dry_run", False):
+        print(f"  would {action} {' '.join(args.vms) or '(nothing)'} in {catalog.local_path()}")
+        return 0
+    result = catalog.update(action, list(args.vms), cfg)
+    if args.json:
+        print(json.dumps(result, indent=2))
+        return 0
+    for name in result["added"]:
+        ui.print_status("ok", f"{name}: added to My VMs")
+    for name in result["removed"]:
+        ui.print_status("ok", f"{name}: removed from My VMs")
+    if not result["added"] and not result["removed"]:
+        ui.print_note("Nothing changed.")
+    if result["selected"]:
+        ui.print_note(f"My VMs: {' '.join(result['selected'])}")
+    else:
+        ui.print_note("My VMs is empty: the dashboards show the whole catalog.")
+    return 0
 
 
 def cmd_status(args: argparse.Namespace) -> int:

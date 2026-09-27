@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import config, profile_overrides, qemu, runtime, state, tui_jobs, ui
+from vmctl import catalog, config, profile_overrides, qemu, runtime, state, tui_jobs, ui
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
@@ -597,6 +597,16 @@ class Handler(BaseHTTPRequestHandler):
             elif path.startswith("/api/vm/") and path.endswith("/ssh-terminal"):
                 terminal = open_ssh_terminal(path[len("/api/vm/"):-len("/ssh-terminal")])
                 self._json({"terminal": terminal})
+            elif path == "/api/catalog":
+                # My VMs: {"action": add|remove|set|clear, "names": [...]}; the selection is validated
+                # against the catalog and saved in local.json, then the snapshot is rebuilt.
+                names = body.get("names") or []
+                if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+                    raise VMError("names must be a list of profile names")
+                result = catalog.update(str(body.get("action") or ""), names, config.load_config())
+                with self.snapshot.lock:
+                    self.snapshot.value = None
+                self._json(result)
             elif path.startswith("/api/vm/") and path.endswith("/override"):
                 saved = profile_overrides.save_override(path[len("/api/vm/"):-len("/override")],
                                                         body.get("override"), body.get("revision", ""))

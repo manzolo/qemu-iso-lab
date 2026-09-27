@@ -431,6 +431,7 @@ class Dashboard(App[None]):
         with Horizontal(id="toolbar"):
             yield Input(placeholder="Search profiles, distributions…  / or F3", id="search")
             with Horizontal(id="filters"):
+                yield Button("My VMs", id="mine", classes="filter")
                 yield Button("All", id="all", classes="filter active")
                 yield Button("With disk", id="disk", classes="filter")
                 yield Button("Running", id="running", classes="filter")
@@ -497,12 +498,18 @@ class Dashboard(App[None]):
                 self.query_one("#activity-text", Static).update("Unable to read installation status.")
         else:
             self.rows = rows
+            if not self.loaded and any(r.get("mine") for r in rows):
+                # A selection exists (vmctl catalog add): the dashboard opens on My VMs.
+                self.mode = "mine"
+                for button in self.query(".filter"):
+                    button.set_class(button.id == "mine", "active")
             self.loaded = True
             self.query_one("#notice").remove_class("error")
             self.query_one("#notice", Static).update(f"Updated {datetime.now():%H:%M:%S}  ·  Select a profile to explore")
             self.query_one("#summary", Static).update(
                 f"{len(rows)} profiles  ·  {sum(bool(r['installed']) for r in rows)} with data"
                 f"  ·  {sum(bool(r['running']) for r in rows)} running"
+                + (f"  ·  {mine} in My VMs" if (mine := sum(bool(r.get('mine')) for r in rows)) else "")
             )
             jobs = [f"{r['name']}  ·  {r['job_status']}" for r in rows if r["job_status"]]
             jobs.sort(key=lambda line: "· running" not in line)

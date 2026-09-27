@@ -22,7 +22,7 @@ COMMAND_HELP: dict[str, str] = {}
 # Every public subcommand must appear in exactly one group (enforced by tests).
 COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Discover", "what is configured, what exists on disk, what the host can run",
-     ["list", "status", "show", "setup", "welcome"]),
+     ["list", "status", "show", "catalog", "setup", "welcome"]),
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
@@ -101,7 +101,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     p.add_argument("--names", action="store_true", help="emit only the profile names, one per line (for scripts and shell completion)")
     p.add_argument("--groups", action="store_true", help="list the profile groups (categories) that check-vms --group accepts, with their members")
+    p.add_argument("--mine", action="store_true", help="only My VMs (vmctl catalog), plus whatever is running")
     p.set_defaults(func=lifecycle.cmd_list)
+
+    p = _add(subparsers, "catalog", help="My VMs: the profiles you chose out of the catalog (the dashboards open on them)",
+             epilog="""examples:
+  vmctl catalog add ubuntu-26.04 kali      choose two profiles (saved in vms/profiles/local.json under "catalog")
+  vmctl catalog                            what is chosen (also: list; --names for scripts)
+  vmctl catalog remove kali                drop one (its disk, if any, stays)
+  vmctl catalog set debian-server          exactly this selection
+  vmctl catalog clear                      back to the whole catalog
+
+The dashboards (vmctl web, vmtui) open on the My VMs filter while the selection has names: the
+chosen profiles, plus whatever is running right now so that a running VM never hides.
+An empty selection is the whole catalog. Only the view changes: vmctl list, check-vms and the
+groups still see every profile.""")
+    p.add_argument("action", nargs="?", default="list", choices=["list", "add", "remove", "set", "clear"], help="what to do (default: list)")
+    p.add_argument("vms", nargs="*", metavar="vm", help="profile names (add, remove, set)")
+    p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    p.add_argument("--names", action="store_true", help="list: only the names, one per line")
+    p.set_defaults(func=lifecycle.cmd_catalog)
 
     p = _add(subparsers, "status", help="report local artifacts and runtime state per VM")
     p.add_argument("--all", action="store_true", help="show the full catalog, including untouched VMs")
