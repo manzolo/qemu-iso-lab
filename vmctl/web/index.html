@@ -886,9 +886,10 @@ function renderDetails() {
   const actions = actionsFor(r), memory = r.memory_mb >= 1024 ? `${r.memory_mb / 1024} GB` : `${r.memory_mb} MB`;
   const expandedDetails = $("details").dataset.vm === r.name ? [...$("details").querySelectorAll("details[open]")].map(el=>el.className) : [];
   $("details").dataset.vm = r.name;
-  const secondary = a => !a.primary && (a.danger || a.form || a.screen || ["attach","checkpoint"].includes(a.args?.[0]));
+  // The panel: All commands… stays in sight; the My VMs entry is the ★ button of the heading (the context menu keeps both).
+  const secondary = a => !a.primary && (a.danger || a.screen || ["attach","checkpoint"].includes(a.args?.[0]));
   const actionButton = (x,i) => `<button aria-label="${esc(x.label)}" data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${i === 0 ? "<kbd>Enter</kbd>" : ""}${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
-  const mainActions = actions.map((a,i) => secondary(a) ? "" : actionButton(a,i)).join("");
+  const mainActions = actions.map((a,i) => secondary(a) || a.mine ? "" : actionButton(a,i)).join("");
   const extraActions = actions.map((a,i) => ({a,i})).filter(({a}) => secondary(a)).sort((x,y) => Number(!!x.a.danger)-Number(!!y.a.danger));
   $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<div class="profile-title"><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div></div></div>${stateBadge(r)}
     <div class="actions primary-actions">${mainActions}</div>
