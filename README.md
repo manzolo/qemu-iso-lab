@@ -119,7 +119,7 @@ reports are welcome.
 Every step gives the equivalent command, for the terminal or a script.
 </details>
 
-**[Read the step-by-step guide](docs/FIRST_VM.md)** · [download it as a PDF](docs/FIRST_VM.pdf) (14 pages)
+**[Read the step-by-step guide](docs/FIRST_VM.md)** · [download it as a PDF](docs/FIRST_VM.pdf) (15 pages)
 
 ## The catalog: pick what you want
 
