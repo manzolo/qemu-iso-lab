@@ -2937,8 +2937,9 @@ def cmd_start(args: argparse.Namespace) -> int:
         cloud_init_args = cloud_init.cloud_init_drive_args(
             cloud_init.create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run)
         )
+    link_args = vmlink.boot_args(args.vm, vm)  # segments this VM was linked on while stopped
     qemu_args = qemu.common_args(vm, args.video, dry_run=args.dry_run, headless=args.headless, spice_port=spice_port)
-    qemu_args += cloud_init_args
+    qemu_args += cloud_init_args + link_args
     if args.background:
         if not args.headless and spice_port is None:
             raise VMError("--background currently requires --headless or --spice-port")
@@ -2952,7 +2953,7 @@ def cmd_start(args: argparse.Namespace) -> int:
                 serial_socket=qemu.serial_socket_path(vm),
                 serial_log=serial_log_path(args.vm),
             )
-            qemu_args += cloud_init_args
+            qemu_args += cloud_init_args + link_args
             ui.print_kv("serial", f"{ui.pretty_path(serial_log_path(args.vm))}  (interactive: vmctl console {args.vm})")
         pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
         stderr_log = companion_stderr_log_path(log_path)
@@ -2961,7 +2962,11 @@ def cmd_start(args: argparse.Namespace) -> int:
             pid_path.write_text(f"{pid}\n", encoding="utf-8")
             ui.print_kv("pid", str(pid))
         ui.print_status("ok", f"Started background VM for '{args.vm}'")
+        if link_args:
+            start_link_settler(args.vm, dry_run=args.dry_run)
         return 0
+    if link_args:
+        start_link_settler(args.vm, dry_run=args.dry_run)
     runtime.run(qemu_args, dry_run=args.dry_run)
     return 0
 
@@ -3238,7 +3243,8 @@ def running_background_pid(name: str, vm: dict[str, Any]) -> int | None:
 
 
 def cmd_link(args: argparse.Namespace) -> int:
-    """``vmctl link <vm> [<vm>...]``: a private segment between running VMs, hot-plugged, for this session."""
+    """``vmctl link <vm> [<vm>...]``: a private segment between VMs, hot-plugged into running ones,
+    added at the next start of stopped ones."""
     cfg = config.load_config()
     segment = str(args.segment or vmlink.DEFAULT_SEGMENT)
     names = [n for n in [args.vm, *(args.peers or [])] if n]
@@ -3252,34 +3258,52 @@ def cmd_link(args: argparse.Namespace) -> int:
             vm = config.get_vm(cfg, name)
             if args.dry_run:
                 ui.print_note(f"Would unplug {name} from segment {segment}")
-            elif vmlink.unlink(vm, name, segment):
+                continue
+            status = vmlink.unlink(vm, name, segment)
+            if status == "removed":
                 ui.print_status("ok", f"{name} left segment {segment}")
+            elif status == "stays":
+                ui.print_status("ok", f"{name} left segment {segment}; the NIC it booted with goes away when it stops")
             else:
                 ui.print_status("warn", f"{name} was not on segment {segment}", ok=False)
         return 0
+    if args.settle:
+        return settle_links(cfg, args.settle)
     if not names or args.status:
         labs_now = vmlink.session_labs()
         if not labs_now:
-            ui.print_status("ok", "No running VM is linked (vmctl link <vm> <vm> connects two running VMs)")
+            ui.print_status("ok", "No VM is linked (vmctl link <vm> <vm> puts two VMs on a private segment)")
             return 0
         for lab in labs_now:
             ui.print_header(f"Segment {lab['segment']} ({len(lab['members'])} VMs, temporary)")
             for name in lab["members"]:
-                ui.print_note(f"{name:<22} {lab['addresses'][name][0]}")
+                when = "  (joins at its next start)" if name in lab["pending"] else ""
+                ui.print_note(f"{name:<22} {lab['addresses'][name][0]}{when}")
         return 0
     if len(names) == 1 and not vmlink.load_record(segment)["members"]:
-        raise VMError("vmctl link needs two running VMs (or one to add to a segment that already has members)")
+        raise VMError("vmctl link needs two VMs (or one to add to a segment that already has members)")
     results: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
     for name in names:
         vm = config.get_vm(cfg, name)
-        pid = vmlink_running_pid(name, vm)
-        member = vmlink.link(vm, name, pid, segment, dry_run=args.dry_run, mcast=args.mcast,
-                             subnet_base=vmlink.parse_subnet(args.subnet) if args.subnet else None)
+        pid = running_background_pid(name, vm)
+        subnet_base = vmlink.parse_subnet(args.subnet) if args.subnet else None
+        try:
+            member = vmlink.link(vm, name, pid, segment, dry_run=args.dry_run, mcast=args.mcast, subnet_base=subnet_base)
+        except VMError as exc:
+            if pid is None:
+                raise
+            # Running but not hot-pluggable (a window, no QMP; a q35 boot older than the slots):
+            # it joins at its next start instead.
+            ui.print_status("warn", f"{name}: {exc}", ok=False)
+            member = vmlink.link(vm, name, None, segment, mcast=args.mcast, subnet_base=subnet_base)
         results.append((name, vm, member))
         if args.dry_run:
             continue
         if member.get("already"):
-            ui.print_status("ok", f"{name} is already on segment {segment} as {member['address']}")
+            ui.print_status("ok", f"{name} is already on segment {segment} as {member['address']}"
+                            + (" (joins at its next start)" if member.get("pending") else ""))
+        elif member.get("pending"):
+            ui.print_status("ok", f"{name} is stopped: it joins segment {segment} as {member['address']} at its next start")
         elif member.get("configured"):
             ui.print_status("ok", f"{name}: {member['interface']} {member['address']} on segment {segment}")
         elif member.get("error"):
@@ -3295,15 +3319,47 @@ def cmd_link(args: argparse.Namespace) -> int:
     ui.print_header(f"Segment {segment}: {', '.join(f'{n} {a}' for n, a in others.items())}")
     if len(others) >= 2:
         first, second = list(others.items())[:2]
-        ui.print_note(f"try: vmctl shell {first[0]}, then ping -c 3 {second[1].split('/')[0]}  (the link ends when the VMs stop)")
+        ui.print_note(f"try: vmctl shell {first[0]}, then ping -c 3 {second[1].split('/')[0]}  (vmctl link --off ends it)")
     return 0
 
 
-def vmlink_running_pid(name: str, vm: dict[str, Any]) -> int:
-    pid = running_background_pid(name, vm)
+LINK_SETTLE_SSH_SEC = 600
+
+
+def settle_links(cfg: dict[str, Any], name: str) -> int:
+    """``vmctl link --settle <vm>`` (detached by ``vmctl start``): wait for the VM that just started
+    with boot-time link NICs, then record it and set the addresses once SSH answers."""
+    vm = config.get_vm(cfg, name)
+    pid = None
+    for _ in range(60):
+        pid = running_background_pid(name, vm)
+        if pid is not None:
+            break
+        time.sleep(1)
     if pid is None:
-        raise VMError(f"{name} is not running in the background (boot it headless first, then link)")
-    return pid
+        raise VMError(f"{name} did not come up: its links stay pending")
+    if cloud_init.ssh_access_config(vm) is not None and vmlink.guest_script(vmlink.guest_family(vm), "x", "x") is not None:
+        ssh.wait_for_ssh(vm, LINK_SETTLE_SSH_SEC)
+    for result in vmlink.settle(name, vm, pid):
+        if result.get("configured"):
+            ui.print_status("ok", f"{name}: {result['interface']} {result['address']} on segment {result['segment']}")
+        else:
+            ui.print_status("warn", f"{name}: on segment {result['segment']}, address {result['address']} "
+                            + (f"not set: {result['error']}" if result.get("error") else "to set by hand"), ok=False)
+    return 0
+
+
+def start_link_settler(name: str, dry_run: bool = False) -> None:
+    """A VM with pending links boots with their NICs; this detached helper sets the addresses."""
+    if dry_run or not vmlink.pending_segments(name):
+        return
+    log = runtime.vm_artifact_base(name) / "logs" / "link-settle.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("ab") as out:
+        subprocess.Popen([str(state.ROOT / "bin" / "vmctl"), "link", "--settle", name], cwd=state.ROOT,
+                         stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
+    ui.print_note(f"linked on {', '.join(vmlink.pending_segments(name))}: the address is set once SSH answers "
+                  f"({ui.pretty_path(log)})")
 
 
 def cmd_stop(args: argparse.Namespace) -> int:

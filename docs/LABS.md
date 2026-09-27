@@ -45,8 +45,8 @@ a **runbook** walks through the lab step by step (each block marked *run*, *chec
 
 ## Temporary links between running VMs (`vmctl link`)
 
-A lab needs profiles that declare a segment. Two machines that are simply running, each on its
-own slirp network, cannot see each other — until they are linked:
+A lab needs profiles that declare a segment. Two machines started on their own, each on its
+own slirp network, cannot see each other — until they are linked, running or not:
 
 ```bash
 vmctl link kali debian-server           # both get a hot-plugged NIC on the "session" segment and a 192.168.100.x address
@@ -56,20 +56,28 @@ vmctl link --off                        # unplug everyone (or name the VMs to un
 vmctl link a b --segment backend        # a second, separate segment (192.168.<n>.0/24, or --subnet 172.16.5.0/24)
 ```
 
-In the dashboard, **drag a running machine's icon onto another running machine**: the same
-command runs after a confirmation, the machine's panel shows a *Linked* row with the address and
-its peers (and an *Unlink* button), and the segment appears under **Labs** as a temporary lab
-until the machines stop.
+In the dashboard, **drag a machine's icon onto another machine** (running or stopped): the same
+command runs after a confirmation, the machine's panel shows a *Linked* row with the address,
+its peers and an *Unlink* button, and the segment appears under **Labs** as a session lab.
 
-What happens: the NIC is added to the running QEMU over QMP (`netdev_add` on the multicast
+A **running** VM gets the NIC at once, hot-plugged. A **stopped** one is recorded as *pending*
+("at next start"): `vmctl start` (headless, background or with a window) adds the NIC to its
+QEMU command line and a detached `vmctl link --settle` sets the address once SSH answers
+(`artifacts/<vm>/logs/link-settle.log`). A member that stops goes back to pending and rejoins at
+its next start; only `vmctl link --off` (or *Unlink*) takes it off the segment. Verified live
+2026-09-27: debian-server and almalinux-server linked while off, both at `enp0s6` after the boot,
+ping 0.6 ms; almalinux stopped and restarted rejoined by itself.
+
+What happens on a running VM: the NIC is added to QEMU over QMP (`netdev_add` on the multicast
 socket the labs use, `device_add`) with a MAC that is stable per segment and VM; Linux and
 FreeBSD guests with SSH get the address set by vmctl (the interface is found by its MAC), other
-guests are told which address to set. Nothing is written to the profiles: the record of a segment
-is `artifacts/labs/links/<segment>.json`, valid only while the QEMU processes it names run.
-Limits: the VMs must be running in the background (*Boot headless*, `vmctl start --headless`),
-because only those have a QMP socket; a q35 machine needs the two empty PCIe root ports that
-headless boots carry since vmctl 0.9, so a VM booted earlier has to be restarted once; two
-segments per VM. For a permanent LAN, declare `networks` in the profiles (Customize) instead.
+guests are told which address to set (NetworkManager guests get a manual `vmctl-link-<if>`
+connection, which DHCP does not flush). Nothing is written to the profiles: the record of a
+segment is `artifacts/labs/links/<segment>.json`. Limits: hot-plugging needs a VM running in the
+background (*Boot headless*: only those have a QMP socket) and, on q35, the two empty PCIe root
+ports of headless boots since vmctl 0.9; a VM that cannot take it is linked at its next start
+instead. A NIC a q35 VM booted with cannot be unplugged live: *Unlink* forgets it at once and the
+NIC goes with the next stop. For a permanent LAN, declare `networks` in the profiles (Customize).
 
 ## Going further
 

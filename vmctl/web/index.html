@@ -546,7 +546,7 @@ function iconInk(hex) { const n = parseInt(hex.slice(1), 16); return (0.299*(n>>
 function catalogIcon(key, large = false, drag = false) {
   const [label,color,glyph] = catalogIcons[key] || catalogIcons.generic;
   const artwork = distroIconKeys.has(key) ? `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" focusable="false"><use href="/assets/distro-icons.svg#${esc(key)}" width="24" height="24"/></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">${glyph}</svg>`;
-  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}"${drag ? ' data-drag="1"' : ""} style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(drag ? label + " · drag onto another running machine to link them" : label)}" aria-hidden="true">${artwork}</span>`;
+  return `<span class="catalog-icon${large ? " large" : ""}" data-icon="${esc(key)}"${drag ? ' data-drag="1"' : ""} style="--icon-color:${color};--icon-ink:${iconInk(color)}" title="${esc(drag ? label + " · drag onto another machine to link them" : label)}" aria-hidden="true">${artwork}</span>`;
 }
 // End of catalog icon definitions.
 
@@ -625,7 +625,7 @@ function openKeyboardHelp() {
   $("help-title").textContent = "Keyboard";
   $("help-text").textContent = ["Type anywhere        filter the machines (Esc clears)", "↑ ↓                  select a machine", "Enter                the machine's main action",
     ...FKEYS.map(([key, label]) => `${key.padEnd(21)}${label}`), "Shift+F10            the machine's menu (right-click)", "/                    the search box", "F1                   this list",
-    "Mouse: drag the icon of a running machine onto another running machine to link them (vmctl link)."].join("\n");
+    "Mouse: drag the icon of a machine onto another one to link them (vmctl link); a stopped one joins when it starts."].join("\n");
   $("help-dialog").showModal();
 }
 
@@ -650,7 +650,7 @@ function render() {
   // Never rebuild the rows during a drag: the dragged icon would be destroyed and Chromium then
   // aborts the drop silently (the 5 s state poll did exactly that on a drag longer than a few seconds).
   if (dragVm) return;
-  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r), false, !!r.running)}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+  $("rows").innerHTML = rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity">${catalogIcon(osIconKey(r), false, !!(r.running || r.installed))}<span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span></span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">No matching profiles.</td></tr>`;
   bindStateLogs($("rows"));
   renderDetails();
@@ -667,7 +667,7 @@ function renderDetails() {
   const facts = [["Disk", r.prepared ? `${esc(r.disk_host || "?")} used <span class="s-muted">/ ${esc(r.disk_capacity || "?")}</span>` : "Not created yet"],
     ["ISO", { cached: "Ready to use", download: "Available to download", manual: "Provided manually" }[r.iso_source] || (r.iso_ready ? "Ready to use" : "Not cached")],
     ...((r.logins || []).length ? [["Login", r.logins.map((l) => `<span class="mono">${esc(l.user)}</span> / ${l.password ? `<span class="mono">${esc(l.password)}</span>` : '<span class="s-muted">no password</span>'}${l.note ? ` <span class="s-muted">· ${esc(l.note)}</span>` : ""}`).join("<br>")]] : []),
-    ...((r.links || []).map((l) => ["Linked", `<span class="mono">${esc(l.address)}</span> <span class="s-muted">on ${esc(l.segment)} with</span> ${l.peers.map((p) => `${esc(p.name)} <span class="mono">${esc(p.address)}</span>`).join(", ")} <button class="ssh-shortcut" data-unlink="${esc(l.segment)}" title="Unplug this machine from the segment">Unlink</button>`])),
+    ...((r.links || []).map((l) => ["Linked", `<span class="mono">${esc(l.address)}</span>${l.up ? "" : ' <span class="s-warn">at next start</span>'} <span class="s-muted">on ${esc(l.segment)} with</span> ${l.peers.map((p) => `${esc(p.name)} <span class="mono">${esc(p.address)}</span>${p.up ? "" : ' <span class="s-muted">(off)</span>'}`).join(", ")} <button class="ssh-shortcut" data-unlink="${esc(l.segment)}" title="Unplug this machine from the segment">Unlink</button>`])),
     ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options (F4)" aria-label="Open SSH console options">&gt;_ SSH <kbd>F4</kbd></button></span>` : "Not configured"]];
   const actions = actionsFor(r), memory = r.memory_mb >= 1024 ? `${r.memory_mb / 1024} GB` : `${r.memory_mb} MB`;
   const expandedDetails = $("details").dataset.vm === r.name ? [...$("details").querySelectorAll("details[open]")].map(el=>el.className) : [];
@@ -697,8 +697,8 @@ function renderLabs() {
   const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
   $("labs-view").innerHTML = S.labs.filter((lab) => words.every((w) => (lab.group + " " + lab.members.join(" ")).toLowerCase().includes(w))).map((lab) => {
     const names = lab.start_order || lab.members, members = names.map((n) => byName[n]).filter(Boolean);
-    if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="chip completed">temporary · ${members.length} linked</span></div>
-      <p class="lab-order">Made with <span class="mono">vmctl link</span> (or by dropping one running machine on another). Private /24 segment between running VMs; it ends when they stop and touches no profile.</p>
+    if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="chip completed">session · ${members.length} linked${(lab.pending || []).length ? ` · ${lab.pending.length} off` : ""}</span></div>
+      <p class="lab-order">Made with <span class="mono">vmctl link</span> (or by dropping one machine on another). A private /24 segment: stopped members join at their next start; it touches no profile and lasts until Unlink all.</p>
       <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "")}</span></span></button>${stateBadge(m)}</div>`).join("")}</div>
       <div class="buttons"><button data-args='${esc(JSON.stringify(["link", "--status", "--segment", lab.segment]))}'>Status</button><button class="danger" data-args='${esc(JSON.stringify(["link", "--off", "--segment", lab.segment]))}'>Unlink all</button></div></section>`;
     const up = members.filter((m) => m.running).length;
@@ -1436,13 +1436,13 @@ function endDrag() {
 }
 function dropTargetAt(x, y, source) {
   const tr = document.elementFromPoint(x, y)?.closest?.("tr[data-vm]"), vm = tr?.dataset.vm;
-  return vm && vm !== source && S.vms.some((r) => r.name === vm && r.running) ? tr : null;
+  return vm && vm !== source && S.vms.some((r) => r.name === vm && (r.running || r.installed)) ? tr : null;
 }
 $("rows").addEventListener("dragstart", (e) => e.preventDefault());  // no native image drag of the icon
 $("rows").addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
   const icon = e.target.closest(".catalog-icon[data-drag]"), vm = icon?.closest("tr[data-vm]")?.dataset.vm;
-  if (!vm || !S.vms.some((r) => r.name === vm && r.running)) return;
+  if (!vm || !S.vms.some((r) => r.name === vm && (r.running || r.installed))) return;
   dragState.start = { vm, x: e.clientX, y: e.clientY, icon };
 });
 document.addEventListener("pointermove", (e) => {
@@ -1467,7 +1467,7 @@ document.addEventListener("pointerup", async (e) => {
   endDrag();
   if (!target) return;
   const ok = await askConfirm({ eyebrow: "Session link", title: `Link ${d.vm} and ${target}?`, button: "Link them",
-    message: "Both machines get a hot-plugged NIC on a private segment (192.168.100.0/24) for this session and, where vmctl can reach the guest over SSH, its address. Nothing is saved in the profiles: the link ends when the machines stop.",
+    message: "Both machines join a private segment (192.168.100.0/24): a running one gets a hot-plugged NIC now, a stopped one gets it at its next start; where vmctl reaches the guest over SSH it also sets the address. Nothing is saved in the profiles, and the link lasts until you unlink it.",
     command: `vmctl link ${d.vm} ${target}` });
   if (ok) run(["link", d.vm, target]);
 });

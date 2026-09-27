@@ -4,9 +4,11 @@ Every VM booted on its own has an isolated slirp network (the same 10.0.2.15 in 
 two running machines cannot talk. A link hot-plugs a NIC into each of them over QMP, on the
 multicast socket of a shared segment (the same transport the labs use), gives it a stable MAC
 and an address in a private /24 (192.168.100.0/24 for the default segment) configured over SSH where the guest is a Linux or
-FreeBSD system vmctl can reach. Nothing is written to the profiles: the record of who is on a
-segment lives in ``artifacts/labs/links/<segment>.json`` and is only as alive as the QEMU
-processes it names, so the temporary lab disappears when the VMs stop.
+FreeBSD system vmctl can reach. A stopped VM can be linked too: it is recorded as *pending* and
+``vmctl start`` gives it the NIC on its own command line, then sets the address once SSH answers
+(``vmctl link --settle``, detached). Nothing is written to the profiles: the record of a segment
+lives in ``artifacts/labs/links/<segment>.json`` until ``vmctl link --off``; a member whose QEMU
+stopped goes back to pending and rejoins at its next start.
 """
 
 from __future__ import annotations
@@ -63,15 +65,24 @@ def qemu_alive(pid: int) -> bool:
     return b"qemu-system" in raw
 
 
+RUNTIME_KEYS = ("pid", "interface", "configured", "netdev", "device", "bus", "error")
+
+
+def is_up(member: dict[str, Any]) -> bool:
+    return bool(member.get("pid")) and qemu_alive(int(member["pid"]))
+
+
 def prune(record: dict[str, Any]) -> dict[str, Any]:
-    """Drop the members whose QEMU is gone; the file follows (and disappears when empty)."""
-    members = {name: m for name, m in record["members"].items() if qemu_alive(int(m.get("pid") or 0))}
-    if members != record["members"]:
-        record["members"] = members
-        if members:
-            save_record(record)
-        else:
-            record_path(str(record["segment"])).unlink(missing_ok=True)
+    """A member whose QEMU is gone goes back to pending (address and MAC kept): it rejoins the
+    segment at its next ``vmctl start``. Only ``vmctl link --off`` removes a member."""
+    changed = False
+    for member in record["members"].values():
+        if member.get("pid") and not qemu_alive(int(member["pid"])):
+            for key in RUNTIME_KEYS:
+                member.pop(key, None)
+            changed = True
+    if changed:
+        save_record(record)
     return record
 
 
@@ -89,8 +100,9 @@ def links_of(name: str) -> list[dict[str, Any]]:
     for record in all_records():
         me = record["members"].get(name)
         if me:
-            found.append({"segment": record["segment"], "address": me["address"],
-                          "peers": [{"name": n, "address": m["address"]} for n, m in record["members"].items() if n != name]})
+            found.append({"segment": record["segment"], "address": me["address"], "up": is_up(me),
+                          "peers": [{"name": n, "address": m["address"], "up": is_up(m)}
+                                    for n, m in record["members"].items() if n != name]})
     return found
 
 
@@ -221,24 +233,33 @@ def configure_guest(vm: dict[str, Any], mac: str, address: str, dry_run: bool = 
     return lines[-1] if lines else "?"
 
 
-def link(vm: dict[str, Any], name: str, pid: int, segment: str = DEFAULT_SEGMENT, dry_run: bool = False,
+def link(vm: dict[str, Any], name: str, pid: int | None, segment: str = DEFAULT_SEGMENT, dry_run: bool = False,
          mcast: str | None = None, subnet_base: str | None = None) -> dict[str, Any]:
-    """Put *name* (running as *pid*) on *segment*: plug, record, configure. Idempotent for a VM already there.
-    *subnet_base* (A.B.C) is honoured for a segment's first member; later ones follow the record."""
+    """Put *name* on *segment*: running as *pid*, plug, record, configure; stopped (``pid`` None),
+    record it as pending for its next start. Idempotent for a VM already there. *subnet_base* (A.B.C)
+    and *mcast* are honoured for a segment's first member; later ones follow the record."""
     record = prune(load_record(segment))
-    if subnet_base and not record["members"]:
-        record["subnet"] = subnet_base
+    if not record["members"]:
+        if subnet_base:
+            record["subnet"] = subnet_base
+        if mcast:
+            record["mcast"] = mcast
     member: dict[str, Any] | None = record["members"].get(name)
-    if member and int(member.get("pid") or 0) == pid:
-        member["already"] = True
-        return dict(member)
-    address = next_address(record)
+    if member and (pid is None or int(member.get("pid") or 0) == pid):
+        return {**member, "already": True, "pending": not is_up(member)}
+    address = member["address"] if member else next_address(record)
     mac = nic_mac(segment, name)
     if dry_run:
-        print(f"  would hot-plug {vm.get('network_device', 'virtio-net-pci')} {mac} on segment {segment} into {name} (pid {pid}), address {address}")
-        configure_guest(vm, mac, address, dry_run=True)
-        return {"address": address, "mac": mac, "pid": pid, "interface": None, "already": False}
-    plugged = hotplug(vm, name, pid, segment, mac, mcast)
+        where = f"into {name} (pid {pid})" if pid else f"on {name}'s next start (it is stopped)"
+        print(f"  would add {vm.get('network_device', 'virtio-net-pci')} {mac} on segment {segment} {where}, address {address}")
+        if pid:
+            configure_guest(vm, mac, address, dry_run=True)
+        return {"address": address, "mac": mac, "pid": pid, "interface": None, "already": False, "pending": not pid}
+    if pid is None:
+        record["members"][name] = {"address": address, "mac": mac}
+        save_record(record)
+        return {"address": address, "mac": mac, "already": False, "pending": True}
+    plugged = hotplug(vm, name, pid, segment, mac, record.get("mcast"))
     member = {"address": address, "pid": pid, "interface": None, "configured": False, **plugged}
     record["members"][name] = member
     save_record(record)  # recorded before the SSH step: a failed guest step still leaves a NIC to unlink
@@ -248,21 +269,67 @@ def link(vm: dict[str, Any], name: str, pid: int, segment: str = DEFAULT_SEGMENT
     except (VMError, subprocess.TimeoutExpired) as exc:
         member["error"] = str(exc)
     save_record(record)
-    member["already"] = False
-    return member
+    return {**member, "already": False, "pending": False}
 
 
-def unlink(vm: dict[str, Any], name: str, segment: str) -> bool:
+def boot_args(name: str, vm: dict[str, Any]) -> list[str]:
+    """QEMU arguments that put a starting VM on every segment it is a member of: the NICs a pending
+    link waits for, on the machine's own bus (no hot-plug needed, any display mode)."""
+    device = str(vm.get("network_device", "virtio-net-pci"))
+    args: list[str] = []
+    for record in all_records():
+        member = record["members"].get(name)
+        if member is None or is_up(member):
+            continue
+        ident = netdev_id(str(record["segment"]))
+        endpoint = qemu.segment_endpoint(str(record["segment"]), record.get("mcast"))
+        args += ["-netdev", f"socket,id={ident},mcast={endpoint}",
+                 "-device", f"{device},netdev={ident},id={ident}-nic,mac={member.get('mac') or nic_mac(str(record['segment']), name)}"]
+    return args
+
+
+def pending_segments(name: str) -> list[str]:
+    return [str(r["segment"]) for r in all_records() if name in r["members"] and not is_up(r["members"][name])]
+
+
+def settle(name: str, vm: dict[str, Any], pid: int) -> list[dict[str, Any]]:
+    """After a start with boot-time link NICs: record the QEMU as the member and set each address
+    (the caller waited for SSH). Returns one result per segment settled."""
+    results = []
+    for segment in pending_segments(name):
+        record = load_record(segment)
+        member = record["members"][name]
+        ident = netdev_id(segment)
+        member.update({"pid": pid, "netdev": ident, "device": f"{ident}-nic", "bus": None,
+                       "interface": None, "configured": False, "boot": True})
+        member.pop("error", None)
+        save_record(record)
+        try:
+            member["interface"] = configure_guest(vm, str(member.get("mac") or nic_mac(segment, name)), str(member["address"]))
+            member["configured"] = member["interface"] is not None
+        except (VMError, subprocess.TimeoutExpired) as exc:
+            member["error"] = str(exc)
+        save_record(record)
+        results.append({"segment": segment, **member})
+    return results
+
+
+def unlink(vm: dict[str, Any], name: str, segment: str) -> str:
+    """``absent`` (not a member), ``removed`` (NIC unplugged, or a pending member forgotten) or
+    ``stays`` (forgotten, but the running QEMU refused to unplug a NIC it booted with: q35's root
+    bus is not hot-pluggable, so it leaves with the next stop)."""
     record = prune(load_record(segment))
     member = record["members"].pop(name, None)
     if member is None:
-        return False
-    removed = unplug(vm, member)
+        return "absent"
+    status = "removed"
+    if is_up(member) and not unplug(vm, member):
+        status = "stays"
     if record["members"]:
         save_record(record)
     else:
         record_path(segment).unlink(missing_ok=True)
-    return removed
+    return status
 
 
 def session_labs() -> list[dict[str, Any]]:
@@ -271,6 +338,7 @@ def session_labs() -> list[dict[str, Any]]:
     for record in all_records():
         members = list(record["members"])
         entries.append({"group": f"link:{record['segment']}", "segment": record["segment"], "members": members,
+                        "pending": [n for n, m in record["members"].items() if not is_up(m)],
                         "lab": True, "session": True, "start_order": members,
                         "addresses": {n: [m["address"]] for n, m in record["members"].items()}})
     return entries

@@ -127,6 +127,8 @@ class VMDetails(Vertical):
         for link in row.get("links") or []:
             facts.append(f"\n\nLINK · {link['segment']}\n", style="bold #84c9e7")
             facts.append(f"{link['address']}", style="bold #dce5ef")
+            if not link.get("up"):
+                facts.append("  at next start", style="#efc582")
             facts.append("  with " + ", ".join(f"{p['name']} {p['address']}" for p in link["peers"]), style="#a6b4c8")
         self.query_one("#vm-facts", Static).update(facts)
         self.query_one("#vm-install", Static).update(row["install_detail"] if row["installed"] else "")

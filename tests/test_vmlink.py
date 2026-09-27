@@ -49,19 +49,41 @@ class RecordTests(BaseVmctlTestCase):
         self.assertNotEqual(vmlink.nic_mac("session", "kali"), vmlink.nic_mac("session", "freebsd"))
         self.assertTrue(vmlink.nic_mac("session", "kali").startswith("52:54:01:"))
 
-    def test_dead_members_are_pruned_and_an_empty_segment_is_forgotten(self):
-        vmlink.save_record({"segment": "session", "members": {"a": {"address": "192.168.100.1/24", "pid": 1}, "b": {"address": "192.168.100.2/24", "pid": 2}}})
+    def test_a_stopped_member_goes_back_to_pending_and_keeps_its_place(self):
+        vmlink.save_record({"segment": "session", "members": {
+            "a": {"address": "192.168.100.1/24", "mac": "52:54:01:00:00:0a", "pid": 1, "interface": "eth1", "bus": "hotplug0"},
+            "b": {"address": "192.168.100.2/24", "pid": 2}}})
         with mock.patch.object(vmlink, "qemu_alive", side_effect=lambda pid: pid == 2):
-            self.assertEqual(list(vmlink.load_record("session")["members"]), ["a", "b"])
-            self.assertEqual(vmlink.links_of("b"), [{"segment": "session", "address": "192.168.100.2/24", "peers": []}])
-            self.assertEqual(vmlink.links_of("a"), [])
+            self.assertEqual(vmlink.links_of("b"), [{"segment": "session", "address": "192.168.100.2/24", "up": True,
+                                                     "peers": [{"name": "a", "address": "192.168.100.1/24", "up": False}]}])
             labs = vmlink.session_labs()
-        self.assertEqual(labs[0]["members"], ["b"])
+            self.assertEqual(vmlink.pending_segments("a"), ["session"])
+        self.assertEqual(vmlink.load_record("session")["members"]["a"], {"address": "192.168.100.1/24", "mac": "52:54:01:00:00:0a"})
+        self.assertEqual(labs[0]["members"], ["a", "b"])
+        self.assertEqual(labs[0]["pending"], ["a"])
         self.assertTrue(labs[0]["session"] and labs[0]["lab"])
-        self.assertEqual(labs[0]["addresses"], {"b": ["192.168.100.2/24"]})
         with mock.patch.object(vmlink, "qemu_alive", return_value=False):
-            self.assertEqual(vmlink.all_records(), [])
-        self.assertFalse(vmlink.record_path("session").exists())
+            self.assertEqual(len(vmlink.all_records()), 1)  # only --off forgets a segment
+
+    def test_a_stopped_vm_is_recorded_pending_and_boots_with_the_nic(self):
+        vm = dict(self.vm_config, machine="q35", network_device="e1000")
+        with mock.patch.object(vmctl.qemu, "qmp_execute") as qmp:
+            member = vmlink.link(vm, "off", None, mcast="239.1.2.3:4000")
+        qmp.assert_not_called()
+        self.assertTrue(member["pending"])
+        self.assertEqual(member["address"], "192.168.100.1/24")
+        self.assertEqual(vmlink.load_record("session")["mcast"], "239.1.2.3:4000")
+        self.assertTrue(vmlink.link(vm, "off", None)["already"])
+        self.assertEqual(vmlink.boot_args("off", vm), [
+            "-netdev", "socket,id=link-session,mcast=239.1.2.3:4000",
+            "-device", f"e1000,netdev=link-session,id=link-session-nic,mac={vmlink.nic_mac('session', 'off')}"])
+        self.assertEqual(vmlink.boot_args("stranger", vm), [])
+        with mock.patch.object(vmlink, "qemu_alive", return_value=True), \
+                mock.patch.object(vmlink, "configure_guest", return_value="enp0s5") as configure:
+            results = vmlink.settle("off", vm, 77)
+            self.assertEqual(vmlink.boot_args("off", vm), [])  # up now: a second start adds nothing
+        configure.assert_called_once_with(vm, vmlink.nic_mac("session", "off"), "192.168.100.1/24")
+        self.assertEqual((results[0]["segment"], results[0]["interface"], results[0]["pid"]), ("session", "enp0s5", 77))
 
 
 class LinkTests(BaseVmctlTestCase):
@@ -103,8 +125,9 @@ class LinkTests(BaseVmctlTestCase):
         self.assertNotIn("bus", device_adds[0])
         self.assertEqual([a["bus"] for a in device_adds[1:]], ["hotplug0", "hotplug1"])
         self.assertEqual(vmlink.links_of("kali"), [
-            {"segment": "backend", "address": vmlink.subnet("backend") + ".1/24", "peers": []},
-            {"segment": "session", "address": "192.168.100.2/24", "peers": [{"name": "old", "address": "192.168.100.1/24"}]}])
+            {"segment": "backend", "address": vmlink.subnet("backend") + ".1/24", "up": True, "peers": []},
+            {"segment": "session", "address": "192.168.100.2/24", "up": True,
+             "peers": [{"name": "old", "address": "192.168.100.1/24", "up": True}]}])
 
     def test_a_refused_device_add_removes_the_netdev_and_explains_an_old_boot(self):
         calls = []
@@ -138,10 +161,20 @@ class LinkTests(BaseVmctlTestCase):
         with mock.patch.object(vmctl.qemu, "qmp_execute"), mock.patch.object(vmlink, "configure_guest", return_value=None):
             vmlink.link(self.vm, "kali", 3)
         with mock.patch.object(vmctl.qemu, "qmp_command", return_value=True) as qmp:
-            self.assertTrue(vmlink.unlink(self.vm, "kali", "session"))
-            self.assertFalse(vmlink.unlink(self.vm, "kali", "session"))
+            self.assertEqual(vmlink.unlink(self.vm, "kali", "session"), "removed")
+            self.assertEqual(vmlink.unlink(self.vm, "kali", "session"), "absent")
         self.assertEqual([c.args[1] for c in qmp.call_args_list], ["device_del", "netdev_del"])
         self.assertFalse(vmlink.record_path("session").exists())
+
+    def test_unlink_of_a_pending_member_touches_no_qemu_and_a_refused_unplug_says_so(self):
+        vmlink.link(self.vm, "off", None)
+        with mock.patch.object(vmctl.qemu, "qmp_command") as qmp:
+            self.assertEqual(vmlink.unlink(self.vm, "off", "session"), "removed")
+        qmp.assert_not_called()
+        with mock.patch.object(vmctl.qemu, "qmp_execute"), mock.patch.object(vmlink, "configure_guest", return_value=None):
+            vmlink.link(self.vm, "kali", 3)
+        with mock.patch.object(vmctl.qemu, "qmp_command", return_value=False):  # q35 root bus: not hot-pluggable
+            self.assertEqual(vmlink.unlink(self.vm, "kali", "session"), "stays")
 
 
 class GuestScriptTests(unittest.TestCase):
@@ -164,24 +197,40 @@ class GuestScriptTests(unittest.TestCase):
 
 class CommandTests(BaseVmctlTestCase):
     def namespace(self, **kw):
-        base = dict(vm=None, peers=[], segment=None, mcast=None, subnet=None, status=False, off=False, dry_run=False)
+        base = dict(vm=None, peers=[], segment=None, mcast=None, subnet=None, status=False, off=False, settle=None, dry_run=False)
         base.update(kw)
         return argparse.Namespace(**base)
 
-    def test_link_refuses_a_stopped_vm_and_a_lone_vm_on_an_empty_segment(self):
+    def test_stopped_vms_are_linked_pending_and_a_lone_vm_is_refused(self):
         self.write_config_dir()
-        with mock.patch.object(vmctl.lifecycle, "running_background_pid", return_value=None):
-            with self.assertRaisesRegex(VMError, "not running in the background"):
-                vmctl.lifecycle.cmd_link(self.namespace(vm=self.vm_name, peers=[self.vm_name]))
-        with self.assertRaisesRegex(VMError, "needs two running VMs"):
+        with self.assertRaisesRegex(VMError, "needs two VMs"):
             vmctl.lifecycle.cmd_link(self.namespace(vm=self.vm_name))
+        with mock.patch.object(vmctl.lifecycle, "running_background_pid", return_value=None), \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+            self.assertEqual(vmctl.lifecycle.cmd_link(self.namespace(vm=self.vm_name, peers=[self.vm_name])), 0)
+        self.assertIn("joins segment session", out.getvalue())
+        self.assertIn(self.vm_name, vmlink.load_record("session")["members"])
+
+    def test_start_boots_a_pending_member_with_its_nic_and_detaches_the_settler(self):
+        self.write_config_dir()
+        vm = vmctl.config.get_vm(vmctl.config.load_config(), self.vm_name)
+        vmlink.link(vm, self.vm_name, None)
+        with mock.patch.object(vmctl.qemu, "common_args", return_value=["qemu-system-x86_64"]), \
+                mock.patch.object(vmctl.runtime, "run") as run, \
+                mock.patch.object(vmctl.lifecycle, "start_link_settler") as settler, \
+                mock.patch("sys.stdout", new_callable=io.StringIO):
+            vmctl.lifecycle.cmd_start(argparse.Namespace(vm=self.vm_name, video=None, dry_run=False, headless=False,
+                                                         background=False, spice_port=None, cloud_init=False))
+        command = run.call_args.args[0]
+        self.assertIn("socket,id=link-session,mcast=" + vmctl.qemu.segment_endpoint("session"), command)
+        settler.assert_called_once_with(self.vm_name, dry_run=False)
 
     def test_status_and_off_on_an_empty_segment_are_quiet(self):
         self.write_config_dir()
         with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
             self.assertEqual(vmctl.lifecycle.cmd_link(self.namespace()), 0)
             self.assertEqual(vmctl.lifecycle.cmd_link(self.namespace(off=True)), 0)
-        self.assertIn("No running VM is linked", out.getvalue())
+        self.assertIn("No VM is linked", out.getvalue())
         self.assertIn("Nothing is linked", out.getvalue())
 
 

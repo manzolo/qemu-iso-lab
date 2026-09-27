@@ -305,11 +305,13 @@ def build_parser() -> argparse.ArgumentParser:
   vmctl link --off                        unplug every VM from the segment (or name the ones to unplug)
   vmctl link a b --segment backend        a second, separate segment (192.168.<n>.0/24, or --subnet 172.16.5.0/24)
 
-The VMs must be running in the background (Boot headless / vmctl start --headless): the NIC is
-added over QMP, on the multicast socket the labs use, so the profiles are not touched and the
-link lasts as long as the VMs run. Linux and FreeBSD guests with SSH get the address set by
-vmctl; other guests are told which address to set. q35 machines need the hot-plug slots that
-headless boots carry since vmctl 0.9: a VM booted earlier has to be restarted once.
+A running VM (booted headless) gets the NIC at once over QMP, on the multicast socket the labs
+use; a stopped VM is recorded as pending and gets it on its own command line at the next
+vmctl start (any display mode), the address being set once SSH answers. The profiles are not
+touched: a link lasts until vmctl link --off, and a stopped member rejoins when it starts.
+Linux and FreeBSD guests with SSH get the address set by vmctl; other guests are told which
+address to set. Hot-plugging into a running q35 machine needs the slots that headless boots
+carry since vmctl 0.9: a VM booted earlier is linked at its next start instead.
 The dashboard does the same when a running machine's icon is dropped on another one.""")
     p.add_argument("vm", nargs="?", help="a running VM")
     p.add_argument("peers", nargs="*", help="the other running VMs to put on the same segment")
@@ -318,6 +320,7 @@ The dashboard does the same when a running machine's icon is dropped on another 
     p.add_argument("--subnet", help="the segment's /24 when its first member joins, e.g. 192.168.50.0/24 (default: 192.168.100.0/24 for 'session', 192.168.<n>.0/24 otherwise)")
     p.add_argument("--status", action="store_true", help="show the linked VMs and their addresses")
     p.add_argument("--off", action="store_true", help="unplug the named VMs (or every VM) from the segment")
+    p.add_argument("--settle", metavar="VM", help=argparse.SUPPRESS)  # run by vmctl start, detached
     p.set_defaults(func=lifecycle.cmd_link)
 
     p = _add(subparsers, "cancel-install", help="cancel a TUI background installation and stop its VM, preserving disk and logs")
