@@ -2,6 +2,7 @@
 
 import argparse
 import io
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -178,7 +179,7 @@ class LinkTests(BaseVmctlTestCase):
 
 
 class GuestScriptTests(unittest.TestCase):
-    def test_linux_and_freebsd_find_the_interface_by_mac_and_windows_is_left_to_the_user(self):
+    def test_linux_and_freebsd_find_the_interface_by_mac_and_windows_has_no_shell_script(self):
         linux = vmlink.guest_script("debian", "52:54:01:aa:bb:cc", "192.168.100.1/24")
         self.assertIn("ip -o link", linux)
         self.assertIn("ip addr replace 192.168.100.1/24", linux)
@@ -193,6 +194,30 @@ class GuestScriptTests(unittest.TestCase):
     def test_configure_guest_skips_guests_without_ssh_or_a_known_family(self):
         self.assertIsNone(vmlink.configure_guest({"meta": {"family": "debian"}}, "52:54:01:00:00:01", "192.168.100.1/24"))
         self.assertIsNone(vmlink.configure_guest({"meta": {"family": "windows"}, "ssh_provision": {"user": "lab", "ssh_host_port": 2}}, "52:54:01:00:00:01", "192.168.100.1/24"))
+        seven = {"meta": {"family": "windows"}, "windows_config": {"edition": "Windows 7 Ultimate"}, "ssh_provision": {"user": "lab", "ssh_host_port": 2}}
+        self.assertIsNone(vmlink.configure_guest(seven, "52:54:01:00:00:01", "192.168.100.1/24"))
+
+    def test_windows_10_and_11_are_configured_with_powershell_over_ssh(self):
+        import base64
+        vm = {"meta": {"family": "windows"}, "windows_config": {"edition": "Windows 11 Pro"},
+              "ssh_provision": {"user": "lab", "ssh_host_port": 2235}}
+        self.assertTrue(vmlink.configures_windows(vm))
+        self.assertFalse(vmlink.configures_windows({"windows_config": {"edition": "Windows 7 Professional"}}))
+        script = vmlink.windows_script("52:54:01:e0:1f:a4", "192.168.100.3/24")
+        self.assertIn("MacAddress -eq '52-54-01-E0-1F-A4'", script)
+        self.assertIn("-IPAddress 192.168.100.3 -PrefixLength 24", script)
+        self.assertIn("-Dhcp Disabled", script)
+        self.assertIn("-NetworkCategory Private", script)
+        self.assertIn("-Protocol ICMPv4 -IcmpType 8", script)
+        done = subprocess.CompletedProcess([], 0, stdout="Ethernet 3\r\n", stderr="")
+        with mock.patch.object(vmlink.ssh, "ssh_base_cmd", return_value=["ssh", "lab@127.0.0.1"]), \
+                mock.patch.object(vmlink.subprocess, "run", return_value=done) as run:
+            self.assertEqual(vmlink.configure_guest(vm, "52:54:01:e0:1f:a4", "192.168.100.3/24"), "Ethernet 3")
+        remote = run.call_args.args[0][-1]
+        self.assertTrue(remote.startswith("powershell -NoProfile -NonInteractive -EncodedCommand "))
+        self.assertNotIn("sudo", remote)
+        decoded = base64.b64decode(remote.rsplit(" ", 1)[1]).decode("utf-16-le")
+        self.assertEqual(decoded, script)
 
 
 class CommandTests(BaseVmctlTestCase):

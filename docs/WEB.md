@@ -69,7 +69,7 @@ What the page offers:
 - **Link**: use the network button shown on hover, focus or the selected row: click it to choose
   another VM, or drag the network button onto another machine to connect them on a private
   segment (`vmctl link`, confirmed first): a running one gets a hot-plugged NIC, a stopped one
-  gets it at its next start; Linux and FreeBSD guests get their 192.168.100.x address over SSH,
+  gets it at its next start; Linux, FreeBSD and Windows 10/11 guests get their 192.168.100.x address over SSH,
   the panel shows a *Linked* row (*at next start* while pending) with an *Unlink* button, and the
   segment is listed under Labs as a session lab. Details and limits: [LABS.md](LABS.md#temporary-links-between-vms-vmctl-link).
 - **Jobs**: everything runs as a detached job with its log followed live. A job started for a VM

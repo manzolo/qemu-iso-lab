@@ -13,6 +13,7 @@ stopped goes back to pending and rejoins at its next start.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import re
@@ -21,7 +22,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from vmctl import cloud_init, qemu, ssh, state
+from vmctl import cloud_init, qemu, ssh, state, windows
 from vmctl.errors import VMError
 
 DEFAULT_SEGMENT = "session"
@@ -214,14 +215,57 @@ def guest_script(family: str, mac: str, address: str) -> str | None:
     return None
 
 
+def configures_windows(vm: dict[str, Any]) -> bool:
+    """Windows 10/11 from bootstrap-windows: OpenSSH as the local administrator, PowerShell 5.
+    Windows 7 and the retro versions have neither, so they keep the manual hint."""
+    cfg = vm.get("windows_config")
+    return isinstance(cfg, dict) and not windows.is_legacy_windows(cfg)
+
+
+def windows_script(mac: str, address: str) -> str:
+    """PowerShell that gives the adapter with *mac* a static *address* and lets ping in: Windows
+    otherwise leaves the new adapter on an APIPA 169.254 address, on the Public profile, where
+    inbound ICMP is blocked (verified live on windows-11). Idempotent: the adapter's previous
+    IPv4 addresses and the firewall rule are replaced."""
+    ip, _, prefix = address.partition("/")
+    win_mac = mac.upper().replace(":", "-")
+    return (
+        "$ErrorActionPreference = 'Stop'; $a = $null; "
+        f"for ($i = 0; $i -lt 30 -and -not $a; $i++) {{ $a = Get-NetAdapter | Where-Object MacAddress -eq '{win_mac}'; "
+        "if (-not $a) { Start-Sleep 1 } }; "
+        f"if (-not $a) {{ [Console]::Error.WriteLine('no interface with {mac}'); exit 3 }}; "
+        "Set-NetIPInterface -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -Dhcp Disabled; "
+        "Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | "
+        "Remove-NetIPAddress -Confirm:$false -ErrorAction SilentlyContinue; "
+        f"New-NetIPAddress -InterfaceIndex $a.ifIndex -IPAddress {ip} -PrefixLength {prefix or 24} | Out-Null; "
+        "Set-NetConnectionProfile -InterfaceIndex $a.ifIndex -NetworkCategory Private -ErrorAction SilentlyContinue; "
+        "Remove-NetFirewallRule -Name vmctl-link-icmp -ErrorAction SilentlyContinue; "
+        "New-NetFirewallRule -Name vmctl-link-icmp -DisplayName 'vmctl link: ping' -Protocol ICMPv4 -IcmpType 8 "
+        "-Direction Inbound -Action Allow | Out-Null; "
+        "Write-Output $a.Name"
+    )
+
+
+def windows_command(vm: dict[str, Any], script: str, dry_run: bool = False) -> list[str]:
+    """The script as one -EncodedCommand (UTF-16LE base64): nothing for cmd.exe, the OpenSSH
+    default shell, to re-quote."""
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    return ssh.ssh_base_cmd(vm, dry_run=dry_run) + [f"powershell -NoProfile -NonInteractive -EncodedCommand {encoded}"]
+
+
 def configure_guest(vm: dict[str, Any], mac: str, address: str, dry_run: bool = False) -> str | None:
     """Give the hot-plugged interface its address over SSH. Returns the interface name, or None when
-    the guest is not one vmctl configures (Windows, hobby systems, no SSH): the caller then prints
-    the address to set by hand."""
-    script = guest_script(guest_family(vm), mac, address)
-    if script is None or cloud_init.ssh_access_config(vm) is None:
+    the guest is not one vmctl configures (Windows 7 and older, hobby systems, no SSH): the caller
+    then prints the address to set by hand."""
+    if cloud_init.ssh_access_config(vm) is None:
         return None
-    command = ssh.remote_sudo_shell_cmd(vm, script, dry_run=dry_run)
+    if configures_windows(vm):
+        command = windows_command(vm, windows_script(mac, address), dry_run=dry_run)
+    else:
+        script = guest_script(guest_family(vm), mac, address)
+        if script is None:
+            return None
+        command = ssh.remote_sudo_shell_cmd(vm, script, dry_run=dry_run)
     if dry_run:
         print("  " + shlex.join(command))
         return "(dry run)"

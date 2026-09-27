@@ -309,7 +309,7 @@ A running VM (booted headless) gets the NIC at once over QMP, on the multicast s
 use; a stopped VM is recorded as pending and gets it on its own command line at the next
 vmctl start (any display mode), the address being set once SSH answers. The profiles are not
 touched: a link lasts until vmctl link --off, and a stopped member rejoins when it starts.
-Linux and FreeBSD guests with SSH get the address set by vmctl; other guests are told which
+Linux, FreeBSD and Windows 10/11 guests with SSH get the address set by vmctl; other guests are told which
 address to set. Hot-plugging into a running q35 machine needs the slots that headless boots
 carry since vmctl 0.9: a VM booted earlier is linked at its next start instead.
 The web dashboard does the same from a machine's network button (click it to pick a peer, or

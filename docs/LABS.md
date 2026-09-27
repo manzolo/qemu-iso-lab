@@ -71,10 +71,12 @@ its next start; only `vmctl link --off` (or *Unlink*) takes it off the segment. 
 ping 0.6 ms; almalinux stopped and restarted rejoined by itself.
 
 What happens on a running VM: the NIC is added to QEMU over QMP (`netdev_add` on the multicast
-socket the labs use, `device_add`) with a MAC that is stable per segment and VM; Linux and
-FreeBSD guests with SSH get the address set by vmctl (the interface is found by its MAC), other
-guests are told which address to set (NetworkManager guests get a manual `vmctl-link-<if>`
-connection, which DHCP does not flush). Nothing is written to the profiles: the record of a
+socket the labs use, `device_add`) with a MAC that is stable per segment and VM; Linux,
+FreeBSD and Windows 10/11 guests with SSH get the address set by vmctl (the interface is found by
+its MAC), other guests (Windows 7 and older, hobby systems) are told which address to set.
+NetworkManager guests get a manual `vmctl-link-<if>` connection, which DHCP does not flush;
+Windows gets a static address in PowerShell, the adapter on the Private profile and an inbound
+ping rule (`vmctl-link-icmp`), since it would otherwise stay on a 169.254 address and drop ICMP. Nothing is written to the profiles: the record of a
 segment is `artifacts/labs/links/<segment>.json`. Limits: hot-plugging needs a VM running in the
 background (*Boot headless*: only those have a QMP socket) and, on q35, the two empty PCIe root
 ports of headless boots since vmctl 0.9; a VM that cannot take it is linked at its next start

@@ -231,8 +231,8 @@ vmctl link --off                # unplug everyone
 
 In the web dashboard, click a machine's network button to pick a peer, drag it onto another
 machine, or select several VMs (Ctrl/Cmd+click, Shift+click) and choose **Link network**.
-A running VM gets a hot-plugged NIC, a stopped one gets it at its next start; Linux and FreeBSD
-guests are given their address over SSH. The linked VMs appear under **Labs** as a *session*
+A running VM gets a hot-plugged NIC, a stopped one gets it at its next start; Linux, FreeBSD and
+Windows 10/11 guests are given their address over SSH. The linked VMs appear under **Labs** as a *session*
 lab, with **Status** and **Unlink all**, until you unlink them. Details:
 [docs/LABS.md](docs/LABS.md#temporary-links-between-vms-vmctl-link).
 
