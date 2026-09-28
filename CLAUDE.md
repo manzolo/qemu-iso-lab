@@ -57,7 +57,7 @@ vmctl group list|status|up|down|map|install|clean|cluster <group>   # a declared
 vmctl export-libvirt <name>                    # hand an installed VM (and the lab-lan network) to libvirt
 vmctl attach <name>                # VNC view of a headless VM, also while a bootstrap runs
 vmctl record <name>                # time-lapse of the screen from the QMP socket (recorder.py): 1 screendump/s, identical frames kept once, GIF by default (--gif-seconds 30 × 2 fps sampled evenly, 480 px), --mp4 for the full H.264 + poster, --from DIR re-encodes, survives the installer→first-boot gap (--grace) → artifacts/<vm>/recording/<stamp>/, `latest` symlink; /vm-record <vm> reinstalls while recording
-vmctl check-vms --record [...]     # one recorder thread per row (recorder.record_in_background, waits for the row's QMP socket, grace 45 s; forwarded to the per-VM workers); then tools/collect_media.py [vms] [--mp4] copies the GIFs into docs/media/<vm>/ for the catalog site (GIF-only by default, an old MP4 is removed)
+vmctl check-vms --record [...]     # one recorder thread per row (recorder.record_in_background, waits for the row's QMP socket, ends with the row: grace `ROW_RECORD_GRACE_SEC` 3600 s because the Arch family boots the disk more than 45 s after the installer; forwarded to the per-VM workers); then tools/collect_media.py [vms] [--mp4] copies the GIFs into docs/media/<vm>/ for the catalog site (GIF-only by default, an old MP4 is removed)
 vmctl console <name>               # serial console (ttyS0 login / pfSense menu) of a background VM, Ctrl-] detaches
 ```
 

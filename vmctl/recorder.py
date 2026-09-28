@@ -244,10 +244,18 @@ def canvas(recording: Recording, width: int | None = None) -> tuple[int, int]:
     return (max(2, w // 2 * 2), max(2, h // 2 * 2))
 
 
-def fit(size: tuple[int, int]) -> str:
+def fit(size: tuple[int, int], rate: float, before: str = "") -> str:
+    """A filter_complex head: every frame scaled into *size* and centred on a black background.
+
+    Not scale + pad: pad computes its offsets for the first frame's size, so a larger frame later
+    (Ubuntu 8.04: 720x400 text, then 1920x1200 at the desktop) was written past the canvas and
+    ffmpeg died with SIGSEGV, leaving an empty GIF in the matrix of 2026-09-27. overlay re-centres
+    each frame (eval=frame). The background runs at *rate*, the output frame rate of the clip.
+    """
     w, h = size
-    return (f"scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos,"
-            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2")
+    return (f"color=c=black:s={w}x{h}:r={rate:g}[bg];"
+            f"[0:v]{before}scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos[fg];"
+            "[bg][fg]overlay=x=(W-w)/2:y=(H-h)/2:eval=frame:shortest=1")
 
 
 def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: float = 1.0, gif: bool = True,
@@ -268,17 +276,16 @@ def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: 
         gif_path = recording.directory / "recording.gif"
         # stats_mode=full: the palette weighs every frame, so the held final screen keeps its colours
         # (diff let a long text log decide the palette and turned the Ubuntu desktop yellow).
-        filters = (fit(canvas(recording, gif_width)) + ",split[a][b];"
+        filters = (fit(canvas(recording, gif_width), gif_fps,
+                       f"fps={gif_fps}:eof_action=pass," if realtime_gif else "") + ",split[a][b];"
                    "[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle")
-        if realtime_gif:
-            filters = f"fps={gif_fps}:eof_action=pass," + filters
         seconds = gif_seconds
         for attempt in range(4):
             if not dry_run:
                 gif_list.write_text(recording.concat_list(max_hold, period) if realtime_gif
                                     else recording.gif_list(seconds, gif_fps), encoding="utf-8")
             runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-reinit_filter", "0", "-f", "concat", "-safe", "0",
-                         "-i", str(gif_list), "-vf", filters, "-loop", "0", str(gif_path)], dry_run=dry_run, quiet=True)
+                         "-i", str(gif_list), "-filter_complex", filters, "-loop", "0", str(gif_path)], dry_run=dry_run, quiet=True)
             if (dry_run or realtime_gif or not gif_target_kb or not gif_path.is_file()
                     or gif_path.stat().st_size <= gif_target_kb * 1024):
                 break
@@ -287,11 +294,10 @@ def encode(recording: Recording, *, max_hold: float = DEFAULT_MAX_HOLD, period: 
     if mp4:
         listing = recording.frames_dir / FRAMES_LIST
         mp4_path = recording.directory / "recording.mp4"
-        filters = fit(canvas(recording)) + ",format=yuv420p"
-        if mp4_fps:
-            filters = f"fps={mp4_fps}," + filters
+        rate = mp4_fps or max(1, round(1 / period))
+        filters = fit(canvas(recording), rate, f"fps={mp4_fps}," if mp4_fps else "") + ",format=yuv420p"
         runtime.run(["ffmpeg", "-y", "-loglevel", "error", "-reinit_filter", "0", "-f", "concat", "-safe", "0",
-                     "-i", str(listing), "-vf", filters, "-fps_mode", "vfr",
+                     "-i", str(listing), "-filter_complex", filters, "-fps_mode", "vfr",
                      "-c:v", "libx264", "-crf", "22", "-preset", "medium", "-movflags", "+faststart", str(mp4_path)],
                     dry_run=dry_run, quiet=True)
         out["mp4"] = mp4_path

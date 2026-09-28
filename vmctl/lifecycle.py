@@ -532,8 +532,10 @@ def ci_boot_accel(vm: dict[str, Any], default: str = "kvm") -> str:
 
 def local_test_prereq_skip(vm_name: str, vm: dict[str, Any]) -> str | None:
     # Windows and other ISOs without a public download URL: nothing to fetch, nothing to test.
-    iso_path = runtime.resolve_path(vm["iso"])
-    if not iso_path.exists() and not iso.iso_url_candidates(vm, allow_discovery=False):
+    # A disk_image profile (SerenityOS) has no "iso" at all: the key lookup failed the whole row
+    # with KeyError: 'iso' in the matrix of 2026-09-27 instead of the skip every manual system gets.
+    iso_path = runtime.resolve_path(vm["iso"]) if vm.get("iso") else None
+    if iso_path is not None and not iso_path.exists() and not iso.iso_url_candidates(vm, allow_discovery=False):
         return f"skipped: ISO {iso_path.name} is not present and vmctl cannot download it (see iso_help: vmctl fetch-iso {vm_name})"
 
     ci = vm.get("ci", {})
@@ -993,6 +995,12 @@ def run_local_test_vm(
     return ("skipped", detail)
 
 
+# A row's recorder ends with the row (the stop event), not with a quiet socket: the Arch family
+# powers the installer off and boots the disk more than 45 s later, so on 2026-09-27 six clips
+# closed on the firmware logo before the desktop ever appeared.
+ROW_RECORD_GRACE_SEC = 3600.0
+
+
 def run_local_test_once(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> tuple[str, str]:
     mode, note = local_test_mode(vm)
     ui.print_header(f"Test VM: {vm_name}")
@@ -1009,7 +1017,7 @@ def run_local_test_once(vm_name: str, vm: dict[str, Any], args: argparse.Namespa
                       else runtime.resolve_path("artifacts/check-vms")) / "recordings" / vm_name
         with report.watch_timeline(vm_name, vm, args), \
                 recorder.record_in_background(vm_name, vm, enabled=bool(getattr(args, "record", False)) and not args.dry_run,
-                                              grace=45.0, out_dir=recordings):
+                                              grace=ROW_RECORD_GRACE_SEC, out_dir=recordings):
             status, detail = run_local_test_vm(vm_name, vm, args)
     except (VMError, OSError, subprocess.CalledProcessError) as exc:
         status = "failed"

@@ -62,7 +62,9 @@ class FramesTests(BaseVmctlTestCase):
         self.assertEqual(recorder.png_size(rec.frames[0][0]), (720, 400))
         self.assertEqual(recorder.canvas(rec), (1024, 768))  # the frame it ends on
         self.assertEqual(recorder.canvas(rec, 480), (480, 360))
-        self.assertIn("pad=480:360", recorder.fit((480, 360)))
+        head = recorder.fit((480, 360), 2)
+        self.assertIn("color=c=black:s=480x360:r=2[bg]", head)
+        self.assertIn("overlay=x=(W-w)/2:y=(H-h)/2:eval=frame", head)
 
     def test_the_gif_ends_on_the_richest_late_screen_held_longer_not_on_the_power_off(self):
         rec = recorder.Recording(self.root / "rec")
@@ -89,6 +91,7 @@ class FramesTests(BaseVmctlTestCase):
             self.assertIn("palettegen", " ".join(calls[0]))
             self.assertIn("-reinit_filter", calls[0])  # a resolution change must not rebuild the graph
             self.assertIn("scale=480:480:force_original_aspect_ratio=decrease", " ".join(calls[0]))
+            self.assertNotIn("pad=", " ".join(calls[0]))  # pad overflowed on a later, larger frame (SIGSEGV)
             self.assertTrue(str(calls[0][-1]).endswith("recording.gif"))
             self.assertTrue((rec.frames_dir / "gif.ffconcat").is_file())
             self.assertTrue((rec.frames_dir / recorder.FRAMES_LIST).is_file())

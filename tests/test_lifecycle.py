@@ -2191,3 +2191,10 @@ class ReportScreenshotBootTests(BaseVmctlTestCase):
              mock.patch.object(vmctl.lifecycle.time, "sleep") as sleep:
             vmctl.lifecycle.boot_for_report_screenshot("vm", self.vm_config, self._args())
         sleep.assert_called_once_with(vmctl.lifecycle.INSTALL_ONLY_SCREENSHOT_WAIT_SEC)
+
+
+class DiskImagePrereqTests(BaseVmctlTestCase):
+    def test_a_profile_without_iso_is_not_a_key_error(self):
+        vm = {k: v for k, v in self.vm_config.items() if k != "iso"}
+        vm["disk_image"] = {"path": "isos/image.img", "format": "raw"}
+        self.assertIsNone(vmctl.lifecycle.local_test_prereq_skip(self.vm_name, vm))
