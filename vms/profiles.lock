@@ -154,6 +154,72 @@
         }
       ]
     },
+    "debian-10": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:a9841ab26da1078da68ebe899e7482515996e8c6a021ccfea03fa19e2c295965",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-11": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c6f47d2f1b66c69b9bca75e7765010da07883253bd6aec2f9e72113dc7480e4e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-12": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:4298bf1bdbe89cbec573f54e3128608fc9f5d430ac5b9aa3d96ff94377d2da3e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-7": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:6512abe478358d4852d799b7b3dd698a2059bee5bd7e28531be5d04a9b928788",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-8": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:de2a6784618e0e0ca0b496c456bf265813e744e9014b62416377c2f2ba957274",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-9": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:9b8f20cd7d6ffc521f3951124b5c9ba802dfd88f96f3bda0f5a70ab57e1efb5f",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "debian-bios": {
       "version": "1.0.0",
       "fingerprint": "sha256:ab7442d5c2574c0d162b93a1e8475aabe4f5351e80aac31ecd2af44d5d7baebe",

@@ -1088,6 +1088,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `ubuntu` | Ubuntu and its official flavours, whatever their `meta.slug`: the whole release series, the 24.04 flavour sweep, the 26.04 profiles and `lubuntu-lab`. They all share `meta.family: debian` with Debian and Kali, so the family alone could not say "the Ubuntu ones" |
 | `ubuntu-releases` | One unattended desktop install per Ubuntu release, 8.04 to 26.04. 24.04's entry is `ubuntu-gnome-24.04`: it is the same recipe under the flavour naming, so the series has no separate `ubuntu-24.04-unattended` profile |
 | `xubuntu-releases` | The Xubuntu history on the same media, 8.04 to 26.04 (`tools/gen_ubuntu_flavors.py`): born `experimental`, so the full matrix sets them aside until each passes when named |
+| `debian-releases` | One GNOME desktop per Debian release, 7 (wheezy) to 13: `debian-7` … `debian-12` on the archived netinst media (`vms/profiles/debian-history.json`, born `experimental`) and `debian-gnome` for 13 |
 | `ubuntu-flavors` | The 24.04 flavour sweep: GNOME, KDE, LXQt, Xfce, MATE, Budgie, Unity, Cinnamon, Studio, Edubuntu |
 | `debian-only` | Debian proper, without the Ubuntu and Kali profiles that share its family |
 | `kali` | Both Kali profiles: the live one (family `kali`) and the preseed one (family `debian`) |
