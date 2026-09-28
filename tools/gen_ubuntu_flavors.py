@@ -56,7 +56,12 @@ def autologin_command(dm: str, release: str, flavour: dict[str, Any]) -> str:
     """The late command (d-i eras) that makes the display manager log the lab user in."""
     if dm == "gdm":
         target = "/etc/gdm/gdm.conf-custom" if release == "8.04" else "/etc/gdm/custom.conf"
-        return f"printf '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{{{user}}}}\\nTimedLoginEnable=false\\n' > {target}"
+        # GDM 2.30 (10.04) with no saved session for the user logged into the "xterm" session (a
+        # bare xterm, verified with [debug] on 2026-09-28): ~/.dmrc plus gdm's own cache name it.
+        session = flavour["lightdm_session"]
+        return (f"printf '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{{{user}}}}\\nTimedLoginEnable=false\\n' > {target}; "
+                f"printf '[Desktop]\\nSession={session}\\nLanguage=en_US.UTF-8\\n' > /home/{{{{user}}}}/.dmrc; chown {{{{user}}}}: /home/{{{{user}}}}/.dmrc; "
+                f"install -d -o {{{{user}}}} -g {{{{user}}}} /var/cache/gdm/{{{{user}}}}; cp /home/{{{{user}}}}/.dmrc /var/cache/gdm/{{{{user}}}}/dmrc; chown {{{{user}}}}: /var/cache/gdm/{{{{user}}}}/dmrc")
     if dm == "lightdm":
         session = flavour["lightdm_session"]
         return (f"printf '[SeatDefaults]\\nautologin-user={{{{user}}}}\\nautologin-user-timeout=0\\nuser-session={session}\\n' "

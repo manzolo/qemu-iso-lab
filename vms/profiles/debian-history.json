@@ -19,7 +19,11 @@
           "keyboard-configuration keyboard-configuration/model select Generic 105-key (Intl) PC",
           "keyboard-configuration keyboard-configuration/optionscode string"
         ]
-      }
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc"
     },
     "debian-8-base": {
       "extends": "debian-desktop-base",
@@ -98,7 +102,7 @@
         ],
         "version": "1.0.0"
       },
-      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Run 3 of 2026-09-28: install and SSH (RSA key) fine, but no X ever came up: the screen stayed a black console and neither gnome-shell nor gnome-session ran (gdm3 3.4 on sysvinit, to inspect on the guest: /var/log/gdm3, Xorg.0.log). Experimental until a live run passes (vmctl check-vms debian-7).",
+      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Run 3 of 2026-09-28: X never started under UEFI ('VESA(0): V_BIOS address out of range': wheezy's X is VESA-only, kernel 3.2 has no bochs KMS), so the base boots BIOS on the pc machine like the old Ubuntus. Experimental until a live run passes (vmctl check-vms debian-7).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"

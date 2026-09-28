@@ -189,7 +189,7 @@
     },
     "debian-7": {
       "version": "1.0.0",
-      "fingerprint": "sha256:5b66f85ff22a0ffb8f58c5071300c2a014654b48f008de666f8fb008eb2bdef2",
+      "fingerprint": "sha256:66ec083df53be3b217dea5386d161e32eaf9ac8295fd260aab325152bf130ffe",
       "history": [
         {
           "version": "1.0.0",
@@ -1234,7 +1234,7 @@
     },
     "xubuntu-10.04": {
       "version": "1.0.0",
-      "fingerprint": "sha256:f87733c9e73229325c5e4a27f738f7a555bf74c22ce68f650d39bfa9f358025c",
+      "fingerprint": "sha256:c8687e54daecd4587ea536ea275f010ca0afa7135d9581eb8f58b2de3972d136",
       "history": [
         {
           "version": "1.0.0",
