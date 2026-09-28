@@ -48,6 +48,13 @@ FINAL_HOLD = 4.0
 # What the repository and the catalog site carry per profile: above this the GIF is re-encoded
 # with fewer frames (a scrolling installer log makes every frame different and heavy).
 GIF_TARGET_KB = 900
+# Most installers work on the serial console and leave text or black on the screen for 10-20
+# minutes: sampled evenly, 40 of the 58 clips of 2026-09-28 were more than three quarters dark
+# text. Console frames now get at most CONSOLE_FRAMES of a GIF (4 s at 2 fps, enough to say
+# "the installer works here"); the rest goes to the graphical screens. A clip with no graphical
+# frame at all (a server) is SERVER_SHARE of the usual length.
+CONSOLE_FRAMES = 8
+SERVER_SHARE = 0.5
 FRAMES_LIST = "frames.ffconcat"
 
 
@@ -117,6 +124,38 @@ def capture(sock: Path, vnc: Path | None = None) -> bytes | None:
         Path(temporary).unlink(missing_ok=True)
 
 
+def frame_kind(path: Path, step: int = 16) -> str:
+    """"graphic" or "console" for a frame this module wrote (ppm_to_png: one IDAT, filter 0).
+
+    A console is text or firmware on black: few distinct colours in a coarse grid of pixels and
+    little of it lit. A desktop has gradients (Kali's black wallpaper still gives >100 colours),
+    a graphical installer is mostly lit. Measured on the matrix of 2026-09-28: consoles 1-31
+    colours and <4 % lit, desktops 126-3165 colours, Windows Setup 39 colours and 100 % lit.
+    """
+    try:
+        data = path.read_bytes()
+        width, height = struct.unpack(">II", data[16:24])
+        idat, pos = b"", 8
+        while pos + 8 <= len(data):
+            (length,) = struct.unpack(">I", data[pos:pos + 4])
+            if data[pos + 4:pos + 8] == b"IDAT":
+                idat += data[pos + 8:pos + 8 + length]
+            pos += 12 + length
+        raw = zlib.decompress(idat)
+    except (OSError, struct.error, zlib.error):
+        return "graphic"
+    stride = width * 3 + 1
+    colours: set[tuple[int, int, int]] = set()
+    lit = total = 0
+    for y in range(0, height, step):
+        row = raw[y * stride + 1:(y + 1) * stride]
+        for pixel in zip(row[0::3 * step], row[1::3 * step], row[2::3 * step]):
+            total += 1
+            lit += max(pixel) > 48
+            colours.add(pixel)
+    return "graphic" if total and (lit / total > 0.15 or len(colours) > 64) else "console"
+
+
 class Recording:
     """Frames on disk plus how long each stayed on screen."""
 
@@ -128,6 +167,7 @@ class Recording:
         self._last_at: float | None = None
         self.captures = 0
         self.size = (0, 0)
+        self._kinds: dict[Path, str] = {}
 
     def add(self, ppm: bytes, at: float) -> bool:
         """Store the frame unless it repeats the previous one; either way, account for the time."""
@@ -168,30 +208,79 @@ class Recording:
         picked = sorted({round(i * last / (count - 1)) for i in range(count)})
         return [self.frames[i][0] for i in picked]
 
+    def kind(self, index: int) -> str:
+        path = self.frames[index][0]
+        if path not in self._kinds:
+            self._kinds[path] = frame_kind(path)
+        return self._kinds[path]
+
     def final_index(self, window: float = FINAL_WINDOW) -> int:
-        """The frame the GIF ends on: among the detailed screens of the last *window* seconds (PNG at
-        least half the size of the largest there: a desktop, not a spinner), the one that stayed the
-        longest, the latest on a tie: a settled desktop rather than the fade that led to it."""
+        """The frame the GIF ends on.
+
+        With graphical screens in the second half of the recording: in the last graphical stretch
+        of the final *window* seconds, the latest frame held at least half as long as the longest
+        there (a settled desktop, not the short fade that may follow it),
+        or the last graphical one when the window holds only the power-off; never a console
+        frame after the desktop. Otherwise (a server): among the detailed screens of the last
+        *window* seconds (PNG at least half the size of the largest), the longest-held."""
         if not self.frames:
             return -1
         total = sum(held for _, held in self.frames)
-        start, candidates = 0.0, []
+        start, candidates, late = 0.0, [], []
         for i, (path, held) in enumerate(self.frames):
             if start >= total - window:
                 candidates.append(i)
+            if start >= total / 2:
+                late.append(i)
             start += held
         candidates = candidates or [len(self.frames) - 1]
+        hold = lambda i: (max(self.frames[i][1], 1.0), i)  # the last frame has no hold yet
+        graphic = [i for i in candidates if self.kind(i) == "graphic"]
+        if graphic:
+            # The last graphical stretch of the window (arch-noctalia: an earlier greeter frame
+            # held longer than the desktop that followed), then its longest-held frame.
+            run = [graphic[-1]]
+            while run[0] - 1 in graphic:
+                run.insert(0, run[0] - 1)
+            longest = max(max(self.frames[i][1], 1.0) for i in run)
+            return max(i for i in run if max(self.frames[i][1], 1.0) * 2 >= longest)
+        late_graphic = [i for i in late if self.kind(i) == "graphic"]
+        if late_graphic:
+            return late_graphic[-1]
         size = {i: self.frames[i][0].stat().st_size if self.frames[i][0].is_file() else 0 for i in candidates}
         rich = [i for i in candidates if size[i] * 2 >= max(size.values())]
-        return max(rich, key=lambda i: (max(self.frames[i][1], 1.0), i))  # the last frame has no hold yet
+        return max(rich, key=hold)
+
+    def gif_frames(self, count: int) -> list[Path]:
+        """What the GIF shows, in order: up to *count* frames up to the final one, console
+        stretches squeezed into CONSOLE_FRAMES, graphical screens spread over the rest; a
+        recording without graphical frames gets SERVER_SHARE of *count*, evenly."""
+        final = self.final_index()
+        if final < 0 or count <= 0:
+            return []
+        indices = list(range(final + 1))
+        graphic = [i for i in indices if self.kind(i) == "graphic"]
+        console = [i for i in indices if self.kind(i) != "graphic"]
+
+        def spread(items: list[int], n: int) -> list[int]:
+            if n <= 0 or not items:
+                return []
+            if len(items) <= n:
+                return items
+            if n == 1:
+                return [items[-1]]
+            return sorted({items[round(k * (len(items) - 1) / (n - 1))] for k in range(n)})
+
+        if not graphic:
+            picked = spread(indices, max(2, round(count * SERVER_SHARE)))
+        else:
+            console_budget = min(len(console), CONSOLE_FRAMES, max(0, count - 1))
+            picked = spread(console, console_budget) + spread(graphic, count - console_budget)
+        picked = sorted(set(picked) | {final})
+        return [self.frames[i][0] for i in picked]
 
     def gif_list(self, seconds: float, fps: int, final_hold: float = FINAL_HOLD) -> str:
-        final = self.final_index()
-        kept, self.frames = self.frames, self.frames[:final + 1]
-        try:
-            frames = self.sample(max(2, int(seconds * fps)))
-        finally:
-            self.frames = kept
+        frames = self.gif_frames(max(2, int(seconds * fps)))
         lines = ["ffconcat version 1.0"]
         for n, path in enumerate(frames):
             lines.append(f"file '{path.name}'")

@@ -51,9 +51,28 @@ class FramesTests(BaseVmctlTestCase):
         self.assertEqual([p.name for p in rec.sample(4)], ["00000.png", "00003.png", "00006.png", "00009.png"])
         self.assertEqual(len(rec.sample(50)), 10)
         self.assertEqual(rec.sample(0), [])
-        gif = rec.gif_list(seconds=2, fps=2, final_hold=0)  # 4 frames of half a second, the last repeated
-        self.assertEqual(gif.count("duration 0.500"), 4)
+        # All dark: a server's clip, half the frames, first and last kept.
+        gif = rec.gif_list(seconds=2, fps=2, final_hold=0)
+        self.assertEqual(gif.count("duration 0.500"), 2)
         self.assertTrue(gif.rstrip().endswith("file '00009.png'"))
+
+    def test_console_stretches_are_squeezed_and_the_desktop_gets_the_clip(self):
+        rec = recorder.Recording(self.root / "rec")
+        at = 0.0
+        for i in range(40):  # a long serial install: dark frames, each a little different
+            rec.add(ppm(32, 32, (i % 20, 0, 0)) + bytes([i]), at); at += 10
+        for i in range(12):  # the desktop: lit, so graphical
+            rec.add(ppm(32, 32, (200, 120 + i, 60)), at); at += 2
+        rec.add(ppm(32, 32, (0, 0, 1)), at)  # the power-off
+        self.assertEqual(recorder.frame_kind(rec.frames[0][0]), "console")
+        self.assertEqual(recorder.frame_kind(rec.frames[45][0]), "graphic")
+        self.assertEqual(rec.final_index(), 51)  # the last desktop frame, not the power-off
+        frames = [p.name for p in rec.gif_frames(20)]
+        console = [n for n in frames if int(n[:5]) < 40]
+        self.assertEqual(len(console), recorder.CONSOLE_FRAMES)
+        self.assertEqual(len(frames) - len(console), 12)  # every desktop frame fits
+        self.assertEqual(frames[-1], "00051.png")
+        self.assertNotIn("00052.png", frames)
 
     def test_one_canvas_for_a_clip_whose_guest_changes_resolution(self):
         rec = recorder.Recording(self.root / "rec")
