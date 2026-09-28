@@ -133,9 +133,13 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
             "ubuntu-unity-24.04", "ubuntustudio-24.04", "windows-10", "windows-11",
             "windows-2000", "windows-7", "windows-xp", "xubuntu-24.04"
         }
+        # The Xubuntu history (tools/gen_ubuntu_flavors.py) on its first live run, 2026-09-28: the
+        # three server-CD eras passed; the alternate-CD and autoinstall eras were regenerated after it.
+        verified_xubuntu_history = {"xubuntu-14.04", "xubuntu-16.04", "xubuntu-18.04"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
-            expected_date = ("2026-09-26" if name in verified_matrix_0926
+            expected_date = ("2026-09-28" if name in verified_xubuntu_history
+                             else "2026-09-26" if name in verified_matrix_0926
                              else "2026-09-16" if name in verified_retry
                              else "2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
                              else "2026-09-12" if name in verified_history

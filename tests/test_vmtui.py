@@ -58,7 +58,7 @@ class VmtuiTests(unittest.TestCase):
                         "hostname": "test-ssh",
                         "user": "tester",
                         "ssh_key": "~/.ssh/id_ed25519",
-                        "ssh_host_port": 2293,
+                        "ssh_host_port": 2999,  # far above the catalog: debian-8 took 2293 (2026-09-28)
                     },
                 }
             }
@@ -132,7 +132,7 @@ class VmtuiTests(unittest.TestCase):
         self.assertTrue(row["prepared"])
         self.assertFalse(row["installed"])
         self.assertEqual(row["install_label"], "empty")
-        self.assertEqual(row["ssh_port"], "2293")
+        self.assertEqual(row["ssh_port"], "2999")
 
     def test_textual_backend_routes_nested_menus_and_forms_to_textual_widgets(self):
         self.env["VMTUI_UI"] = "textual"
@@ -489,7 +489,7 @@ run_vm_menu_action "Video Profile"
         result = self.run_bash("source bin/vmtui; vm_facts test-ssh")
         facts = dict(line.split("\t", 1) for line in result.stdout.splitlines())
         self.assertEqual(facts["has_ssh"], "1")
-        self.assertEqual(facts["ssh_port"], "2293")
+        self.assertEqual(facts["ssh_port"], "2999")
         self.assertEqual(facts["installed"], "0")
         self.assertEqual(facts["running"], "0")
         self.assertEqual(facts["video_default"], "std")
@@ -552,7 +552,7 @@ run_vm_menu_action "Video Profile"
         self.mark_installed("test-ssh")
         result = self.run_bash("source bin/vmtui; load_vm_facts test-ssh; vm_status_header")
         self.assertTrue(result.stdout.startswith("■ stopped, disk has data"))
-        self.assertIn("SSH port 2293", result.stdout)
+        self.assertIn("SSH port 2999", result.stdout)
 
     def test_dashboard_refresh_key_is_reported_not_swallowed(self):
         # A letter would collide with the filter, so the refresh lives on Ctrl-R / F5 and
@@ -985,7 +985,7 @@ run_dashboard_hotkey alt-u {vm}
         self.assertIn("test-ssh", tags)
         row = self._description_of(lines[1:], "test-ssh")
         self.assertTrue(row.startswith("■ test-ssh"), row)
-        self.assertIn(":2293", row)
+        self.assertIn(":2999", row)
         # installed VMs sort before the rest: no ○ row may precede a ■ row
         glyphs = [lines[1:][i + 1][0] for i, tag in enumerate(lines[1:]) if tag in tags and i % 2 == 0]
         self.assertGreater(glyphs.index("○") if "○" in glyphs else len(glyphs), glyphs.index("■"))

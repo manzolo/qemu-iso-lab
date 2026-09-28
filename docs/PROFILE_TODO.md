@@ -61,6 +61,7 @@ Recorded dates:
   `verify-desktop` service gate holds unchanged. Guest: Ubuntu 26.04 LTS, kernel 7.0.0-31-generic,
   `graphical.target`, `ubuntu-desktop` 1.570.3, session 1 for `lab` on seat0.
 
+- 2026-09-28: `xubuntu-14.04`, `xubuntu-16.04`, `xubuntu-18.04`, the first rows of the Xubuntu history (`tools/gen_ubuntu_flavors.py`, `ubuntu-flavors-history.json`) to pass live, promoted from `experimental`. Same run: `xubuntu-8.04/10.04/12.04` came up on a text login (tasksel on the alternate CD ignores the flavour task: now pkgsel/include) and `xubuntu-20.04/22.04/26.04` on the GDM greeter (the server ISO also lands gdm3, which wins the display-manager alternative: the install now pins the flavour's own); all six regenerated, re-run pending.
 - 2026-09-19: `pearos-nicecore` (first live run of `bootstrap-pearos`), `nixos-server` and `nixos-gnome` (first live runs of `bootstrap-nixos`; the GNOME row through `verify-desktop` on its autologin session).
 
 - 2026-09-12: `ubuntu-8.04`, `ubuntu-10.04`, `ubuntu-12.04`, `ubuntu-14.04`, `ubuntu-16.04`, `ubuntu-18.04`, `ubuntu-20.04`, `ubuntu-22.04` and `reactos`, each reinstalled from a clean disk with the final recipe (autologin session, passwordless sudo, legacy SSH verified in-guest).

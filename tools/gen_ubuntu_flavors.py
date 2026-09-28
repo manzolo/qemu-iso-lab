@@ -106,9 +106,21 @@ def profile(key: str, flavour: dict[str, Any], release: str, base_names: dict[st
     if release in AUTOINSTALL:
         install = ({"late_commands": [f"curtin in-target --target=/target -- sh -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y {package} spice-vdagent qemu-guest-agent'"]}
                    if release == "20.04" else {"packages": [package, "spice-vdagent", "qemu-guest-agent"]})
+        # The server ISO plus a flavour metapackage also lands gdm3, which wins the display-manager
+        # alternative: xubuntu-20.04/22.04/26.04 sat on the GDM greeter (2026-09-28). The install
+        # therefore pins the flavour's own display manager, and the first boot writes the autologin
+        # for it and for gdm3 alike (what the 24.04 flavours do).
+        binary = {"lightdm": "/usr/sbin/lightdm", "sddm": "/usr/bin/sddm", "gdm": "/usr/sbin/gdm3"}[dm]
+        service = "gdm3" if dm == "gdm" else dm
+        pin = (f"curtin in-target --target=/target -- sh -c 'echo {binary} > /etc/X11/default-display-manager; "
+               f"systemctl disable gdm3 gdm sddm lightdm 2>/dev/null; systemctl enable --force {service}'")
+        install["late_commands"] = install.get("late_commands", []) + [pin]
+        files = [dropin(dm, flavour)]
+        if dm != "gdm":
+            files.append(dropin("gdm", flavour))
         out["autoinstall"] = {"hostname": hostname, **install}
-        out["cloud_init"] = {"hostname": hostname, "write_files": [dropin(dm, flavour)],
-                             "runcmd": [f"systemctl enable {'gdm3' if dm == 'gdm' else dm}.service",
+        out["cloud_init"] = {"hostname": hostname, "write_files": files,
+                             "runcmd": [f"systemctl enable --force {service}.service",
                                         "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
                                         "systemctl enable --now serial-getty@ttyS0.service"]}
         out["ssh_provision"] = {"hostname": hostname, "ssh_host_port": port, "post_install_run": [
