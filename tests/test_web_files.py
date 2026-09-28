@@ -2,6 +2,7 @@
 import io
 import shutil
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -59,6 +60,61 @@ class SFTPTests(unittest.TestCase):
         self.assertFalse((self.root / 'pwned').exists())
         self.assertEqual((self.root / second['name']).read_bytes(), b'new')
         self.assertFalse(list(self.root.glob('.vmctl-upload-*')))
+
+    def test_multiple_uploads_share_one_local_sftp_session_and_keep_existing_files(self):
+        sessions = web_files.UploadSessions()
+        self.addCleanup(sessions.close_all)
+        with mock.patch.object(web_files, 'SFTP', return_value=self.client) as start:
+            token = sessions.create('vm', {})
+        previous_expiry = sessions.sessions[token][3]
+        with self.assertRaisesRegex(VMError, 'another VM'):
+            with sessions.use('other', token):
+                pass
+        for content in (b'first', b'second', b'third'):
+            with sessions.use('vm', token) as client:
+                self.assertIs(client, self.client)
+                client.upload('.', 'same.txt', io.BytesIO(content), len(content))
+        start.assert_called_once()
+        previous_expiry.function()  # a late cancelled callback must not expire the renewed session
+        self.assertIsNone(self.client.process.poll())
+        sessions.close('vm', token)
+        self.assertEqual((self.root / 'same.txt').read_bytes(), b'first')
+        self.assertEqual((self.root / 'same (2).txt').read_bytes(), b'second')
+        self.assertEqual((self.root / 'same (3).txt').read_bytes(), b'third')
+        self.assertFalse(list(self.root.glob('.vmctl-upload-*')))
+        self.assertIsNotNone(self.client.process.poll())
+
+    def test_session_failure_cleans_partial_and_closes_connection(self):
+        sessions = web_files.UploadSessions()
+        with mock.patch.object(web_files, 'SFTP', return_value=self.client):
+            token = sessions.create('vm', {})
+        with self.assertRaisesRegex(VMError, 'interrupted'):
+            with sessions.use('vm', token) as client:
+                client.upload('.', 'partial', io.BytesIO(b'x'), 20)
+        self.assertEqual(list(self.root.iterdir()), [])
+        self.assertFalse(sessions.sessions)
+        self.assertIsNotNone(self.client.process.poll())
+
+    def test_session_limits_busy_guard_idle_expiry_and_file_size(self):
+        sessions = web_files.UploadSessions(idle_timeout=.15, max_sessions=1)
+        self.addCleanup(sessions.close_all)
+        with mock.patch.object(web_files, 'SFTP', return_value=self.client):
+            token = sessions.create('vm', {})
+            with self.assertRaisesRegex(VMError, 'Too many'):
+                sessions.create('vm', {})
+        with sessions.use('vm', token) as client:
+            with self.assertRaisesRegex(VMError, 'Another file'):
+                with sessions.use('vm', token):
+                    pass
+            with self.assertRaisesRegex(VMError, '256 MiB'):
+                client.upload('.', 'large', io.BytesIO(), web_files.MAX_FILE_SIZE + 1)
+            time.sleep(.2)  # a busy session does not expire in the middle of a transfer
+            self.assertIsNone(client.process.poll())
+        deadline = time.monotonic() + 3
+        while self.client.process.poll() is None and time.monotonic() < deadline:
+            time.sleep(.02)
+        self.assertIsNotNone(self.client.process.poll())
+        self.assertFalse(sessions.sessions)
 
     def test_empty_file_and_nested_directory_navigation(self):
         (self.root / 'folder with spaces').mkdir()

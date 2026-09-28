@@ -16,6 +16,7 @@ let jobStatus = 'completed', jobCommand = 'vmctl start arch-noctalia --headless 
 let jobId = 'web:fixture', holdRun = false, releaseRun;
 let hideJobs = false, recording = null, recordingExports = [], failExport = false;
 let clipboardChannel = true, consoleRunning = true, failFiles = false;
+let connectionChecks = 0, guestCommands = [], uploadSessions = 0, uploadSessionIds = [];
 const guestFiles = new Map([['hello.txt',Buffer.from('hello from guest')],['.hidden',Buffer.from('hidden')]]);
 let screenDelay = 700;
 let screenRequests = 0, failScreen = false, holdState = false, stateWaiters = [], dynamicVmJobs = false;
@@ -40,12 +41,26 @@ const server = createServer(async (req,res) => {
   if (req.url.includes('/files-upload?')) {
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
     const query=new URL(req.url,'http://fixture').searchParams;
+    assert(query.get('session')); uploadSessionIds.push(query.get('session'));
     let name=query.get('name');if(guestFiles.has(name))name='copy-'+name;
     guestFiles.set(name,Buffer.concat(chunks));await new Promise(resolve=>setTimeout(resolve,75));
     return res.end(JSON.stringify({name,path:query.get('path')+'/'+name,size:guestFiles.get(name).length}));
   }
   if(req.url.includes('/file?')) {const name=new URL(req.url,'http://fixture').searchParams.get('path').split('/').at(-1);res.setHeader('Content-Type','application/octet-stream');return res.end(guestFiles.get(name));}
   if (req.url.endsWith('/console-info')) return res.end(JSON.stringify({running:consoleRunning,clipboard_channel:clipboardChannel,clipboard_enabled:true}));
+  if (req.url.endsWith('/files-session')) return res.end(JSON.stringify({session:'upload-'+(++uploadSessions)}));
+  if (req.url.endsWith('/files-session-close')) return res.end(JSON.stringify({closed:true}));
+  if (req.url.endsWith('/connections')) {
+    connectionChecks++;
+    return res.end(JSON.stringify({time:Date.now()/1000,checks:{console:{status:'available',detail:'VM process running'},ssh:{status:'denied',detail:'SSH key rejected'},agent:{status:'available',detail:'Guest agent answers ping'},clipboard:{status:'unknown',detail:'Channel configured; clipboard not verified'},sftp:{status:'unavailable',detail:'Requires SSH access'}}}));
+  }
+  if (req.url.endsWith('/history')) return res.end(JSON.stringify([{id:'history:arch-noctalia:fixture',command:'Guest command · echo hello',status:'failed (7)'}]));
+  if (req.url.endsWith('/diagnostics')) {res.setHeader('Content-Type','text/plain');res.setHeader('Content-Disposition','attachment; filename="diagnostics-fixture.txt"');return res.end('Serial log fixture: installer error');}
+  if (req.url.endsWith('/guest-command')) {
+    let body='';for await(const chunk of req)body+=chunk;
+    guestCommands.push(JSON.parse(body));assert.equal(guestCommands.at(-1).confirmed,true);
+    return res.end(JSON.stringify({job:'vm:arch-noctalia',command:guestCommands.at(-1).command}));
+  }
   if (req.url.endsWith('/ssh-terminal')) { sshLaunches++; return res.end(JSON.stringify({terminal:'fixture'})); }
   if (req.url.endsWith('/override')) {
     if (req.method === 'POST') { let body=''; for await (const chunk of req) body+=chunk; const data=JSON.parse(body); assert.equal(data.revision,String(overrideRevision)); savedOverride=data.override; overrideRevision++; }
@@ -563,6 +578,29 @@ try {
   await page.evaluate(()=>window.oldConsoleClient.dispatchEvent(new CustomEvent('clipboard',{detail:{text:'stale clipboard'}})));
   assert.equal(await page.locator('#console-clipboard-send').inputValue(),'');
   check('missing clipboard channel, automatic recovery, stopped VM explanation, retry opt-out and cleanup on close');
+  assert.equal(connectionChecks,0); // dashboard refresh and console reconnect never probe guest integration
+  await page.evaluate(()=>window.keyEvents=[]);
+  await page.locator('#vnc-integration').click();
+  await page.waitForFunction(()=>document.getElementById('integration-connections').textContent.includes('SSH key rejected'));
+  assert.equal(connectionChecks,1);
+  assert.deepEqual(await page.evaluate(()=>window.keyEvents),[]);
+  await page.locator('#integration-refresh').click();await page.waitForFunction(()=>document.getElementById('integration-connections').textContent.includes('SSH key rejected'));
+  await page.setViewportSize({width:925,height:909});
+  const toolbarGroups=await page.locator('#console-shell > header .console-action-group').evaluateAll(groups=>groups.map(el=>el.getBoundingClientRect().top));
+  assert.equal(toolbarGroups[0],toolbarGroups[1]); // recorder never wraps onto a third header row
+  await shot('console-integration');await page.setViewportSize({width:1440,height:1000});
+  const diagnosticDownload=page.waitForEvent('download');await page.locator('#integration-diagnostics').click();
+  const diagnostic=await diagnosticDownload;assert.equal(diagnostic.suggestedFilename(),'diagnostics-fixture.txt');
+  assert.match(readFileSync(await diagnostic.path()).toString(),/installer error/);
+  await page.locator('#integration-command').fill('echo hello\nexit 7');
+  await page.locator('#integration-command').press('Enter');assert.equal(guestCommands.length,0);
+  await page.locator('#integration-run').click();await page.locator('#confirm-no').click();assert.equal(guestCommands.length,0);
+  await page.locator('#integration-run').click();await page.locator('#confirm-yes').click();
+  await page.locator('#log-dialog').waitFor();assert.equal(guestCommands.length,1);assert.equal(guestCommands[0].command,'echo hello\nexit 7\n');
+  await page.locator('#log-dialog [data-close]').click();
+  await page.locator('#integration-history button').first().click();await page.locator('#log-dialog').waitFor();await page.locator('#log-dialog [data-close]').click();
+  assert.deepEqual(await page.evaluate(()=>window.keyEvents),[]);
+  check('integration probes only on demand, downloads diagnostics, confirms commands, opens history and sends no guest keys');
   await page.locator('#vnc-files').click(); await page.waitForFunction(()=>document.getElementById('console-files-path').textContent==='/home/lab');
   assert.equal(await page.locator('.file-entry').count(),2);
   await page.locator('#console-files-hidden').check();assert.equal(await page.locator('.file-entry').count(),3);
@@ -572,6 +610,10 @@ try {
   await page.locator('#console-files-input').setInputFiles([{name:'uploaded.bin',mimeType:'application/octet-stream',buffer:Buffer.from([0,255,17])}]);
   await page.waitForFunction(()=>document.getElementById('console-files-status').textContent.includes('Saved in VM: uploaded.bin'));
   assert.deepEqual(guestFiles.get('uploaded.bin'),Buffer.from([0,255,17]));
+  const beforeBatch=uploadSessions;
+  await page.locator('#console-files-input').setInputFiles([{name:'batch-a.txt',mimeType:'text/plain',buffer:Buffer.from('a')},{name:'batch-b.txt',mimeType:'text/plain',buffer:Buffer.from('b')}]);
+  await page.waitForFunction(()=>document.getElementById('console-files-status').textContent.includes('Saved in VM: batch-a.txt, batch-b.txt'));
+  assert.equal(uploadSessions,beforeBatch+1);assert.equal(uploadSessionIds.at(-1),uploadSessionIds.at(-2));
   await page.locator('#console-files-drop').evaluate(el=>{const transfer=new DataTransfer();transfer.items.add(new File(['drop bytes'],'dropped.txt',{type:'text/plain'}));el.dispatchEvent(new DragEvent('drop',{dataTransfer:transfer,bubbles:true,cancelable:true}));});
   await page.waitForFunction(()=>document.getElementById('console-files-status').textContent.includes('Saved in VM: dropped.txt'));
   assert.equal(guestFiles.get('dropped.txt').toString(),'drop bytes');
@@ -616,6 +658,16 @@ try {
   await page.reload(); await page.locator('#recording-stop').waitFor();
   await page.locator('#recording-stop').click();
   await page.locator('#record-dialog').waitFor();
+  await page.locator('#record-dialog [data-close]').click();
+  await page.locator('#recording-dismiss').click();
+  assert(!(await page.locator('#recording-controls').isVisible()));
+  assert.equal(recordingExports.length,0);
+  await page.reload();await page.locator('#rows [data-vm]').first().waitFor();
+  assert(!(await page.locator('#recording-controls').isVisible()));
+  await page.evaluate(()=>openConsole('arch-noctalia'));
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  assert.equal(await page.locator('#vnc-record').textContent(),'Saved recording');
+  await page.locator('#vnc-record').click();await page.locator('#record-dialog').waitFor();
   failExport=true; await page.locator('#record-download').click();
   await page.waitForFunction(()=>document.getElementById('toast').textContent.includes('frames preserved'));
   failExport=false;
@@ -626,8 +678,9 @@ try {
   }
   assert.deepEqual(recordingExports,['gif','mp4']);
   await page.locator('#record-new').click();
+  await page.locator('#vnc-close').click();
   assert(!(await page.locator('#recording-controls').isVisible()));
-  check('fullscreen uses the whole viewport; recording survives console close and reload and offers GIF/MP4 with retry');
+  check('fullscreen fills viewport; recording survives reload, notice can be dismissed without downloading, saved recording stays accessible');
   failState=true; await page.evaluate(()=>refresh()); assert.equal(await page.locator('#connection').textContent(),'Disconnected · retrying');
   failState=false; await page.evaluate(()=>refresh()); assert.equal(await page.locator('#connection').textContent(),'Live'); check('connection recovery');
   const initialY=(await page.locator('#profiles-view').boundingBox()).y;

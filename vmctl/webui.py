@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import catalog, config, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording
+from vmctl import catalog, config, integration, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
@@ -171,9 +171,44 @@ def job_directory(job_id: str) -> Path:
     kind, _, name = job_id.partition(":")
     if kind == "vm":
         return tui_jobs.job_dir(state.ROOT, name)
+    if kind == "history":
+        vm, _, entry = name.partition(":")
+        if entry and entry not in (".", "..") and Path(entry).name == entry:
+            return tui_jobs.job_dir(state.ROOT, vm) / "history" / entry
     if kind == "web" and name and Path(name).name == name:
         return web_jobs_dir() / name
     raise VMError(f"Unknown job: {job_id}")
+
+
+def vm_history(name: str) -> list[dict[str, Any]]:
+    config.get_vm(config.load_config(), name)
+    directory = tui_jobs.job_dir(state.ROOT, name)
+    entries = [(f"vm:{name}", directory)]
+    archived = directory / "history"
+    if archived.is_dir():
+        entries += [(f"history:{name}:{path.name}", path) for path in sorted(archived.iterdir(), reverse=True)[:99] if path.is_dir()]
+    return [{"id": job_id, "command": display_job_command(tui_jobs.command(path)),
+             "status": tui_jobs.status(path), "updated": (path / "output.log").stat().st_mtime}
+            for job_id, path in entries if (path / "output.log").is_file()]
+
+
+def is_guest_command(argv: list[str]) -> bool:
+    return len(argv) == 6 and argv[1:3] == ["guest-command-helper", "--vm"] and argv[4].startswith("--script=")
+
+
+def display_job_command(argv: list[str]) -> str:
+    if is_guest_command(argv):
+        return f"Guest command · {argv[3]}: {argv[4][len('--script='):]}"
+    return shlex.join(argv).replace(str(state.ROOT / "bin" / "vmctl"), "vmctl")
+
+
+def prepare_guest_command(name: str, command: Any, confirmed: Any) -> list[str]:
+    config.get_vm(config.load_config(), name)
+    if confirmed is not True:
+        raise VMError("Confirm the guest command explicitly before running it")
+    if not isinstance(command, str) or not command.strip() or "\0" in command or len(command.encode()) > 16384:
+        raise VMError("Guest command must contain 1–16384 bytes, without NUL characters")
+    return [str(state.ROOT / "bin" / "vmctl"), "guest-command-helper", "--vm", name, "--script=" + command, "--yes"]
 
 
 def list_jobs(limit: int = 40) -> list[dict[str, Any]]:
@@ -192,6 +227,9 @@ def list_jobs(limit: int = 40) -> list[dict[str, Any]]:
         with log.open(errors="replace") as fh:
             first = fh.readline().strip()
         command = first[2:] if first.startswith("$ ") else first
+        argv = tui_jobs.command(directory)
+        if argv:
+            command = display_job_command(argv)
         jobs.append({"id": job_id, "status": tui_jobs.status(directory) or "unknown",
                      "command": command.replace(str(state.ROOT / "bin" / "vmctl"), "vmctl"),
                      "updated": log.stat().st_mtime})
@@ -219,6 +257,8 @@ def cancel_job(job_id: str, force_stop: bool = False) -> bool:
         vmctl = str(state.ROOT / "bin" / "vmctl")
 
         def stop_vm() -> None:
+            if not force_stop and is_guest_command(tui_jobs.command(tui_jobs.job_dir(state.ROOT, name))):
+                return  # cancelling an SSH command does not power off its guest
             result = subprocess.run([vmctl, "stop", name, "--force"], stdin=subprocess.DEVNULL,
                                     capture_output=True, text=True, check=False)
             if result.returncode:
@@ -314,8 +354,12 @@ def console_info(vm_name: str) -> dict[str, Any]:
     channel = None
     if running:
         try:
-            with qemu.QMP_LOCK:  # QMP serves one client: never race the recorder or the report
+            if not qemu.QMP_LOCK.acquire(timeout=2.0):
+                raise VMError("QMP is busy")
+            try:  # QMP serves one client: never race the recorder or the report
                 devices = qemu.qmp_execute(qemu.qmp_socket_path(vm), "query-chardev", timeout=2.0)
+            finally:
+                qemu.QMP_LOCK.release()
             channel = any(device.get("label") == "vdagent0" for device in devices)
         except VMError:
             pass  # An unavailable monitor cannot prove that the channel is absent.
@@ -459,7 +503,7 @@ class Snapshot:
                 rows = bridge.snapshot()
                 for row in rows:
                     argv = tui_jobs.command(tui_jobs.job_dir(state.ROOT, row["name"]))
-                    row["job_command"] = argv[1] if len(argv) > 1 and Path(argv[0]).name == "vmctl" else ""
+                    row["job_command"] = "guest-command" if is_guest_command(argv) else argv[1] if len(argv) > 1 and Path(argv[0]).name == "vmctl" else ""
                 self.value = {"vms": rows, "labs": bridge.labs(), "time": time.time()}
                 self.taken = time.monotonic()
             return self.value
@@ -474,6 +518,8 @@ class Handler(BaseHTTPRequestHandler):
     port = DEFAULT_PORT
     snapshot = Snapshot()
     recordings = web_recording.Recordings()
+    connections = integration.ConnectionCache()
+    uploads = web_files.UploadSessions()
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - BaseHTTPRequestHandler API
         return
@@ -546,6 +592,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._vnc(path.split("/")[3])
             elif path.startswith("/api/vm/") and path.endswith("/console-info"):
                 self._json(console_info(path[len("/api/vm/"):-len("/console-info")]))
+            elif path.startswith("/api/vm/") and path.endswith("/connections"):
+                self._json(self.connections.get(path[len("/api/vm/"):-len("/connections")], console_info))
+            elif path.startswith("/api/vm/") and path.endswith("/history"):
+                self._json(vm_history(path[len("/api/vm/"):-len("/history")]))
             elif path.startswith("/api/vm/") and path.endswith("/files"):
                 vm = config.get_vm(config.load_config(), path[len("/api/vm/"):-len("/files")])
                 with web_files.SFTP(vm, timeout=30) as client:
@@ -643,12 +693,17 @@ class Handler(BaseHTTPRequestHandler):
         path = web_files.validate_path((query.get("path") or ["."])[0])
         filename = web_files.validate_name((query.get("name") or [""])[0])
         vm = config.get_vm(config.load_config(), name)
-        with tempfile.TemporaryFile() as source:
+        token = (query.get("session") or [""])[0]
+        session = self.uploads.use(name, token) if token else web_files.SFTP(vm)
+        with session as client, tempfile.TemporaryFile() as source:
             remaining = length
             previous_timeout = self.connection.gettimeout()
             self.connection.settimeout(30)
+            deadline = time.monotonic() + 180
             try:
                 while remaining:
+                    if time.monotonic() >= deadline:
+                        raise VMError("Upload timed out")
                     chunk = self.rfile.read(min(65536, remaining))
                     if not chunk:
                         raise VMError("Upload interrupted")
@@ -657,8 +712,8 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 self.connection.settimeout(previous_timeout)
             source.seek(0)
-            with web_files.SFTP(vm) as client:
-                self._json(client.upload(path, filename, source, length))
+            client.deadline = time.monotonic() + 180
+            self._json(client.upload(path, filename, source, length))
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         if not self._allowed():
@@ -677,7 +732,32 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
             if not isinstance(body, dict):
                 raise VMError("Request body must be a JSON object")
-            if path == "/api/recordings":
+            if path.startswith("/api/vm/") and path.endswith("/diagnostics"):
+                if body:
+                    raise VMError("Diagnostics accepts no commands or options")
+                name = path[len("/api/vm/"):-len("/diagnostics")]
+                target = integration.diagnostics(name)
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{target.name}"')
+                self.send_header("Content-Length", str(target.stat().st_size))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                self.wfile.write(target.read_bytes())
+            elif path.startswith("/api/vm/") and path.endswith("/guest-command"):
+                name = path[len("/api/vm/"):-len("/guest-command")]
+                command = prepare_guest_command(name, body.get("command"), body.get("confirmed"))
+                self._json({"job": start_job(command, name), "command": body["command"]})
+            elif path.startswith("/api/vm/") and path.endswith("/files-session"):
+                name = path[len("/api/vm/"):-len("/files-session")]
+                profile = config.get_vm(config.load_config(), name)
+                self._json({"session": self.uploads.create(name, profile)})
+            elif path.startswith("/api/vm/") and path.endswith("/files-session-close"):
+                name = path[len("/api/vm/"):-len("/files-session-close")]
+                self.uploads.close(name, str(body.get("session", "")))
+                self._json({"closed": True})
+            elif path == "/api/recordings":
                 name = str(body.get("vm", ""))
                 profile = config.get_vm(config.load_config(), name)
                 self._json(self.recordings.start(name, qemu.qmp_socket_path(profile),
@@ -738,9 +818,16 @@ def _version() -> str:
 
 
 def make_server(port: int, token: str) -> ThreadingHTTPServer:
+    uploads = web_files.UploadSessions()
+    class WebServer(ThreadingHTTPServer):
+        def server_close(self) -> None:
+            uploads.close_all()
+            super().server_close()
+
     handler: type[Handler] = type("BoundHandler", (Handler,), {"token": token, "port": port, "snapshot": Snapshot(),
-                                                              "recordings": web_recording.Recordings()})
-    server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+                                                              "recordings": web_recording.Recordings(),
+                                                              "connections": integration.ConnectionCache(), "uploads": uploads})
+    server = WebServer(("127.0.0.1", port), handler)
     server.daemon_threads = True
     handler.port = server.server_address[1]  # --port 0: the Host check needs the port actually bound
     return server

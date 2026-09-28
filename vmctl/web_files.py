@@ -14,6 +14,7 @@ import stat
 import struct
 import subprocess
 import tempfile
+import threading
 import time
 from collections.abc import Iterator
 from types import TracebackType
@@ -26,6 +27,82 @@ MAX_FILE_SIZE = 256 * 1024 * 1024
 MAX_ENTRIES = 2000
 CHUNK_SIZE = 32768
 MAX_PACKET = 1024 * 1024
+
+
+class UploadSessions:
+    """Bounded, VM-scoped SFTP sessions for sequential uploads; idle sessions expire."""
+
+    def __init__(self, idle_timeout: float = 60, max_sessions: int = 8):
+        self.idle_timeout = idle_timeout
+        self.max_sessions = max_sessions
+        self.lock = threading.Lock()
+        self.sessions: dict[str, tuple[str, SFTP, threading.Lock, threading.Timer]] = {}
+
+    def _expiry_timer(self, name: str, token: str) -> threading.Timer:
+        timer = threading.Timer(self.idle_timeout, lambda: self.close(name, token, timer))
+        timer.daemon = True
+        return timer
+
+    def create(self, name: str, vm: dict[str, Any]) -> str:
+        with self.lock:
+            if len(self.sessions) >= self.max_sessions:
+                raise VMError("Too many upload sessions. Wait for existing transfers to finish.")
+            client = SFTP(vm, timeout=10).__enter__()
+            token = secrets.token_hex(24)
+            timer = self._expiry_timer(name, token)
+            self.sessions[token] = (name, client, threading.Lock(), timer)
+            timer.start()
+            return token
+
+    @contextlib.contextmanager
+    def use(self, name: str, token: str) -> Iterator[SFTP]:
+        with self.lock:
+            entry = self.sessions.get(token)
+            if entry is None or entry[0] != name:
+                raise VMError("Upload session expired or belongs to another VM. Start the upload again.")
+            _, client, busy, timer = entry
+            if not busy.acquire(blocking=False):
+                raise VMError("Another file is being uploaded in this session")
+            timer.cancel()
+        try:
+            client.deadline = time.monotonic() + 180
+            yield client
+        except BaseException:
+            # Remove a failed session before another request can borrow it.
+            with self.lock:
+                self.sessions.pop(token, None)
+                busy.release()
+            client.__exit__(None, None, None)
+            raise
+        else:
+            with self.lock:
+                timer = self._expiry_timer(name, token)
+                self.sessions[token] = (name, client, busy, timer)
+                busy.release()
+                timer.start()
+
+    def close(self, name: str, token: str, expected_timer: threading.Timer | None = None) -> None:
+        with self.lock:
+            entry = self.sessions.get(token)
+            if entry is None or entry[0] != name:
+                return
+            _, client, busy, timer = entry
+            if expected_timer is not None and expected_timer is not timer:
+                return  # a cancelled timer may already be waiting for this lock
+            if not busy.acquire(blocking=False):
+                return  # the borrower will rearm expiry after the bounded transfer
+            del self.sessions[token]
+            timer.cancel()
+        try:
+            client.__exit__(None, None, None)
+        finally:
+            busy.release()
+
+    def close_all(self) -> None:
+        with self.lock:
+            entries = [(value[0], token) for token, value in self.sessions.items()]
+        for name, token in entries:
+            self.close(name, token)
 
 
 class FileEntry(TypedDict):
@@ -103,7 +180,7 @@ class SFTPError(VMError):
 
 class SFTP:
     def __init__(self, vm: dict[str, Any], timeout: float = 180):
-        base = ssh.ssh_base_cmd(vm)
+        base = ssh.ssh_base_cmd(vm, read_only=True)
         self.command = base[:-1] + ["-o", "ConnectTimeout=8", "-o", "ServerAliveInterval=15",
                                    "-o", "ServerAliveCountMax=2", "-s", base[-1], "sftp"]
         self.timeout = timeout

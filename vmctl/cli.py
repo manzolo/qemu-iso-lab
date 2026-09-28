@@ -613,6 +613,7 @@ complete -F _vmctl vmctl""")
 
 
 INTERNAL_MODES = {
+    "guest-command-helper",
     "flash-helper",
     "import-helper",
     "list-empty-devices",
@@ -621,6 +622,17 @@ INTERNAL_MODES = {
 
 
 def dispatch_internal(mode: str, argv: list[str]) -> int:
+    if mode == "guest-command-helper":
+        from vmctl import integration
+
+        p = argparse.ArgumentParser(prog=f"vmctl {mode}")
+        p.add_argument("--vm", required=True)
+        p.add_argument("--script", required=True)
+        p.add_argument("--yes", action="store_true")
+        args = p.parse_args(argv)
+        if not args.yes:
+            raise VMError("Guest commands require explicit confirmation")
+        return integration.run_guest(args.vm, args.script)
     if mode in {"list-empty-devices", "list-target-devices"}:
         p = argparse.ArgumentParser(prog=f"vmctl {mode}")
         p.add_argument("--json", action="store_true", help="include disk identity and partition details")

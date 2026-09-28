@@ -325,6 +325,9 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 #console-shell:fullscreen.controls-visible #console-tools { display:none; }
 #recording-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 24px 16px; padding:10px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
 #recording-controls.hidden { display:none; }
+#recording-status { flex:1; font-size:12px; }
+#recording-dismiss { margin-left:auto; padding:5px 9px; background:transparent; color:var(--muted); border:1px solid transparent; font-size:19px; line-height:1; }
+#recording-dismiss:hover { color:var(--text); border-color:var(--line); }
 #recording-status { color:var(--warn); }
 #record-downloads { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 #console-workspace { display:flex; flex:1; min-height:0; position:relative; }
@@ -354,17 +357,17 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .console-empty { display:grid; place-items:center; height:100%; color:var(--muted); font-size:14px; }
 @media(max-width:720px) { #vnc-dialog header { gap:12px; } .console-toolbar { width:100%; } .console-toolbar button { flex:1; padding:7px; } .console-heading .machine-icon { width:30px; height:30px; border-radius:8px; } .console-footer { padding:10px; } #vnc-note { font-size:11px; } }
 /* Console controls keep a stable hierarchy at laptop and desktop widths. */
-#console-shell > header { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:16px; padding:16px 20px; background:linear-gradient(125deg,#182637,#121d2d 65%); }
+#console-shell > header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; padding:16px 20px; background:radial-gradient(ellipse at top left,#23444a55,transparent 55%),linear-gradient(125deg,#182637,#121d2d 65%); }
 #console-shell .console-heading { min-width:0; flex-shrink:0; }
 #console-shell .console-heading h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:230px; font-size:15px; letter-spacing:-.02em; }
 #console-shell .console-heading .eyebrow { display:flex; align-items:center; gap:7px; white-space:nowrap; font-size:10px; letter-spacing:.15em; }
 #console-shell .console-heading .eyebrow::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--muted); }
 #console-shell[data-connected="true"] .console-heading .eyebrow::before { background:var(--accent); box-shadow:0 0 9px #7ddfc566; }
 #console-shell .console-heading .machine-icon { box-shadow:0 4px 14px #0003; }
-#console-shell > header .console-toolbar { justify-content:center; gap:10px; }
-.console-action-group { display:flex; gap:5px; align-items:center; }
-.console-capture { border-left:1px solid #34455a; padding-left:10px; }
-.console-window-actions { display:flex; align-items:center; gap:6px; }
+#console-shell > header .console-toolbar { grid-row:2; grid-column:1/-1; justify-content:space-between; flex-wrap:nowrap; gap:12px; }
+.console-action-group { display:flex; gap:4px; align-items:center; padding:4px; border:1px solid #304257; border-radius:12px; background:#0b142344; }
+.console-capture { flex-shrink:0; }
+.console-window-actions { grid-row:1; grid-column:2; display:flex; align-items:center; gap:6px; }
 #console-shell button,#console-shell select { transition:background .15s,border-color .15s,color .15s,box-shadow .15s; }
 #console-shell > header button,#console-shell > header select { min-height:36px; padding:8px 10px; border:1px solid #34465d; border-radius:8px; background:#203047; color:#c5d3e4; font-size:12px; white-space:nowrap; }
 #console-shell button .console-button-icon { display:inline-flex; flex:0 0 15px; width:15px; height:15px; color:#92aecb; }
@@ -374,6 +377,7 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 #console-shell > header button[aria-expanded="true"],#console-shell > header button.active { background:#183b3c; border-color:#397d75; color:#9bf0da; box-shadow:inset 0 1px 0 #a0f5de0c; }
 #console-shell > header button[aria-expanded="true"] .console-button-icon,#console-shell > header button.active .console-button-icon { color:#80e7cd; }
 #console-shell > header #vnc-screenshot .console-button-icon { color:#a0baff; }
+#console-shell > header #vnc-integration .console-button-icon { color:#91c9f5; }
 #console-shell > header #vnc-record .console-button-icon { color:#f0989e; }
 #console-shell > header #vnc-record.recording { background:#442737; border-color:#985162; color:#ffbdc2; }
 #console-shell > header #vnc-record-fps { background:#101b2a; color:#99aec4; font-size:11px; }
@@ -408,6 +412,13 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
   #console-shell > header > .console-toolbar { grid-row:2; grid-column:1/-1; justify-content:flex-start; }
   #console-shell > header > .console-window-actions { grid-row:1; grid-column:2; }
 }
+@media(max-width:1100px) {
+  #console-shell > header #vnc-fit .console-button-label,
+  #console-shell > header #vnc-keyboard .console-button-label,
+  #console-shell > header #vnc-clipboard .console-button-label,
+  #console-shell > header #vnc-screenshot .console-button-label { display:none; }
+  #console-shell > header #vnc-record-fps { max-width:104px; }
+}
 @media(max-width:720px) {
   #console-shell > header { gap:10px; padding:10px 12px; }
   #console-shell > header > .console-toolbar { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; padding-bottom:4px; width:100%; }
@@ -431,6 +442,18 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 #console-panel .clipboard-actions button { padding:10px 8px; font-size:11px; gap:5px; }
 #console-panel #console-clipboard-latest { margin-bottom:10px; width:100%; }
 #console-panel #console-clipboard-latest[hidden] { display:none; }
+#console-panel:has(#console-integration-panel:not([hidden])) { width:360px; }
+.integration-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:4px 0 10px; }
+.integration-heading h3 { margin:0; color:#d7e6f5; font-size:12px; }
+#integration-connections > div { margin:8px 0; padding:12px; border:1px solid #30465c; border-radius:10px; background:#0c182780; }
+#integration-connections .connection-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; }
+#integration-connections .connection-state { display:inline-flex; align-items:center; gap:5px; font-size:10px; border-radius:20px; padding:3px 7px; background:#ffffff09; }
+#integration-connections .connection-state::before { content:""; width:5px; height:5px; border-radius:50%; background:currentColor; }
+#integration-connections p { margin:6px 0 0; font-size:11px; }
+.integration-section { border-top:1px solid #304257; padding-top:16px; margin-top:18px; }
+#console-panel #integration-diagnostics,#console-panel #integration-run { width:100%; padding:10px; background:#1b3b42; border-color:#397a78; color:#b3f4e4; }
+#integration-command { width:100%; resize:vertical; }
+#integration-history button { width:100%; margin-top:6px; padding:10px; text-align:left; overflow-wrap:anywhere; white-space:normal; }
 .file-navigation { display:flex; gap:5px; }
 #console-panel .file-navigation button { flex:1; padding:6px; font-size:10px; gap:4px; }
 #console-files-path { padding:10px 0; margin:0; overflow-wrap:anywhere; font-size:11px; color:#a9c5db; }
@@ -621,7 +644,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   <button id="all-commands">Commands <kbd>F10</kbd></button>
 </div>
 <div id="activity-panel" popover="auto" role="region" aria-label="Latest activity details"><div class="activity-copy"><div class="eyebrow">Latest activity</div><strong id="activity-status" role="status"></strong><span id="activity-command"></span></div><div class="job-controls"><button id="activity-log">View log</button><button id="activity-cancel" class="danger hidden">Cancel job</button><button id="activity-dismiss" class="hidden" aria-label="Dismiss completed activity" title="Keep in Recent activity">Dismiss</button></div></div>
-<div id="recording-controls" class="hidden"><span id="recording-status" role="status"></span><button id="recording-stop">Stop recording</button><button id="recording-open" class="hidden">Download recording</button></div>
+<div id="recording-controls" class="hidden"><span id="recording-status" role="status"></span><button id="recording-stop">Stop recording</button><button id="recording-open" class="hidden">Download recording</button><button id="recording-dismiss" class="hidden" aria-label="Dismiss recording notice" title="Dismiss this notice; the recording stays available in the console">×</button></div>
 <main id="profiles-view">
   <nav id="lab-navigation" class="lab-navigation hidden" aria-label="Lab navigation"><button id="back-to-labs">← Labs</button><span aria-hidden="true">/</span><span id="lab-origin" class="mono"></span><span aria-hidden="true">/</span><span id="lab-current-vm" class="mono" aria-current="page"></span></nav>
   <section class="card"><h2 id="list-title">Profiles</h2>
@@ -654,9 +677,10 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
       <button id="vnc-keyboard" aria-expanded="false" aria-controls="console-panel">Keyboard</button>
       <button id="vnc-clipboard" aria-expanded="false" aria-controls="console-panel">Clipboard</button>
       <button id="vnc-files" aria-expanded="false" aria-controls="console-panel">Files</button>
+      <button id="vnc-integration" aria-expanded="false" aria-controls="console-panel">Integration</button>
       <button id="vnc-ssh" aria-expanded="false" aria-controls="console-ssh">SSH</button>
-      <button id="vnc-screenshot" disabled>Screenshot</button></div>
-      <div class="console-action-group console-capture"><select id="vnc-record-fps" aria-label="Recording frame rate" title="Capture frame rate for MP4; GIF exports at 1 fps"><option value="1">Record: 1 fps</option><option value="5">Record: 5 fps</option><option value="10" selected>Record: 10 fps</option><option value="15">Record: 15 fps</option></select>
+      </div>
+      <div class="console-action-group console-capture"><button id="vnc-screenshot" disabled>Screenshot</button><select id="vnc-record-fps" aria-label="Recording frame rate" title="Capture frame rate for MP4; GIF exports at 1 fps"><option value="1">1 fps</option><option value="5">5 fps</option><option value="10" selected>10 fps</option><option value="15">15 fps</option></select>
       <button id="vnc-record" disabled>Record</button></div>
     </div><div class="console-window-actions"><button id="vnc-detach" title="Open console in a separate window">Detach</button><button id="vnc-full" title="Toggle full screen">Full screen</button><button id="vnc-close" title="Close console">Close</button></div>
   </header>
@@ -681,6 +705,23 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
       <div class="clipboard-actions"><button id="console-clipboard-paste" disabled>Send to VM</button><button id="console-clipboard-copy" disabled>Copy to computer</button></div>
       <p class="help">After sending, paste inside the VM. Text copied in the VM appears here automatically when supported.</p>
       <p id="console-clipboard-message" class="help" role="status"></p>
+    </section>
+    <section id="console-integration-panel" hidden>
+      <div class="integration-heading"><h3>Connections</h3><button id="integration-refresh">Refresh</button></div>
+      <p class="help">Read-only checks · cached for 5 seconds</p>
+      <div id="integration-connections" role="status"></div>
+      <div class="integration-section"><div class="integration-heading"><h3>Diagnostics</h3></div>
+      <button id="integration-diagnostics">Download diagnostics</button>
+      <p class="help">System and service logs, or existing serial logs when SSH is unavailable. A text copy is saved in the VM logs.</p>
+      <p id="integration-message" class="help" role="status"></p>
+      </div><div class="integration-section"><div class="integration-heading"><h3>Guest commands</h3></div>
+      <label for="integration-command">Run a command in the guest</label>
+      <textarea id="integration-command" rows="4" spellcheck="false" placeholder="Command or script for the guest login shell"></textarea>
+      <p class="help">Runs over SSH after confirmation. Output and exit status are kept in VM history. Limit: 60 seconds / 1 MiB of output. Closing SSH may leave a guest process running.</p>
+      <button id="integration-run">Review command…</button>
+      </div><div class="integration-section"><div class="integration-heading"><h3>VM command history</h3><button id="integration-history-refresh">Refresh</button></div>
+      <div id="integration-history"></div>
+      </div>
     </section>
     <section id="console-files-panel" hidden>
       <div class="file-navigation"><button id="console-files-home" title="Home folder">Home</button><button id="console-files-up" title="Parent folder">Up</button><button id="console-files-refresh" title="Refresh folder">Refresh</button></div>
@@ -1402,7 +1443,8 @@ async function pollLog(session) {
 }
 async function cancelJob(job, forceStop = false) {
   if (cancellingJobs.has(job)) return;
-  if (!await askConfirm({ eyebrow: "Job", title: forceStop ? "Force stop this VM?" : "Cancel this job?", message: forceStop ? "Stop the operation and power off the VM now. Unsaved guest changes may be lost; the disk and logs are kept." : job.startsWith("vm:") ? "The running operation and its VM will be stopped. Existing disk and logs are kept; changes already made are not undone." : "The running operation will be interrupted. Changes already made are not undone.", command: job, button: forceStop ? "Force stop" : "Cancel the job" })) return;
+  const guest = knownJobs.find(entry => entry.id === job)?.command.startsWith("Guest command · ");
+  if (!await askConfirm({ eyebrow: "Job", title: forceStop ? "Force stop this VM?" : "Cancel this job?", message: forceStop ? "Stop the operation and power off the VM now. Unsaved guest changes may be lost; the disk and logs are kept." : guest ? "Disconnect the SSH command. The VM stays on; a guest process may continue running. Changes already made are not undone." : job.startsWith("vm:") ? "The running operation and its VM will be stopped. Existing disk and logs are kept; changes already made are not undone." : "The running operation will be interrupted. Changes already made are not undone.", command: job, button: forceStop ? "Force stop" : "Cancel the job" })) return;
   cancellingJobs.add(job); renderActivity(); render();
   if (logJob === job) $("log-cancel").disabled = true;
   $("job-rows").querySelectorAll("[data-job]").forEach(row => { if (row.dataset.job === job) { const b = row.querySelector("[data-job-cancel]"); if (b) b.disabled = true; } });
@@ -1534,28 +1576,36 @@ const consoleIconPaths = {
   close:'<path d="m6 6 12 12M6 18 18 6"/>',
   reconnect:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-2l2 3M4 16l2 3a7 7 0 0 0 12-2"/>',
   copy:'<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
-  send:'<path d="m21 3-7 18-4-7-7-4L21 3ZM10 14 21 3"/>'
+  send:'<path d="m21 3-7 18-4-7-7-4L21 3ZM10 14 21 3"/>',
+  integration:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/><path d="M14 6h3a1 1 0 0 1 1 1v3M10 18H7a1 1 0 0 1-1-1v-3M10 10l4 4"/>',
+  download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>'
 };
 function consoleButton(id, label, icon) {
   $(id).innerHTML = `<span class="console-button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${consoleIconPaths[icon]}</svg></span><span class="console-button-label">${esc(label)}</span>`;
   $(id).setAttribute("aria-label", label);
+  if (!$(id).title) $(id).title = label;
 }
 for (const [id,label,icon] of [
   ["vnc-fit","Fit to window","fit"],["vnc-keyboard","Keyboard","keyboard"],["vnc-clipboard","Clipboard","clipboard"],
   ["vnc-files","Files","files"],["vnc-detach","Detach","detach"],["vnc-ssh","SSH","terminal"],["vnc-screenshot","Screenshot","camera"],["vnc-full","Full screen","expand"],["vnc-close","Close","close"],
+  ["vnc-integration","Integration","integration"],["integration-refresh","Refresh","reconnect"],
+  ["integration-history-refresh","Refresh","reconnect"],["integration-diagnostics","Download diagnostics","download"],["integration-run","Review command…","terminal"],
   ["vnc-reconnect","Reconnect","reconnect"],["terminal-reconnect","Reconnect","reconnect"],["terminal-close","Close","close"],
   ["console-files-home","Home","home"],["console-files-up","Up","up"],["console-files-refresh","Refresh","reconnect"],
   ["console-clipboard-read","Paste","clipboard"],["console-clipboard-copy","Copy to computer","copy"],["console-clipboard-paste","Send to VM","send"]
 ]) consoleButton(id,label,icon);
 let consoleRecording = null, recordingBusy = false, recordingTimer;
+let dismissedRecording = "";
 try { consoleRecording = JSON.parse(sessionStorage.getItem("vmctl-recording") || "null"); } catch (_) {}
+try { dismissedRecording = sessionStorage.getItem("vmctl-recording-dismissed") || ""; } catch (_) {}
 function renderRecording() {
   const rec = consoleRecording, active = rec?.status === "recording";
-  consoleButton("vnc-record", active ? "Stop recording" : rec ? "Recording…" : "Record", active ? "stop" : "record");
+  consoleButton("vnc-record", active ? "Stop recording" : rec ? "Saved recording" : "Record", active ? "stop" : "record");
   $("vnc-record").classList.toggle("recording", !!active);
   $("vnc-record-fps").disabled = recordingBusy || !!rec;
   $("vnc-record").disabled = recordingBusy || (!rec && $("vnc-status").textContent !== "Connected");
-  $("recording-controls").classList.toggle("hidden", !rec);
+  $("recording-controls").classList.toggle("hidden", !rec || (!active && rec.id === dismissedRecording));
+  $("recording-dismiss").classList.toggle("hidden", !rec || active);
   $("recording-status").textContent = rec ? `${active ? "● Recording" : "Recording ready"} · ${rec.vm} · ${rec.frames || 0} frames · ${rec.fps || 10} fps` : "";
   $("recording-stop").classList.toggle("hidden", !active);
   $("recording-stop").disabled = recordingBusy;
@@ -1603,6 +1653,12 @@ async function stopConsoleRecording() {
 $("vnc-record").onclick = () => consoleRecording ? (consoleRecording.status === "recording" ? stopConsoleRecording() : showRecordingDownload()) : startConsoleRecording();
 $("recording-stop").onclick = stopConsoleRecording;
 $("recording-open").onclick = showRecordingDownload;
+$("recording-dismiss").onclick = () => {
+  if (!consoleRecording || consoleRecording.status === "recording") return;
+  dismissedRecording = consoleRecording.id;
+  try { sessionStorage.setItem("vmctl-recording-dismissed", dismissedRecording); } catch (_) {}
+  renderRecording();
+};
 $("record-new").onclick = () => { consoleRecording = null; renderRecording(); $("record-dialog").close(); };
 $("record-download").onclick = async () => {
   if (recordingBusy || !consoleRecording) return;
@@ -1687,6 +1743,7 @@ async function openConsole(vm, retry = false) {
     closeConsolePanel(false);
     $("console-clipboard-send").value = "";
     $("console-clipboard-message").textContent = "";
+    $("integration-command").value = ""; $("integration-message").textContent = "";
   }
   resetConsoleClipboard();
   consoleVm = vm;
@@ -1741,7 +1798,7 @@ async function openConsole(vm, retry = false) {
 }
 function closeConsolePanel(focus = true) {
   $("console-panel").hidden = true;
-  for (const name of ["keyboard", "clipboard", "files"]) $("vnc-" + name).setAttribute("aria-expanded", "false");
+  for (const name of ["keyboard", "clipboard", "files", "integration"]) $("vnc-" + name).setAttribute("aria-expanded", "false");
   if (focus && consoleConnected) rfb?.focus();
 }
 function toggleConsolePanel(name) {
@@ -1750,10 +1807,11 @@ function toggleConsolePanel(name) {
   if (!show) { rfb?.focus(); return; }
   rfb?.blur();
   $("console-panel").hidden = false;
-  $("console-panel-title").textContent = {keyboard:"Keyboard", clipboard:"Clipboard", files:"Files"}[name];
-  for (const panel of ["keyboard", "clipboard", "files"]) $("console-" + panel + "-panel").hidden = panel !== name;
+  $("console-panel-title").textContent = {keyboard:"Keyboard", clipboard:"Clipboard", files:"Files", integration:"VM integration"}[name];
+  for (const panel of ["keyboard", "clipboard", "files", "integration"]) $("console-" + panel + "-panel").hidden = panel !== name;
   button.setAttribute("aria-expanded", "true");
   if (name === "files" && !consoleFilesListing && !consoleFilesBusy) loadConsoleFiles(".");
+  if (name === "integration") { loadConnections(); loadGuestHistory(); }
   (name === "clipboard" ? $("console-clipboard-send") : $("console-panel-close")).focus();
 }
 function closeConsole() {
@@ -1770,6 +1828,7 @@ $("vnc-dialog").addEventListener("cancel", e => e.preventDefault());
 $("vnc-keyboard").onclick = () => toggleConsolePanel("keyboard");
 $("vnc-clipboard").onclick = () => toggleConsolePanel("clipboard");
 $("vnc-files").onclick = () => toggleConsolePanel("files");
+$("vnc-integration").onclick = () => toggleConsolePanel("integration");
 $("vnc-detach").onclick = () => {
   const url = new URL(location.href); url.search = "";
   url.searchParams.set("token", TOKEN); url.searchParams.set("detached", "1");
@@ -1853,6 +1912,60 @@ $("console-clipboard-copy").onclick = async () => {
     $("console-clipboard-message").textContent = "Copy the selected text with Ctrl+C (⌘C on Mac).";
   }
 };
+async function loadConnections() {
+  const vm = consoleVm, generation = consoleGeneration;
+  $("integration-connections").textContent = "Checking connections…";
+  try {
+    const data = await api(`/api/vm/${encodeURIComponent(vm)}/connections`);
+    if (generation !== consoleGeneration) return;
+    const labels = {console:"Console", ssh:"SSH", agent:"Guest agent", clipboard:"Clipboard", sftp:"Files (SFTP)"};
+    $("integration-connections").innerHTML = Object.entries(data.checks).map(([key, check]) => {
+      const status = key === "console" ? (consoleConnected ? "connected" : "disconnected") : check.status;
+      const color = ["available", "connected"].includes(status) ? "s-ok" : "s-warn";
+      return `<div><div class="connection-heading"><strong>${esc(labels[key] || key)}</strong><span class="connection-state ${color}">${esc(status)}</span></div><p class="help">${esc(check.detail)}</p></div>`;
+    }).join("") + `<p class="help">Checked ${esc(new Date(data.time * 1000).toLocaleTimeString())}</p>`;
+  } catch (e) { if (generation === consoleGeneration) $("integration-connections").textContent = e.message; }
+}
+async function loadGuestHistory() {
+  const vm = consoleVm, generation = consoleGeneration;
+  $("integration-history").textContent = "Loading history…";
+  try {
+    const entries = await api(`/api/vm/${encodeURIComponent(vm)}/history`);
+    if (generation !== consoleGeneration) return;
+    $("integration-history").innerHTML = entries.map((entry, index) => `<button data-history-index="${index}">${esc(entry.status)} · ${esc(entry.command)}</button>`).join("") || '<p class="help">No commands recorded yet.</p>';
+    $("integration-history").querySelectorAll('[data-history-index]').forEach(button => button.onclick = () => {
+      const entry = entries[Number(button.dataset.historyIndex)]; openLog(entry.id, vm + " · " + entry.command);
+    });
+  } catch (e) { if (generation === consoleGeneration) $("integration-history").textContent = e.message; }
+}
+$("integration-refresh").onclick = loadConnections;
+$("integration-history-refresh").onclick = loadGuestHistory;
+$("integration-diagnostics").onclick = async () => {
+  const vm = consoleVm, generation = consoleGeneration;
+  $("integration-diagnostics").disabled = true;
+  $("integration-message").textContent = "Collecting bounded diagnostics…";
+  try {
+    const response = await fetch(`/api/vm/${encodeURIComponent(vm)}/diagnostics`, {method:"POST", headers:{"X-Vmctl-Token":TOKEN}});
+    if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Diagnostics failed"); }
+    const filename = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") || "")?.[1] || "diagnostics.txt";
+    const url = URL.createObjectURL(await response.blob()), link = document.createElement("a");
+    link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (generation === consoleGeneration) $("integration-message").textContent = `Downloaded; also saved in artifacts/${vm}/logs/${filename}`;
+  } catch (e) { if (generation === consoleGeneration) $("integration-message").textContent = e.message; }
+  finally { $("integration-diagnostics").disabled = false; }
+};
+$("integration-run").onclick = async () => {
+  const vm = consoleVm, command = $("integration-command").value, generation = consoleGeneration;
+  if (!command.trim()) { $("integration-message").textContent = "Enter a guest command first."; return; }
+  $("integration-run").disabled = true;
+  try {
+    if (!await askConfirm({eyebrow:"Guest command", title:`Run in ${vm}?`, message:"This executes in the guest login shell over SSH and is recorded in the VM history.", command, button:"Run command"})) return;
+    const result = await api(`/api/vm/${encodeURIComponent(vm)}/guest-command`, {command, confirmed:true});
+    if (generation === consoleGeneration) { $("integration-message").textContent = "Command started. Open its log for output and exit status."; loadGuestHistory(); }
+    refreshJobs(); openLog(result.job, vm + " · " + command);
+  } catch (e) { if (generation === consoleGeneration) $("integration-message").textContent = e.message; }
+  finally { $("integration-run").disabled = false; }
+};
 // Files use an independent session so display reconnects never restart a transfer.
 let consoleFilesListing = null, consoleFilesBusy = false, consoleFilesGeneration = 0;
 let consoleFilesController = null, consoleFilesUpload = null;
@@ -1901,10 +2014,10 @@ async function loadConsoleFiles(path = ".", note = "") {
   } catch (e) { if (generation === consoleFilesGeneration) fileStatus(e.message, true); }
   finally { if (generation === consoleFilesGeneration) { consoleFilesBusy = false; consoleFilesController = null; renderConsoleFiles(); } }
 }
-function uploadConsoleFile(file, path, generation, position, total) {
+function uploadConsoleFile(file, path, generation, position, total, vm, session) {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest(); consoleFilesUpload = request;
-    request.open("POST", `/api/vm/${encodeURIComponent(consoleVm)}/files-upload?path=${encodeURIComponent(path)}&name=${encodeURIComponent(file.name)}`);
+    request.open("POST", `/api/vm/${encodeURIComponent(vm)}/files-upload?path=${encodeURIComponent(path)}&name=${encodeURIComponent(file.name)}&session=${encodeURIComponent(session)}`);
     request.setRequestHeader("X-Vmctl-Token", TOKEN); request.setRequestHeader("Content-Type", "application/octet-stream");
     request.timeout = 240000;
     request.upload.onprogress = e => {
@@ -1928,20 +2041,26 @@ async function uploadConsoleFiles(files) {
   if (consoleFilesBusy || !consoleFilesListing || !files.length) return;
   const limit = consoleFilesListing.max_file_size || 256 * 1024 * 1024;
   if (files.some(file => file.size > limit)) { fileStatus("Choose files no larger than 256 MiB each.", true); return; }
-  const path = consoleFilesListing.path, generation = ++consoleFilesGeneration;
+  const path = consoleFilesListing.path, generation = ++consoleFilesGeneration, vm = consoleVm;
   consoleFilesBusy = true; renderConsoleFiles();
   const saved = [];
+  let session = null;
   try {
+    session = (await api(`/api/vm/${encodeURIComponent(vm)}/files-session`, {})).session;
+    if (generation !== consoleFilesGeneration) return;
     for (const [index, file] of files.entries()) {
       fileStatus(`${index + 1}/${files.length} · Sending ${file.name}…`);
-      const result = await uploadConsoleFile(file, path, generation, index + 1, files.length);
+      const result = await uploadConsoleFile(file, path, generation, index + 1, files.length, vm, session);
       if (generation !== consoleFilesGeneration) return;
       saved.push(result.name);
     }
     consoleFilesBusy = false; consoleFilesUpload = null;
     await loadConsoleFiles(path, `Saved in VM: ${saved.join(", ")}`);
   } catch (e) { if (generation === consoleFilesGeneration) fileStatus(`${saved.length ? `${saved.length} file(s) saved. ` : ""}${e.message}`, true); }
-  finally { if (generation === consoleFilesGeneration) { consoleFilesBusy = false; consoleFilesUpload = null; renderConsoleFiles(); } }
+  finally {
+    if (session) api(`/api/vm/${encodeURIComponent(vm)}/files-session-close`, {session}).catch(() => {});
+    if (generation === consoleFilesGeneration) { consoleFilesBusy = false; consoleFilesUpload = null; renderConsoleFiles(); }
+  }
 }
 async function downloadConsoleFile(path, name, size) {
   if (consoleFilesBusy) return;

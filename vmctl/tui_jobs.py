@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import fcntl
+import json
 from contextlib import contextmanager
 import os
 from pathlib import Path
 import shlex
 import signal
+import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -33,6 +36,9 @@ def own_job(directory: Path) -> bool:
         return False
 
 
+HISTORY_KEEP = 100  # archived runs kept per VM under runtime/tui-job/history/
+
+
 def status(directory: Path) -> str:
     try:
         with (directory / "lock").open("rb") as lock:
@@ -49,6 +55,10 @@ def status(directory: Path) -> str:
 def command(directory: Path) -> list[str]:
     """Read the recorded argv, including jobs launched before the web UI existed."""
     try:
+        if (directory / "command.json").is_file():
+            argv = json.loads((directory / "command.json").read_text())
+            if isinstance(argv, list) and all(isinstance(arg, str) for arg in argv):
+                return argv
         with (directory / "output.log").open(errors="replace") as log:
             first = log.readline().strip()
         return shlex.split(first[2:]) if first.startswith("$ ") else []
@@ -81,6 +91,20 @@ def _start(root: Path, name: str, directory: Path, command: list[str]) -> Path:
         except BlockingIOError:
             raise RuntimeError(f"A job is already running for '{name}'; open its log or wait for it to finish") from None
         log_path = directory / "output.log"
+        # Preserve the previous execution before replacing the live job slot.
+        # This also keeps browser guest commands in the same history as CLI jobs.
+        if log_path.is_file():
+            archived = directory / "history" / (time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(4))
+            archived.mkdir(parents=True)
+            shutil.copyfile(log_path, archived / "output.log")
+            if (directory / "command.json").is_file():
+                shutil.copyfile(directory / "command.json", archived / "command.json")
+            previous = (directory / "status").read_text().strip() if (directory / "status").exists() else "unknown"
+            (archived / "status").write_text(("interrupted" if previous == "running" else previous) + "\n")
+            (archived / "lock").touch()
+            for stale in sorted(path for path in archived.parent.iterdir() if path.is_dir())[:-HISTORY_KEEP]:
+                shutil.rmtree(stale, ignore_errors=True)
+        (directory / "command.json").write_text(json.dumps(command))
         with log_path.open("w") as log:
             log.write(f"$ {shlex.join(command)}\n\n")
             log.flush()

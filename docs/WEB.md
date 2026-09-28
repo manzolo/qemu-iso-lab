@@ -201,6 +201,11 @@ The page can delete disks and start anything `vmctl` can, so:
 | GET | `/api/vm/<vm>/files?path=.` | directory listing over SFTP, canonical path, home, parent and transfer limit |
 | GET | `/api/vm/<vm>/file?path=…` | download a regular guest file, staged before HTTP headers are sent |
 | POST | `/api/vm/<vm>/files-upload?path=…&name=…` | raw file body, at most 256 MiB; returns the saved name/path/size without replacing existing files |
+| POST | `/api/vm/<vm>/files-session` / `files-session-close` | open (and close) one SFTP session that several sequential uploads share (`?session=` on `files-upload`); 8 sessions at most, idle ones expire after 60 s |
+| GET | `/api/vm/<vm>/connections` | the *Integration* panel's checks: console, SSH (key rejected / algorithm mismatch / port closed), guest agent, SFTP, clipboard channel; read-only probes of 3 s, cached 5 s |
+| POST | `/api/vm/<vm>/diagnostics` | a text report of fixed read-only commands (system, network, storage, services, logs, APT/DNF state; Windows has its own list; sysvinit guests get no `journalctl`), as root when `sudo -n` works, 10 s / 128 KiB per command, plus the tails of the serial logs; also saved as `artifacts/<vm>/logs/diagnostics-<utc>.txt` |
+| POST | `/api/vm/<vm>/guest-command` | `{"command": "...", "confirmed": true}`: one shell command over SSH as a job in the VM's slot (60 s, 1 MiB); stdout, stderr and exit code in the job log; cancelling closes SSH, not the VM |
+| GET | `/api/vm/<vm>/history` | the VM's current job and the archived ones (`runtime/tui-job/history/`, the last 100), each openable as a log |
 | GET (WebSocket) | `/api/vm/<vm>/vnc?token=` | the VM's VNC socket, relayed both ways (noVNC in the page) |
 | GET | `/labs/<group>/map` | the lab's network map page (`vmctl group map <group>` writes it) |
 

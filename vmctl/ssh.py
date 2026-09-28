@@ -130,12 +130,19 @@ def _ssh_common_opts(cfg: dict[str, Any], dry_run: bool = False) -> list[str]:
     return opts
 
 
-def ssh_base_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
+def ssh_base_cmd(vm: dict[str, Any], dry_run: bool = False, *, read_only: bool = False) -> list[str]:
     host, port, user = ssh_target(vm)
     cfg = cloud_init.ssh_access_config(vm)
     assert cfg is not None
     opts = _ssh_common_opts(cfg, dry_run=dry_run)
-    private = resolve_ssh_private_key(vm, cfg, dry_run=dry_run)
+    private: Path | None
+    if read_only:
+        # Inspection/file exchange must never generate keys or run ssh-keygen.
+        private = _configured_ssh_key(cfg) or generated_ssh_key_path(vm)
+        if not private.is_file():
+            raise VMError(f"SSH private key not found: {private}")
+    else:
+        private = resolve_ssh_private_key(vm, cfg, dry_run=dry_run)
     if private is not None:
         opts += ["-i", str(private)]
     return ["ssh"] + opts + ["-o", "BatchMode=yes", "-p", str(port), f"{user}@{host}"]
@@ -175,11 +182,13 @@ SSH_DENIED_SEC = 300.0
 
 
 def classify_ssh_failure(stderr: str) -> str:
-    """'negotiate', 'denied' or '' for a failed probe's stderr."""
+    """'negotiate', 'denied', 'closed' or '' for a failed probe's stderr."""
     if any(marker in stderr for marker in SSH_NEGOTIATION_FAILURES):
         return "negotiate"
     if "Permission denied (" in stderr:
         return "denied"
+    if "Connection refused" in stderr:
+        return "closed"
     return ""
 
 

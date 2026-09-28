@@ -189,6 +189,7 @@ the access token.
 | **My VMs** | The ★ of a profile adds it to your selection; the page opens on it from then on. |
 | **Multiple selection** | Ctrl/Cmd+click or Shift+click several VMs to start, stop, link or unlink them together (F2/F8 act on the selection). |
 | **Live console** | Desktop with keyboard shortcuts, clipboard, file upload/download, PNG screenshots, recording, automatic reconnect and docked SSH. Detach consoles to work with several VMs side by side. |
+| **VM integration** | Open **Integration** in the live console to inspect connections, download diagnostics, run a confirmed guest command over SSH and review the VM's job history. |
 | **SSH** | Open an interactive terminal in the browser or on the host, or copy the connection command. |
 | **Link** | Connect two or more VMs on a private network from a machine's network button (click or drag). |
 | **Commands** | Browse suggestions and recent commands, filter by category, edit parameters, then copy or run the preview. |
@@ -212,6 +213,23 @@ Use `/` to search profiles, `F10` to open commands and **Ctrl/Cmd+Enter** to run
 reviewed command. Destructive commands ask for confirmation. Physical-disk **Flash** and
 **import-device** pick the target disk from a list and open in a terminal window on the host,
 where sudo asks for your password and the CLI asks its questions.
+
+Integration checks run only on request and are cached for five seconds. They reuse the console
+channel inspection, SSH error classification, guest-agent ping and SFTP; they never wake the
+guest or generate SSH keys. A clipboard channel alone is reported as unverified.
+Diagnostics use fixed, read-only commands for Windows or the guest's detected init/package
+family (including SysV/older APT guests), with a 10-second and 128-KiB output limit per command.
+The text download is also saved as `artifacts/<vm>/logs/diagnostics-<UTC timestamp>.txt` and
+includes the tails of existing serial logs, even when SSH is unavailable.
+
+Guest commands require confirmation each time and use the existing VM job slot. They record
+stdout, stderr and exit status, bounded to 60 seconds and 1 MiB of output. Cancelling one closes
+SSH without powering off the VM; a remote process may continue. Previous jobs are retained under
+`artifacts/<vm>/runtime/tui-job/history/` and can be opened from **VM command history**.
+Multiple file uploads share one SFTP session and run sequentially; each file is limited to
+256 MiB, staged under a temporary name, then renamed without replacing existing files.
+Use the **×** on a completed recording notice to dismiss it without downloading; **Saved recording**
+in the console still opens its download options.
 
 The graphical console and browser SSH terminal load noVNC/xterm.js from a CDN;
 the dashboard and screenshot view need no external assets. After updating the code,
