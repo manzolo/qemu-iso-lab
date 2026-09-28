@@ -163,32 +163,74 @@ def scp_base_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     return ["scp"] + opts + ["-P", str(port)]
 
 
+# What the client says when no amount of waiting will help: the two sides cannot agree on an
+# algorithm (OpenSSH 6.0 on Debian 7 offers only ssh-rsa/ssh-dss host keys, which a modern client
+# refuses unless the profile adds `ssh_options`), or the key is a type the server never learned.
+SSH_NEGOTIATION_FAILURES = ("Unable to negotiate", "no matching host key type", "no matching key exchange",
+                            "no mutual signature", "no hostkey alg")
+# A key that the guest keeps rejecting: a provisioning that never installed it, or one the sshd
+# cannot verify. Guests that add the key late (Windows at first logon) reject for a while first,
+# so this needs the denials to continue for this long before it counts.
+SSH_DENIED_SEC = 300.0
+
+
+def classify_ssh_failure(stderr: str) -> str:
+    """'negotiate', 'denied' or '' for a failed probe's stderr."""
+    if any(marker in stderr for marker in SSH_NEGOTIATION_FAILURES):
+        return "negotiate"
+    if "Permission denied (" in stderr:
+        return "denied"
+    return ""
+
+
 def wait_for_ssh(vm: dict[str, Any], timeout_sec: int, dry_run: bool = False, probe_command: str = "true") -> None:
-    """Poll SSH until *probe_command* succeeds (``exit 0`` for guests whose login shell is cmd.exe)."""
+    """Poll SSH until *probe_command* succeeds (``exit 0`` for guests whose login shell is cmd.exe).
+
+    Fails at once when the sshd answered and the failure is one no wait can fix (an algorithm the
+    two sides do not share), and after ``SSH_DENIED_SEC`` of the guest refusing the key: debian-7
+    installed fine on 2026-09-28 and the row then spent its whole hour retrying an ed25519 key
+    against OpenSSH 6.0."""
     host, port, _ = ssh_target(vm)
     if dry_run:
         ui.print_note(f"Would wait for SSH on {host}:{port}")
         return
     deadline = time.monotonic() + timeout_sec
     probe_cmd = ssh_base_cmd(vm, dry_run=dry_run) + [probe_command]
+    denied_since: float | None = None
+    last_error = ""
     while time.monotonic() < deadline:
         try:
             result = subprocess.run(
                 probe_cmd,
                 check=False,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 # A closed port fails instantly; the timeout only bites on an sshd that is up but
                 # slow to answer (a legacy guest doing a reverse lookup took 5 s, verified live).
                 timeout=15,
             )
             if result.returncode == 0:
                 return
+            stderr = result.stderr.decode("utf-8", errors="replace")
+            kind = classify_ssh_failure(stderr)
+            last_error = next((line for line in stderr.splitlines() if line.strip()), "").strip()
+            if kind == "negotiate":
+                raise VMError(f"SSH to {host}:{port} cannot agree on an algorithm with the guest: {last_error} "
+                              "(an old sshd: add ssh_provision.ssh_options with the legacy HostKeyAlgorithms/"
+                              "PubkeyAcceptedAlgorithms/KexAlgorithms, and key_type: rsa if it predates ed25519)")
+            if kind == "denied":
+                denied_since = denied_since or time.monotonic()
+                if time.monotonic() - denied_since >= SSH_DENIED_SEC:
+                    raise VMError(f"SSH to {host}:{port} has refused the key for {int(SSH_DENIED_SEC)}s: {last_error} "
+                                  "(the provisioning did not install the project key, or the sshd cannot use it: "
+                                  "key_type: rsa for an sshd older than OpenSSH 6.5)")
+            else:
+                denied_since = None
         except (OSError, subprocess.TimeoutExpired):
             time.sleep(2)
             continue
         time.sleep(2)
-    raise VMError(f"Timed out waiting for SSH on {host}:{port}")
+    raise VMError(f"Timed out waiting for SSH on {host}:{port}" + (f" (last: {last_error})" if last_error else ""))
 
 
 def remote_shell_cmd(vm: dict[str, Any], command: str, dry_run: bool = False) -> list[str]:
