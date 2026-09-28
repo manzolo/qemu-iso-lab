@@ -188,9 +188,19 @@
       ]
     },
     "debian-7": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:cfeb34423f002bc731e59067b08242edbe5b2880fe768ef7f25c7207f54708b8",
+      "version": "1.0.3",
+      "fingerprint": "sha256:edea5fdf93a4756f6f49ca679b240665e28884801cd9498f5c66ca3a3e03e1eb",
       "history": [
+        {
+          "version": "1.0.3",
+          "date": "2026-09-28",
+          "note": "acpid so the ACPI power button works on wheezy"
+        },
+        {
+          "version": "1.0.2",
+          "date": "2026-09-28",
+          "note": "wheezy has no qemu-guest-agent package: guest_agent false"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-28",

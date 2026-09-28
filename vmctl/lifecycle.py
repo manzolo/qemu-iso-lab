@@ -3368,7 +3368,7 @@ def poweroff_grace_sec(vm: dict[str, Any]) -> int:
 
 
 def ssh_poweroff_command(vm: dict[str, Any]) -> list[str] | None:
-    """Power-off over the VM's SSH access (`systemctl poweroff`, `shutdown /s` on Windows), or None without SSH."""
+    """Power-off over the VM's SSH access (`systemctl poweroff`, else `poweroff`; `shutdown /s` on Windows), or None without SSH."""
     ssh_cfg = cloud_init.ssh_access_config(vm)
     if ssh_cfg is None or not ssh_cfg.get("ssh_host_port"):
         return None
@@ -3384,7 +3384,8 @@ def ssh_poweroff_command(vm: dict[str, Any]) -> list[str] | None:
         return base + ["shutdown", "-q"]
     if proxmox.proxmox_config(vm) is not None:
         return base + ["systemctl", "poweroff"]
-    return base + ["sudo", "systemctl", "poweroff"]
+    # sysvinit guests (Debian 7) have no systemctl: plain poweroff there.
+    return base + ["sudo", "sh", "-c", "command -v systemctl >/dev/null 2>&1 && exec systemctl poweroff; exec poweroff"]
 
 
 def cmd_cancel_install(args: argparse.Namespace) -> int:

@@ -95,14 +95,15 @@
     "debian-7": {
       "name": "Debian 7.11 GNOME (wheezy, unattended, preseed)",
       "extends": "debian-7-base",
+      "guest_agent": false,
       "meta": {
         "status": "experimental",
         "groups": [
           "debian-releases"
         ],
-        "version": "1.0.1"
+        "version": "1.0.3"
       },
-      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Run 3 of 2026-09-28: X never started under UEFI ('VESA(0): V_BIOS address out of range': wheezy's X is VESA-only, kernel 3.2 has no bochs KMS), so the base boots BIOS on the pc machine like the old Ubuntus. Run 4: the desktop came up (GNOME 3.4 fallback mode on VESA) but the check missed it: the session manager runs as x-session-manager, whose comm is the 15-character 'x-session-manag', as on the old Ubuntus. Experimental until a live run passes (vmctl check-vms debian-7).",
+      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Run 3 of 2026-09-28: X never started under UEFI ('VESA(0): V_BIOS address out of range': wheezy's X is VESA-only, kernel 3.2 has no bochs KMS), so the base boots BIOS on the pc machine like the old Ubuntus. Run 4: the desktop came up (GNOME 3.4 fallback mode on VESA) but the check missed it: the session manager runs as x-session-manager, whose comm is the 15-character 'x-session-manag', as on the old Ubuntus. Run 5 passed the desktop check; the guest agent stayed silent because wheezy has no qemu-guest-agent package at all (it first shipped in jessie; the base's package list still names it, harmlessly), so the profile declares no agent, and acpid is installed so the ACPI power button stops the VM (wheezy's GNOME task does not pull it in and there is no systemctl for the SSH fallback: the row ended in a SIGTERM). Experimental until a live run passes (vmctl check-vms debian-7).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"
@@ -110,7 +111,8 @@
         "packages": [
           "qemu-guest-agent",
           "spice-vdagent",
-          "gnome-shell"
+          "gnome-shell",
+          "acpid"
         ],
         "hostname": "debian-7",
         "late_commands": [
