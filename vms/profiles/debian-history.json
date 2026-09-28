@@ -98,7 +98,7 @@
         ],
         "version": "1.0.0"
       },
-      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Run 2 of 2026-09-28 installed but the post-install never got in: OpenSSH 6.0 has no ed25519, so the profile now uses an RSA key with the legacy algorithms. Experimental until a live run passes (vmctl check-vms debian-7).",
+      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Run 3 of 2026-09-28: install and SSH (RSA key) fine, but no X ever came up: the screen stayed a black console and neither gnome-shell nor gnome-session ran (gdm3 3.4 on sysvinit, to inspect on the guest: /var/log/gdm3, Xorg.0.log). Experimental until a live run passes (vmctl check-vms debian-7).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"
