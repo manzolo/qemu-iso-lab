@@ -750,8 +750,11 @@ class WindowsBootstrapTests(BaseVmctlTestCase):
         # Debian 7 (2026-09-28): an unquoted script reached the guest as separate words and nothing ran.
         import shlex
         self.vm_config.pop("windows_config", None)
+        self.vm_config["ssh_provision"] = {"ssh_host_port": 2222, "user": "lab"}
         with mock.patch.object(vmctl.ssh, "ensure_generated_ssh_keypair", return_value=self.root / "artifacts/testvm/ssh/id_ed25519"):
             cmd = self.vmctl.ssh_poweroff_command(self.vm_config)
+        self.assertIsNotNone(cmd)
+        assert cmd is not None
         self.assertEqual(cmd[-4:-1], ["sudo", "sh", "-c"])
         script = shlex.split(cmd[-1])
         self.assertEqual(len(script), 1)
