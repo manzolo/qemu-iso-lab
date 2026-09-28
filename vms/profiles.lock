@@ -323,6 +323,39 @@
         }
       ]
     },
+    "edubuntu-10.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:8ad3b14e3faffd3afd8f7db765d34f759a7e6458a045ef40ddbff9895fae90bc",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "edubuntu-12.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d122d847d8bef999264298df990dc139b2a9237edfcc1ba53f4143b9735dd03e",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "edubuntu-14.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:346da4a6a81521c4342c67761aa7bd8fdf90eafc8216d07545b848320881d689",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "edubuntu-24.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:33e690d11db5ed4cf142a8e63517fe583e1806fde8b3485adca62fcf0ad80a40",
@@ -330,6 +363,28 @@
         {
           "version": "1.0.0",
           "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "edubuntu-26.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:86a1ea7213843bb1c8fe6b56fc02cdee9409a77ba8a836ec4a7dc490a122ff09",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "edubuntu-8.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:4caddf915117f4076b43e88d0d1f89044171d381fea4c4a9257d7bf4dbbfc8f5",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
           "note": "first versioned catalog"
         }
       ]
@@ -532,6 +587,83 @@
         }
       ]
     },
+    "kubuntu-10.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:fa003c3ab13db55dcee3cda414b482d573cc27d1c320dbadbd495a2be40ab084",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kubuntu-12.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:16d405767bfce4e4c1192fb2817d5293473508587a89997fbea32db35fbc5085",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kubuntu-14.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:46d2b1f14a12fe1088ab195e0ec9cba6bcc00b51ecd4e2241200eda2ddccfb5a",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kubuntu-16.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:41d84fe0176c65c9b5a44977deac3a34deb51832185daa8de651cee7cbb107fa",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kubuntu-18.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:5e6d0a1bb85c3d2e2495132c4e9fcbcb6291499332e54d5390a97dd84e014231",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kubuntu-20.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:e3bb272db74a3503425d873ee4ae73a4f469891e30e7263c0a32dfccd2d0e108",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kubuntu-22.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:a995710a50583daefd8fdc78e695d6da6ecb013364add1314943dc437bd15350",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "kubuntu-24.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:2162da93d3796221569af70df3b49df9e3cbfec170f77c91e6b0e72e05edefd5",
@@ -539,6 +671,28 @@
         {
           "version": "1.0.0",
           "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kubuntu-26.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:399718c64645590bc71f37b885aa4ba2a6c79dc67bde415eecb9100a0d0bb4cc",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "kubuntu-8.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:7d35fa41d73e1b0d7e73e9b3fa66d06975b1ee97b8a6227cff86a446712b762c",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
           "note": "first versioned catalog"
         }
       ]
@@ -565,6 +719,72 @@
         }
       ]
     },
+    "lubuntu-12.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:7f08621e30664e1e245fd3e709895b836c2a123495d8d66acc76b241711c8ed1",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "lubuntu-14.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:80870f18b5b6f5a0946306f7729f9e7580350592846c804c90e96bfb641f6da6",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "lubuntu-16.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:e8205918312f54538f7f47387c49f164c2ef2db0792075f970c24f3afc8bcd3f",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "lubuntu-18.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:ea52db5c067bc4b2d04e16f56770b015b6e3a4b364bde9b8432ba88269a448b3",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "lubuntu-20.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d7cf2a615ab6cf490a1aecea6741dc879f73e7b5cb2c4c0929466fd3293cb95f",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "lubuntu-22.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d4fde6631c58dd93bb48c6637018eb2ff3a818dff88debcaef412ffc7b958d7b",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "lubuntu-24.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:c47609ecce410c8ffa7eacb5b3fedab9b473716e6027c3a0ea0b5f0756af4b74",
@@ -572,6 +792,17 @@
         {
           "version": "1.0.0",
           "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "lubuntu-26.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:7381bb4decc8dc584de47ddaca0cfce1c977a9a98c971d94e4639eb168105d11",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
           "note": "first versioned catalog"
         }
       ]
@@ -1027,6 +1258,39 @@
         }
       ]
     },
+    "ubuntu-budgie-18.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:9ca2b291c8bd74160413faf98f6400da1a5c083af52bdb71529e08ad22d36ed3",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-budgie-20.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:9501a2ab765fe3f2984faeee787d21766f176f2b1daf37926df58d946d18910f",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-budgie-22.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:3df631e2b268aa02adf24afcc0440977a7382f0ff78198fce8c1f89654a53d96",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "ubuntu-budgie-24.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:cf35a05003d73a2a00a8d30724c9ccce84493900c9664360f5bafd61c50ae8fd",
@@ -1038,6 +1302,17 @@
         }
       ]
     },
+    "ubuntu-budgie-26.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f7356dc84b9584b086da970acb17ce86456e54724b95909f1580817adf6d72c3",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "ubuntu-cinnamon-24.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:cdad90d4462627c36084e76f0c90212288a5bd9f337facd2ff4450edaf89fe7b",
@@ -1045,6 +1320,17 @@
         {
           "version": "1.0.0",
           "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-cinnamon-26.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:8cae220715778c7cbc8d36afde6ec336bac0c2c12e6d835eab0e259c08081eed",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
           "note": "first versioned catalog"
         }
       ]
@@ -1071,6 +1357,50 @@
         }
       ]
     },
+    "ubuntu-mate-16.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:2004b163dc5964f622850772a0eb7953755a06c87af443d333dd91c8776091e0",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-mate-18.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:e7e2f4c6082ac4541bb938d1fef1d3341b92e71e2b3633e996fb9cc6d640cc7a",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-mate-20.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:b8d7aec445dcdbc4177667d106e5ba5705500656f486c55773bda3a0d82f0b66",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-mate-22.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:cc1c5e96e853e1539843e3ac744daedf4613c0ba4527094f20a4d77c042f6731",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "ubuntu-mate-24.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:6270272c03135ef5d2b59facf739b3eaee4ada43feeda2cf7a3ce9a526d5e5cb",
@@ -1078,6 +1408,17 @@
         {
           "version": "1.0.0",
           "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-mate-26.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:105b1ebf03f2c4ceec0a2c2729a3a55483a5919b695bea4837e18dc0ff4ddd59",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
           "note": "first versioned catalog"
         }
       ]
@@ -1122,6 +1463,17 @@
         {
           "version": "1.0.0",
           "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-unity-26.04": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c0c4b23dd1c2eb091aad8e41c45fb94b32077a025988c9e6d3b35dbb724fff99",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-28",
           "note": "first versioned catalog"
         }
       ]
