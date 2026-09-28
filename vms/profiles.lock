@@ -189,7 +189,7 @@
     },
     "debian-7": {
       "version": "1.0.0",
-      "fingerprint": "sha256:2d3a3164b73655acfb27a75c637f90d7e6fe5c41f2111af90b516a46f7d475c8",
+      "fingerprint": "sha256:5b66f85ff22a0ffb8f58c5071300c2a014654b48f008de666f8fb008eb2bdef2",
       "history": [
         {
           "version": "1.0.0",
@@ -1288,9 +1288,14 @@
       ]
     },
     "xubuntu-20.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:7897056203c3ea0b3f91c35ed16c111891e63af1d830a7b900f77cd779c6c447",
+      "version": "1.0.1",
+      "fingerprint": "sha256:7469c4a86a2cae2ed5cbeb6c5958163794ef125763250bdd0e56680823cb2852",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-28",
+          "note": "no release-upgrade prompt on the desktop (update-manager Prompt=never)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1299,9 +1304,14 @@
       ]
     },
     "xubuntu-22.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:9a931391c8737084c6f9a5c6e7869a835c453cee9714c96013f1a3ae0b73c1e0",
+      "version": "1.0.1",
+      "fingerprint": "sha256:c010bd1e74bca9822da627f2dcfab2a89bd2b3836e56b129ed925bbacb68e244",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-28",
+          "note": "no release-upgrade prompt on the desktop (update-manager Prompt=never)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1321,9 +1331,14 @@
       ]
     },
     "xubuntu-26.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:84394f0c03fabdc85f4cfb97943f635e955ce53bf4ebd0b4d9ee51bc44f2bfa7",
+      "version": "1.0.1",
+      "fingerprint": "sha256:923f697f167c6eb9fb0d5b2c751eff6571165ca9a3942f59ea2a0d0ccfdf0a4f",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-28",
+          "note": "no release-upgrade prompt on the desktop (update-manager Prompt=never)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",

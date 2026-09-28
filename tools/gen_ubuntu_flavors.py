@@ -125,6 +125,7 @@ def profile(key: str, flavour: dict[str, Any], release: str, base_names: dict[st
         out["autoinstall"] = {"hostname": hostname, **install}
         out["cloud_init"] = {"hostname": hostname, "write_files": files,
                              "runcmd": [f"ln -sf /lib/systemd/system/{service}.service /etc/systemd/system/display-manager.service",
+                                        NO_RELEASE_PROMPT,  # or update-notifier's upgrade dialog sits on the desktop (xubuntu-20.04/22.04 clips, 2026-09-28)
                                         "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
                                         "systemctl enable --now serial-getty@ttyS0.service"]}
         out["ssh_provision"] = {"hostname": hostname, "ssh_host_port": port, "post_install_run": [
