@@ -122,8 +122,32 @@ Tracked profiles are generic on purpose:
   installing the tracked user, and the post-install waited for SSH as somebody the
   guest had never heard of until it timed out.
 
-To use your own name, key and dotfiles, override only the identity fields in
-the git-ignored `vms/profiles/local.json`; every `{{user}}` follows:
+To use your own name everywhere, give `local.json` a top-level `identity`: it
+is applied to **every tracked profile**, the ones added tomorrow included, so a
+new profile of the catalog never installs as `lab` on your host:
+
+```json
+{
+  "identity": {
+    "user": "YOUR_USER",
+    "password": "YOUR_PASSWORD",
+    "password_hash": "REPLACE_WITH_SHA512_HASH",
+    "realname": "Your Name"
+  },
+  "vms": {}
+}
+```
+
+`user` is required; the other keys are used where a profile's identity section
+carries that field (`password_hash` for cloud-init, autoinstall, preseed,
+kickstart and the others that take a hash, `password` for Windows, pfSense,
+FreeBSD and archinstall, `realname` for autoinstall and Windows). Only the
+sections a profile already has are touched, and a profile defined in
+`local.json` alone is left as you wrote it. A per-VM entry under `vms` still
+wins, field by field, for the exceptions (another key, a VM kept on `lab`).
+
+To go further than the name (key, dotfiles, an ISO of your own), add the per-VM
+entries; every `{{user}}` follows:
 
 ```bash
 make init-local-profile        # copies vms/profiles/local.json.example

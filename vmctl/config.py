@@ -135,6 +135,52 @@ def load_tracked(profiles_dir: Path | None = None) -> dict[str, dict[str, Any]]:
     return profile_bases.resolve_extends(vms, bases)
 
 
+IDENTITY_KEYS = ("user", "password", "password_hash", "realname")
+
+
+def validate_identity(identity: Any, path: str) -> dict[str, str]:
+    """The optional top-level ``identity`` of local.json: one guest identity for every tracked profile."""
+    if not isinstance(identity, dict):
+        raise VMError(f"Invalid 'identity' in {path}: expected an object")
+    unknown = sorted(set(identity) - set(IDENTITY_KEYS))
+    if unknown:
+        raise VMError(f"Invalid 'identity' in {path}: unknown key(s) {', '.join(unknown)} (allowed: {', '.join(IDENTITY_KEYS)})")
+    clean: dict[str, str] = {}
+    for key, value in identity.items():
+        if not isinstance(value, str) or not value.strip():
+            raise VMError(f"Invalid 'identity' in {path}: '{key}' must be a non-empty string")
+        if USER_PLACEHOLDER in value:
+            raise VMError(f"Invalid 'identity' in {path}: '{key}' cannot contain {USER_PLACEHOLDER}")
+        clean[key] = value
+    if "user" not in clean:
+        raise VMError(f"Invalid 'identity' in {path}: 'user' is required")
+    return clean
+
+
+def apply_identity(vm: dict[str, Any], identity: dict[str, str], explicit: dict[str, Any]) -> None:
+    """Move every identity section the profile has to ``identity``, keeping what a per-VM override set.
+
+    Only sections that exist are touched (a profile without ``windows_config`` gets none), only
+    the user name and the credential fields the section already carries (``password_hash``,
+    ``password``, ``realname``): the per-VM override of ``local.json`` still wins field by field.
+    """
+    for section, field in USER_IDENTITY_FIELDS:
+        sec = vm.get(section)
+        if not isinstance(sec, dict):
+            continue
+        explicit_section = explicit.get(section)
+        kept: dict[str, Any] = explicit_section if isinstance(explicit_section, dict) else {}
+        values = {field: identity["user"]}
+        for key in ("password_hash", "password"):
+            if key in sec and key in identity:
+                values[key] = identity[key]
+        if "realname" in sec:
+            values["realname"] = identity.get("realname", identity["user"])
+        for key, value in values.items():
+            if key not in kept:
+                sec[key] = value
+
+
 def resolve_vm_user(vm: dict[str, Any]) -> tuple[str | None, str | None]:
     """Return ``(user, error)`` from the identity fields of a VM profile."""
     found: dict[str, str] = {}
@@ -388,6 +434,9 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
 
     merged_vms: dict[str, dict[str, Any]] = {}
     bases: dict[str, dict[str, Any]] = {}
+    identity: dict[str, str] | None = None
+    local_entries: dict[str, dict[str, Any]] = {}  # per-VM overrides of local.json, by canonical name
+    tracked_names: set[str] = set()
     profile_paths = sorted(profiles_dir.glob("*.json"), key=lambda p: (p.name == "local.json", p.name))
     if local_profiles is not None and profiles_dir / "local.json" not in profile_paths:
         profile_paths.append(profiles_dir / "local.json")
@@ -395,6 +444,10 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
         profile_data = local_profiles if path.name == "local.json" and local_profiles is not None else runtime.load_json_file(path)
         if "vms" not in profile_data or not isinstance(profile_data["vms"], dict):
             raise VMError(f"Invalid profile file: {path}")
+        if path.name == "local.json":
+            tracked_names = set(merged_vms)
+            if "identity" in profile_data:
+                identity = validate_identity(profile_data["identity"], str(path))
         for base_name, base in profile_bases.bases_of(profile_data, str(path)).items():
             if base_name in bases:
                 raise VMError(f"Duplicate base '{base_name}' in {path}")
@@ -410,6 +463,7 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
                 local_names.add(name)
             if name in merged_vms:
                 if path.name == "local.json":
+                    local_entries[name] = cast(dict[str, Any], vm)
                     merged_vms[name] = merge_vm_profile(merged_vms[name], cast(dict[str, Any], vm))
                     continue
                 raise VMError(f"Duplicate VM profile '{name}' in {path}")
@@ -421,6 +475,12 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
     # A local override sits on the raw tracked entry and the base is applied afterwards: the
     # merge is associative, so base + (delta + override) is (base + delta) + override.
     merged_vms = profile_bases.resolve_extends(merged_vms, bases)
+
+    # After the bases, so an identity section inherited from a base is seen too; the tracked
+    # profiles only (a VM defined in local.json alone is already the user's own recipe).
+    if identity is not None:
+        for name in tracked_names:
+            apply_identity(merged_vms[name], identity, local_entries.get(name, {}))
 
     all_errors: list[str] = []
     for name, vm in list(merged_vms.items()):

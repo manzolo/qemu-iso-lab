@@ -1,5 +1,11 @@
 {
-  "_comment": "Git-ignored personal overrides. Tracked profiles use the guest user 'lab' (password 'lab'); override the identity fields below and every {{user}} in paths/commands follows. The optional 'catalog' key is My VMs: the profiles the dashboards open on (vmctl catalog add|remove|set|clear keeps it).",
+  "_comment": "Git-ignored personal overrides. Tracked profiles use the guest user 'lab' (password 'lab'); 'identity' moves every tracked profile to your user (per-VM entries under 'vms' still win field by field) and every {{user}} in paths/commands follows. The optional 'catalog' key is My VMs: the profiles the dashboards open on (vmctl catalog add|remove|set|clear keeps it).",
+  "identity": {
+    "user": "YOUR_USER",
+    "password": "YOUR_PASSWORD",
+    "password_hash": "REPLACE_WITH_SHA512_HASH",
+    "realname": "Your Name"
+  },
   "catalog": {
     "selected": ["cachyos-desktop", "ubuntu-niri-gl"]
   },

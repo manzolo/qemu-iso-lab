@@ -129,6 +129,51 @@ class ConfigTests(BaseVmctlTestCase):
         self.assertIn("localvm", config["vms"])
         self.assertEqual(config["vms"]["localvm"]["name"], "Local VM")
 
+    def test_local_identity_applies_to_every_tracked_profile_but_per_vm_overrides_win(self):
+        # 2026-09-28: fifteen new history profiles were born lab/lab because no per-VM entry named them.
+        self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2222}
+        self.vm_config["preseed_config"] = {"username": "lab", "password_hash": "$6$lab"}
+        import copy
+        def variant(name, port, **sections):
+            vm = copy.deepcopy(self.vm_config)
+            vm["name"] = name
+            vm["disk"]["path"] = f"artifacts/{name}/disk.qcow2"
+            vm["ssh_provision"]["ssh_host_port"] = port
+            vm.pop("preseed_config")
+            vm.update(sections)
+            return vm
+        windows = variant("win", 2223, windows_config={"username": "lab", "password": "lab", "realname": "Lab User", "edition": "Windows 11 Pro"})
+        base = variant("base", 2224, preseed_config={"username": "lab", "password_hash": "$6$lab"})
+        base.pop("name")
+        self.write_config_dir()
+        self.write_extra_profile("more.json", {
+            "bases": {"identity-base": base},
+            "vms": {"win": windows, "child": {"extends": "identity-base", "name": "Child", "disk": {"path": "artifacts/child/disk.qcow2"}}}})
+        local_only = variant("mine", 2225, preseed_config={"username": "other", "password_hash": "$6$other"})
+        local_only["ssh_provision"]["user"] = "other"
+        self.write_extra_profile("local.json", {
+            "identity": {"user": "me", "password": "secret", "password_hash": "$6$me", "realname": "Me Myself"},
+            "vms": {"win": {"windows_config": {"password": "explicit"}}, "mine": local_only}})
+
+        vms = self.vmctl.load_config()["vms"]
+        self.assertEqual(vms[self.vm_name]["ssh_provision"]["user"], "me")
+        self.assertEqual(vms[self.vm_name]["preseed_config"], {"username": "me", "password_hash": "$6$me"})
+        self.assertNotIn("windows_config", vms[self.vm_name])  # sections are never created
+        self.assertEqual(vms["win"]["windows_config"]["username"], "me")
+        self.assertEqual(vms["win"]["windows_config"]["realname"], "Me Myself")
+        self.assertEqual(vms["win"]["windows_config"]["password"], "explicit")  # the per-VM entry wins field by field
+        self.assertEqual(vms["child"]["preseed_config"]["username"], "me")  # inherited from the base
+        self.assertEqual(vms["child"]["ssh_provision"]["user"], "me")
+        self.assertEqual(vms["mine"]["preseed_config"]["username"], "other")  # a local-only VM is left alone
+
+    def test_local_identity_is_validated(self):
+        self.write_config_dir()
+        for identity in ("me", {}, {"user": ""}, {"user": "me", "shell": "zsh"}, {"user": "{{user}}"}, {"user": "me", "password": 5}):
+            with self.subTest(identity=identity):
+                self.write_extra_profile("local.json", {"identity": identity, "vms": {}})
+                with self.assertRaisesRegex(self.vmctl.VMError, "identity"):
+                    self.vmctl.load_config()
+
     def test_load_config_local_profile_can_override_shared_profile(self):
         self.vm_config["ssh_provision"] = {
             "hostname": "base-vm",
