@@ -1,5 +1,5 @@
 """vmctl – QEMU VM management toolkit."""
-__version__ = "0.10.2"
+__version__ = "0.11.0"
 from vmctl.errors import VMError
 from vmctl.cli import main
 
