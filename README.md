@@ -14,7 +14,7 @@ dashboard (`vmtui`) or the CLI (`vmctl`), all sharing the same profiles, VM stat
 - **100+ profiles**, more than half of them fully unattended: every Ubuntu LTS since 8.04, Debian,
   Fedora, Arch, NixOS, openSUSE, FreeBSD, Haiku, ReactOS and Windows from 11 back to NT 4,
   plus hobby systems to boot and explore (KolibriOS, Redox OS, MenuetOS, SerenityOS).
-  Browse them at [manzolo.github.io/qemu-iso-lab](https://manzolo.github.io/qemu-iso-lab/).
+  Browse them, with a clip of each install, at [manzolo.github.io/qemu-iso-lab](https://manzolo.github.io/qemu-iso-lab/).
 - **My VMs**: choose the profiles you care about; the dashboards open on them and nothing is
   downloaded until you install one. Every profile is versioned, with its changelog.
 - **Labs**: groups of VMs on a private network, installed and started as one stack (a pfSense +
@@ -22,8 +22,8 @@ dashboard (`vmtui`) or the CLI (`vmctl`), all sharing the same profiles, VM stat
 - **In your browser**: live VM screens, interactive SSH, searchable commands, job logs and
   local profile customization, served on 127.0.0.1.
 - **Tested for real**: every unattended profile is reinstalled from scratch by a local
-  validation matrix; the last full run (2026-09-26) was 58 PASS and one Haiku timeout that
-  passed when re-run alone.
+  validation matrix; the last full run (2026-09-27) passed 60 of 61 rows, the one failure a
+  vmctl bug on a disk-image profile (SerenityOS), fixed the next morning.
 
 ![The web dashboard: My VMs, two of them running, the selected one with its actions and facts](docs/screenshots/web-dashboard.png)
 
@@ -125,8 +125,10 @@ Every step gives the equivalent command, for the terminal or a script.
 
 The catalog is large on purpose; you do not have to look at all of it. Browse it online at
 **[manzolo.github.io/qemu-iso-lab](https://manzolo.github.io/qemu-iso-lab/)**: search, filter by
-family, kind of install and role, read each profile's version and changelog, tick the ones you
-want and copy the resulting line:
+family, kind of install and role, and watch each unattended profile install itself: every card
+carries a short clip of a real install, recorded by the validation matrix (`vmctl check-vms
+--record`), from the installer to the installed system. Read each profile's version and changelog,
+tick the ones you want and copy the resulting line:
 
 ```bash
 vmctl catalog add ubuntu-26.04 debian-server kali   # or right-click a row → Add to My VMs
@@ -136,7 +138,7 @@ vmctl catalog                                       # what is chosen; remove, se
 From then on both dashboards open on **My VMs** (your choice, plus whatever is running) and the
 chosen profiles carry a ★. Nothing is downloaded until you install one.
 
-[![The online catalog: cards per profile with version, verification date and commands, three of them picked into a vmctl catalog add line](docs/screenshots/catalog-site.png)](https://manzolo.github.io/qemu-iso-lab/)
+[![The online catalog: cards per profile with the clip of its install, version, verification date and commands, three of them picked into a vmctl catalog add line](docs/screenshots/catalog-site.png)](https://manzolo.github.io/qemu-iso-lab/)
 
 Every profile has a version (`meta.version`, `1.0.0` today) and a history of changes; an install
 records the version it used, so the dashboards tell you when a disk carries an older recipe than
