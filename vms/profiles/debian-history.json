@@ -100,9 +100,9 @@
         "groups": [
           "debian-releases"
         ],
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
-      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Run 3 of 2026-09-28: X never started under UEFI ('VESA(0): V_BIOS address out of range': wheezy's X is VESA-only, kernel 3.2 has no bochs KMS), so the base boots BIOS on the pc machine like the old Ubuntus. Experimental until a live run passes (vmctl check-vms debian-7).",
+      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Run 3 of 2026-09-28: X never started under UEFI ('VESA(0): V_BIOS address out of range': wheezy's X is VESA-only, kernel 3.2 has no bochs KMS), so the base boots BIOS on the pc machine like the old Ubuntus. Run 4: the desktop came up (GNOME 3.4 fallback mode on VESA) but the check missed it: the session manager runs as x-session-manager, whose comm is the 15-character 'x-session-manag', as on the old Ubuntus. Experimental until a live run passes (vmctl check-vms debian-7).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"
@@ -124,7 +124,7 @@
         "ssh_host_port": 2292,
         "ssh_key": null,
         "post_install_run": [
-          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-shell|gnome-session' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-shell|gnome-session' >/dev/null && dpkg-query -W -f='${Status}\\n' gnome-shell | grep -q 'install ok installed'"
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-shell|gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-shell|gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' gnome-shell | grep -q 'install ok installed'"
         ],
         "key_type": "rsa",
         "ssh_options": [

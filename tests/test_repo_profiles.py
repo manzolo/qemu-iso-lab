@@ -135,7 +135,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         }
         # The Xubuntu history (tools/gen_ubuntu_flavors.py) on its first live run, 2026-09-28: the
         # three server-CD eras passed; the alternate-CD and autoinstall eras were regenerated after it.
-        verified_xubuntu_history = {"xubuntu-8.04", "xubuntu-14.04", "xubuntu-16.04", "xubuntu-18.04", "xubuntu-20.04",
+        verified_xubuntu_history = {"xubuntu-8.04", "xubuntu-10.04", "xubuntu-14.04", "xubuntu-16.04", "xubuntu-18.04", "xubuntu-20.04",
                                     "xubuntu-22.04", "xubuntu-26.04",
                                     # the Debian release history (debian-history.json), same evening
                                     "debian-8", "debian-9", "debian-10", "debian-11", "debian-12"}

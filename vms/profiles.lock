@@ -188,9 +188,14 @@
       ]
     },
     "debian-7": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:66ec083df53be3b217dea5386d161e32eaf9ac8295fd260aab325152bf130ffe",
+      "version": "1.0.1",
+      "fingerprint": "sha256:cfeb34423f002bc731e59067b08242edbe5b2880fe768ef7f25c7207f54708b8",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-28",
+          "note": "Desktop check also accepts x-session-manager (GNOME 3.4 fallback on VESA)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
