@@ -24,6 +24,7 @@ import os
 import re
 import shutil
 import struct
+import sys
 import tempfile
 import threading
 import time
@@ -117,6 +118,16 @@ def capture(sock: Path, vnc: Path | None = None) -> bytes | None:
             data = Path(temporary).read_bytes()
             header = parse_ppm_header(data)
             if header is not None and len(data) >= header[2] + header[0] * header[1] * 3:
+                if vnc is not None and vnc.exists() and data.count(0, header[2]) == len(data) - header[2]:
+                    # All black: QXL in native mode can leave the VGA surface black while the
+                    # desktop runs (Kubuntu, Unity, Studio 24.04 on 2026-09-27); VNC may see it.
+                    try:
+                        other = qemu.vnc_frame(vnc, timeout=10.0)
+                        start = parse_ppm_header(other)
+                        if start is not None and other.count(0, start[2]) != len(other) - start[2]:
+                            return other
+                    except OSError:
+                        pass
                 return data
             time.sleep(0.05)
         return None
@@ -417,10 +428,52 @@ def _point_latest(directory: Path) -> None:
         pass
 
 
+# check-vms --record: before a row powers its VM off it waits (``linger``) until the recorder has
+# seen DESKTOP_LINGER_SEC of graphical screen in a row, at most LINGER_TIMEOUT_SEC: the rows used
+# to stop the guest seconds after the desktop check, and a dozen desktop clips of 2026-09-27 had
+# one frame of desktop or none.
+DESKTOP_LINGER_SEC = 15.0
+LINGER_TIMEOUT_SEC = 60.0
+_WATCHES: dict[str, dict[str, float]] = {}
+_WATCH_LOCK = threading.Lock()
+
+
+def _watch_update(name: str | None, graphic: bool, seconds: float) -> None:
+    if name is None:
+        return
+    with _WATCH_LOCK:
+        watch = _WATCHES.setdefault(name, {"graphic": 0.0})
+        watch["graphic"] = watch["graphic"] + seconds if graphic else 0.0
+
+
+def linger(vm_name: str, seconds: float = DESKTOP_LINGER_SEC, timeout: float = LINGER_TIMEOUT_SEC,
+           poll: float = 0.5) -> str | None:
+    """Wait until the running recorder of *vm_name* has seen *seconds* of graphical screen in a row
+    (at most *timeout*). Nothing to do without a recorder, or while an exception is propagating
+    (the row failed: its clip does not matter more than its time). Returns a note, or None."""
+    if sys.exc_info()[0] is not None:
+        return None
+    with _WATCH_LOCK:
+        if vm_name not in _WATCHES:
+            return None
+    deadline = time.monotonic() + timeout
+    started = time.monotonic()
+    while True:
+        with _WATCH_LOCK:
+            seen = _WATCHES.get(vm_name, {}).get("graphic", 0.0)
+        if seen >= seconds:
+            waited = time.monotonic() - started
+            return f"{vm_name}: {seen:.0f}s of desktop recorded" + (f" (waited {waited:.0f}s)" if waited >= 1 else "")
+        if time.monotonic() >= deadline:
+            return f"{vm_name}: no {seconds:.0f}s of graphical screen within {timeout:.0f}s (recorded {seen:.0f}s): the clip may end without a desktop"
+        time.sleep(poll)
+
+
 def record(vm_name: str, vm: dict[str, Any], *, fps: float = DEFAULT_FPS, max_hold: float = DEFAULT_MAX_HOLD,
            grace: float = DEFAULT_GRACE, duration: float | None = None, gif: bool = True, mp4: bool = False,
            gif_seconds: float = GIF_SECONDS, out_dir: Path | None = None, dry_run: bool = False,
-           stop: threading.Event | None = None, wait_for_socket: bool = False, quiet: bool = False) -> dict[str, Path]:
+           stop: threading.Event | None = None, wait_for_socket: bool = False, quiet: bool = False,
+           watch: str | None = None) -> dict[str, Path]:
     """Capture until the VM is gone for *grace* seconds (or *duration*, Ctrl-C, *stop*), then encode.
     With *wait_for_socket* the recorder waits for the socket to appear first (a row of check-vms
     downloads its ISO before QEMU starts)."""
@@ -464,6 +517,8 @@ def record(vm_name: str, vm: dict[str, Any], *, fps: float = DEFAULT_FPS, max_ho
                     stored += 1
                     if stored % 10 == 0:
                         say(f"{stored} frames kept of {recording.captures} captures, {now - started:.0f}s")
+                if watch is not None:
+                    _watch_update(watch, recording.kind(len(recording.frames) - 1) == "graphic", period)
             elif now - last_seen > grace:
                 say(f"the VM has been gone for {grace:g}s: recording ends")
                 break
@@ -508,16 +563,20 @@ def record_in_background(vm_name: str, vm: dict[str, Any], enabled: bool = True,
 
     def run() -> None:
         try:
-            outcome.update(record(vm_name, vm, stop=stop, wait_for_socket=True, quiet=True, **options))
+            outcome.update(record(vm_name, vm, stop=stop, wait_for_socket=True, quiet=True, watch=vm_name, **options))
         except (VMError, OSError) as exc:  # pragma: no cover - depends on the live VM
             outcome["error"] = str(exc)
 
+    with _WATCH_LOCK:
+        _WATCHES[vm_name] = {"graphic": 0.0}
     thread = threading.Thread(target=run, name=f"record-{vm_name}", daemon=True)
     thread.start()
     try:
         yield
     finally:
         stop.set()
+        with _WATCH_LOCK:
+            _WATCHES.pop(vm_name, None)
         thread.join(timeout=600)
         if outcome.get("error"):
             ui.print_note(f"{vm_name}: recording skipped: {outcome['error']}")

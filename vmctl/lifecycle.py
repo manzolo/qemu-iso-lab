@@ -657,6 +657,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -677,6 +678,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -696,6 +698,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -715,6 +718,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -734,6 +738,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -753,6 +758,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -774,6 +780,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -793,6 +800,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -812,6 +820,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -831,6 +840,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -850,6 +860,7 @@ def run_local_test_vm(
             )
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -871,6 +882,7 @@ def run_local_test_vm(
                 boot_for_report_screenshot(vm_name, prepared_vm, args)
             args._report_phase = "post-install"
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -890,6 +902,7 @@ def run_local_test_vm(
             )
             boot_for_report_screenshot(vm_name, prepared_vm, args)
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -909,6 +922,7 @@ def run_local_test_vm(
             )
             boot_for_report_screenshot(vm_name, prepared_vm, args)
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -928,6 +942,7 @@ def run_local_test_vm(
             )
             boot_for_report_screenshot(vm_name, prepared_vm, args)
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -947,6 +962,7 @@ def run_local_test_vm(
             )
             boot_for_report_screenshot(vm_name, prepared_vm, args)
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -966,6 +982,7 @@ def run_local_test_vm(
             )
             boot_for_report_screenshot(vm_name, prepared_vm, args)
         finally:
+            linger_for_recording(vm_name)
             report.capture(vm_name, prepared_vm, args)
             cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
         detail = f"{note}; stopped after check-vms"
@@ -993,6 +1010,13 @@ def run_local_test_vm(
         return ("passed", detail)
     detail = note if prep_note is None else f"{note}; {prep_note}"
     return ("skipped", detail)
+
+
+def linger_for_recording(vm_name: str) -> None:
+    """check-vms --record: let the recorder see the desktop before the row powers the VM off."""
+    note = recorder.linger(vm_name)
+    if note:
+        ui.print_note(note)
 
 
 # A row's recorder ends with the row (the stop event), not with a quiet socket: the Arch family

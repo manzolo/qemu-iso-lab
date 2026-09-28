@@ -1,5 +1,6 @@
 """vmctl record: screendumps into frames with their hold time, then ffmpeg into a GIF (and MP4)."""
 import struct
+from pathlib import Path
 import threading
 import zlib
 from unittest import mock
@@ -181,6 +182,41 @@ class FramesTests(BaseVmctlTestCase):
         frame = vmctl.qemu.vnc_frame(path, timeout=5)
         thread.join(5); server.close()
         self.assertEqual(frame, b"P6\n2 1\n255\n" + bytes([1, 2, 3, 4, 5, 6]))
+
+    def test_an_all_black_screendump_asks_vnc_and_keeps_the_black_frame_if_vnc_is_black_too(self):
+        sock, vnc = self.root / "qmp.sock", self.root / "vnc.sock"
+        sock.write_text(""); vnc.write_text("")
+        black, desktop = ppm(4, 4, (0, 0, 0)), ppm(4, 4, (30, 60, 90))
+
+        def dump(_sock, _cmd, arguments, timeout):
+            Path(arguments["filename"]).write_bytes(black)
+
+        with mock.patch.object(vmctl.qemu, "qmp_execute", side_effect=dump), \
+             mock.patch.object(vmctl.qemu, "vnc_frame", return_value=desktop) as grab:
+            self.assertEqual(recorder.capture(sock, vnc), desktop)
+            grab.return_value = black
+            self.assertEqual(recorder.capture(sock, vnc), black)
+            self.assertEqual(recorder.capture(sock), black)  # no VNC socket given: not asked
+        self.assertEqual(grab.call_count, 2)
+
+    def test_linger_waits_for_seconds_of_desktop_and_never_for_a_failed_row(self):
+        self.assertIsNone(recorder.linger("nobody"))  # no recorder: nothing to wait for
+        with recorder._WATCH_LOCK:
+            recorder._WATCHES["vm"] = {"graphic": 0.0}
+        try:
+            note = recorder.linger("vm", seconds=5, timeout=0.2, poll=0.05)
+            self.assertIn("no 5s of graphical screen", note)
+            recorder._watch_update("vm", True, 3); recorder._watch_update("vm", True, 3)
+            self.assertIn("6s of desktop recorded", recorder.linger("vm", seconds=5, timeout=1))
+            recorder._watch_update("vm", False, 1)  # back to a console: the stretch starts again
+            self.assertEqual(recorder._WATCHES["vm"]["graphic"], 0.0)
+            try:
+                raise VMError("the row failed")
+            except VMError:
+                self.assertIsNone(recorder.linger("vm", seconds=5, timeout=5))
+        finally:
+            with recorder._WATCH_LOCK:
+                recorder._WATCHES.pop("vm", None)
 
     def test_record_needs_the_socket_and_dry_run_only_explains(self):
         vm = {**self.vm_config}
