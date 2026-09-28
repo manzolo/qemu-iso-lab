@@ -116,7 +116,12 @@ def profile(key: str, flavour: dict[str, Any], release: str, base_names: dict[st
         return out
     getty = GETTY["8.04"] if release == "8.04" else GETTY["upstart"] if release in ("10.04", "12.04", "14.04") else GETTY["systemd"]
     late = [autologin_command(dm, release, flavour), getty, NO_RELEASE_PROMPT, *screensaver_commands(flavour["screensaver"], release), NO_APT_PERIODIC]
-    preseed: dict[str, Any] = ({"tasks": [package]} if release in PRESEED_OLD else {"packages": [package, "openssh-server", "sudo"]})
+    # pkgsel/include, never a tasksel task: on the Ubuntu alternate CDs tasksel ignores the flavour
+    # tasks (xubuntu-8.04/10.04/12.04 came up on a text login with no desktop at all, 2026-09-28),
+    # while apt pulls the metapackage from the mirror on every era; universe holds the flavours.
+    preseed: dict[str, Any] = {"packages": [package, "openssh-server", "sudo"]}
+    if release in PRESEED_OLD:
+        preseed["extra"] = ["d-i apt-setup/universe boolean true"]
     out["preseed_config"] = {**preseed, "hostname": hostname, "late_commands": late}
     ssh: dict[str, Any] = {"hostname": hostname, "ssh_host_port": port}
     if release in ("16.04", "18.04"):

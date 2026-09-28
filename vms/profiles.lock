@@ -1234,7 +1234,7 @@
     },
     "xubuntu-10.04": {
       "version": "1.0.0",
-      "fingerprint": "sha256:16f83f0711e40e9b994e2d1a3005b9f274f1f98b469d06652e1b9f29265913dc",
+      "fingerprint": "sha256:f87733c9e73229325c5e4a27f738f7a555bf74c22ce68f650d39bfa9f358025c",
       "history": [
         {
           "version": "1.0.0",
@@ -1245,7 +1245,7 @@
     },
     "xubuntu-12.04": {
       "version": "1.0.0",
-      "fingerprint": "sha256:a7ee9cf74be319fc10ec5fdd2a1c226ebbcc1daaa45cec38a643a0ccd7f2cdac",
+      "fingerprint": "sha256:0b4781b7060cfd4c582320633ad7dda957210a5b021d03d39c4a82d830fafb8b",
       "history": [
         {
           "version": "1.0.0",
@@ -1333,7 +1333,7 @@
     },
     "xubuntu-8.04": {
       "version": "1.0.0",
-      "fingerprint": "sha256:614fbe25868993ed763d165ea50a5691dc7f4a63a2c4139d6b2a1bcb3144122e",
+      "fingerprint": "sha256:0be6642df90468cea3d88ade1a04e0825a95dd35c5310e2a41f5b384f1bb2079",
       "history": [
         {
           "version": "1.0.0",
