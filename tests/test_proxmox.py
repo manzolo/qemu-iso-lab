@@ -10,8 +10,9 @@ from vmctl import checkpoint, lifecycle, libvirt, proxmox, qemu
 
 class ProxmoxTests(BaseVmctlTestCase):
     def profile(self, name='proxmox-ve'):
-        # Tracked profile file only; never consult the host's local.json.
-        return json.loads((ROOT / 'vms/profiles/proxmox-lab.json').read_text())['vms'][name]
+        # Tracked profiles only, resolved over proxmox-node-base; never the host's local.json.
+        from vmctl import config
+        return config.load_tracked(ROOT / 'vms/profiles')[name]
 
     def test_profiles_pick_their_flows(self):
         self.assertEqual(lifecycle.local_test_mode(self.profile())[0], 'bootstrap-proxmox')
@@ -116,7 +117,10 @@ class ProxmoxTests(BaseVmctlTestCase):
 
     def test_cluster_nodes_are_distinct_and_the_runbook_matches_what_form_runs(self):
         from vmctl import pvecluster
-        cfg = {'vms': json.loads((ROOT / 'vms/profiles/proxmox-lab.json').read_text())['vms']}
+        from vmctl import config
+        members = json.loads((ROOT / 'vms/profiles/proxmox-lab.json').read_text())['vms']
+        tracked = config.load_tracked(ROOT / 'vms/profiles')
+        cfg = {'vms': {name: tracked[name] for name in members}}
         names = list(cfg['vms'])
         found = pvecluster.clusters(cfg, names)
         self.assertEqual(found, {'pve-lab': {'primary': 'proxmox-ve',

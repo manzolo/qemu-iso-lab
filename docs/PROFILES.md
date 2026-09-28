@@ -412,6 +412,15 @@ base it is built on with `extends`:
   web editor (its *Catalog template* is the resolved one) and the catalog site, whose card says
   `on <base>`. A local override in `local.json` applies on top of the resolved profile, and a
   wholly local profile may extend a tracked base.
+- The bases in the catalog today (`grep -l '"bases"' vms/profiles/*.json`): `ubuntu-desktop-base`
+  → `ubuntu-24.04-base` (ten flavours; the 20.04/22.04/26.04 releases sit on the first),
+  `ubuntu-preseed-base` → `ubuntu-preseed-old-base` (8.04-12.04) and `ubuntu-preseed-new-base`
+  (14.04-18.04), `ubuntu-desktop-iso-base` (the manual desktop ISOs), `debian-preseed-base` →
+  `debian-desktop-base`, `fedora-kickstart-base`, `archinstall-base` → `arch-base` and
+  `cachyos-base`, `proxmox-node-base`, `windows-base`, `rhel-server-base`.
+  `tools/extract_profile_base.py <file> <base> <vm>... [--parent BASE] --write` carves a base out
+  of existing profiles (the shared part, lists by common prefix) and refuses to write unless every
+  profile resolves exactly as before.
 - **Versions**: the fingerprint is the resolved recipe, so editing a base changes the recipe of
   every profile built on it and `make check` names each of them; bump them together:
   `tools/bump_profile.py ubuntu-desktop-base patch --children -m "..."`. A base nothing

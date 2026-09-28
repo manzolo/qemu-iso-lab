@@ -1,4 +1,208 @@
 {
+  "bases": {
+    "archinstall-base": {
+      "meta": {
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling",
+        "status": "unattended"
+      },
+      "iso_discovery": {
+        "sort": "desc",
+        "limit": 1
+      },
+      "disk": {
+        "path": "artifacts/{{name}}/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/{{name}}/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "virtio-gl",
+        "headless": [
+          "-device",
+          "virtio-vga-gl",
+          "-display",
+          "egl-headless"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "archinstall_config": {
+        "username": "lab",
+        "password": "lab",
+        "timezone": "Europe/Rome",
+        "keyboard_layout": "it",
+        "locale_lang": "it_IT",
+        "locale_enc": "UTF-8",
+        "bootloader": "Grub",
+        "audio": true
+      },
+      "ssh_provision": {
+        "user": "lab"
+      }
+    },
+    "arch-base": {
+      "meta": {
+        "slug": "archlinux"
+      },
+      "iso_discovery": {
+        "index_url": "https://geo.mirror.pkgbuild.com/iso/latest/",
+        "pattern": "href=\"(archlinux-\\d{4}\\.\\d{2}\\.\\d{2}-x86_64\\.iso)\""
+      },
+      "archinstall_config": {
+        "kernels": [
+          "linux"
+        ],
+        "bootstrap_chroot_commands": [
+          "pacman -S --noconfirm --needed git base-devel",
+          "usermod -aG seat {{user}}",
+          "systemctl enable seatd greetd",
+          "cat > /etc/greetd/config.toml <<\"EOF\"\n[terminal]\nvt = 1\n\n[initial_session]\ncommand = \"niri-session\"\nuser = \"{{user}}\"\n\n[default_session]\ncommand = \"agreety\"\nuser = \"greeter\"\nEOF"
+        ]
+      },
+      "iso": "isos/archlinux-latest-x86_64.iso",
+      "iso_url": "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-2026.09.01-x86_64.iso",
+      "memory_mb": 8192,
+      "extends": "archinstall-base"
+    },
+    "cachyos-base": {
+      "meta": {
+        "catalog_slug": "cachyos"
+      },
+      "iso_discovery": {
+        "index_url": "https://mirror.cachyos.org/ISO/desktop/",
+        "pattern": "href=\"(\\d{6})/\"",
+        "url_template": "https://mirror.cachyos.org/ISO/desktop/{match}/cachyos-desktop-linux-{match}.iso"
+      },
+      "video": {
+        "variants": {
+          "safe": [
+            "-serial",
+            "mon:stdio"
+          ]
+        }
+      },
+      "archinstall_config": {
+        "kernels": [
+          "linux-cachyos"
+        ],
+        "inherit_live_pacman_conf": true,
+        "live_login_prompt": "CachyOS login:",
+        "live_shell_prompt": "root@CachyOS",
+        "live_kernel_append": "systemd.unit=multi-user.target",
+        "packages": [
+          "cachyos-hooks",
+          "cachyos-keyring",
+          "cachyos-mirrorlist",
+          "cachyos-v3-mirrorlist",
+          "cachyos-v4-mirrorlist",
+          "cachyos-rate-mirrors",
+          "chwd",
+          "linux-cachyos-headers",
+          "cachyos-hello",
+          "cachyos-kernel-manager",
+          "cachyos-packageinstaller",
+          "cachyos-settings",
+          "cachyos-micro-settings",
+          "cachyos-wallpapers",
+          "cachyos-zsh-config",
+          "cachyos-niri-noctalia",
+          "sddm",
+          "foot",
+          "fuzzel",
+          "polkit",
+          "nss-mdns",
+          "alsa-utils",
+          "pavucontrol",
+          "pipewire-alsa",
+          "pipewire-pulse",
+          "wireplumber",
+          "gst-plugin-pipewire",
+          "noto-fonts",
+          "noto-fonts-emoji",
+          "noto-fonts-cjk",
+          "ttf-dejavu",
+          "ttf-liberation",
+          "ttf-meslo-nerd",
+          "accountsservice",
+          "bash-completion",
+          "xdg-user-dirs",
+          "xdg-utils",
+          "mesa",
+          "mesa-utils",
+          "sof-firmware",
+          "power-profiles-daemon",
+          "upower",
+          "alacritty",
+          "btop",
+          "fastfetch",
+          "git",
+          "micro",
+          "nano",
+          "vim",
+          "rsync",
+          "wget",
+          "ripgrep",
+          "firefox"
+        ],
+        "bootstrap_chroot_commands": [
+          "systemctl enable sddm power-profiles-daemon",
+          "install -d -m 755 /etc/sddm.conf.d && printf '[Autologin]\\nUser={{user}}\\nSession=niri\\n' > /etc/sddm.conf.d/autologin.conf",
+          "install -d -o {{user}} -g {{user}} /home/{{user}}/.config/niri/cfg && printf '%s\\n' '// qemu-iso-lab: the VM power button (vmctl stop) must reach logind, which powers off.' '// niri would otherwise inhibit it and map XF86PowerOff to suspend.' 'input {' '    disable-power-key-handling' '}' > /home/{{user}}/.config/niri/cfg/vm-power.kdl && grep -q 'cfg/vm-power.kdl' /home/{{user}}/.config/niri/config.kdl 2>/dev/null || echo 'include \"./cfg/vm-power.kdl\"' >> /home/{{user}}/.config/niri/config.kdl && chown -R {{user}}:{{user}} /home/{{user}}/.config/niri"
+        ]
+      },
+      "ssh_provision": {
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/cachyos-desktop/bin/cachyos-post-install",
+            "dest": "/home/{{user}}/bin/cachyos-post-install",
+            "dest_mode": "755"
+          }
+        ],
+        "verify_after_reboot": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager pacman --package cachyos-niri-noctalia"
+        ]
+      },
+      "iso": "isos/cachyos-desktop-linux-latest.iso",
+      "iso_url": "https://mirror.cachyos.org/ISO/desktop/260809/cachyos-desktop-linux-260809.iso",
+      "installer_boot": {
+        "kernel": "arch/boot/x86_64/vmlinuz-linux-cachyos",
+        "initrd": "arch/boot/x86_64/initramfs-linux-cachyos.img"
+      },
+      "memory_mb": 4096,
+      "extends": "archinstall-base"
+    }
+  },
   "vms": {
     "arch": {
       "name": "Arch Linux",
@@ -118,165 +322,18 @@
     },
     "cachyos-desktop": {
       "name": "CachyOS + niri + Noctalia",
+      "extends": "cachyos-base",
       "meta": {
-        "catalog_slug": "cachyos",
-        "family": "arch",
-        "role": "desktop",
-        "release_model": "rolling",
-        "status": "unattended",
         "verified": "2026-09-26",
         "version": "1.0.0"
       },
-      "iso": "isos/cachyos-desktop-linux-latest.iso",
-      "iso_discovery": {
-        "index_url": "https://mirror.cachyos.org/ISO/desktop/",
-        "pattern": "href=\"(\\d{6})/\"",
-        "url_template": "https://mirror.cachyos.org/ISO/desktop/{match}/cachyos-desktop-linux-{match}.iso",
-        "sort": "desc",
-        "limit": 1
-      },
-      "iso_url": "https://mirror.cachyos.org/ISO/desktop/260809/cachyos-desktop-linux-260809.iso",
-      "installer_boot": {
-        "kernel": "arch/boot/x86_64/vmlinuz-linux-cachyos",
-        "initrd": "arch/boot/x86_64/initramfs-linux-cachyos.img"
-      },
-      "disk": {
-        "path": "artifacts/cachyos-desktop/disk.qcow2",
-        "size": "32G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/cachyos-desktop/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 4,
-      "network": "user",
-      "audio": true,
-      "video": {
-        "default": "virtio-gl",
-        "headless": [
-          "-device",
-          "virtio-vga-gl",
-          "-display",
-          "egl-headless"
-        ],
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
-          ],
-          "virtio-gl": [
-            "-device",
-            "virtio-vga-gl",
-            "-display",
-            "gtk,gl=on"
-          ]
-        }
-      },
-      "usb_tablet": true,
       "archinstall_config": {
-        "hostname": "cachyos-desktop",
-        "username": "lab",
-        "password": "lab",
-        "timezone": "Europe/Rome",
-        "keyboard_layout": "it",
-        "locale_lang": "it_IT",
-        "locale_enc": "UTF-8",
-        "bootloader": "Grub",
-        "kernels": [
-          "linux-cachyos"
-        ],
-        "audio": true,
-        "inherit_live_pacman_conf": true,
-        "live_login_prompt": "CachyOS login:",
-        "live_shell_prompt": "root@CachyOS",
-        "live_kernel_append": "systemd.unit=multi-user.target",
-        "packages": [
-          "cachyos-hooks",
-          "cachyos-keyring",
-          "cachyos-mirrorlist",
-          "cachyos-v3-mirrorlist",
-          "cachyos-v4-mirrorlist",
-          "cachyos-rate-mirrors",
-          "chwd",
-          "linux-cachyos-headers",
-          "cachyos-hello",
-          "cachyos-kernel-manager",
-          "cachyos-packageinstaller",
-          "cachyos-settings",
-          "cachyos-micro-settings",
-          "cachyos-wallpapers",
-          "cachyos-zsh-config",
-          "cachyos-niri-noctalia",
-          "sddm",
-          "foot",
-          "fuzzel",
-          "polkit",
-          "nss-mdns",
-          "alsa-utils",
-          "pavucontrol",
-          "pipewire-alsa",
-          "pipewire-pulse",
-          "wireplumber",
-          "gst-plugin-pipewire",
-          "noto-fonts",
-          "noto-fonts-emoji",
-          "noto-fonts-cjk",
-          "ttf-dejavu",
-          "ttf-liberation",
-          "ttf-meslo-nerd",
-          "accountsservice",
-          "bash-completion",
-          "xdg-user-dirs",
-          "xdg-utils",
-          "mesa",
-          "mesa-utils",
-          "sof-firmware",
-          "power-profiles-daemon",
-          "upower",
-          "alacritty",
-          "btop",
-          "fastfetch",
-          "git",
-          "micro",
-          "nano",
-          "vim",
-          "rsync",
-          "wget",
-          "ripgrep",
-          "firefox"
-        ],
-        "bootstrap_chroot_commands": [
-          "systemctl enable sddm power-profiles-daemon",
-          "install -d -m 755 /etc/sddm.conf.d && printf '[Autologin]\\nUser={{user}}\\nSession=niri\\n' > /etc/sddm.conf.d/autologin.conf",
-          "install -d -o {{user}} -g {{user}} /home/{{user}}/.config/niri/cfg && printf '%s\\n' '// qemu-iso-lab: the VM power button (vmctl stop) must reach logind, which powers off.' '// niri would otherwise inhibit it and map XF86PowerOff to suspend.' 'input {' '    disable-power-key-handling' '}' > /home/{{user}}/.config/niri/cfg/vm-power.kdl && grep -q 'cfg/vm-power.kdl' /home/{{user}}/.config/niri/config.kdl 2>/dev/null || echo 'include \"./cfg/vm-power.kdl\"' >> /home/{{user}}/.config/niri/config.kdl && chown -R {{user}}:{{user}} /home/{{user}}/.config/niri"
-        ]
+        "hostname": "cachyos-desktop"
       },
       "ssh_provision": {
         "hostname": "cachyos-desktop",
-        "user": "lab",
         "ssh_host_port": 2223,
         "copy_from_host": [
-          {
-            "source": "vms/profile-files/cachyos-desktop/bin/cachyos-post-install",
-            "dest": "/home/{{user}}/bin/cachyos-post-install",
-            "dest_mode": "755"
-          },
           {
             "source": "vms/profile-files/common/bin/verify-desktop",
             "dest": "/home/{{user}}/bin/verify-desktop",
@@ -285,174 +342,24 @@
         ],
         "post_install_run": [
           "~/bin/cachyos-post-install"
-        ],
-        "verify_after_reboot": [
-          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager pacman --package cachyos-niri-noctalia"
         ]
       },
       "notes": "CachyOS installed unattended by bootstrap-archinstall: the desktop ISO is an archiso, so the pacstrap flow runs on it (installer_boot kernel, CachyOS serial prompts, live pacman.conf inherited by the target so the [cachyos] repository and linux-cachyos survive the first boot). The package set mirrors what Calamares installs for its 'Niri' desktop choice: cachyos-niri-noctalia (niri + Noctalia shell, CachyOS defaults) with SDDM autologin, plus the CachyOS base groups. Calamares itself remains available for a manual install (vmctl install)."
     },
     "cachyos-nvidia": {
       "name": "CachyOS + niri + Noctalia + NVIDIA open",
+      "extends": "cachyos-base",
       "meta": {
-        "catalog_slug": "cachyos",
-        "family": "arch",
-        "role": "desktop",
-        "release_model": "rolling",
-        "status": "unattended",
         "verified": "2026-09-26",
         "version": "1.0.0"
       },
-      "iso": "isos/cachyos-desktop-linux-latest.iso",
-      "iso_discovery": {
-        "index_url": "https://mirror.cachyos.org/ISO/desktop/",
-        "pattern": "href=\"(\\d{6})/\"",
-        "url_template": "https://mirror.cachyos.org/ISO/desktop/{match}/cachyos-desktop-linux-{match}.iso",
-        "sort": "desc",
-        "limit": 1
-      },
-      "iso_url": "https://mirror.cachyos.org/ISO/desktop/260809/cachyos-desktop-linux-260809.iso",
-      "installer_boot": {
-        "kernel": "arch/boot/x86_64/vmlinuz-linux-cachyos",
-        "initrd": "arch/boot/x86_64/initramfs-linux-cachyos.img"
-      },
-      "disk": {
-        "path": "artifacts/cachyos-nvidia/disk.qcow2",
-        "size": "32G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/cachyos-nvidia/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 4,
-      "network": "user",
-      "audio": true,
-      "video": {
-        "default": "virtio-gl",
-        "headless": [
-          "-device",
-          "virtio-vga-gl",
-          "-display",
-          "egl-headless"
-        ],
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk",
-            "-serial",
-            "mon:stdio"
-          ],
-          "virtio-gl": [
-            "-device",
-            "virtio-vga-gl",
-            "-display",
-            "gtk,gl=on"
-          ]
-        }
-      },
-      "usb_tablet": true,
       "archinstall_config": {
-        "hostname": "cachyos-nvidia",
-        "username": "lab",
-        "password": "lab",
-        "timezone": "Europe/Rome",
-        "keyboard_layout": "it",
-        "locale_lang": "it_IT",
-        "locale_enc": "UTF-8",
-        "bootloader": "Grub",
-        "kernels": [
-          "linux-cachyos"
-        ],
-        "audio": true,
-        "inherit_live_pacman_conf": true,
-        "live_login_prompt": "CachyOS login:",
-        "live_shell_prompt": "root@CachyOS",
-        "live_kernel_append": "systemd.unit=multi-user.target",
-        "packages": [
-          "cachyos-hooks",
-          "cachyos-keyring",
-          "cachyos-mirrorlist",
-          "cachyos-v3-mirrorlist",
-          "cachyos-v4-mirrorlist",
-          "cachyos-rate-mirrors",
-          "chwd",
-          "linux-cachyos-headers",
-          "cachyos-hello",
-          "cachyos-kernel-manager",
-          "cachyos-packageinstaller",
-          "cachyos-settings",
-          "cachyos-micro-settings",
-          "cachyos-wallpapers",
-          "cachyos-zsh-config",
-          "cachyos-niri-noctalia",
-          "sddm",
-          "foot",
-          "fuzzel",
-          "polkit",
-          "nss-mdns",
-          "alsa-utils",
-          "pavucontrol",
-          "pipewire-alsa",
-          "pipewire-pulse",
-          "wireplumber",
-          "gst-plugin-pipewire",
-          "noto-fonts",
-          "noto-fonts-emoji",
-          "noto-fonts-cjk",
-          "ttf-dejavu",
-          "ttf-liberation",
-          "ttf-meslo-nerd",
-          "accountsservice",
-          "bash-completion",
-          "xdg-user-dirs",
-          "xdg-utils",
-          "mesa",
-          "mesa-utils",
-          "sof-firmware",
-          "power-profiles-daemon",
-          "upower",
-          "alacritty",
-          "btop",
-          "fastfetch",
-          "git",
-          "micro",
-          "nano",
-          "vim",
-          "rsync",
-          "wget",
-          "ripgrep",
-          "firefox"
-        ],
-        "bootstrap_chroot_commands": [
-          "systemctl enable sddm power-profiles-daemon",
-          "install -d -m 755 /etc/sddm.conf.d && printf '[Autologin]\\nUser={{user}}\\nSession=niri\\n' > /etc/sddm.conf.d/autologin.conf",
-          "install -d -o {{user}} -g {{user}} /home/{{user}}/.config/niri/cfg && printf '%s\\n' '// qemu-iso-lab: the VM power button (vmctl stop) must reach logind, which powers off.' '// niri would otherwise inhibit it and map XF86PowerOff to suspend.' 'input {' '    disable-power-key-handling' '}' > /home/{{user}}/.config/niri/cfg/vm-power.kdl && grep -q 'cfg/vm-power.kdl' /home/{{user}}/.config/niri/config.kdl 2>/dev/null || echo 'include \"./cfg/vm-power.kdl\"' >> /home/{{user}}/.config/niri/config.kdl && chown -R {{user}}:{{user}} /home/{{user}}/.config/niri"
-        ]
+        "hostname": "cachyos-nvidia"
       },
       "ssh_provision": {
         "hostname": "cachyos-nvidia",
-        "user": "lab",
         "ssh_host_port": 2224,
         "copy_from_host": [
-          {
-            "source": "vms/profile-files/cachyos-desktop/bin/cachyos-post-install",
-            "dest": "/home/{{user}}/bin/cachyos-post-install",
-            "dest_mode": "755"
-          },
           {
             "source": "vms/profile-files/cachyos-nvidia/bin/cachyos-nvidia-post-install",
             "dest": "/home/{{user}}/bin/cachyos-nvidia-post-install",
@@ -466,95 +373,22 @@
         ],
         "post_install_run": [
           "~/bin/cachyos-nvidia-post-install"
-        ],
-        "verify_after_reboot": [
-          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager pacman --package cachyos-niri-noctalia"
         ]
       },
       "notes": "CachyOS installed unattended by bootstrap-archinstall on the CachyOS archiso (installer_boot kernel, CachyOS serial prompts, live pacman.conf inherited by the target). Same desktop as Calamares' 'Niri' choice: cachyos-niri-noctalia (niri + Noctalia) with SDDM autologin and the CachyOS base groups. The SSH post-install adds the mainline NVIDIA open kernel modules (nvidia-open-dkms + nvidia-utils, 610 series at the time of writing) built against the installed linux-cachyos headers. Previously pinned to the legacy 580xx branch and installed interactively."
     },
     "arch-noctalia": {
       "name": "Arch Linux + Noctalia 5",
+      "extends": "arch-base",
       "meta": {
-        "slug": "archlinux",
-        "family": "arch",
-        "role": "desktop",
-        "release_model": "rolling",
-        "status": "unattended",
         "groups": [
           "smoke"
         ],
         "verified": "2026-09-26",
         "version": "1.0.0"
       },
-      "iso": "isos/archlinux-latest-x86_64.iso",
-      "iso_discovery": {
-        "index_url": "https://geo.mirror.pkgbuild.com/iso/latest/",
-        "pattern": "href=\"(archlinux-\\d{4}\\.\\d{2}\\.\\d{2}-x86_64\\.iso)\"",
-        "sort": "desc",
-        "limit": 1
-      },
-      "iso_url": "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-2026.09.01-x86_64.iso",
-      "disk": {
-        "path": "artifacts/arch-noctalia/disk.qcow2",
-        "size": "32G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/arch-noctalia/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 8192,
-      "cpus": 4,
-      "network": "user",
-      "audio": true,
-      "video": {
-        "default": "virtio-gl",
-        "headless": [
-          "-device",
-          "virtio-vga-gl",
-          "-display",
-          "egl-headless"
-        ],
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "virtio-gl": [
-            "-device",
-            "virtio-vga-gl",
-            "-display",
-            "gtk,gl=on"
-          ]
-        }
-      },
-      "usb_tablet": true,
       "archinstall_config": {
         "hostname": "arch-noctalia",
-        "username": "lab",
-        "password": "lab",
-        "timezone": "Europe/Rome",
-        "keyboard_layout": "it",
-        "locale_lang": "it_IT",
-        "locale_enc": "UTF-8",
-        "bootloader": "Grub",
-        "kernels": [
-          "linux"
-        ],
-        "audio": true,
         "packages": [
           "adwaita-icon-theme",
           "brightnessctl",
@@ -637,17 +471,10 @@
           "xorg-xwayland",
           "zip",
           "p7zip"
-        ],
-        "bootstrap_chroot_commands": [
-          "pacman -S --noconfirm --needed git base-devel",
-          "usermod -aG seat {{user}}",
-          "systemctl enable seatd greetd",
-          "cat > /etc/greetd/config.toml <<\"EOF\"\n[terminal]\nvt = 1\n\n[initial_session]\ncommand = \"niri-session\"\nuser = \"{{user}}\"\n\n[default_session]\ncommand = \"agreety\"\nuser = \"greeter\"\nEOF"
         ]
       },
       "ssh_provision": {
         "hostname": "arch-noctalia",
-        "user": "lab",
         "ssh_host_port": 2226,
         "copy_from_host": [
           {
@@ -685,83 +512,13 @@
     },
     "arch-dms": {
       "name": "Arch Linux + niri + DankMaterialShell",
+      "extends": "arch-base",
       "meta": {
-        "slug": "archlinux",
-        "family": "arch",
-        "role": "desktop",
-        "release_model": "rolling",
-        "status": "unattended",
         "verified": "2026-09-26",
         "version": "1.0.0"
       },
-      "iso": "isos/archlinux-latest-x86_64.iso",
-      "iso_discovery": {
-        "index_url": "https://geo.mirror.pkgbuild.com/iso/latest/",
-        "pattern": "href=\"(archlinux-\\d{4}\\.\\d{2}\\.\\d{2}-x86_64\\.iso)\"",
-        "sort": "desc",
-        "limit": 1
-      },
-      "iso_url": "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-2026.09.01-x86_64.iso",
-      "disk": {
-        "path": "artifacts/arch-dms/disk.qcow2",
-        "size": "32G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/arch-dms/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 8192,
-      "cpus": 4,
-      "network": "user",
-      "audio": true,
-      "video": {
-        "default": "virtio-gl",
-        "headless": [
-          "-device",
-          "virtio-vga-gl",
-          "-display",
-          "egl-headless"
-        ],
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "virtio-gl": [
-            "-device",
-            "virtio-vga-gl",
-            "-display",
-            "gtk,gl=on"
-          ]
-        }
-      },
-      "usb_tablet": true,
       "archinstall_config": {
         "hostname": "arch-dms",
-        "username": "lab",
-        "password": "lab",
-        "timezone": "Europe/Rome",
-        "keyboard_layout": "it",
-        "locale_lang": "it_IT",
-        "locale_enc": "UTF-8",
-        "bootloader": "Grub",
-        "kernels": [
-          "linux"
-        ],
-        "audio": true,
         "packages": [
           "accountsservice",
           "adwaita-icon-theme",
@@ -854,17 +611,10 @@
           "xorg-xwayland",
           "xwayland-satellite",
           "zip"
-        ],
-        "bootstrap_chroot_commands": [
-          "pacman -S --noconfirm --needed git base-devel",
-          "usermod -aG seat {{user}}",
-          "systemctl enable seatd greetd",
-          "cat > /etc/greetd/config.toml <<\"EOF\"\n[terminal]\nvt = 1\n\n[initial_session]\ncommand = \"niri-session\"\nuser = \"{{user}}\"\n\n[default_session]\ncommand = \"agreety\"\nuser = \"greeter\"\nEOF"
         ]
       },
       "ssh_provision": {
         "hostname": "arch-dms",
-        "user": "lab",
         "ssh_host_port": 2230,
         "copy_from_host": [
           {
@@ -895,83 +645,13 @@
     },
     "arch-dms-nvidia": {
       "name": "Arch Linux + niri + DMS + NVIDIA open (recipe for bare metal)",
+      "extends": "arch-base",
       "meta": {
-        "slug": "archlinux",
-        "family": "arch",
-        "role": "desktop",
-        "release_model": "rolling",
-        "status": "unattended",
         "verified": "2026-09-26",
         "version": "1.0.0"
       },
-      "iso": "isos/archlinux-latest-x86_64.iso",
-      "iso_discovery": {
-        "index_url": "https://geo.mirror.pkgbuild.com/iso/latest/",
-        "pattern": "href=\"(archlinux-\\d{4}\\.\\d{2}\\.\\d{2}-x86_64\\.iso)\"",
-        "sort": "desc",
-        "limit": 1
-      },
-      "iso_url": "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-2026.09.01-x86_64.iso",
-      "disk": {
-        "path": "artifacts/arch-dms-nvidia/disk.qcow2",
-        "size": "32G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/arch-dms-nvidia/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 8192,
-      "cpus": 4,
-      "network": "user",
-      "audio": true,
-      "video": {
-        "default": "virtio-gl",
-        "headless": [
-          "-device",
-          "virtio-vga-gl",
-          "-display",
-          "egl-headless"
-        ],
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "virtio-gl": [
-            "-device",
-            "virtio-vga-gl",
-            "-display",
-            "gtk,gl=on"
-          ]
-        }
-      },
-      "usb_tablet": true,
       "archinstall_config": {
         "hostname": "arch-dms-nvidia",
-        "username": "lab",
-        "password": "lab",
-        "timezone": "Europe/Rome",
-        "keyboard_layout": "it",
-        "locale_lang": "it_IT",
-        "locale_enc": "UTF-8",
-        "bootloader": "Grub",
-        "kernels": [
-          "linux"
-        ],
-        "audio": true,
         "packages": [
           "accountsservice",
           "adwaita-icon-theme",
@@ -1076,10 +756,6 @@
           "zsh-syntax-highlighting"
         ],
         "bootstrap_chroot_commands": [
-          "pacman -S --noconfirm --needed git base-devel",
-          "usermod -aG seat {{user}}",
-          "systemctl enable seatd greetd",
-          "cat > /etc/greetd/config.toml <<\"EOF\"\n[terminal]\nvt = 1\n\n[initial_session]\ncommand = \"niri-session\"\nuser = \"{{user}}\"\n\n[default_session]\ncommand = \"agreety\"\nuser = \"greeter\"\nEOF",
           "printf 'options nvidia_drm modeset=1\\noptions nvidia NVreg_PreserveVideoMemoryAllocations=1\\noptions nvidia NVreg_TemporaryFilePath=/var\\n' > /etc/modprobe.d/nvidia.conf",
           "sed -i 's|^MODULES=.*|MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)|; s/ kms//' /etc/mkinitcpio.conf && mkinitcpio -P",
           "sed -i 's|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"nvidia-drm.modeset=1 drm_kms_helper.poll=0\"|' /etc/default/grub && { test -f /boot/grub/grub.cfg && grub-mkconfig -o /boot/grub/grub.cfg || true; }",
@@ -1088,7 +764,6 @@
       },
       "ssh_provision": {
         "hostname": "arch-dms-nvidia",
-        "user": "lab",
         "ssh_host_port": 2231,
         "copy_from_host": [
           {

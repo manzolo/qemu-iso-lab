@@ -1,4 +1,66 @@
 {
+  "bases": {
+    "rhel-server-base": {
+      "meta": {
+        "family": "rhel",
+        "role": "server",
+        "release_model": "stable",
+        "status": "unattended"
+      },
+      "disk": {
+        "path": "artifacts/{{name}}/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/{{name}}/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "kickstart_config": {
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "packages": [
+          "@^minimal-environment",
+          "openssh-server",
+          "sudo",
+          "vim-minimal"
+        ],
+        "disk_device": "vda",
+        "selinux": "enforcing",
+        "firewall": "enabled"
+      },
+      "ssh_provision": {
+        "user": "lab"
+      }
+    }
+  },
   "vms": {
     "linuxmint-cinnamon": {
       "name": "Linux Mint 22.3 Cinnamon",
@@ -188,12 +250,9 @@
     },
     "almalinux-server": {
       "name": "AlmaLinux 10.1 Server (Kickstart)",
+      "extends": "rhel-server-base",
       "meta": {
         "slug": "almalinux",
-        "family": "rhel",
-        "role": "server",
-        "release_model": "stable",
-        "status": "unattended",
         "groups": [
           "smoke"
         ],
@@ -202,62 +261,14 @@
       },
       "iso": "isos/AlmaLinux-10.1-x86_64-minimal.iso",
       "iso_url": "https://repo.almalinux.org/vault/10.1/isos/x86_64/AlmaLinux-10.1-x86_64-minimal.iso",
-      "disk": {
-        "path": "artifacts/almalinux-server/disk.qcow2",
-        "size": "24G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/almalinux-server/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 2048,
-      "cpus": 2,
-      "network": "user",
-      "audio": false,
-      "video": {
-        "default": "safe",
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
-      },
-      "usb_tablet": true,
       "kickstart_config": {
         "hostname": "almalinux-server",
-        "username": "lab",
-        "fullname": "Lab User",
-        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "timezone": "Europe/Rome",
         "keyboard_layout": "it",
         "locale": "it_IT.UTF-8",
-        "packages": [
-          "@^minimal-environment",
-          "openssh-server",
-          "sudo",
-          "vim-minimal"
-        ],
-        "post_commands": [],
-        "disk_device": "vda",
-        "selinux": "enforcing",
-        "firewall": "enabled"
+        "post_commands": []
       },
       "ssh_provision": {
-        "user": "lab",
         "ssh_host_port": 2229,
         "ssh_key": null
       },
@@ -314,74 +325,23 @@
     },
     "rocky-9": {
       "name": "Rocky Linux 9.8 (Kickstart)",
+      "extends": "rhel-server-base",
       "meta": {
         "slug": "rocky",
-        "family": "rhel",
-        "role": "server",
-        "release_model": "stable",
-        "status": "unattended",
         "verified": "2026-09-26",
         "version": "1.0.0"
       },
       "iso": "isos/Rocky-9.8-x86_64-minimal.iso",
       "iso_url": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-minimal.iso",
-      "disk": {
-        "path": "artifacts/rocky-9/disk.qcow2",
-        "size": "24G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/rocky-9/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 2048,
-      "cpus": 2,
-      "network": "user",
-      "audio": false,
-      "usb_tablet": true,
-      "video": {
-        "default": "safe",
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
-      },
       "notes": "Rocky Linux 9 minimal via kickstart, the RHEL twin of almalinux-server: same flow, install source on the ISO (inst.repo=cdrom), SSH on 2245.",
       "kickstart_config": {
         "hostname": "rocky-9",
-        "username": "lab",
-        "fullname": "Lab User",
-        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
         "timezone": "UTC",
         "keyboard_layout": "us",
         "locale": "en_US.UTF-8",
-        "packages": [
-          "@^minimal-environment",
-          "openssh-server",
-          "sudo",
-          "vim-minimal"
-        ],
-        "post_commands": [],
-        "disk_device": "vda",
-        "selinux": "enforcing",
-        "firewall": "enabled"
+        "post_commands": []
       },
       "ssh_provision": {
-        "user": "lab",
         "ssh_host_port": 2245,
         "ssh_key": null,
         "post_install_run": [

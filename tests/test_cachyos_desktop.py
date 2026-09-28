@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
+from vmctl import config  # noqa: E402
 SCRIPT = ROOT / "vms/profile-files/cachyos-desktop/bin/cachyos-post-install"
 
 
@@ -104,7 +105,7 @@ esac
         self.assertNotIn("CachyOS desktop ready", result.stdout)
 
     def test_bootstrap_leaves_the_power_key_to_logind(self):
-        profiles = json.loads((ROOT / "vms/profiles/arch.json").read_text())["vms"]
+        profiles = config.load_tracked(ROOT / "vms/profiles")  # resolved over cachyos-base
         for name in ("cachyos-desktop", "cachyos-nvidia"):
             with self.subTest(profile=name):
                 commands = profiles[name]["archinstall_config"]["bootstrap_chroot_commands"]
@@ -122,7 +123,7 @@ esac
                 self.assertIn("disable-power-key-handling", input_block)
 
     def test_both_profiles_deliver_and_run_desktop_check(self):
-        profiles = json.loads((ROOT / "vms/profiles/arch.json").read_text())["vms"]
+        profiles = config.load_tracked(ROOT / "vms/profiles")  # resolved over cachyos-base
         for name in ("cachyos-desktop", "cachyos-nvidia"):
             with self.subTest(profile=name):
                 self.assertEqual(profiles[name]["video"]["headless"], [

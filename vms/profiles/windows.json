@@ -1,19 +1,14 @@
 {
-  "vms": {
-    "windows-10": {
-      "name": "Windows 10 (unattended)",
+  "bases": {
+    "windows-base": {
       "meta": {
-        "slug": "windows-10",
         "family": "windows",
         "role": "desktop",
         "release_model": "custom",
-        "status": "unattended",
-        "verified": "2026-09-26",
-        "version": "1.0.0"
+        "status": "unattended"
       },
-      "iso": "isos/windows10.iso",
       "disk": {
-        "path": "artifacts/windows-10/disk.qcow2",
+        "path": "artifacts/{{name}}/disk.qcow2",
         "size": "64G",
         "format": "qcow2",
         "interface": "virtio"
@@ -22,11 +17,9 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/windows-10/OVMF_VARS.fd"
+        "vars_path": "artifacts/{{name}}/OVMF_VARS.fd"
       },
       "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 2,
       "network": "user",
       "network_device": "virtio-net-pci",
       "audio": true,
@@ -49,21 +42,16 @@
       },
       "usb_tablet": true,
       "guest_agent": true,
-      "notes": "Unattended Windows 10 via autounattend.xml (bootstrap-windows), same flow as windows-11: put the retail ISO at isos/windows10.iso (or point 'iso' at it in local.json), it is rebuilt once as isos/windows10-noprompt.iso. Multi-edition ISOs carry several images: 'edition' must name one of them ('Windows 10 Pro' here). No TPM/Secure Boot bypass needed. OpenSSH Server is an optional capability on 1809+.",
       "windows_config": {
         "username": "lab",
         "password": "lab",
         "realname": "Lab User",
-        "computer_name": "WIN10-LAB",
         "organization": "Lab",
-        "edition": "Windows 10 Pro",
         "language": "en-US",
         "input_locale": "en-US",
         "timezone": "UTC",
-        "driver_flavor": "w10",
         "virtio_iso": "isos/virtio-win.iso",
         "virtio_iso_url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso",
-        "bypass_requirements": false,
         "auto_logon": true,
         "install_guest_tools": true,
         "install_openssh": true,
@@ -73,9 +61,7 @@
         ]
       },
       "ssh_provision": {
-        "hostname": "win10-lab",
         "user": "lab",
-        "ssh_host_port": 2236,
         "post_install_run": [
           "ver",
           "powershell -NoProfile -Command \"(Get-CimInstance Win32_OperatingSystem).Caption; (Get-Service sshd).Status\"",
@@ -87,96 +73,55 @@
       "shared_dir": {
         "source": "shared",
         "tag": "shared"
+      }
+    }
+  },
+  "vms": {
+    "windows-10": {
+      "name": "Windows 10 (unattended)",
+      "extends": "windows-base",
+      "meta": {
+        "slug": "windows-10",
+        "verified": "2026-09-26",
+        "version": "1.0.0"
+      },
+      "iso": "isos/windows10.iso",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "notes": "Unattended Windows 10 via autounattend.xml (bootstrap-windows), same flow as windows-11: put the retail ISO at isos/windows10.iso (or point 'iso' at it in local.json), it is rebuilt once as isos/windows10-noprompt.iso. Multi-edition ISOs carry several images: 'edition' must name one of them ('Windows 10 Pro' here). No TPM/Secure Boot bypass needed. OpenSSH Server is an optional capability on 1809+.",
+      "windows_config": {
+        "computer_name": "WIN10-LAB",
+        "edition": "Windows 10 Pro",
+        "driver_flavor": "w10",
+        "bypass_requirements": false
+      },
+      "ssh_provision": {
+        "hostname": "win10-lab",
+        "ssh_host_port": 2236
       },
       "iso_help": "Microsoft gives out only temporary, per-session links. Open https://www.microsoft.com/software-download/windows10ISO from Linux (the page offers the ISO directly there; on Windows it pushes the Media Creation Tool), choose Windows 10 (multi-edition ISO), your language and 64-bit, and download it (the link lasts 24 hours). The image name in install.wim must match windows_config.edition."
     },
     "windows-11": {
       "name": "Windows 11 (unattended)",
+      "extends": "windows-base",
       "meta": {
         "slug": "windows-11",
-        "family": "windows",
-        "role": "desktop",
-        "release_model": "custom",
-        "status": "unattended",
         "verified": "2026-09-26",
         "version": "1.0.0"
       },
       "iso": "isos/windows11.iso",
-      "disk": {
-        "path": "artifacts/windows-11/disk.qcow2",
-        "size": "64G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/windows-11/OVMF_VARS.fd"
-      },
-      "machine": "q35",
       "memory_mb": 8192,
       "cpus": 4,
-      "network": "user",
-      "network_device": "virtio-net-pci",
-      "audio": true,
-      "video": {
-        "default": "std",
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
-      },
-      "usb_tablet": true,
-      "guest_agent": true,
       "notes": "Unattended Windows 11 via autounattend.xml (bootstrap-windows). Microsoft publishes no stable download URL: put the retail ISO at isos/windows11.iso (or point 'iso' at it in local.json). The ISO is rebuilt once as isos/windows11-noprompt.iso (UEFI efisys_noprompt.bin, no 'Press any key' wait); the answer file rides on a VMCTLSEED CD, the virtio-win ISO (downloaded from fedorapeople) supplies viostor/NetKVM in WinPE and the guest tools at first logon. TPM/Secure Boot/CPU/RAM checks are bypassed through the LabConfig registry keys (no swtpm needed). Edition/language must exist in the ISO ('Windows 11 Pro', en-US on the multi-edition English ISO; it-IT on the Italian one). Post-install runs over Windows OpenSSH with cmd.exe semantics.",
       "windows_config": {
-        "username": "lab",
-        "password": "lab",
-        "realname": "Lab User",
         "computer_name": "WIN11-LAB",
-        "organization": "Lab",
         "edition": "Windows 11 Pro",
-        "language": "en-US",
-        "input_locale": "en-US",
-        "timezone": "UTC",
         "driver_flavor": "w11",
-        "virtio_iso": "isos/virtio-win.iso",
-        "virtio_iso_url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso",
-        "bypass_requirements": true,
-        "auto_logon": true,
-        "install_guest_tools": true,
-        "install_openssh": true,
-        "setup_commands": [
-          "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server' -Name fDenyTSConnections -Value 0",
-          "Enable-NetFirewallRule -DisplayGroup 'Desktop remoto' -ErrorAction SilentlyContinue; Enable-NetFirewallRule -DisplayGroup 'Remote Desktop' -ErrorAction SilentlyContinue"
-        ]
+        "bypass_requirements": true
       },
       "ssh_provision": {
         "hostname": "win11-lab",
-        "user": "lab",
-        "ssh_host_port": 2235,
-        "post_install_run": [
-          "ver",
-          "powershell -NoProfile -Command \"(Get-CimInstance Win32_OperatingSystem).Caption; (Get-Service sshd).Status\"",
-          "type C:\\vmctl\\setup.log",
-          "powershell -NoProfile -Command \"(Get-Service VirtioFsSvc).Status; Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Description -like '*virtio*' -or $_.Name -ne 'C' } | Select-Object -ExpandProperty Root\""
-        ]
-      },
-      "acpi_poweroff_grace_sec": 300,
-      "shared_dir": {
-        "source": "shared",
-        "tag": "shared"
+        "ssh_host_port": 2235
       },
       "iso_help": "Microsoft gives out only temporary, per-session links. Open https://www.microsoft.com/software-download/windows11, choose 'Download Windows 11 Disk Image (ISO) for x64 devices', the edition 'Windows 11 (multi-edition ISO for x64 devices)' and your language, and download it (the link lasts 24 hours). The image name in install.wim must match windows_config.edition: 'Windows 11 Pro' on Microsoft's ISO."
     },
