@@ -412,8 +412,10 @@ base it is built on with `extends`:
   web editor (its *Catalog template* is the resolved one) and the catalog site, whose card says
   `on <base>`. A local override in `local.json` applies on top of the resolved profile, and a
   wholly local profile may extend a tracked base.
-- The bases in the catalog today (`grep -l '"bases"' vms/profiles/*.json`): `ubuntu-desktop-base`
-  → `ubuntu-24.04-base` (ten flavours; the 20.04/22.04/26.04 releases sit on the first),
+- The bases in the catalog today (`grep -l '"bases"' vms/profiles/*.json`): `ubuntu-<release>-base`
+  for every LTS from 8.04 to 26.04 (the medium and the machine of that era: the GNOME release
+  profile and the flavour history `tools/gen_ubuntu_flavors.py` generates sit on it), `ubuntu-desktop-base`
+  → `ubuntu-24.04-base` (ten flavours; the 20.04/22.04/26.04 bases sit on the first),
   `ubuntu-preseed-base` → `ubuntu-preseed-old-base` (8.04-12.04) and `ubuntu-preseed-new-base`
   (14.04-18.04), `ubuntu-desktop-iso-base` (the manual desktop ISOs), `debian-preseed-base` →
   `debian-desktop-base`, `fedora-kickstart-base`, `archinstall-base` → `arch-base` and

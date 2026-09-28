@@ -91,8 +91,7 @@
         "release_model": "lts",
         "status": "unattended",
         "groups": [
-          "ubuntu",
-          "ubuntu-releases"
+          "ubuntu"
         ]
       },
       "disk": {
@@ -197,9 +196,6 @@
     "ubuntu-preseed-old-base": {
       "preseed_config": {
         "mirror_hostname": "old-releases.ubuntu.com",
-        "tasks": [
-          "ubuntu-desktop"
-        ],
         "packages": [
           "openssh-server",
           "sudo"
@@ -211,9 +207,6 @@
         ]
       },
       "ssh_provision": {
-        "post_install_run": [
-          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
-        ],
         "key_type": "rsa",
         "ssh_options": [
           "HostKeyAlgorithms=+ssh-rsa",
@@ -236,11 +229,6 @@
         "tasks": [
           "standard"
         ],
-        "packages": [
-          "ubuntu-desktop",
-          "openssh-server",
-          "sudo"
-        ],
         "disk_device": "/dev/vda",
         "extra": [
           "d-i pkgsel/update-policy select none"
@@ -255,6 +243,109 @@
       "machine": "q35",
       "vmport": false,
       "extends": "ubuntu-preseed-base"
+    },
+    "ubuntu-8.04-base": {
+      "extends": "ubuntu-preseed-old-base",
+      "iso": "isos/ubuntu-8.04.4-alternate-amd64.iso",
+      "iso_url": "https://old-releases.ubuntu.com/releases/8.04.4/ubuntu-8.04.4-alternate-amd64.iso",
+      "iso_sha256": "2a4d687fe8824db5c541c8ac40a42e71e8524cbce497a39a7346b92be5d85b6b",
+      "memory_mb": 1024,
+      "network_device": "e1000",
+      "disk": {
+        "size": "16G",
+        "interface": "ide"
+      },
+      "preseed_config": {
+        "disk_device": "auto"
+      }
+    },
+    "ubuntu-10.04-base": {
+      "extends": "ubuntu-preseed-old-base",
+      "iso": "isos/ubuntu-10.04.4-alternate-amd64.iso",
+      "iso_url": "https://old-releases.ubuntu.com/releases/10.04.4/ubuntu-10.04.4-alternate-amd64.iso",
+      "iso_sha256": "2cd07fd3c2786df06d8e3ddcf6ff5752550d04c08bd45b4f69e1d2789d908328",
+      "memory_mb": 1536,
+      "disk": {
+        "size": "16G",
+        "interface": "virtio"
+      },
+      "preseed_config": {
+        "disk_device": "/dev/vda"
+      }
+    },
+    "ubuntu-12.04-base": {
+      "extends": "ubuntu-preseed-old-base",
+      "iso": "isos/ubuntu-12.04.5-alternate-amd64.iso",
+      "iso_url": "https://old-releases.ubuntu.com/releases/12.04.5/ubuntu-12.04.5-alternate-amd64.iso",
+      "iso_sha256": "4d5faa527e1660f0d84b801e47d9cec3181d0c77560825d7100746430e7bab70",
+      "memory_mb": 2048,
+      "disk": {
+        "size": "20G",
+        "interface": "virtio"
+      },
+      "preseed_config": {
+        "disk_device": "/dev/vda"
+      }
+    },
+    "ubuntu-14.04-base": {
+      "extends": "ubuntu-preseed-new-base",
+      "iso": "isos/ubuntu-14.04.6-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/14.04/ubuntu-14.04.6-server-amd64.iso",
+      "iso_sha256": "b17d7c1e9d0321ad5810ba77b69aef43f0f29a5422b08120e6ee0576c4527c0e",
+      "memory_mb": 2048,
+      "disk": {
+        "size": "20G"
+      }
+    },
+    "ubuntu-16.04-base": {
+      "extends": "ubuntu-preseed-new-base",
+      "iso": "isos/ubuntu-16.04.7-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/16.04/ubuntu-16.04.7-server-amd64.iso",
+      "iso_sha256": "b23488689e16cad7a269eb2d3a3bf725d3457ee6b0868e00c8762d3816e25848",
+      "memory_mb": 2048,
+      "disk": {
+        "size": "24G"
+      }
+    },
+    "ubuntu-18.04-base": {
+      "extends": "ubuntu-preseed-new-base",
+      "iso": "isos/ubuntu-18.04.6-server-amd64.iso",
+      "iso_url": "https://cdimage.ubuntu.com/releases/18.04/release/ubuntu-18.04.6-server-amd64.iso",
+      "iso_sha256": "f5cbb8104348f0097a8e513b10173a07dbc6684595e331cb06f93f385d0aecf6",
+      "memory_mb": 3072,
+      "disk": {
+        "size": "24G"
+      }
+    },
+    "ubuntu-20.04-base": {
+      "extends": "ubuntu-desktop-base",
+      "iso": "isos/ubuntu-20.04.6-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/20.04/ubuntu-20.04.6-live-server-amd64.iso",
+      "iso_sha256": "b8f31413336b9393ad5d8ef0282717b2ab19f007df2e9ed5196c13d8f9153c8b",
+      "vmport": false,
+      "disk": {
+        "size": "32G"
+      }
+    },
+    "ubuntu-22.04-base": {
+      "extends": "ubuntu-desktop-base",
+      "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso",
+      "iso_sha256": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+      "vmport": false,
+      "disk": {
+        "size": "32G"
+      }
+    },
+    "ubuntu-26.04-base": {
+      "extends": "ubuntu-desktop-base",
+      "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
+      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9",
+      "vmport": false,
+      "disk": {
+        "size": "35G"
+      }
     }
   },
   "vms": {
@@ -510,18 +601,19 @@
     },
     "ubuntu-8.04": {
       "name": "Ubuntu 8.04.4 Desktop (unattended, d-i alternate)",
-      "extends": "ubuntu-preseed-old-base",
+      "extends": "ubuntu-8.04-base",
       "meta": {
         "verified": "2026-09-26",
-        "version": "1.0.0"
-      },
-      "disk": {
-        "size": "16G",
-        "interface": "ide"
+        "version": "1.0.0",
+        "groups": [
+          "ubuntu-releases"
+        ]
       },
       "preseed_config": {
+        "tasks": [
+          "ubuntu-desktop"
+        ],
         "hostname": "ubuntu-804",
-        "disk_device": "auto",
         "late_commands": [
           "printf '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\nTimedLoginEnable=false\\n' > /etc/gdm/gdm.conf-custom",
           "printf 'start on runlevel 2\\nstart on runlevel 3\\nstart on runlevel 4\\nstart on runlevel 5\\nstop on runlevel 0\\nstop on runlevel 1\\nstop on runlevel 6\\nrespawn\\nexec /sbin/getty -L 115200 ttyS0 vt102\\n' > /etc/event.d/ttyS0",
@@ -532,29 +624,28 @@
       },
       "ssh_provision": {
         "hostname": "ubuntu-804",
-        "ssh_host_port": 2252
+        "ssh_host_port": 2252,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
+        ]
       },
-      "iso": "isos/ubuntu-8.04.4-alternate-amd64.iso",
-      "iso_url": "https://old-releases.ubuntu.com/releases/8.04.4/ubuntu-8.04.4-alternate-amd64.iso",
-      "memory_mb": 1024,
-      "network_device": "e1000",
-      "iso_sha256": "2a4d687fe8824db5c541c8ac40a42e71e8524cbce497a39a7346b92be5d85b6b",
       "notes": "OpenSSH 4.7 in the guest: RSA key, SHA-1 signatures and DH group exchange (ssh_options)."
     },
     "ubuntu-10.04": {
       "name": "Ubuntu 10.04.4 Desktop (unattended, d-i alternate)",
-      "extends": "ubuntu-preseed-old-base",
+      "extends": "ubuntu-10.04-base",
       "meta": {
         "verified": "2026-09-26",
-        "version": "1.0.0"
-      },
-      "disk": {
-        "size": "16G",
-        "interface": "virtio"
+        "version": "1.0.0",
+        "groups": [
+          "ubuntu-releases"
+        ]
       },
       "preseed_config": {
+        "tasks": [
+          "ubuntu-desktop"
+        ],
         "hostname": "ubuntu-1004",
-        "disk_device": "/dev/vda",
         "late_commands": [
           "printf '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\nTimedLoginEnable=false\\n' > /etc/gdm/custom.conf",
           "printf 'start on stopped rc RUNLEVEL=[2345]\\nstop on runlevel [!2345]\\nrespawn\\nexec /sbin/getty -L 115200 ttyS0 vt102\\n' > /etc/init/ttyS0.conf",
@@ -565,28 +656,28 @@
       },
       "ssh_provision": {
         "hostname": "ubuntu-1004",
-        "ssh_host_port": 2253
+        "ssh_host_port": 2253,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
+        ]
       },
-      "iso": "isos/ubuntu-10.04.4-alternate-amd64.iso",
-      "iso_url": "https://old-releases.ubuntu.com/releases/10.04.4/ubuntu-10.04.4-alternate-amd64.iso",
-      "memory_mb": 1536,
-      "iso_sha256": "2cd07fd3c2786df06d8e3ddcf6ff5752550d04c08bd45b4f69e1d2789d908328",
       "notes": "OpenSSH 5.3 in the guest: RSA key, SHA-1 signatures and DH group exchange (ssh_options)."
     },
     "ubuntu-12.04": {
       "name": "Ubuntu 12.04.5 Desktop (unattended, d-i alternate)",
-      "extends": "ubuntu-preseed-old-base",
+      "extends": "ubuntu-12.04-base",
       "meta": {
         "verified": "2026-09-26",
-        "version": "1.0.0"
-      },
-      "disk": {
-        "size": "20G",
-        "interface": "virtio"
+        "version": "1.0.0",
+        "groups": [
+          "ubuntu-releases"
+        ]
       },
       "preseed_config": {
+        "tasks": [
+          "ubuntu-desktop"
+        ],
         "hostname": "ubuntu-1204",
-        "disk_device": "/dev/vda",
         "late_commands": [
           "printf '[SeatDefaults]\\nautologin-user={{user}}\\nautologin-user-timeout=0\\n' > /etc/lightdm/lightdm.conf",
           "printf 'start on stopped rc RUNLEVEL=[2345]\\nstop on runlevel [!2345]\\nrespawn\\nexec /sbin/getty -L 115200 ttyS0 vt102\\n' > /etc/init/ttyS0.conf",
@@ -597,25 +688,29 @@
       },
       "ssh_provision": {
         "hostname": "ubuntu-1204",
-        "ssh_host_port": 2254
+        "ssh_host_port": 2254,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
+        ]
       },
-      "iso": "isos/ubuntu-12.04.5-alternate-amd64.iso",
-      "iso_url": "https://old-releases.ubuntu.com/releases/12.04.5/ubuntu-12.04.5-alternate-amd64.iso",
-      "memory_mb": 2048,
-      "iso_sha256": "4d5faa527e1660f0d84b801e47d9cec3181d0c77560825d7100746430e7bab70",
       "notes": "OpenSSH 5.9 in the guest: RSA key and SHA-1 signatures (ssh_options)."
     },
     "ubuntu-14.04": {
       "name": "Ubuntu 14.04.6 Desktop (unattended, d-i server)",
-      "extends": "ubuntu-preseed-new-base",
+      "extends": "ubuntu-14.04-base",
       "meta": {
         "verified": "2026-09-26",
-        "version": "1.0.0"
-      },
-      "disk": {
-        "size": "20G"
+        "version": "1.0.0",
+        "groups": [
+          "ubuntu-releases"
+        ]
       },
       "preseed_config": {
+        "packages": [
+          "ubuntu-desktop",
+          "openssh-server",
+          "sudo"
+        ],
         "hostname": "ubuntu-1404",
         "late_commands": [
           "printf '[SeatDefaults]\\nautologin-user={{user}}\\nautologin-user-timeout=0\\n' > /etc/lightdm/lightdm.conf",
@@ -632,23 +727,24 @@
           "for i in $(seq 1 90); do pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x 'gnome-session|x-session-manag(er)?' >/dev/null && dpkg-query -W -f='${Status}\\n' ubuntu-desktop | grep -q 'install ok installed'"
         ]
       },
-      "iso": "isos/ubuntu-14.04.6-server-amd64.iso",
-      "iso_url": "https://releases.ubuntu.com/14.04/ubuntu-14.04.6-server-amd64.iso",
-      "memory_mb": 2048,
-      "iso_sha256": "b17d7c1e9d0321ad5810ba77b69aef43f0f29a5422b08120e6ee0576c4527c0e",
       "notes": "Server ISO (d-i): the ubuntu-desktop task is not installed by pkgsel from this medium (verified live), so the metapackage comes through pkgsel/include from archive.ubuntu.com; OpenSSH 6.6 accepts the ed25519 key."
     },
     "ubuntu-16.04": {
       "name": "Ubuntu 16.04.7 Desktop (unattended, d-i server)",
-      "extends": "ubuntu-preseed-new-base",
+      "extends": "ubuntu-16.04-base",
       "meta": {
         "verified": "2026-09-26",
-        "version": "1.0.0"
-      },
-      "disk": {
-        "size": "24G"
+        "version": "1.0.0",
+        "groups": [
+          "ubuntu-releases"
+        ]
       },
       "preseed_config": {
+        "packages": [
+          "ubuntu-desktop",
+          "openssh-server",
+          "sudo"
+        ],
         "hostname": "ubuntu-1604",
         "late_commands": [
           "printf '[SeatDefaults]\\nautologin-user={{user}}\\nautologin-user-timeout=0\\n' > /etc/lightdm/lightdm.conf",
@@ -672,23 +768,24 @@
           }
         ]
       },
-      "iso": "isos/ubuntu-16.04.7-server-amd64.iso",
-      "iso_url": "https://releases.ubuntu.com/16.04/ubuntu-16.04.7-server-amd64.iso",
-      "memory_mb": 2048,
-      "iso_sha256": "b23488689e16cad7a269eb2d3a3bf725d3457ee6b0868e00c8762d3816e25848",
       "notes": "Server ISO (d-i) + the ubuntu-desktop metapackage from archive.ubuntu.com (pkgsel/include); Unity 7 on LightDM, systemd, so verify-desktop applies."
     },
     "ubuntu-18.04": {
       "name": "Ubuntu 18.04.6 Desktop (unattended, d-i server)",
-      "extends": "ubuntu-preseed-new-base",
+      "extends": "ubuntu-18.04-base",
       "meta": {
         "verified": "2026-09-26",
-        "version": "1.0.0"
-      },
-      "disk": {
-        "size": "24G"
+        "version": "1.0.0",
+        "groups": [
+          "ubuntu-releases"
+        ]
       },
       "preseed_config": {
+        "packages": [
+          "ubuntu-desktop",
+          "openssh-server",
+          "sudo"
+        ],
         "hostname": "ubuntu-1804",
         "late_commands": [
           "printf '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\n' > /etc/gdm3/custom.conf",
@@ -712,15 +809,11 @@
           }
         ]
       },
-      "iso": "isos/ubuntu-18.04.6-server-amd64.iso",
-      "iso_url": "https://cdimage.ubuntu.com/releases/18.04/release/ubuntu-18.04.6-server-amd64.iso",
-      "memory_mb": 3072,
-      "iso_sha256": "f5cbb8104348f0097a8e513b10173a07dbc6684595e331cb06f93f385d0aecf6",
       "notes": "Server ISO (d-i, only on cdimage.ubuntu.com) + the ubuntu-desktop metapackage from archive.ubuntu.com; GNOME Shell on GDM3, systemd, so verify-desktop applies."
     },
     "ubuntu-20.04": {
       "name": "Ubuntu 20.04.6 Desktop (unattended, autoinstall)",
-      "extends": "ubuntu-desktop-base",
+      "extends": "ubuntu-20.04-base",
       "meta": {
         "slug": "ubuntu",
         "groups": [
@@ -728,11 +821,6 @@
         ],
         "verified": "2026-09-26",
         "version": "1.0.0"
-      },
-      "iso": "isos/ubuntu-20.04.6-live-server-amd64.iso",
-      "iso_url": "https://releases.ubuntu.com/20.04/ubuntu-20.04.6-live-server-amd64.iso",
-      "disk": {
-        "size": "32G"
       },
       "notes": "Ubuntu Server 20.04.6 autoinstall plus the ubuntu-desktop metapackage: GNOME 3.36 on gdm3 with the autologin drop-in. Its subiquity (22.07) installs `packages` with only the CD pool in the target's sources (the mirror waits in sources.list.curtin.old), so ubuntu-desktop is 'Unable to locate' there (verified live): the desktop is installed by a late-command through curtin in-target instead, after the mirror sources are back. Same recipe otherwise as ubuntu-gnome-24.04, which stands for 24.04 in this series.",
       "autoinstall": {
@@ -762,13 +850,11 @@
         "post_install_run": [
           "~/bin/verify-desktop --user \"{{user}}\" --service gdm3.service --package-manager dpkg --package ubuntu-desktop"
         ]
-      },
-      "iso_sha256": "b8f31413336b9393ad5d8ef0282717b2ab19f007df2e9ed5196c13d8f9153c8b",
-      "vmport": false
+      }
     },
     "ubuntu-22.04": {
       "name": "Ubuntu 22.04.5 Desktop (unattended, autoinstall)",
-      "extends": "ubuntu-desktop-base",
+      "extends": "ubuntu-22.04-base",
       "meta": {
         "slug": "ubuntu",
         "groups": [
@@ -776,11 +862,6 @@
         ],
         "verified": "2026-09-26",
         "version": "1.0.0"
-      },
-      "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
-      "iso_url": "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso",
-      "disk": {
-        "size": "32G"
       },
       "notes": "Ubuntu Server 22.04.5 autoinstall plus the ubuntu-desktop metapackage: GNOME 42 on gdm3 with the autologin drop-in; same recipe as ubuntu-gnome-24.04, which stands for 24.04 in this series.",
       "autoinstall": {
@@ -812,13 +893,11 @@
         "post_install_run": [
           "~/bin/verify-desktop --user \"{{user}}\" --service gdm3.service --package-manager dpkg --package ubuntu-desktop"
         ]
-      },
-      "iso_sha256": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
-      "vmport": false
+      }
     },
     "ubuntu-26.04": {
       "name": "Ubuntu 26.04 Desktop (unattended, autoinstall)",
-      "extends": "ubuntu-desktop-base",
+      "extends": "ubuntu-26.04-base",
       "meta": {
         "slug": "ubuntu",
         "groups": [
@@ -826,11 +905,6 @@
         ],
         "verified": "2026-09-26",
         "version": "1.0.0"
-      },
-      "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
-      "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
-      "disk": {
-        "size": "35G"
       },
       "notes": "Ubuntu Server 26.04 autoinstall plus the ubuntu-desktop metapackage, the newest entry of the per-release desktop series (24.04's entry is ubuntu-gnome-24.04). Same recipe as 22.04 and 24.04, unchanged: gdm3 autologin drop-in, the user in the autologin and nopasswdlogin groups, a ttyS0 getty, and a post-install that asserts an active local graphical session rather than an enabled display manager. The ISO is the one ubuntu-server-live and ubuntu-server-ci already pin. Live PASS 2026-09-20 in 12.9 min: 26.04's subiquity resolves ubuntu-desktop from autoinstall 'packages' (no late_commands with curtin in-target, which 20.04 needed), and gdm3.service still answers because Ubuntu keeps it an alias of gdm.service, so the verify-desktop service gate holds.",
       "autoinstall": {
@@ -862,9 +936,7 @@
         "post_install_run": [
           "~/bin/verify-desktop --user \"{{user}}\" --service gdm3.service --package-manager dpkg --package ubuntu-desktop"
         ]
-      },
-      "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9",
-      "vmport": false
+      }
     }
   }
 }

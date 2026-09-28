@@ -252,7 +252,7 @@ class RepositoryGroupTests(unittest.TestCase):
         declared = sorted({group for _, vm in vmctl.config.sorted_vm_items(self.cfg)
                            for group in vmctl.config.declared_groups(vm)})
         self.assertEqual(declared, ["debian-only", "hobby-os", "kali", "netlab", "proxmox-lab", "smoke", "ubuntu",
-                                    "ubuntu-flavors", "ubuntu-releases", "windows-retro"])
+                                    "ubuntu-flavors", "ubuntu-releases", "windows-retro", "xubuntu-releases"])
         documentation = (ROOT / "docs" / "UNATTENDED.md").read_text(encoding="utf-8")
         for group in declared:
             self.assertIn(f"`{group}`", documentation, f"{group} is not documented")
