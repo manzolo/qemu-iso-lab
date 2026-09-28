@@ -78,7 +78,7 @@ class RecordingTests(unittest.TestCase):
         for frame in (None, OSError("display unavailable")):
             with self.subTest(frame=frame):
                 session = self.start()
-                with mock.patch.object(recorder, "capture", side_effect=frame if isinstance(frame, Exception) else lambda _: None):
+                with mock.patch.object(recorder, "capture", side_effect=frame if isinstance(frame, Exception) else lambda *_: None):
                     session.thread.join(timeout=3)
                 self.assertFalse(session.thread.is_alive())
                 self.assertEqual(session.info()["status"], "stopped")

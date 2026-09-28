@@ -10,6 +10,7 @@ import socket
 import threading
 import shutil
 import subprocess
+import struct
 import sys
 import time
 from pathlib import Path
@@ -626,6 +627,92 @@ def guest_agent_args(vm: dict[str, Any]) -> list[str]:
         "-device", "virtio-serial-pci,id=qga-serial",
         "-device", "virtserialport,bus=qga-serial.0,chardev=qga0,name=org.qemu.guest_agent.0",
     ]
+
+
+VNC_DESKTOP_SIZE_ENCODING = -223
+
+
+def _rfb_read(sock: socket.socket, count: int) -> bytes:
+    chunks = []
+    remaining = count
+    while remaining > 0:
+        chunk = sock.recv(min(remaining, 1 << 16))
+        if not chunk:
+            raise OSError("VNC connection closed early")
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def vnc_frame(path: Path, timeout: float = 15.0) -> bytes:
+    """One full frame from a VM's VNC unix socket, as PPM (P6) bytes.
+
+    The only way to see an accelerated display (``virtio-vga-gl`` + ``egl-headless``): QMP
+    ``screendump`` answers "no surface" there once the guest driver takes over, while QEMU's VNC
+    server reads the GL scanout back. RFB 3.8, no authentication, a shared session (a viewer
+    already connected stays), RAW encoding plus DesktopSize (a guest that changes video mode
+    resizes the framebuffer mid-update). Rows are converted with slices, not per pixel: the
+    recorder calls this every second on 1280x800 screens.
+    """
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.settimeout(timeout)
+        sock.connect(str(path))
+        version = _rfb_read(sock, 12)
+        if not version.startswith(b"RFB "):
+            raise OSError(f"Unexpected VNC greeting: {version!r}")
+        sock.sendall(b"RFB 003.008\n")
+        count = _rfb_read(sock, 1)[0]
+        if count == 0:
+            reason_length = struct.unpack("!I", _rfb_read(sock, 4))[0]
+            raise OSError(f"VNC refused the connection: {_rfb_read(sock, reason_length)!r}")
+        if 1 not in _rfb_read(sock, count):
+            raise OSError("VNC server requires authentication")
+        sock.sendall(bytes([1]))
+        if struct.unpack("!I", _rfb_read(sock, 4))[0] != 0:
+            raise OSError("VNC authentication failed")
+        sock.sendall(bytes([1]))  # share the session, do not disconnect other viewers
+        width, height = struct.unpack("!HH", _rfb_read(sock, 4))
+        _rfb_read(sock, 16)  # the server's pixel format, replaced below
+        _rfb_read(sock, struct.unpack("!I", _rfb_read(sock, 4))[0])  # desktop name
+        if width == 0 or height == 0:
+            raise OSError("VNC reported an empty framebuffer")
+        # 32 bpp true colour, big-endian: a pixel is 00 RR GG BB on the wire.
+        pixel_format = struct.pack("!BBBBHHHBBBxxx", 32, 24, 1, 1, 255, 255, 255, 16, 8, 0)
+        sock.sendall(b"\x00\x00\x00\x00" + pixel_format)
+        sock.sendall(struct.pack("!BBH", 2, 0, 2) + struct.pack("!ii", 0, VNC_DESKTOP_SIZE_ENCODING))
+        sock.sendall(struct.pack("!BBHHHH", 3, 0, 0, 0, width, height))
+        frame = bytearray(width * height * 3)
+        painted = 0
+        deadline = time.monotonic() + timeout
+        while painted < width * height and time.monotonic() < deadline:
+            if _rfb_read(sock, 1)[0] != 0:  # only framebuffer updates were requested
+                continue
+            _rfb_read(sock, 1)
+            rectangles = struct.unpack("!H", _rfb_read(sock, 2))[0]
+            resized = False
+            for _ in range(rectangles):
+                rx, ry, rw, rh, encoding = struct.unpack("!HHHHi", _rfb_read(sock, 12))
+                if encoding == VNC_DESKTOP_SIZE_ENCODING:  # pseudo-encoding: no pixel data follows
+                    width, height = rw, rh
+                    frame = bytearray(width * height * 3)
+                    painted = 0
+                    resized = True
+                    continue
+                if encoding != 0:
+                    raise OSError(f"Unsupported VNC encoding: {encoding}")
+                data = _rfb_read(sock, rw * rh * 4)
+                if rx + rw > width or ry + rh > height:
+                    raise OSError("VNC sent a rectangle outside the framebuffer")
+                for row in range(rh):
+                    src = data[row * rw * 4:(row + 1) * rw * 4]
+                    rgb = bytearray(rw * 3)
+                    rgb[0::3], rgb[1::3], rgb[2::3] = src[1::4], src[2::4], src[3::4]
+                    offset = ((ry + row) * width + rx) * 3
+                    frame[offset:offset + rw * 3] = rgb
+                painted += rw * rh
+            if resized and painted < width * height:
+                sock.sendall(struct.pack("!BBHHHH", 3, 0, 0, 0, width, height))
+        return b"P6\n%d %d\n255\n" % (width, height) + bytes(frame)
 
 
 def vnc_socket_path(vm: dict[str, Any]) -> Path:

@@ -116,6 +116,43 @@ class FramesTests(BaseVmctlTestCase):
         with self.assertRaisesRegex(VMError, "not a recording"):
             recorder.Recording.load(self.root / "nowhere")
 
+    def test_a_failed_screendump_falls_back_to_the_vnc_socket(self):
+        sock, vnc = self.root / "qmp.sock", self.root / "vnc.sock"
+        sock.write_text("")
+        frame = ppm(2, 2, (7, 8, 9))
+        with mock.patch.object(vmctl.qemu, "qmp_execute", side_effect=VMError("QMP screendump: no surface")), \
+             mock.patch.object(vmctl.qemu, "vnc_frame", return_value=frame) as grab:
+            self.assertIsNone(recorder.capture(sock, vnc))  # no VNC socket: nothing
+            vnc.write_text("")
+            self.assertEqual(recorder.capture(sock, vnc), frame)
+            grab.side_effect = OSError("closed")
+            self.assertIsNone(recorder.capture(sock, vnc))
+        self.assertEqual(grab.call_count, 2)
+
+    def test_vnc_frame_reads_raw_rectangles_and_a_desktop_resize(self):
+        import socket as socketlib
+        path = self.root / "fake-vnc.sock"
+        server = socketlib.socket(socketlib.AF_UNIX); server.bind(str(path)); server.listen(1)
+
+        def serve():
+            conn, _ = server.accept()
+            with conn:
+                conn.sendall(b"RFB 003.008\n"); conn.recv(12)
+                conn.sendall(b"\x01\x01"); conn.recv(1)
+                conn.sendall(struct.pack("!I", 0)); conn.recv(1)
+                conn.sendall(struct.pack("!HH", 4, 4) + bytes(16) + struct.pack("!I", 4) + b"QEMU")
+                conn.recv(4096)
+                # the guest switched mode: DesktopSize 2x1, then one RAW rectangle 00 RR GG BB
+                conn.sendall(b"\x00\x00" + struct.pack("!H", 2)
+                             + struct.pack("!HHHHi", 0, 0, 2, 1, vmctl.qemu.VNC_DESKTOP_SIZE_ENCODING)
+                             + struct.pack("!HHHHi", 0, 0, 2, 1, 0) + bytes([0, 1, 2, 3, 0, 4, 5, 6]))
+                conn.recv(4096)
+
+        thread = threading.Thread(target=serve, daemon=True); thread.start()
+        frame = vmctl.qemu.vnc_frame(path, timeout=5)
+        thread.join(5); server.close()
+        self.assertEqual(frame, b"P6\n2 1\n255\n" + bytes([1, 2, 3, 4, 5, 6]))
+
     def test_record_needs_the_socket_and_dry_run_only_explains(self):
         vm = {**self.vm_config}
         with mock.patch.object(vmctl.qemu, "qmp_socket_path", return_value=self.root / "missing.sock"):
@@ -128,7 +165,7 @@ class FramesTests(BaseVmctlTestCase):
         frames = [ppm(2, 2, (1, 1, 1)), ppm(2, 2, (1, 1, 1)), ppm(2, 2, (5, 5, 5)), None, None]
         clock = iter(range(0, 200))
         with mock.patch.object(vmctl.qemu, "qmp_socket_path", return_value=self.root / "qmp.sock"), \
-             mock.patch.object(recorder, "capture", side_effect=lambda sock: frames.pop(0) if frames else None), \
+             mock.patch.object(recorder, "capture", side_effect=lambda sock, vnc=None: frames.pop(0) if frames else None), \
              mock.patch.object(recorder.time, "monotonic", side_effect=lambda: float(next(clock))), \
              mock.patch.object(recorder.time, "sleep"), \
              mock.patch.object(recorder, "encode", return_value={"gif": self.root / "r" / "recording.gif"}) as encode:
@@ -146,7 +183,7 @@ class FramesTests(BaseVmctlTestCase):
         sock = self.root / "qmp.sock"
         captures = []
 
-        def capture(_sock):
+        def capture(_sock, _vnc=None):
             captures.append(1)
             if len(captures) == 3:
                 stop.set()

@@ -84,24 +84,34 @@ def ppm_to_png(ppm: bytes) -> tuple[bytes, int, int]:
     return png, width, height
 
 
-def capture(sock: Path) -> bytes | None:
+def capture(sock: Path, vnc: Path | None = None) -> bytes | None:
     """One screendump as PPM bytes, or None when QEMU is not there (socket gone or refused).
-    QMP serves one client at a time: the lock is shared with the report's screenshots."""
+    QMP serves one client at a time: the lock is shared with the report's screenshots.
+
+    With *vnc* (the VM's ``runtime/vnc.sock``) a failed screendump falls back to a frame read
+    over VNC: on ``virtio-vga-gl`` screendump answers "no surface" once the guest driver takes
+    over, so the Arch/CachyOS/niri clips of 2026-09-28 froze on the boot loader."""
     if not sock.exists():
         return None
     fd, temporary = tempfile.mkstemp(prefix="vmctl-record-", suffix=".ppm", dir="/tmp")
     os.close(fd)
     try:
-        with qemu.QMP_LOCK:
-            qemu.qmp_execute(sock, "screendump", arguments={"filename": temporary}, timeout=10.0)
+        try:
+            with qemu.QMP_LOCK:
+                qemu.qmp_execute(sock, "screendump", arguments={"filename": temporary}, timeout=10.0)
+        except VMError:
+            if vnc is None or not vnc.exists():
+                return None
+            try:
+                return qemu.vnc_frame(vnc, timeout=10.0)
+            except OSError:
+                return None
         for _ in range(20):  # QEMU writes the file after answering; a partial read is a black frame
             data = Path(temporary).read_bytes()
             header = parse_ppm_header(data)
             if header is not None and len(data) >= header[2] + header[0] * header[1] * 3:
                 return data
             time.sleep(0.05)
-        return None
-    except VMError:
         return None
     finally:
         Path(temporary).unlink(missing_ok=True)
@@ -329,6 +339,7 @@ def record(vm_name: str, vm: dict[str, Any], *, fps: float = DEFAULT_FPS, max_ho
         raise VMError("--fps must be positive")
     period = 1.0 / fps
     sock = qemu.qmp_socket_path(vm)
+    vnc = qemu.vnc_socket_path(vm)
     stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     directory = out_dir or recording_dir(vm_name) / stamp
     say = (lambda text: None) if quiet else ui.print_note
@@ -357,7 +368,7 @@ def record(vm_name: str, vm: dict[str, Any], *, fps: float = DEFAULT_FPS, max_ho
     try:
         while True:
             now = time.monotonic()
-            ppm = capture(sock)
+            ppm = capture(sock, vnc)
             if ppm is not None:
                 last_seen = now
                 if recording.add(ppm, now):

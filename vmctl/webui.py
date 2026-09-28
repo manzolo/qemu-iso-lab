@@ -605,7 +605,8 @@ class Handler(BaseHTTPRequestHandler):
                 name = str(body.get("vm", ""))
                 profile = config.get_vm(config.load_config(), name)
                 self._json(self.recordings.start(name, qemu.qmp_socket_path(profile),
-                                                state.ROOT / "artifacts" / ".web-recordings", body.get("fps", 10)))
+                                                state.ROOT / "artifacts" / ".web-recordings", body.get("fps", 10),
+                                                vnc=qemu.vnc_socket_path(profile)))
             elif path.startswith("/api/recordings/") and path.endswith("/stop"):
                 self._json(self.recordings.get(path[len("/api/recordings/"):-len("/stop")]).stop())
             elif path.startswith("/api/recordings/") and path.endswith("/export"):

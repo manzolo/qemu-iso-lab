@@ -13,11 +13,13 @@ from vmctl.errors import VMError
 
 
 class ConsoleRecording:
-    def __init__(self, vm: str, socket: Path, directory: Path, first: bytes, fps: int) -> None:
+    def __init__(self, vm: str, socket: Path, directory: Path, first: bytes, fps: int,
+                 vnc: Path | None = None) -> None:
         self.vm = vm
         self.fps = fps
         self.period = 1 / fps
         self.socket = socket
+        self.vnc = vnc
         self.recording = recorder.Recording(directory)
         self.started = time.monotonic()
         self.recording.add(first, self.started)
@@ -34,7 +36,7 @@ class ConsoleRecording:
             next_frame = self.started + self.period
             while not self.stop_event.wait(max(0, next_frame - time.monotonic())):
                 next_frame = time.monotonic() + self.period
-                frame = recorder.capture(self.socket)
+                frame = recorder.capture(self.socket, self.vnc)
                 if frame is None:
                     break
                 with self.lock:
@@ -89,7 +91,7 @@ class Recordings:
         self.sessions: dict[str, ConsoleRecording] = {}
         self.lock = threading.Lock()
 
-    def start(self, vm: str, socket: Path, root: Path, fps: Any = 10) -> dict[str, Any]:
+    def start(self, vm: str, socket: Path, root: Path, fps: Any = 10, vnc: Path | None = None) -> dict[str, Any]:
         if type(fps) is not int or fps not in (1, 5, 10, 15):
             raise VMError("Recording frame rate must be 1, 5, 10 or 15 fps")
         if not shutil.which("ffmpeg"):
@@ -97,11 +99,11 @@ class Recordings:
         with self.lock:
             if any(s.vm == vm and not s.finished for s in self.sessions.values()):
                 raise VMError("This VM is already being recorded")
-            first = recorder.capture(socket)
+            first = recorder.capture(socket, vnc)
             if first is None:
                 raise VMError("No screen available: start the VM headless before recording")
             key = secrets.token_hex(16)
-            session = ConsoleRecording(vm, socket, root / key, first, fps)
+            session = ConsoleRecording(vm, socket, root / key, first, fps, vnc)
             self.sessions[key] = session
             return {"id": key, **session.info()}
 
