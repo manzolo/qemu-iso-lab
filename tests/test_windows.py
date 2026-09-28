@@ -746,6 +746,18 @@ class WindowsBootstrapTests(BaseVmctlTestCase):
         self.assertEqual(cmd[-1], "shutdown /s /t 0 /f")
         self.assertNotIn("systemctl", cmd)
 
+    def test_linux_ssh_poweroff_is_one_quoted_script_with_a_sysvinit_fallback(self):
+        # Debian 7 (2026-09-28): an unquoted script reached the guest as separate words and nothing ran.
+        import shlex
+        self.vm_config.pop("windows_config", None)
+        with mock.patch.object(vmctl.ssh, "ensure_generated_ssh_keypair", return_value=self.root / "artifacts/testvm/ssh/id_ed25519"):
+            cmd = self.vmctl.ssh_poweroff_command(self.vm_config)
+        self.assertEqual(cmd[-4:-1], ["sudo", "sh", "-c"])
+        script = shlex.split(cmd[-1])
+        self.assertEqual(len(script), 1)
+        self.assertIn("systemctl poweroff", script[0])
+        self.assertIn("exec poweroff", script[0])
+
     def test_stop_honours_the_profile_grace_period(self):
         import time as _time
         sock_path = self.root / "qmp.sock"; sock_path.write_text("")

@@ -138,7 +138,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_xubuntu_history = {"xubuntu-8.04", "xubuntu-10.04", "xubuntu-14.04", "xubuntu-16.04", "xubuntu-18.04", "xubuntu-20.04",
                                     "xubuntu-22.04", "xubuntu-26.04",
                                     # the Debian release history (debian-history.json), same evening
-                                    "debian-8", "debian-9", "debian-10", "debian-11", "debian-12"}
+                                    "debian-7", "debian-8", "debian-9", "debian-10", "debian-11", "debian-12"}
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
             expected_date = ("2026-09-28" if name in verified_xubuntu_history

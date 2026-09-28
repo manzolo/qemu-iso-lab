@@ -3385,7 +3385,8 @@ def ssh_poweroff_command(vm: dict[str, Any]) -> list[str] | None:
     if proxmox.proxmox_config(vm) is not None:
         return base + ["systemctl", "poweroff"]
     # sysvinit guests (Debian 7) have no systemctl: plain poweroff there.
-    return base + ["sudo", "sh", "-c", "command -v systemctl >/dev/null 2>&1 && exec systemctl poweroff; exec poweroff"]
+    # One quoted token: ssh joins its arguments with spaces and the guest's shell splits them again.
+    return base + ["sudo", "sh", "-c", shlex.quote("command -v systemctl >/dev/null 2>&1 && exec systemctl poweroff; exec poweroff")]
 
 
 def cmd_cancel_install(args: argparse.Namespace) -> int:
