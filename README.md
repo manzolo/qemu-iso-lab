@@ -188,7 +188,7 @@ the access token.
 | **Profiles** | Search and filter (My VMs, All, With disk, Running, Labs), inspect RAM/CPU/disk, and install, boot or stop a VM. Right-click a row for its actions. |
 | **My VMs** | The ★ of a profile adds it to your selection; the page opens on it from then on. |
 | **Multiple selection** | Ctrl/Cmd+click or Shift+click several VMs to start, stop, link or unlink them together (F2/F8 act on the selection). |
-| **Live console** | Use the guest's screen, keyboard and mouse in the browser, with fit/actual-size, reconnect and full screen. |
+| **Live console** | Desktop with keyboard shortcuts, clipboard, file upload/download, PNG screenshots, recording, automatic reconnect and docked SSH. Detach consoles to work with several VMs side by side. |
 | **SSH** | Open an interactive terminal in the browser or on the host, or copy the connection command. |
 | **Link** | Connect two or more VMs on a private network from a machine's network button (click or drag). |
 | **Commands** | Browse suggestions and recent commands, filter by category, edit parameters, then copy or run the preview. |

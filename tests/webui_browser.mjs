@@ -15,6 +15,8 @@ let requests = [], failRun = false, failState = false, sshLaunches = 0, override
 let jobStatus = 'completed', jobCommand = 'vmctl start arch-noctalia --headless --background', cancelRequests = [], failCancel = false, cancelResult = true;
 let jobId = 'web:fixture', holdRun = false, releaseRun;
 let hideJobs = false, recording = null, recordingExports = [], failExport = false;
+let clipboardChannel = true, consoleRunning = true, failFiles = false;
+const guestFiles = new Map([['hello.txt',Buffer.from('hello from guest')],['.hidden',Buffer.from('hidden')]]);
 let screenDelay = 700;
 let screenRequests = 0, failScreen = false, holdState = false, stateWaiters = [], dynamicVmJobs = false;
 const profileBase = {name:'Arch Linux + Noctalia',memory_mb:8192,cpus:4,post_install:{commands:Array.from({length:35},(_,i)=>'echo catalog step '+i)}};
@@ -30,6 +32,20 @@ const server = createServer(async (req,res) => {
     res.setHeader('Content-Type','image/svg+xml');
     return res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768"><rect width="1024" height="768" fill="#111827"/><rect width="1024" height="38" fill="#263449"/><g fill="#bceedd" font-family="monospace" font-size="22"><text x="24" y="94">Arch Linux · console</text><text x="24" y="145">guest@arch-noctalia:~$ uptime</text><text x="24" y="186">Screen frame ${screenRequests}</text></g></svg>`);
   }
+  if (req.url.includes('/files?')) {
+    if(failFiles) {res.statusCode=400;return res.end(JSON.stringify({error:'SSH key unavailable'}));}
+    const path=new URL(req.url,'http://fixture').searchParams.get('path');
+    return res.end(JSON.stringify({path:path==='.'?'/home/lab':path,home:'/home/lab',parent:'/home/lab',max_file_size:256*1024*1024,entries:[{name:'Documents',kind:'directory',size:0},...Array.from(guestFiles,([name,data])=>({name,kind:'file',size:data.length}))]}));
+  }
+  if (req.url.includes('/files-upload?')) {
+    const chunks=[];for await(const chunk of req)chunks.push(chunk);
+    const query=new URL(req.url,'http://fixture').searchParams;
+    let name=query.get('name');if(guestFiles.has(name))name='copy-'+name;
+    guestFiles.set(name,Buffer.concat(chunks));await new Promise(resolve=>setTimeout(resolve,75));
+    return res.end(JSON.stringify({name,path:query.get('path')+'/'+name,size:guestFiles.get(name).length}));
+  }
+  if(req.url.includes('/file?')) {const name=new URL(req.url,'http://fixture').searchParams.get('path').split('/').at(-1);res.setHeader('Content-Type','application/octet-stream');return res.end(guestFiles.get(name));}
+  if (req.url.endsWith('/console-info')) return res.end(JSON.stringify({running:consoleRunning,clipboard_channel:clipboardChannel,clipboard_enabled:true}));
   if (req.url.endsWith('/ssh-terminal')) { sshLaunches++; return res.end(JSON.stringify({terminal:'fixture'})); }
   if (req.url.endsWith('/override')) {
     if (req.method === 'POST') { let body=''; for await (const chunk of req) body+=chunk; const data=JSON.parse(body); assert.equal(data.revision,String(overrideRevision)); savedOverride=data.override; overrideRevision++; }
@@ -81,7 +97,12 @@ let browser;
 try {
   browser = await chromium.launch({headless:true, executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined});
   const context = await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});
-  await context.route('https://cdn.jsdelivr.net/npm/@novnc/**', route => route.fulfill({contentType:'text/javascript',body:`export default class RFB extends EventTarget { constructor(el) { super(); el.innerHTML='<div class="console-empty">Fixture guest display</div>'; setTimeout(()=>this.dispatchEvent(new Event('connect')),20); } disconnect() {} focus() {} sendCtrlAltDel() { window.sentCAD=true; } }`}));
+  await context.route('https://cdn.jsdelivr.net/npm/@novnc/**', route => route.fulfill({contentType:'text/javascript',body:`export default class RFB extends EventTarget {
+    constructor(el) { super(); window.fixtureRfb=this; window.rfbCount=(window.rfbCount||0)+1; window.keyEvents=[]; el.innerHTML='<div class="console-empty">Fixture guest display</div>'; this.timer=setTimeout(()=>this.dispatchEvent(new Event('connect')),20); }
+    disconnect() { clearTimeout(this.timer); } focus() {} blur() {} sendCtrlAltDel() { window.sentCAD=true; }
+    sendKey(...args) { window.keyEvents.push(args); } clipboardPasteFrom(text) { window.sentClipboard=text; }
+    toBlob(callback,type) { const canvas=document.createElement('canvas'); canvas.width=1024; canvas.height=768; canvas.toBlob(callback,type); }
+  }`}));
   if (!process.env.REAL_TERMINAL_ASSETS) await context.route('https://cdn.jsdelivr.net/npm/@xterm/**', route => {
     const url=route.request().url();
     const body=url.endsWith('.css') ? '.xterm {height:100%}' : url.includes('addon-fit') ? 'window.FitAddon={FitAddon:class { fit() {} }};' : `window.Terminal=class { constructor(){this.cols=100;this.rows=30;} loadAddon(){} open(el){this.el=el;el.textContent='Fixture SSH terminal';this.buffer={active:{length:1,getLine:()=>({translateToString:()=>this.el.textContent})}};} onData(fn){this.data=fn;} onResize(fn){this.resize=fn;} write(data){this.el.textContent+=typeof data==='string'?data:new TextDecoder().decode(data);} input(data){this.data(data);} focus(){} dispose(){} };`;
@@ -455,7 +476,128 @@ try {
   await page.locator('#cmd-dialog [data-close]').click();
   await page.locator('#details [data-action="0"]').click(); await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
   await page.locator('#vnc-fit').click(); assert.equal(await page.locator('#vnc-fit').textContent(),'Actual size');
+  await page.locator('#vnc-keyboard').click();
   await page.locator('#vnc-cad').click(); assert(await page.evaluate(()=>window.sentCAD));
+  await page.locator('[data-key="alt-tab"]').click();
+  assert.deepEqual(await page.evaluate(()=>window.keyEvents),[[65513,'AltLeft',true],[65289,'Tab',true],[65289,'Tab',false],[65513,'AltLeft',false]]);
+  await page.evaluate(()=>window.keyEvents=[]);
+  await page.locator('#console-function-key').selectOption('12'); await page.locator('#console-send-tty').click();
+  assert.deepEqual(await page.evaluate(()=>window.keyEvents.map(k=>k[1])),['ControlLeft','AltLeft','F12','F12','AltLeft','ControlLeft']);
+  await page.locator('#console-release').click();
+  assert((await page.evaluate(()=>window.keyEvents.slice(-9))).every(k=>k[2]===false));
+  await page.locator('#vnc-clipboard').click();
+  await page.locator('#console-clipboard-send').fill('echo café\nsecond line');
+  await page.locator('#console-clipboard-paste').click(); assert.equal(await page.evaluate(()=>window.sentClipboard),'echo café\nsecond line');
+  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('clipboard',{detail:{text:'guest text'}})));
+  assert.equal(await page.locator('#console-clipboard-send').inputValue(),'guest text');
+  await page.locator('#console-clipboard-copy').click(); assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'guest text');
+  await page.locator('#console-clipboard-read').click(); await page.waitForFunction(()=>document.getElementById('console-clipboard-send').value==='guest text');
+  await page.evaluate(()=>{window.savedRead=navigator.clipboard.readText.bind(navigator.clipboard);navigator.clipboard.readText=()=>Promise.reject(new Error('denied'));});
+  await page.locator('#console-clipboard-read').click(); await page.waitForFunction(()=>document.getElementById('console-clipboard-message').textContent.includes('Paste directly'));
+  await page.evaluate(()=>navigator.clipboard.readText=window.savedRead);
+  await page.locator('#console-clipboard-send').fill('unsent draft');
+  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('clipboard',{detail:{text:'new guest copy'}})));
+  assert.equal(await page.locator('#console-clipboard-send').inputValue(),'unsent draft');
+  await page.locator('#console-clipboard-latest').click();assert.equal(await page.locator('#console-clipboard-send').inputValue(),'new guest copy');
+
+  await page.locator('#console-panel-close').click();
+  const screenshotEvent=page.waitForEvent('download'); await page.locator('#vnc-screenshot').click();
+  const screenshot=await screenshotEvent; assert(screenshot.suggestedFilename().startsWith('arch-noctalia-')); assert(screenshot.suggestedFilename().endsWith('.png'));
+  const png=readFileSync(await screenshot.path()); assert.equal(png.subarray(1,4).toString(),'PNG'); assert.equal(png.readUInt32BE(16),1024);
+  await page.locator('#vnc-ssh').click(); await page.waitForFunction(()=>document.getElementById('terminal-status').textContent==='Session open');
+  assert(await page.locator('#console-ssh #terminal-shell').isVisible()); assert(!(await page.locator('#terminal-dialog').evaluate(el=>el.open)));
+  await page.evaluate(()=>terminal.input('whoami\r'));
+  await page.waitForFunction(()=>document.getElementById('terminal-screen').textContent.includes('fixture-user'));
+  await page.locator('#console-divider').focus(); await page.keyboard.press('ArrowUp'); assert.equal(await page.locator('#console-divider').getAttribute('aria-valuenow'),'43');
+  const dividerBox=await page.locator('#console-divider').boundingBox();
+  await page.mouse.move(dividerBox.x+50,dividerBox.y+4); await page.mouse.down(); await page.mouse.move(dividerBox.x+50,dividerBox.y-40); await page.mouse.up();
+  assert(Number(await page.locator('#console-divider').getAttribute('aria-valuenow'))>43);
+  await shot('console-tools');
+  for (const width of [925,600,375]) {
+    await page.setViewportSize({width,height:909});
+    const closeBox=await page.locator('#vnc-close').boundingBox(); assert(closeBox.x>=0 && closeBox.x+closeBox.width<=width);
+    const heading=await page.locator('#vnc-title').boundingBox(); assert(heading.height<30);
+    await page.locator('#vnc-clipboard').click();
+    const panel=await page.locator('#console-panel').boundingBox(); assert(panel.x>=0 && panel.x+panel.width<=width);
+    if(width===925) await shot('console-laptop');
+    await page.locator('#console-panel-close').click();
+    assert((await page.locator('#vnc-screen').boundingBox()).height>70);
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  check('console toolbar, clipboard panel and SSH dock remain usable at laptop, tablet and phone widths');
+  await page.locator('#vnc-reconnect').click(); await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  assert(await page.locator('#console-ssh #terminal-shell').isVisible());
+  await page.evaluate(()=>terminal.input('exit\r')); await page.waitForFunction(()=>document.getElementById('console-ssh').hidden);
+  assert(await page.locator('#vnc-dialog').isVisible());
+  check('console shortcuts, bidirectional clipboard with browser fallback, PNG export and resizable SSH dock');
+  clipboardChannel=false;
+  await page.locator('#vnc-reconnect').click(); await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  await page.locator('#vnc-clipboard').click();
+  await page.waitForFunction(()=>document.getElementById('console-clipboard-paste').disabled);
+  assert((await page.locator('#console-clipboard-status').textContent()).includes('shut down'));
+  assert.equal(await page.evaluate(()=>consoleClipboardText),'');
+  clipboardChannel=true;
+  await page.locator('#console-panel-close').click();
+  const beforeRetry=await page.evaluate(()=>window.rfbCount);
+  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:false}})));
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Reconnecting');
+  assert(await page.locator('#vnc-screenshot').isDisabled());
+  await page.waitForFunction(count=>window.rfbCount>count && document.getElementById('vnc-status').textContent==='Connected',beforeRetry);
+  await page.locator('#vnc-auto').uncheck();
+  const noRetry=await page.evaluate(()=>window.rfbCount); consoleRunning=false;
+  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:true}})));
+  await page.waitForFunction(()=>document.getElementById('vnc-note').textContent.includes('VM is stopped'));
+  await page.waitForTimeout(2300); assert.equal(await page.evaluate(()=>window.rfbCount),noRetry);
+  consoleRunning=true; await page.locator('#vnc-auto').check();
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:false}})));
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Reconnecting');
+  await page.locator('#vnc-close').click(); const closedCount=await page.evaluate(()=>window.rfbCount);
+  await page.waitForTimeout(2300); assert.equal(await page.evaluate(()=>window.rfbCount),closedCount);
+  await page.evaluate(()=>openConsole('arch-noctalia')); await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  await page.evaluate(()=>{window.oldConsoleClient=window.fixtureRfb;});
+  await page.locator('#vnc-ssh').click(); await page.waitForFunction(()=>document.getElementById('terminal-status').textContent==='Session open');
+  await page.locator('#vnc-close').click();
+  assert(await page.evaluate(()=>terminal===null && terminalSocket===null && !terminalDocked));
+  await page.evaluate(()=>openConsole('arch-noctalia')); await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  await page.evaluate(()=>window.oldConsoleClient.dispatchEvent(new CustomEvent('clipboard',{detail:{text:'stale clipboard'}})));
+  assert.equal(await page.locator('#console-clipboard-send').inputValue(),'');
+  check('missing clipboard channel, automatic recovery, stopped VM explanation, retry opt-out and cleanup on close');
+  await page.locator('#vnc-files').click(); await page.waitForFunction(()=>document.getElementById('console-files-path').textContent==='/home/lab');
+  assert.equal(await page.locator('.file-entry').count(),2);
+  await page.locator('#console-files-hidden').check();assert.equal(await page.locator('.file-entry').count(),3);
+  const fileDownload=page.waitForEvent('download');await page.locator('.file-entry').filter({hasText:'hello.txt'}).click();
+  const guestDownload=await fileDownload;assert.equal(guestDownload.suggestedFilename(),'hello.txt');assert.equal(readFileSync(await guestDownload.path()).toString(),'hello from guest');
+  await page.waitForFunction(()=>!consoleFilesBusy);
+  await page.locator('#console-files-input').setInputFiles([{name:'uploaded.bin',mimeType:'application/octet-stream',buffer:Buffer.from([0,255,17])}]);
+  await page.waitForFunction(()=>document.getElementById('console-files-status').textContent.includes('Saved in VM: uploaded.bin'));
+  assert.deepEqual(guestFiles.get('uploaded.bin'),Buffer.from([0,255,17]));
+  await page.locator('#console-files-drop').evaluate(el=>{const transfer=new DataTransfer();transfer.items.add(new File(['drop bytes'],'dropped.txt',{type:'text/plain'}));el.dispatchEvent(new DragEvent('drop',{dataTransfer:transfer,bubbles:true,cancelable:true}));});
+  await page.waitForFunction(()=>document.getElementById('console-files-status').textContent.includes('Saved in VM: dropped.txt'));
+  assert.equal(guestFiles.get('dropped.txt').toString(),'drop bytes');
+  await page.locator('.file-entry').filter({hasText:'Documents'}).click();await page.waitForFunction(()=>document.getElementById('console-files-path').textContent==='/home/lab/Documents');
+  await page.locator('#console-files-home').click();await page.waitForFunction(()=>document.getElementById('console-files-path').textContent==='/home/lab');
+  await page.setViewportSize({width:925,height:909});await shot('console-files');await page.setViewportSize({width:1440,height:1000});
+  failFiles=true;await page.locator('#console-files-refresh').click();await page.waitForFunction(()=>document.getElementById('console-files-status').textContent.includes('SSH key unavailable'));
+  failFiles=false;await page.locator('#console-files-refresh').click();await page.waitForFunction(()=>!consoleFilesBusy);
+  await page.locator('#console-panel-close').click();
+  check('file browser navigates folders, uploads binary files and drops, downloads original bytes and recovers from SSH errors');
+  const popupEvent=context.waitForEvent('page');await page.locator('#vnc-detach').click();const popup=await popupEvent;
+  popup.on('pageerror',e=>errors.push(e.message));
+  await popup.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  assert(await popup.locator('body').evaluate(el=>el.classList.contains('console-detached')));
+  assert.equal(await popup.locator('#vnc-title').textContent(),'arch-noctalia');
+  assert(!(await page.locator('#vnc-dialog').evaluate(el=>el.open)));assert(!(await popup.locator('#vnc-detach').isVisible()));
+  assert(!(await popup.locator('body > header').isVisible()));assert.equal(await popup.evaluate(()=>window.opener),null);
+  await page.evaluate(()=>openConsole('debian-server'));await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  assert.equal(await page.locator('#vnc-title').textContent(),'debian-server');assert.equal(await popup.locator('#vnc-title').textContent(),'arch-noctalia');
+  await popup.reload();await popup.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  assert(await popup.locator('body').evaluate(el=>el.classList.contains('console-detached')));
+  const popupClosed=popup.waitForEvent('close');await popup.locator('#vnc-close').click();await popupClosed;
+  assert.equal(await page.locator('#vnc-status').textContent(),'Connected');
+  await page.evaluate(()=>openConsole('arch-noctalia'));await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  check('detached console survives reload and operates independently alongside a second VM');
+
   await page.locator('#vnc-reconnect').click(); await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
   await page.locator('#vnc-full').click(); await page.waitForFunction(()=>document.fullscreenElement?.id==='console-shell');
   await page.evaluate(()=>document.activeElement.blur());

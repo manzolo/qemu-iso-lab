@@ -39,6 +39,34 @@ class NetworkSpecTests(BaseVmctlTestCase):
         self.assertIn("virtio-net-pci,netdev=n1", runtime_args)
         self.assertFalse(any("mac=" in a for a in runtime_args))
 
+    def test_headless_clipboard_preserves_all_existing_device_positions(self):
+        self.create_disk()
+        self.vm_config.update(clipboard=True, guest_agent=True, usb_tablet=True)
+        self.vm_config["networks"] = [{"id": "wan", "type": "user"}, {"id": "lan", "type": "user"}]
+        for machine in ("pc", "q35"):
+            with self.subTest(machine=machine), mock.patch.object(vmctl.qemu.runtime, "require_command"):
+                self.vm_config["machine"] = machine
+                install = vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True,
+                                                network_phase="install", enable_clipboard=False)
+                started = vmctl.qemu.common_args(self.vm_config, None, dry_run=True, headless=True)
+            # Device order determines automatic PCI addresses. The first clipboard
+            # boot must retain the entire old argument prefix, including NICs and
+            # q35 hot-plug root ports, before appending the new controller/channel.
+            self.assertEqual(started[:len(install)], install)
+            self.assertEqual(started[len(install):], [
+                "-device", "virtio-serial-pci,id=clipboard-serial",
+                "-chardev", "qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on",
+                "-device", "virtserialport,bus=clipboard-serial.0,chardev=vdagent0,name=com.redhat.spice.0",
+            ])
+
+    def test_windowed_clipboard_preserves_its_existing_position_before_network(self):
+        self.create_disk()
+        self.vm_config["clipboard"] = True
+        with mock.patch.object(vmctl.qemu.runtime, "require_command"):
+            args = vmctl.qemu.common_args(self.vm_config, None, dry_run=True)
+        self.assertLess(args.index("virtio-serial-pci,id=clipboard-serial"),
+                        args.index("virtio-net-pci,netdev=n1"))
+
     def test_phase_filter_keeps_the_slot_and_the_mac_of_a_member_nic(self):
         self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2238}
         self.vm_config["networks"] = [

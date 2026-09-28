@@ -903,9 +903,14 @@ def common_args(
         args += ["-device", "usb-tablet"]
     if vm.get("audio"):
         args += audio_args(vm)
-    if enable_clipboard and vm.get("clipboard") and not headless and spice_port is None:
-        args += ["-device", "virtio-serial-pci", "-chardev", "qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on",
-                 "-device", "virtserialport,chardev=vdagent0,name=com.redhat.spice.0"]
+    clipboard_args = []
+    if enable_clipboard and vm.get("clipboard") and spice_port is None:
+        # VNC uses the same guest clipboard agent as the local display. Name its
+        # bus explicitly so it cannot attach to the separate QEMU guest agent bus.
+        clipboard_args = ["-device", "virtio-serial-pci,id=clipboard-serial", "-chardev", "qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on",
+                          "-device", "virtserialport,bus=clipboard-serial.0,chardev=vdagent0,name=com.redhat.spice.0"]
+        if not headless:
+            args += clipboard_args  # Preserve the existing windowed PCI layout.
     args += network_args(vm, network_phase)
     args += shared_dir_vvfat_args(vm, network_phase)
     if shared_device:
@@ -915,6 +920,10 @@ def common_args(
         args += shared_device
     if headless and spice_port is None:
         args += hotplug_port_args(vm)
+        # Headless installs and older boots did not have this controller. Append
+        # it after every existing device so NIC addresses/interface names and
+        # hot-plug root ports stay stable on the first boot with clipboard enabled.
+        args += clipboard_args
     if no_reboot:
         args += ["-no-reboot"]
     return args

@@ -782,9 +782,23 @@ class VmctlTests(BaseVmctlTestCase):
         with mock.patch.object(vmctl.runtime, "require_command"):
             qemu_cmd = self.vmctl.common_args(self.vm_config, variant="std", dry_run=True)
 
-        self.assertIn("virtio-serial-pci", qemu_cmd)
+        self.assertIn("virtio-serial-pci,id=clipboard-serial", qemu_cmd)
         self.assertIn("qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on", qemu_cmd)
-        self.assertIn("virtserialport,chardev=vdagent0,name=com.redhat.spice.0", qemu_cmd)
+        self.assertIn("virtserialport,bus=clipboard-serial.0,chardev=vdagent0,name=com.redhat.spice.0", qemu_cmd)
+
+    def test_headless_clipboard_respects_profile_install_and_spice_settings(self):
+        self.create_disk()
+        for enabled, install, spice, expected in (
+            (True, False, None, True), (False, False, None, False),
+            (True, True, None, False), (True, False, 5901, False),
+        ):
+            with self.subTest(enabled=enabled, install=install, spice=spice), mock.patch.object(vmctl.runtime, "require_command"):
+                self.vm_config["clipboard"] = enabled
+                args = self.vmctl.common_args(self.vm_config, None, dry_run=True, headless=True,
+                                             enable_clipboard=not install, spice_port=spice)
+                self.assertEqual("qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on" in args, expected)
+                if expected:
+                    self.assertIn("virtserialport,bus=clipboard-serial.0,chardev=vdagent0,name=com.redhat.spice.0", args)
 
     def test_common_args_can_disable_clipboard_agent(self):
         self.create_disk()
@@ -798,9 +812,9 @@ class VmctlTests(BaseVmctlTestCase):
                 enable_clipboard=False,
             )
 
-        self.assertNotIn("virtio-serial-pci", qemu_cmd)
+        self.assertNotIn("virtio-serial-pci,id=clipboard-serial", qemu_cmd)
         self.assertNotIn("qemu-vdagent,id=vdagent0,name=vdagent,clipboard=on", qemu_cmd)
-        self.assertNotIn("virtserialport,chardev=vdagent0,name=com.redhat.spice.0", qemu_cmd)
+        self.assertNotIn("virtserialport,bus=clipboard-serial.0,chardev=vdagent0,name=com.redhat.spice.0", qemu_cmd)
 
     def test_cmd_boot_check_dry_run_uses_ci_settings(self):
         self.create_disk()

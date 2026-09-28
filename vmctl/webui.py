@@ -32,6 +32,7 @@ import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from http import HTTPStatus
@@ -40,7 +41,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import catalog, config, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_recording
+from vmctl import catalog, config, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
@@ -304,6 +305,23 @@ def open_ssh_terminal(vm_name: str) -> str:
     ssh.ssh_target(vm)  # validate access without creating keys or opening a connection
     return open_host_terminal([str(state.ROOT / "bin" / "vmctl"), "shell", vm_name])
 
+def console_info(vm_name: str) -> dict[str, Any]:
+    """Inspect the running process/channel, not just the next-boot profile."""
+    from vmctl import lifecycle
+
+    vm = config.get_vm(config.load_config(), vm_name)
+    running = lifecycle.running_qemu_pid(vm_name, vm) is not None
+    channel = None
+    if running:
+        try:
+            with qemu.QMP_LOCK:  # QMP serves one client: never race the recorder or the report
+                devices = qemu.qmp_execute(qemu.qmp_socket_path(vm), "query-chardev", timeout=2.0)
+            channel = any(device.get("label") == "vdagent0" for device in devices)
+        except VMError:
+            pass  # An unavailable monitor cannot prove that the channel is absent.
+    return {"running": running, "clipboard_channel": channel, "clipboard_enabled": bool(vm.get("clipboard"))}
+
+
 def screenshot_png(vm_name: str) -> bytes | None:
     from vmctl import report
 
@@ -526,6 +544,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(run_json(["show", path.split("/")[3], "--json"]))
             elif path.startswith("/api/vm/") and path.endswith("/vnc"):
                 self._vnc(path.split("/")[3])
+            elif path.startswith("/api/vm/") and path.endswith("/console-info"):
+                self._json(console_info(path[len("/api/vm/"):-len("/console-info")]))
+            elif path.startswith("/api/vm/") and path.endswith("/files"):
+                vm = config.get_vm(config.load_config(), path[len("/api/vm/"):-len("/files")])
+                with web_files.SFTP(vm, timeout=30) as client:
+                    self._json(client.listing((query.get("path") or ["."])[0]))
+            elif path.startswith("/api/vm/") and path.endswith("/file"):
+                self._download_file(path[len("/api/vm/"):-len("/file")], (query.get("path") or [""])[0])
             elif path.startswith("/api/vm/") and path.endswith("/ssh"):
                 self._ssh(path[len("/api/vm/"):-len("/ssh")])
             elif path.startswith("/api/vm/") and path.endswith("/screen.png"):
@@ -589,11 +615,61 @@ class Handler(BaseHTTPRequestHandler):
         self.close_connection = True
         bridge_vnc(self, sock)
 
+    def _download_file(self, name: str, path: str) -> None:
+        web_files.validate_path(path)
+        vm = config.get_vm(config.load_config(), name)
+        # Stage before sending headers so an SSH failure remains a JSON error,
+        # never a successful-looking but truncated download.
+        with tempfile.TemporaryFile() as target:
+            with web_files.SFTP(vm) as client:
+                size = client.download(path, target)
+            target.seek(0)
+            try:
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(size))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                shutil.copyfileobj(target, self.wfile, length=65536)
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
+
+    def _upload_file(self, name: str, query: dict[str, list[str]]) -> None:
+        length = int(self.headers.get("Content-Length") or 0)
+        if not 0 <= length <= web_files.MAX_FILE_SIZE:
+            self.close_connection = True
+            raise VMError("Files must be no larger than 256 MiB")
+        path = web_files.validate_path((query.get("path") or ["."])[0])
+        filename = web_files.validate_name((query.get("name") or [""])[0])
+        vm = config.get_vm(config.load_config(), name)
+        with tempfile.TemporaryFile() as source:
+            remaining = length
+            previous_timeout = self.connection.gettimeout()
+            self.connection.settimeout(30)
+            try:
+                while remaining:
+                    chunk = self.rfile.read(min(65536, remaining))
+                    if not chunk:
+                        raise VMError("Upload interrupted")
+                    source.write(chunk)
+                    remaining -= len(chunk)
+            finally:
+                self.connection.settimeout(previous_timeout)
+            source.seek(0)
+            with web_files.SFTP(vm) as client:
+                self._json(client.upload(path, filename, source, length))
+
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         if not self._allowed():
             return
         path = unquote(urlparse(self.path).path)
         try:
+            if path.startswith("/api/vm/") and path.endswith("/files-upload"):
+                # Raw file bodies have their own bounded, disk-backed reader.
+                self.close_connection = True
+                self._upload_file(path[len("/api/vm/"):-len("/files-upload")], parse_qs(urlparse(self.path).query))
+                return
             length = int(self.headers.get("Content-Length") or 0)
             if not 0 <= length <= 1024 * 1024:
                 self.close_connection = True

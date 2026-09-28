@@ -43,7 +43,40 @@ What the page offers:
 - **Console**: the VM's own screen with keyboard and mouse, in the page (noVNC), for any VM that
   runs headless: `Boot headless`, and every unattended install while it runs (*Watch the install*).
   The server bridges a WebSocket to the VM's `runtime/vnc.sock`, the socket `vmctl attach` uses.
-  The toolbar has fit-to-window/actual-size, reconnect, Ctrl+Alt+Del and full screen controls.
+  The toolbar groups display/input and capture controls, with highlighted buttons for open tools.
+  **Keyboard** sends Ctrl+Alt+Del, Super/Windows, Alt+Tab, Esc, Ctrl+Esc, Print Screen,
+  F1–F12 and Ctrl+Alt+F1–F12, and can release held modifiers. Actual size keeps scrollbars
+  available for a desktop larger than its viewport. **Screenshot** downloads the current VNC
+  frame as a PNG at guest resolution. The **Record: … fps** selector only affects recording.
+  **SSH** opens the existing browser terminal below the desktop; drag the divider or focus it
+  and use ↑/↓ (Home/End for the limits). Closing SSH keeps the desktop open. Closing the
+  console ends its docked SSH session. Reconnecting the display preserves the SSH session.
+  **Clipboard** uses one text box: paste/type text and **Send to VM**, or copy text in the
+  guest and choose **Copy to computer**. Incoming text never replaces an unsent local draft;
+  **Load new text copied in VM** appears instead. Sending updates the guest clipboard;
+  paste inside the guest to insert it. Local clipboard access is explicit, with
+  manual copy/paste as a fallback when the browser denies access. Text is not stored in browser
+  storage and is cleared when the console closes or changes VM. Profiles with `clipboard: true`
+  now expose the agent channel in headless mode too, after a shutdown and new start. Guest
+  desktop clipboard integration still requires a working agent such as `spice-vdagent`;
+  QEMU Guest Agent alone does not provide it. The panel distinguishes a missing channel from
+  unverified guest support and confirms reception only after text arrives from the guest.
+  **Files** browses the SSH user's home folder and its directories. Click a file to download,
+  drag files onto the console, or click the upload area to choose several files. Transfers use
+  the profile's existing SSH key and the guest's SFTP subsystem, independently of clipboard
+  support; password-only SSH sessions are not sufficient. Files are limited to **256 MiB each**.
+  Existing names get a numbered copy; uploads are staged privately and renamed only on success.
+  Symlinks and special files are shown but cannot be downloaded. Zip folders before uploading.
+  The browser shows upload progress followed by **Saving in VM** until SFTP confirms completion.
+  If a connection fails, refresh the folder before retrying. A lost SSH connection may leave a
+  hidden `.vmctl-upload-*.part` file when cleanup cannot reach the guest.
+  **Detach** moves the console into its own window, leaving the dashboard free to open another
+  VM. Each window has its own display, tools and docked SSH session; closing one does not stop
+  its VM or close the other consoles. Allow pop-ups for the local dashboard if prompted by
+  the browser. Reloading a detached window restores that VM's console.
+  **Auto reconnect** retries display failures after 2, 4, 8, 16 and then 30 seconds, with a
+  countdown and a separate message for a stopped VM. Uncheck it to pause retries, or use
+  **Reconnect** immediately. Closing the console cancels pending attempts.
   Full screen gives the entire display to the guest; move the pointer to the top edge or click
   **Controls** to reveal the toolbar. The guest is asked to resize when supported; otherwise
   fit-to-window preserves its aspect ratio, which can leave bars. Esc goes to the VM outside
@@ -164,6 +197,10 @@ The page can delete disks and start anything `vmctl` can, so:
 | GET | `/api/devices` | the host's block devices (`vmctl list-target-devices --json`) for the `--device` field |
 | GET (WebSocket) | `/api/vm/<vm>/ssh?token=` | interactive SSH PTY; JSON input/resize messages, binary terminal output |
 | GET | `/api/vm/<vm>/screen.png` | a screenshot of a running headless VM (QMP screendump) |
+| GET | `/api/vm/<vm>/console-info` | running process, actual clipboard channel (null if unknown), and profile clipboard setting; channel presence does not establish guest agent readiness |
+| GET | `/api/vm/<vm>/files?path=.` | directory listing over SFTP, canonical path, home, parent and transfer limit |
+| GET | `/api/vm/<vm>/file?path=…` | download a regular guest file, staged before HTTP headers are sent |
+| POST | `/api/vm/<vm>/files-upload?path=…&name=…` | raw file body, at most 256 MiB; returns the saved name/path/size without replacing existing files |
 | GET (WebSocket) | `/api/vm/<vm>/vnc?token=` | the VM's VNC socket, relayed both ways (noVNC in the page) |
 | GET | `/labs/<group>/map` | the lab's network map page (`vmctl group map <group>` writes it) |
 

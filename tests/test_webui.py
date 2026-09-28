@@ -194,6 +194,24 @@ class RequestTests(BaseVmctlTestCase):
         command, _ = webui.prepare_command(["clean", self.vm_name], confirmed=True)
         self.assertNotIn("--yes", command)  # clean has no question to answer
 
+    def test_console_info_uses_running_channels_and_preserves_unknown(self):
+        from unittest import mock
+
+        self.vm_config["clipboard"] = True
+        self.write_config_dir()
+        with mock.patch("vmctl.lifecycle.running_qemu_pid", return_value=123), \
+             mock.patch.object(webui.qemu, "qmp_execute") as query:
+            for devices, expected in (([{"label": "vdagent0"}], True), ([{"label": "qga0"}], False)):
+                query.return_value = devices
+                self.assertEqual(webui.console_info(self.vm_name), {
+                    "running": True, "clipboard_channel": expected, "clipboard_enabled": True})
+            query.side_effect = VMError("monitor unavailable")
+            self.assertIsNone(webui.console_info(self.vm_name)["clipboard_channel"])
+        with mock.patch("vmctl.lifecycle.running_qemu_pid", return_value=None), \
+             mock.patch.object(webui.qemu, "qmp_execute") as query:
+            self.assertFalse(webui.console_info(self.vm_name)["running"])
+            query.assert_not_called()
+
     def test_an_accelerated_display_is_read_over_vnc(self):
         # virtio-vga-gl + egl-headless (arch-noctalia) answers "no surface" to screendump.
         from unittest import mock
@@ -396,6 +414,60 @@ class ServerTests(BaseVmctlTestCase):
         status, body = self.get("/api/commands")
         self.assertEqual(status, 200)
         self.assertTrue(any(entry["name"] == "start" for entry in json.loads(body)))
+
+    def test_file_endpoints_transfer_binary_and_require_authentication(self):
+        from unittest import mock
+
+        self.write_config_dir()
+        self.assertEqual(self.get("/api/vm/testvm/files", token=None)[0], 401)
+        with mock.patch.object(webui.web_files, "SFTP") as sftp:
+            client = sftp.return_value.__enter__.return_value
+            client.listing.return_value = {"path": "/home/lab", "entries": []}
+            self.assertEqual(self.get("/api/vm/testvm/files?path=%2Fhome%2Flab")[0], 200)
+            client.listing.assert_called_once_with("/home/lab")
+            payload = b"binary\0\xfffile"
+            def download(path, target):
+                self.assertEqual(path, "/home/lab/test.bin")
+                target.write(payload)
+                return len(payload)
+            client.download.side_effect = download
+            self.assertEqual(self.get("/api/vm/testvm/file?path=%2Fhome%2Flab%2Ftest.bin"), (200, payload))
+            def upload(path, name, source, size):
+                self.assertEqual((path, name, size), ("/home/lab", "test.bin", len(payload)))
+                self.assertEqual(source.read(), payload)
+                return {"name": name, "size": size}
+            client.upload.side_effect = upload
+            conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+            conn.request("POST", "/api/vm/testvm/files-upload?path=%2Fhome%2Flab&name=test.bin", payload,
+                         {"X-Vmctl-Token": "secret-token", "Content-Type": "application/octet-stream"})
+            response = conn.getresponse()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(json.loads(response.read())["size"], len(payload))
+            conn.close()
+
+    def test_file_upload_rejects_oversize_and_invalid_name_before_ssh(self):
+        from unittest import mock
+
+        with mock.patch.object(webui.web_files, "SFTP") as sftp:
+            for query, length in (("name=test", webui.web_files.MAX_FILE_SIZE + 1), ("name=..%2Fevil", 0)):
+                conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+                conn.request("POST", "/api/vm/testvm/files-upload?" + query, headers={
+                    "X-Vmctl-Token": "secret-token", "Content-Length": str(length)})
+                response = conn.getresponse()
+                self.assertEqual(response.status, 400)
+                response.read()
+                conn.close()
+            sftp.assert_not_called()
+
+    def test_console_info_requires_token_and_decodes_vm_name(self):
+        from unittest import mock
+
+        self.assertEqual(self.get("/api/vm/testvm/console-info", token=None)[0], 401)
+        with mock.patch.object(webui, "console_info", return_value={"running": True}) as info:
+            status, body = self.get("/api/vm/test%76m/console-info")
+            self.assertEqual(status, 200)
+            self.assertTrue(json.loads(body)["running"])
+            info.assert_called_once_with("testvm")
 
     def test_percent_encoded_job_ids_are_decoded(self):
         # The page encodes "vm:<name>" as "vm%3A<name>": the log of a VM's job was "Unknown job".

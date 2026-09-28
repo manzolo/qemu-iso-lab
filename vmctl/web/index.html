@@ -310,7 +310,7 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .console-heading h1 { font-size:15px; }
 .console-toolbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .console-toolbar button { font-size:12px; }
-#vnc-screen { flex:1; min-height:0; background:#060a10; position:relative; overflow:hidden; }
+#vnc-screen { flex:1; min-width:0; min-height:0; background:#060a10; position:relative; overflow:hidden; }
 .console-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 18px; background:#111a28; border-top:1px solid var(--line); flex-shrink:0; }
 #vnc-note { margin:0; font-size:12px; color:var(--muted); }
 #vnc-status { white-space:nowrap; }
@@ -327,8 +327,133 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 #recording-controls.hidden { display:none; }
 #recording-status { color:var(--warn); }
 #record-downloads { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+#console-workspace { display:flex; flex:1; min-height:0; position:relative; }
+#console-desktop { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; }
+#console-panel { width:300px; max-width:45%; padding:16px; overflow:auto; border-left:1px solid var(--line); background:#111a28; }
+#console-panel[hidden],#console-panel section[hidden],#console-ssh[hidden],#console-divider[hidden] { display:none; }
+#console-panel h2 { margin:0 0 12px; font-size:14px; }
+.console-key-grid { display:flex; flex-wrap:wrap; gap:7px; }
+.console-key-grid button { font-size:12px; }
+#console-panel textarea { width:100%; min-height:110px; resize:vertical; margin:8px 0; font:13px/1.5 ui-monospace,monospace; }
+#console-panel label { display:block; margin-top:14px; font-size:12px; color:var(--muted); }
+#console-panel .help { font-size:12px; overflow-wrap:anywhere; }
+#console-panel .panel-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px; }
+#console-panel .panel-heading button { padding:5px 9px; }
+#console-divider { flex:0 0 9px; cursor:row-resize; background:var(--line); touch-action:none; }
+#console-divider:hover,#console-divider:focus-visible { background:var(--accent); }
+#console-ssh { display:flex; flex:0 0 38%; min-height:140px; overflow:hidden; }
+#console-ssh #terminal-shell { min-width:0; }
+#console-ssh header { padding:8px 14px; gap:8px; }
+#console-ssh .eyebrow,#console-ssh #terminal-full { display:none; }
+#console-ssh h1 { font-size:13px; }
+#console-ssh .console-footer { padding:5px 14px; }
+#console-ssh #terminal-frame { padding:8px; }
+.console-auto { display:flex; align-items:center; gap:5px; font-size:12px; white-space:nowrap; color:var(--muted); }
+.console-auto input { width:auto; }
+@media(max-width:720px) { #console-panel { position:absolute; inset:0 0 0 auto; width:300px; max-width:85%; z-index:3; box-shadow:-8px 0 24px #0005; } .console-footer { flex-wrap:wrap; gap:8px; } }
 .console-empty { display:grid; place-items:center; height:100%; color:var(--muted); font-size:14px; }
 @media(max-width:720px) { #vnc-dialog header { gap:12px; } .console-toolbar { width:100%; } .console-toolbar button { flex:1; padding:7px; } .console-heading .machine-icon { width:30px; height:30px; border-radius:8px; } .console-footer { padding:10px; } #vnc-note { font-size:11px; } }
+/* Console controls keep a stable hierarchy at laptop and desktop widths. */
+#console-shell > header { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:16px; padding:16px 20px; background:linear-gradient(125deg,#182637,#121d2d 65%); }
+#console-shell .console-heading { min-width:0; flex-shrink:0; }
+#console-shell .console-heading h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:230px; font-size:15px; letter-spacing:-.02em; }
+#console-shell .console-heading .eyebrow { display:flex; align-items:center; gap:7px; white-space:nowrap; font-size:10px; letter-spacing:.15em; }
+#console-shell .console-heading .eyebrow::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--muted); }
+#console-shell[data-connected="true"] .console-heading .eyebrow::before { background:var(--accent); box-shadow:0 0 9px #7ddfc566; }
+#console-shell .console-heading .machine-icon { box-shadow:0 4px 14px #0003; }
+#console-shell > header .console-toolbar { justify-content:center; gap:10px; }
+.console-action-group { display:flex; gap:5px; align-items:center; }
+.console-capture { border-left:1px solid #34455a; padding-left:10px; }
+.console-window-actions { display:flex; align-items:center; gap:6px; }
+#console-shell button,#console-shell select { transition:background .15s,border-color .15s,color .15s,box-shadow .15s; }
+#console-shell > header button,#console-shell > header select { min-height:36px; padding:8px 10px; border:1px solid #34465d; border-radius:8px; background:#203047; color:#c5d3e4; font-size:12px; white-space:nowrap; }
+#console-shell button .console-button-icon { display:inline-flex; flex:0 0 15px; width:15px; height:15px; color:#92aecb; }
+#console-shell button:has(.console-button-icon) { display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+#console-shell button .console-button-icon svg { width:100%; height:100%; }
+#console-shell > header button:hover:not(:disabled),#console-panel button:hover:not(:disabled) { border-color:#6a8ba8; background:#2b4059; color:#f0f7ff; box-shadow:0 2px 8px #0002; }
+#console-shell > header button[aria-expanded="true"],#console-shell > header button.active { background:#183b3c; border-color:#397d75; color:#9bf0da; box-shadow:inset 0 1px 0 #a0f5de0c; }
+#console-shell > header button[aria-expanded="true"] .console-button-icon,#console-shell > header button.active .console-button-icon { color:#80e7cd; }
+#console-shell > header #vnc-screenshot .console-button-icon { color:#a0baff; }
+#console-shell > header #vnc-record .console-button-icon { color:#f0989e; }
+#console-shell > header #vnc-record.recording { background:#442737; border-color:#985162; color:#ffbdc2; }
+#console-shell > header #vnc-record-fps { background:#101b2a; color:#99aec4; font-size:11px; }
+#console-shell > header .console-window-actions button { background:transparent; border-color:transparent; color:#95a9bf; }
+#console-shell > header #vnc-close:hover { background:#432b39; border-color:#754353; color:#ffb9c5; }
+#console-shell button:disabled { opacity:.4; }
+#console-shell > .console-footer { padding:9px 16px; gap:12px; background:#101a28; }
+#console-shell > .console-footer #vnc-note { flex:1; font-size:11px; }
+#console-shell > .console-footer button { padding:6px 9px; font-size:11px; background:transparent; color:#aec2d7; border:1px solid #304257; }
+.console-auto { font-size:11px; }
+.console-auto input { accent-color:#7ddfc5; }
+#console-panel { background:linear-gradient(165deg,#172538,#101a28); }
+#console-panel .panel-heading strong { font-size:13px; letter-spacing:.02em; }
+#console-panel .panel-heading { border-bottom:1px solid #304257; padding-bottom:12px; }
+#console-panel button { border:1px solid #34465d; background:#213148; border-radius:7px; font-size:11px; }
+#console-panel textarea { background:#0c1522; border:1px solid #33465e; border-radius:8px; padding:10px; color:#e6edf7; }
+#console-panel textarea:focus { outline:2px solid #65baa4; outline-offset:1px; }
+#console-panel #console-clipboard-paste { background:#20463f; border-color:#3c796a; color:#9fe7d5; }
+#console-panel .help { color:#96abc2; line-height:1.6; }
+#console-divider { position:relative; flex-basis:11px; background:#142132; border-top:1px solid #34465d; border-bottom:1px solid #34465d; }
+#console-divider::after { content:""; position:absolute; width:38px; height:3px; border-radius:3px; top:3px; left:calc(50% - 19px); background:#546e88; transition:width .15s,background .15s; }
+#console-divider:hover,#console-divider:focus-visible { background:#1c3541; }
+#console-divider:hover::after,#console-divider:focus-visible::after { background:#80e7cd; }
+#console-ssh header { background:linear-gradient(100deg,#172c36,#152133); }
+#console-ssh header > div:first-child { display:flex; align-items:center; gap:10px; }
+#console-ssh .eyebrow { display:block; padding:4px 7px; border:1px solid #3a615e; border-radius:5px; color:#8cddca; font:10px ui-monospace,monospace; letter-spacing:.04em; }
+#console-ssh .console-toolbar button { padding:5px 8px; font-size:11px; background:transparent; border:1px solid #33495d; }
+#console-ssh .console-footer { background:#0e1925; }
+#console-ssh #terminal-note { font-size:10px; }
+@media(max-width:1250px) {
+  #console-shell > header { grid-template-columns:minmax(0,1fr) auto; gap:12px; padding:13px 18px; }
+  #console-shell > header > .console-toolbar { grid-row:2; grid-column:1/-1; justify-content:flex-start; }
+  #console-shell > header > .console-window-actions { grid-row:1; grid-column:2; }
+}
+@media(max-width:720px) {
+  #console-shell > header { gap:10px; padding:10px 12px; }
+  #console-shell > header > .console-toolbar { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; padding-bottom:4px; width:100%; }
+  #console-shell > header button { flex:none; }
+  #console-shell > header .console-action-group { flex-shrink:0; }
+  #console-shell .console-heading h1 { max-width:155px; font-size:13px; }
+  #console-shell > header .console-window-actions button { padding:6px; }
+  #console-shell > header .console-window-actions .console-button-label { display:none; }
+  #console-shell > .console-footer #vnc-note { display:none; }
+  #console-shell > .console-footer .console-auto { margin-left:auto; }
+  #console-ssh header .console-toolbar { width:auto; gap:5px; }
+  #console-ssh .eyebrow { display:none; }
+}
+@media(prefers-reduced-motion:reduce) { #console-shell button,#console-shell select,#console-divider::after { transition:none; } }
+#console-panel .console-hint { padding:10px 12px; border:1px solid #355365; border-radius:8px; background:#10232d; margin:0 0 16px; }
+#console-panel .clipboard-label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+#console-panel .clipboard-label label { margin:0; }
+#console-panel .clipboard-label button { padding:5px 8px; background:transparent; }
+#console-panel #console-clipboard-send { min-height:180px; }
+.clipboard-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+#console-panel .clipboard-actions button { padding:10px 8px; font-size:11px; gap:5px; }
+#console-panel #console-clipboard-latest { margin-bottom:10px; width:100%; }
+#console-panel #console-clipboard-latest[hidden] { display:none; }
+.file-navigation { display:flex; gap:5px; }
+#console-panel .file-navigation button { flex:1; padding:6px; font-size:10px; gap:4px; }
+#console-files-path { padding:10px 0; margin:0; overflow-wrap:anywhere; font-size:11px; color:#a9c5db; }
+#console-panel .file-drop { display:flex; flex-direction:column; width:100%; gap:5px; padding:16px 8px; background:#173038; border:1px dashed #528578; color:#9de5d3; }
+#console-panel .file-drop.drag-over { background:#265449; border-color:#a4ffe3; }
+.file-drop-symbol { font-size:25px; line-height:1; }
+.file-drop span:last-child { font-size:10px; color:#a3bbb9; }
+#console-panel .file-hidden-toggle { display:flex; align-items:center; gap:7px; margin:10px 0; font-size:11px; }
+.file-hidden-toggle input { width:auto; accent-color:#7ddfc5; }
+#console-files-list { border-top:1px solid #304257; }
+#console-panel .file-entry { display:flex; align-items:center; gap:7px; width:100%; text-align:left; background:transparent; border:0; border-bottom:1px solid #26394d; border-radius:0; padding:11px 3px; }
+.file-entry .file-name { flex:1; min-width:0; overflow-wrap:anywhere; color:#c4d8e9; }
+.file-entry .file-size { font-size:10px; color:#8ba6bd; white-space:nowrap; }
+.file-entry .file-kind { font:15px ui-monospace,monospace; color:#83d2be; }
+body.console-detached { overflow:hidden; }
+body.console-detached > :not(dialog):not(#toast):not(script) { display:none !important; }
+body.console-detached #vnc-dialog { position:fixed; inset:0; margin:0; width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border:0; border-radius:0; }
+body.console-detached #vnc-detach { display:none; }
+@media(min-width:1251px) and (max-width:1450px) {
+  #console-shell > header { grid-template-columns:minmax(0,1fr) auto; gap:12px; }
+  #console-shell > header > .console-toolbar { grid-row:2; grid-column:1/-1; justify-content:flex-start; }
+  #console-shell > header > .console-window-actions { grid-row:1; grid-column:2; }
+}
 .profile-heading { display:flex; align-items:center; justify-content:space-between; padding-right:16px; border-bottom:1px solid var(--line); }
 .profile-heading h2 { border:0; }
 .profile-heading button { background:transparent; color:var(--accent); font-size:11px; padding:5px 8px; border:1px solid var(--line); }
@@ -522,8 +647,54 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   </div></dialog>
 <dialog id="screen-dialog"><header><h1 id="screen-title">Screen</h1><button data-close>Close</button></header>
   <div class="body" id="screen"><img id="screen-img" alt="VM screen"><p class="s-muted" id="screen-note">Loading the screen…</p></div></dialog>
-<dialog id="vnc-dialog" aria-labelledby="vnc-title"><div id="console-shell"><button id="console-tools" aria-label="Show console controls">Controls ▾</button><header><div class="console-heading"><span id="console-icon" aria-hidden="true"></span><div><div class="eyebrow">Live console</div><h1 id="vnc-title">Console</h1></div></div><div class="console-toolbar"><button id="vnc-fit" class="active" aria-pressed="true" title="Switch between fit to window and actual size">Fit to window</button><button id="vnc-cad" title="Send Ctrl+Alt+Delete to the guest">Ctrl+Alt+Del</button><button id="vnc-reconnect">Reconnect</button><select id="vnc-record-fps" aria-label="Recording frame rate" title="Capture frame rate for MP4; GIF exports at 1 fps"><option value="1">1 fps</option><option value="5">5 fps</option><option value="10" selected>10 fps</option><option value="15">15 fps</option></select><button id="vnc-record" disabled>● Record</button><button id="vnc-full">Full screen</button><button id="vnc-close">Close</button></div></header>
-  <div id="vnc-screen"></div><div class="console-footer"><span id="vnc-status" class="state s-warn" role="status">Connecting</span><p id="vnc-note">Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave.</p></div></div></dialog>
+<dialog id="vnc-dialog" aria-labelledby="vnc-title"><div id="console-shell"><button id="console-tools" aria-label="Show console controls">Controls ▾</button>
+  <header><div class="console-heading"><span id="console-icon" aria-hidden="true"></span><div><div class="eyebrow">Live console</div><h1 id="vnc-title">Console</h1></div></div>
+    <div class="console-toolbar"><div class="console-action-group">
+      <button id="vnc-fit" class="active" aria-pressed="true" title="Switch between fit to window and actual size">Fit to window</button>
+      <button id="vnc-keyboard" aria-expanded="false" aria-controls="console-panel">Keyboard</button>
+      <button id="vnc-clipboard" aria-expanded="false" aria-controls="console-panel">Clipboard</button>
+      <button id="vnc-files" aria-expanded="false" aria-controls="console-panel">Files</button>
+      <button id="vnc-ssh" aria-expanded="false" aria-controls="console-ssh">SSH</button>
+      <button id="vnc-screenshot" disabled>Screenshot</button></div>
+      <div class="console-action-group console-capture"><select id="vnc-record-fps" aria-label="Recording frame rate" title="Capture frame rate for MP4; GIF exports at 1 fps"><option value="1">Record: 1 fps</option><option value="5">Record: 5 fps</option><option value="10" selected>Record: 10 fps</option><option value="15">Record: 15 fps</option></select>
+      <button id="vnc-record" disabled>Record</button></div>
+    </div><div class="console-window-actions"><button id="vnc-detach" title="Open console in a separate window">Detach</button><button id="vnc-full" title="Toggle full screen">Full screen</button><button id="vnc-close" title="Close console">Close</button></div>
+  </header>
+  <div id="console-workspace"><div id="console-desktop"><div id="vnc-screen"></div>
+    <div id="console-divider" role="separator" aria-label="Resize SSH terminal" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="70" aria-valuenow="38" tabindex="0" hidden></div>
+    <div id="console-ssh" hidden></div>
+  </div>
+  <aside id="console-panel" aria-label="Console tools" hidden>
+    <div class="panel-heading"><strong id="console-panel-title">Keyboard</strong><button id="console-panel-close" aria-label="Close console tools">Close</button></div>
+    <section id="console-keyboard-panel" hidden><p class="help">Send shortcuts directly to the guest.</p><div class="console-key-grid">
+      <button id="vnc-cad" data-console-key>Ctrl+Alt+Del</button>
+      <button data-key="super" data-console-key>Super / Windows</button><button data-key="alt-tab" data-console-key>Alt+Tab</button>
+      <button data-key="escape" data-console-key>Esc</button><button data-key="ctrl-escape" data-console-key>Ctrl+Esc</button>
+      <button data-key="print" data-console-key>Print Screen</button>
+    </div><label for="console-function-key">Function key</label><div class="console-key-grid"><select id="console-function-key" aria-label="Function key"></select><button id="console-send-function" data-console-key>Send</button><button id="console-send-tty" data-console-key>Ctrl+Alt+Fn</button></div>
+    <p class="help">Ctrl+Alt+Fn switches Linux virtual terminals where supported.</p><button id="console-release" data-console-key>Release modifiers</button></section>
+    <section id="console-clipboard-panel" hidden>
+      <p id="console-clipboard-status" class="help console-hint" role="status">Copy text in the VM, or paste text below to send it.</p>
+      <div class="clipboard-label"><label for="console-clipboard-send">Clipboard text</label><button id="console-clipboard-read" title="Read clipboard from your computer">Paste</button></div>
+      <textarea id="console-clipboard-send" placeholder="Paste here with Ctrl+V…" spellcheck="false"></textarea>
+      <button id="console-clipboard-latest" hidden>Load new text copied in VM</button>
+      <div class="clipboard-actions"><button id="console-clipboard-paste" disabled>Send to VM</button><button id="console-clipboard-copy" disabled>Copy to computer</button></div>
+      <p class="help">After sending, paste inside the VM. Text copied in the VM appears here automatically when supported.</p>
+      <p id="console-clipboard-message" class="help" role="status"></p>
+    </section>
+    <section id="console-files-panel" hidden>
+      <div class="file-navigation"><button id="console-files-home" title="Home folder">Home</button><button id="console-files-up" title="Parent folder">Up</button><button id="console-files-refresh" title="Refresh folder">Refresh</button></div>
+      <p id="console-files-path" class="mono" title="Folder in the VM">Home folder</p>
+      <button id="console-files-drop" class="file-drop" disabled><span class="file-drop-symbol" aria-hidden="true">⇧</span><strong>Drop files here</strong><span>or click to choose · up to 256 MiB each</span></button>
+      <input id="console-files-input" type="file" multiple hidden>
+      <p id="console-files-status" class="help" role="status">Loading files…</p>
+      <label class="file-hidden-toggle"><input id="console-files-hidden" type="checkbox">Show hidden files</label>
+      <div id="console-files-list" aria-label="Files in the VM"></div>
+      <p class="help">Uploads go into this folder. Existing files are kept; duplicate names are numbered.</p>
+    </section>
+  </aside></div>
+  <div class="console-footer"><span id="vnc-status" class="state s-warn" role="status">Connecting</span><p id="vnc-note">Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave.</p><label class="console-auto"><input id="vnc-auto" type="checkbox" checked>Auto reconnect</label><button id="vnc-reconnect">Reconnect</button></div>
+</div></dialog>
 <dialog id="confirm-dialog" aria-labelledby="confirm-title"><div class="body"><div class="eyebrow bad" id="confirm-eyebrow">Confirm</div><h1 id="confirm-title">Are you sure?</h1><p id="confirm-message"></p><pre id="confirm-command" class="hidden"></pre><dl id="confirm-facts" class="hidden"></dl><div class="confirm-buttons"><button id="confirm-no">Cancel</button><button id="confirm-yes" class="danger">Continue</button></div></div></dialog>
 <dialog id="ssh-dialog" aria-labelledby="ssh-title"><header><div><div class="eyebrow">Terminal access</div><h1 id="ssh-title">SSH console</h1></div><button data-close>Close</button></header><div class="body"><p id="ssh-description" class="s-muted"></p><pre id="ssh-command"></pre><p class="help">Run from the project directory. Uses the profile’s SSH user, port and key.</p><div class="command-buttons"><button id="ssh-browser" class="primary">Open in browser</button><button id="ssh-launch">Open SSH terminal on host ↗</button><button id="ssh-copy">Copy command</button></div><p id="ssh-result" class="help" role="status"></p></div></dialog>
 <dialog id="terminal-dialog" aria-labelledby="terminal-title"><div id="terminal-shell"><header><div><div class="eyebrow">SSH terminal</div><h1 id="terminal-title">SSH</h1></div><div class="console-toolbar"><span id="terminal-status" class="state s-warn" role="status">Connecting</span><button id="terminal-reconnect">Reconnect</button><button id="terminal-full">Full screen</button><button id="terminal-close">Close</button></div></header><div id="terminal-frame"><div id="terminal-screen"></div></div><div class="console-footer"><p id="terminal-note">Interactive SSH to the guest. Closing this terminal disconnects SSH; the VM keeps running.</p></div></div></dialog>
@@ -585,7 +756,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <script>
 "use strict";
 const params = new URLSearchParams(location.search);
-if (params.get("token")) { sessionStorage.setItem("vmctl-token", params.get("token")); history.replaceState(null, "", "/" + location.hash); }
+if (params.get("token")) { sessionStorage.setItem("vmctl-token", params.get("token")); params.delete("token"); history.replaceState(null, "", "/" + (params.size ? "?" + params.toString() : "") + location.hash); }
 const TOKEN = sessionStorage.getItem("vmctl-token") || "";
 let S = { vms: [], labs: [] }, catalog = [], filter = "all", filterSettled = false, selected = localStorage.getItem("vmctl-selected") || "", logJob = null, logOffset = 0;
 let dragVm = null;  // the machine whose network handle is being dragged (vmctl link)
@@ -1266,7 +1437,7 @@ $("ssh-launch").onclick = async () => {
 $("ssh-copy").onclick = async () => { try { await navigator.clipboard.writeText($("ssh-command").textContent); $("ssh-result").textContent = "Command copied."; } catch (e) { $("ssh-result").textContent = "Select and copy the command above."; } };
 
 // xterm.js renders the guest SSH PTY; credentials and keys stay in the existing SSH CLI.
-let terminal = null, terminalSocket = null, terminalObserver = null, terminalGeneration = 0, terminalVm = "", xtermLoad = null;
+let terminal = null, terminalSocket = null, terminalObserver = null, terminalGeneration = 0, terminalVm = "", xtermLoad = null, terminalDocked = false;
 function loadTerminalAssets() {
   if (xtermLoad) return xtermLoad;
   const load = (url, style = false) => new Promise((resolve,reject) => {
@@ -1288,10 +1459,15 @@ function disposeTerminal() {
   terminal?.dispose(); terminal = null;
 }
 function terminalStatus(label,color,note) { $("terminal-status").textContent = label; $("terminal-status").className = "state " + color; if (note) $("terminal-note").textContent = note; }
-async function openBrowserSsh(vm) {
+async function openBrowserSsh(vm, docked = false) {
   const generation = ++terminalGeneration; disposeTerminal(); terminalVm = vm;
+  terminalDocked = docked;
   $("ssh-dialog").close(); $("terminal-title").textContent = vm;
-  if (!$("terminal-dialog").open) $("terminal-dialog").showModal();
+  $("console-ssh").hidden = $("console-divider").hidden = !docked;
+  $("vnc-ssh").setAttribute("aria-expanded", String(docked));
+  (docked ? $("console-ssh") : $("terminal-dialog")).append($("terminal-shell"));
+  if (docked) { $("terminal-dialog").close(); rfb?.blur(); }
+  else if (!$("terminal-dialog").open) $("terminal-dialog").showModal();
   $("terminal-screen").innerHTML = ""; terminalStatus("Connecting","s-warn","Loading the SSH terminal…");
   try {
     await loadTerminalAssets(); if (generation !== terminalGeneration) return;
@@ -1305,7 +1481,7 @@ async function openBrowserSsh(vm) {
     terminalObserver = new ResizeObserver(() => fit.fit()); terminalObserver.observe($("terminal-screen"));
     socket.onopen = () => { if (generation !== terminalGeneration) return; send({type:"resize",cols:term.cols,rows:term.rows}); terminalStatus("Session open","s-ok","Log in at the prompt if asked. Close disconnects SSH; the VM keeps running."); term.focus(); };
     socket.onmessage = e => { if (generation === terminalGeneration) term.write(typeof e.data === "string" ? e.data : new Uint8Array(e.data)); };
-    socket.onerror = () => terminalStatus("Unavailable","s-bad","Could not open SSH. Check the VM and profile, and restart make web if the server was running before this update.");
+    socket.onerror = () => { if (generation !== terminalGeneration) return; terminalStatus("Unavailable","s-bad","Could not open SSH. Check the VM and profile, and restart make web if the server was running before this update."); };
     socket.onclose = e => {
       if (generation !== terminalGeneration) return;
       if (e.code === 1000) { closeBrowserSsh(); return; }
@@ -1314,11 +1490,15 @@ async function openBrowserSsh(vm) {
   } catch (e) { if (generation === terminalGeneration) terminalStatus("Unavailable","s-bad",e.message + ". You can still use the SSH terminal on the host."); }
 }
 $("ssh-browser").onclick = () => openBrowserSsh(sshVm);
-$("terminal-reconnect").onclick = () => openBrowserSsh(terminalVm);
+$("terminal-reconnect").onclick = () => openBrowserSsh(terminalVm, terminalDocked);
 function closeBrowserSsh() {
   ++terminalGeneration; disposeTerminal();
   if (document.fullscreenElement === $("terminal-shell")) document.exitFullscreen().catch(()=>{});
   $("terminal-dialog").close();
+  $("terminal-dialog").append($("terminal-shell"));
+  $("console-ssh").hidden = $("console-divider").hidden = true;
+  $("vnc-ssh").setAttribute("aria-expanded", "false");
+  terminalDocked = false;
 }
 $("terminal-close").onclick = closeBrowserSsh;
 $("terminal-dialog").addEventListener("cancel",e=>e.preventDefault());
@@ -1335,11 +1515,44 @@ $("screen-img").onerror = () => ($("screen-note").textContent = "No screen yet: 
 $("screen-img").onload = () => ($("screen-note").textContent = "A screenshot every 2 s. For keyboard and mouse use Console.");
 
 // --- console: noVNC in the page, bridged by the server to the VM's runtime/vnc.sock
+const consoleDetached = new URLSearchParams(location.search).get("detached") === "1";
+if (consoleDetached) document.body.classList.add("console-detached");
+const consoleIconPaths = {
+  files:'<path d="M3 7V4h6l2 3h10v13H3z"/><path d="M3 7h8"/>',
+  detach:'<path d="M14 3h7v7m0-7L11 13M10 3H3v18h18v-7"/>',
+  up:'<path d="m6 10 6-6 6 6M12 4v16"/>',
+  home:'<path d="m3 10 9-7 9 7v11h-7v-7h-4v7H3z"/>',
+
+  fit:'<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M8 8h8v8H8z"/>',
+  keyboard:'<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/>',
+  clipboard:'<rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6m-6 4h4"/>',
+  terminal:'<path d="m4 6 6 6-6 6m9 0h7"/>',
+  camera:'<path d="m8 5 2-2h4l2 2h4a2 2 0 0 1 2 2v12H2V7a2 2 0 0 1 2-2z"/><circle cx="12" cy="12" r="4"/>',
+  record:'<circle cx="12" cy="12" r="7" fill="currentColor" stroke="none"/>',
+  stop:'<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor" stroke="none"/>',
+  expand:'<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',
+  close:'<path d="m6 6 12 12M6 18 18 6"/>',
+  reconnect:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-2l2 3M4 16l2 3a7 7 0 0 0 12-2"/>',
+  copy:'<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
+  send:'<path d="m21 3-7 18-4-7-7-4L21 3ZM10 14 21 3"/>'
+};
+function consoleButton(id, label, icon) {
+  $(id).innerHTML = `<span class="console-button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${consoleIconPaths[icon]}</svg></span><span class="console-button-label">${esc(label)}</span>`;
+  $(id).setAttribute("aria-label", label);
+}
+for (const [id,label,icon] of [
+  ["vnc-fit","Fit to window","fit"],["vnc-keyboard","Keyboard","keyboard"],["vnc-clipboard","Clipboard","clipboard"],
+  ["vnc-files","Files","files"],["vnc-detach","Detach","detach"],["vnc-ssh","SSH","terminal"],["vnc-screenshot","Screenshot","camera"],["vnc-full","Full screen","expand"],["vnc-close","Close","close"],
+  ["vnc-reconnect","Reconnect","reconnect"],["terminal-reconnect","Reconnect","reconnect"],["terminal-close","Close","close"],
+  ["console-files-home","Home","home"],["console-files-up","Up","up"],["console-files-refresh","Refresh","reconnect"],
+  ["console-clipboard-read","Paste","clipboard"],["console-clipboard-copy","Copy to computer","copy"],["console-clipboard-paste","Send to VM","send"]
+]) consoleButton(id,label,icon);
 let consoleRecording = null, recordingBusy = false, recordingTimer;
 try { consoleRecording = JSON.parse(sessionStorage.getItem("vmctl-recording") || "null"); } catch (_) {}
 function renderRecording() {
   const rec = consoleRecording, active = rec?.status === "recording";
-  $("vnc-record").textContent = active ? "■ Stop recording" : rec ? "Recording…" : "● Record";
+  consoleButton("vnc-record", active ? "Stop recording" : rec ? "Recording…" : "Record", active ? "stop" : "record");
+  $("vnc-record").classList.toggle("recording", !!active);
   $("vnc-record-fps").disabled = recordingBusy || !!rec;
   $("vnc-record").disabled = recordingBusy || (!rec && $("vnc-status").textContent !== "Connected");
   $("recording-controls").classList.toggle("hidden", !rec);
@@ -1409,44 +1622,399 @@ $("record-download").onclick = async () => {
 renderRecording(); pollRecording();
 const NOVNC = "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.7.0/core/rfb.js";
 let rfb = null, consoleVm = "", consoleGeneration = 0, consoleFit = true;
+let consoleConnected = false, consoleRetryTimer, consoleConnectTimer, consoleRetryAttempt = 0;
+let consoleClipboardChannel = null, consoleClipboardReceived = false, consoleClipboardText = "", consoleClipboardDirty = false;
 function consoleStatus(label, color, note) {
+  consoleConnected = label === "Connected";
+  $("console-shell").dataset.connected = String(consoleConnected);
   $("vnc-status").textContent = label; $("vnc-status").className = "state " + color;
-  $("vnc-cad").disabled = label !== "Connected";
+  document.querySelectorAll('[data-console-key]').forEach(button => button.disabled = !consoleConnected);
+  $("vnc-screenshot").disabled = !consoleConnected;
+  $("console-clipboard-paste").disabled = !consoleConnected || consoleClipboardChannel === false;
   if (note) $("vnc-note").textContent = note;
   renderRecording();
 }
-async function openConsole(vm) {
+function cancelConsoleRetry() {
+  clearTimeout(consoleRetryTimer); clearTimeout(consoleConnectTimer);
+}
+function resetConsoleClipboard() {
+  consoleClipboardChannel = null; consoleClipboardReceived = false;
+  consoleClipboardText = "";
+  if (!consoleClipboardDirty) $("console-clipboard-send").value = "";
+  $("console-clipboard-latest").hidden = true;
+  $("console-clipboard-copy").disabled = !$("console-clipboard-send").value;
+  $("console-clipboard-status").textContent = "Copy text in the VM to check clipboard sharing.";
+}
+async function inspectConsole(vm, generation) {
+  try {
+    const info = await api(`/api/vm/${encodeURIComponent(vm)}/console-info`);
+    if (generation !== consoleGeneration || !$("vnc-dialog").open) return null;
+    if (!consoleClipboardReceived) {
+      consoleClipboardChannel = info.clipboard_channel;
+      $("console-clipboard-status").textContent = info.clipboard_channel === false
+        ? (info.clipboard_enabled ? "Restart needed: shut down this VM, then start it again to enable clipboard sharing." : "Enable clipboard in Customize profile, then shut down and start the VM.")
+        : "Copy text in the VM to check sharing. If nothing arrives, check that spice-vdagent is running in the guest desktop.";
+      $("console-clipboard-paste").disabled = !consoleConnected || info.clipboard_channel === false;
+    }
+    return info;
+  } catch (_) { return null; } // Old/unreachable servers must not prevent a VNC connection.
+}
+async function retryConsole(generation, reason) {
+  cancelConsoleRetry();
+  if (generation !== consoleGeneration || !$("vnc-dialog").open) return;
+  consoleStatus("Disconnected", "s-warn", reason);
+  const info = await inspectConsole(consoleVm, generation);
+  if (generation !== consoleGeneration || !$("vnc-dialog").open) return;
+  const message = info?.running === false ? "The VM is stopped. Start it from the dashboard." : reason;
+  if (!$("vnc-auto").checked) { consoleStatus("Disconnected", "s-muted", message + " Use Reconnect to try again."); return; }
+  let remaining = Math.min(30, 2 ** Math.min(++consoleRetryAttempt, 5));
+  const tick = () => {
+    if (generation !== consoleGeneration || !$("vnc-dialog").open || !$("vnc-auto").checked) return;
+    consoleStatus("Reconnecting", "s-warn", `${message} Retrying in ${remaining} s…`);
+    if (remaining-- <= 0) { openConsole(consoleVm, true); return; }
+    consoleRetryTimer = setTimeout(tick, 1000);
+  };
+  tick();
+}
+async function openConsole(vm, retry = false) {
+  const newSession = vm !== consoleVm || !$("vnc-dialog").open;
   const generation = ++consoleGeneration;
+  cancelConsoleRetry();
+  if (!retry) consoleRetryAttempt = 0;
+  if (newSession) {
+    if (terminalDocked) closeBrowserSsh();
+    resetConsoleFiles(); consoleClipboardDirty = false;
+    closeConsolePanel(false);
+    $("console-clipboard-send").value = "";
+    $("console-clipboard-message").textContent = "";
+  }
+  resetConsoleClipboard();
   consoleVm = vm;
   if (rfb) { rfb.disconnect(); rfb = null; }
-  $("vnc-title").textContent = vm; $("console-icon").innerHTML = catalogIcon(osIconKey(S.vms.find(r => r.name === vm)), true);
+  const row = S.vms.find(r => r.name === vm);
+  $("vnc-files").disabled = $("vnc-ssh").disabled = !row?.ssh_port;
+  $("vnc-files").title = row?.ssh_port ? "Exchange files with this VM" : "SSH is not configured for this VM";
+  $("vnc-ssh").title = row?.ssh_port ? "Open SSH alongside the desktop" : "SSH is not configured for this VM";
+  $("vnc-title").textContent = vm; $("console-icon").innerHTML = catalogIcon(osIconKey(row), true);
   $("vnc-screen").innerHTML = '<div class="console-empty">Connecting to the machine…</div>';
   consoleStatus("Connecting", "s-warn", "Opening the remote display…");
   if (!$("vnc-dialog").open) $("vnc-dialog").showModal();
+  inspectConsole(vm, generation);
+  // Also recover a WebSocket handshake that stalls without firing disconnect.
+  consoleConnectTimer = setTimeout(() => {
+    if (generation !== consoleGeneration || consoleConnected) return;
+    ++consoleGeneration; rfb?.disconnect(); rfb = null;
+    retryConsole(consoleGeneration, "Display connection timed out.");
+  }, 15000);
   try {
     const RFB = (await import(NOVNC)).default;
     if (generation !== consoleGeneration || !$("vnc-dialog").open) return;
     $("vnc-screen").innerHTML = "";
     const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/vm/${encodeURIComponent(vm)}/vnc?token=${encodeURIComponent(TOKEN)}`;
     const client = new RFB($("vnc-screen"), url); rfb = client;
-    client.scaleViewport = consoleFit; client.clipViewport = !consoleFit; client.resizeSession = document.fullscreenElement === $("console-shell"); client.focusOnClick = true;
-    client.addEventListener("connect", () => { if (generation !== consoleGeneration) return; consoleStatus("Connected", "s-ok", "Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave."); client.focus(); });
-    client.addEventListener("disconnect", (e) => { if (generation !== consoleGeneration) return; consoleStatus("Disconnected", "s-bad", e.detail.clean ? "Connection closed. Use Reconnect to open the display again." : "The VM stopped or its display is unavailable. A headless VM is required for this console."); });
+    client.scaleViewport = consoleFit; client.clipViewport = false; client.resizeSession = document.fullscreenElement === $("console-shell"); client.focusOnClick = true;
+    client.addEventListener("connect", () => {
+      if (generation !== consoleGeneration) return;
+      cancelConsoleRetry(); consoleRetryAttempt = 0;
+      consoleStatus("Connected", "s-ok", "Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave.");
+      if (!terminalDocked && $("console-panel").hidden) client.focus();
+    });
+    client.addEventListener("clipboard", e => {
+      if (generation !== consoleGeneration || !consoleConnected) return;
+      consoleClipboardChannel = true; consoleClipboardReceived = true;
+      consoleClipboardText = e.detail.text;
+      if (!consoleClipboardDirty) loadGuestClipboard();
+      else $("console-clipboard-latest").hidden = false;
+      $("console-clipboard-paste").disabled = false;
+      $("console-clipboard-status").textContent = "Clipboard connected · text received from VM.";
+    });
+    client.addEventListener("disconnect", () => {
+      if (generation !== consoleGeneration) return;
+      resetConsoleClipboard();
+      retryConsole(generation, "Display connection closed.");
+    });
   } catch (e) {
     if (generation !== consoleGeneration) return;
-    consoleStatus("Unavailable", "s-bad", "Cannot load the console: " + e.message + ". Try Reconnect, or use Live screenshot from the profile.");
     $("vnc-screen").innerHTML = '<div class="console-empty">The console could not be opened.</div>';
+    retryConsole(generation, "Cannot load the console: " + e.message + ".");
   }
 }
-function closeConsole() { ++consoleGeneration; if (rfb) { rfb.disconnect(); rfb = null; } if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); $("vnc-dialog").close(); }
-$("vnc-close").onclick = closeConsole;
-$("vnc-dialog").addEventListener("cancel", (e) => e.preventDefault());
-$("vnc-cad").onclick = () => { if (rfb) { rfb.sendCtrlAltDel(); rfb.focus(); } };
+function closeConsolePanel(focus = true) {
+  $("console-panel").hidden = true;
+  for (const name of ["keyboard", "clipboard", "files"]) $("vnc-" + name).setAttribute("aria-expanded", "false");
+  if (focus && consoleConnected) rfb?.focus();
+}
+function toggleConsolePanel(name) {
+  const button = $("vnc-" + name), show = button.getAttribute("aria-expanded") !== "true";
+  closeConsolePanel(false);
+  if (!show) { rfb?.focus(); return; }
+  rfb?.blur();
+  $("console-panel").hidden = false;
+  $("console-panel-title").textContent = {keyboard:"Keyboard", clipboard:"Clipboard", files:"Files"}[name];
+  for (const panel of ["keyboard", "clipboard", "files"]) $("console-" + panel + "-panel").hidden = panel !== name;
+  button.setAttribute("aria-expanded", "true");
+  if (name === "files" && !consoleFilesListing && !consoleFilesBusy) loadConsoleFiles(".");
+  (name === "clipboard" ? $("console-clipboard-send") : $("console-panel-close")).focus();
+}
+function closeConsole() {
+  ++consoleGeneration; cancelConsoleRetry(); resetConsoleFiles();
+  if (terminalDocked) closeBrowserSsh();
+  if (rfb) { rfb.disconnect(); rfb = null; }
+  resetConsoleClipboard(); $("console-clipboard-send").value = "";
+  consoleStatus("Disconnected", "s-muted");
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  $("vnc-dialog").close();
+}
+$("vnc-close").onclick = () => { closeConsole(); if (consoleDetached) window.close(); };
+$("vnc-dialog").addEventListener("cancel", e => e.preventDefault());
+$("vnc-keyboard").onclick = () => toggleConsolePanel("keyboard");
+$("vnc-clipboard").onclick = () => toggleConsolePanel("clipboard");
+$("vnc-files").onclick = () => toggleConsolePanel("files");
+$("vnc-detach").onclick = () => {
+  const url = new URL(location.href); url.search = "";
+  url.searchParams.set("token", TOKEN); url.searchParams.set("detached", "1");
+  url.hash = "console=" + encodeURIComponent(consoleVm);
+  const popup = window.open(url.href, "_blank", "popup,width=1280,height=900,resizable=yes,scrollbars=yes");
+  if (!popup) { toast("Allow pop-up windows for this page, then try Detach again.", true); return; }
+  popup.opener = null;
+  closeConsole();
+};
+$("console-panel-close").onclick = () => closeConsolePanel();
 $("vnc-reconnect").onclick = () => openConsole(consoleVm);
+$("vnc-auto").onchange = () => {
+  clearTimeout(consoleRetryTimer);
+  if (consoleConnected) return;
+  if ($("vnc-auto").checked) openConsole(consoleVm);
+  else if ($("vnc-status").textContent !== "Connecting") consoleStatus("Disconnected", "s-muted", "Automatic reconnect paused. Use Reconnect to try again.");
+};
+const consoleKeys = {
+  control:[0xffe3,"ControlLeft"], alt:[0xffe9,"AltLeft"],
+  super:[0xffeb,"MetaLeft"], escape:[0xff1b,"Escape"], tab:[0xff09,"Tab"], print:[0xff61,"PrintScreen"]
+};
+function sendConsoleKeys(keys) {
+  if (!consoleConnected || !rfb) return;
+  rfb.blur();
+  try { for (const key of keys) rfb.sendKey(...key, true); }
+  finally { for (const key of [...keys].reverse()) rfb.sendKey(...key, false); }
+  rfb.focus();
+}
+$("vnc-cad").onclick = () => { if (consoleConnected) { rfb.sendCtrlAltDel(); rfb.focus(); } };
+document.querySelectorAll('[data-key]').forEach(button => button.onclick = () => {
+  const sequences = {super:[consoleKeys.super], "alt-tab":[consoleKeys.alt,consoleKeys.tab], escape:[consoleKeys.escape], "ctrl-escape":[consoleKeys.control,consoleKeys.escape], print:[consoleKeys.print]};
+  sendConsoleKeys(sequences[button.dataset.key]);
+});
+for (let n = 1; n <= 12; n++) $("console-function-key").add(new Option(`F${n}`, String(n)));
+function sendConsoleFunction(tty) {
+  const n = Number($("console-function-key").value);
+  sendConsoleKeys([...(tty ? [consoleKeys.control, consoleKeys.alt] : []), [0xffbd+n, `F${n}`]]);
+}
+$("console-send-function").onclick = () => sendConsoleFunction(false);
+$("console-send-tty").onclick = () => sendConsoleFunction(true);
+$("console-release").onclick = () => {
+  if (!consoleConnected || !rfb) return;
+  rfb.blur();
+  for (const [symbol,code] of [[0xffe1,"ShiftLeft"],[0xffe2,"ShiftRight"],[0xffe3,"ControlLeft"],[0xffe4,"ControlRight"],[0xffe9,"AltLeft"],[0xffea,"AltRight"],[0xffeb,"MetaLeft"],[0xffec,"MetaRight"],[0xfe03,"AltRight"]]) rfb.sendKey(symbol,code,false);
+  rfb.focus();
+};
+function loadGuestClipboard() {
+  $("console-clipboard-send").value = consoleClipboardText;
+  consoleClipboardDirty = false;
+  $("console-clipboard-latest").hidden = true;
+  $("console-clipboard-copy").disabled = !consoleClipboardText;
+}
+$("console-clipboard-latest").onclick = loadGuestClipboard;
+$("console-clipboard-send").oninput = () => {
+  consoleClipboardDirty = true;
+  $("console-clipboard-copy").disabled = !$("console-clipboard-send").value;
+};
+$("console-clipboard-read").onclick = async () => {
+  const generation = consoleGeneration;
+  try {
+    const value = await navigator.clipboard.readText();
+    if (generation !== consoleGeneration) return;
+    $("console-clipboard-send").value = value; consoleClipboardDirty = true;
+    $("console-clipboard-copy").disabled = !value;
+    $("console-clipboard-message").textContent = "Ready to send to the VM.";
+  } catch (_) { if (generation === consoleGeneration) $("console-clipboard-message").textContent = "Paste directly into the box with Ctrl+V (⌘V on Mac)."; }
+};
+$("console-clipboard-paste").onclick = () => {
+  if (!consoleConnected || consoleClipboardChannel === false) return;
+  rfb.clipboardPasteFrom($("console-clipboard-send").value); consoleClipboardDirty = false;
+  $("console-clipboard-message").textContent = "Sent. Paste inside the VM to insert the text.";
+};
+$("console-clipboard-copy").onclick = async () => {
+  const generation = consoleGeneration;
+  try {
+    await navigator.clipboard.writeText($("console-clipboard-send").value);
+    if (generation === consoleGeneration) $("console-clipboard-message").textContent = "Copied to your computer.";
+  } catch (_) {
+    if (generation !== consoleGeneration) return;
+    $("console-clipboard-send").focus(); $("console-clipboard-send").select();
+    $("console-clipboard-message").textContent = "Copy the selected text with Ctrl+C (⌘C on Mac).";
+  }
+};
+// Files use an independent session so display reconnects never restart a transfer.
+let consoleFilesListing = null, consoleFilesBusy = false, consoleFilesGeneration = 0;
+let consoleFilesController = null, consoleFilesUpload = null;
+function resetConsoleFiles() {
+  ++consoleFilesGeneration;
+  consoleFilesController?.abort(); consoleFilesUpload?.abort();
+  consoleFilesController = consoleFilesUpload = null;
+  consoleFilesListing = null; consoleFilesBusy = false;
+  $("console-files-list").innerHTML = ""; $("console-files-path").textContent = "Home folder";
+  $("console-files-status").textContent = "Open Files to browse the VM.";
+  $("console-files-input").value = "";
+  renderConsoleFiles();
+}
+function fileStatus(text, error = false) {
+  $("console-files-status").textContent = text;
+  $("console-files-status").className = "help" + (error ? " s-bad" : "");
+}
+function fileSize(bytes) {
+  return bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+}
+function renderConsoleFiles() {
+  for (const id of ["console-files-home", "console-files-up", "console-files-refresh"]) $(id).disabled = consoleFilesBusy;
+  $("console-files-up").disabled ||= !consoleFilesListing || consoleFilesListing.path === consoleFilesListing.parent;
+  $("console-files-drop").disabled = consoleFilesBusy || !consoleFilesListing;
+  const entries = (consoleFilesListing?.entries || []).filter(entry => $("console-files-hidden").checked || !entry.name.startsWith("."));
+  $("console-files-list").innerHTML = entries.map((entry, index) => `<button class="file-entry" data-file-index="${index}" ${consoleFilesBusy || entry.kind === "other" ? "disabled" : ""} title="${esc(entry.kind === "directory" ? "Open folder" : entry.kind === "file" ? "Download file" : "Not a regular file")}"><span class="file-kind" aria-hidden="true">${entry.kind === "directory" ? "▸" : "↓"}</span><span class="file-name">${esc(entry.name)}</span><span class="file-size">${entry.kind === "directory" ? "Folder" : entry.kind === "file" ? fileSize(entry.size) : "Special"}</span></button>`).join("") || (consoleFilesListing ? '<p class="help">No files to show in this folder.</p>' : "");
+  $("console-files-list").querySelectorAll('[data-file-index]').forEach(button => button.onclick = () => {
+    const entry = entries[Number(button.dataset.fileIndex)];
+    const path = consoleFilesListing.path.replace(/\/$/, "") + "/" + entry.name;
+    if (entry.kind === "directory") loadConsoleFiles(path);
+    else downloadConsoleFile(path, entry.name, entry.size);
+  });
+}
+async function loadConsoleFiles(path = ".", note = "") {
+  if (consoleFilesBusy) return;
+  const generation = ++consoleFilesGeneration, vm = consoleVm;
+  consoleFilesController = new AbortController();
+  consoleFilesBusy = true; renderConsoleFiles(); fileStatus("Connecting to files in the VM…");
+  try {
+    const response = await fetch(`/api/vm/${encodeURIComponent(vm)}/files?path=${encodeURIComponent(path)}`, {headers:{"X-Vmctl-Token":TOKEN}, signal:consoleFilesController.signal});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || (response.status === 404 ? "Restart vmctl web to enable file exchange, then open its new URL." : "Cannot list guest files."));
+    if (generation !== consoleFilesGeneration) return;
+    consoleFilesListing = data; $("console-files-path").textContent = data.path;
+    fileStatus(note || (data.truncated ? "Showing the first 2,000 entries. Open a subfolder to see more." : "Click a folder to open it, or a file to download."));
+  } catch (e) { if (generation === consoleFilesGeneration) fileStatus(e.message, true); }
+  finally { if (generation === consoleFilesGeneration) { consoleFilesBusy = false; consoleFilesController = null; renderConsoleFiles(); } }
+}
+function uploadConsoleFile(file, path, generation, position, total) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest(); consoleFilesUpload = request;
+    request.open("POST", `/api/vm/${encodeURIComponent(consoleVm)}/files-upload?path=${encodeURIComponent(path)}&name=${encodeURIComponent(file.name)}`);
+    request.setRequestHeader("X-Vmctl-Token", TOKEN); request.setRequestHeader("Content-Type", "application/octet-stream");
+    request.timeout = 240000;
+    request.upload.onprogress = e => {
+      if (generation !== consoleFilesGeneration) return;
+      const percent = e.lengthComputable ? Math.round(e.loaded / e.total * 100) : 0;
+      fileStatus(`${position}/${total} · ${file.name} · ${percent < 100 ? `Sending ${percent}%` : "Saving in VM…"}`);
+    };
+    request.onload = () => {
+      let result;
+      try { result = JSON.parse(request.responseText); } catch (_) { reject(new Error("Invalid file transfer response. Restart vmctl web if it was updated.")); return; }
+      if (request.status >= 200 && request.status < 300) resolve(result);
+      else reject(new Error(result.error || "Upload failed"));
+    };
+    request.onerror = () => reject(new Error("File transfer connection lost. Refresh the folder to check the result."));
+    request.ontimeout = () => reject(new Error("File transfer timed out. Refresh the folder before retrying."));
+    request.onabort = () => reject(new Error("File transfer view closed."));
+    request.send(file);
+  });
+}
+async function uploadConsoleFiles(files) {
+  if (consoleFilesBusy || !consoleFilesListing || !files.length) return;
+  const limit = consoleFilesListing.max_file_size || 256 * 1024 * 1024;
+  if (files.some(file => file.size > limit)) { fileStatus("Choose files no larger than 256 MiB each.", true); return; }
+  const path = consoleFilesListing.path, generation = ++consoleFilesGeneration;
+  consoleFilesBusy = true; renderConsoleFiles();
+  const saved = [];
+  try {
+    for (const [index, file] of files.entries()) {
+      fileStatus(`${index + 1}/${files.length} · Sending ${file.name}…`);
+      const result = await uploadConsoleFile(file, path, generation, index + 1, files.length);
+      if (generation !== consoleFilesGeneration) return;
+      saved.push(result.name);
+    }
+    consoleFilesBusy = false; consoleFilesUpload = null;
+    await loadConsoleFiles(path, `Saved in VM: ${saved.join(", ")}`);
+  } catch (e) { if (generation === consoleFilesGeneration) fileStatus(`${saved.length ? `${saved.length} file(s) saved. ` : ""}${e.message}`, true); }
+  finally { if (generation === consoleFilesGeneration) { consoleFilesBusy = false; consoleFilesUpload = null; renderConsoleFiles(); } }
+}
+async function downloadConsoleFile(path, name, size) {
+  if (consoleFilesBusy) return;
+  if (size > (consoleFilesListing?.max_file_size || 256 * 1024 * 1024)) { fileStatus("Choose a file no larger than 256 MiB.", true); return; }
+  const generation = ++consoleFilesGeneration;
+  consoleFilesBusy = true; consoleFilesController = new AbortController(); renderConsoleFiles(); fileStatus(`Downloading ${name}…`);
+  try {
+    const response = await fetch(`/api/vm/${encodeURIComponent(consoleVm)}/file?path=${encodeURIComponent(path)}`, {headers:{"X-Vmctl-Token":TOKEN}, signal:consoleFilesController.signal});
+    if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Download failed"); }
+    const blob = await response.blob();
+    if (generation !== consoleFilesGeneration) return;
+    const url = URL.createObjectURL(blob), link = document.createElement("a");
+    link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    fileStatus(`Downloaded ${name}`);
+  } catch (e) { if (generation === consoleFilesGeneration) fileStatus(e.message, true); }
+  finally { if (generation === consoleFilesGeneration) { consoleFilesBusy = false; consoleFilesController = null; renderConsoleFiles(); } }
+}
+$("console-files-home").onclick = () => loadConsoleFiles(".");
+$("console-files-up").onclick = () => loadConsoleFiles(consoleFilesListing?.parent || ".");
+$("console-files-refresh").onclick = () => loadConsoleFiles(consoleFilesListing?.path || ".");
+$("console-files-hidden").onchange = renderConsoleFiles;
+$("console-files-drop").onclick = () => $("console-files-input").click();
+$("console-files-input").onchange = e => { const files = Array.from(e.target.files); e.target.value = ""; uploadConsoleFiles(files); };
+$("console-shell").addEventListener("dragover", e => {
+  if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = $("vnc-files").disabled ? "none" : "copy";
+  if ($("vnc-files").disabled) return;
+  if ($("vnc-files").getAttribute("aria-expanded") !== "true") toggleConsolePanel("files");
+  $("console-files-drop").classList.add("drag-over");
+});
+$("console-shell").addEventListener("dragleave", e => { if (!e.currentTarget.contains(e.relatedTarget)) $("console-files-drop").classList.remove("drag-over"); });
+$("console-shell").addEventListener("drop", e => {
+  if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+  e.preventDefault(); $("console-files-drop").classList.remove("drag-over");
+  if (Array.from(e.dataTransfer.items).some(item => item.webkitGetAsEntry?.()?.isDirectory)) { fileStatus("Choose files, or zip a folder before uploading it.", true); return; }
+  if (consoleFilesBusy || !consoleFilesListing) { fileStatus("Wait for the folder to load, then drop the files again.", true); return; }
+  uploadConsoleFiles(Array.from(e.dataTransfer.files));
+});
+$("vnc-screenshot").onclick = () => {
+  if (!consoleConnected || !rfb) return;
+  const vm = consoleVm;
+  try {
+    rfb.toBlob(blob => {
+      if (!blob) { toast("Screenshot unavailable. Try again after the desktop appears.", true); return; }
+      const url = URL.createObjectURL(blob), link = document.createElement("a");
+      link.href = url; link.download = `${vm}-${new Date().toISOString().replace(/[:.]/g,"-")}.png`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, "image/png");
+  } catch (e) { toast("Screenshot unavailable: " + e.message, true); }
+};
+$("vnc-ssh").onclick = () => terminalDocked ? closeBrowserSsh() : openBrowserSsh(consoleVm, true);
+function resizeConsoleTerminal(percent) {
+  const value = Math.max(20, Math.min(70, percent));
+  $("console-ssh").style.flexBasis = value + "%";
+  $("console-divider").setAttribute("aria-valuenow", String(Math.round(value)));
+}
+$("console-divider").onpointerdown = e => { if (e.button === 0) { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); } };
+$("console-divider").onpointermove = e => {
+  if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+  const rect = $("console-desktop").getBoundingClientRect();
+  resizeConsoleTerminal(100 * (rect.bottom - e.clientY) / rect.height);
+};
+$("console-divider").onpointerup = e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); };
+$("console-divider").onkeydown = e => {
+  if (!["ArrowUp","ArrowDown","Home","End"].includes(e.key)) return;
+  e.preventDefault();
+  const value = Number(e.currentTarget.getAttribute("aria-valuenow"));
+  resizeConsoleTerminal(e.key === "Home" ? 20 : e.key === "End" ? 70 : value + (e.key === "ArrowUp" ? 5 : -5));
+};
 $("vnc-fit").onclick = () => {
-  consoleFit = !consoleFit; $("vnc-fit").textContent = consoleFit ? "Fit to window" : "Actual size";
+  consoleFit = !consoleFit; consoleButton("vnc-fit", consoleFit ? "Fit to window" : "Actual size", "fit");
   $("vnc-fit").classList.toggle("active", consoleFit); $("vnc-fit").setAttribute("aria-pressed", consoleFit);
-  if (rfb) { rfb.scaleViewport = consoleFit; rfb.clipViewport = !consoleFit; }
+  if (rfb) { rfb.scaleViewport = consoleFit; rfb.clipViewport = false; }
 };
 $("vnc-full").onclick = async () => { try {
   if (document.fullscreenElement) await document.exitFullscreen();
@@ -1464,7 +2032,7 @@ $("console-shell").addEventListener("pointermove", e => {
 });
 document.addEventListener("fullscreenchange", () => {
   const full = document.fullscreenElement === $("console-shell");
-  $("vnc-full").textContent = full ? "Exit full screen" : "Full screen";
+  consoleButton("vnc-full", full ? "Exit full screen" : "Full screen", "expand");
   if (rfb) rfb.resizeSession = full;
   $("console-shell").classList.remove("controls-visible");
   clearTimeout(consoleToolsTimer);
