@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
-import json
+import sys
 from pathlib import Path
 
 
@@ -15,17 +15,16 @@ def main() -> int:
     parser.add_argument("--iso-root", type=Path, default=root, help="Checkout that owns isos/")
     args = parser.parse_args()
     expected: dict[Path, set[str]] = {}
-    for profile in sorted((root / "vms/profiles").glob("*.json")):
-        if profile.name == "local.json":
-            continue
-        for vm in json.loads(profile.read_text())["vms"].values():
-            if vm.get("iso_sha256") and not vm.get("iso_discovery"):
-                path = args.iso_root / vm["iso"]
-                expected.setdefault(path, set()).add(vm["iso_sha256"])
-                if path.name == "alpine-virt-3.24.1-x86_64.iso":
-                    legacy = path.with_name("alpine-virt-latest-stable-x86_64.iso")
-                    if legacy.is_file():
-                        expected.setdefault(legacy, set()).add(vm["iso_sha256"])
+    sys.path.insert(0, str(root))
+    from vmctl import config  # noqa: E402  (profiles resolved over their bases)
+    for vm in config.load_tracked(root / "vms/profiles").values():
+        if vm.get("iso_sha256") and not vm.get("iso_discovery"):
+            path = args.iso_root / vm["iso"]
+            expected.setdefault(path, set()).add(vm["iso_sha256"])
+            if path.name == "alpine-virt-3.24.1-x86_64.iso":
+                legacy = path.with_name("alpine-virt-latest-stable-x86_64.iso")
+                if legacy.is_file():
+                    expected.setdefault(legacy, set()).add(vm["iso_sha256"])
 
     def audit(item: tuple[Path, set[str]]) -> tuple[str, bool]:
         path, hashes = item

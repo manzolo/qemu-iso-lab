@@ -79,7 +79,7 @@ def profile_record(name: str, vm: dict[str, Any], lock: dict[str, Any]) -> dict[
         "role": str(meta.get("role") or ""), "release_model": str(meta.get("release_model") or ""),
         "status": str(meta.get("status") or "manual"), "verified": meta.get("verified"),
         "version": meta.get("version"), "history": list(locked.get("history") or []),
-        "groups": list(meta.get("groups") or []),
+        "groups": list(meta.get("groups") or []), "extends": str(vm.get("extends") or ""),
         "memory_mb": vm.get("memory_mb"), "cpus": vm.get("cpus"),
         "firmware": str((vm.get("firmware") or {}).get("type") or "").upper(),
         "disk": str((vm.get("disk") or {}).get("size") or ""),
@@ -159,7 +159,7 @@ h2.family { font-size:16px; margin:26px 0 10px; color:var(--muted); font-weight:
 .card.picked .pick { background:var(--accent); color:#0f1722; border-color:var(--accent); }
 .badges { display:flex; gap:6px; flex-wrap:wrap; font-size:11px; }
 .badge { border:1px solid currentColor; border-radius:6px; padding:1px 7px; font-weight:600; }
-.b-unattended { color:var(--ok); } .b-manual { color:var(--muted); } .b-experimental { color:var(--warn); } .b-version { color:#9ebdff; } .b-verified { color:var(--ok); } .b-medium { color:var(--warn); } .b-lab { color:#c9a7ff; }
+.b-unattended { color:var(--ok); } .b-manual { color:var(--muted); } .b-experimental { color:var(--warn); } .b-version { color:#9ebdff; } .b-verified { color:var(--ok); } .b-medium { color:var(--warn); } .b-lab { color:#c9a7ff; } .b-base { color:var(--muted); }
 .facts { display:flex; gap:14px; flex-wrap:wrap; color:var(--muted); font-size:12.5px; }
 .facts b { color:var(--text); font-weight:600; }
 .cmds { background:#0f1622; border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-size:12.5px; position:relative; }
@@ -270,6 +270,7 @@ function card(p) {
   if (p.verified) badges.push(`<span class="badge b-verified" title="Last live PASS of the validation matrix">verified ${esc(p.verified)}</span>`);
   if (p.medium === "manual") badges.push(`<span class="badge b-medium" title="No public download: the profile says which medium to provide">your own ISO</span>`);
   if (p.lab) badges.push(`<span class="badge b-lab">lab member</span>`);
+  if (p.extends) badges.push(`<span class="badge b-base" title="The shared recipe this profile extends (vms/profiles: bases)">on ${esc(p.extends)}</span>`);
   const facts = [`<b>${esc(ram(p))}</b> RAM`, `<b>${esc(p.cpus)}</b> vCPU`, `<b>${esc(p.firmware)}</b>`, p.disk ? `<b>${esc(p.disk)}</b> disk` : "", p.ssh ? `SSH` : "", p.shared_dir ? `shared folder` : ""].filter(Boolean);
   const history = p.history.length ? `<details><summary>Changes (${p.history.length})</summary><ul class="history">${p.history.map(h => `<li><span class="v">${esc(h.version)}</span>${esc(h.date)} · ${esc(h.note)}</li>`).join("")}</ul></details>` : "";
   const notes = p.notes ? `<details><summary>Notes</summary><p>${esc(p.notes)}</p></details>` : "";

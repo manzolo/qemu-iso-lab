@@ -19,7 +19,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from vmctl import state
+from vmctl import profile_bases, state
 from vmctl.errors import VMError
 
 LOCK_FILE = Path("vms") / "profiles.lock"
@@ -28,7 +28,7 @@ PROFILE_FILES_DIR = Path("vms") / "profile-files"
 SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 PARTS = ("major", "minor", "patch")
 # Keys that describe or document a profile without changing what gets installed.
-FINGERPRINT_EXCLUDED = frozenset({"name", "meta", "iso_help", "notes", "description", "_comment"})
+FINGERPRINT_EXCLUDED = frozenset({"name", "meta", "iso_help", "notes", "description", "_comment", profile_bases.EXTENDS_KEY})
 INITIAL_VERSION = "1.0.0"
 
 
@@ -45,13 +45,33 @@ def tracked_profile_files(root: Path | None = None) -> list[Path]:
     return sorted(p for p in (_root(root) / PROFILES_DIR).glob("*.json") if not p.name.startswith("local"))
 
 
-def tracked_entries(root: Path | None = None) -> dict[str, tuple[Path, dict[str, Any]]]:
-    entries: dict[str, tuple[Path, dict[str, Any]]] = {}
+def tracked_documents(root: Path | None = None) -> tuple[dict[str, tuple[Path, dict[str, Any]]], dict[str, dict[str, Any]]]:
+    """The raw ``vms`` (with the file each lives in) and the ``bases`` of the tracked catalog."""
+    vms: dict[str, tuple[Path, dict[str, Any]]] = {}
+    bases: dict[str, dict[str, Any]] = {}
     for path in tracked_profile_files(root):
         document = json.loads(path.read_text(encoding="utf-8"))
         for name, entry in (document.get("vms") or {}).items():
-            entries[name] = (path, entry)
-    return entries
+            vms[name] = (path, entry)
+        bases.update(profile_bases.bases_of(document, str(path)))
+    return vms, bases
+
+
+def tracked_entries(root: Path | None = None) -> dict[str, tuple[Path, dict[str, Any]]]:
+    """Every tracked profile, resolved over its base (``profile_bases``): the recipe an install
+    depends on is the resolved one, so a base edit changes every child's fingerprint."""
+    vms, bases = tracked_documents(root)
+    resolved = profile_bases.resolve_extends({name: entry for name, (_, entry) in vms.items()}, bases)
+    return {name: (vms[name][0], resolved[name]) for name in vms}
+
+
+def children_of(base: str, root: Path | None = None) -> list[str]:
+    """The tracked profiles built on *base*, directly or through another base, in catalog order."""
+    vms, bases = tracked_documents(root)
+    if base not in bases:
+        raise VMError(f"{base} is not a base (bases: {', '.join(sorted(bases)) or 'none'})")
+    raw = {name: entry for name, (_, entry) in vms.items()}
+    return [name for name in vms if base in profile_bases.chain_of(name, raw, bases)]
 
 
 def referenced_files(entry: dict[str, Any]) -> list[str]:
@@ -133,6 +153,11 @@ def check(root: Path | None = None) -> list[str]:
                             f"tools/bump_profile.py {name} patch|minor|major -m '...'")
     for name in sorted(set(lock) - set(entries)):
         problems.append(f"{name}: in {LOCK_FILE} but not in the catalog (tools/bump_profile.py --prune)")
+    vms, bases = tracked_documents(root)
+    raw = {name: entry for name, (_, entry) in vms.items()}
+    used = {base for name in list(raw) + list(bases) for base in profile_bases.chain_of(name, raw, bases)}
+    for base in sorted(set(bases) - used):
+        problems.append(f"{base}: a base nothing extends (drop it, or extend it)")
     return problems
 
 
@@ -170,7 +195,8 @@ def bump(name: str, part: str, note: str, root: Path | None = None, date: str | 
         raise VMError(f"{name}: meta.version {old!r} is not MAJOR.MINOR.PATCH (tools/bump_profile.py --init)")
     major, minor, patch = (int(g) for g in match.groups())
     new = {"major": f"{major + 1}.0.0", "minor": f"{major}.{minor + 1}.0", "patch": f"{major}.{minor}.{patch + 1}"}[part]
-    entry = _set_version(path, name, new)
+    _set_version(path, name, new)
+    entry = tracked_entries(root)[name][1]  # resolved over its base: the recipe the fingerprint covers
     lock = read_lock(root)
     record = lock["profiles"].setdefault(name, {"history": []})
     record.update({"version": new, "fingerprint": fingerprint(entry, root)})
@@ -188,7 +214,8 @@ def init(note: str, root: Path | None = None, date: str | None = None) -> list[s
         version = (entry.get("meta") or {}).get("version")
         if not is_semver(version):
             version = INITIAL_VERSION
-            entry = _set_version(path, name, version)
+            _set_version(path, name, version)
+            entry = tracked_entries(root)[name][1]
             touched.append(name)
         if name not in lock["profiles"]:
             lock["profiles"][name] = {"version": version, "fingerprint": fingerprint(entry, root),

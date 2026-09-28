@@ -344,6 +344,8 @@ your copy in `local.json`, together with your `edition`/`language` (multi-editio
    `iso_discovery` so the profile follows new releases).
 2. Add a VM object to the family file in `vms/profiles/`, or create a new file,
    then `tools/bump_profile.py --init` (1.0.0 and its lock entry; a test fails otherwise).
+   A sibling of an existing profile (another Ubuntu flavour, another Debian desktop) should
+   `extend` the family's base and carry only its delta: see *Profile bases* below.
    Use the generic guest user `lab` and the `{{user}}` placeholder; never a
    real name, password or hash (the repository is public).
 3. Choose disk format, firmware type and runtime settings.
@@ -360,6 +362,61 @@ To make it install unattended, add the matching config section and read
 `ssh_provision` and read [PROVISIONING.md](PROVISIONING.md). A test in
 `tests/test_repo_profiles.py` loads the whole tracked catalog, so `make check`
 catches a broken profile.
+
+## Profile bases: write the shared recipe once
+
+Ten Ubuntu flavours differ in a metapackage, a display-manager drop-in, a hostname and a port;
+everything else (the autoinstall seed, sudoers, the serial getty, the video card, the ISO) is the
+same recipe. A profile file may carry, next to `vms`, a `bases` object, and a profile names the
+base it is built on with `extends`:
+
+```json
+{
+  "bases": {
+    "ubuntu-24.04-base": {
+      "extends": "ubuntu-desktop-base",
+      "iso": "isos/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-live-server-amd64.iso",
+      "iso_sha256": "e907d92e…"
+    }
+  },
+  "vms": {
+    "kubuntu-24.04": {
+      "name": "Kubuntu 24.04 LTS (KDE Plasma)",
+      "extends": "ubuntu-24.04-base",
+      "meta": {"slug": "kubuntu"},
+      "disk": {"size": "30G"},
+      "autoinstall": {"hostname": "kubuntu", "packages": ["kubuntu-desktop", "spice-vdagent", "qemu-guest-agent"]},
+      "cloud_init": {"hostname": "kubuntu", "write_files": [{"path": "/etc/sddm.conf.d/vmctl-autologin.conf", "...": "..."}]},
+      "ssh_provision": {"hostname": "kubuntu", "ssh_host_port": 2241, "post_install_run": ["..."]}
+    }
+  }
+}
+```
+
+- A base is not a VM: it is never listed, installed or versioned on its own, and it needs no
+  `iso`, disk or port; `meta.version` and `meta.verified` are refused in a base, because a
+  bump and a live PASS are earned per profile. A base may extend another base (`ubuntu-desktop-base` holds what every
+  autoinstall desktop shares, `ubuntu-24.04-base` adds the 24.04 medium, the flavours add the
+  desktop; `ubuntu-20.04`, `ubuntu-22.04` and `ubuntu-26.04` extend `ubuntu-desktop-base`
+  directly with their own medium). Bases are global: any tracked file may define one, every
+  file may extend it, and a name used twice (or used for both a base and a VM) is an error.
+- The merge is the one of `local.json`: objects merge, lists **append** (the base's
+  `write_files` and `runcmd` come first, the child's follow), scalars are replaced by the
+  child. A child cannot remove what the base put in a list, so a base holds only what every
+  child really shares.
+- `{{name}}` in any string becomes the profile's own key, so the base can say
+  `artifacts/{{name}}/disk.qcow2` and `artifacts/{{name}}/OVMF_VARS.fd`. It works in every
+  profile, with or without a base.
+- Everything downstream sees the resolved profile: `vmctl show`, the flows, the dashboards, the
+  web editor (its *Catalog template* is the resolved one) and the catalog site, whose card says
+  `on <base>`. A local override in `local.json` applies on top of the resolved profile, and a
+  wholly local profile may extend a tracked base.
+- **Versions**: the fingerprint is the resolved recipe, so editing a base changes the recipe of
+  every profile built on it and `make check` names each of them; bump them together:
+  `tools/bump_profile.py ubuntu-desktop-base patch --children -m "..."`. A base nothing
+  extends is reported by `--check`. The migration of 2026-09-28 left every resolved profile
+  byte-identical (the lock did not change), so no profile needed a bump or a new live run.
 
 ## Canonical names and compatibility
 

@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import vmctl.config  # noqa: E402
 import vmctl.iso  # noqa: E402
 import vmctl.runtime  # noqa: E402
 from vmctl.errors import VMError  # noqa: E402
@@ -362,14 +363,11 @@ class IsoArchiveTests(BaseVmctlTestCase):
     def test_every_tracked_profile_can_get_its_iso_or_says_how(self):
         # The rule this commit set: vmctl downloads what has a public source, and a medium only
         # the user can provide carries iso_help (Windows, the retro media, pearOS's signed links).
-        for path in (ROOT / "vms/profiles").glob("*.json"):
-            if path.name.startswith("local"):
-                continue
-            for name, vm in json.loads(path.read_text())["vms"].items():
-                with self.subTest(profile=name):
-                    has_source = vm.get("iso_url") or vm.get("iso_urls") or vm.get("iso_discovery")
-                    help_text = vm.get("iso_help") or (vm.get("disk_image") or {}).get("help")  # a built image says how
-                    self.assertTrue(has_source or help_text, f"{name}: no download source and no iso_help")
+        for name, vm in vmctl.config.load_tracked(ROOT / "vms/profiles").items():  # resolved over their bases
+            with self.subTest(profile=name):
+                has_source = vm.get("iso_url") or vm.get("iso_urls") or vm.get("iso_discovery")
+                help_text = vm.get("iso_help") or (vm.get("disk_image") or {}).get("help")  # a built image says how
+                self.assertTrue(has_source or help_text, f"{name}: no download source and no iso_help")
 
 
 class DownloadProgressTests(unittest.TestCase):

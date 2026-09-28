@@ -387,8 +387,5 @@ class TrackedDiskPathTests(unittest.TestCase):
         # become the unattended profile's directory: each pair would install over the other.
         import json
 
-        vms: dict = {}
-        for path in sorted((ROOT / "vms/profiles").glob("*.json")):
-            if path.name != "local.json":
-                vms.update(json.loads(path.read_text())["vms"])
+        vms = vmctl.config.load_tracked(ROOT / "vms/profiles")
         self.assertEqual(vmctl.config._disk_path_conflicts(vms), [])

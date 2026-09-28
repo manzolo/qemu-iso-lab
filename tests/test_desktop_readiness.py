@@ -97,8 +97,10 @@ else:
         self.assertIn('Desktop ready: lab', result.stdout)
 
     def test_all_flavors_use_shared_assertive_checks(self):
-        profiles = json.loads((ROOT / 'vms/profiles/ubuntu-flavors.json').read_text())['vms']
-        for vm in profiles.values():
+        from vmctl import config
+        names = json.loads((ROOT / 'vms/profiles/ubuntu-flavors.json').read_text())['vms']
+        tracked = config.load_tracked(ROOT / 'vms/profiles')  # resolved over ubuntu-24.04-base
+        for vm in (tracked[name] for name in names):
             cfg = vm['ssh_provision']
             self.assertTrue(any('verify-desktop --user "{{user}}"' in c for c in cfg['post_install_run']))
             self.assertNotIn('systemctl get-default', cfg['post_install_run'])

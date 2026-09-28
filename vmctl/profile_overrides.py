@@ -43,13 +43,7 @@ def read_override(name: str) -> dict[str, Any]:
     revision = _revision()
     effective = config.get_vm(config.load_config(), name)
     _, document = _document()
-    base = None
-    for path in sorted((state.CONFIG_DIR / "profiles").glob("*.json")):
-        if path.name != "local.json":
-            entry = json.loads(path.read_text()).get("vms", {}).get(name)
-            if entry is not None:
-                base = entry
-                break
+    base = config.load_tracked().get(name)  # resolved over its base: what the catalog really says
     if revision != _revision():
         raise VMError("Profiles changed while loading. Open the editor again.")
     return {"name": name, "base": base, "effective": effective,

@@ -1,4 +1,89 @@
 {
+  "bases": {
+    "ubuntu-desktop-base": {
+      "meta": {
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "lts",
+        "status": "unattended",
+        "groups": [
+          "ubuntu"
+        ]
+      },
+      "disk": {
+        "path": "artifacts/{{name}}/disk.qcow2",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/{{name}}/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": true,
+      "usb_tablet": true,
+      "guest_agent": true,
+      "clipboard": true,
+      "video": {
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-device",
+            "qxl-vga",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "autoinstall": {
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "storage_layout": "direct",
+        "install_ssh": true
+      },
+      "cloud_init": {
+        "user": "lab",
+        "write_files": [
+          {
+            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
+            "permissions": "0440",
+            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl set-default graphical.target"
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ]
+      }
+    }
+  },
   "vms": {
     "ubuntu-8.04-desktop": {
       "name": "Ubuntu 8.04.4 Desktop",
@@ -1164,14 +1249,10 @@
     },
     "ubuntu-20.04": {
       "name": "Ubuntu 20.04.6 Desktop (unattended, autoinstall)",
+      "extends": "ubuntu-desktop-base",
       "meta": {
         "slug": "ubuntu",
-        "family": "debian",
-        "role": "desktop",
-        "release_model": "lts",
-        "status": "unattended",
         "groups": [
-          "ubuntu",
           "ubuntu-releases"
         ],
         "verified": "2026-09-26",
@@ -1180,68 +1261,18 @@
       "iso": "isos/ubuntu-20.04.6-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/20.04/ubuntu-20.04.6-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-20.04/disk.qcow2",
-        "size": "32G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-20.04/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 2,
-      "network": "user",
-      "audio": true,
-      "usb_tablet": true,
-      "clipboard": true,
-      "video": {
-        "default": "std",
-        "installer_order": [
-          "std",
-          "safe"
-        ],
-        "variants": {
-          "std": [
-            "-device",
-            "qxl-vga",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
+        "size": "32G"
       },
       "notes": "Ubuntu Server 20.04.6 autoinstall plus the ubuntu-desktop metapackage: GNOME 3.36 on gdm3 with the autologin drop-in. Its subiquity (22.07) installs `packages` with only the CD pool in the target's sources (the mirror waits in sources.list.curtin.old), so ubuntu-desktop is 'Unable to locate' there (verified live): the desktop is installed by a late-command through curtin in-target instead, after the mirror sources are back. Same recipe otherwise as ubuntu-gnome-24.04, which stands for 24.04 in this series.",
       "autoinstall": {
         "hostname": "ubuntu-2004",
-        "username": "lab",
-        "realname": "Lab User",
-        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
-        "timezone": "UTC",
-        "keyboard_layout": "us",
-        "storage_layout": "direct",
-        "install_ssh": true,
         "late_commands": [
           "curtin in-target --target=/target -- sh -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ubuntu-desktop spice-vdagent qemu-guest-agent'"
         ]
       },
       "cloud_init": {
         "hostname": "ubuntu-2004",
-        "user": "lab",
         "write_files": [
-          {
-            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
-            "permissions": "0440",
-            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
-          },
           {
             "path": "/etc/gdm3/custom.conf",
             "permissions": "0644",
@@ -1249,7 +1280,6 @@
           }
         ],
         "runcmd": [
-          "systemctl set-default graphical.target",
           "for dm in gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
           "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
           "systemctl enable --now serial-getty@ttyS0.service"
@@ -1257,33 +1287,20 @@
       },
       "ssh_provision": {
         "hostname": "ubuntu-2004",
-        "user": "lab",
         "ssh_host_port": 2258,
         "post_install_run": [
           "~/bin/verify-desktop --user \"{{user}}\" --service gdm3.service --package-manager dpkg --package ubuntu-desktop"
-        ],
-        "copy_from_host": [
-          {
-            "source": "vms/profile-files/common/bin/verify-desktop",
-            "dest": "/home/{{user}}/bin/verify-desktop",
-            "dest_mode": "755"
-          }
         ]
       },
       "iso_sha256": "b8f31413336b9393ad5d8ef0282717b2ab19f007df2e9ed5196c13d8f9153c8b",
-      "guest_agent": true,
       "vmport": false
     },
     "ubuntu-22.04": {
       "name": "Ubuntu 22.04.5 Desktop (unattended, autoinstall)",
+      "extends": "ubuntu-desktop-base",
       "meta": {
         "slug": "ubuntu",
-        "family": "debian",
-        "role": "desktop",
-        "release_model": "lts",
-        "status": "unattended",
         "groups": [
-          "ubuntu",
           "ubuntu-releases"
         ],
         "verified": "2026-09-26",
@@ -1292,55 +1309,11 @@
       "iso": "isos/ubuntu-22.04.5-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-22.04/disk.qcow2",
-        "size": "32G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-22.04/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 2,
-      "network": "user",
-      "audio": true,
-      "usb_tablet": true,
-      "clipboard": true,
-      "video": {
-        "default": "std",
-        "installer_order": [
-          "std",
-          "safe"
-        ],
-        "variants": {
-          "std": [
-            "-device",
-            "qxl-vga",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
+        "size": "32G"
       },
       "notes": "Ubuntu Server 22.04.5 autoinstall plus the ubuntu-desktop metapackage: GNOME 42 on gdm3 with the autologin drop-in; same recipe as ubuntu-gnome-24.04, which stands for 24.04 in this series.",
       "autoinstall": {
         "hostname": "ubuntu-2204",
-        "username": "lab",
-        "realname": "Lab User",
-        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
-        "timezone": "UTC",
-        "keyboard_layout": "us",
-        "storage_layout": "direct",
-        "install_ssh": true,
         "packages": [
           "ubuntu-desktop",
           "spice-vdagent",
@@ -1349,13 +1322,7 @@
       },
       "cloud_init": {
         "hostname": "ubuntu-2204",
-        "user": "lab",
         "write_files": [
-          {
-            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
-            "permissions": "0440",
-            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
-          },
           {
             "path": "/etc/gdm3/custom.conf",
             "permissions": "0644",
@@ -1363,7 +1330,6 @@
           }
         ],
         "runcmd": [
-          "systemctl set-default graphical.target",
           "for dm in gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
           "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
           "systemctl enable --now serial-getty@ttyS0.service"
@@ -1371,33 +1337,20 @@
       },
       "ssh_provision": {
         "hostname": "ubuntu-2204",
-        "user": "lab",
         "ssh_host_port": 2259,
         "post_install_run": [
           "~/bin/verify-desktop --user \"{{user}}\" --service gdm3.service --package-manager dpkg --package ubuntu-desktop"
-        ],
-        "copy_from_host": [
-          {
-            "source": "vms/profile-files/common/bin/verify-desktop",
-            "dest": "/home/{{user}}/bin/verify-desktop",
-            "dest_mode": "755"
-          }
         ]
       },
       "iso_sha256": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
-      "guest_agent": true,
       "vmport": false
     },
     "ubuntu-26.04": {
       "name": "Ubuntu 26.04 Desktop (unattended, autoinstall)",
+      "extends": "ubuntu-desktop-base",
       "meta": {
         "slug": "ubuntu",
-        "family": "debian",
-        "role": "desktop",
-        "release_model": "lts",
-        "status": "unattended",
         "groups": [
-          "ubuntu",
           "ubuntu-releases"
         ],
         "verified": "2026-09-26",
@@ -1406,55 +1359,11 @@
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",
       "disk": {
-        "path": "artifacts/ubuntu-26.04/disk.qcow2",
-        "size": "35G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-26.04/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 2,
-      "network": "user",
-      "audio": true,
-      "usb_tablet": true,
-      "clipboard": true,
-      "video": {
-        "default": "std",
-        "installer_order": [
-          "std",
-          "safe"
-        ],
-        "variants": {
-          "std": [
-            "-device",
-            "qxl-vga",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
+        "size": "35G"
       },
       "notes": "Ubuntu Server 26.04 autoinstall plus the ubuntu-desktop metapackage, the newest entry of the per-release desktop series (24.04's entry is ubuntu-gnome-24.04). Same recipe as 22.04 and 24.04, unchanged: gdm3 autologin drop-in, the user in the autologin and nopasswdlogin groups, a ttyS0 getty, and a post-install that asserts an active local graphical session rather than an enabled display manager. The ISO is the one ubuntu-server-live and ubuntu-server-ci already pin. Live PASS 2026-09-20 in 12.9 min: 26.04's subiquity resolves ubuntu-desktop from autoinstall 'packages' (no late_commands with curtin in-target, which 20.04 needed), and gdm3.service still answers because Ubuntu keeps it an alias of gdm.service, so the verify-desktop service gate holds.",
       "autoinstall": {
         "hostname": "ubuntu-2604",
-        "username": "lab",
-        "realname": "Lab User",
-        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
-        "timezone": "UTC",
-        "keyboard_layout": "us",
-        "storage_layout": "direct",
-        "install_ssh": true,
         "packages": [
           "ubuntu-desktop",
           "spice-vdagent",
@@ -1463,13 +1372,7 @@
       },
       "cloud_init": {
         "hostname": "ubuntu-2604",
-        "user": "lab",
         "write_files": [
-          {
-            "path": "/etc/sudoers.d/90-{{user}}-nopasswd",
-            "permissions": "0440",
-            "content": "{{user}} ALL=(ALL) NOPASSWD:ALL\n"
-          },
           {
             "path": "/etc/gdm3/custom.conf",
             "permissions": "0644",
@@ -1477,7 +1380,6 @@
           }
         ],
         "runcmd": [
-          "systemctl set-default graphical.target",
           "for dm in gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
           "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
           "systemctl enable --now serial-getty@ttyS0.service"
@@ -1485,21 +1387,12 @@
       },
       "ssh_provision": {
         "hostname": "ubuntu-2604",
-        "user": "lab",
         "ssh_host_port": 2275,
         "post_install_run": [
           "~/bin/verify-desktop --user \"{{user}}\" --service gdm3.service --package-manager dpkg --package ubuntu-desktop"
-        ],
-        "copy_from_host": [
-          {
-            "source": "vms/profile-files/common/bin/verify-desktop",
-            "dest": "/home/{{user}}/bin/verify-desktop",
-            "dest_mode": "755"
-          }
         ]
       },
       "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9",
-      "guest_agent": true,
       "vmport": false
     }
   }

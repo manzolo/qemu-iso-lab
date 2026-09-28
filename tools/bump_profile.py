@@ -6,6 +6,7 @@
     tools/bump_profile.py --init               # first run, or a new profile: 1.0.0 + lock entry
     tools/bump_profile.py --history ubuntu-26.04
     tools/bump_profile.py --prune              # forget lock entries of profiles that left the catalog
+    tools/bump_profile.py ubuntu-24.04-desktop patch --children -m "..."   # a base changed: bump every profile built on it
 
 patch: a fix to the recipe (reinstalling is optional). minor: something more (packages, a
 shared folder). major: an installed VM is no longer comparable (disk layout, user, port,
@@ -33,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--init", action="store_true", help="stamp 1.0.0 on unversioned profiles and record missing lock entries")
     parser.add_argument("--history", metavar="NAME", help="print a profile's version history")
     parser.add_argument("--prune", action="store_true", help="drop lock entries whose profile is gone")
+    parser.add_argument("--children", action="store_true", help="NAME is a base: bump every profile that extends it")
     parser.add_argument("--root", type=Path, default=ROOT, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     try:
@@ -60,8 +62,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if not args.name or not args.part:
             parser.error("name and part are required (or one of --check, --init, --history, --prune)")
-        old, new = profile_versions.bump(args.name, args.part, args.message, args.root)
-        print(f"{args.name}: {old} -> {new}")
+        names = profile_versions.children_of(args.name, args.root) if args.children else [args.name]
+        if not names:
+            print(f"{args.name}: no profile extends it")
+            return 1
+        for name in names:
+            old, new = profile_versions.bump(name, args.part, args.message, args.root)
+            print(f"{name}: {old} -> {new}")
         return 0
     except VMError as exc:
         print(f"error: {exc}", file=sys.stderr)

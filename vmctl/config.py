@@ -7,7 +7,9 @@ import sys
 from datetime import date
 from typing import Any, cast
 
-from vmctl import state, runtime
+from pathlib import Path
+
+from vmctl import profile_bases, state, runtime
 from vmctl.errors import VMError
 
 PROFILE_ALIASES: dict[str, str] = {
@@ -105,15 +107,32 @@ USER_IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
 
 
 def merge_vm_profile(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    merged = copy.deepcopy(base)
-    for key, value in override.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = merge_vm_profile(cast(dict[str, Any], merged[key]), value)
-        elif isinstance(value, list) and isinstance(merged.get(key), list):
-            merged[key] = copy.deepcopy(merged[key]) + copy.deepcopy(value)
-        else:
-            merged[key] = copy.deepcopy(value)
-    return merged
+    """A local override (or a profile's delta over its base): see ``profile_bases.merge``."""
+    return profile_bases.merge(base, override)
+
+
+def load_tracked(profiles_dir: Path | None = None) -> dict[str, dict[str, Any]]:
+    """The tracked catalog alone (never local.json): every entry resolved over its base
+    (``profile_bases``) with ``{{user}}`` still literal and nothing validated. What the profile
+    versions, the web editor's catalog template and the repository tests look at."""
+    directory = profiles_dir or (state.CONFIG_DIR / "profiles")
+    vms: dict[str, dict[str, Any]] = {}
+    bases: dict[str, dict[str, Any]] = {}
+    for path in sorted(directory.glob("*.json")):
+        if path.name.startswith("local"):
+            continue
+        document = runtime.load_json_file(path)
+        if not isinstance(document.get("vms"), dict):
+            raise VMError(f"Invalid profile file: {path}")
+        for name, entry in document["vms"].items():
+            if name in vms:
+                raise VMError(f"Duplicate VM profile '{name}' in {path}")
+            vms[name] = cast(dict[str, Any], entry)
+        for name, entry in profile_bases.bases_of(document, str(path)).items():
+            if name in bases:
+                raise VMError(f"Duplicate base '{name}' in {path}")
+            bases[name] = entry
+    return profile_bases.resolve_extends(vms, bases)
 
 
 def resolve_vm_user(vm: dict[str, Any]) -> tuple[str | None, str | None]:
@@ -147,13 +166,7 @@ def _contains_placeholder(value: Any) -> bool:
 
 
 def _substitute(value: Any, user: str) -> Any:
-    if isinstance(value, str):
-        return value.replace(USER_PLACEHOLDER, user)
-    if isinstance(value, dict):
-        return {k: _substitute(v, user) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_substitute(v, user) for v in value]
-    return value
+    return profile_bases.replace_placeholder(value, USER_PLACEHOLDER, user)
 
 
 def expand_user_placeholder(name: str, vm: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
@@ -374,6 +387,7 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
         raise VMError(f"Missing profiles directory: {profiles_dir}")
 
     merged_vms: dict[str, dict[str, Any]] = {}
+    bases: dict[str, dict[str, Any]] = {}
     profile_paths = sorted(profiles_dir.glob("*.json"), key=lambda p: (p.name == "local.json", p.name))
     if local_profiles is not None and profiles_dir / "local.json" not in profile_paths:
         profile_paths.append(profiles_dir / "local.json")
@@ -381,6 +395,10 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
         profile_data = local_profiles if path.name == "local.json" and local_profiles is not None else runtime.load_json_file(path)
         if "vms" not in profile_data or not isinstance(profile_data["vms"], dict):
             raise VMError(f"Invalid profile file: {path}")
+        for base_name, base in profile_bases.bases_of(profile_data, str(path)).items():
+            if base_name in bases:
+                raise VMError(f"Duplicate base '{base_name}' in {path}")
+            bases[base_name] = base
         local_names: set[str] = set()
         for name, vm in profile_data["vms"].items():
             if not isinstance(vm, dict):
@@ -399,6 +417,10 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
 
     if not merged_vms:
         raise VMError(f"No VM profiles found in: {profiles_dir}")
+
+    # A local override sits on the raw tracked entry and the base is applied afterwards: the
+    # merge is associative, so base + (delta + override) is (base + delta) + override.
+    merged_vms = profile_bases.resolve_extends(merged_vms, bases)
 
     all_errors: list[str] = []
     for name, vm in list(merged_vms.items()):
