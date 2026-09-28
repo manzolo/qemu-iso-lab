@@ -134,19 +134,29 @@ class FramesTests(BaseVmctlTestCase):
         path = self.root / "fake-vnc.sock"
         server = socketlib.socket(socketlib.AF_UNIX); server.bind(str(path)); server.listen(1)
 
+        def read(conn, count):  # exactly *count* bytes: the client sends its messages one by one
+            data = b""
+            while len(data) < count:
+                chunk = conn.recv(count - len(data))
+                if not chunk:
+                    break
+                data += chunk
+            return data
+
         def serve():
             conn, _ = server.accept()
             with conn:
-                conn.sendall(b"RFB 003.008\n"); conn.recv(12)
-                conn.sendall(b"\x01\x01"); conn.recv(1)
-                conn.sendall(struct.pack("!I", 0)); conn.recv(1)
+                conn.sendall(b"RFB 003.008\n"); read(conn, 12)
+                conn.sendall(b"\x01\x01"); read(conn, 1)
+                conn.sendall(struct.pack("!I", 0)); read(conn, 1)
                 conn.sendall(struct.pack("!HH", 4, 4) + bytes(16) + struct.pack("!I", 4) + b"QEMU")
-                conn.recv(4096)
+                read(conn, 20 + 12 + 10)  # SetPixelFormat, SetEncodings (2), FramebufferUpdateRequest
                 # the guest switched mode: DesktopSize 2x1, then one RAW rectangle 00 RR GG BB
                 conn.sendall(b"\x00\x00" + struct.pack("!H", 2)
                              + struct.pack("!HHHHi", 0, 0, 2, 1, vmctl.qemu.VNC_DESKTOP_SIZE_ENCODING)
                              + struct.pack("!HHHHi", 0, 0, 2, 1, 0) + bytes([0, 1, 2, 3, 0, 4, 5, 6]))
-                conn.recv(4096)
+                while conn.recv(4096):  # stay open until the client hangs up
+                    pass
 
         thread = threading.Thread(target=serve, daemon=True); thread.start()
         frame = vmctl.qemu.vnc_frame(path, timeout=5)
