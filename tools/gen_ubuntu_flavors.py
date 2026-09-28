@@ -112,15 +112,19 @@ def profile(key: str, flavour: dict[str, Any], release: str, base_names: dict[st
         # for it and for gdm3 alike (what the 24.04 flavours do).
         binary = {"lightdm": "/usr/sbin/lightdm", "sddm": "/usr/bin/sddm", "gdm": "/usr/sbin/gdm3"}[dm]
         service = "gdm3" if dm == "gdm" else dm
+        # `systemctl enable` cannot pick a display manager: the units are static and the choice is
+        # the display-manager.service alias the packages create (xubuntu-22.04 came up with no
+        # display manager at all after a disable + enable --force, 2026-09-28: verified live that
+        # the alias alone brings LightDM and the Xfce autologin up).
         pin = (f"curtin in-target --target=/target -- sh -c 'echo {binary} > /etc/X11/default-display-manager; "
-               f"systemctl disable gdm3 gdm sddm lightdm 2>/dev/null; systemctl enable --force {service}'")
+               f"ln -sf /lib/systemd/system/{service}.service /etc/systemd/system/display-manager.service'")
         install["late_commands"] = install.get("late_commands", []) + [pin]
         files = [dropin(dm, flavour)]
         if dm != "gdm":
             files.append(dropin("gdm", flavour))
         out["autoinstall"] = {"hostname": hostname, **install}
         out["cloud_init"] = {"hostname": hostname, "write_files": files,
-                             "runcmd": [f"systemctl enable --force {service}.service",
+                             "runcmd": [f"ln -sf /lib/systemd/system/{service}.service /etc/systemd/system/display-manager.service",
                                         "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
                                         "systemctl enable --now serial-getty@ttyS0.service"]}
         out["ssh_provision"] = {"hostname": hostname, "ssh_host_port": port, "post_install_run": [

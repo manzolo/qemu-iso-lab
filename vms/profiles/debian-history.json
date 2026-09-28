@@ -10,7 +10,14 @@
         "extra": [
           "d-i apt-setup/services-select multiselect",
           "d-i debian-installer/allow_unauthenticated boolean true",
-          "d-i pkgsel/update-policy select none"
+          "d-i pkgsel/update-policy select none",
+          "keyboard-configuration keyboard-configuration/layoutcode string us",
+          "keyboard-configuration keyboard-configuration/layout select English (US)",
+          "keyboard-configuration keyboard-configuration/variant select English (US)",
+          "keyboard-configuration keyboard-configuration/variantcode string",
+          "keyboard-configuration keyboard-configuration/modelcode string pc105",
+          "keyboard-configuration keyboard-configuration/model select Generic 105-key (Intl) PC",
+          "keyboard-configuration keyboard-configuration/optionscode string"
         ]
       }
     },
@@ -91,7 +98,7 @@
         ],
         "version": "1.0.0"
       },
-      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Experimental until a live run passes (vmctl check-vms debian-7).",
+      "notes": "Debian 7 (wheezy) from the archived netinst 7.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. First run of 2026-09-28 stopped on the keyboard layout question that wheezy's keyboard-configuration asks in the target (now preseeded). Experimental until a live run passes (vmctl check-vms debian-7).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"
@@ -104,7 +111,7 @@
         "hostname": "debian-7",
         "late_commands": [
           "install -d /etc/gdm3",
-          "printf %s '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\n' > /etc/gdm3/daemon.conf",
+          "printf %s '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n' > /etc/gdm3/daemon.conf",
           "printf 'T0:23:respawn:/sbin/getty -L ttyS0 115200 vt100\\n' >> /etc/inittab",
           "printf 'Acquire::Check-Valid-Until \"false\";\\n' > /etc/apt/apt.conf.d/99vmctl-archive"
         ]
@@ -127,7 +134,7 @@
         ],
         "version": "1.0.0"
       },
-      "notes": "Debian 8 (jessie) from the archived netinst 8.11.1: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Experimental until a live run passes (vmctl check-vms debian-8).",
+      "notes": "Debian 8 (jessie) from the archived netinst 8.11.1: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. First run of 2026-09-28 sat on the GDM greeter: the autologin file had literal \\n (printf %s). Experimental until a live run passes (vmctl check-vms debian-8).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"
@@ -140,8 +147,8 @@
         "hostname": "debian-8",
         "late_commands": [
           "install -d /etc/gdm3",
-          "printf %s '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\n' > /etc/gdm3/daemon.conf",
-          "systemctl enable gdm3.service serial-getty@ttyS0.service",
+          "printf %s '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n' > /etc/gdm3/daemon.conf",
+          "systemctl enable serial-getty@ttyS0.service; systemctl enable gdm3.service || true",
           "systemctl set-default graphical.target",
           "printf 'Acquire::Check-Valid-Until \"false\";\\n' > /etc/apt/apt.conf.d/99vmctl-archive"
         ]
@@ -164,7 +171,7 @@
         ],
         "version": "1.0.0"
       },
-      "notes": "Debian 9 (stretch) from the archived netinst 9.13.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Experimental until a live run passes (vmctl check-vms debian-9).",
+      "notes": "Debian 9 (stretch) from the archived netinst 9.13.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. First run of 2026-09-28 sat on the GDM greeter: the autologin file had literal \\n (printf %s). Experimental until a live run passes (vmctl check-vms debian-9).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"
@@ -177,8 +184,8 @@
         "hostname": "debian-9",
         "late_commands": [
           "install -d /etc/gdm3",
-          "printf %s '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\n' > /etc/gdm3/daemon.conf",
-          "systemctl enable gdm3.service serial-getty@ttyS0.service",
+          "printf %s '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n' > /etc/gdm3/daemon.conf",
+          "systemctl enable serial-getty@ttyS0.service; systemctl enable gdm3.service || true",
           "systemctl set-default graphical.target",
           "printf 'Acquire::Check-Valid-Until \"false\";\\n' > /etc/apt/apt.conf.d/99vmctl-archive"
         ]
@@ -201,7 +208,7 @@
         ],
         "version": "1.0.0"
       },
-      "notes": "Debian 10 (buster) from the archived netinst 10.13.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Experimental until a live run passes (vmctl check-vms debian-10).",
+      "notes": "Debian 10 (buster) from the archived netinst 10.13.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. First run of 2026-09-28 sat on the GDM greeter: the autologin file had literal \\n (printf %s). Experimental until a live run passes (vmctl check-vms debian-10).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"
@@ -214,8 +221,8 @@
         "hostname": "debian-10",
         "late_commands": [
           "install -d /etc/gdm3",
-          "printf %s '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\n' > /etc/gdm3/daemon.conf",
-          "systemctl enable gdm3.service serial-getty@ttyS0.service",
+          "printf %s '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n' > /etc/gdm3/daemon.conf",
+          "systemctl enable serial-getty@ttyS0.service; systemctl enable gdm3.service || true",
           "systemctl set-default graphical.target",
           "printf 'Acquire::Check-Valid-Until \"false\";\\n' > /etc/apt/apt.conf.d/99vmctl-archive"
         ]
@@ -238,7 +245,7 @@
         ],
         "version": "1.0.0"
       },
-      "notes": "Debian 11 (bullseye) from the archived netinst 11.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. Experimental until a live run passes (vmctl check-vms debian-11).",
+      "notes": "Debian 11 (bullseye) from the archived netinst 11.11.0: the same preseed recipe as debian-gnome (Debian 13) with the archive mirror, no security pocket and expired-signature tolerance. First run of 2026-09-28 sat on the GDM greeter: the autologin file had literal \\n (printf %s). Experimental until a live run passes (vmctl check-vms debian-11).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"
@@ -251,8 +258,8 @@
         "hostname": "debian-11",
         "late_commands": [
           "install -d /etc/gdm3",
-          "printf %s '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\n' > /etc/gdm3/daemon.conf",
-          "systemctl enable gdm3.service serial-getty@ttyS0.service",
+          "printf %s '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n' > /etc/gdm3/daemon.conf",
+          "systemctl enable serial-getty@ttyS0.service; systemctl enable gdm3.service || true",
           "systemctl set-default graphical.target",
           "printf 'Acquire::Check-Valid-Until \"false\";\\n' > /etc/apt/apt.conf.d/99vmctl-archive"
         ]
@@ -275,7 +282,7 @@
         ],
         "version": "1.0.0"
       },
-      "notes": "Debian 12 (bookworm) from the archived netinst 12.15.0: the same preseed recipe as debian-gnome (Debian 13) on deb.debian.org. Experimental until a live run passes (vmctl check-vms debian-12).",
+      "notes": "Debian 12 (bookworm) from the archived netinst 12.15.0: the same preseed recipe as debian-gnome (Debian 13) on deb.debian.org. First run of 2026-09-28 sat on the GDM greeter: the autologin file had literal \\n (printf %s). Experimental until a live run passes (vmctl check-vms debian-12).",
       "preseed_config": {
         "tasks": [
           "gnome-desktop"
@@ -288,8 +295,8 @@
         "hostname": "debian-12",
         "late_commands": [
           "install -d /etc/gdm3",
-          "printf %s '[daemon]\\nAutomaticLoginEnable=true\\nAutomaticLogin={{user}}\\n' > /etc/gdm3/daemon.conf",
-          "systemctl enable gdm3.service serial-getty@ttyS0.service",
+          "printf %s '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n' > /etc/gdm3/daemon.conf",
+          "systemctl enable serial-getty@ttyS0.service; systemctl enable gdm3.service || true",
           "systemctl set-default graphical.target"
         ]
       },

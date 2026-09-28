@@ -156,7 +156,7 @@
     },
     "debian-10": {
       "version": "1.0.0",
-      "fingerprint": "sha256:a9841ab26da1078da68ebe899e7482515996e8c6a021ccfea03fa19e2c295965",
+      "fingerprint": "sha256:ab448da825e7fe69e7b3d2d5e8b4a09c7917fc3ea376f4cc79124aae663f390c",
       "history": [
         {
           "version": "1.0.0",
@@ -167,7 +167,7 @@
     },
     "debian-11": {
       "version": "1.0.0",
-      "fingerprint": "sha256:c6f47d2f1b66c69b9bca75e7765010da07883253bd6aec2f9e72113dc7480e4e",
+      "fingerprint": "sha256:c829f19de1f4ea3393aaf309e9d961eb13e2844c2abcfaaa40c5c4decc4a684b",
       "history": [
         {
           "version": "1.0.0",
@@ -178,7 +178,7 @@
     },
     "debian-12": {
       "version": "1.0.0",
-      "fingerprint": "sha256:4298bf1bdbe89cbec573f54e3128608fc9f5d430ac5b9aa3d96ff94377d2da3e",
+      "fingerprint": "sha256:d75c3c2fd24a513907e6ff2d8b201e45ba4c486d30f3502cf632cd2086050dd3",
       "history": [
         {
           "version": "1.0.0",
@@ -189,7 +189,7 @@
     },
     "debian-7": {
       "version": "1.0.0",
-      "fingerprint": "sha256:6512abe478358d4852d799b7b3dd698a2059bee5bd7e28531be5d04a9b928788",
+      "fingerprint": "sha256:2d3a3164b73655acfb27a75c637f90d7e6fe5c41f2111af90b516a46f7d475c8",
       "history": [
         {
           "version": "1.0.0",
@@ -200,7 +200,7 @@
     },
     "debian-8": {
       "version": "1.0.0",
-      "fingerprint": "sha256:de2a6784618e0e0ca0b496c456bf265813e744e9014b62416377c2f2ba957274",
+      "fingerprint": "sha256:fc663f1f2ad93c4632ec8d49cfe6815c66f927600895116b917b40af671a06a5",
       "history": [
         {
           "version": "1.0.0",
@@ -211,7 +211,7 @@
     },
     "debian-9": {
       "version": "1.0.0",
-      "fingerprint": "sha256:9b8f20cd7d6ffc521f3951124b5c9ba802dfd88f96f3bda0f5a70ab57e1efb5f",
+      "fingerprint": "sha256:a085351cd07dc9e7248eeca446638e8676cc28b3d26f7c4ec75b8125492182ea",
       "history": [
         {
           "version": "1.0.0",
@@ -1289,7 +1289,7 @@
     },
     "xubuntu-20.04": {
       "version": "1.0.0",
-      "fingerprint": "sha256:57745acd3f3c1472d833ee7737c905b318f9cdd0e5f7f0d1b1a7660cb8eb7321",
+      "fingerprint": "sha256:7897056203c3ea0b3f91c35ed16c111891e63af1d830a7b900f77cd779c6c447",
       "history": [
         {
           "version": "1.0.0",
@@ -1300,7 +1300,7 @@
     },
     "xubuntu-22.04": {
       "version": "1.0.0",
-      "fingerprint": "sha256:f90dfdad575a949d5f1ccb33b70587d29a443ef49dbe7a4b7a5a16b24c915bae",
+      "fingerprint": "sha256:9a931391c8737084c6f9a5c6e7869a835c453cee9714c96013f1a3ae0b73c1e0",
       "history": [
         {
           "version": "1.0.0",
