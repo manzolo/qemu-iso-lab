@@ -211,7 +211,7 @@ def wait_for_ssh(vm: dict[str, Any], timeout_sec: int, dry_run: bool = False, pr
             )
             if result.returncode == 0:
                 return
-            stderr = result.stderr.decode("utf-8", errors="replace")
+            stderr = (result.stderr or b"").decode("utf-8", errors="replace")  # a probe run without a pipe has None
             kind = classify_ssh_failure(stderr)
             last_error = next((line for line in stderr.splitlines() if line.strip()), "").strip()
             if kind == "negotiate":
