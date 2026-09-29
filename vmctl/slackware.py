@@ -296,8 +296,9 @@ if [ "$XINITRC" = xinitrc.xfce ] && [ -f {TARGET}/etc/xdg/xfce4/panel/default.xm
     mkdir -p "$HOME_DIR/.config/xfce4/xfconf/xfce-perchannel-xml"
     cp {TARGET}/etc/xdg/xfce4/panel/default.xml "$HOME_DIR/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
 fi
-# Xfce 4.6 (13.0, 13.37) opens "Tips and tricks" at every login: hidden for the user
-if [ -f {TARGET}/etc/xdg/autostart/xfce4-tips-autostart.desktop ]; then
+# Xfce 4.6 (13.0, 13.37) opens "Tips and tricks" at every login; unticking "Display tips on
+# startup" writes this very file in the user's autostart directory (xfce4-tips does it)
+if [ -x {TARGET}/usr/bin/xfce4-tips ]; then
     mkdir -p "$HOME_DIR/.config/autostart"
     printf '[Desktop Entry]\nType=Application\nName=xfce4-tips\nHidden=true\n' > "$HOME_DIR/.config/autostart/xfce4-tips-autostart.desktop"
 fi
