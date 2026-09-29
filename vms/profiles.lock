@@ -1257,9 +1257,14 @@
       ]
     },
     "slackware-13.0": {
-      "version": "1.0.3",
-      "fingerprint": "sha256:1733eb6d300d839297bd2e45b1134f6209f06d3ea0b7b0d07256ebc7b98c378f",
+      "version": "1.0.4",
+      "fingerprint": "sha256:9876c70eb2427b177b1e4a9da56205872a00427134fbd8ba9020543be1bd2988",
       "history": [
+        {
+          "version": "1.0.4",
+          "date": "2026-09-29",
+          "note": "the desktop check looks for the xfce-4.6 package (Xfce is one package on 13.x)"
+        },
         {
           "version": "1.0.3",
           "date": "2026-09-29",
@@ -1283,9 +1288,14 @@
       ]
     },
     "slackware-13.37": {
-      "version": "1.0.3",
-      "fingerprint": "sha256:33684b10ed748d05ea52a90138cb0a0d5ed4fd8947fde706e2a5109427f15ab2",
+      "version": "1.0.4",
+      "fingerprint": "sha256:bbf14dbcf4e82a7eeb25b55493ca13691b93e2116011fe26023458cba38cf757",
       "history": [
+        {
+          "version": "1.0.4",
+          "date": "2026-09-29",
+          "note": "the desktop check looks for the xfce-4.6 package (Xfce is one package on 13.x)"
+        },
         {
           "version": "1.0.3",
           "date": "2026-09-29",

@@ -86,7 +86,7 @@
       "extends": "slackware-legacy-ssh-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.3"
+        "version": "1.0.4"
       },
       "iso": "isos/slackware64-13.0-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-13.0-iso/slackware64-13.0-install-dvd.iso",
@@ -109,7 +109,7 @@
         "hostname": "slackware-130",
         "ssh_host_port": 2334,
         "post_install_run": [
-          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce-4.*; [ -e \"$1\" ]; }"
         ]
       },
       "notes": "Slackware 13.0 (August 2009): the first 64-bit release, kernel 2.6.29, Xfce 4.6 (the xfce package sits in xap, OPT), KDE 4.2, OpenSSH 5.2 (RSA key and the legacy SSH options). The install runs from the DVD's own shell: vmctl/slackware.py partitions, installpkg --root from the DVD (ADD and REC of the a/ap/l/n/x/xap series plus sudo and xfce, minus the screensavers and the big xap applications), configures the target, tty1 logs the user in (agetty -l) and ~/.bash_profile starts Xfce with startx; LILO on the MBR, the huge kernel. Born experimental: vmctl check-vms slackware-13.0 runs one.",
@@ -124,7 +124,7 @@
       "extends": "slackware-legacy-ssh-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.3"
+        "version": "1.0.4"
       },
       "iso": "isos/slackware64-13.37-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-13.37-iso/slackware64-13.37-install-dvd.iso",
@@ -147,7 +147,7 @@
         "hostname": "slackware-1337",
         "ssh_host_port": 2335,
         "post_install_run": [
-          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce-4.*; [ -e \"$1\" ]; }"
         ]
       },
       "notes": "Slackware 13.37 (April 2011): kernel 2.6.37, Xfce 4.6.2 (still in xap), OpenSSH 5.8 (RSA key, legacy SSH options). Same script as 13.0. Born experimental: vmctl check-vms slackware-13.37 runs one.",

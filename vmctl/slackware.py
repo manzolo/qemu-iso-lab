@@ -295,8 +295,13 @@ chmod 600 "$HOME_DIR/.ssh/authorized_keys"
 if [ "$XINITRC" = xinitrc.xfce ] && [ -f {TARGET}/etc/xdg/xfce4/panel/default.xml ]; then
     mkdir -p "$HOME_DIR/.config/xfce4/xfconf/xfce-perchannel-xml"
     cp {TARGET}/etc/xdg/xfce4/panel/default.xml "$HOME_DIR/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
-    chroot {TARGET} chown -R "$USERNAME:users" "/home/$USERNAME/.config"
 fi
+# Xfce 4.6 (13.0, 13.37) opens "Tips and tricks" at every login: hidden for the user
+if [ -f {TARGET}/etc/xdg/autostart/xfce4-tips-autostart.desktop ]; then
+    mkdir -p "$HOME_DIR/.config/autostart"
+    printf '[Desktop Entry]\nType=Application\nName=xfce4-tips\nHidden=true\n' > "$HOME_DIR/.config/autostart/xfce4-tips-autostart.desktop"
+fi
+[ -d "$HOME_DIR/.config" ] && chroot {TARGET} chown -R "$USERNAME:users" "/home/$USERNAME/.config"
 
 echo "==> sshd, serial console, autologin and the desktop session..."
 if grep -q '^#*UseDNS' {TARGET}/etc/ssh/sshd_config; then
@@ -308,8 +313,10 @@ chmod 755 {TARGET}/etc/rc.d/rc.sshd
 echo 's1:12345:respawn:/sbin/agetty -L ttyS0 115200 vt100' >> {TARGET}/etc/inittab
 cat > {TARGET}/usr/local/sbin/vmctl-autologin <<EOF
 #!/bin/sh
-# vmctl: tty1 logs $USERNAME in without a password (agetty -l); ~/.bash_profile starts X.
-exec /bin/login -f $USERNAME
+# vmctl: tty1 becomes $USERNAME's login shell without a password (agetty -l runs this as root);
+# ~/.bash_profile starts X. su - and not login -f: the shadow 4.0 login of 13.0 asks for the
+# password on a tty even with -f (verified live 2026-09-29).
+exec /bin/su - $USERNAME
 EOF
 chmod 755 {TARGET}/usr/local/sbin/vmctl-autologin
 if chroot {TARGET} /sbin/agetty --help 2>&1 | grep -c -- '--autologin' >/dev/null; then
