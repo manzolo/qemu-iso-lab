@@ -4109,6 +4109,7 @@ class RowCleanup:
         with self.lock:
             backup = self.stashed.pop(name, None)
         if backup is not None:
+            self._keep_evidence(name, status)  # the test's logs go with the test's artifacts
             restore_local_test_artifacts({name: backup}, dry_run=self.dry_run)
             with self.lock:
                 self.restored.append(name)

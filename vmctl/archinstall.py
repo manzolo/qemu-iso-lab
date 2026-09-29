@@ -309,12 +309,14 @@ echo "==> Using the Arch Linux Archive snapshot of {archive_date}..."
 echo 'Server = {server}' > /etc/pacman.d/mirrorlist
 sed -i 's/^#*SigLevel.*/SigLevel = Never/' /etc/pacman.conf
 """
-        if insecure_tls:
-            # OpenSSL 1.0.1 (arch-2014) rejects the archive's Let's Encrypt chain ("self signed
-            # certificate in certificate chain") whatever CA bundle it is given. Signatures are
-            # off on these guests already; the download goes through curl -k on the live system.
-            archive_block += """echo "==> Downloading without TLS verification (archive_insecure_tls)..."
-sed -i '/^\\[options\\]/a XferCommand = /usr/bin/curl -k -L -C - -f -o %o %u' /etc/pacman.conf
+        # Packages older than 2019 are redirected to archive.org, whose data nodes answer HTTP 500
+        # now and then (the same file failed and then downloaded, 2026-09-29): curl retries each
+        # download, 500 included, and pacman's own downloader cannot. -k only where the medium's
+        # OpenSSL 1.0.1 rejects the archive's Let's Encrypt chain whatever CA bundle it is given
+        # (arch-2014, archive_insecure_tls; signatures are off on these guests already).
+        insecure = "-k " if insecure_tls else ""
+        archive_block += f"""echo "==> Downloading with curl and retries{' (no TLS verification: archive_insecure_tls)' if insecure_tls else ''}..."
+sed -i '/^\\[options\\]/a XferCommand = /usr/bin/curl {insecure}-L -C - -f --retry 8 --retry-delay 15 -o %o %u' /etc/pacman.conf
 """
         target_archive_block = f"""
 echo "==> Keeping the target on the {archive_date} snapshot..."

@@ -136,8 +136,9 @@
       "name": "Arch Linux 2019.12 (Xfce, archive snapshot)",
       "extends": "arch-history-base",
       "meta": {
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "version": "1.1.0",
+        "verified": "2026-09-29"
       },
       "iso": "isos/archlinux-2019.12.01-x86_64.iso",
       "iso_url": "https://archive.archlinux.org/iso/2019.12.01/archlinux-2019.12.01-x86_64.iso",
@@ -154,7 +155,7 @@
         "hostname": "arch-2019",
         "ssh_host_port": 2331
       },
-      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2019 runs one. December 2019, two months after base became a metapackage without a kernel (the kernel is named explicitly, as it is today); kernel 5.4, Xfce 4.14. The snapshot is the one of 2019/12/31: in November's the libusbmuxd that upower pulls in points at a file the archive no longer has (HTTP 500 three times, 2026-09-29)."
+      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Passed live on 2026-09-29. December 2019, two months after base became a metapackage without a kernel (the kernel is named explicitly, as it is today); kernel 5.4, Xfce 4.14. The snapshot is the one of 2019/12/31: in November's the libusbmuxd that upower pulls in points at a file the archive no longer has (HTTP 500 three times, 2026-09-29)."
     },
     "arch-2022": {
       "name": "Arch Linux 2022.01 (Xfce, archive snapshot)",

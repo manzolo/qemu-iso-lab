@@ -136,6 +136,17 @@ class RowCleanupTests(BaseVmctlTestCase):
         self.assertFalse(base.exists())
         self.assertEqual((report / "logs" / "fresh" / "bootstrap-serial.log").read_text(), "Could not resolve host")
 
+    def test_a_stashed_row_that_failed_keeps_its_logs_too(self):
+        report, backup = self.root / "report", self.root / "backup" / "stashed"
+        backup.mkdir(parents=True)
+        base = self.install("stashed")
+        (base / "logs").mkdir()
+        (base / "logs" / "bootstrap-serial.log").write_text("HTTP 500")
+        cleanup = self.cleanup({"stashed": str(backup)}, _report_dir=str(report))
+        with mock.patch.object(lifecycle, "cmd_stop"), redirect_stdout(io.StringIO()):
+            cleanup.row_done("stashed", "failed")
+        self.assertEqual((report / "logs" / "stashed" / "bootstrap-serial.log").read_text(), "HTTP 500")
+
     def test_keep_and_keep_passed(self):
         with mock.patch.object(lifecycle, "cmd_stop"):
             cleanup = self.cleanup(keep_passed=True)
