@@ -152,6 +152,20 @@ What the page offers:
 
 ![Labs in the web dashboard: member addresses, live VM states, stack controls and a session lab](screenshots/web-labs.png)
 
+## Welcome and the guest identity
+
+The tracked catalog installs every machine as `lab` (password `lab`). The first `vmctl web` on a
+checkout without `vms/profiles/local.json` opens **Welcome**: one form with the guest user, the
+real name and the password, prefilled with those defaults. *Save* creates `local.json` with a
+top-level `identity` (the user, a SHA-512 crypt hash of the password and, unless the box is
+unticked, the password in clear: Windows, Arch and Alpine installers take only a plain one), and
+from then on every tracked profile installs as that user (`docs/PROVISIONING.md`). *Not now* keeps
+`lab`/`lab`. The **Identity** button in the header reopens the same form later: an empty password
+keeps the current one, and the per-VM overrides, *My VMs* and the protected list of `local.json`
+stay as they are (a `.bak` of the previous file is kept). The file is personal and git ignores it.
+The terminal twin is `vmctl identity` (`--user`, `--ask-password`, `--realname`; no option shows
+it), which the command center does not list so that no password lands in a job log.
+
 ## Safety
 
 The page can delete disks and start anything `vmctl` can, so:
@@ -202,7 +216,8 @@ The page can delete disks and start anything `vmctl` can, so:
 | GET | `/api/vm/<vm>/file?path=…` | download a regular guest file, staged before HTTP headers are sent |
 | POST | `/api/vm/<vm>/files-upload?path=…&name=…` | raw file body, at most 256 MiB; returns the saved name/path/size without replacing existing files |
 | POST | `/api/vm/<vm>/files-session` / `files-session-close` | open (and close) one SFTP session that several sequential uploads share (`?session=` on `files-upload`); 8 sessions at most, idle ones expire after 60 s |
-| POST | `/api/protect` | `{"action": "add"|"remove", "names": [...]}`: `vmctl protect`/`unprotect`, saved in local.json; the 🔒 of the details panel |
+| GET / POST | `/api/identity` | the guest identity of local.json: `{exists, path, identity: {user, realname, has_password, has_hash}, defaults}`; save `{"user", "password" (empty keeps the current one), "realname", "store_password"}`: creates the file on a fresh checkout, keeps every other key afterwards |
+| POST | `/api/protect` | `{"action": "add"|"remove", "names": [...]}`: `vmctl protect`/`unprotect`, saved in local.json; the 🔒 of the details panel. A VM in *My VMs* whose disk holds data is protected as well (`protected_by: star` in the rows): the star, not this call, unlocks it |
 | GET | `/api/vm/<vm>/connections` | the *Integration* panel's checks: console, SSH (key rejected / algorithm mismatch / port closed), guest agent, SFTP, clipboard channel; read-only probes of 3 s, cached 5 s |
 | POST | `/api/vm/<vm>/diagnostics` | a text report of fixed read-only commands (system, network, storage, services, logs, APT/DNF state; Windows has its own list; sysvinit guests get no `journalctl`), as root when `sudo -n` works, 10 s / 128 KiB per command, plus the tails of the serial logs; also saved as `artifacts/<vm>/logs/diagnostics-<utc>.txt` |
 | POST | `/api/vm/<vm>/guest-command` | `{"command": "...", "confirmed": true}`: one shell command over SSH as a job in the VM's slot (60 s, 1 MiB); stdout, stderr and exit code in the job log; cancelling closes SSH, not the VM |

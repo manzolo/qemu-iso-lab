@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import vmctl
-from vmctl import clone, config, disk_inspect, flash, import_dev, lifecycle, ui, webui
+from vmctl import clone, config, disk_inspect, flash, import_dev, lifecycle, local_identity, ui, webui
 from vmctl.errors import VMError
 
 
@@ -22,7 +22,7 @@ COMMAND_HELP: dict[str, str] = {}
 # Every public subcommand must appear in exactly one group (enforced by tests).
 COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Discover", "what is configured, what exists on disk, what the host can run",
-     ["list", "status", "show", "catalog", "protect", "unprotect", "setup", "welcome"]),
+     ["list", "status", "show", "catalog", "protect", "unprotect", "identity", "setup", "welcome"]),
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
@@ -509,6 +509,15 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--port", type=int, default=webui.DEFAULT_PORT, help=f"port on 127.0.0.1 (default: {webui.DEFAULT_PORT}; 0 picks a free one)")
     p.add_argument("--open", action="store_true", help="open the page in the default browser")
     p.set_defaults(func=webui.cmd_web)
+
+    p = _add(subparsers, "identity", help="the guest identity of local.json (user, password, real name) that every tracked profile takes; no option: show it")
+    p.add_argument("--user", help="guest user name (a POSIX login name; the tracked catalog is 'lab')")
+    p.add_argument("--password", help="guest password: hashed (SHA-512 crypt) and, unless --no-store-password, kept in clear for the installers that take only a plain one")
+    p.add_argument("--ask-password", action="store_true", help="ask the password on the terminal instead of --password")
+    p.add_argument("--realname", help="the user's real name (GECOS / the desktop's display name)")
+    p.add_argument("--no-store-password", action="store_true", help="write only the hash: Windows, Arch and Alpine profiles then keep the catalog's password")
+    p.add_argument("--json", action="store_true", help="machine-readable output")
+    p.set_defaults(func=local_identity.cmd_identity)
 
     p = _add(subparsers, "welcome", help="what to do next after setup: the first commands, with the paths that work on this host; in a terminal it then asks which one to run (--no-menu: print only)")
     p.add_argument("--no-menu", action="store_true", help="print the screen without asking what to run next")

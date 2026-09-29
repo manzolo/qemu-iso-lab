@@ -673,7 +673,7 @@ state.ROOT = Path(sys.argv[1])
 state.CONFIG_DIR = Path(sys.argv[2])
 VMS = config.load_config()["vms"]
 MINE = set(catalog.selected())  # My VMs: the names chosen in local.json ("catalog")
-PROTECTED = set(catalog.protected())  # vmctl protect: disks the destructive commands refuse
+FLAGGED = vmstate.flagged_names()  # vmctl protect; a starred VM with a disk is protected too (vmstate.protection_reason)
 
 
 def ellipsize(text, width):
@@ -704,6 +704,7 @@ def facts(name, vm):
                  "profile_version": None, "catalog_version": None}
     # "installed" keeps its historical meaning for the menu: the disk has data on it.
     installed = prepared and bool(known["has_data"])
+    protected_by = "flag" if name in FLAGGED else "star" if name in MINE and installed else None
     try:
         runtime_str, note = lifecycle.vm_runtime_status(name, vm)
     except Exception:
@@ -734,7 +735,8 @@ def facts(name, vm):
     return {
         "name": name,
         "mine": name in MINE,
-        "protected": name in PROTECTED,
+        "protected": protected_by is not None,
+        "protected_by": protected_by,  # "flag" (vmctl protect) or "star" (My VMs + a disk with data)
         "job_status": tui_jobs.status(tui_jobs.job_dir(state.ROOT, name)),
         "label": str(vm.get("name", name)),
         "family": str(meta.get("family", "")),

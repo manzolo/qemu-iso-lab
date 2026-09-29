@@ -1276,15 +1276,18 @@ def cmd_protect(args: argparse.Namespace) -> int:
     if not args.vms:
         if off:
             raise VMError("vmctl unprotect needs at least one VM name")
-        names = catalog.protected()
+        flagged = catalog.protected()
+        starred = sorted(vmstate.protected_names() - set(flagged))  # My VMs with a disk that holds data
         if getattr(args, "json", False):
-            print(json.dumps({"protected": names}, indent=2))
-        elif not names:
-            print("No protected VMs. vmctl protect <vm> guards a disk against clean, reinstall and checkpoint restore.")
+            print(json.dumps({"protected": flagged + starred, "flagged": flagged, "starred": starred}, indent=2))
+        elif not flagged and not starred:
+            print("No protected VMs. vmctl protect <vm> guards a disk against clean, reinstall and checkpoint restore; "
+                  "a VM in My VMs (vmctl catalog add) is protected while its disk holds data.")
         else:
-            ui.print_header(f"Protected VMs ({len(names)})")
-            for name in names:
-                print(f"  {name:<32} {str(cfg['vms'].get(name, {}).get('name', '(not in the catalog any more)'))}")
+            ui.print_header(f"Protected VMs ({len(flagged) + len(starred)})")
+            for name in [*flagged, *starred]:
+                how = "vmctl protect" if name in flagged else "My VMs + disk"
+                print(f"  {name:<32} {how:<16} {str(cfg['vms'].get(name, {}).get('name', '(not in the catalog any more)'))}")
         return 0
     if getattr(args, "dry_run", False):
         print(f"  would {'unprotect' if off else 'protect'} {' '.join(args.vms)} in {catalog.local_path()}")
@@ -1297,6 +1300,9 @@ def cmd_protect(args: argparse.Namespace) -> int:
         ui.print_status("ok", f"{name}: protected")
     for name in result["removed"]:
         ui.print_status("ok", f"{name}: no longer protected")
+    for name in args.vms:
+        if off and name not in result["removed"] and vmstate.protection_reason(config.canonical_vm_name(name, warn=False)) == "star":
+            ui.print_note(f"{name}: still protected, it is in My VMs and its disk holds data (vmctl catalog remove {name})")
     if not result["added"] and not result["removed"]:
         ui.print_note("Nothing changed.")
     return 0

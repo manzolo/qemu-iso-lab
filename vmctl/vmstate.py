@@ -131,32 +131,65 @@ def _versions(vm_name: str) -> dict[str, Any]:
     return {"profile_version": profile_versions.catalog_version(vm_name), "vmctl_version": vmctl.__version__}
 
 
-# Protected VMs (``vmctl protect``): names kept in local.json under "protected": {"vms": [...]},
-# written by catalog.update_protected. Nothing that would delete or overwrite their disk runs:
-# clean, a new installation on a disk with data, a checkpoint restore; check-vms moves them aside
-# and back. Read here, the lowest module every one of those paths goes through.
+# Protected VMs: nothing that would delete or overwrite their disk runs (clean, a new installation
+# on a disk with data, a checkpoint restore; check-vms moves them aside and back). Two sources,
+# both in local.json and read here, the lowest module every one of those paths goes through:
+# the explicit flag of ``vmctl protect`` ("protected": {"vms": [...]}, written by
+# catalog.update_protected) and My VMs ("catalog": {"selected": [...]}): a starred VM whose disk
+# holds data is protected as long as the star is on it (decision of 2026-09-29: the machines one
+# keeps are the ones one would not want a stray clean to take).
 PROTECTED_KEY = "protected"
+CATALOG_KEY = "catalog"
 
 
-def protected_names() -> set[str]:
+def _local_names(key: str, field: str) -> set[str]:
     path = state.CONFIG_DIR / "profiles" / "local.json"
     try:
         document = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     except (ValueError, OSError):
         return set()
-    section = document.get(PROTECTED_KEY) if isinstance(document, dict) else None
-    names = section.get("vms") if isinstance(section, dict) else None
+    section = document.get(key) if isinstance(document, dict) else None
+    names = section.get(field) if isinstance(section, dict) else None
     return {name for name in names if isinstance(name, str)} if isinstance(names, list) else set()
 
 
+def flagged_names() -> set[str]:
+    """The names ``vmctl protect`` flagged, whatever their disk holds."""
+    return _local_names(PROTECTED_KEY, "vms")
+
+
+def starred_names() -> set[str]:
+    """My VMs, as local.json spells them (catalog.selected resolves aliases; the writers store canonical names)."""
+    return _local_names(CATALOG_KEY, "selected")
+
+
+def protection_reason(vm_name: str) -> str | None:
+    """Why *vm_name* is protected: ``flag`` (vmctl protect), ``star`` (in My VMs with a disk that
+    holds data) or None. The flag wins in the wording because only it needs ``vmctl unprotect``."""
+    if vm_name in flagged_names():
+        return "flag"
+    if vm_name in starred_names() and artifact_disk_has_data(vm_name):
+        return "star"
+    return None
+
+
+def protected_names() -> set[str]:
+    """Every protected VM: the flagged ones plus the starred ones whose disk holds data."""
+    return flagged_names() | {name for name in starred_names() if artifact_disk_has_data(name)}
+
+
 def is_protected(vm_name: str) -> bool:
-    return vm_name in protected_names()
+    return protection_reason(vm_name) is not None
 
 
 def refuse_if_protected(vm_name: str, action: str) -> None:
-    if is_protected(vm_name):
+    reason = protection_reason(vm_name)
+    if reason == "flag":
         raise VMError(f"'{vm_name}' is protected: refusing to {action}. "
                       f"vmctl unprotect {vm_name} first if that is really what you want.")
+    if reason == "star":
+        raise VMError(f"'{vm_name}' is in My VMs and its disk holds data, so it is protected: refusing to {action}. "
+                      f"vmctl catalog remove {vm_name} first if that is really what you want.")
 
 
 def artifact_disk_has_data(vm_name: str) -> bool:

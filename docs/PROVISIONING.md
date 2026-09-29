@@ -154,7 +154,10 @@ make init-local-profile        # copies vms/profiles/local.json.example
 ```
 
 Then replace `YOUR_USER`, `YOUR_PASSWORD` / `REPLACE_WITH_SHA512_HASH`
-(`openssl passwd -6`) and the SSH key paths. `local.json` is deep-merged over
+(`openssl passwd -6`) and the SSH key paths. Or let the lab write the `identity` for you:
+`vmctl identity --user <name> --ask-password --realname "..."` creates the file with the hash
+(and the password in clear unless `--no-store-password`), and `vmctl web` opens the same form
+as its *Welcome* page while no `local.json` exists (the *Identity* button edits it later). `local.json` is deep-merged over
 the tracked profiles: dicts merge key by key, lists concatenate, scalars
 replace. A minimal override looks like this:
 

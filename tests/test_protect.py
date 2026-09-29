@@ -40,6 +40,30 @@ class ProtectTests(BaseVmctlTestCase):
         catalog.update_protected("remove", [self.vm_name], self.cfg)
         self.assertNotIn("protected", json.loads(catalog.local_path().read_text()))
 
+    def test_a_starred_vm_with_a_disk_is_protected_while_the_star_is_on_it(self):
+        catalog.update("add", [self.vm_name, "other"], self.cfg)  # My VMs
+        self.disk("other", data=False)
+        self.assertIsNone(vmstate.protection_reason(self.vm_name))  # no disk yet
+        self.assertIsNone(vmstate.protection_reason("other"))  # an empty disk: nothing to lose
+        self.disk(self.vm_name)
+        self.assertEqual(vmstate.protection_reason(self.vm_name), "star")
+        self.assertEqual(vmstate.protected_names(), {self.vm_name})
+        with self.assertRaisesRegex(VMError, "in My VMs and its disk holds data.*vmctl catalog remove"):
+            vmstate.refuse_if_protected(self.vm_name, "delete its disk")
+        with self.assertRaisesRegex(VMError, "vmctl catalog remove"):
+            vmstate.begin_install(self.vm_name, "bootstrap-preseed")
+        # vmctl unprotect cannot undo it: the star can
+        out = io.StringIO()
+        with redirect_stdout(out):
+            lifecycle.cmd_protect(argparse.Namespace(command="unprotect", vms=[self.vm_name], json=False, dry_run=False))
+            lifecycle.cmd_protect(argparse.Namespace(command="protect", vms=[], json=True, dry_run=False))
+        self.assertIn("still protected, it is in My VMs", out.getvalue())
+        self.assertEqual(json.loads(out.getvalue()[out.getvalue().index("{"):]), {"protected": [self.vm_name], "flagged": [], "starred": [self.vm_name]})
+        catalog.update("remove", [self.vm_name], self.cfg)
+        self.assertIsNone(vmstate.protection_reason(self.vm_name))
+        catalog.update_protected("add", [self.vm_name], self.cfg)
+        self.assertEqual(vmstate.protection_reason(self.vm_name), "flag")  # the flag wins in the wording
+
     def test_clean_refuses_a_protected_vm_and_clean_all_skips_it(self):
         mine, other = self.disk(self.vm_name), self.disk("other")
         catalog.update_protected("add", [self.vm_name], self.cfg)

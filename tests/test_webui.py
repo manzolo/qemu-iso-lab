@@ -364,6 +364,33 @@ class ServerTests(BaseVmctlTestCase):
         conn.close()
         self.assertIsNone(self.server.RequestHandlerClass.snapshot.value)
 
+    def test_identity_endpoint_creates_local_json_and_invalidates_cached_state(self):
+        status, body = self.get('/api/identity')
+        self.assertEqual(status, 200)
+        self.assertFalse(json.loads(body)['exists'])  # the Welcome opens on this
+        self.assertNotIn('identity', [c['name'] for c in webui.command_catalog()])  # never a password in a job log
+        self.server.RequestHandlerClass.snapshot.value = {'stale': True}
+        for body, status in (({'user': 'tester', 'password': 's3cret', 'realname': 'T', 'store_password': False}, 200),
+                             ({'user': 'Bad Name', 'password': 'x'}, 400), ({'user': 'tester', 'password': 5}, 400),
+                             ({'user': 'tester2', 'password': ''}, 200)):
+            with self.subTest(body=body):
+                conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+                conn.request('POST', '/api/identity', body=json.dumps(body), headers={'X-Vmctl-Token': 'secret-token'})
+                response = conn.getresponse()
+                self.assertEqual(response.status, status)
+                data = json.loads(response.read())
+                conn.close()
+                if status == 200:
+                    self.assertEqual(data['identity']['user'], body['user'])
+                    self.assertTrue(data['identity']['has_hash'])
+                    self.assertFalse(data['identity']['has_password'])
+                    self.assertNotIn('$6$', json.dumps(data))
+        self.assertIsNone(self.server.RequestHandlerClass.snapshot.value)
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+        conn.request('POST', '/api/identity', body=json.dumps({'user': 'x', 'password': 'y'}))
+        self.assertEqual(conn.getresponse().status, 401)
+        conn.close()
+
     def test_catalog_endpoint_needs_the_token_validates_and_invalidates_cached_state(self):
         conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
         conn.request('POST', '/api/catalog', body=json.dumps({'action': 'add', 'names': ['testvm']}))

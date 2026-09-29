@@ -482,6 +482,17 @@ body.console-detached #vnc-detach { display:none; }
 .profile-heading button { background:transparent; color:var(--accent); font-size:11px; padding:5px 8px; border:1px solid var(--line); }
 #profile-mine { margin-right:6px; padding:4px 9px; font-size:13px; line-height:1; color:var(--warn); }
 #profile-mine.chosen { background:#3a3320; border-color:#6b5a2a; }
+#identity-open { padding:6px 10px; background:#172333; border:1px solid var(--line); border-radius:20px; font-size:11px; }
+#identity-open:hover { background:#233449; border-color:#496078; }
+#identity-dialog { width:min(640px,94vw); }
+#identity-dialog .body { display:flex; flex-direction:column; gap:16px; }
+#identity-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+#identity-fields input:not([type=checkbox]) { width:100%; }
+#identity-fields label.check { align-items:flex-start; line-height:1.4; }
+#identity-fields label.check input { margin-top:2px; }
+#identity-fields .field.wide { grid-column:1 / -1; }
+#identity-dialog p.lead { margin:0; line-height:1.55; }
+@media (max-width:640px) { #identity-fields { grid-template-columns:1fr; } }
 #profile-protect { margin-right:6px; padding:4px 9px; font-size:13px; line-height:1; }
 #profile-protect.chosen { background:#1f3340; border-color:#2f5a6b; }
 .protect-mark { margin-left:6px; font-size:11px; vertical-align:1px; }
@@ -635,6 +646,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   <span id="summary">Reading VM state…</span>
   <span id="connection" role="status">Connecting</span>
   <div id="activity" class="hidden"><button id="activity-toggle" popovertarget="activity-panel" aria-label="Latest activity" aria-expanded="false"><span id="activity-symbol" aria-hidden="true"></span><span id="activity-label">Activity</span></button></div>
+  <button id="identity-open" title="The guest identity of local.json: user, password, real name">Identity</button>
   <span id="version" class="s-muted"></span>
 </header>
 <section class="overview" aria-label="Lab overview">
@@ -786,6 +798,20 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   </div>
 </dialog>
 <div id="vm-context" popover="manual" role="menu" aria-label="VM actions"></div>
+<dialog id="identity-dialog" aria-labelledby="identity-title">
+  <header><div><div class="eyebrow" id="identity-eyebrow">Guest identity</div><h1 id="identity-title">Identity</h1></div><button data-close id="identity-close">Close</button></header>
+  <form id="identity-form" novalidate><div class="body">
+    <p class="lead" id="identity-lead"></p>
+    <div id="identity-fields">
+      <div class="field"><label for="identity-user">Guest user</label><input id="identity-user" type="text" autocomplete="username" spellcheck="false" pattern="[a-z_][a-z0-9_\-]{0,31}" required><span class="help">Lower-case letters, digits, - and _.</span></div>
+      <div class="field"><label for="identity-realname">Real name</label><input id="identity-realname" type="text" autocomplete="name"><span class="help">The desktop's display name (optional).</span></div>
+      <div class="field wide"><label for="identity-password">Password</label><input id="identity-password" type="password" autocomplete="new-password"><span class="help" id="identity-password-help"></span></div>
+      <div class="field wide"><label class="check"><input id="identity-store" type="checkbox" checked> Keep the password in clear in local.json too</label><span class="help">Windows, Arch and Alpine installers take only a plain password; without it those profiles keep the catalog's <code>lab</code>. The hash (SHA-512 crypt) is always written.</span></div>
+    </div>
+    <p class="help" id="identity-note"></p>
+  </div>
+  <div class="command-footer"><p id="identity-feedback" role="status" aria-live="polite"></p><div class="command-buttons"><button type="button" id="identity-skip">Not now</button><button type="submit" id="identity-save" class="primary">Save</button></div></div></form>
+</dialog>
 <dialog id="unlink-dialog" aria-labelledby="unlink-title"><header><h1 id="unlink-title">Choose network to unlink</h1><button data-close>Close</button></header><div class="body"><p id="unlink-members" class="mono"></p><p>These machines share multiple networks. Choose the network to disconnect.</p><label for="unlink-segment">Network</label><select id="unlink-segment"></select><p class="help">Only the listed machines will be removed from this network.</p><button id="unlink-review">Review unlink…</button></div></dialog>
 <dialog id="link-dialog" aria-labelledby="link-title"><header><h1 id="link-title">Network connection</h1><button data-close>Close</button></header><div class="body"><p id="link-source" class="mono"></p><label for="link-target">Connect to</label><select id="link-target"></select><p class="help">Link to a machine, or unlink an existing connection. Stopped machines join new links at their next start.</p><button id="link-review" class="primary">Review link…</button></div></dialog>
 <dialog id="help-dialog"><header><h1 id="help-title">ISO needed</h1><button data-close>Close</button></header>
@@ -926,9 +952,10 @@ function actionsFor(r) {
     if (vmJobs.get(n)?.confirming) a.push({label:"Force stop", args:["stop",n,"--force"], danger:true, primary:true, icon:"power", tone:"bad"});
     else a.push({ label:forceStop ? "Force stop" : "Cancel job", cancelJob:"vm:" + n, forceStop, primary:true, danger:forceStop, icon:"power", tone:"bad", disabled:submittingVms.has(n) || cancellingJobs.has("vm:"+n) });
   }
-  if (!r.running && (r.prepared || r.installed)) a.push({ label: r.protected ? "Clean: protected (unprotect first)" : "Clean: delete the disk", args: ["clean", n], disabled:busy || !!r.protected, danger: true, icon:"trash", tone:"bad" });
+  if (!r.running && (r.prepared || r.installed)) a.push({ label: r.protected ? (r.protected_by === "star" ? "Clean: protected by My VMs (remove the star first)" : "Clean: protected (unprotect first)") : "Clean: delete the disk", args: ["clean", n], disabled:busy || !!r.protected, danger: true, icon:"trash", tone:"bad" });
   a.push({ label: r.mine ? "Remove from My VMs" : "Add to My VMs", mine: r.mine ? "remove" : "add", icon:"star", tone:"info" });
-  if (r.protected || r.prepared || r.installed) a.push({ label: r.protected ? "Unprotect the disk" : "Protect the disk", protect: r.protected ? "remove" : "add", icon:"lock", tone:"info" });
+  if (r.protected || r.prepared || r.installed) a.push(r.protected_by === "star" ? { label: "Protected by My VMs: remove the star to unlock", protect: "star", icon:"lock", tone:"info", disabled: true }
+    : { label: r.protected ? "Unprotect the disk" : "Protect the disk", protect: r.protected ? "remove" : "add", icon:"lock", tone:"info" });
   a.push({ label: "All commands for " + n + "…", form: n, icon:"list" });
   return a;
 }
@@ -1159,7 +1186,7 @@ function render() {
   if (dragVm || dragState.start) return;
   const focused = document.activeElement, focusedVm = focused.closest?.("#rows [data-vm]")?.dataset.vm;
   const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : null;
-  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.protected ? '<span class="protect-mark" title="Protected: clean, reinstall and checkpoint restore refuse it">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">${filter === "mine" && !$("search").value ? "Nothing in My VMs yet. Choose All, then right-click a profile (or select several) and Add to My VMs." : "No matching profiles."}</td></tr>`);
   bindStateLogs($("rows"));
   if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
@@ -1177,8 +1204,9 @@ function renderDetails() {
   $("profile-protect").classList.toggle("hidden", !r || !visible().length || !(r.protected || r.prepared || r.installed));
   if (r) {
     const p = $("profile-protect"); p.textContent = r.protected ? "🔒" : "🔓"; p.classList.toggle("chosen", !!r.protected);
-    p.title = p.ariaLabel = r.protected ? "Protected: clean, reinstall and checkpoint restore refuse this disk · click to unprotect" : "Protect this disk against clean, reinstall and checkpoint restore";
-    p.onclick = () => setProtect(r.protected ? "remove" : "add", [r.name]);
+    p.title = p.ariaLabel = r.protected_by === "star" ? "Protected: in My VMs and its disk holds data · remove the star (☆) to unlock"
+      : r.protected ? "Protected: clean, reinstall and checkpoint restore refuse this disk · click to unprotect" : "Protect this disk against clean, reinstall and checkpoint restore";
+    p.onclick = () => r.protected_by === "star" ? toast("Protected by My VMs: remove the star (☆) to unlock the disk.") : setProtect(r.protected ? "remove" : "add", [r.name]);
   }
   if (r) {
     const b = $("profile-mine"); b.textContent = r.mine ? "★" : "☆"; b.classList.toggle("chosen", !!r.mine);
@@ -2488,6 +2516,42 @@ async function openProfileEditor(vm = selected) {
 }
 $("profile-dialog").addEventListener("close", () => { profileGeneration++; });
 $("profile-edit").onclick = () => openProfileEditor();
+// The guest identity of local.json (vmctl identity): the Welcome of a fresh checkout, the same panel later.
+let identityInfo = null;
+async function openIdentity(welcome = false) {
+  const d = $("identity-dialog");
+  try { identityInfo = await api("/api/identity"); } catch (e) { toast(e.message, true); return; }
+  const id = identityInfo.identity, fresh = !identityInfo.exists;
+  $("identity-eyebrow").textContent = welcome || fresh ? "Welcome" : "Guest identity";
+  $("identity-title").textContent = welcome || fresh ? "Welcome to QEMU ISO Lab" : "Guest identity";
+  $("identity-lead").textContent = fresh
+    ? `No ${identityInfo.path} yet. Every profile of the catalog creates the guest user ${identityInfo.defaults.user} (password ${identityInfo.defaults.password}). Choose your own once: it becomes the user of every machine you install from here, and the file is personal (git ignores it).`
+    : id.user ? `Every tracked profile installs as ${id.user}. Change it here; machines already installed keep the user they were installed with.`
+    : `${identityInfo.path} exists but names no identity: the profiles install as ${identityInfo.defaults.user}/${identityInfo.defaults.password}.` + (identityInfo.problem ? " " + identityInfo.problem : "");
+  $("identity-user").value = id.user || identityInfo.defaults.user;
+  $("identity-realname").value = id.realname || "";
+  $("identity-password").value = fresh || !id.has_hash ? identityInfo.defaults.password : "";
+  $("identity-password").placeholder = id.has_hash ? "unchanged" : "";
+  $("identity-password-help").textContent = id.has_hash ? "Leave it empty to keep the current password." : "Hashed for the installers; keep it simple, it is a lab.";
+  $("identity-store").checked = fresh ? true : !!id.has_password;
+  $("identity-note").textContent = fresh ? "Not now keeps the catalog's defaults; the Identity button in the header reopens this page." : `Saved in ${identityInfo.path} (a .bak of the previous file is kept); ${identityInfo.overrides} per-VM override(s) stay as they are.`;
+  $("identity-skip").textContent = fresh ? "Not now" : "Cancel";
+  $("identity-feedback").textContent = "";
+  if (!d.open) d.showModal();
+}
+$("identity-open").onclick = () => openIdentity(false);
+$("identity-skip").onclick = () => $("identity-dialog").close();
+$("identity-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const body = { user: $("identity-user").value.trim(), password: $("identity-password").value, realname: $("identity-realname").value.trim(), store_password: $("identity-store").checked };
+  if (!$("identity-user").checkValidity()) { $("identity-feedback").textContent = "The user name must be a POSIX login name (lower-case letters, digits, - and _)."; return; }
+  $("identity-save").disabled = true;
+  try {
+    const result = await api("/api/identity", body);
+    $("identity-dialog").close(); toast(`Guest identity saved: ${result.identity.user}`); refresh(true);
+  } catch (err) { $("identity-feedback").textContent = err.message; }
+  finally { $("identity-save").disabled = false; }
+};
 for (const [id] of profileResources) $("profile-" + id).oninput = () => {
   try {
     const value = profileOverride();
@@ -2845,6 +2909,8 @@ async function refresh(fresh = false) {
   if (!TOKEN) { $("connection").textContent = "Token required"; $("summary").textContent = "No token: open the URL that `vmctl web` printed."; return; }
   try { catalog = await api("/api/commands"); } catch (e) { toast(e.message, true); }
   await refresh(); refreshJobs();
+  // A fresh checkout: no local.json yet, so the Welcome asks for the guest identity once (Not now keeps lab/lab).
+  try { identityInfo = await api("/api/identity"); if (!identityInfo.exists && !location.hash) openIdentity(true); } catch (e) { /* an older server: the header button stays */ }
   const wanted = decodeURIComponent((location.hash.match(/^#console=(.+)$/) || [])[1] || "");
   if (wanted) { selected = wanted; render(); openConsole(wanted); }
   const cmds = decodeURIComponent((location.hash.match(/^#commands=(.*)$/) || [])[1] || "");

@@ -41,13 +41,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import catalog, config, integration, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording
+from vmctl import catalog, config, integration, local_identity, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
 WEB_DIR = Path(__file__).resolve().parent / "web"
 # Need an interactive terminal or sudo: excluded from the detached job endpoint.
-EXCLUDED_COMMANDS = {"web", "shell", "console", "flash", "import-device", "completion"}
+EXCLUDED_COMMANDS = {"web", "shell", "console", "flash", "import-device", "completion", "identity"}  # identity: its own panel, no password in a job log
 # Discoverable in the command center and opened in a terminal window on the host (sudo and the
 # CLI's own questions happen there), never as a detached job.
 TERMINAL_COMMANDS = {"flash", "import-device"}
@@ -575,6 +575,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({**self.snapshot.get(fresh="fresh" in query), "version": _version()})
             elif path == "/api/commands":
                 self._json(command_catalog())
+            elif path == "/api/identity":
+                # The Welcome / Identity panel: does local.json exist, which user it names (never the credentials).
+                self._json(local_identity.read())
             elif path == "/api/devices":
                 self._json(run_json(["list-target-devices", "--json"]))
             elif path.startswith("/api/vm/") and path.endswith("/override"):
@@ -785,6 +788,17 @@ class Handler(BaseHTTPRequestHandler):
             elif path.startswith("/api/vm/") and path.endswith("/ssh-terminal"):
                 terminal = open_ssh_terminal(path[len("/api/vm/"):-len("/ssh-terminal")])
                 self._json({"terminal": terminal})
+            elif path == "/api/identity":
+                # vmctl identity: {"user", "password" (empty keeps the current one), "realname", "store_password"};
+                # creates local.json on a fresh checkout, keeps every other key of it afterwards.
+                fields = {key: body.get(key, "") for key in ("user", "password", "realname")}
+                if not all(isinstance(value, str) for value in fields.values()):
+                    raise VMError("user, password and realname must be strings")
+                result = local_identity.save(fields["user"], fields["password"], fields["realname"],
+                                             store_password=bool(body.get("store_password", True)))
+                with self.snapshot.lock:
+                    self.snapshot.value = None
+                self._json(result)
             elif path == "/api/protect":
                 # vmctl protect / unprotect: {"action": add|remove, "names": [...]}, saved in local.json.
                 names = body.get("names") or []

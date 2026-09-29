@@ -40,6 +40,21 @@ def _document() -> dict[str, Any]:
     return document
 
 
+def read_document() -> dict[str, Any]:
+    """local.json as a document (``{"vms": {}}`` while it does not exist): what every writer of
+    the file starts from, so no key another feature keeps is lost (identity, catalog, protected, vms)."""
+    return _document()
+
+
+def write_document(document: dict[str, Any]) -> Path:
+    """Write the whole document back: ``.bak`` of the previous file, then an atomic replace."""
+    path = local_path()
+    if path.exists():
+        _atomic_write(path.with_suffix(".json.bak"), path.read_bytes())
+    _atomic_write(path, (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode())
+    return path
+
+
 def selection_of(document: dict[str, Any], key: str = KEY, field: str = "selected") -> list[str]:
     """The selected names of a local.json document: canonical, in order, without duplicates."""
     section = document.get(key)
@@ -121,8 +136,5 @@ def update(action: str, names: list[str], cfg: dict[str, Any], key: str = KEY, f
             document[key] = {**section, field: new}
         else:
             document.pop(key, None)
-        path = local_path()
-        if path.exists():
-            _atomic_write(path.with_suffix(".json.bak"), path.read_bytes())
-        _atomic_write(path, (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode())
+        write_document(document)
         return result
