@@ -174,6 +174,12 @@ excluded() {{
     for x in $EXCLUDE; do [ "$x" = "$name" ] && return 0; done
     return 1
 }}
+installed_log() {{
+    # $1 = package name: is its entry in the target's package log? grep -c reads the whole
+    # listing: under pipefail, `ls | grep -q` quitting at the first match hands ls a SIGPIPE
+    # once the listing outgrows the pipe, and iproute2 sits early in the alphabet (2026-09-29).
+    [ "$(ls "{TARGET}/var/log/packages/" | grep -c "^$1-[^-]*-[^-]*-[^-]*$")" -gt 0 ]
+}}
 count=0
 install_one() {{
     # $1 = package file; installpkg reads the whole package name from the file name
@@ -203,23 +209,21 @@ for s in $SERIES; do
     echo "    series $s: $(sort -u "$wanted" | wc -l) packages"
     for name in $(sort -u "$wanted"); do
         excluded "$name" && continue
-        file="$(grep "^$name " "$index" | head -1 | cut -d' ' -f2-)"
+        file="$(grep "^$name " "$index" | sed -n '1p' | cut -d' ' -f2-)"
         [ -n "$file" ] || {{ echo "    $name: tagged but not on the DVD, skipped"; continue; }}
         install_one "$file"
     done
 done
 echo "    $count packages installed"
 for p in $EXTRA_PACKAGES; do
-    if ! ls {TARGET}/var/log/packages/ | grep -q "^$p-[^-]*-[^-]*-[^-]*$"; then
+    if ! installed_log "$p"; then
         # not among the installed packages: say what the DVD has under that name and install it
-        # again, this time with installpkg's own output (14.1 lost iproute2 silently, 2026-09-29)
-        file="$(grep -h "^$p " /tmp/vmctl-index-* 2>/dev/null | head -1 | cut -d' ' -f2-)"
+        # again, this time with installpkg's own output
+        file="$(grep -h "^$p " /tmp/vmctl-index-* 2>/dev/null | sed -n '1p' | cut -d' ' -f2-)"
         echo "$p is not in /var/log/packages after the series pass (${{file:-no such package on the DVD}})"
         [ -n "$file" ] || false
         "$INSTALLPKG" --root {TARGET} "$file"
-        ls {TARGET}/var/log/packages/ | grep -q "^$p-[^-]*-[^-]*-[^-]*$" || {{
-            echo "$p is still missing; entries with its name:"; ls {TARGET}/var/log/packages/ | grep -i "$p" || echo "(none)"
-            ls -ld {TARGET}/var/log/packages {TARGET}/var/adm 2>&1 | head -3; false; }}
+        installed_log "$p" || {{ echo "$p is still missing"; false; }}
     fi
 done
 

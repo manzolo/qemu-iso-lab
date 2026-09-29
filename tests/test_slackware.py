@@ -69,6 +69,9 @@ class SlackwareTests(BaseVmctlTestCase):
         self.assertIn('grep -E \':(ADD|REC)$\' "$dir/tagfile"', script)
         self.assertIn('echo "${b%-*-*-*} $f"', script)  # exact names, never a prefix match
         self.assertIn("HOSTNAME_SHORT=slack", script)
+        self.assertNotIn("| grep -q", script)  # pipefail + grep -q quitting early = SIGPIPE for ls (iproute2, 2026-09-29)
+        self.assertNotIn("| head -1", script)
+        self.assertIn('installed_log "$p"', script)
         self.assertIn('[ "$XINITRC" = xinitrc.xfce ] && [ -f /mnt/etc/xdg/xfce4/panel/default.xml ]', script)  # Xfce 4.10/4.12: no first-start panel question
         self.assertIn("loadkeys %s.map", script)
         self.assertIn("export LANG=$LOCALE", script)
