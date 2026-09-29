@@ -217,7 +217,9 @@ for p in $EXTRA_PACKAGES; do
         echo "$p is not in /var/log/packages after the series pass (${{file:-no such package on the DVD}})"
         [ -n "$file" ] || false
         "$INSTALLPKG" --root {TARGET} "$file"
-        ls {TARGET}/var/log/packages/ | grep -q "^$p-[^-]*-[^-]*-[^-]*$" || {{ echo "$p is still missing"; false; }}
+        ls {TARGET}/var/log/packages/ | grep -q "^$p-[^-]*-[^-]*-[^-]*$" || {{
+            echo "$p is still missing; entries with its name:"; ls {TARGET}/var/log/packages/ | grep -i "$p" || echo "(none)"
+            ls -ld {TARGET}/var/log/packages {TARGET}/var/adm 2>&1 | head -3; false; }}
     fi
 done
 
