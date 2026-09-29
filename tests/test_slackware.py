@@ -64,6 +64,7 @@ class SlackwareTests(BaseVmctlTestCase):
         self.assertIn('SERIES="a ap l n x xap"', script)
         self.assertIn('EXTRA_PACKAGES="sudo iproute2 xfce"', script)  # the base's sudo + iproute2 (OPT on 15.0) plus the child's xfce
         self.assertIn("xscreensaver", script)  # the default exclusions
+        self.assertIn("xfce4-pulseaudio-plugin", script)  # no sound server: the plugin would loop-crash with a dialog
         self.assertIn("mozilla-firefox", script)
         self.assertIn('grep -E \':(ADD|REC)$\' "$dir/tagfile"', script)
         self.assertIn('echo "${b%-*-*-*} $f"', script)  # exact names, never a prefix match

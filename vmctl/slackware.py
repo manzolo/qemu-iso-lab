@@ -52,7 +52,8 @@ DEFAULT_SERIES = ["a", "ap", "l", "n", "x", "xap", "xfce"]
 DEFAULT_PACKAGES = ["sudo", "iproute2"]
 # What would lock or blank the screen before the report's screenshot, and the big desktop
 # applications the DVD's REC tags would drag in (firefox, seamonkey, thunderbird, gimp: ~400 MB).
-DEFAULT_EXCLUDE = ["xscreensaver", "xfce4-screensaver", "mozilla-firefox", "seamonkey", "mozilla-thunderbird", "gimp"]
+# xfce4-pulseaudio-plugin crashes in a loop without a sound server and parks a dialog on the desktop (15.0, 2026-09-29).
+DEFAULT_EXCLUDE = ["xscreensaver", "xfce4-screensaver", "xfce4-pulseaudio-plugin", "mozilla-firefox", "seamonkey", "mozilla-thunderbird", "gimp"]
 
 
 def slackware_config(vm: dict[str, Any]) -> dict[str, Any] | None:

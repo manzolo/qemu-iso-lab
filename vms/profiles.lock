@@ -67,9 +67,14 @@
       ]
     },
     "arch-2014": {
-      "version": "1.0.5",
-      "fingerprint": "sha256:30a38a31a715f820b93effb7f6e3701a8499266777a47cd3994ab82ba332b370",
+      "version": "1.0.6",
+      "fingerprint": "sha256:395892a2574b1df5ff472b7d6566820fee7d13ffdc8d4d224eaaa1d3e9c0e77b",
       "history": [
+        {
+          "version": "1.0.6",
+          "date": "2026-09-29",
+          "note": "The desktop check is a pgrep of the user's xfce4-session under lightdm.service: systemd 208's loginctl predates verify-desktop's query"
+        },
         {
           "version": "1.0.5",
           "date": "2026-09-29",
