@@ -369,7 +369,7 @@ vmctl_poweroff
 def create_seed_iso(vm_name: str, vm: dict[str, Any], keys: list[str], dry_run: bool = False) -> Path:
     """The seed CD: install.sh alone (the live trigger mounts it and runs it)."""
     return cloud_init.create_iso_with_files(
-        slackware_artifact_dir(vm), {"install.sh": render_install_script(vm_name, vm, keys)},
+        slackware_artifact_dir(vm), {"install.sh": render_install_script(vm_name, vm, keys), "run.sh": render_run_script()},
         dry_run=dry_run, volume_id=SEED_VOLUME_ID)
 
 
@@ -378,11 +378,49 @@ def seed_iso_drive_args(iso_path: Path) -> list[str]:
     return ["-drive", f"file={iso_path},format=raw,if=ide,index=3,media=cdrom,readonly=on"]
 
 
+def render_run_script() -> str:
+    """``run.sh``, POSIX sh: runs install.sh under a real bash. The installer initrd of 15.0 has
+    bash; the ones of 13.0 and 13.37 ship busybox ash under that name (`set: illegal option -E`,
+    first live run of 13.37, 2026-09-29), so the DVD's own bash package (a/bash-*.t?z) is
+    unpacked into the RAM disk, which has xz, libncurses and glibc for it."""
+    return f"""#!/bin/sh
+# vmctl: install.sh under a real bash (the 13.x installer initrds call busybox ash "bash")
+if bash -c 'set -E' 2>/dev/null; then
+    exec bash {SEED_MOUNTPOINT}/install.sh
+fi
+echo "==> The initrd's bash is busybox: unpacking the DVD's bash package..."
+mkdir -p {DVD_MOUNTPOINT}
+for dev in /dev/sr0 /dev/sr1 /dev/sr2 /dev/hdc /dev/hdd /dev/scd0 /dev/scd1; do
+    [ -b "$dev" ] || continue
+    mount -t iso9660 -o ro "$dev" {DVD_MOUNTPOINT} 2>/dev/null || continue
+    [ -d {DVD_MOUNTPOINT}/slackware64 ] && break
+    umount {DVD_MOUNTPOINT}
+done
+pkg=""
+for f in {DVD_MOUNTPOINT}/slackware64/a/bash-*.t?z; do [ -f "$f" ] && pkg="$f" && break; done
+if [ -z "$pkg" ]; then
+    echo "{BOOTSTRAP_FAILED_TOKEN}: no bash package on the DVD"
+    poweroff -f
+fi
+mkdir -p /tmp/vmctl-bash
+case "$pkg" in
+    *.txz) xz -dc "$pkg" | tar x -C /tmp/vmctl-bash ;;
+    *) gzip -dc "$pkg" | tar x -C /tmp/vmctl-bash ;;
+esac
+umount {DVD_MOUNTPOINT}  # install.sh mounts the DVD itself
+for b in /tmp/vmctl-bash/bin/bash /tmp/vmctl-bash/bin/bash[0-9]*; do
+    [ -x "$b" ] && exec "$b" {SEED_MOUNTPOINT}/install.sh
+done
+echo "{BOOTSTRAP_FAILED_TOKEN}: the bash package holds no bash binary"
+poweroff -f
+"""
+
+
 def live_trigger_command() -> str:
     """Typed at the live root prompt: find the seed among the CD-ROM drives and run its script."""
     return (f"mkdir -p {SEED_MOUNTPOINT}; for d in /dev/sr1 /dev/sr0 /dev/sr2 /dev/hdd /dev/hdc; do "
             f"mount -t iso9660 -o ro $d {SEED_MOUNTPOINT} 2>/dev/null && [ -f {SEED_MOUNTPOINT}/install.sh ] && break; "
-            f"umount {SEED_MOUNTPOINT} 2>/dev/null; done; bash {SEED_MOUNTPOINT}/install.sh")
+            f"umount {SEED_MOUNTPOINT} 2>/dev/null; done; sh {SEED_MOUNTPOINT}/run.sh")
 
 
 def extract_boot_artifacts(vm: dict[str, Any], iso_path: Path, dry_run: bool = False) -> tuple[Path, Path]:

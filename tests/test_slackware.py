@@ -94,7 +94,13 @@ class SlackwareTests(BaseVmctlTestCase):
         self.assertEqual(slackware.seed_iso_drive_args(self.root / "seed.iso"),
                          ["-drive", f"file={self.root / 'seed.iso'},format=raw,if=ide,index=3,media=cdrom,readonly=on"])
         trigger = slackware.live_trigger_command()
-        self.assertTrue(trigger.endswith("bash /vmctl-seed/install.sh"))
+        self.assertTrue(trigger.endswith("sh /vmctl-seed/run.sh"))  # run.sh finds a real bash (13.x initrds call busybox ash "bash")
+        run = slackware.render_run_script()
+        self.assertTrue(run.startswith("#!/bin/sh\n"))
+        self.assertIn("bash -c 'set -E'", run)
+        self.assertIn("/slackware64/a/bash-*.t?z", run)
+        self.assertIn("exec \"$b\" /vmctl-seed/install.sh", run)
+        self.assertNotIn("[[", run)
         self.assertIn("/dev/sr1 /dev/sr0", trigger)
         self.assertTrue(slackware.LIVE_KERNEL_APPEND.endswith("console=tty0 console=ttyS0,115200"))  # the shell on the serial port
         self.assertIn("SLACK_KERNEL=huge.s", slackware.LIVE_KERNEL_APPEND)
