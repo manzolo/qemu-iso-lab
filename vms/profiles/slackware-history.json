@@ -64,10 +64,7 @@
         ]
       },
       "ssh_provision": {
-        "user": "lab",
-        "post_install_run": [
-          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
-        ]
+        "user": "lab"
       }
     },
     "slackware-legacy-ssh-base": {
@@ -109,7 +106,10 @@
       },
       "ssh_provision": {
         "hostname": "slackware-130",
-        "ssh_host_port": 2334
+        "ssh_host_port": 2334,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
+        ]
       },
       "notes": "Slackware 13.0 (August 2009): the first 64-bit release, kernel 2.6.29, Xfce 4.6 (the xfce package sits in xap, OPT), KDE 4.2, OpenSSH 5.2 (RSA key and the legacy SSH options). The install runs from the DVD's own shell: vmctl/slackware.py partitions, installpkg --root from the DVD (ADD and REC of the a/ap/l/n/x/xap series plus sudo and xfce, minus the screensavers and the big xap applications), configures the target, tty1 logs the user in (agetty -l) and ~/.bash_profile starts Xfce with startx; LILO on the MBR, the huge kernel. Born experimental: vmctl check-vms slackware-13.0 runs one."
     },
@@ -139,7 +139,10 @@
       },
       "ssh_provision": {
         "hostname": "slackware-1337",
-        "ssh_host_port": 2335
+        "ssh_host_port": 2335,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
+        ]
       },
       "notes": "Slackware 13.37 (April 2011): kernel 2.6.37, Xfce 4.6.2 (still in xap), OpenSSH 5.8 (RSA key, legacy SSH options). Same script as 13.0. Born experimental: vmctl check-vms slackware-13.37 runs one."
     },
@@ -158,7 +161,10 @@
       },
       "ssh_provision": {
         "hostname": "slackware-140",
-        "ssh_host_port": 2336
+        "ssh_host_port": 2336,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
+        ]
       },
       "notes": "Slackware 14.0 (September 2012): kernel 3.2, Xfce 4.10 in its own series, OpenSSH 6.1 (no ed25519 before 6.5, no rsa-sha2 before 7.2: RSA key, legacy SSH options), agetty with --autologin. Born experimental: vmctl check-vms slackware-14.0 runs one."
     },
@@ -177,48 +183,78 @@
       },
       "ssh_provision": {
         "hostname": "slackware-141",
-        "ssh_host_port": 2337
+        "ssh_host_port": 2337,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
+        ]
       },
       "notes": "Slackware 14.1 (November 2013): kernel 3.10, Xfce 4.10, OpenSSH 6.3 (RSA key, legacy SSH options). Born experimental: vmctl check-vms slackware-14.1 runs one."
     },
     "slackware-14.2": {
-      "name": "Slackware 14.2 (Xfce 4.12, unattended, DVD script)",
+      "name": "Slackware 14.2 (KDE 4.14, unattended, DVD script)",
       "extends": "slackware-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.1"
+        "version": "1.1.0"
       },
       "iso": "isos/slackware64-14.2-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.2-iso/slackware64-14.2-install-dvd.iso",
       "iso_md5": "522db1d2845aaab22078530c67f858c1",
       "slackware_config": {
-        "hostname": "slackware-142"
+        "hostname": "slackware-142",
+        "series": [
+          "a",
+          "ap",
+          "l",
+          "n",
+          "x",
+          "xap",
+          "kde"
+        ],
+        "xinitrc": "xinitrc.kde"
       },
       "ssh_provision": {
         "hostname": "slackware-142",
-        "ssh_host_port": 2338
+        "ssh_host_port": 2338,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x plasma-desktop >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x plasma-desktop >/dev/null && { set -- /var/log/packages/kde-workspace-*; [ -e \"$1\" ]; }"
+        ]
       },
-      "notes": "Slackware 14.2 (July 2016): kernel 4.4, Xfce 4.12, OpenSSH 7.2 (the ed25519 key works). Born experimental: vmctl check-vms slackware-14.2 runs one."
+      "notes": "Slackware 14.2 (July 2016): kernel 4.4, OpenSSH 7.2 (the ed25519 key works), and KDE SC 4.14 (kde-workspace 4.11) from the kde series (186 ADD+REC packages; xinitrc.kde runs startkde, the check is the user's plasma-desktop). Born experimental: vmctl check-vms slackware-14.2 runs one."
     },
     "slackware-15.0": {
-      "name": "Slackware 15.0 (Xfce 4.16, unattended, DVD script)",
+      "name": "Slackware 15.0 (KDE Plasma 5.23, unattended, DVD script)",
       "extends": "slackware-history-base",
       "meta": {
         "status": "unattended",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "verified": "2026-09-29"
       },
       "iso": "isos/slackware64-15.0-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-15.0-iso/slackware64-15.0-install-dvd.iso",
       "iso_md5": "f8418ef0ec2c0a205adf5dbc2f2a1971",
       "slackware_config": {
-        "hostname": "slackware-150"
+        "hostname": "slackware-150",
+        "series": [
+          "a",
+          "ap",
+          "l",
+          "n",
+          "x",
+          "xap",
+          "kde"
+        ],
+        "xinitrc": "xinitrc.kde"
       },
       "ssh_provision": {
         "hostname": "slackware-150",
-        "ssh_host_port": 2339
+        "ssh_host_port": 2339,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x plasmashell >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x plasmashell >/dev/null && { set -- /var/log/packages/plasma-workspace-*; [ -e \"$1\" ]; }"
+        ]
       },
-      "notes": "Slackware 15.0 (February 2022): kernel 5.15, Xfce 4.16, elogind, OpenSSH 8.8, PAM. First live PASS 2026-09-29 (334 s: 966 packages from the DVD, LILO, tty1 autologin into Xfce)."
+      "notes": "Slackware 15.0 (February 2022): kernel 5.15, elogind, PAM, OpenSSH 8.8, and KDE Plasma 5.23 from the kde series (367 ADD+REC packages; xinitrc.kde runs startplasma-x11, the check is the user's plasmashell). The series shows three desktops: Xfce up to 14.1, KDE 4 on 14.2, Plasma on 15.0. The Xfce recipe passed live on 2026-09-29 (334 s: 966 packages from the DVD, LILO, tty1 autologin).",
+      "memory_mb": 3072
     }
   }
 }

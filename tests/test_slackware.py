@@ -74,6 +74,16 @@ class SlackwareTests(BaseVmctlTestCase):
         self.assertIn('console=tty0 console=ttyS0,115200', script)  # LILO append: the serial getty and the log
         self.assertNotIn("systemctl", script)
 
+    def test_kde_on_14_2_and_plasma_on_15_0(self):
+        for name, xinitrc, process in (("slackware-14.2", "xinitrc.kde", "plasma-desktop"), ("slackware-15.0", "xinitrc.kde", "plasmashell"),
+                                       ("slackware-14.1", "xinitrc.xfce", "xfce4-session")):
+            with self.subTest(name=name):
+                vm = self.profile(name)
+                script = slackware.render_install_script(name, vm, [])
+                self.assertIn(f'XINITRC={xinitrc}', script)
+                self.assertIn(" kde" if xinitrc == "xinitrc.kde" else " xfce", script.split('SERIES="', 1)[1].split('"', 1)[0] + " ")
+                self.assertIn(f"-x {process} ", vm["ssh_provision"]["post_install_run"][0])
+
     def test_the_seed_and_the_boot_line(self):
         vm = self.profile()
         self.assertEqual(slackware.seed_iso_drive_args(self.root / "seed.iso"),

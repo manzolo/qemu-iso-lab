@@ -1301,9 +1301,14 @@
       ]
     },
     "slackware-14.2": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:6f5afa905533b89cd6f3c27c00512a992745662fc32de0dab23b5a56e7d48cfa",
+      "version": "1.1.0",
+      "fingerprint": "sha256:7913fbc2fcc192c9738b3c737fc101df6a994cac3be5fc2f6babff0df7300e21",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-29",
+          "note": "KDE SC 4.14 from the kde series instead of Xfce"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
@@ -1317,9 +1322,14 @@
       ]
     },
     "slackware-15.0": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:254721f22719f3105d7020193660b6b02537a8e42304f43ee00f02b4d1568970",
+      "version": "1.1.0",
+      "fingerprint": "sha256:e168f7f8de58331063c9b6561602f2fa00e252cc44b8f23d605aeecca3119419",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-29",
+          "note": "KDE Plasma 5.23 from the kde series instead of Xfce (the series shows three desktops)"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
