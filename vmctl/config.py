@@ -136,6 +136,10 @@ def load_tracked(profiles_dir: Path | None = None) -> dict[str, dict[str, Any]]:
     return profile_bases.resolve_extends(vms, bases)
 
 
+# meta.manual of a manual profile: why it is manual, what the catalog shows next to "Manual install".
+MANUAL_REASONS = ("live", "image", "template", "ci", "twin", "todo")
+MANUAL_LABELS = {"live": "live media", "image": "disk image", "template": "import template", "ci": "CI boot check",
+                 "twin": "automated as", "todo": "awaiting automation"}
 IDENTITY_KEYS = ("user", "password", "password_hash", "realname")
 
 
@@ -282,6 +286,17 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
         else:
             if "status" in meta and meta["status"] not in ("manual", "unattended", "experimental"):
                 err("meta.status must be manual, unattended or experimental")
+            if "manual" in meta:
+                # Why a manual profile is manual (the catalog badge): live media, a disk image, an import
+                # template, a CI boot check, the manual twin of an automated profile, or still to automate.
+                if meta.get("status", "manual") != "manual":
+                    err("meta.manual belongs to manual profiles only")
+                elif meta["manual"] not in MANUAL_REASONS:
+                    err(f"meta.manual must be one of {', '.join(MANUAL_REASONS)}")
+                elif meta["manual"] == "twin" and not (isinstance(meta.get("automated_as"), str) and meta["automated_as"].strip()):
+                    err("meta.manual 'twin' names the automated profile in meta.automated_as")
+            elif "automated_as" in meta:
+                err("meta.automated_as goes with meta.manual: twin")
             if "version" in meta and not (isinstance(meta["version"], str) and re.fullmatch(r"\d+\.\d+\.\d+", meta["version"])):
                 err("meta.version must be MAJOR.MINOR.PATCH (tools/bump_profile.py keeps it)")
             if "verified" in meta:

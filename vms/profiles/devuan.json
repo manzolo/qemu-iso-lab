@@ -8,7 +8,8 @@
         "role": "installer",
         "release_model": "stable",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "todo"
       },
       "iso": "isos/devuan_excalibur_6.1.1_amd64_netinstall.iso",
       "iso_url": "https://files.devuan.org/devuan_excalibur/installer-iso/devuan_excalibur_6.1.1_amd64_netinstall.iso",

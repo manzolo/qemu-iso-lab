@@ -8,7 +8,8 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "todo"
       },
       "iso": "isos/pop-os_24.04_amd64_generic_22.iso",
       "iso_url": "https://iso.pop-os.org/24.04/amd64/generic/22/pop-os_24.04_amd64_generic_22.iso",
@@ -64,7 +65,9 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "twin",
+        "automated_as": "pearos-nicecore"
       },
       "iso": "isos/pearOS-NiceC0re-2026.09-x86_64.iso",
       "iso_size": 3395530752,
@@ -214,7 +217,8 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "todo"
       },
       "iso": "isos/EndeavourOS_Titan-2026.03.06.iso",
       "iso_urls": [
@@ -272,7 +276,8 @@
         "role": "desktop",
         "release_model": "rolling-desktop",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "live"
       },
       "iso": "isos/neon-user-current.iso",
       "iso_url": "https://files.kde.org/neon/images/user/current/neon-user-current.iso",
@@ -327,7 +332,8 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "todo"
       },
       "iso": "isos/void-live-x86_64-20250202-xfce.iso",
       "iso_url": "https://repo-default.voidlinux.org/live/current/void-live-x86_64-20250202-xfce.iso",
@@ -377,7 +383,8 @@
         "role": "desktop",
         "release_model": "slow-rolling",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "todo"
       },
       "iso": "isos/openSUSE-Slowroll-DVD-x86_64-Media.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",

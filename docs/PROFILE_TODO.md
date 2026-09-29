@@ -30,6 +30,7 @@ Add profiles that cover a new axis: firmware, installation flow, operating syste
 Every tracked profile has `meta.status`:
 
 - `manual`: interactive installation, live media or an import template; automation may still boot or inspect it.
+  Since 2026-09-29 every manual profile also says why in `meta.manual`: `live` (live media), `image` (a ready disk image), `template` (an import template), `ci` (the CI boot check), `twin` (the manual twin of an automated profile, named in `meta.automated_as`) or `todo` (still to automate: the catalog shows *Awaiting automation* and a *To automate* filter, and the profile's notes say which existing flow is the road).
 - `unattended`: an automated installation/provisioning recipe exists; this is not a claim that this revision passed a live test.
 - `experimental`: a known incomplete or unsettled flow. Currently the package-only Ubuntu niri recipes, the custom Omarchy/NVIDIA flow, `windows-98` and, since 2026-09-16, `windows-nt4`, demoted after failing reproducibly outside the matrix with its documented cause excluded (its `verified` keeps the 09-15 date: the field records the last live PASS, it does not certify the current code). A full `check-vms` (no profile names) reports them as skipped instead of running them; `check-vms <name>` runs one on purpose, which is how it gets promoted (2026-09-14).
 

@@ -212,7 +212,9 @@
         "role": "baseline",
         "release_model": "rolling",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "twin",
+        "automated_as": "arch-2026"
       },
       "iso": "isos/archlinux-latest-x86_64.iso",
       "iso_discovery": {
@@ -266,7 +268,8 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "live"
       },
       "iso": "isos/cachyos-desktop-linux-latest.iso",
       "iso_discovery": {

@@ -11,6 +11,22 @@ if str(ROOT) not in sys.path:
 from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
+class ManualReasonTests(BaseVmctlTestCase):
+    def test_meta_manual_is_validated(self):
+        from vmctl import config
+        base = {**self.vm_config}
+        ok = {**base, "meta": {"status": "manual", "manual": "live"}}
+        self.assertEqual(config.validate_vm_profile("v", ok), [])
+        twin = {**base, "meta": {"status": "manual", "manual": "twin", "automated_as": "other"}}
+        self.assertEqual(config.validate_vm_profile("v", twin), [])
+        for meta, message in (({"status": "manual", "manual": "nope"}, "must be one of"),
+                              ({"status": "manual", "manual": "twin"}, "automated_as"),
+                              ({"status": "unattended", "manual": "todo"}, "manual profiles only"),
+                              ({"status": "manual", "automated_as": "x"}, "goes with meta.manual")):
+            with self.subTest(meta=meta):
+                problems = config.validate_vm_profile("v", {**base, "meta": meta})
+                self.assertTrue(any(message in p for p in problems), problems)
+
 class ConfigTests(BaseVmctlTestCase):
     def test_rejects_invalid_profile_status_and_verification_date(self):
         from vmctl import config

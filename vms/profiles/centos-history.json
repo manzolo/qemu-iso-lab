@@ -50,7 +50,8 @@
       "extends": "centos-history-base",
       "meta": {
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "todo"
       },
       "iso": "isos/CentOS-5.11-x86_64-netinstall.iso",
       "iso_url": "https://vault.centos.org/5.11/isos/x86_64/CentOS-5.11-x86_64-netinstall.iso",
@@ -63,7 +64,8 @@
       "extends": "centos-history-base",
       "meta": {
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "todo"
       },
       "iso": "isos/CentOS-6.10-x86_64-minimal.iso",
       "iso_url": "https://vault.centos.org/6.10/isos/x86_64/CentOS-6.10-x86_64-minimal.iso",
@@ -76,7 +78,8 @@
       "extends": "centos-history-base",
       "meta": {
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "todo"
       },
       "iso": "isos/CentOS-7-x86_64-Minimal-2009.iso",
       "iso_url": "https://vault.centos.org/7.9.2009/isos/x86_64/CentOS-7-x86_64-Minimal-2009.iso",
@@ -89,7 +92,8 @@
       "extends": "centos-history-base",
       "meta": {
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "todo"
       },
       "iso": "isos/CentOS-8.5.2111-x86_64-boot.iso",
       "iso_url": "https://vault.centos.org/8.5.2111/isos/x86_64/CentOS-8.5.2111-x86_64-boot.iso",

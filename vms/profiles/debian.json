@@ -113,7 +113,8 @@
         "groups": [
           "debian-only"
         ],
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "live"
       },
       "iso": "isos/debian-live-13.4.0-amd64-gnome.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0-live/amd64/iso-hybrid/debian-live-13.4.0-amd64-gnome.iso",
@@ -165,7 +166,9 @@
         "groups": [
           "debian-only"
         ],
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "twin",
+        "automated_as": "debian-server"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -214,7 +217,9 @@
         "groups": [
           "debian-only"
         ],
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "twin",
+        "automated_as": "debian-server"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -270,7 +275,9 @@
         "groups": [
           "debian-only"
         ],
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "twin",
+        "automated_as": "debian-server"
       },
       "iso": "isos/debian-13.4.0-amd64-netinst.iso",
       "iso_url": "https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/debian-13.4.0-amd64-netinst.iso",
@@ -354,7 +361,8 @@
         "groups": [
           "ubuntu"
         ],
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "live"
       },
       "iso": "isos/ubuntu-26.04-desktop-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-desktop-amd64.iso",
@@ -410,7 +418,9 @@
         "groups": [
           "ubuntu"
         ],
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "twin",
+        "automated_as": "ubuntu-server-ci"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
       "iso_url": "https://releases.ubuntu.com/resolute/ubuntu-26.04-live-server-amd64.iso",

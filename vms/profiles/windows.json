@@ -134,7 +134,8 @@
         "release_model": "custom",
         "status": "manual",
         "verified": "2026-09-06",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "template"
       },
       "iso": "isos/windows-10-installer.iso",
       "disk": {
@@ -184,7 +185,8 @@
         "release_model": "custom",
         "status": "manual",
         "verified": "2026-09-06",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "template"
       },
       "iso": "isos/windows-11-installer.iso",
       "disk": {

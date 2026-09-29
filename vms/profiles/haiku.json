@@ -8,7 +8,9 @@
         "role": "desktop",
         "release_model": "stable",
         "status": "manual",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "twin",
+        "automated_as": "haiku"
       },
       "iso": "isos/haiku-r1beta6-x86_64-anyboot.iso",
       "iso_url": "https://mirrors.rit.edu/haiku/r1beta6/haiku-r1beta6-x86_64-anyboot.iso",

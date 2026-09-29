@@ -79,6 +79,7 @@ def profile_record(name: str, vm: dict[str, Any], lock: dict[str, Any]) -> dict[
         "family": str(meta.get("family") or ""), "family_label": FAMILY_LABELS.get(str(meta.get("family") or ""), str(meta.get("family") or "Other")),
         "role": str(meta.get("role") or ""), "release_model": str(meta.get("release_model") or ""),
         "status": str(meta.get("status") or "manual"), "verified": meta.get("verified"),
+        "manual": meta.get("manual"), "automated_as": meta.get("automated_as"),
         "version": meta.get("version"), "history": list(locked.get("history") or []),
         "groups": list(meta.get("groups") or []), "extends": str(vm.get("extends") or ""),
         "memory_mb": vm.get("memory_mb"), "cpus": vm.get("cpus"),
@@ -197,7 +198,7 @@ h2.family::after { content:""; height:1px; background:var(--line); flex:1; margi
 .card-head .desc { color:var(--muted); font-size:11px; margin-top:4px; overflow-wrap:anywhere; }
 .badges { display:flex; gap:5px; flex-wrap:wrap; font-size:10px; min-height:23px; align-items:flex-start; }
 .badge { border:1px solid #ffffff10; background:#ffffff04; border-radius:5px; padding:2px 6px; font-weight:500; }
-.b-unattended,.b-verified { color:var(--ok); background:#8aead009; } .b-manual,.b-base { color:var(--muted); } .b-experimental,.b-medium { color:var(--warn); } .b-version { color:#aec4f0; } .b-lab { color:#d1b1f7; }
+.b-unattended,.b-verified { color:var(--ok); background:#8aead009; } .b-manual,.b-base { color:var(--muted); } .b-manual a { color:var(--accent); } .b-todo { color:var(--warn); border-color:#f1ca8a55; background:#f1ca8a10; } .b-experimental,.b-medium { color:var(--warn); } .b-version { color:#aec4f0; } .b-lab { color:#d1b1f7; }
 .facts { display:flex; gap:15px; flex-wrap:wrap; color:var(--muted); font-size:11px; padding:11px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .facts b { color:var(--text); font-weight:550; }
 .cmds { background:#0b111a; border:1px solid #253242; border-radius:7px; overflow:hidden; }
@@ -260,7 +261,7 @@ footer { color:var(--muted); font-size:11px; padding:30px 0 0; }
   </details>
   <div id="toolbar">
     <div class="search-row"><div class="search-wrap"><input id="search" type="search" placeholder="Search profiles… e.g. ubuntu 26, fedora kde" autocomplete="off" aria-label="Search profiles"><kbd aria-hidden="true">/</kbd></div>
-    <div class="chips" id="kind" role="group" aria-label="Kind of install"><button data-v="" class="active" aria-pressed="true">All profiles</button><button data-v="unattended" aria-pressed="false">Automated</button><button data-v="manual" aria-pressed="false">Manual</button><button data-v="experimental" aria-pressed="false">Experimental</button></div></div>
+    <div class="chips" id="kind" role="group" aria-label="Kind of install"><button data-v="" class="active" aria-pressed="true">All profiles</button><button data-v="unattended" aria-pressed="false">Automated</button><button data-v="manual" aria-pressed="false">Manual</button><button data-v="experimental" aria-pressed="false">Experimental</button><button data-v="todo" aria-pressed="false" title="Manual profiles whose automation is still to write">To automate</button></div></div>
     <div class="filter-row"><span class="filter-label">BUILT FOR</span><div class="chips" id="role" role="group" aria-label="Role"><button data-v="" class="active" aria-pressed="true">Any role</button><button data-v="desktop" aria-pressed="false">Desktop</button><button data-v="server" aria-pressed="false">Server</button><button data-v="other" aria-pressed="false">Other</button></div>
     <select id="family" aria-label="Family"><option value="">All OS families</option></select></div>
   </div>
@@ -302,7 +303,7 @@ function searchProfiles(profiles, query) {
 }
 function visible() {
   return searchProfiles(DATA.profiles, $("search").value).filter(p =>
-    (!kind || p.status === kind) && (!role || roleGroup(p) === role) && (!family || p.family_label === family));
+    (!kind || (kind === "todo" ? p.manual === "todo" : p.status === kind)) && (!role || roleGroup(p) === role) && (!family || p.family_label === family));
 }
 function clipBlock(p) {
   const c = p.clip; if (!c) return "";
@@ -327,7 +328,15 @@ $("player-close").onclick = () => $("player").close();
 $("player").addEventListener("close", () => { const v = $("player-video"); v.pause(); v.removeAttribute("src"); v.load(); });
 const familyColors = {debian:"#de769b",arch:"#60b5e8",fedora:"#749cf5",rhel:"#76bcc8",opensuse:"#8dc96e",nix:"#8aafe8",alpine:"#65afcc",void:"#91bf7f",mint:"#9fcf7c",kali:"#90a5de",bsd:"#eb9681",windows:"#70b8f8",proxmox:"#ecaa71",slackware:"#7fa6d9",haiku:"#f0c25a",reactos:"#6fb3e0"};
 function card(p) {
-  const badges = [`<span class="badge b-${esc(p.status)}">${p.status === "unattended" ? "Auto install" : p.status === "manual" ? "Manual install" : esc(p.status)}</span>`];
+  // A manual profile says why (meta.manual): live media, a disk image, an import template, a CI boot
+  // check, the manual twin of an automated profile, or still to automate (the amber badge, filter "To automate").
+  const manualLabel = {live:"Manual · live media", image:"Manual · disk image", template:"Manual · import template", ci:"Manual · CI boot check", twin:"Manual · automated as", todo:"Awaiting automation"};
+  const statusBadge = p.status === "unattended" ? `<span class="badge b-unattended">Auto install</span>`
+    : p.status === "manual" ? (p.manual === "todo" ? `<span class="badge b-todo" title="Manual for now: the notes say which flow is the road to unattended">Awaiting automation</span>`
+      : p.manual === "twin" ? `<span class="badge b-manual" title="The same system installs itself as ${esc(p.automated_as)}">Manual · automated as <a href="#${esc(p.automated_as)}" data-goto="${esc(p.automated_as)}">${esc(p.automated_as)}</a></span>`
+      : `<span class="badge b-manual">${esc(manualLabel[p.manual] || "Manual install")}</span>`)
+    : `<span class="badge b-${esc(p.status)}">${esc(p.status)}</span>`;
+  const badges = [statusBadge];
   if (p.version) badges.push(`<span class="badge b-version" title="Profile version">v${esc(p.version)}</span>`);
   if (p.verified) badges.push(`<span class="badge b-verified" title="Last live PASS of the validation matrix">✓ ${esc(p.verified)}</span>`);
   if (p.medium === "manual") badges.push(`<span class="badge b-medium" title="The profile says which medium to provide">Your own ISO</span>`);
@@ -337,7 +346,7 @@ function card(p) {
   const notes = p.notes || p.extends ? `<details><summary>Profile notes</summary>${p.extends ? `<p>Based on <code>${esc(p.extends)}</code>.</p>` : ""}${p.notes ? `<p>${esc(p.notes)}</p>` : ""}</details>` : "";
   const help = p.iso_help ? `<details><summary>Install medium</summary><p>${esc(p.iso_help)}</p></details>` : "";
   const clips = clipBlock(p);
-  return `<article class="card${picked.has(p.name) ? " picked" : ""}" data-name="${esc(p.name)}" style="--tint:${familyColors[p.family] || "#b3a0df"}">
+  return `<article class="card${picked.has(p.name) ? " picked" : ""}" id="${esc(p.name)}" data-name="${esc(p.name)}" style="--tint:${familyColors[p.family] || "#b3a0df"}">
     <div class="cover"><span class="cover-top">${esc(p.role || "Virtual machine")}</span>${catalogIcon(osIconKey(p))}<span class="cover-label">${esc(p.family_label)}</span><button class="pick" data-pick="${esc(p.name)}" aria-label="${picked.has(p.name) ? "Remove" : "Select"} ${esc(p.name)}" aria-pressed="${picked.has(p.name)}">${picked.has(p.name) ? "✓" : "+"}</button></div>
     <div class="card-body"><div class="card-head"><div class="name">${esc(p.label)}</div><div class="desc mono">${esc(p.name)}</div></div>
     <div class="badges">${badges.join("")}</div><div class="facts">${facts.map(f => `<span>${f}</span>`).join("")}</div>

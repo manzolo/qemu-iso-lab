@@ -12,7 +12,8 @@
           "hobby-os"
         ],
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "image"
       },
       "iso": "isos/kolibrios-latest.iso",
       "iso_url": "https://builds.kolibrios.org/en_US/latest-iso.7z",
@@ -80,7 +81,8 @@
             "note": "Redox book"
           }
         ],
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "image"
       },
       "iso": "isos/redox_desktop_x86_64_2024-09-07_1225_livedisk.iso",
       "iso_url": "https://static.redox-os.org/releases/0.9.0/x86_64/redox_desktop_x86_64_2024-09-07_1225_livedisk.iso.zst",
@@ -134,7 +136,8 @@
         "groups": [
           "hobby-os"
         ],
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "image"
       },
       "iso": "isos/menuetos-m64cd.iso",
       "iso_help": "MenuetOS 64 is freeware distributed only from its own site, after you accept its license (m64l.txt), through Google Drive links that change with every release: vmctl cannot download it for you.\n\n1. Open https://www.menuetos.net/download.htm and read the license.\n2. Download the CD image, M64CD-<version>.ISO (about 80 MB, 'bootable CD'), then boot it with vmctl provision menuetos.",
@@ -192,7 +195,8 @@
             "note": "logged in already; su gives root without a password"
           }
         ],
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "manual": "image"
       },
       "disk_image": {
         "path": "isos/serenityos-grub-cccf3076.img",

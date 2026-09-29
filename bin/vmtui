@@ -737,6 +737,8 @@ def facts(name, vm):
         "name": name,
         "mine": name in MINE,
         "hidden": name in HIDDEN,
+        "manual": str(meta.get("manual") or ""),  # why a manual profile is manual (meta.manual)
+        "automated_as": str(meta.get("automated_as") or ""),
         "protected": protected_by is not None,
         "protected_by": protected_by,  # "flag" (vmctl protect) or "star" (My VMs + a disk with data)
         "job_status": tui_jobs.status(tui_jobs.job_dir(state.ROOT, name)),

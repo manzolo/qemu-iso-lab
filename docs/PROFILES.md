@@ -49,7 +49,7 @@ the rest (see [PROVISIONING.md](PROVISIONING.md#guest-identity-and-localjson)).
 | Field | Meaning |
 |-------|---------|
 | `name` | Human title shown by `vmctl list` and the TUI |
-| `meta` | `family` drives grouping; `role` and `release_model` describe the guest. `status` is `manual`, `unattended` or `experimental`; `version` is the recipe's version (see [Profile versions](#profile-versions)); optional `verified` is the last maintainer-reported live PASS date (`YYYY-MM-DD`). `vmctl list` and HTML reports show status and verification separately from current test results. |
+| `meta` | `family` drives grouping; `role` and `release_model` describe the guest. `status` is `manual`, `unattended` or `experimental`; `version` is the recipe's version (see [Profile versions](#profile-versions)); optional `verified` is the last maintainer-reported live PASS date (`YYYY-MM-DD`). A manual profile also carries `manual`: why it is manual (`live`, `image`, `template`, `ci`, `twin` with `automated_as`, or `todo` for one still to automate), what the catalog shows next to *Manual*. `vmctl list` and HTML reports show status and verification separately from current test results. |
 | `iso`, `iso_url`, `iso_urls`, `iso_discovery`, `iso_size`, `iso_sha256` | See [ISO sources](#iso-sources) |
 | `disk` | See [Disk](#disk) |
 | `firmware` | `efi` or `bios`, see [Firmware](#firmware) |

@@ -144,6 +144,16 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_flavours_0929 |= {"haiku", "arch-2014", "slackware-15.0"}  # PASS on 2026-09-29 (haiku after the identity fix; arch-2014 with the host cache, kept experimental)
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
+            # Every manual profile says why (meta.manual): the catalog tells the ones awaiting automation
+            # from live media, disk images, import templates, the CI check and the manual twins of automated ones.
+            if vm["meta"]["status"] == "manual":
+                self.assertIn(vm["meta"].get("manual"), vmctl.config.MANUAL_REASONS, name)
+                if vm["meta"]["manual"] == "twin":
+                    twin = cfg["vms"].get(vm["meta"]["automated_as"])
+                    self.assertIsNotNone(twin, f"{name}: automated_as names no profile")
+                    self.assertIn(twin["meta"]["status"], ("unattended", "experimental"), name)
+            else:
+                self.assertNotIn("manual", vm["meta"], name)
             expected_date = ("2026-09-29" if name in verified_flavours_0929
                              else "2026-09-28" if name in verified_xubuntu_history
                              else "2026-09-26" if name in verified_matrix_0926
