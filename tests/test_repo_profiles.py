@@ -139,9 +139,12 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                                     "xubuntu-22.04", "xubuntu-26.04",
                                     # the Debian release history (debian-history.json), same evening
                                     "debian-7", "debian-8", "debian-9", "debian-10", "debian-11", "debian-12"}
+        # The other flavour series, first run of the night of 2026-09-28/29 (tools/gen_ubuntu_flavors.py).
+        verified_flavours_0929 = set("""edubuntu-8.04 edubuntu-10.04 edubuntu-14.04 edubuntu-26.04 kubuntu-8.04 kubuntu-10.04 kubuntu-14.04 kubuntu-16.04 kubuntu-18.04 kubuntu-22.04 kubuntu-26.04 lubuntu-14.04 lubuntu-16.04 lubuntu-18.04 lubuntu-22.04 lubuntu-26.04 ubuntu-budgie-18.04 ubuntu-budgie-20.04 ubuntu-budgie-22.04 ubuntu-budgie-26.04 ubuntu-cinnamon-26.04 ubuntu-mate-16.04 ubuntu-mate-18.04 ubuntu-mate-20.04 ubuntu-mate-22.04 ubuntu-mate-26.04 ubuntu-unity-26.04""".split())
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
-            expected_date = ("2026-09-28" if name in verified_xubuntu_history
+            expected_date = ("2026-09-29" if name in verified_flavours_0929
+                             else "2026-09-28" if name in verified_xubuntu_history
                              else "2026-09-26" if name in verified_matrix_0926
                              else "2026-09-16" if name in verified_retry
                              else "2026-09-09" if name in verified_matrix else "2026-09-06" if name in verified_templates
