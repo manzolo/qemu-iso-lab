@@ -26,6 +26,7 @@
       "cpus": 4,
       "memory_mb": 4096,
       "network": "user",
+      "audio": true,
       "usb_tablet": true,
       "video": {
         "default": "std",
@@ -98,7 +99,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.7",
+        "version": "1.0.8",
         "verified": "2026-09-29"
       },
       "iso": "isos/archlinux-2014.01.05-dual.iso",
@@ -143,7 +144,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "unattended",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "verified": "2026-09-29"
       },
       "iso": "isos/archlinux-2019.12.01-x86_64.iso",
@@ -171,7 +172,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "unattended",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "verified": "2026-09-29"
       },
       "iso": "isos/archlinux-2022.01.01-x86_64.iso",
@@ -195,7 +196,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "unattended",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "verified": "2026-09-29"
       },
       "iso": "isos/archlinux-2026.09.01-x86_64.iso",

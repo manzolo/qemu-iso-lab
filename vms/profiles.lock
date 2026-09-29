@@ -67,9 +67,14 @@
       ]
     },
     "arch-2014": {
-      "version": "1.0.7",
-      "fingerprint": "sha256:8051b534ec2770dca7cf8ee4ddea963b39d6e7354727e51de53e7f9bf972e3bc",
+      "version": "1.0.8",
+      "fingerprint": "sha256:cfeabd5e360e8b687d97b277f520bf57e67510c42399c34e56510bb9426def6b",
       "history": [
+        {
+          "version": "1.0.8",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile"
+        },
         {
           "version": "1.0.7",
           "date": "2026-09-29",
@@ -113,9 +118,14 @@
       ]
     },
     "arch-2019": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:b90dcd9294cc3f62734175d2aad19d26259c3a0b02bbae7f0ba54ec3e134ee28",
+      "version": "1.1.1",
+      "fingerprint": "sha256:49ceddcb9e06bcbf4c245138dc62ff53faff5ed91204d814909d098c16e771d3",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-29",
@@ -134,9 +144,14 @@
       ]
     },
     "arch-2022": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:03fac2b5e0ecfbbd00c45c5feb40e2a4078959b0df265e62f7d9793376fab6ff",
+      "version": "1.0.2",
+      "fingerprint": "sha256:fc118a0606831030af069f721978b5cd5db2d160bb7156886e014bd5948b3293",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
@@ -150,9 +165,14 @@
       ]
     },
     "arch-2026": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:5a4f09f8eb8a4d3b154d4c39a8e994fec9e322f2f15339714af780224fd60217",
+      "version": "1.0.2",
+      "fingerprint": "sha256:ad029aef2886a568379626366fa002357438d5af07b77ec830f25486ed928648",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
@@ -1237,9 +1257,14 @@
       ]
     },
     "slackware-13.0": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:42926bfbb63c58198b7358a04c663d3ae5ca0453c4ab1e2831fa641930c00ba3",
+      "version": "1.0.2",
+      "fingerprint": "sha256:f9c99824727f89cd8aedcc8d3e431a8f3d08ff23129a611a3e91a39bab1a4a1c",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile (the Slackware VMs had no sound device, noticed live 2026-09-29)"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
@@ -1253,9 +1278,14 @@
       ]
     },
     "slackware-13.37": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:750c9187c78862fc98dbdebcd5c3d11134baa864297393d2df2aecb89f18f6ec",
+      "version": "1.0.2",
+      "fingerprint": "sha256:ab496f9179705b9e5a8a26a1d1ae8ec6d5a10b887dea49addf7c3d3acfbeece1",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile (the Slackware VMs had no sound device, noticed live 2026-09-29)"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
@@ -1269,9 +1299,14 @@
       ]
     },
     "slackware-14.0": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:239d85d2628dc7650a84b750ae108cda60a488f3ea7afef66f15117ba67a846e",
+      "version": "1.0.2",
+      "fingerprint": "sha256:fe62d1e8a78a6f4f2b0841d065d93d587a6e7bd362c8463f21dcbaed5b12cf18",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile (the Slackware VMs had no sound device, noticed live 2026-09-29)"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
@@ -1285,9 +1320,14 @@
       ]
     },
     "slackware-14.1": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:bcebf67577c1bbb3d545913cf59842e4c367f62c43b4e961e98387030b8f5255",
+      "version": "1.0.2",
+      "fingerprint": "sha256:a159a33abebaa4c8d44cc7bda85bf710db5076d8a9b56f0cd85a6211a908d539",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile (the Slackware VMs had no sound device, noticed live 2026-09-29)"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
@@ -1301,9 +1341,14 @@
       ]
     },
     "slackware-14.2": {
-      "version": "1.1.2",
-      "fingerprint": "sha256:863b195a9306ac7dc7bb2a95e78de209278c8a72fb99ccdd85cdb0788afacb4e",
+      "version": "1.1.3",
+      "fingerprint": "sha256:deecd9852c1fe4ca06312ac2c5fb3fbf1917a427fdd55f08e506c89a20cc42c0",
       "history": [
+        {
+          "version": "1.1.3",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile (the Slackware VMs had no sound device, noticed live 2026-09-29)"
+        },
         {
           "version": "1.1.2",
           "date": "2026-09-29",
@@ -1332,9 +1377,14 @@
       ]
     },
     "slackware-15.0": {
-      "version": "1.1.2",
-      "fingerprint": "sha256:506643496459a60a117c18f1d4b6affc3fd08171dc2d8770c6e838960612bd64",
+      "version": "1.1.3",
+      "fingerprint": "sha256:da5124144d99245e76e9ee8d33068902301d74a305d8c7fa6146bbc91b1f66c7",
       "history": [
+        {
+          "version": "1.1.3",
+          "date": "2026-09-29",
+          "note": "audio: true like every other desktop profile (the Slackware VMs had no sound device, noticed live 2026-09-29)"
+        },
         {
           "version": "1.1.2",
           "date": "2026-09-29",
