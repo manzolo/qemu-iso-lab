@@ -289,6 +289,8 @@ class IsoArchiveTests(BaseVmctlTestCase):
         self.assertEqual(vmctl.iso.validate_iso_file(path, good), [])
         problems = vmctl.iso.validate_iso_file(path, {"iso_sha1": "0" * 40})
         self.assertTrue(any(p.startswith("sha1 is ") for p in problems), problems)
+        self.assertEqual(vmctl.iso.validate_iso_file(path, {"iso_md5": hashlib.md5(self.PAYLOAD).hexdigest()}), [])  # Slackware's DVDs
+        self.assertTrue(any(p.startswith("md5 is ") for p in vmctl.iso.validate_iso_file(path, {"iso_md5": "0" * 32})))
 
     def test_zip_member_is_extracted_verified_and_the_archive_removed(self):
         vm = self.vm(iso_archive={"type": "zip", "member": "test.iso"})

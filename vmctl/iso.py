@@ -79,6 +79,11 @@ def validate_iso_file(path: Path, vm: dict[str, Any] | None = None) -> list[str]
         actual_sha1 = hash_file(path, "sha1")
         if actual_sha1.lower() != str(expected_sha1).lower():
             problems.append(f"sha1 is {actual_sha1}, expected {expected_sha1}")
+    expected_md5 = vm.get("iso_md5")  # Slackware publishes MD5 (plus a GPG signature) for its DVDs
+    if expected_md5:
+        actual_md5 = hash_file(path, "md5")
+        if actual_md5.lower() != str(expected_md5).lower():
+            problems.append(f"md5 is {actual_md5}, expected {expected_md5}")
 
     return problems
 

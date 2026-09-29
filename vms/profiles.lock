@@ -1144,6 +1144,72 @@
         }
       ]
     },
+    "slackware-13.0": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:8e8374f8572e2fad086063099f26e922e091dda4d78d2ed3f577f8a0f85c76da",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "slackware-13.37": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:6c99e6b7de2fb2b8ef873ace6475751b6ae71d5f31ffe5264b36e188cb2b957f",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "slackware-14.0": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:685af36a15db4ab896c200eee35adee2c8dad1783295b1ba5e121c37d4d48fbf",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "slackware-14.1": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:03328af0b06ec07100bbe53b86716947bf5376c89428f603c692fc43f09af1b8",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "slackware-14.2": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:4ea836d56b67388832862e3badc82b26cf2d32e83e1ccf50e9279f577f4fb448",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "slackware-15.0": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:3a13e25a9d8b7ffd69b23ae8b1b45d259c5550bff32f1323d4022ad140031189",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "ubuntu-10.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:a557cec423e71e07039aadb7eb1233dab0bf669c071505f80a4e3f7213bb3614",

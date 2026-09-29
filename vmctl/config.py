@@ -103,6 +103,7 @@ USER_IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
     ("windows_config", "username"),
     ("pfsense_config", "username"),
     ("freebsd_config", "username"),
+    ("slackware_config", "username"),
 )
 
 

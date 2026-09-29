@@ -1089,6 +1089,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `ubuntu-releases` | One unattended desktop install per Ubuntu release, 8.04 to 26.04. 24.04's entry is `ubuntu-gnome-24.04`: it is the same recipe under the flavour naming, so the series has no separate `ubuntu-24.04-unattended` profile |
 | `xubuntu-releases` | The Xubuntu history on the same media, 8.04 to 26.04 (`tools/gen_ubuntu_flavors.py`): born `experimental`, so the full matrix sets them aside until each passes when named |
 | `arch-releases` | Arch Linux as it was in 2014, 2019, 2022 and 2026 (`arch-history.json`): the archived ISO of the month and pacstrap from the Arch Linux Archive snapshot of that day (`archinstall_config.archive_date`), Xfce on LightDM throughout; born `experimental` |
+| `slackware-releases` | Slackware 13.0, 13.37, 14.0, 14.1, 14.2 and 15.0 on x86_64 (`slackware-history.json`, `bootstrap-slackware`): a script run from the install DVD's own shell, Xfce started from the console login; born `experimental` |
 | `kubuntu-releases` | Kubuntu on the same media, 8.04 to 26.04 (kdm, then LightDM, then SDDM from 16.04), same generator and rule |
 | `lubuntu-releases` | Lubuntu 12.04 to 26.04 (LXDE on LightDM, LXQt on SDDM from 20.04), same generator and rule |
 | `ubuntu-mate-releases` | Ubuntu MATE 16.04 to 26.04 (LightDM), same generator and rule |
@@ -1295,6 +1296,42 @@ outcome and duration, the captioned frames, the final screen — plus an `index.
 ### CentOS Stream 10 Server (Kickstart)
 
 `vmctl bootstrap-kickstart centos-stream-10 --timeout 3600` (SSH 2270). Server-only kickstart from the boot ISO and Stream 10 online repository. Requires an x86-64-v3 host CPU with KVM; QEMU uses the host CPU. SSH and ttyS0 getty are enabled. Experimental until a clean live PASS.
+
+## Slackware from the DVD's shell (`bootstrap-slackware`)
+
+Slackware's `setup` is a dialog program without an answer file, but its install DVD is a
+complete shell: `rc.S` prints a decorative `slackware login:` (a plain `read`) and busybox
+init then spawns a root shell on the console. `vmctl/slackware.py` boots the DVD's huge
+kernel and initrd (`kernels/huge.s/bzImage`, `isolinux/initrd.img`) with the DVD's own
+command line plus `console=tty0 console=ttyS0,115200`, answers the login, mounts a seed CD
+(the second IDE CD-ROM) at the `:/# ` prompt and runs `install.sh` from it. The script,
+the same for 13.0 (2009) and 15.0 (2022):
+
+- partitions the IDE disk (`/dev/sda` under libata on every release since 12.0): one bootable
+  Linux partition, ext4;
+- installs the `ADD` and `REC` packages of the profile's series (`a ap l n x xap xfce`, no
+  `xfce` series before 14.0: the `xfce` package sits in `xap` as `OPT` and is named) with
+  `installpkg --root` straight from the DVD, plus `slackware_config.packages` (`sudo` is `OPT`
+  everywhere), minus `exclude` (the screensavers, and firefox/seamonkey/thunderbird/gimp);
+  package names are matched exactly from the file names, never by prefix;
+- writes fstab, `HOSTNAME`, `rc.inet1.conf` (DHCP), timezone, `rc.keymap`, `lang.sh`, the X
+  keyboard layout, root and the user (`chpasswd` in a chroot), `NOPASSWD` sudo, the project
+  key, `UseDNS no`, a serial getty in `inittab`;
+- has tty1 log the user in (`agetty --autologin` from util-linux 2.20, `agetty -n -l` with a
+  `login -f` wrapper on 13.x) and `~/.bash_profile` run `startx` into `xinitrc.xfce`: no display
+  manager, because xdm cannot autologin and KDM/SDDM would pull KDE in;
+- installs LILO on the MBR with the huge kernel (no initrd) and `console=ttyS0` in the append;
+- ends with `sync` → unmount → `sync` → the token → `poweroff` (the FAILED token comes from an
+  ERR trap). The post-install checks `xfce4-session` with `pgrep` (no systemd). OpenSSH before
+  7.2 (13.0 to 14.1) needs the RSA key and the legacy SSH options, like Debian 7.
+
+The DVDs are pinned by the vendor's MD5 (`iso_md5`: Slackware publishes MD5 and a GPG
+signature, no SHA-256).
+
+```sh
+vmctl bootstrap-slackware slackware-15.0 --timeout 3600
+vmctl check-vms slackware-15.0 --restore --report --record
+```
 
 ## FreeBSD disc1 (`bootstrap-freebsd`)
 

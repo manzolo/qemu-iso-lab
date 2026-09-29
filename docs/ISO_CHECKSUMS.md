@@ -12,6 +12,12 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `arch-2019` | `archlinux-2019.12.01-x86_64.iso` (SHA-1, `iso_sha1`) | [Manifest](https://archive.archlinux.org/iso/2019.12.01/sha1sums.txt) |
 | `arch-2022` | `archlinux-2022.01.01-x86_64.iso` (SHA-1, `iso_sha1`) | [Manifest](https://archive.archlinux.org/iso/2022.01.01/sha1sums.txt) |
 | `arch-2026` | `archlinux-2026.09.01-x86_64.iso` | [Manifest](https://archive.archlinux.org/iso/2026.09.01/sha256sums.txt) |
+| `slackware-13.0` | `slackware64-13.0-install-dvd.iso` (MD5, `iso_md5`: the vendor publishes MD5 and a GPG signature) | [Manifest](https://mirrors.slackware.com/slackware/slackware-iso/slackware64-13.0-iso/slackware64-13.0-install-dvd.iso.md5) |
+| `slackware-13.37` | `slackware64-13.37-install-dvd.iso` (MD5, `iso_md5`: the vendor publishes MD5 and a GPG signature) | [Manifest](https://mirrors.slackware.com/slackware/slackware-iso/slackware64-13.37-iso/slackware64-13.37-install-dvd.iso.md5) |
+| `slackware-14.0` | `slackware64-14.0-install-dvd.iso` (MD5, `iso_md5`: the vendor publishes MD5 and a GPG signature) | [Manifest](https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.0-iso/slackware64-14.0-install-dvd.iso.md5) |
+| `slackware-14.1` | `slackware64-14.1-install-dvd.iso` (MD5, `iso_md5`: the vendor publishes MD5 and a GPG signature) | [Manifest](https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.1-iso/slackware64-14.1-install-dvd.iso.md5) |
+| `slackware-14.2` | `slackware64-14.2-install-dvd.iso` (MD5, `iso_md5`: the vendor publishes MD5 and a GPG signature) | [Manifest](https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.2-iso/slackware64-14.2-install-dvd.iso.md5) |
+| `slackware-15.0` | `slackware64-15.0-install-dvd.iso` (MD5, `iso_md5`: the vendor publishes MD5 and a GPG signature) | [Manifest](https://mirrors.slackware.com/slackware/slackware-iso/slackware64-15.0-iso/slackware64-15.0-install-dvd.iso.md5) |
 | `debian-bios` | `debian-13.4.0-amd64-netinst.iso` | [Manifest](https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/SHA256SUMS) |
 | `debian-efi` | `debian-13.4.0-amd64-netinst.iso` | [Manifest](https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/SHA256SUMS) |
 | `debian-gnome-live` | `debian-live-13.4.0-amd64-gnome.iso` | [Manifest](https://cdimage.debian.org/mirror/cdimage/archive/13.4.0-live/amd64/iso-hybrid/SHA256SUMS) |

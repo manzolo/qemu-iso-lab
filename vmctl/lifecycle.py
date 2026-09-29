@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
+from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, slackware, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -443,6 +443,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         return ("skip", "nixos_config without SSH post-install")
     if freebsd.freebsd_config(vm) is not None:
         return ("bootstrap-freebsd", "FreeBSD bsdinstall + SSH verification")
+    if slackware.slackware_config(vm) is not None:
+        return ("bootstrap-slackware", "Slackware DVD script + post-install")
     if haiku.haiku_config(vm) is not None:
         return ("bootstrap-haiku", "Haiku live install driven over QMP + SSH verification")
     if proxmox.proxmox_config(vm) is not None:
@@ -564,7 +566,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-slackware", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -767,9 +769,9 @@ def run_local_test_vm(
         if prep_note is not None:
             detail = f"{detail}; {prep_note}"
         return ("passed", detail)
-    if mode in {"bootstrap-freebsd", "bootstrap-haiku", "bootstrap-proxmox"}:
-        handler = {"bootstrap-freebsd": cmd_bootstrap_freebsd, "bootstrap-haiku": cmd_bootstrap_haiku,
-                   "bootstrap-proxmox": cmd_bootstrap_proxmox}[mode]
+    if mode in {"bootstrap-freebsd", "bootstrap-slackware", "bootstrap-haiku", "bootstrap-proxmox"}:
+        handler = {"bootstrap-freebsd": cmd_bootstrap_freebsd, "bootstrap-slackware": cmd_bootstrap_slackware,
+                   "bootstrap-haiku": cmd_bootstrap_haiku, "bootstrap-proxmox": cmd_bootstrap_proxmox}[mode]
         try:
             handler(
                 argparse.Namespace(
@@ -2104,6 +2106,47 @@ def cmd_bootstrap_freebsd(args: argparse.Namespace) -> int:
     start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
     report.phase(args, "post-install")
     run_post_install(args.vm, vm, args.timeout, dry_run=args.dry_run)
+    return 0
+
+
+def cmd_bootstrap_slackware(args: argparse.Namespace) -> int:
+    """Slackware from its install DVD: the host boots the DVD's kernel with the serial port as
+    console, answers the decorative login of rc.S, mounts the seed CD at the root shell and runs
+    install.sh from it (vmctl/slackware.py); LILO, then the disk boots for the SSH post-install."""
+    vm = resolved_vm(args, config.load_config())
+    slackware.check_profile(args.vm, vm)
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Slackware (script from the DVD's shell): {args.vm}")
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-slackware", dry_run=args.dry_run)
+    keys = slackware.resolve_ssh_pubkey(vm, dry_run=args.dry_run)
+    seed_iso = slackware.create_seed_iso(args.vm, vm, keys, dry_run=args.dry_run)
+    kernel_path, initrd_path = slackware.extract_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+    command = qemu.common_args(vm, None, dry_run=args.dry_run, accel=automation_accel(vm), headless=True,
+                               serial_stdio=True, no_reboot=True, allow_missing_disk=args.dry_run and not disk_exists,
+                               enable_clipboard=False, network_phase="install")
+    command += ["-cdrom", str(iso_path)]
+    command += slackware.seed_iso_drive_args(seed_iso)
+    command += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", slackware.LIVE_KERNEL_APPEND]
+    ui.print_note("Booting the install DVD on the serial console; the root shell then runs the seed's install.sh...")
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    report.phase(args, "install")
+    try:
+        qemu.run_and_expect(command, expected_text=slackware.BOOTSTRAP_COMPLETE_TOKEN,
+                            timeout_sec=getattr(args, "timeout", 3600),
+                            auto_inputs=[(slackware.LIVE_LOGIN_PROMPT, "root\n"),
+                                         (slackware.LIVE_SHELL_PROMPT, f"\n{slackware.live_trigger_command()}\n")],
+                            dry_run=args.dry_run, log_path=serial_log)
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, slackware.BOOTSTRAP_FAILED_TOKEN, "Slackware", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-slackware", vm, dry_run=args.dry_run)
+    ui.print_status("ok", "Installation complete: starting the installed VM for the post-install")
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
+    report.phase(args, "post-install")
+    run_post_install(args.vm, vm, getattr(args, "timeout", 600), dry_run=args.dry_run)
+    ui.print_status("ok", f"Bootstrap complete for VM '{args.vm}'")
     return 0
 
 
@@ -4449,6 +4492,7 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: 
         preseed.preseed_artifact_dir(vm),
         kickstart.kickstart_artifact_dir(vm),
         alpine.alpine_artifact_dir(vm),
+        slackware.slackware_artifact_dir(vm),
         windows.windows_artifact_dir(vm),
         pfsense.pfsense_artifact_dir(vm),
         proxmox.proxmox_artifact_dir(vm),

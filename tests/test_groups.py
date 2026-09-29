@@ -252,7 +252,7 @@ class RepositoryGroupTests(unittest.TestCase):
         declared = sorted({group for _, vm in vmctl.config.sorted_vm_items(self.cfg)
                            for group in vmctl.config.declared_groups(vm)})
         self.assertEqual(declared, ["arch-releases", "debian-only", "debian-releases", "edubuntu-releases", "hobby-os", "kali", "kubuntu-releases",
-                                    "lubuntu-releases", "netlab", "proxmox-lab", "smoke", "ubuntu", "ubuntu-budgie-releases",
+                                    "lubuntu-releases", "netlab", "proxmox-lab", "slackware-releases", "smoke", "ubuntu", "ubuntu-budgie-releases",
                                     "ubuntu-cinnamon-releases", "ubuntu-flavors", "ubuntu-mate-releases", "ubuntu-releases",
                                     "ubuntu-unity-releases", "windows-retro", "xubuntu-releases"])
         documentation = (ROOT / "docs" / "UNATTENDED.md").read_text(encoding="utf-8")

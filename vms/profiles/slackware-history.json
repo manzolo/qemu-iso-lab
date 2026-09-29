@@ -1,0 +1,222 @@
+{
+  "bases": {
+    "slackware-history-base": {
+      "meta": {
+        "family": "slackware",
+        "role": "desktop",
+        "release_model": "fixed",
+        "slug": "slackware",
+        "groups": [
+          "slackware-releases"
+        ]
+      },
+      "disk": {
+        "path": "artifacts/{{name}}/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "ide"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "cpus": 2,
+      "memory_mb": 2048,
+      "network": "user",
+      "network_device": "e1000",
+      "video": {
+        "default": "std",
+        "headless": [
+          "-vga",
+          "std",
+          "-display",
+          "none"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "installer_boot": {
+        "kernel": "kernels/huge.s/bzImage",
+        "initrd": "isolinux/initrd.img"
+      },
+      "slackware_config": {
+        "username": "lab",
+        "password": "lab",
+        "timezone": "Europe/Rome",
+        "keymap": "it",
+        "locale": "it_IT.UTF-8",
+        "xinitrc": "xinitrc.xfce",
+        "packages": [
+          "sudo"
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && ls /var/log/packages | grep -q '^xfce'"
+        ]
+      }
+    },
+    "slackware-legacy-ssh-base": {
+      "extends": "slackware-history-base",
+      "ssh_provision": {
+        "key_type": "rsa",
+        "ssh_options": [
+          "HostKeyAlgorithms=+ssh-rsa",
+          "PubkeyAcceptedAlgorithms=+ssh-rsa",
+          "KexAlgorithms=+diffie-hellman-group-exchange-sha256"
+        ]
+      }
+    }
+  },
+  "vms": {
+    "slackware-13.0": {
+      "name": "Slackware 13.0 (Xfce 4.6, unattended, DVD script)",
+      "extends": "slackware-legacy-ssh-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/slackware64-13.0-install-dvd.iso",
+      "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-13.0-iso/slackware64-13.0-install-dvd.iso",
+      "iso_md5": "2b30f2fccf4e493c461f723b4dc21240",
+      "slackware_config": {
+        "hostname": "slackware-130",
+        "series": [
+          "a",
+          "ap",
+          "l",
+          "n",
+          "x",
+          "xap"
+        ],
+        "packages": [
+          "xfce"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "slackware-130",
+        "ssh_host_port": 2334
+      },
+      "notes": "Slackware 13.0 (August 2009): the first 64-bit release, kernel 2.6.29, Xfce 4.6 (the xfce package sits in xap, OPT), KDE 4.2, OpenSSH 5.2 (RSA key and the legacy SSH options). The install runs from the DVD's own shell: vmctl/slackware.py partitions, installpkg --root from the DVD (ADD and REC of the a/ap/l/n/x/xap series plus sudo and xfce, minus the screensavers and the big xap applications), configures the target, tty1 logs the user in (agetty -l) and ~/.bash_profile starts Xfce with startx; LILO on the MBR, the huge kernel. Born experimental: vmctl check-vms slackware-13.0 runs one."
+    },
+    "slackware-13.37": {
+      "name": "Slackware 13.37 (Xfce 4.6, unattended, DVD script)",
+      "extends": "slackware-legacy-ssh-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/slackware64-13.37-install-dvd.iso",
+      "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-13.37-iso/slackware64-13.37-install-dvd.iso",
+      "iso_md5": "96352381b9233c11c6c735ee7f79934b",
+      "slackware_config": {
+        "hostname": "slackware-1337",
+        "series": [
+          "a",
+          "ap",
+          "l",
+          "n",
+          "x",
+          "xap"
+        ],
+        "packages": [
+          "xfce"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "slackware-1337",
+        "ssh_host_port": 2335
+      },
+      "notes": "Slackware 13.37 (April 2011): kernel 2.6.37, Xfce 4.6.2 (still in xap), OpenSSH 5.8 (RSA key, legacy SSH options). Same script as 13.0. Born experimental: vmctl check-vms slackware-13.37 runs one."
+    },
+    "slackware-14.0": {
+      "name": "Slackware 14.0 (Xfce 4.10, unattended, DVD script)",
+      "extends": "slackware-legacy-ssh-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/slackware64-14.0-install-dvd.iso",
+      "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.0-iso/slackware64-14.0-install-dvd.iso",
+      "iso_md5": "371986562d282abc5c6cd39be7179544",
+      "slackware_config": {
+        "hostname": "slackware-140"
+      },
+      "ssh_provision": {
+        "hostname": "slackware-140",
+        "ssh_host_port": 2336
+      },
+      "notes": "Slackware 14.0 (September 2012): kernel 3.2, Xfce 4.10 in its own series, OpenSSH 6.1 (no ed25519 before 6.5, no rsa-sha2 before 7.2: RSA key, legacy SSH options), agetty with --autologin. Born experimental: vmctl check-vms slackware-14.0 runs one."
+    },
+    "slackware-14.1": {
+      "name": "Slackware 14.1 (Xfce 4.10, unattended, DVD script)",
+      "extends": "slackware-legacy-ssh-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/slackware64-14.1-install-dvd.iso",
+      "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.1-iso/slackware64-14.1-install-dvd.iso",
+      "iso_md5": "805ebe2f2f748ab992ff10a843503d92",
+      "slackware_config": {
+        "hostname": "slackware-141"
+      },
+      "ssh_provision": {
+        "hostname": "slackware-141",
+        "ssh_host_port": 2337
+      },
+      "notes": "Slackware 14.1 (November 2013): kernel 3.10, Xfce 4.10, OpenSSH 6.3 (RSA key, legacy SSH options). Born experimental: vmctl check-vms slackware-14.1 runs one."
+    },
+    "slackware-14.2": {
+      "name": "Slackware 14.2 (Xfce 4.12, unattended, DVD script)",
+      "extends": "slackware-history-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/slackware64-14.2-install-dvd.iso",
+      "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.2-iso/slackware64-14.2-install-dvd.iso",
+      "iso_md5": "522db1d2845aaab22078530c67f858c1",
+      "slackware_config": {
+        "hostname": "slackware-142"
+      },
+      "ssh_provision": {
+        "hostname": "slackware-142",
+        "ssh_host_port": 2338
+      },
+      "notes": "Slackware 14.2 (July 2016): kernel 4.4, Xfce 4.12, OpenSSH 7.2 (the ed25519 key works). Born experimental: vmctl check-vms slackware-14.2 runs one."
+    },
+    "slackware-15.0": {
+      "name": "Slackware 15.0 (Xfce 4.16, unattended, DVD script)",
+      "extends": "slackware-history-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/slackware64-15.0-install-dvd.iso",
+      "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-15.0-iso/slackware64-15.0-install-dvd.iso",
+      "iso_md5": "f8418ef0ec2c0a205adf5dbc2f2a1971",
+      "slackware_config": {
+        "hostname": "slackware-150"
+      },
+      "ssh_provision": {
+        "hostname": "slackware-150",
+        "ssh_host_port": 2339
+      },
+      "notes": "Slackware 15.0 (February 2022): kernel 5.15, Xfce 4.16, elogind, OpenSSH 8.8, PAM. Born experimental: vmctl check-vms slackware-15.0 runs one."
+    }
+  }
+}
