@@ -278,8 +278,15 @@ cat > "$HOME_DIR/.ssh/authorized_keys" <<'EOF'
 EOF
 chmod 700 "$HOME_DIR/.ssh"
 chmod 600 "$HOME_DIR/.ssh/authorized_keys"
+# Xfce 4.10 and 4.12 ask about the panel at their first start (14.0 and 14.1, 2026-09-29): the
+# user gets the default layout, so the desktop comes up complete and the clip shows no dialog.
+if [ "$XINITRC" = xinitrc.xfce ] && [ -f {TARGET}/etc/xdg/xfce4/panel/default.xml ]; then
+    mkdir -p "$HOME_DIR/.config/xfce4/xfconf/xfce-perchannel-xml"
+    cp {TARGET}/etc/xdg/xfce4/panel/default.xml "$HOME_DIR/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+    chroot {TARGET} chown -R "$USERNAME:users" "/home/$USERNAME/.config"
+fi
 
-echo "==> sshd, serial console, autologin and the Xfce session..."
+echo "==> sshd, serial console, autologin and the desktop session..."
 if grep -q '^#*UseDNS' {TARGET}/etc/ssh/sshd_config; then
     sed -i 's/^#*UseDNS.*/UseDNS no/' {TARGET}/etc/ssh/sshd_config
 else
