@@ -324,8 +324,14 @@ echo "==> Waiting for the live network and pacman keyring..."
 # The serial login prompt comes up before archiso's pacman-init finished
 # populating the keyring and before DHCP settled; pacstrap needs both.
 systemctl start pacman-init.service 2>/dev/null || true
-for _ in $(seq 1 60); do
+for attempt in $(seq 1 60); do
     getent hosts archlinux.org >/dev/null 2>&1 && break
+    # The 2014 medium brings no network up by itself on a serial boot (arch-2014, 2026-09-29):
+    # after 10 s without DNS ask for a DHCP lease once. A medium already online never gets here.
+    if [ "$attempt" = 5 ] && command -v dhcpcd >/dev/null 2>&1; then
+        echo "==> No network yet: starting dhcpcd..."
+        dhcpcd >/dev/null 2>&1 || true
+    fi
     sleep 2
 done
 

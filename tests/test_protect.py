@@ -125,6 +125,17 @@ class RowCleanupTests(BaseVmctlTestCase):
             cleanup.row_done("boot", "passed")  # a boot-check row installs nothing: its disk stays
             self.assertTrue(boot.exists())
 
+    def test_a_row_that_did_not_pass_keeps_its_logs_in_the_report(self):
+        report = self.root / "report"
+        base = self.install("fresh")
+        (base / "logs").mkdir()
+        (base / "logs" / "bootstrap-serial.log").write_text("Could not resolve host")
+        cleanup = self.cleanup(_report_dir=str(report))
+        with mock.patch.object(lifecycle, "cmd_stop"), redirect_stdout(io.StringIO()):
+            cleanup.row_done("fresh", "failed")
+        self.assertFalse(base.exists())
+        self.assertEqual((report / "logs" / "fresh" / "bootstrap-serial.log").read_text(), "Could not resolve host")
+
     def test_keep_and_keep_passed(self):
         with mock.patch.object(lifecycle, "cmd_stop"):
             cleanup = self.cleanup(keep_passed=True)

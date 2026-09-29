@@ -67,9 +67,14 @@
       ]
     },
     "arch-2014": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:43e16bcb2e3e2e30724d4c0fb1e13b33511e4b4f40b7f8131ec55740c55bf871",
+      "version": "1.0.1",
+      "fingerprint": "sha256:b1c6c4e9a2cc7472f7ba47ae7b57108ce952574cbed7326d6c952adbd71d81b7",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "live_shell_prompt @archiso: zsh colours split root and @archiso on 2019/2022"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -78,9 +83,14 @@
       ]
     },
     "arch-2019": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:4107104391992b6211a2663adbf1c5d91b2050765bf6cad7bca9aeb2998e0b26",
+      "version": "1.0.1",
+      "fingerprint": "sha256:72d5383db45e818719af6a503ccbd1245780299d40d19ffefa363fae4d66927f",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "live_shell_prompt @archiso: zsh colours split root and @archiso on 2019/2022"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -89,9 +99,14 @@
       ]
     },
     "arch-2022": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:fc646c9bda9dcb8e6a5cb974398289315cd5093f7574309eb8f0089d83f812f0",
+      "version": "1.0.1",
+      "fingerprint": "sha256:03fac2b5e0ecfbbd00c45c5feb40e2a4078959b0df265e62f7d9793376fab6ff",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "live_shell_prompt @archiso: zsh colours split root and @archiso on 2019/2022"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -100,9 +115,14 @@
       ]
     },
     "arch-2026": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:1b7fc38082a7a716d9604788f379d11378e9e224604c40f4ffba16c0b72079a0",
+      "version": "1.0.1",
+      "fingerprint": "sha256:5a4f09f8eb8a4d3b154d4c39a8e994fec9e322f2f15339714af780224fd60217",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "live_shell_prompt @archiso: zsh colours split root and @archiso on 2019/2022"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",

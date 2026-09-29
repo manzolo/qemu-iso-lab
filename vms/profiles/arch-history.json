@@ -58,6 +58,7 @@
         "locale_lang": "it_IT",
         "locale_enc": "UTF-8",
         "bootloader": "Grub",
+        "live_shell_prompt": "@archiso",
         "kernels": [
           "linux"
         ],
@@ -100,7 +101,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/archlinux-2014.01.05-dual.iso",
       "iso_url": "https://archive.archlinux.org/iso/2014.01.05/archlinux-2014.01.05-dual.iso",
@@ -134,7 +135,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/archlinux-2019.11.01-x86_64.iso",
       "iso_url": "https://archive.archlinux.org/iso/2019.11.01/archlinux-2019.11.01-x86_64.iso",
@@ -158,7 +159,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/archlinux-2022.01.01-x86_64.iso",
       "iso_url": "https://archive.archlinux.org/iso/2022.01.01/archlinux-2022.01.01-x86_64.iso",
@@ -178,7 +179,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/archlinux-2026.09.01-x86_64.iso",
       "iso_url": "https://archive.archlinux.org/iso/2026.09.01/archlinux-2026.09.01-x86_64.iso",

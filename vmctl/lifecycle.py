@@ -4087,6 +4087,8 @@ class RowCleanup:
         self.keep = bool(getattr(args, "keep", False))
         self.keep_passed = bool(getattr(args, "keep_passed", False))
         self.dry_run = bool(getattr(args, "dry_run", False))
+        report_dir = getattr(args, "_report_dir", None)
+        self.report_dir = Path(report_dir) if report_dir else None
         selected = set(selected_names)
         self.deferred = {node for entry in pvecluster.clusters(cfg, config.sorted_vm_names(cfg)).values()
                          if selected.issuperset(entry["nodes"]) for node in entry["nodes"]}
@@ -4117,9 +4119,24 @@ class RowCleanup:
             with self.lock:
                 self.kept.append(name)
             return
+        self._keep_evidence(name, status)
         restore_local_test_artifacts({}, dry_run=self.dry_run, fresh=[name])
         with self.lock:
             self.removed.append(name)
+
+    def _keep_evidence(self, name: str, status: str) -> None:
+        """A row that did not pass keeps its logs in the report before its artifacts go: the
+        serial log is the diagnosis (arch-2014's missing network, 2026-09-29, was read there)."""
+        if status == "passed" or self.dry_run or self.report_dir is None:
+            return
+        logs = runtime.vm_artifact_base(name) / "logs"
+        if logs.is_dir():
+            target = self.report_dir / "logs" / name
+            try:
+                shutil.copytree(logs, target, dirs_exist_ok=True)
+                ui.print_note(f"{name}: logs kept in {ui.pretty_path(target)}")
+            except OSError as exc:
+                ui.print_note(f"{name}: could not keep the logs ({exc})")
 
     def finish(self) -> None:
         """The cluster nodes after their check, and any row an exception left behind."""
