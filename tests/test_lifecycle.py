@@ -1006,7 +1006,7 @@ class VmctlTests(BaseVmctlTestCase):
             exit_code = self.vmctl.cmd_test_local(args)
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(cmd_stop.call_count, 2)
+        self.assertEqual(cmd_stop.call_count, 3)  # before the clean, the row's own, the row's cleanup
         self.assertTrue(all(call.args[0].vm == "ubuntu" for call in cmd_stop.call_args_list))
         clean_vm.assert_called_once()
         self.assertEqual(clean_vm.call_args.args[0], "ubuntu")
@@ -1101,7 +1101,7 @@ class VmctlTests(BaseVmctlTestCase):
         clean.assert_not_called()  # --restore replaces the destructive --clean-first path
         stash.assert_called_once()
         self.assertEqual(stash.call_args.args[0], ["ubuntu"])
-        restore.assert_called_once_with({"ubuntu": "/tmp/backup/ubuntu"}, dry_run=True, fresh=mock.ANY)
+        restore.assert_called_once_with({"ubuntu": "/tmp/backup/ubuntu"}, dry_run=True)  # at the end of its row
 
     def test_cmd_test_local_restore_reverts_even_when_a_flow_raises(self):
         ubuntu_vm = json.loads(json.dumps(self.vm_config))
@@ -1162,8 +1162,8 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual(exit_code, 0)
         bootstrap_unattended.assert_called_once()
         self.assertEqual(bootstrap_unattended.call_args.args[0].vm, "ubuntu")
-        cmd_stop.assert_called_once()
-        self.assertEqual(cmd_stop.call_args.args[0].vm, "ubuntu")
+        # The install row stops its VM and its cleanup stops it again; boot-check rows own no install to remove.
+        self.assertEqual([call.args[0].vm for call in cmd_stop.call_args_list], ["ubuntu", "ubuntu"])
         booted = sorted(call.args[0].vm for call in boot_check.call_args_list)
         self.assertEqual(booted, ["alpine"])
         output = stdout.getvalue()
@@ -1315,6 +1315,7 @@ class VmctlTests(BaseVmctlTestCase):
                 resources = vmctl.scheduler.HostResources(32000, 20000, 16)
                 with mock.patch.object(vmctl.lifecycle, "maybe_clean_local_test_candidates"), \
                      mock.patch.object(vmctl.scheduler, "host_resources", return_value=resources) as probe, \
+                     mock.patch.object(vmctl.scheduler, "free_disk_gb", return_value=10_000), \
                      mock.patch.object(vmctl.lifecycle, "run_local_test_vm_subprocess", return_value=("passed", "ok", "")) as worker, \
                      mock.patch.object(concurrent.futures, "ThreadPoolExecutor") as executor, \
                      mock.patch.object(concurrent.futures, "wait", side_effect=wait), \
@@ -1353,8 +1354,8 @@ class VmctlTests(BaseVmctlTestCase):
             exit_code = self.vmctl.cmd_test_local(args)
 
         self.assertEqual(exit_code, 1)
-        cmd_stop.assert_called_once()
-        self.assertEqual(cmd_stop.call_args.args[0].vm, "ubuntu")
+        self.assertEqual(cmd_stop.call_count, 2)  # the failed row's own stop, then its cleanup's
+        self.assertTrue(all(call.args[0].vm == "ubuntu" for call in cmd_stop.call_args_list))
 
     def test_cmd_test_local_clean_first_skips_prompt(self):
         ubuntu_vm = json.loads(json.dumps(self.vm_config))
@@ -1371,7 +1372,7 @@ class VmctlTests(BaseVmctlTestCase):
 
         self.assertEqual(exit_code, 0)
         prompt.assert_not_called()
-        self.assertEqual(cmd_stop.call_count, 2)
+        self.assertEqual(cmd_stop.call_count, 3)  # before the clean, the row's own, the row's cleanup
         clean_vm.assert_called_once()
         bootstrap_unattended.assert_called_once()
 

@@ -1124,7 +1124,19 @@ non-destructive alternative: it stashes each installed VM's `artifacts/<vm>`
 directory aside, runs the matrix on a virgin state, then removes what the test
 created and moves the originals back, so validating every unattended flow does
 not cost you the VMs you already have installed. A stash is kept under
-`artifacts/.check-vms-restore/` only for the duration of the run.
+`artifacts/.check-vms-restore/` only for the duration of the run; a run that
+died (host off, killed) leaves it there, and the next `check-vms` puts it back
+first.
+
+Every row gives its disk back **the moment it ends**, after its screenshot,
+clip and sheet: a stashed VM gets its own artifacts again, any other install
+row loses its test install, so the space a matrix needs is that of the rows
+running together, not of the whole catalog (a full run on 2026-09-29 filled
+389 GB when everything waited for the end). `--keep` keeps every test install,
+`--keep-passed` only the ones that passed. A VM under `vmctl protect` is never
+cleaned: with or without `--restore` its artifacts are moved aside and back.
+The dynamic scheduler also counts disk: a row starts only while the free space
+of `artifacts/` minus 30 GB and the running rows' disks holds its own disk.
 
 Both parallel modes keep VMs sharing host TCP ports from running together,
 including forwards used only during installation. For example, pfSense's WAN

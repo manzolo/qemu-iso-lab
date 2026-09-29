@@ -13,6 +13,7 @@ import subprocess
 import re
 import shlex
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any, Iterator
@@ -4076,6 +4077,85 @@ def run_cluster_checks(cfg: dict[str, Any], selected_names: list[str],
         report.record_group_row(row, label, primary, args, status, detail, time.monotonic() - started, "group cluster")
 
 
+class RowCleanup:
+    """What ``check-vms`` gives back after each row: see the comment in ``cmd_test_local``."""
+
+    def __init__(self, stashed: dict[str, str], candidates: list[str], cfg: dict[str, Any],
+                 selected_names: list[str], args: argparse.Namespace) -> None:
+        self.stashed = dict(stashed)
+        self.candidates = set(candidates)
+        self.keep = bool(getattr(args, "keep", False))
+        self.keep_passed = bool(getattr(args, "keep_passed", False))
+        self.dry_run = bool(getattr(args, "dry_run", False))
+        selected = set(selected_names)
+        self.deferred = {node for entry in pvecluster.clusters(cfg, config.sorted_vm_names(cfg)).values()
+                         if selected.issuperset(entry["nodes"]) for node in entry["nodes"]}
+        self.waiting: dict[str, str] = {}
+        self.lock = threading.Lock()
+        self.restored: list[str] = []
+        self.removed: list[str] = []
+        self.kept: list[str] = []
+
+    def row_done(self, name: str, status: str) -> None:
+        if name in self.deferred:
+            with self.lock:
+                self.waiting[name] = status
+            return
+        self._give_back(name, status)
+
+    def _give_back(self, name: str, status: str) -> None:
+        with self.lock:
+            backup = self.stashed.pop(name, None)
+        if backup is not None:
+            restore_local_test_artifacts({name: backup}, dry_run=self.dry_run)
+            with self.lock:
+                self.restored.append(name)
+            return
+        if name not in self.candidates:
+            return
+        if self.keep or (self.keep_passed and status == "passed"):
+            with self.lock:
+                self.kept.append(name)
+            return
+        restore_local_test_artifacts({}, dry_run=self.dry_run, fresh=[name])
+        with self.lock:
+            self.removed.append(name)
+
+    def finish(self) -> None:
+        """The cluster nodes after their check, and any row an exception left behind."""
+        for name, status in list(self.waiting.items()):
+            self._give_back(name, status)
+        for name in list(self.stashed):
+            self._give_back(name, "failed")
+        if self.restored or self.removed or self.kept:
+            ui.print_header("Artifacts after the matrix")
+        if self.restored:
+            ui.print_kv("restored", ", ".join(sorted(self.restored)))
+        if self.removed:
+            ui.print_kv("removed", f"{len(self.removed)} test install(s)")
+        if self.kept:
+            ui.print_kv("kept", ", ".join(sorted(self.kept)))
+
+
+def recover_orphan_stash(dry_run: bool = False) -> None:
+    """A matrix that died (host off, killed) leaves the original artifacts in the stash: put back
+    what has no directory in the way; report the rest instead of choosing for the user."""
+    base = restore_backup_base()
+    if not base.is_dir():
+        return
+    for backup in sorted(path for path in base.iterdir() if path.is_dir()):
+        target = runtime.vm_artifact_base(backup.name)
+        if target.exists():
+            ui.print_status("warn", f"{backup.name}: an earlier run left its original artifacts in {ui.pretty_path(backup)}, "
+                                    f"and {ui.pretty_path(target)} exists too: both kept, choose by hand", ok=False)
+            continue
+        ui.print_note(f"{backup.name}: putting back the artifacts an interrupted run left in {ui.pretty_path(backup)}")
+        if not dry_run:
+            shutil.move(str(backup), str(target))
+    if not dry_run and not any(base.iterdir()):
+        base.rmdir()
+
+
 def cmd_test_local(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     named = list(dict.fromkeys(getattr(args, "vms", None) or []))
@@ -4124,11 +4204,10 @@ def cmd_test_local(args: argparse.Namespace) -> int:
         scheduler.print_plan(matrix_scheduler, [(name, scheduler.vm_cost(config.get_vm(cfg, name))) for name in selected_names])
     ui.print_kv("mode", "restore (stash + revert)" if restore else "in place")
 
+    recover_orphan_stash(dry_run=args.dry_run)
     stashed: dict[str, str] = {}
-    fresh: list[str] = []
+    candidates = local_test_clean_candidates(selected_names, cfg)
     if restore:
-        candidates = local_test_clean_candidates(selected_names, cfg)
-        fresh = [name for name in candidates if not runtime.vm_artifact_base(name).exists()]
         if candidates:
             ui.print_header("Stash existing artifacts before the matrix")
             ui.print_kv("profiles", ", ".join(candidates))
@@ -4138,7 +4217,7 @@ def cmd_test_local(args: argparse.Namespace) -> int:
     else:
         # A protected VM is never cleaned: without --restore the run still borrows its artifact
         # directory and gives it back, like --restore does for every row.
-        guarded = [name for name in local_test_clean_candidates(selected_names, cfg)
+        guarded = [name for name in candidates
                    if name in vmstate.protected_names() and runtime.vm_artifact_base(name).exists()]
         if guarded:
             ui.print_header("Move protected VMs aside for the matrix")
@@ -4148,12 +4227,23 @@ def cmd_test_local(args: argparse.Namespace) -> int:
             stashed = stash_local_test_artifacts(guarded, dry_run=args.dry_run)
         maybe_clean_local_test_candidates(selected_names, cfg, args)
 
+    # Each row gives its disk back the moment it ends, after its screenshot, clip and sheet: a
+    # stashed VM gets its own artifacts again, any other install row loses its test install
+    # unless --keep (or --keep-passed on a PASS). Until 2026-09-29 everything waited for the end
+    # of the matrix and a full run filled the disk. Nodes of a Proxmox cluster in the run wait
+    # for the cluster check, which runs on their disks after the rows.
+    cleanup = RowCleanup(stashed, candidates, cfg, selected_names, args)
+
     try:
         if parallel == 1:
             for vm_name in selected_names:
                 vm = config.get_vm(cfg, vm_name)
-                status, detail = run_local_test_once(vm_name, vm, args)
-                results.append((vm_name, status, detail))
+                status = "failed"
+                try:
+                    status, detail = run_local_test_once(vm_name, vm, args)
+                    results.append((vm_name, status, detail))
+                finally:
+                    cleanup.row_done(vm_name, status)
         elif matrix_scheduler is not None:
             for vm_name in selected_names:
                 ui.print_note(f"{vm_name} logs: {ui.pretty_path(check_vm_stdout_log_path(vm_name))} | {ui.pretty_path(check_vm_stderr_log_path(vm_name))}")
@@ -4161,9 +4251,18 @@ def cmd_test_local(args: argparse.Namespace) -> int:
             jobs = [(vm_name, scheduler.vm_cost(config.get_vm(cfg, vm_name))) for vm_name in selected_names]
 
             def on_start(vm_name: str, cost: scheduler.VmCost, running_now: int) -> None:
-                ui.print_note(f"starting {vm_name} ({cost.mem_mb} MB, {cost.cpus} vCPU): {running_now} VM(s) running")
+                ui.print_note(f"starting {vm_name} ({cost.mem_mb} MB, {cost.cpus} vCPU, {cost.disk_gb} GB disk): {running_now} VM(s) running")
 
-            for vm_name, outcome in matrix_scheduler.run(jobs, lambda name: run_local_test_vm_subprocess(name, args), on_start=on_start):
+            def row(name: str) -> tuple[str, str, str]:
+                status = "failed"
+                try:
+                    outcome = run_local_test_vm_subprocess(name, args)
+                    status = outcome[0]
+                    return outcome
+                finally:
+                    cleanup.row_done(name, status)
+
+            for vm_name, outcome in matrix_scheduler.run(jobs, row, on_start=on_start):
                 if isinstance(outcome, BaseException):
                     results.append((vm_name, "failed", str(outcome)))
                     ui.print_header(f"Test VM: {vm_name}")
@@ -4177,13 +4276,7 @@ def cmd_test_local(args: argparse.Namespace) -> int:
         # On the rows' own disks, before --restore puts the stashed ones back.
         run_cluster_checks(cfg, selected_names, results, args)
     finally:
-        if stashed or fresh:
-            ui.print_header("Restore stashed artifacts")
-            restore_local_test_artifacts(stashed, dry_run=args.dry_run, fresh=fresh)
-            if stashed:
-                ui.print_kv("restored", ", ".join(sorted(stashed)))
-            if fresh:
-                ui.print_kv("removed", f"{len(fresh)} VM(s) with no artifacts before the run")
+        cleanup.finish()
 
     if report_directory is not None:
         report.finish(report_directory, args, results, cfg)

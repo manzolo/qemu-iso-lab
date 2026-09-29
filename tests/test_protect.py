@@ -90,3 +90,90 @@ class ProtectTests(BaseVmctlTestCase):
         self.assertEqual(catalog.protected(), [])
         with self.assertRaisesRegex(VMError, "needs at least one"):
             lifecycle.cmd_protect(argparse.Namespace(command="unprotect", vms=[], json=False, dry_run=False))
+
+
+class RowCleanupTests(BaseVmctlTestCase):
+    """check-vms gives each row's disk back when the row ends (2026-09-29: a full matrix filled the disk)."""
+
+    def setUp(self):
+        super().setUp()
+        self.cfg = config.load_config()
+
+    def install(self, name):
+        base = self.root / "artifacts" / name
+        base.mkdir(parents=True, exist_ok=True)
+        (base / "disk.qcow2").write_bytes(b"TEST-INSTALL")
+        return base
+
+    def cleanup(self, stashed=None, **flags):
+        args = argparse.Namespace(dry_run=False, **flags)
+        with mock.patch.object(lifecycle.pvecluster, "clusters", return_value={"c": {"nodes": ["node1", "node2"]}}):
+            return lifecycle.RowCleanup(stashed or {}, ["fresh", "stashed", "node1", "node2"], self.cfg,
+                                        ["fresh", "stashed", "node1", "node2", "boot"], args)
+
+    def test_each_row_removes_its_install_and_a_stashed_vm_gets_its_own_back(self):
+        backup = self.root / "backup" / "stashed"
+        backup.mkdir(parents=True)
+        (backup / "disk.qcow2").write_bytes(b"ORIGINAL")
+        cleanup = self.cleanup({"stashed": str(backup)})
+        fresh, stashed, boot = self.install("fresh"), self.install("stashed"), self.install("boot")
+        with mock.patch.object(lifecycle, "cmd_stop"):
+            cleanup.row_done("fresh", "passed")
+            self.assertFalse(fresh.exists())  # at once, not at the end of the matrix
+            cleanup.row_done("stashed", "failed")
+            self.assertEqual((stashed / "disk.qcow2").read_bytes(), b"ORIGINAL")
+            cleanup.row_done("boot", "passed")  # a boot-check row installs nothing: its disk stays
+            self.assertTrue(boot.exists())
+
+    def test_keep_and_keep_passed(self):
+        with mock.patch.object(lifecycle, "cmd_stop"):
+            cleanup = self.cleanup(keep_passed=True)
+            passed, failed = self.install("fresh"), self.install("stashed")
+            cleanup.row_done("fresh", "passed")
+            cleanup.row_done("stashed", "failed")
+            self.assertTrue(passed.exists())
+            self.assertFalse(failed.exists())
+            cleanup = self.cleanup(keep=True)
+            kept = self.install("stashed")
+            cleanup.row_done("stashed", "failed")
+            self.assertTrue(kept.exists())
+
+    def test_cluster_nodes_wait_for_the_cluster_check(self):
+        cleanup = self.cleanup()
+        node = self.install("node1")
+        with mock.patch.object(lifecycle, "cmd_stop"):
+            cleanup.row_done("node1", "passed")
+            self.assertTrue(node.exists())  # the cluster check still needs this disk
+            with redirect_stdout(io.StringIO()):
+                cleanup.finish()
+        self.assertFalse(node.exists())
+
+    def test_an_interrupted_run_leaves_its_stash_and_the_next_run_puts_it_back(self):
+        stash = lifecycle.restore_backup_base()
+        (stash / "lost").mkdir(parents=True)
+        (stash / "lost" / "disk.qcow2").write_bytes(b"ORIGINAL")
+        (stash / "both").mkdir()
+        self.install("both")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            lifecycle.recover_orphan_stash()
+        self.assertEqual((self.root / "artifacts" / "lost" / "disk.qcow2").read_bytes(), b"ORIGINAL")
+        self.assertTrue((stash / "both").exists())  # a directory in the way: both kept, the user chooses
+        self.assertIn("choose by hand", out.getvalue())
+
+
+class DiskAdmissionTests(BaseVmctlTestCase):
+    def test_sizes_and_disk_room_decide_admission(self):
+        from vmctl import scheduler
+        self.assertEqual([scheduler.size_gb(v) for v in ("32G", "512M", "1T", "", "junk", 2 * 1024 ** 3)], [32, 1, 1024, 0, 0, 2])
+        free = {"gb": 100}
+        s = scheduler.DynamicScheduler(scheduler.HostResources(64000, 64000, 16), disk_source=lambda: free["gb"],
+                                       disk_reserve_gb=30, memory_source=lambda: 64000)
+        s.disk_free_gb = free["gb"]
+        big = scheduler.VmCost(mem_mb=1024, cpus=1, disk_gb=40)
+        self.assertTrue(s.fits([], big))
+        self.assertFalse(s.fits([big], big))  # 100 - 30 - 40 < 40
+        self.assertTrue(s.fits([big], scheduler.VmCost(mem_mb=1024, cpus=1)))  # no disk: nothing to reserve
+        ran = s.run([("a", big), ("b", big)], lambda name: name)
+        self.assertEqual(sorted(name for name, _ in ran), ["a", "b"])  # the second waited for the first
+        self.assertEqual(s.peak_running, 1)
