@@ -237,6 +237,12 @@ class FramesTests(BaseVmctlTestCase):
             with recorder._WATCH_LOCK:
                 recorder._WATCHES.pop("vm", None)
 
+    def test_the_settled_mark_is_the_frame_on_screen_before_the_shutdown_changed_it(self):
+        self.assertEqual(recorder.settled_index(194, capture_added_a_frame=True), 192)  # the desktop, not the weave
+        self.assertEqual(recorder.settled_index(194, capture_added_a_frame=False), 193)  # the same screen still
+        self.assertEqual(recorder.settled_index(1, capture_added_a_frame=True), 0)
+        self.assertEqual(recorder.settled_index(0, capture_added_a_frame=False), 0)
+
     def test_record_needs_the_socket_and_dry_run_only_explains(self):
         vm = {**self.vm_config}
         with mock.patch.object(vmctl.qemu, "qmp_socket_path", return_value=self.root / "missing.sock"):

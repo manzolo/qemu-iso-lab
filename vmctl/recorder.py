@@ -449,6 +449,16 @@ def _point_latest(directory: Path) -> None:
 # one frame of desktop or none.
 DESKTOP_LINGER_SEC = 15.0
 SETTLED_FILE = "settled"  # next to frames.ffconcat: the index of Recording.settled
+
+
+def settled_index(frame_count: int, capture_added_a_frame: bool) -> int:
+    """The frame the row settled on, marked at the first capture after the linger returned:
+    the frame on screen while the linger counted, which is the previous one when this very
+    capture changed the screen (the row powers the VM off right after the linger, and the
+    first new frame is then X's root weave or the console: slackware-14.0, 2026-09-29)."""
+    if capture_added_a_frame and frame_count > 1:
+        return frame_count - 2
+    return max(0, frame_count - 1)
 LINGER_TIMEOUT_SEC = 60.0
 _WATCHES: dict[str, dict[str, float]] = {}
 _WATCH_LOCK = threading.Lock()
@@ -532,7 +542,8 @@ def record(vm_name: str, vm: dict[str, Any], *, fps: float = DEFAULT_FPS, max_ho
             ppm = capture(sock, vnc)
             if ppm is not None:
                 last_seen = now
-                if recording.add(ppm, now):
+                added = recording.add(ppm, now)
+                if added:
                     stored += 1
                     if stored % 10 == 0:
                         say(f"{stored} frames kept of {recording.captures} captures, {now - started:.0f}s")
@@ -540,7 +551,11 @@ def record(vm_name: str, vm: dict[str, Any], *, fps: float = DEFAULT_FPS, max_ho
                     _watch_update(watch, recording.kind(len(recording.frames) - 1) == "graphic", period)
                     with _WATCH_LOCK:
                         if recording.settled is None and _WATCHES.get(watch, {}).get("settled"):
-                            recording.settled = len(recording.frames) - 1
+                            # The frame the linger counted is the one on screen when it returned. The row
+                            # powers the VM off right after, so a capture that just changed the screen is
+                            # the shutdown (X's root weave, the console): the frame before it settled
+                            # (slackware-14.0's clip ended on the weave, 2026-09-29).
+                            recording.settled = settled_index(len(recording.frames), added)
             elif now - last_seen > grace:
                 say(f"the VM has been gone for {grace:g}s: recording ends")
                 break

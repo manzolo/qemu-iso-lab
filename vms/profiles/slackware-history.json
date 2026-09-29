@@ -150,8 +150,9 @@
       "name": "Slackware 14.0 (Xfce 4.10, unattended, DVD script)",
       "extends": "slackware-legacy-ssh-base",
       "meta": {
-        "status": "experimental",
-        "version": "1.0.1"
+        "status": "unattended",
+        "version": "1.0.1",
+        "verified": "2026-09-29"
       },
       "iso": "isos/slackware64-14.0-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.0-iso/slackware64-14.0-install-dvd.iso",
@@ -166,14 +167,15 @@
           "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
         ]
       },
-      "notes": "Slackware 14.0 (September 2012): kernel 3.2, Xfce 4.10 in its own series, OpenSSH 6.1 (no ed25519 before 6.5, no rsa-sha2 before 7.2: RSA key, legacy SSH options), agetty with --autologin. Born experimental: vmctl check-vms slackware-14.0 runs one."
+      "notes": "Slackware 14.0 (September 2012): kernel 3.2, Xfce 4.10 in its own series, OpenSSH 6.1 (no ed25519 before 6.5, no rsa-sha2 before 7.2: RSA key, legacy SSH options), agetty with --autologin. First live PASS 2026-09-29 (231 s, Xfce 4.10 on tty1 autologin)."
     },
     "slackware-14.1": {
       "name": "Slackware 14.1 (Xfce 4.10, unattended, DVD script)",
       "extends": "slackware-legacy-ssh-base",
       "meta": {
-        "status": "experimental",
-        "version": "1.0.1"
+        "status": "unattended",
+        "version": "1.0.1",
+        "verified": "2026-09-29"
       },
       "iso": "isos/slackware64-14.1-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.1-iso/slackware64-14.1-install-dvd.iso",
@@ -188,7 +190,7 @@
           "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
         ]
       },
-      "notes": "Slackware 14.1 (November 2013): kernel 3.10, Xfce 4.10, OpenSSH 6.3 (RSA key, legacy SSH options). Born experimental: vmctl check-vms slackware-14.1 runs one."
+      "notes": "Slackware 14.1 (November 2013): kernel 3.10, Xfce 4.10, OpenSSH 6.3 (RSA key, legacy SSH options). First live PASS 2026-09-29 (231 s, Xfce 4.10 on tty1 autologin)."
     },
     "slackware-14.2": {
       "name": "Slackware 14.2 (KDE 4.14, unattended, DVD script)",
