@@ -482,6 +482,9 @@ body.console-detached #vnc-detach { display:none; }
 .profile-heading button { background:transparent; color:var(--accent); font-size:11px; padding:5px 8px; border:1px solid var(--line); }
 #profile-mine { margin-right:6px; padding:4px 9px; font-size:13px; line-height:1; color:var(--warn); }
 #profile-mine.chosen { background:#3a3320; border-color:#6b5a2a; }
+#profile-protect { margin-right:6px; padding:4px 9px; font-size:13px; line-height:1; }
+#profile-protect.chosen { background:#1f3340; border-color:#2f5a6b; }
+.protect-mark { margin-left:6px; font-size:11px; vertical-align:1px; }
 #terminal-dialog { width:min(1200px,96vw); height:85dvh; overflow:hidden; }
 #terminal-dialog[open],#terminal-shell { display:flex; flex-direction:column; }
 #terminal-shell { flex:1; min-height:0; background:var(--panel); }
@@ -652,7 +655,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
     <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
-  <section class="card" id="machine-panel" tabindex="-1" aria-label="Machine details"><div class="profile-heading"><h2>Machine details</h2><button id="profile-mine" class="hidden" aria-label="Add to My VMs">☆</button><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
+  <section class="card" id="machine-panel" tabindex="-1" aria-label="Machine details"><div class="profile-heading"><h2>Machine details</h2><button id="profile-protect" class="hidden" aria-label="Protect this disk">🔓</button><button id="profile-mine" class="hidden" aria-label="Add to My VMs">☆</button><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
 </main>
 <div id="labs-view" class="labs hidden"></div>
 <section id="jobs" class="card"><div class="section-heading"><div><h2>Recent activity</h2><p>Jobs from the web and TUI keep running when you close this page.</p></div><span id="job-count" class="chip">0 jobs</span></div>
@@ -888,7 +891,8 @@ const actionIcons = {
   terminal: '<path d="m5 7 5 5-5 5M12 17h7"/>',
   network: '<rect x="9" y="3" width="6" height="5" rx="1"/><path d="M12 8v5M5 16v-3h14v3"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/>',
   sliders: '<path d="M4 7h10m4 0h2M4 17h4m4 0h8M14 5v4M8 15v4"/>',
-  star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>'
+  star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
 };
 const actionIcon = (a) => a.icon ? `<span class="ai ${a.tone || ""}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${actionIcons[a.icon]}</svg></span>` : "";
 function actionsFor(r) {
@@ -922,8 +926,9 @@ function actionsFor(r) {
     if (vmJobs.get(n)?.confirming) a.push({label:"Force stop", args:["stop",n,"--force"], danger:true, primary:true, icon:"power", tone:"bad"});
     else a.push({ label:forceStop ? "Force stop" : "Cancel job", cancelJob:"vm:" + n, forceStop, primary:true, danger:forceStop, icon:"power", tone:"bad", disabled:submittingVms.has(n) || cancellingJobs.has("vm:"+n) });
   }
-  if (!r.running && (r.prepared || r.installed)) a.push({ label: "Clean: delete the disk", args: ["clean", n], disabled:busy, danger: true, icon:"trash", tone:"bad" });
+  if (!r.running && (r.prepared || r.installed)) a.push({ label: r.protected ? "Clean: protected (unprotect first)" : "Clean: delete the disk", args: ["clean", n], disabled:busy || !!r.protected, danger: true, icon:"trash", tone:"bad" });
   a.push({ label: r.mine ? "Remove from My VMs" : "Add to My VMs", mine: r.mine ? "remove" : "add", icon:"star", tone:"info" });
+  if (r.protected || r.prepared || r.installed) a.push({ label: r.protected ? "Unprotect the disk" : "Protect the disk", protect: r.protected ? "remove" : "add", icon:"lock", tone:"info" });
   a.push({ label: "All commands for " + n + "…", form: n, icon:"list" });
   return a;
 }
@@ -934,6 +939,15 @@ async function setMine(action, names) {
     const changed = [...result.added, ...result.removed];
     toast(changed.length ? `${result.added.length ? "Added to" : "Removed from"} My VMs: ${changed.join(", ")}` : "My VMs unchanged.");
     if (!result.selected.length && filter === "mine") setFilter("all");
+    await refresh(true);
+  } catch (e) { toast(e.message, true); }
+}
+// vmctl protect: the disk is refused to clean, reinstall and checkpoint restore; saved in local.json.
+async function setProtect(action, names) {
+  try {
+    const result = await api("/api/protect", { action, names });
+    const changed = [...result.added, ...result.removed];
+    toast(changed.length ? `${result.added.length ? "Protected" : "No longer protected"}: ${changed.join(", ")}` : "Protection unchanged.");
     await refresh(true);
   } catch (e) { toast(e.message, true); }
 }
@@ -1145,7 +1159,7 @@ function render() {
   if (dragVm || dragState.start) return;
   const focused = document.activeElement, focusedVm = focused.closest?.("#rows [data-vm]")?.dataset.vm;
   const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : null;
-  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.protected ? '<span class="protect-mark" title="Protected: clean, reinstall and checkpoint restore refuse it">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">${filter === "mine" && !$("search").value ? "Nothing in My VMs yet. Choose All, then right-click a profile (or select several) and Add to My VMs." : "No matching profiles."}</td></tr>`);
   bindStateLogs($("rows"));
   if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
@@ -1159,6 +1173,13 @@ function renderDetails() {
   const r = S.vms.find((x) => x.name === selected);
   $("profile-edit").disabled = !r || !visible().length;
   $("profile-mine").classList.toggle("hidden", !r || !visible().length);
+  // Only with a disk to guard (or already protected, so it can always be undone).
+  $("profile-protect").classList.toggle("hidden", !r || !visible().length || !(r.protected || r.prepared || r.installed));
+  if (r) {
+    const p = $("profile-protect"); p.textContent = r.protected ? "🔒" : "🔓"; p.classList.toggle("chosen", !!r.protected);
+    p.title = p.ariaLabel = r.protected ? "Protected: clean, reinstall and checkpoint restore refuse this disk · click to unprotect" : "Protect this disk against clean, reinstall and checkpoint restore";
+    p.onclick = () => setProtect(r.protected ? "remove" : "add", [r.name]);
+  }
   if (r) {
     const b = $("profile-mine"); b.textContent = r.mine ? "★" : "☆"; b.classList.toggle("chosen", !!r.mine);
     b.title = b.ariaLabel = r.mine ? "In My VMs · click to remove" : "Add to My VMs";
@@ -1178,7 +1199,7 @@ function renderDetails() {
   // The panel: All commands… stays in sight; the My VMs entry is the ★ button of the heading (the context menu keeps both).
   const secondary = a => !a.primary && (a.danger || a.screen || ["attach","checkpoint"].includes(a.args?.[0]));
   const actionButton = (x,i) => `<button aria-label="${esc(x.label)}" data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
-  const mainActions = actions.map((a,i) => secondary(a) || a.mine ? "" : actionButton(a,i)).join("");
+  const mainActions = actions.map((a,i) => secondary(a) || a.mine || a.protect ? "" : actionButton(a,i)).join("");
   const extraActions = actions.map((a,i) => ({a,i})).filter(({a}) => secondary(a)).sort((x,y) => Number(!!x.a.danger)-Number(!!y.a.danger));
   $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<div class="profile-title"><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div></div></div>${stateBadge(r)}
     <div class="actions primary-actions">${mainActions}</div>
@@ -1279,6 +1300,7 @@ function runAction(r, a) {
   if (a.help) { $("help-title").textContent = "ISO needed: " + r.name; $("help-text").textContent = (r.iso_help || "").replace(/\\n/g, "\n"); return $("help-dialog").showModal(); }
   if (a.form) return openCommands(a.form);
   if (a.mine) return setMine(a.mine, [r.name]);
+  if (a.protect) return setProtect(a.protect, [r.name]);
   run(a.args, a.danger);
 }
 

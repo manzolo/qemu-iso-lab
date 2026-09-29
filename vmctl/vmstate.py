@@ -41,7 +41,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from vmctl import profile_versions, runtime
+from vmctl import profile_versions, runtime, state
+from vmctl.errors import VMError
 
 STATE_FILE = "state.json"
 STATE_VERSION = 1
@@ -130,8 +131,50 @@ def _versions(vm_name: str) -> dict[str, Any]:
     return {"profile_version": profile_versions.catalog_version(vm_name), "vmctl_version": vmctl.__version__}
 
 
+# Protected VMs (``vmctl protect``): names kept in local.json under "protected": {"vms": [...]},
+# written by catalog.update_protected. Nothing that would delete or overwrite their disk runs:
+# clean, a new installation on a disk with data, a checkpoint restore; check-vms moves them aside
+# and back. Read here, the lowest module every one of those paths goes through.
+PROTECTED_KEY = "protected"
+
+
+def protected_names() -> set[str]:
+    path = state.CONFIG_DIR / "profiles" / "local.json"
+    try:
+        document = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except (ValueError, OSError):
+        return set()
+    section = document.get(PROTECTED_KEY) if isinstance(document, dict) else None
+    names = section.get("vms") if isinstance(section, dict) else None
+    return {name for name in names if isinstance(name, str)} if isinstance(names, list) else set()
+
+
+def is_protected(vm_name: str) -> bool:
+    return vm_name in protected_names()
+
+
+def refuse_if_protected(vm_name: str, action: str) -> None:
+    if is_protected(vm_name):
+        raise VMError(f"'{vm_name}' is protected: refusing to {action}. "
+                      f"vmctl unprotect {vm_name} first if that is really what you want.")
+
+
+def artifact_disk_has_data(vm_name: str) -> bool:
+    """Whether artifacts/<vm>/ holds a disk image with data (any format, allocated blocks)."""
+    base = runtime.vm_artifact_base(vm_name)
+    for path in base.glob("disk.*") if base.is_dir() else ():
+        try:
+            if path.is_file() and path.stat().st_blocks * 512 > DATA_MIN_BYTES:
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def begin_install(vm_name: str, flow: str, interactive: bool = False, dry_run: bool = False) -> None:
     """A new installation starts on this disk: whatever the record said no longer holds."""
+    if not dry_run and artifact_disk_has_data(vm_name):
+        refuse_if_protected(vm_name, "install over its disk")
     record = {
         "origin": {"kind": "install", "flow": flow, "at": now()},
         "install": {"flow": flow, "started_at": now(), "completed_at": None,

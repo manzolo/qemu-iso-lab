@@ -17,7 +17,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from vmctl import config, state
+from vmctl import config, state, vmstate
 from vmctl.errors import VMError
 
 KEY = "catalog"
@@ -40,16 +40,16 @@ def _document() -> dict[str, Any]:
     return document
 
 
-def selection_of(document: dict[str, Any]) -> list[str]:
+def selection_of(document: dict[str, Any], key: str = KEY, field: str = "selected") -> list[str]:
     """The selected names of a local.json document: canonical, in order, without duplicates."""
-    section = document.get(KEY)
+    section = document.get(key)
     if section is None:
         return []
-    if not isinstance(section, dict) or not isinstance(section.get("selected", []), list) \
-            or not all(isinstance(entry, str) for entry in section.get("selected", [])):
-        raise VMError(f"local.json: '{KEY}' must be an object with a 'selected' list of profile names")
+    if not isinstance(section, dict) or not isinstance(section.get(field, []), list) \
+            or not all(isinstance(entry, str) for entry in section.get(field, [])):
+        raise VMError(f"local.json: '{key}' must be an object with a '{field}' list of profile names")
     names: list[str] = []
-    for entry in section.get("selected", []):
+    for entry in section.get(field, []):
         name = config.canonical_vm_name(entry, warn=False)
         if name not in names:
             names.append(name)
@@ -74,10 +74,21 @@ def _atomic_write(path: Path, contents: bytes) -> None:
         Path(temporary).unlink(missing_ok=True)
 
 
-def update(action: str, names: list[str], cfg: dict[str, Any]) -> dict[str, Any]:
+def protected() -> list[str]:
+    """The protected VMs (``vmctl protect``): what vmstate.refuse_if_protected guards."""
+    return selection_of(_document(), vmstate.PROTECTED_KEY, "vms")
+
+
+def update_protected(action: str, names: list[str], cfg: dict[str, Any]) -> dict[str, Any]:
+    """``add``/``remove`` protected VMs; the same checks and atomic write as My VMs."""
+    return update(action, names, cfg, key=vmstate.PROTECTED_KEY, field="vms")
+
+
+def update(action: str, names: list[str], cfg: dict[str, Any], key: str = KEY, field: str = "selected") -> dict[str, Any]:
     """``add``/``remove``/``set``/``clear`` the selection and save it. Every name must be a
     profile of *cfg* (aliases resolve), so a typo never lands in the file. Returns the new
-    selection with what changed; nothing is written when nothing changed."""
+    selection with what changed; nothing is written when nothing changed. *key*/*field* name
+    the list: My VMs by default, the protected VMs for ``update_protected``."""
     if action not in ("add", "remove", "set", "clear"):
         raise VMError(f"Unknown catalog action: {action}")
     resolved: list[str] = []
@@ -92,7 +103,7 @@ def update(action: str, names: list[str], cfg: dict[str, Any]) -> dict[str, Any]
         raise VMError(f"catalog {action} needs at least one profile name")
     with _LOCK:
         document = _document()
-        current = selection_of(document)
+        current = selection_of(document, key, field)
         if action == "add":
             new = current + [name for name in resolved if name not in current]
         elif action == "remove":
@@ -106,10 +117,10 @@ def update(action: str, names: list[str], cfg: dict[str, Any]) -> dict[str, Any]
         if new == current:
             return result
         if new:
-            section: dict[str, Any] = document[KEY] if isinstance(document.get(KEY), dict) else {}
-            document[KEY] = {**section, "selected": new}
+            section: dict[str, Any] = document[key] if isinstance(document.get(key), dict) else {}
+            document[key] = {**section, field: new}
         else:
-            document.pop(KEY, None)
+            document.pop(key, None)
         path = local_path()
         if path.exists():
             _atomic_write(path.with_suffix(".json.bak"), path.read_bytes())

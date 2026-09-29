@@ -785,6 +785,18 @@ class Handler(BaseHTTPRequestHandler):
             elif path.startswith("/api/vm/") and path.endswith("/ssh-terminal"):
                 terminal = open_ssh_terminal(path[len("/api/vm/"):-len("/ssh-terminal")])
                 self._json({"terminal": terminal})
+            elif path == "/api/protect":
+                # vmctl protect / unprotect: {"action": add|remove, "names": [...]}, saved in local.json.
+                names = body.get("names") or []
+                if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+                    raise VMError("names must be a list of profile names")
+                action = str(body.get("action") or "")
+                if action not in ("add", "remove"):
+                    raise VMError("action must be add or remove")
+                result = catalog.update_protected(action, names, config.load_config())
+                with self.snapshot.lock:
+                    self.snapshot.value = None
+                self._json(result)
             elif path == "/api/catalog":
                 # My VMs: {"action": add|remove|set|clear, "names": [...]}; the selection is validated
                 # against the catalog and saved in local.json, then the snapshot is rebuilt.

@@ -673,6 +673,7 @@ state.ROOT = Path(sys.argv[1])
 state.CONFIG_DIR = Path(sys.argv[2])
 VMS = config.load_config()["vms"]
 MINE = set(catalog.selected())  # My VMs: the names chosen in local.json ("catalog")
+PROTECTED = set(catalog.protected())  # vmctl protect: disks the destructive commands refuse
 
 
 def ellipsize(text, width):
@@ -733,6 +734,7 @@ def facts(name, vm):
     return {
         "name": name,
         "mine": name in MINE,
+        "protected": name in PROTECTED,
         "job_status": tui_jobs.status(tui_jobs.job_dir(state.ROOT, name)),
         "label": str(vm.get("name", name)),
         "family": str(meta.get("family", "")),

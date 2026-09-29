@@ -22,7 +22,7 @@ COMMAND_HELP: dict[str, str] = {}
 # Every public subcommand must appear in exactly one group (enforced by tests).
 COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Discover", "what is configured, what exists on disk, what the host can run",
-     ["list", "status", "show", "catalog", "setup", "welcome"]),
+     ["list", "status", "show", "catalog", "protect", "unprotect", "setup", "welcome"]),
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
@@ -121,6 +121,26 @@ groups still see every profile.""")
     p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     p.add_argument("--names", action="store_true", help="list: only the names, one per line")
     p.set_defaults(func=lifecycle.cmd_catalog)
+
+    protect_help = """A protected VM keeps its disk against the lab's own destructive commands: vmctl clean
+refuses it (clean --all skips it), a new installation over a disk with data refuses, a
+checkpoint restore refuses, and check-vms moves its artifacts aside and gives them back
+instead of cleaning them. Saved in vms/profiles/local.json under "protected". It is not a
+filesystem permission: a manual rm still deletes the files."""
+    p = _add(subparsers, "protect", help="guard VMs' disks against clean, reinstall and checkpoint restore (no names: list them)",
+             epilog="""examples:
+  vmctl protect ubuntu-26.04 windows-11    guard two disks
+  vmctl protect                            which VMs are protected
+  vmctl unprotect windows-11               allow clean/reinstall again
+
+""" + protect_help)
+    p.add_argument("vms", nargs="*", metavar="vm", help="profile names; none lists the protected VMs")
+    p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    p.set_defaults(func=lifecycle.cmd_protect)
+    p = _add(subparsers, "unprotect", help="remove the protection of VMs (vmctl protect)", epilog=protect_help)
+    p.add_argument("vms", nargs="+", metavar="vm", help="profile names")
+    p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    p.set_defaults(func=lifecycle.cmd_protect)
 
     p = _add(subparsers, "status", help="report local artifacts and runtime state per VM")
     p.add_argument("--all", action="store_true", help="show the full catalog, including untouched VMs")

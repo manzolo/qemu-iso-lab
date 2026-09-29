@@ -384,6 +384,26 @@ class ServerTests(BaseVmctlTestCase):
         self.assertIsNone(self.server.RequestHandlerClass.snapshot.value)
         self.assertNotIn('catalog', json.loads((self.config_dir / 'profiles' / 'local.json').read_text()))
 
+    def test_protect_endpoint_needs_the_token_validates_and_invalidates_cached_state(self):
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+        conn.request('POST', '/api/protect', body=json.dumps({'action': 'add', 'names': ['testvm']}))
+        self.assertEqual(conn.getresponse().status, 401)
+        conn.close()
+        self.server.RequestHandlerClass.snapshot.value = {'stale': True}
+        for body, status in (({'action': 'add', 'names': ['testvm']}, 200), ({'action': 'set', 'names': ['testvm']}, 400),
+                             ({'action': 'add', 'names': ['nope']}, 400), ({'action': 'remove', 'names': ['testvm']}, 200)):
+            with self.subTest(body=body):
+                conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+                conn.request('POST', '/api/protect', body=json.dumps(body), headers={'X-Vmctl-Token': 'secret-token'})
+                response = conn.getresponse()
+                self.assertEqual(response.status, status)
+                data = json.loads(response.read())
+                conn.close()
+                if status == 200:
+                    self.assertEqual(data['selected'], ['testvm'] if body['action'] == 'add' else [])
+        self.assertIsNone(self.server.RequestHandlerClass.snapshot.value)
+        self.assertNotIn('protected', json.loads((self.config_dir / 'profiles' / 'local.json').read_text()))
+
     def test_ssh_websocket_uses_profile_command_and_disables_local_escapes(self):
         from unittest import mock
 

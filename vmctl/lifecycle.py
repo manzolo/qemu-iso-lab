@@ -569,7 +569,8 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
 
 
 def maybe_clean_local_test_candidates(selected_names: list[str], cfg: dict[str, Any], args: argparse.Namespace) -> None:
-    candidates = local_test_clean_candidates(selected_names, cfg)
+    guarded = vmstate.protected_names()  # check-vms moves those aside and back instead
+    candidates = [name for name in local_test_clean_candidates(selected_names, cfg) if name not in guarded]
     if not candidates:
         return
     names = ", ".join(candidates)
@@ -1258,6 +1259,41 @@ def style_status_cell(value: str, width: int, align: str = "<") -> str:
     if not codes:
         return padded
     return ui.style(padded, *codes)
+
+
+def cmd_protect(args: argparse.Namespace) -> int:
+    """``vmctl protect [vm...]`` / ``vmctl unprotect vm...``: guard a VM's disk against the lab's
+    own destructive commands (clean, a new install over data, checkpoint restore; check-vms moves
+    it aside and back). No names: list the protected VMs."""
+    cfg = config.load_config()
+    off = args.command == "unprotect"
+    if not args.vms:
+        if off:
+            raise VMError("vmctl unprotect needs at least one VM name")
+        names = catalog.protected()
+        if getattr(args, "json", False):
+            print(json.dumps({"protected": names}, indent=2))
+        elif not names:
+            print("No protected VMs. vmctl protect <vm> guards a disk against clean, reinstall and checkpoint restore.")
+        else:
+            ui.print_header(f"Protected VMs ({len(names)})")
+            for name in names:
+                print(f"  {name:<32} {str(cfg['vms'].get(name, {}).get('name', '(not in the catalog any more)'))}")
+        return 0
+    if getattr(args, "dry_run", False):
+        print(f"  would {'unprotect' if off else 'protect'} {' '.join(args.vms)} in {catalog.local_path()}")
+        return 0
+    result = catalog.update_protected("remove" if off else "add", list(args.vms), cfg)
+    if getattr(args, "json", False):
+        print(json.dumps(result, indent=2))
+        return 0
+    for name in result["added"]:
+        ui.print_status("ok", f"{name}: protected")
+    for name in result["removed"]:
+        ui.print_status("ok", f"{name}: no longer protected")
+    if not result["added"] and not result["removed"]:
+        ui.print_note("Nothing changed.")
+    return 0
 
 
 def cmd_catalog(args: argparse.Namespace) -> int:
@@ -4100,6 +4136,16 @@ def cmd_test_local(args: argparse.Namespace) -> int:
                 cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
             stashed = stash_local_test_artifacts(candidates, dry_run=args.dry_run)
     else:
+        # A protected VM is never cleaned: without --restore the run still borrows its artifact
+        # directory and gives it back, like --restore does for every row.
+        guarded = [name for name in local_test_clean_candidates(selected_names, cfg)
+                   if name in vmstate.protected_names() and runtime.vm_artifact_base(name).exists()]
+        if guarded:
+            ui.print_header("Move protected VMs aside for the matrix")
+            ui.print_kv("profiles", ", ".join(guarded))
+            for vm_name in guarded:
+                cmd_stop(argparse.Namespace(vm=vm_name, dry_run=args.dry_run))
+            stashed = stash_local_test_artifacts(guarded, dry_run=args.dry_run)
         maybe_clean_local_test_candidates(selected_names, cfg, args)
 
     try:
@@ -4258,6 +4304,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 
 def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: bool = False) -> None:
+    vmstate.refuse_if_protected(name, "delete its disk")
     # A web/TUI clean is itself a job under runtime/. Keep its open log and lock
     # reachable until the supervisor writes the result (also prevents a new job racing it).
     job = tui_jobs.job_dir(state.ROOT, name)
@@ -4341,7 +4388,11 @@ def cmd_clean(args: argparse.Namespace) -> int:
     if args.all:
         if remove_profile:
             raise VMError("--remove-profile applies to one VM, not to --all")
+        guarded = vmstate.protected_names()
         for name, vm in config.sorted_vm_items(cfg):
+            if name in guarded:
+                ui.print_note(f"{name}: protected, left as it is (vmctl unprotect {name})")
+                continue
             cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
             clean_vm(name, vm, dry_run=args.dry_run, checkpoints=checkpoints)
         return 0
@@ -4351,6 +4402,7 @@ def cmd_clean(args: argparse.Namespace) -> int:
         # Refuse before deleting anything: a tracked profile keeps its artifacts too.
         if name in clone.tracked_profile_names():
             raise VMError(f"'{name}' is a tracked profile; --remove-profile removes only profiles that live in local.json alone (clones)")
+    vmstate.refuse_if_protected(name, "delete its disk")  # before the force-stop, not after it
     cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
     clean_vm(name, vm, dry_run=args.dry_run, checkpoints=remove_profile or checkpoints)
     if remove_profile:
@@ -4487,6 +4539,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> int:
                           replace=bool(getattr(args, "replace", False)), dry_run=args.dry_run)
         return 0
     if action == "restore":
+        vmstate.refuse_if_protected(args.vm, "replace its disk with a checkpoint")
         ensure_vm_quiescent(args.vm, vm, "restore a checkpoint into")
         if checkpoint.load_manifest(checkpoint.checkpoint_dir(args.vm, name)) is None:
             raise VMError(f"Checkpoint '{name}' of '{args.vm}' does not exist (vmctl checkpoint list {args.vm})")
