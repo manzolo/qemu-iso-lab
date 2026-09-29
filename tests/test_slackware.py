@@ -97,7 +97,7 @@ class SlackwareTests(BaseVmctlTestCase):
         self.assertTrue(trigger.endswith("sh /vmctl-seed/run.sh"))  # run.sh finds a real bash (13.x initrds call busybox ash "bash")
         run = slackware.render_run_script()
         self.assertTrue(run.startswith("#!/bin/sh\n"))
-        self.assertIn("bash --version 2>/dev/null | grep -q 'GNU bash'", run)  # busybox takes `set -E` from -c without complaint
+        self.assertIn('bash -c \'echo "${BASH_VERSION:-}"\' </dev/null', run)  # busybox takes `set -E` from -c and opens a shell on --version
         self.assertIn("/slackware64/a/bash-*.t?z", run)
         self.assertIn("exec \"$b\" /vmctl-seed/install.sh", run)
         self.assertNotIn("[[", run)
