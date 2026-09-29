@@ -1032,6 +1032,22 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertEqual((base / "disk.qcow2").read_bytes(), b"ORIGINAL-INSTALL")
         self.assertFalse(vmctl.lifecycle.restore_backup_base().exists())  # backup dir cleaned up
 
+    def test_restore_removes_the_test_install_of_a_vm_that_had_no_artifacts(self):
+        # 2026-09-29: every battery left a full disk behind for each profile never installed on the
+        # host, and the morning matrix filled the disk.
+        kept = self.root / "artifacts" / "ubuntu"
+        kept.mkdir(parents=True)
+        (kept / "disk.qcow2").write_bytes(b"ORIGINAL-INSTALL")
+        stashed = vmctl.lifecycle.stash_local_test_artifacts(["ubuntu", "never-installed"])
+        for name in ("ubuntu", "never-installed"):
+            (self.root / "artifacts" / name).mkdir(parents=True, exist_ok=True)
+            (self.root / "artifacts" / name / "disk.qcow2").write_bytes(b"THROWAWAY")
+        with mock.patch.object(vmctl.lifecycle, "cmd_stop") as cmd_stop:
+            vmctl.lifecycle.restore_local_test_artifacts(stashed, fresh=["never-installed", "ubuntu"])
+        self.assertFalse((self.root / "artifacts" / "never-installed").exists())
+        self.assertEqual((kept / "disk.qcow2").read_bytes(), b"ORIGINAL-INSTALL")  # a stashed VM is restored, not removed
+        self.assertEqual(cmd_stop.call_count, 2)
+
     def test_check_vms_restore_returns_disk_bytes_after_failed_install(self):
         """Restore is format-agnostic: preserve every byte after a failed flow,
         using simulated disk content so this test runs on bare CI too."""
@@ -1085,7 +1101,7 @@ class VmctlTests(BaseVmctlTestCase):
         clean.assert_not_called()  # --restore replaces the destructive --clean-first path
         stash.assert_called_once()
         self.assertEqual(stash.call_args.args[0], ["ubuntu"])
-        restore.assert_called_once_with({"ubuntu": "/tmp/backup/ubuntu"}, dry_run=True)
+        restore.assert_called_once_with({"ubuntu": "/tmp/backup/ubuntu"}, dry_run=True, fresh=mock.ANY)
 
     def test_cmd_test_local_restore_reverts_even_when_a_flow_raises(self):
         ubuntu_vm = json.loads(json.dumps(self.vm_config))

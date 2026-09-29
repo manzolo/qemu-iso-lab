@@ -3844,9 +3844,21 @@ def stash_local_test_artifacts(candidates: list[str], dry_run: bool = False) -> 
     return stashed
 
 
-def restore_local_test_artifacts(stashed: dict[str, str], dry_run: bool = False) -> None:
+def restore_local_test_artifacts(stashed: dict[str, str], dry_run: bool = False, fresh: list[str] | tuple[str, ...] = ()) -> None:
     """Remove what the matrix created for each stashed VM and move its original
-    artifact directory back into place."""
+    artifact directory back into place; a *fresh* VM (no artifacts before the run) goes
+    back to having none. Until 2026-09-29 those kept their test install: every battery left
+    a full disk behind for each profile never installed on the host, and the matrix of that
+    morning filled the disk (389 GB free at the start, ENOSPC after 96 minutes)."""
+    for vm_name in fresh:
+        if vm_name in stashed:
+            continue
+        cmd_stop(argparse.Namespace(vm=vm_name, dry_run=dry_run))
+        base = runtime.vm_artifact_base(vm_name)
+        if base.exists():
+            ui.print_note(f"Removing test artifacts {ui.pretty_path(base)} (none before the run)")
+            if not dry_run:
+                shutil.rmtree(base)
     for vm_name, backup_path in stashed.items():
         # A failed flow may have left a VM running on the throwaway disk.
         cmd_stop(argparse.Namespace(vm=vm_name, dry_run=dry_run))
@@ -4077,8 +4089,10 @@ def cmd_test_local(args: argparse.Namespace) -> int:
     ui.print_kv("mode", "restore (stash + revert)" if restore else "in place")
 
     stashed: dict[str, str] = {}
+    fresh: list[str] = []
     if restore:
         candidates = local_test_clean_candidates(selected_names, cfg)
+        fresh = [name for name in candidates if not runtime.vm_artifact_base(name).exists()]
         if candidates:
             ui.print_header("Stash existing artifacts before the matrix")
             ui.print_kv("profiles", ", ".join(candidates))
@@ -4117,10 +4131,13 @@ def cmd_test_local(args: argparse.Namespace) -> int:
         # On the rows' own disks, before --restore puts the stashed ones back.
         run_cluster_checks(cfg, selected_names, results, args)
     finally:
-        if stashed:
+        if stashed or fresh:
             ui.print_header("Restore stashed artifacts")
-            restore_local_test_artifacts(stashed, dry_run=args.dry_run)
-            ui.print_kv("restored", ", ".join(sorted(stashed)))
+            restore_local_test_artifacts(stashed, dry_run=args.dry_run, fresh=fresh)
+            if stashed:
+                ui.print_kv("restored", ", ".join(sorted(stashed)))
+            if fresh:
+                ui.print_kv("removed", f"{len(fresh)} VM(s) with no artifacts before the run")
 
     if report_directory is not None:
         report.finish(report_directory, args, results, cfg)
