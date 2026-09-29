@@ -1301,9 +1301,14 @@
       ]
     },
     "slackware-14.2": {
-      "version": "1.1.1",
-      "fingerprint": "sha256:7929d164f3d87325f4f0579df5d7aaca5b80c620835cddcd7cd70146dafbf829",
+      "version": "1.1.2",
+      "fingerprint": "sha256:863b195a9306ac7dc7bb2a95e78de209278c8a72fb99ccdd85cdb0788afacb4e",
       "history": [
+        {
+          "version": "1.1.2",
+          "date": "2026-09-29",
+          "note": "sqlite and flac from the ap series (OPT): ksmserver needs libsqlite3"
+        },
         {
           "version": "1.1.1",
           "date": "2026-09-29",
@@ -1327,9 +1332,14 @@
       ]
     },
     "slackware-15.0": {
-      "version": "1.1.1",
-      "fingerprint": "sha256:067733cf558b2c8f913174f0f6c731d156e4bde48c209fb2b2d00790a043415b",
+      "version": "1.1.2",
+      "fingerprint": "sha256:506643496459a60a117c18f1d4b6affc3fd08171dc2d8770c6e838960612bd64",
       "history": [
+        {
+          "version": "1.1.2",
+          "date": "2026-09-29",
+          "note": "sqlite and flac from the ap series (OPT): plasma_session needs libFLAC"
+        },
         {
           "version": "1.1.1",
           "date": "2026-09-29",
