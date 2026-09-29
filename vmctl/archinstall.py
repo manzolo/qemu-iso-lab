@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from vmctl import runtime, ssh, ui
+from vmctl import arch_archive, runtime, ssh, ui
 from vmctl.errors import VMError
 
 
@@ -174,8 +174,11 @@ def render_archinstall_creds(vm: dict[str, Any]) -> str:
     return json.dumps(creds, indent=2) + "\n"
 
 
-def _iso_builder_cmd(out_path: Path, files: list[Path], volid: str = "ARCHCONF") -> list[str]:
+def _iso_builder_cmd(out_path: Path, files: list[Path], volid: str = "ARCHCONF",
+                     grafts: dict[str, Path] | None = None) -> list[str]:
     str_files = [str(f) for f in files]
+    if grafts:  # directories under a name of their own (the seed's pkg/ cache)
+        str_files = ["-graft-points", *str_files, *(f"{name}={path}" for name, path in grafts.items())]
     if shutil.which("xorriso"):
         return ["xorriso", "-as", "mkisofs", "-output", str(out_path),
                 "-volid", volid, "-joliet", "-rock"] + str_files
@@ -314,6 +317,14 @@ sed -i 's/^#*SigLevel.*/SigLevel = Never/' /etc/pacman.conf
         # download, 500 included, and pacman's own downloader cannot. -k only where the medium's
         # OpenSSL 1.0.1 rejects the archive's Let's Encrypt chain whatever CA bundle it is given
         # (arch-2014, archive_insecure_tls; signatures are off on these guests already).
+        archive_block += f"""if [ -d "$SEED_DIR/{SEED_PACKAGE_DIR}" ]; then
+    # The host cached the install set (host_package_cache): pacstrap -c reads the live system's
+    # cache directories, the seed's first, and downloads only what is not there.
+    echo "==> Installing from the package cache on the seed ($(ls "$SEED_DIR/{SEED_PACKAGE_DIR}" | wc -l) files)..."
+    sed -i "/^\\[options\\]/a CacheDir = /var/cache/pacman/pkg/\\nCacheDir = $SEED_DIR/{SEED_PACKAGE_DIR}/" /etc/pacman.conf
+    pacstrap_cache="-c"
+fi
+"""
         insecure = "-k " if insecure_tls else ""
         archive_block += f"""echo "==> Downloading with curl and retries{' (no TLS verification: archive_insecure_tls)' if insecure_tls else ''}..."
 sed -i '/^\\[options\\]/a XferCommand = /usr/bin/curl {insecure}-L -C - -f --retry 8 --retry-delay 15 -o %o %u' /etc/pacman.conf
@@ -383,8 +394,8 @@ done
 echo "==> Installing base system (this will take a while)..."
 # -K (a fresh keyring in the target) exists since arch-install-scripts 24 (2022); older media
 # initialise the target's keyring from the live one on their own.
-pacstrap_opts=""
-if pacstrap -h 2>&1 | grep -q -- '-K'; then pacstrap_opts="-K"; fi
+pacstrap_opts="${{pacstrap_cache:-}}"
+if pacstrap -h 2>&1 | grep -q -- '-K'; then pacstrap_opts="$pacstrap_opts -K"; fi
 # A download that dies halfway (the Arch Linux Archive answered 500 and then stalled on arch-2019,
 # 2026-09-29) is retried: what was fetched stays in the target's cache. "if" keeps a failed
 # attempt away from the ERR trap; the third failure is the real one.
@@ -526,6 +537,7 @@ def arch_iso_label(iso_path: Path) -> str:
 HOST_CA_BUNDLES = (Path("/etc/ssl/certs/ca-certificates.crt"), Path("/etc/pki/tls/certs/ca-bundle.crt"),
                    Path("/etc/ca-certificates/extracted/tls-ca-bundle.pem"))
 CA_BUNDLE_NAME = "ca-certificates.crt"
+SEED_PACKAGE_DIR = "pkg"  # arch_archive.prefetch's cache on the seed CD
 
 
 def create_bootstrap_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
@@ -563,5 +575,8 @@ bash "$SCRIPT_DIR/install.sh"
         if not dry_run:
             shutil.copyfile(bundle, ca_path)
         members.append(ca_path)
-    runtime.run(_iso_builder_cmd(iso_path, members, volid="ARCHBOOT"), dry_run=dry_run)
+    grafts: dict[str, Path] = {}
+    if cfg.get("host_package_cache") and cfg.get("archive_date"):
+        grafts[f"{SEED_PACKAGE_DIR}/"] = arch_archive.prefetch(str(cfg["archive_date"]), cfg, dry_run=dry_run)
+    runtime.run(_iso_builder_cmd(iso_path, members, volid="ARCHBOOT", grafts=grafts), dry_run=dry_run)
     return iso_path

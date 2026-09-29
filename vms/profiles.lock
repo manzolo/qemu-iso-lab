@@ -67,9 +67,14 @@
       ]
     },
     "arch-2014": {
-      "version": "1.0.3",
-      "fingerprint": "sha256:36bfbff3356e820b4c9dc76a813479cbdd2bb8491954b0269ef611a0b2ece307",
+      "version": "1.0.4",
+      "fingerprint": "sha256:9d65a5dfbb57e99e9fa4b66ad97c83e05cd8f0b0dad5da3e8f2339fdd9e99f58",
       "history": [
+        {
+          "version": "1.0.4",
+          "date": "2026-09-29",
+          "note": "host_package_cache: install from a host-side cache of the archive snapshot"
+        },
         {
           "version": "1.0.3",
           "date": "2026-09-29",

@@ -349,7 +349,7 @@ class ArchinstallLiveIsoTests(BaseVmctlTestCase):
         self._arch_vm()
         script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
         self.assertNotIn("archive.archlinux.org", script)  # today's mirrors by default
-        self.assertIn("if pacstrap -h 2>&1 | grep -q -- '-K'; then pacstrap_opts=\"-K\"; fi", script)
+        self.assertIn("if pacstrap -h 2>&1 | grep -q -- '-K'; then pacstrap_opts=\"$pacstrap_opts -K\"; fi", script)
         self.vm_config["archinstall_config"]["archive_date"] = "2014/01/05"
         script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
         server = "echo 'Server = https://archive.archlinux.org/repos/2014/01/05/$repo/os/$arch' > /etc/pacman.d/mirrorlist"
@@ -371,6 +371,24 @@ class ArchinstallLiveIsoTests(BaseVmctlTestCase):
         self.vm_config["archinstall_config"]["archive_date"] = "2014-01-05"
         with self.assertRaisesRegex(vmctl.archinstall.VMError, "YYYY/MM/DD"):
             vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+
+    def test_the_seed_carries_the_host_package_cache_and_pacstrap_reads_it(self):
+        self._arch_vm()
+        self.vm_config["archinstall_config"].update(archive_date="2014/01/05", host_package_cache=True)
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        self.assertIn('CacheDir = $SEED_DIR/pkg/" /etc/pacman.conf', script)
+        self.assertIn('pacstrap_cache="-c"', script)
+        self.assertLess(script.index('pacstrap_cache="-c"'), script.index('pacstrap_opts="${pacstrap_cache:-}"'))
+        cache = self.root / "cache"
+        cache.mkdir()
+        with mock.patch.object(vmctl.archinstall.arch_archive, "prefetch", return_value=cache) as prefetch, \
+             mock.patch.object(vmctl.runtime, "run") as run, mock.patch("shutil.which", return_value="/usr/bin/xorriso"), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            vmctl.archinstall.create_bootstrap_iso(self.vm_name, self.vm_config)
+        self.assertEqual(prefetch.call_args.args[0], "2014/01/05")
+        command = run.call_args.args[0]
+        self.assertIn("-graft-points", command)
+        self.assertIn(f"pkg/={cache}", command)
 
     def test_the_seed_carries_the_host_ca_bundle_when_asked(self):
         self._arch_vm()
