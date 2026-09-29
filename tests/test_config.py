@@ -166,6 +166,13 @@ class ConfigTests(BaseVmctlTestCase):
         self.assertEqual(vms["child"]["ssh_provision"]["user"], "me")
         self.assertEqual(vms["mine"]["preseed_config"]["username"], "other")  # a local-only VM is left alone
 
+    def test_local_identity_leaves_haiku_on_its_only_user(self):
+        self.vm_config["ssh_provision"] = {"user": "user", "ssh_host_port": 2280}
+        self.vm_config["haiku_config"] = {}
+        self.write_config_dir()
+        self.write_extra_profile("local.json", {"identity": {"user": "me"}, "vms": {}})
+        self.assertEqual(self.vmctl.load_config()["vms"][self.vm_name]["ssh_provision"]["user"], "user")
+
     def test_local_identity_is_validated(self):
         self.write_config_dir()
         for identity in ("me", {}, {"user": ""}, {"user": "me", "shell": "zsh"}, {"user": "{{user}}"}, {"user": "me", "password": 5}):

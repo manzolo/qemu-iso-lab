@@ -1127,7 +1127,8 @@ created and moves the originals back, so validating every unattended flow does
 not cost you the VMs you already have installed. A stash is kept under
 `artifacts/.check-vms-restore/` only for the duration of the run; a run that
 died (host off, killed) leaves it there, and the next `check-vms` puts it back
-first.
+first. One `check-vms` runs at a time per checkout (`artifacts/.check-vms.lock`):
+a second one would put the first one's stash back under its feet.
 
 Every row gives its disk back **the moment it ends**, after its screenshot,
 clip and sheet: a stashed VM gets its own artifacts again, any other install

@@ -142,8 +142,8 @@ new profile of the catalog never installs as `lab` on your host:
 carries that field (`password_hash` for cloud-init, autoinstall, preseed,
 kickstart and the others that take a hash, `password` for Windows, pfSense,
 FreeBSD and archinstall, `realname` for autoinstall and Windows). Only the
-sections a profile already has are touched, and a profile defined in
-`local.json` alone is left as you wrote it. A per-VM entry under `vms` still
+sections a profile already has are touched, a profile defined in
+`local.json` alone is left as you wrote it, and Haiku keeps its only user (`user`). A per-VM entry under `vms` still
 wins, field by field, for the exceptions (another key, a VM kept on `lab`).
 
 To go further than the name (key, dotfiles, an ISO of your own), add the per-VM

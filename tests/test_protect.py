@@ -199,3 +199,15 @@ class DiskAdmissionTests(BaseVmctlTestCase):
         ran = s.run([("a", big), ("b", big)], lambda name: name)
         self.assertEqual(sorted(name for name, _ in ran), ["a", "b"])  # the second waited for the first
         self.assertEqual(s.peak_running, 1)
+
+
+class MatrixLockTests(BaseVmctlTestCase):
+    def test_a_second_check_vms_refuses_while_one_runs(self):
+        with lifecycle.matrix_lock():
+            with self.assertRaisesRegex(VMError, "Another check-vms is running"):
+                with lifecycle.matrix_lock():
+                    pass
+            with lifecycle.matrix_lock(dry_run=True):
+                pass  # a dry run neither takes nor needs the lock
+        with lifecycle.matrix_lock():
+            pass  # released with the run

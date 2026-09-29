@@ -165,6 +165,8 @@ def apply_identity(vm: dict[str, Any], identity: dict[str, str], explicit: dict[
     the user name and the credential fields the section already carries (``password_hash``,
     ``password``, ``realname``): the per-VM override of ``local.json`` still wins field by field.
     """
+    if vm.get("haiku_config") is not None:
+        return  # Haiku has one user, `user` (haiku.SSH_USER): the identity cannot move it (matrix of 2026-09-29)
     for section, field in USER_IDENTITY_FIELDS:
         sec = vm.get(section)
         if not isinstance(sec, dict):
