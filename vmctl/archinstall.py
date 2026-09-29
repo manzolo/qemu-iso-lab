@@ -469,12 +469,17 @@ if [ ! -s /mnt/boot/grub/grub.cfg ]; then
 fi
 
 test -s /mnt/boot/grub/grub.cfg
-# A rejected config is printed whole, numbered: the checker names a line and the disk of a
-# failed row is gone before anyone can read it (arch-2014, GRUB 2.00: "Syntax error at line 160").
+# GRUB 2.00's grub-script-check (Arch of 2014) rejects every file at its end ("out of memory",
+# "Syntax error at line N" with N the last line: the lexer built with flex >= 2.5.36, fixed in
+# 2.02), so grub-mkconfig there always keeps grub.cfg.new and the salvage above installs it;
+# its verdict is advisory on that version. Any other version's rejection prints the config
+# numbered, because the disk of a failed row is gone before anyone can read the file.
 if ! arch-chroot /mnt grub-script-check /boot/grub/grub.cfg; then
-    echo "==> grub-script-check rejected /boot/grub/grub.cfg:"
-    cat -n /mnt/boot/grub/grub.cfg
-    false
+    grub_version=$(arch-chroot /mnt grub-script-check --version 2>/dev/null | awk '{{print $NF}}')
+    case "$grub_version" in
+        2.00*) echo "==> grub-script-check $grub_version cannot parse any file to its end (flex bug, fixed in 2.02): keeping /boot/grub/grub.cfg" ;;
+        *) echo "==> grub-script-check rejected /boot/grub/grub.cfg:"; cat -n /mnt/boot/grub/grub.cfg; false ;;
+    esac
 fi
 
 # Replace the plain EFI loader with a standalone GRUB image that embeds the

@@ -94,6 +94,7 @@ class SlackwareTests(BaseVmctlTestCase):
         self.write_config_dir()
         out = io.StringIO()
         with mock.patch.object(lifecycle.iso, "ensure_iso", return_value=self.root / "isos" / "dvd.iso"), \
+             mock.patch.object(lifecycle, "ensure_vm_disk"), \
              mock.patch.object(lifecycle.qemu, "run_and_expect") as run, \
              mock.patch.object(lifecycle, "start_installed_vm_headless"), \
              mock.patch.object(lifecycle, "run_post_install"), \

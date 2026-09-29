@@ -59,7 +59,7 @@
         "groups": [
           "smoke"
         ],
-        "verified": "2026-09-26",
+        "verified": "2026-09-29",
         "version": "1.0.0"
       },
       "iso": "isos/haiku-r1beta6-x86_64-anyboot.iso",

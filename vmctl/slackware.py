@@ -226,7 +226,10 @@ EOF
 sed -i 's/^USE_DHCP\\[0\\]=.*/USE_DHCP[0]="yes"/' {TARGET}/etc/rc.d/rc.inet1.conf
 if [ -f "{TARGET}/usr/share/zoneinfo/$TIMEZONE" ]; then
     cp "{TARGET}/usr/share/zoneinfo/$TIMEZONE" {TARGET}/etc/localtime
-    echo "$TIMEZONE" > {TARGET}/etc/localtime-copied-from
+    # what timeconfig does: a symlink into the target's zoneinfo. The etc package ships the
+    # file as a symlink already, and writing through it from the installer resolves outside
+    # the target (ENOENT on the first live run, 2026-09-29).
+    ln -sf "/usr/share/zoneinfo/$TIMEZONE" {TARGET}/etc/localtime-copied-from
 fi
 echo "UTC" > {TARGET}/etc/hardwareclock
 printf '#!/bin/sh\\nif [ -x /usr/bin/loadkeys ]; then /usr/bin/loadkeys %s.map; fi\\n' "$KEYMAP" > {TARGET}/etc/rc.d/rc.keymap
