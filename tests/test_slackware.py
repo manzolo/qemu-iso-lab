@@ -62,7 +62,7 @@ class SlackwareTests(BaseVmctlTestCase):
         positions = [script.index(piece) for piece in order]
         self.assertEqual(positions, sorted(positions), order)
         self.assertIn('SERIES="a ap l n x xap"', script)
-        self.assertIn('EXTRA_PACKAGES="sudo xfce"', script)  # the base's sudo plus the child's xfce
+        self.assertIn('EXTRA_PACKAGES="sudo iproute2 xfce"', script)  # the base's sudo + iproute2 (OPT on 15.0) plus the child's xfce
         self.assertIn("xscreensaver", script)  # the default exclusions
         self.assertIn("mozilla-firefox", script)
         self.assertIn('grep -E \':(ADD|REC)$\' "$dir/tagfile"', script)

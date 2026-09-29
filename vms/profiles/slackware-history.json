@@ -59,13 +59,14 @@
         "locale": "it_IT.UTF-8",
         "xinitrc": "xinitrc.xfce",
         "packages": [
-          "sudo"
+          "sudo",
+          "iproute2"
         ]
       },
       "ssh_provision": {
         "user": "lab",
         "post_install_run": [
-          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && ls /var/log/packages | grep -q '^xfce'"
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && { set -- /var/log/packages/xfce4-session-*; [ -e \"$1\" ]; }"
         ]
       }
     },
@@ -87,7 +88,7 @@
       "extends": "slackware-legacy-ssh-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/slackware64-13.0-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-13.0-iso/slackware64-13.0-install-dvd.iso",
@@ -117,7 +118,7 @@
       "extends": "slackware-legacy-ssh-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/slackware64-13.37-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-13.37-iso/slackware64-13.37-install-dvd.iso",
@@ -147,7 +148,7 @@
       "extends": "slackware-legacy-ssh-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/slackware64-14.0-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.0-iso/slackware64-14.0-install-dvd.iso",
@@ -166,7 +167,7 @@
       "extends": "slackware-legacy-ssh-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/slackware64-14.1-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.1-iso/slackware64-14.1-install-dvd.iso",
@@ -185,7 +186,7 @@
       "extends": "slackware-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/slackware64-14.2-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.2-iso/slackware64-14.2-install-dvd.iso",
@@ -204,7 +205,7 @@
       "extends": "slackware-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/slackware64-15.0-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-15.0-iso/slackware64-15.0-install-dvd.iso",

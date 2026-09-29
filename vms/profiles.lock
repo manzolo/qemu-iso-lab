@@ -67,9 +67,14 @@
       ]
     },
     "arch-2014": {
-      "version": "1.0.4",
-      "fingerprint": "sha256:9d65a5dfbb57e99e9fa4b66ad97c83e05cd8f0b0dad5da3e8f2339fdd9e99f58",
+      "version": "1.0.5",
+      "fingerprint": "sha256:30a38a31a715f820b93effb7f6e3701a8499266777a47cd3994ab82ba332b370",
       "history": [
+        {
+          "version": "1.0.5",
+          "date": "2026-09-29",
+          "note": "X.Org 1.14 on efifb: a xorg.conf.d snippet pins the fbdev driver (no screen under OVMF otherwise)"
+        },
         {
           "version": "1.0.4",
           "date": "2026-09-29",
@@ -1145,9 +1150,14 @@
       ]
     },
     "slackware-13.0": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:8e8374f8572e2fad086063099f26e922e091dda4d78d2ed3f577f8a0f85c76da",
+      "version": "1.0.1",
+      "fingerprint": "sha256:42926bfbb63c58198b7358a04c663d3ae5ca0453c4ab1e2831fa641930c00ba3",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "iproute2 (OPT on the DVD, needed by rc.inet1); the desktop check tests the package file with a glob instead of ls | grep, which prints nothing in Slackware's login shell"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -1156,9 +1166,14 @@
       ]
     },
     "slackware-13.37": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:6c99e6b7de2fb2b8ef873ace6475751b6ae71d5f31ffe5264b36e188cb2b957f",
+      "version": "1.0.1",
+      "fingerprint": "sha256:750c9187c78862fc98dbdebcd5c3d11134baa864297393d2df2aecb89f18f6ec",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "iproute2 (OPT on the DVD, needed by rc.inet1); the desktop check tests the package file with a glob instead of ls | grep, which prints nothing in Slackware's login shell"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -1167,9 +1182,14 @@
       ]
     },
     "slackware-14.0": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:685af36a15db4ab896c200eee35adee2c8dad1783295b1ba5e121c37d4d48fbf",
+      "version": "1.0.1",
+      "fingerprint": "sha256:239d85d2628dc7650a84b750ae108cda60a488f3ea7afef66f15117ba67a846e",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "iproute2 (OPT on the DVD, needed by rc.inet1); the desktop check tests the package file with a glob instead of ls | grep, which prints nothing in Slackware's login shell"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -1178,9 +1198,14 @@
       ]
     },
     "slackware-14.1": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:03328af0b06ec07100bbe53b86716947bf5376c89428f603c692fc43f09af1b8",
+      "version": "1.0.1",
+      "fingerprint": "sha256:bcebf67577c1bbb3d545913cf59842e4c367f62c43b4e961e98387030b8f5255",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "iproute2 (OPT on the DVD, needed by rc.inet1); the desktop check tests the package file with a glob instead of ls | grep, which prints nothing in Slackware's login shell"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -1189,9 +1214,14 @@
       ]
     },
     "slackware-14.2": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:4ea836d56b67388832862e3badc82b26cf2d32e83e1ccf50e9279f577f4fb448",
+      "version": "1.0.1",
+      "fingerprint": "sha256:6f5afa905533b89cd6f3c27c00512a992745662fc32de0dab23b5a56e7d48cfa",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "iproute2 (OPT on the DVD, needed by rc.inet1); the desktop check tests the package file with a glob instead of ls | grep, which prints nothing in Slackware's login shell"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -1200,9 +1230,14 @@
       ]
     },
     "slackware-15.0": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:3a13e25a9d8b7ffd69b23ae8b1b45d259c5550bff32f1323d4022ad140031189",
+      "version": "1.0.1",
+      "fingerprint": "sha256:254721f22719f3105d7020193660b6b02537a8e42304f43ee00f02b4d1568970",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-09-29",
+          "note": "iproute2 (OPT on the DVD, needed by rc.inet1); the desktop check tests the package file with a glob instead of ls | grep, which prints nothing in Slackware's login shell"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",

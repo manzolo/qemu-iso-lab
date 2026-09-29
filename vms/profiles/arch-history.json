@@ -101,7 +101,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.4"
+        "version": "1.0.5"
       },
       "iso": "isos/archlinux-2014.01.05-dual.iso",
       "iso_url": "https://archive.archlinux.org/iso/2014.01.05/archlinux-2014.01.05-dual.iso",
@@ -119,6 +119,9 @@
         "packages": [
           "xf86-video-fbdev",
           "xf86-video-vesa"
+        ],
+        "bootstrap_chroot_commands": [
+          "install -d -m 755 /etc/X11/xorg.conf.d && printf 'Section \"Device\"\\n    Identifier \"efifb\"\\n    Driver \"fbdev\"\\nEndSection\\n' > /etc/X11/xorg.conf.d/10-fbdev.conf"
         ]
       },
       "ssh_provision": {
@@ -131,7 +134,7 @@
           "KexAlgorithms=+diffie-hellman-group-exchange-sha256"
         ]
       },
-      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2014 runs one. January 2014: kernel 3.12, systemd 208, Xfce 4.10, OpenSSH 6.4 (no ed25519 before 6.5: the RSA key and the legacy SSH options of the old Ubuntus). The dual i686/x86_64 medium with the pre-2020 kernel and initrd names. No bochs DRM driver before 3.14, so X runs on the UEFI framebuffer (xf86-video-fbdev). Its live system brings no network up on a serial boot (the install script starts dhcpcd) and its CA bundle predates the Arch Linux Archive's certificate (the seed carries the host's, host_ca_bundle), and its OpenSSL 1.0.1 still rejects the archive's Let's Encrypt chain, so the live pacman downloads with curl -k (archive_insecure_tls; signatures are off anyway). Its packages live on archive.org, whose nodes answer HTTP 500 now and then: three installs died on them, so the host caches the install set first (host_package_cache, isos/arch-archive/2014-01-05/) and the seed CD carries it."
+      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2014 runs one. January 2014: kernel 3.12, systemd 208, Xfce 4.10, OpenSSH 6.4 (no ed25519 before 6.5: the RSA key and the legacy SSH options of the old Ubuntus). The dual i686/x86_64 medium with the pre-2020 kernel and initrd names. No bochs DRM driver before 3.14, so X runs on the UEFI framebuffer (xf86-video-fbdev). Its live system brings no network up on a serial boot (the install script starts dhcpcd) and its CA bundle predates the Arch Linux Archive's certificate (the seed carries the host's, host_ca_bundle), and its OpenSSL 1.0.1 still rejects the archive's Let's Encrypt chain, so the live pacman downloads with curl -k (archive_insecure_tls; signatures are off anyway). Its packages live on archive.org, whose nodes answer HTTP 500 now and then: three installs died on them, so the host caches the install set first (host_package_cache, isos/arch-archive/2014-01-05/) and the seed CD carries it. X.Org 1.14 under OVMF finds no screen by itself (vesa has no VBIOS under EFI, the modesetting driver needs bochs-drm, which arrived in Linux 3.14), so a xorg.conf.d snippet pins the fbdev driver on efifb (verified live 2026-09-29); GRUB 2.00's grub-script-check rejects every file at its end (flex bug), the install script treats its verdict as a note there."
     },
     "arch-2019": {
       "name": "Arch Linux 2019.12 (Xfce, archive snapshot)",

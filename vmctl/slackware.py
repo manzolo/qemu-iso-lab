@@ -48,7 +48,8 @@ INITRD_MEMBER = "isolinux/initrd.img"
 
 DEFAULT_SERIES = ["a", "ap", "l", "n", "x", "xap", "xfce"]
 # sudo is OPT in ap on every release, Xfce is OPT in xap on 13.x (its own series from 14.0).
-DEFAULT_PACKAGES = ["sudo"]
+# iproute2 is tagged OPT on the 15.0 DVD while its rc.inet1 calls /sbin/ip (first live run, 2026-09-29).
+DEFAULT_PACKAGES = ["sudo", "iproute2"]
 # What would lock or blank the screen before the report's screenshot, and the big desktop
 # applications the DVD's REC tags would drag in (firefox, seamonkey, thunderbird, gimp: ~400 MB).
 DEFAULT_EXCLUDE = ["xscreensaver", "xfce4-screensaver", "mozilla-firefox", "seamonkey", "mozilla-thunderbird", "gimp"]
