@@ -518,6 +518,9 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--ask-password", action="store_true", help="ask the password on the terminal instead of --password")
     p.add_argument("--realname", help="the user's real name (GECOS / the desktop's display name)")
     p.add_argument("--no-store-password", action="store_true", help="write only the hash: Windows, Arch and Alpine profiles then keep the catalog's password")
+    p.add_argument("--language", help="guest locale for every installer that takes one (it_IT.UTF-8; empty string: back to the profiles' own)")
+    p.add_argument("--keyboard", help="keyboard layout, XKB name (it, us, de...)")
+    p.add_argument("--timezone", help="time zone, IANA name (Europe/Rome)")
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.set_defaults(func=local_identity.cmd_identity)
 

@@ -88,18 +88,29 @@ def read() -> dict[str, Any]:
             identity = config.validate_identity(raw, str(path))
         except VMError as exc:
             problem = str(exc)
+    raw_locale = document.get("locale")
+    locale: dict[str, str] = {}
+    if raw_locale is not None:
+        try:
+            locale = config.validate_locale(raw_locale, str(path))
+        except VMError as exc:
+            problem = (problem + " " + str(exc)).strip()
     return {
         "exists": exists,
         "path": ui.pretty_path(path),
         "identity": {"user": identity.get("user", ""), "realname": identity.get("realname", ""),
                      "has_password": "password" in identity, "has_hash": "password_hash" in identity},
+        # Language, keyboard and time zone for every installer section that has them (config.apply_locale).
+        "locale": {key: locale.get(key, "") for key in config.LOCALE_KEYS},
         "problem": problem,
-        "defaults": {"user": DEFAULT_USER, "password": DEFAULT_PASSWORD, "realname": ""},
+        "defaults": {"user": DEFAULT_USER, "password": DEFAULT_PASSWORD, "realname": "",
+                     "language": "en_US.UTF-8", "keyboard": "us", "timezone": "UTC"},
         "overrides": len(document.get("vms") or {}),
     }
 
 
-def save(user: str, password: str = "", realname: str = "", store_password: bool = True) -> dict[str, Any]:
+def save(user: str, password: str = "", realname: str = "", store_password: bool = True,
+         locale: dict[str, str] | None = None) -> dict[str, Any]:
     """Write the identity: the user, a fresh SHA-512 hash of *password* (kept in clear too with
     *store_password*, for the profiles whose installer takes only a plain password: Windows,
     Arch, Alpine...) and the real name. An empty *password* keeps the credentials the file has.
@@ -128,6 +139,21 @@ def save(user: str, password: str = "", realname: str = "", store_password: bool
         identity["realname"] = realname.strip()
     path = catalog.local_path()
     document["identity"] = config.validate_identity(identity, str(path))
+    if locale is not None:
+        # The locale block: the keys given (an empty value drops the key), the others as they were.
+        raw_current_locale = document.get("locale")
+        current_locale: dict[str, Any] = dict(raw_current_locale) if isinstance(raw_current_locale, dict) else {}
+        for key, value in locale.items():
+            if key not in config.LOCALE_KEYS:
+                raise VMError(f"Unknown locale field '{key}' (allowed: {', '.join(config.LOCALE_KEYS)})")
+            if value.strip():
+                current_locale[key] = value.strip()
+            else:
+                current_locale.pop(key, None)
+        if current_locale:
+            document["locale"] = config.validate_locale(current_locale, str(path))
+        else:
+            document.pop("locale", None)
     config.load_config(local_profiles=document)  # every tracked profile must still resolve with it
     catalog.write_document(document)
     return read()
@@ -138,7 +164,8 @@ def cmd_identity(args: Any) -> int:
     with no change requested, show the identity local.json carries."""
     import json
 
-    changing = any(getattr(args, key, None) for key in ("user", "password", "ask_password", "realname"))
+    changing = any(getattr(args, key, None) is not None and getattr(args, key) is not False
+                   for key in ("user", "password", "ask_password", "realname", "language", "keyboard", "timezone"))
     if changing:
         current = read()["identity"]
         password = getattr(args, "password", None) or ""
@@ -151,7 +178,9 @@ def cmd_identity(args: Any) -> int:
         if getattr(args, "dry_run", False):
             print(f"  would set identity user={user!r} realname={realname!r} password={'(new)' if password else '(kept)'} in {catalog.local_path()}")
             return 0
-        result = save(user, password, realname, store_password=not getattr(args, "no_store_password", False))
+        locale = {key: getattr(args, key) for key in ("language", "keyboard", "timezone") if getattr(args, key, None) is not None}
+        result = save(user, password, realname, store_password=not getattr(args, "no_store_password", False),
+                      locale=locale or None)
         if not getattr(args, "json", False):
             ui.print_status("ok", f"identity saved in {result['path']}: user {result['identity']['user']}")
     else:
@@ -172,4 +201,6 @@ def cmd_identity(args: Any) -> int:
             print(f"Guest identity in {result['path']}: user {identity['user']}"
                   + (f", real name {identity['realname']}" if identity["realname"] else "") + f" ({creds}); "
                   f"{result['overrides']} per-VM override(s)")
+        loc = {k: v for k, v in result["locale"].items() if v}
+        print("Locale: " + (", ".join(f"{k} {v}" for k, v in loc.items()) if loc else "the profiles' own (vmctl identity --language it_IT.UTF-8 --keyboard it --timezone Europe/Rome)"))
     return 0

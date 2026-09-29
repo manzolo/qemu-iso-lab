@@ -794,8 +794,11 @@ class Handler(BaseHTTPRequestHandler):
                 fields = {key: body.get(key, "") for key in ("user", "password", "realname")}
                 if not all(isinstance(value, str) for value in fields.values()):
                     raise VMError("user, password and realname must be strings")
+                locale = body.get("locale")
+                if locale is not None and not (isinstance(locale, dict) and all(isinstance(v, str) for v in locale.values())):
+                    raise VMError("locale must be an object of strings (language, keyboard, timezone)")
                 result = local_identity.save(fields["user"], fields["password"], fields["realname"],
-                                             store_password=bool(body.get("store_password", True)))
+                                             store_password=bool(body.get("store_password", True)), locale=locale)
                 with self.snapshot.lock:
                     self.snapshot.value = None
                 self._json(result)

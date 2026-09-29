@@ -11,6 +11,49 @@ if str(ROOT) not in sys.path:
 from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
+class LocaleBlockTests(BaseVmctlTestCase):
+    def test_validate_locale_accepts_posix_names_and_rejects_the_rest(self):
+        from vmctl import config
+        from vmctl.errors import VMError
+        self.assertEqual(config.validate_locale({"language": "it_IT.UTF-8", "keyboard": "it", "timezone": "Europe/Rome"}, "x"),
+                         {"language": "it_IT.UTF-8", "keyboard": "it", "timezone": "Europe/Rome"})
+        self.assertEqual(config.validate_locale({"timezone": " UTC "}, "x"), {"timezone": "UTC"})
+        for bad in ({"language": "italian"}, {"keyboard": "Italian"}, {"timezone": "Rome time"}, {"lang": "it"}, {"language": ""}, ["it"]):
+            with self.subTest(bad=bad), self.assertRaises(VMError):
+                config.validate_locale(bad, "x")
+
+    def test_apply_locale_speaks_every_installer_format_and_a_per_vm_override_wins(self):
+        from vmctl import config
+        locale = {"language": "it_IT.UTF-8", "keyboard": "it", "timezone": "Europe/Rome"}
+        vm = {"preseed_config": {"locale": "en_US.UTF-8", "language": "en", "country": "US", "keyboard_layout": "us", "timezone": "UTC"},
+              "autoyast_config": {"language": "en_US", "keyboard_layout": "english-us", "timezone": "UTC"},
+              "windows_config": {"language": "en-US", "input_locale": "en-US", "timezone": "UTC"},
+              "archinstall_config": {"locale_lang": "en_US", "locale_enc": "UTF-8", "keyboard_layout": "us"},
+              "kickstart_config": {"locale": "en_US.UTF-8"}, "haiku_config": {"user": "user"}}
+        config.apply_locale(vm, locale, {"windows_config": {"timezone": "GMT Standard Time"}})
+        self.assertEqual(vm["preseed_config"], {"locale": "it_IT.UTF-8", "language": "it", "country": "IT", "keyboard_layout": "it", "timezone": "Europe/Rome"})
+        self.assertEqual(vm["autoyast_config"], {"language": "it_IT", "keyboard_layout": "italian", "timezone": "Europe/Rome"})
+        self.assertEqual(vm["windows_config"], {"language": "en-US", "input_locale": "it-IT", "timezone": "UTC"})  # an overridden field is left alone (the override merges on top), the UI language stays
+        self.assertEqual(vm["archinstall_config"], {"locale_lang": "it_IT", "locale_enc": "UTF-8", "keyboard_layout": "it"})  # no timezone field: none added
+        self.assertEqual(vm["kickstart_config"], {"locale": "it_IT.UTF-8"})
+        self.assertEqual(vm["haiku_config"], {"user": "user"})
+        # an unknown keyboard leaves AutoYaST's field alone, an unknown zone Windows'
+        vm = {"autoyast_config": {"keyboard_layout": "english-us"}, "windows_config": {"timezone": "UTC"}}
+        config.apply_locale(vm, {"keyboard": "xx", "timezone": "Mars/Olympus"}, {})
+        self.assertEqual(vm, {"autoyast_config": {"keyboard_layout": "english-us"}, "windows_config": {"timezone": "UTC"}})
+
+    def test_load_config_applies_the_locale_of_local_json_to_tracked_profiles_only(self):
+        from vmctl import config
+        self.write_extra_profile("more.json", {"vms": {"withpreseed": {**self.vm_config, "name": "P", "preseed_config": {"username": "lab", "locale": "en_US.UTF-8", "timezone": "UTC"},
+                                                                        "disk": {**self.vm_config["disk"], "path": "artifacts/withpreseed/disk.qcow2"}}}})
+        local = {"locale": {"language": "it_IT.UTF-8", "timezone": "Europe/Rome"},
+                 "vms": {"withpreseed": {"preseed_config": {"timezone": "Europe/Berlin"}},
+                         "mine": {**self.vm_config, "name": "M", "preseed_config": {"username": "lab", "locale": "en_US.UTF-8"}, "disk": {**self.vm_config["disk"], "path": "artifacts/mine/disk.qcow2"}}}}
+        cfg = config.load_config(local_profiles=local)
+        self.assertEqual(cfg["vms"]["withpreseed"]["preseed_config"]["locale"], "it_IT.UTF-8")
+        self.assertEqual(cfg["vms"]["withpreseed"]["preseed_config"]["timezone"], "Europe/Berlin")  # the per-VM entry wins
+        self.assertEqual(cfg["vms"]["mine"]["preseed_config"]["locale"], "en_US.UTF-8")  # a local-only VM is untouched
+
 class ManualReasonTests(BaseVmctlTestCase):
     def test_meta_manual_is_validated(self):
         from vmctl import config

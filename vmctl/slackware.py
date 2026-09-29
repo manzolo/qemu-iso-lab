@@ -385,7 +385,8 @@ def render_run_script() -> str:
     unpacked into the RAM disk, which has xz, libncurses and glibc for it."""
     return f"""#!/bin/sh
 # vmctl: install.sh under a real bash (the 13.x installer initrds call busybox ash "bash")
-if bash -c 'set -E' 2>/dev/null; then
+# busybox ash takes `set -E` from -c without a word and complains only inside a script: ask for the banner
+if bash --version 2>/dev/null | grep -q 'GNU bash'; then
     exec bash {SEED_MOUNTPOINT}/install.sh
 fi
 echo "==> The initrd's bash is busybox: unpacking the DVD's bash package..."

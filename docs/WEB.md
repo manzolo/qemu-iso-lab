@@ -167,8 +167,12 @@ from then on every tracked profile installs as that user (`docs/PROVISIONING.md`
 `lab`/`lab`. The **Identity** button in the header reopens the same form later: an empty password
 keeps the current one, and the per-VM overrides, *My VMs* and the protected list of `local.json`
 stay as they are (a `.bak` of the previous file is kept). The file is personal and git ignores it.
-The terminal twin is `vmctl identity` (`--user`, `--ask-password`, `--realname`; no option shows
-it), which the command center does not list so that no password lands in a job log.
+The form also takes the guest **language, keyboard and time zone**: saved as a top-level
+`locale` block, applied to every installer section that has such fields, in each installer's
+own format (`docs/PROVISIONING.md`); empty fields keep each profile's own values.
+The terminal twin is `vmctl identity` (`--user`, `--ask-password`, `--realname`, `--language`,
+`--keyboard`, `--timezone`; no option shows it), which the command center does not list so
+that no password lands in a job log.
 
 ## Safety
 

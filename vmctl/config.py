@@ -162,6 +162,91 @@ def validate_identity(identity: Any, path: str) -> dict[str, str]:
     return clean
 
 
+LOCALE_KEYS = ("language", "keyboard", "timezone")
+# The keyboard names AutoYaST knows for the XKB layouts the other installers take.
+AUTOYAST_KEYBOARDS = {"us": "english-us", "gb": "english-uk", "it": "italian", "de": "german", "fr": "french", "es": "spanish",
+                      "pt": "portugese", "br": "portugese-br", "nl": "dutch", "dk": "danish", "se": "swedish", "no": "norwegian",
+                      "fi": "finnish", "pl": "polish", "cz": "czech", "hu": "hungarian", "ru": "russian", "ch": "swiss-german"}
+# IANA zones -> the Windows time zone names Setup takes (the common European and American ones).
+WINDOWS_TIMEZONES = {"UTC": "UTC", "Europe/Rome": "W. Europe Standard Time", "Europe/Berlin": "W. Europe Standard Time",
+                     "Europe/Paris": "Romance Standard Time", "Europe/Madrid": "Romance Standard Time", "Europe/Amsterdam": "W. Europe Standard Time",
+                     "Europe/Vienna": "W. Europe Standard Time", "Europe/Zurich": "W. Europe Standard Time", "Europe/Brussels": "Romance Standard Time",
+                     "Europe/London": "GMT Standard Time", "Europe/Dublin": "GMT Standard Time", "Europe/Lisbon": "GMT Standard Time",
+                     "Europe/Warsaw": "Central European Standard Time", "Europe/Prague": "Central Europe Standard Time",
+                     "Europe/Athens": "GTB Standard Time", "Europe/Helsinki": "FLE Standard Time", "Europe/Moscow": "Russian Standard Time",
+                     "America/New_York": "Eastern Standard Time", "America/Chicago": "Central Standard Time",
+                     "America/Denver": "Mountain Standard Time", "America/Los_Angeles": "Pacific Standard Time",
+                     "America/Sao_Paulo": "E. South America Standard Time", "Asia/Tokyo": "Tokyo Standard Time",
+                     "Asia/Shanghai": "China Standard Time", "Australia/Sydney": "AUS Eastern Standard Time"}
+
+
+def validate_locale(locale: Any, path: str) -> dict[str, str]:
+    """The optional top-level ``locale`` of local.json: ``language`` (``it_IT.UTF-8``), ``keyboard``
+    (an XKB layout, ``it``) and ``timezone`` (an IANA zone, ``Europe/Rome``), each optional."""
+    if not isinstance(locale, dict):
+        raise VMError(f"Invalid 'locale' in {path}: expected an object")
+    unknown = sorted(set(locale) - set(LOCALE_KEYS))
+    if unknown:
+        raise VMError(f"Invalid 'locale' in {path}: unknown key(s) {', '.join(unknown)} (allowed: {', '.join(LOCALE_KEYS)})")
+    clean: dict[str, str] = {}
+    for key, value in locale.items():
+        if not isinstance(value, str) or not value.strip():
+            raise VMError(f"Invalid 'locale' in {path}: '{key}' must be a non-empty string")
+        clean[key] = value.strip()
+    if "language" in clean and not re.fullmatch(r"[a-z]{2,3}_[A-Z]{2}(\.[A-Za-z0-9-]+)?(@[a-z]+)?", clean["language"]):
+        raise VMError(f"Invalid 'locale' in {path}: 'language' looks like it_IT.UTF-8 (a POSIX locale name)")
+    if "keyboard" in clean and not re.fullmatch(r"[a-z]{2,3}(\([a-z_]+\))?", clean["keyboard"]):
+        raise VMError(f"Invalid 'locale' in {path}: 'keyboard' is an XKB layout such as it or us")
+    if "timezone" in clean and not re.fullmatch(r"[A-Za-z_+-]+(/[A-Za-z_+-]+){0,2}", clean["timezone"]):
+        raise VMError(f"Invalid 'locale' in {path}: 'timezone' is an IANA zone such as Europe/Rome")
+    return clean
+
+
+def locale_values(locale: dict[str, str]) -> dict[str, dict[str, str]]:
+    """What each installer section gets from the locale block, in the format it takes: only the
+    keys the block has, and only the formats a table knows (an unknown keyboard leaves AutoYaST's
+    field alone, an unknown zone Windows'). Windows' UI ``language`` is never touched: it must
+    exist in the medium."""
+    language, keyboard, timezone = locale.get("language"), locale.get("keyboard"), locale.get("timezone")
+    lang_region = language.split(".")[0].split("@")[0] if language else None  # it_IT
+    lang2 = lang_region.split("_")[0] if lang_region else None  # it
+    country = lang_region.split("_")[1] if lang_region else None  # IT
+    bcp47 = lang_region.replace("_", "-") if lang_region else None  # it-IT
+    def pick(**fields: str | None) -> dict[str, str]:
+        return {key: value for key, value in fields.items() if value}
+    return {
+        "alpine_config": pick(keyboard_layout=keyboard, timezone=timezone),
+        "archinstall_config": pick(keyboard_layout=keyboard, locale_lang=lang_region, timezone=timezone),
+        "omarchy_config": pick(keyboard_layout=keyboard, locale=language, timezone=timezone),
+        "autoinstall": pick(keyboard_layout=keyboard, locale=language, timezone=timezone),
+        "autoyast_config": pick(keyboard_layout=AUTOYAST_KEYBOARDS.get(keyboard or ""), language=lang_region, timezone=timezone),
+        "kickstart_config": pick(keyboard_layout=keyboard, locale=language, timezone=timezone),
+        "nixos_config": pick(keymap=keyboard, locale=language, timezone=timezone),
+        "pearos_config": pick(keymap=keyboard, locale=language, timezone=timezone),
+        "pfsense_config": pick(timezone=timezone),
+        "preseed_config": pick(keyboard_layout=keyboard, locale=language, language=lang2, country=country, timezone=timezone),
+        "proxmox_config": pick(keyboard=keyboard, country=country.lower() if country else None, timezone=timezone),
+        "slackware_config": pick(keymap=keyboard, locale=language, timezone=timezone),
+        "ubiquity_config": pick(keyboard_layout=keyboard, locale=language, timezone=timezone),
+        "windows_config": pick(input_locale=bcp47, timezone=WINDOWS_TIMEZONES.get(timezone or "")),
+    }
+
+
+def apply_locale(vm: dict[str, Any], locale: dict[str, str], explicit: dict[str, Any]) -> None:
+    """Move the language, keyboard and time zone of every installer section the profile has to
+    the ``locale`` block, like ``apply_identity``: only the fields the section already carries,
+    a per-VM override of local.json still wins field by field."""
+    for section, values in locale_values(locale).items():
+        sec = vm.get(section)
+        if not isinstance(sec, dict) or not values:
+            continue
+        explicit_section = explicit.get(section)
+        kept: dict[str, Any] = explicit_section if isinstance(explicit_section, dict) else {}
+        for key, value in values.items():
+            if key in sec and key not in kept:
+                sec[key] = value
+
+
 def apply_identity(vm: dict[str, Any], identity: dict[str, str], explicit: dict[str, Any]) -> None:
     """Move every identity section the profile has to ``identity``, keeping what a per-VM override set.
 
@@ -453,6 +538,7 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
     merged_vms: dict[str, dict[str, Any]] = {}
     bases: dict[str, dict[str, Any]] = {}
     identity: dict[str, str] | None = None
+    locale: dict[str, str] | None = None
     local_entries: dict[str, dict[str, Any]] = {}  # per-VM overrides of local.json, by canonical name
     tracked_names: set[str] = set()
     profile_paths = sorted(profiles_dir.glob("*.json"), key=lambda p: (p.name == "local.json", p.name))
@@ -466,6 +552,8 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
             tracked_names = set(merged_vms)
             if "identity" in profile_data:
                 identity = validate_identity(profile_data["identity"], str(path))
+            if "locale" in profile_data:
+                locale = validate_locale(profile_data["locale"], str(path))
         for base_name, base in profile_bases.bases_of(profile_data, str(path)).items():
             if base_name in bases:
                 raise VMError(f"Duplicate base '{base_name}' in {path}")
@@ -499,6 +587,9 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
     if identity is not None:
         for name in tracked_names:
             apply_identity(merged_vms[name], identity, local_entries.get(name, {}))
+    if locale is not None:
+        for name in tracked_names:
+            apply_locale(merged_vms[name], locale, local_entries.get(name, {}))
 
     all_errors: list[str] = []
     for name, vm in list(merged_vms.items()):

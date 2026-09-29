@@ -65,6 +65,18 @@ class IdentityFileTests(BaseVmctlTestCase):
         self.assertEqual(after["protected"], before["protected"])
         self.assertTrue(catalog.local_path().with_suffix(".json.bak").exists())
 
+    def test_the_locale_block_is_saved_next_to_the_identity_and_empty_values_drop_keys(self):
+        result = local_identity.save("tester", "s3cret", locale={"language": "it_IT.UTF-8", "keyboard": "it", "timezone": "Europe/Rome"})
+        self.assertEqual(result["locale"], {"language": "it_IT.UTF-8", "keyboard": "it", "timezone": "Europe/Rome"})
+        self.assertEqual(json.loads(catalog.local_path().read_text())["locale"], {"language": "it_IT.UTF-8", "keyboard": "it", "timezone": "Europe/Rome"})
+        result = local_identity.save("tester", "", locale={"keyboard": ""})  # one key dropped, the others kept
+        self.assertEqual(result["locale"], {"language": "it_IT.UTF-8", "keyboard": "", "timezone": "Europe/Rome"})
+        result = local_identity.save("tester", "", locale={"language": "", "timezone": ""})
+        self.assertNotIn("locale", json.loads(catalog.local_path().read_text()))
+        with self.assertRaisesRegex(VMError, "language"):
+            local_identity.save("tester", "", locale={"language": "italiano"})
+        self.assertEqual(local_identity.read()["defaults"]["language"], "en_US.UTF-8")
+
     def test_refuses_a_bad_user_name_and_a_first_save_without_a_password(self):
         for bad in ("", "Root", "a b", "x" * 33, "1abc"):
             with self.subTest(user=bad), self.assertRaisesRegex(VMError, "POSIX login name"):

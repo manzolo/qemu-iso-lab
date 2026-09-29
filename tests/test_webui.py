@@ -372,7 +372,8 @@ class ServerTests(BaseVmctlTestCase):
         self.server.RequestHandlerClass.snapshot.value = {'stale': True}
         for body, status in (({'user': 'tester', 'password': 's3cret', 'realname': 'T', 'store_password': False}, 200),
                              ({'user': 'Bad Name', 'password': 'x'}, 400), ({'user': 'tester', 'password': 5}, 400),
-                             ({'user': 'tester2', 'password': ''}, 200)):
+                             ({'user': 'tester2', 'password': '', 'locale': {'language': 'it_IT.UTF-8', 'timezone': 'Europe/Rome'}}, 200),
+                             ({'user': 'tester2', 'password': '', 'locale': 'it'}, 400)):
             with self.subTest(body=body):
                 conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
                 conn.request('POST', '/api/identity', body=json.dumps(body), headers={'X-Vmctl-Token': 'secret-token'})
@@ -382,6 +383,8 @@ class ServerTests(BaseVmctlTestCase):
                 conn.close()
                 if status == 200:
                     self.assertEqual(data['identity']['user'], body['user'])
+                    if 'locale' in body:
+                        self.assertEqual(data['locale']['language'], 'it_IT.UTF-8')
                     self.assertTrue(data['identity']['has_hash'])
                     self.assertFalse(data['identity']['has_password'])
                     self.assertNotIn('$6$', json.dumps(data))

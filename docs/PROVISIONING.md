@@ -157,7 +157,12 @@ Then replace `YOUR_USER`, `YOUR_PASSWORD` / `REPLACE_WITH_SHA512_HASH`
 (`openssl passwd -6`) and the SSH key paths. Or let the lab write the `identity` for you:
 `vmctl identity --user <name> --ask-password --realname "..."` creates the file with the hash
 (and the password in clear unless `--no-store-password`), and `vmctl web` opens the same form
-as its *Welcome* page while no `local.json` exists (the *Identity* button edits it later). `local.json` is deep-merged over
+as its *Welcome* page while no `local.json` exists (the *Identity* button edits it later).
+The same form (and `vmctl identity --language it_IT.UTF-8 --keyboard it --timezone Europe/Rome`)
+writes a top-level `locale` block that moves the language, keyboard layout and time zone of
+every installer section that has them, each in its own format (AutoYaST's keyboard names,
+preseed's `country`, Windows' time zone names for the common zones; Windows' display language
+is never touched, it must be on the medium). A per-VM entry under `vms` still wins field by field. `local.json` is deep-merged over
 the tracked profiles: dicts merge key by key, lists concatenate, scalars
 replace. A minimal override looks like this:
 
