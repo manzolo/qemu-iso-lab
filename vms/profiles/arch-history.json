@@ -101,7 +101,7 @@
       "extends": "arch-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.0.1"
+        "version": "1.0.2"
       },
       "iso": "isos/archlinux-2014.01.05-dual.iso",
       "iso_url": "https://archive.archlinux.org/iso/2014.01.05/archlinux-2014.01.05-dual.iso",
@@ -113,6 +113,7 @@
       "archinstall_config": {
         "hostname": "arch-2014",
         "archive_date": "2014/01/05",
+        "host_ca_bundle": true,
         "packages": [
           "xf86-video-fbdev",
           "xf86-video-vesa"
@@ -128,7 +129,7 @@
           "KexAlgorithms=+diffie-hellman-group-exchange-sha256"
         ]
       },
-      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2014 runs one. January 2014: kernel 3.12, systemd 208, Xfce 4.10, OpenSSH 6.4 (no ed25519 before 6.5: the RSA key and the legacy SSH options of the old Ubuntus). The dual i686/x86_64 medium with the pre-2020 kernel and initrd names. No bochs DRM driver before 3.14, so X runs on the UEFI framebuffer (xf86-video-fbdev)."
+      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2014 runs one. January 2014: kernel 3.12, systemd 208, Xfce 4.10, OpenSSH 6.4 (no ed25519 before 6.5: the RSA key and the legacy SSH options of the old Ubuntus). The dual i686/x86_64 medium with the pre-2020 kernel and initrd names. No bochs DRM driver before 3.14, so X runs on the UEFI framebuffer (xf86-video-fbdev). Its live system brings no network up on a serial boot (the install script starts dhcpcd) and its CA bundle predates the Arch Linux Archive's certificate (the seed carries the host's, host_ca_bundle)."
     },
     "arch-2019": {
       "name": "Arch Linux 2019.11 (Xfce, archive snapshot)",
@@ -158,8 +159,9 @@
       "name": "Arch Linux 2022.01 (Xfce, archive snapshot)",
       "extends": "arch-history-base",
       "meta": {
-        "status": "experimental",
-        "version": "1.0.1"
+        "status": "unattended",
+        "version": "1.0.1",
+        "verified": "2026-09-29"
       },
       "iso": "isos/archlinux-2022.01.01-x86_64.iso",
       "iso_url": "https://archive.archlinux.org/iso/2022.01.01/archlinux-2022.01.01-x86_64.iso",
@@ -172,14 +174,15 @@
         "hostname": "arch-2022",
         "ssh_host_port": 2332
       },
-      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2022 runs one. January 2022: archinstall on the medium (this flow still installs with its own pacstrap script), kernel 5.15, Xfce 4.16."
+      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Passed live on 2026-09-29. January 2022: archinstall on the medium (this flow still installs with its own pacstrap script), kernel 5.15, Xfce 4.16."
     },
     "arch-2026": {
       "name": "Arch Linux 2026.09 (Xfce, archive snapshot)",
       "extends": "arch-history-base",
       "meta": {
-        "status": "experimental",
-        "version": "1.0.1"
+        "status": "unattended",
+        "version": "1.0.1",
+        "verified": "2026-09-29"
       },
       "iso": "isos/archlinux-2026.09.01-x86_64.iso",
       "iso_url": "https://archive.archlinux.org/iso/2026.09.01/archlinux-2026.09.01-x86_64.iso",
@@ -192,7 +195,7 @@
         "hostname": "arch-2026",
         "ssh_host_port": 2333
       },
-      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2026 runs one. September 2026, today's end of the series, pinned like the others to its own snapshot."
+      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Passed live on 2026-09-29. September 2026, today's end of the series, pinned like the others to its own snapshot."
     }
   }
 }

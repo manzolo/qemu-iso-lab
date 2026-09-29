@@ -299,6 +299,11 @@ arch-chroot /mnt pacman-key --populate || true
         # time have expired since, and gpg judges an expiry against today's clock: signatures are
         # not checked on a historical lab guest (SigLevel Never, live and target alike).
         archive_block = f"""
+SEED_DIR="$(dirname "$(readlink -f "$0")")"
+if [ -f "$SEED_DIR/{CA_BUNDLE_NAME}" ]; then
+    echo "==> Installing the host's CA bundle in the live system..."
+    install -m 644 "$SEED_DIR/{CA_BUNDLE_NAME}" /etc/ssl/certs/ca-certificates.crt
+fi
 echo "==> Using the Arch Linux Archive snapshot of {archive_date}..."
 echo 'Server = {server}' > /etc/pacman.d/mirrorlist
 sed -i 's/^#*SigLevel.*/SigLevel = Never/' /etc/pacman.conf
@@ -306,6 +311,7 @@ sed -i 's/^#*SigLevel.*/SigLevel = Never/' /etc/pacman.conf
         target_archive_block = f"""
 echo "==> Keeping the target on the {archive_date} snapshot..."
 install -m 644 /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
+if [ -f "$SEED_DIR/{CA_BUNDLE_NAME}" ]; then install -m 644 "$SEED_DIR/{CA_BUNDLE_NAME}" /mnt/etc/ssl/certs/ca-certificates.crt; fi
 sed -i 's/^#*SigLevel.*/SigLevel = Never/' /mnt/etc/pacman.conf
 """
 
@@ -369,7 +375,17 @@ echo "==> Installing base system (this will take a while)..."
 # initialise the target's keyring from the live one on their own.
 pacstrap_opts=""
 if pacstrap -h 2>&1 | grep -q -- '-K'; then pacstrap_opts="-K"; fi
-pacstrap $pacstrap_opts /mnt {package_line}
+# A download that dies halfway (the Arch Linux Archive answered 500 and then stalled on arch-2019,
+# 2026-09-29) is retried: what was fetched stays in the target's cache. "if" keeps a failed
+# attempt away from the ERR trap; the third failure is the real one.
+pacstrap_done=0
+for attempt in 1 2; do
+    if pacstrap $pacstrap_opts /mnt {package_line}; then pacstrap_done=1; break; fi
+    echo "==> pacstrap failed (attempt $attempt of 3), retrying in 30 s..."
+    sleep 30
+done
+# The third attempt runs under the ERR trap, so a real failure names pacstrap, not a test.
+[ "$pacstrap_done" = 1 ] || pacstrap $pacstrap_opts /mnt {package_line}
 
 echo "==> Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -497,6 +513,11 @@ def arch_iso_label(iso_path: Path) -> str:
     return "ARCH_LIVE"
 
 
+HOST_CA_BUNDLES = (Path("/etc/ssl/certs/ca-certificates.crt"), Path("/etc/pki/tls/certs/ca-bundle.crt"),
+                   Path("/etc/ca-certificates/extracted/tls-ca-bundle.pem"))
+CA_BUNDLE_NAME = "ca-certificates.crt"
+
+
 def create_bootstrap_iso(vm_name: str, vm: dict[str, Any], dry_run: bool = False) -> Path:
     """Create an ISO with the self-contained bash install script for automated bootstrap."""
     artifact_dir = archinstall_artifact_dir(vm)
@@ -520,5 +541,17 @@ bash "$SCRIPT_DIR/install.sh"
         run_path.chmod(0o755)
         ui.print_status("ok", f"Bootstrap script: {ui.pretty_path(install_path)}")
 
-    runtime.run(_iso_builder_cmd(iso_path, [install_path, run_path], volid="ARCHBOOT"), dry_run=dry_run)
+    members = [install_path, run_path]
+    cfg = archinstall_config(vm) or {}
+    if cfg.get("host_ca_bundle"):
+        # A medium of 2014 does not know today's certificate authorities, and the Arch Linux
+        # Archive answers HTTPS only (plain HTTP redirects): the host's bundle travels on the seed.
+        bundle = next((path for path in HOST_CA_BUNDLES if path.is_file()), None)
+        if bundle is None:
+            raise VMError("archinstall_config.host_ca_bundle: no CA bundle on this host (" + ", ".join(map(str, HOST_CA_BUNDLES)) + ")")
+        ca_path = artifact_dir / CA_BUNDLE_NAME
+        if not dry_run:
+            shutil.copyfile(bundle, ca_path)
+        members.append(ca_path)
+    runtime.run(_iso_builder_cmd(iso_path, members, volid="ARCHBOOT"), dry_run=dry_run)
     return iso_path

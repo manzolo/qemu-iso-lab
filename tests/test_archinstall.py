@@ -1,3 +1,4 @@
+import io
 import json
 import shutil
 import sys
@@ -227,7 +228,7 @@ class ArchinstallBootstrapTests(BaseVmctlTestCase):
         self.assertIn("poweroff -f", trap_line)
         self.assertTrue(trap_line.endswith("' ERR"))
         # The trap is armed before any step that can fail, and the tokens never mistake each other.
-        self.assertLess(script.index("trap "), script.index("\npacstrap "))  # the command, not the comment naming it
+        self.assertLess(script.index("trap "), script.index("pacstrap $pacstrap_opts /mnt"))  # the command, not the comment naming it
         self.assertNotIn(vmctl.archinstall.BOOTSTRAP_COMPLETE_TOKEN, vmctl.archinstall.BOOTSTRAP_FAILED_TOKEN)
         self.assertNotIn(vmctl.archinstall.BOOTSTRAP_FAILED_TOKEN, vmctl.archinstall.BOOTSTRAP_COMPLETE_TOKEN)
 
@@ -239,7 +240,7 @@ class ArchinstallBootstrapTests(BaseVmctlTestCase):
         script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
         refresh = script.index("pacman -Syy --noconfirm")
         self.assertLess(script.index("trap "), refresh)
-        self.assertLess(refresh, script.index("\npacstrap "))
+        self.assertLess(refresh, script.index("pacstrap $pacstrap_opts /mnt"))
         self.assertIn("pacman -Syy --noconfirm >/dev/null 2>&1 && break", script)
         self.assertIn("for attempt in 1 2 3; do", script)
 
@@ -359,9 +360,27 @@ class ArchinstallLiveIsoTests(BaseVmctlTestCase):
         self.assertLess(script.index("pacstrap $pacstrap_opts /mnt"), script.index(target))
         self.assertLess(script.index(target), script.index("grub-install"))
         self.assertIn("sed -i 's/^#*SigLevel.*/SigLevel = Never/' /mnt/etc/pacman.conf", script)
+        self.assertIn('[ "$pacstrap_done" = 1 ] || pacstrap $pacstrap_opts /mnt', script)  # retried, the last try under the trap
+        self.assertLess(script.index('SEED_DIR="$(dirname'), script.index("pacman -Syy"))  # the seed's CA bundle before any download
         self.vm_config["archinstall_config"]["archive_date"] = "2014-01-05"
         with self.assertRaisesRegex(vmctl.archinstall.VMError, "YYYY/MM/DD"):
             vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+
+    def test_the_seed_carries_the_host_ca_bundle_when_asked(self):
+        self._arch_vm()
+        self.vm_config["archinstall_config"]["host_ca_bundle"] = True
+        bundle = self.root / "host-ca.crt"
+        bundle.write_text("CA")
+        with mock.patch.object(vmctl.archinstall, "HOST_CA_BUNDLES", (self.root / "missing", bundle)), \
+             mock.patch.object(vmctl.runtime, "run") as run, mock.patch("shutil.which", return_value="/usr/bin/xorriso"), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            vmctl.archinstall.create_bootstrap_iso(self.vm_name, self.vm_config)
+        command = run.call_args.args[0]
+        self.assertTrue(any(str(arg).endswith("ca-certificates.crt") for arg in command))
+        self.assertEqual((vmctl.archinstall.archinstall_artifact_dir(self.vm_config) / "ca-certificates.crt").read_text(), "CA")
+        with mock.patch.object(vmctl.archinstall, "HOST_CA_BUNDLES", (self.root / "missing",)), \
+             mock.patch("sys.stdout", new_callable=io.StringIO), self.assertRaisesRegex(vmctl.archinstall.VMError, "no CA bundle"):
+            vmctl.archinstall.create_bootstrap_iso(self.vm_name, self.vm_config)
 
     def test_bootstrap_script_copies_live_pacman_conf_when_requested(self):
         self._arch_vm()

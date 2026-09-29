@@ -67,9 +67,14 @@
       ]
     },
     "arch-2014": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:b1c6c4e9a2cc7472f7ba47ae7b57108ce952574cbed7326d6c952adbd71d81b7",
+      "version": "1.0.2",
+      "fingerprint": "sha256:7b1d379353118c00fc4163d7ba7ace9979be9350a98b65271e67b969085f9311",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-09-29",
+          "note": "host_ca_bundle: the 2014 CA bundle predates the archive's certificate"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
