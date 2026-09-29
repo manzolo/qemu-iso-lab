@@ -342,7 +342,26 @@ class ArchinstallLiveIsoTests(BaseVmctlTestCase):
         script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
         self.assertIn("systemctl start pacman-init.service 2>/dev/null || true", script)
         self.assertIn("getent hosts archlinux.org", script)
-        self.assertLess(script.index("pacman-init.service"), script.index("pacstrap -K /mnt"))
+        self.assertLess(script.index("pacman-init.service"), script.index("pacstrap $pacstrap_opts /mnt"))
+
+    def test_bootstrap_script_installs_from_an_archive_snapshot_when_dated(self):
+        self._arch_vm()
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        self.assertNotIn("archive.archlinux.org", script)  # today's mirrors by default
+        self.assertIn("if pacstrap -h 2>&1 | grep -q -- '-K'; then pacstrap_opts=\"-K\"; fi", script)
+        self.vm_config["archinstall_config"]["archive_date"] = "2014/01/05"
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        server = "echo 'Server = https://archive.archlinux.org/repos/2014/01/05/$repo/os/$arch' > /etc/pacman.d/mirrorlist"
+        self.assertIn(server, script)
+        # Live before the first sync, target after pacstrap (which writes its own files) and before GRUB.
+        self.assertLess(script.index(server), script.index("pacman -Syy"))
+        target = "install -m 644 /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist"
+        self.assertLess(script.index("pacstrap $pacstrap_opts /mnt"), script.index(target))
+        self.assertLess(script.index(target), script.index("grub-install"))
+        self.assertIn("sed -i 's/^#*SigLevel.*/SigLevel = Never/' /mnt/etc/pacman.conf", script)
+        self.vm_config["archinstall_config"]["archive_date"] = "2014-01-05"
+        with self.assertRaisesRegex(vmctl.archinstall.VMError, "YYYY/MM/DD"):
+            vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
 
     def test_bootstrap_script_copies_live_pacman_conf_when_requested(self):
         self._arch_vm()
@@ -354,7 +373,7 @@ class ArchinstallLiveIsoTests(BaseVmctlTestCase):
         self.assertIn("arch-chroot /mnt pacman-key --populate || true", script)
         self.assertIn("linux-cachyos", script)
         # After pacstrap (which would otherwise overwrite it) and before the bootloader step.
-        self.assertLess(script.index("pacstrap -K /mnt"), script.index("install -m 644 /etc/pacman.conf"))
+        self.assertLess(script.index("pacstrap $pacstrap_opts /mnt"), script.index("install -m 644 /etc/pacman.conf"))
         self.assertLess(script.index("install -m 644 /etc/pacman.conf"), script.index("grub-install"))
 
     def test_bootstrap_script_leaves_pacman_conf_alone_by_default(self):

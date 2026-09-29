@@ -280,6 +280,16 @@ class IsoArchiveTests(BaseVmctlTestCase):
             bundle.writestr(member, self.PAYLOAD)
         return buffer.getvalue()
 
+    def test_a_vendor_sha1_pins_old_media_like_a_sha256(self):
+        # The Arch Linux archive published only SHA-1 (and MD5) for its ISOs before 2021.
+        path = self.root / "isos" / "old.iso"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(self.PAYLOAD)
+        good = {"iso_sha1": hashlib.sha1(self.PAYLOAD).hexdigest()}
+        self.assertEqual(vmctl.iso.validate_iso_file(path, good), [])
+        problems = vmctl.iso.validate_iso_file(path, {"iso_sha1": "0" * 40})
+        self.assertTrue(any(p.startswith("sha1 is ") for p in problems), problems)
+
     def test_zip_member_is_extracted_verified_and_the_archive_removed(self):
         vm = self.vm(iso_archive={"type": "zip", "member": "test.iso"})
         with mock.patch.object(vmctl.iso, "_fetch", side_effect=self.fetch_writing(self.zip_bytes())), \

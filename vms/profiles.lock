@@ -66,6 +66,50 @@
         }
       ]
     },
+    "arch-2014": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:43e16bcb2e3e2e30724d4c0fb1e13b33511e4b4f40b7f8131ec55740c55bf871",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "arch-2019": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:4107104391992b6211a2663adbf1c5d91b2050765bf6cad7bca9aeb2998e0b26",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "arch-2022": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:fc646c9bda9dcb8e6a5cb974398289315cd5093f7574309eb8f0089d83f812f0",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "arch-2026": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:1b7fc38082a7a716d9604788f379d11378e9e224604c40f4ffba16c0b72079a0",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "arch-dms": {
       "version": "1.0.0",
       "fingerprint": "sha256:ad7c41ab5b425db1d5a51a4531cb624de7453b91309567be4cc2961211f5049d",

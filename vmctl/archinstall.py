@@ -234,6 +234,9 @@ def render_bootstrap_script(vm_name: str, vm: dict[str, Any]) -> str:
     services: list[str] = list(cfg.get("services") or [])
     bootstrap_chroot_commands: list[str] = list(cfg.get("bootstrap_chroot_commands") or [])
     inherit_live_pacman_conf = bool(cfg.get("inherit_live_pacman_conf", False))
+    archive_date = str(cfg.get("archive_date") or "").strip()
+    if archive_date and not re.fullmatch(r"\d{4}/\d{2}/\d{2}", archive_date):
+        raise VMError(f"archinstall_config.archive_date must be YYYY/MM/DD, not {archive_date!r}")
 
     if not username:
         raise VMError("archinstall_config.username is required for bootstrap")
@@ -288,6 +291,24 @@ done
 arch-chroot /mnt pacman-key --populate || true
 """
 
+    archive_block = target_archive_block = ""
+    if archive_date:
+        server = f"https://archive.archlinux.org/repos/{archive_date}/$repo/os/$arch"
+        # The Arch Linux Archive: the repositories as they were that day, so the installed system
+        # is the one of its era, not today's packages on an old kernel. The packagers' keys of that
+        # time have expired since, and gpg judges an expiry against today's clock: signatures are
+        # not checked on a historical lab guest (SigLevel Never, live and target alike).
+        archive_block = f"""
+echo "==> Using the Arch Linux Archive snapshot of {archive_date}..."
+echo 'Server = {server}' > /etc/pacman.d/mirrorlist
+sed -i 's/^#*SigLevel.*/SigLevel = Never/' /etc/pacman.conf
+"""
+        target_archive_block = f"""
+echo "==> Keeping the target on the {archive_date} snapshot..."
+install -m 644 /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
+sed -i 's/^#*SigLevel.*/SigLevel = Never/' /mnt/etc/pacman.conf
+"""
+
     return f"""\
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -308,6 +329,7 @@ for _ in $(seq 1 60); do
     sleep 2
 done
 
+{archive_block}
 echo "==> Partitioning /dev/vda..."
 sgdisk --zap-all /dev/vda
 sgdisk --new=1:0:+512MiB --typecode=1:ef00 --change-name=1:EFI /dev/vda
@@ -337,11 +359,15 @@ for attempt in 1 2 3; do
 done
 
 echo "==> Installing base system (this will take a while)..."
-pacstrap -K /mnt {package_line}
+# -K (a fresh keyring in the target) exists since arch-install-scripts 24 (2022); older media
+# initialise the target's keyring from the live one on their own.
+pacstrap_opts=""
+if pacstrap -h 2>&1 | grep -q -- '-K'; then pacstrap_opts="-K"; fi
+pacstrap $pacstrap_opts /mnt {package_line}
 
 echo "==> Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
-{pacman_conf_block}
+{pacman_conf_block}{target_archive_block}
 echo "==> Timezone..."
 arch-chroot /mnt ln -sf /usr/share/zoneinfo/{timezone} /etc/localtime
 arch-chroot /mnt hwclock --systohc

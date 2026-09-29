@@ -1088,6 +1088,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `ubuntu` | Ubuntu and its official flavours, whatever their `meta.slug`: the whole release series, the 24.04 flavour sweep, the 26.04 profiles and `lubuntu-lab`. They all share `meta.family: debian` with Debian and Kali, so the family alone could not say "the Ubuntu ones" |
 | `ubuntu-releases` | One unattended desktop install per Ubuntu release, 8.04 to 26.04. 24.04's entry is `ubuntu-gnome-24.04`: it is the same recipe under the flavour naming, so the series has no separate `ubuntu-24.04-unattended` profile |
 | `xubuntu-releases` | The Xubuntu history on the same media, 8.04 to 26.04 (`tools/gen_ubuntu_flavors.py`): born `experimental`, so the full matrix sets them aside until each passes when named |
+| `arch-releases` | Arch Linux as it was in 2014, 2019, 2022 and 2026 (`arch-history.json`): the archived ISO of the month and pacstrap from the Arch Linux Archive snapshot of that day (`archinstall_config.archive_date`), Xfce on LightDM throughout; born `experimental` |
 | `kubuntu-releases` | Kubuntu on the same media, 8.04 to 26.04 (kdm, then LightDM, then SDDM from 16.04), same generator and rule |
 | `lubuntu-releases` | Lubuntu 12.04 to 26.04 (LXDE on LightDM, LXQt on SDDM from 20.04), same generator and rule |
 | `ubuntu-mate-releases` | Ubuntu MATE 16.04 to 26.04 (LightDM), same generator and rule |

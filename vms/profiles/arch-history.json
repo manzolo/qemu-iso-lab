@@ -1,0 +1,197 @@
+{
+  "bases": {
+    "arch-history-base": {
+      "meta": {
+        "family": "arch",
+        "role": "desktop",
+        "release_model": "rolling",
+        "slug": "archlinux",
+        "groups": [
+          "arch-releases"
+        ]
+      },
+      "disk": {
+        "path": "artifacts/{{name}}/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/{{name}}/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "cpus": 4,
+      "memory_mb": 4096,
+      "network": "user",
+      "usb_tablet": true,
+      "video": {
+        "default": "std",
+        "headless": [
+          "-vga",
+          "std",
+          "-display",
+          "none"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "archinstall_config": {
+        "username": "lab",
+        "password": "lab",
+        "timezone": "Europe/Rome",
+        "keyboard_layout": "it",
+        "locale_lang": "it_IT",
+        "locale_enc": "UTF-8",
+        "bootloader": "Grub",
+        "kernels": [
+          "linux"
+        ],
+        "packages": [
+          "xorg-server",
+          "xfce4",
+          "lightdm",
+          "lightdm-gtk-greeter",
+          "sudo"
+        ],
+        "services": [
+          "lightdm",
+          "serial-getty@ttyS0"
+        ],
+        "bootstrap_chroot_commands": [
+          "groupadd -rf autologin; gpasswd -a {{user}} autologin",
+          "sed -i -e 's/^#*autologin-user=.*/autologin-user={{user}}/' -e 's/^#*autologin-user-timeout=.*/autologin-user-timeout=0/' -e 's/^#*autologin-session=.*/autologin-session=xfce/' -e 's/^#*user-session=.*/user-session=xfce/' /etc/lightdm/lightdm.conf",
+          "grep -q '^autologin-user={{user}}' /etc/lightdm/lightdm.conf",
+          "systemctl set-default graphical.target"
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service lightdm.service --package-manager pacman --package xfce4-session --process xfce4-session"
+        ]
+      }
+    }
+  },
+  "vms": {
+    "arch-2014": {
+      "name": "Arch Linux 2014.01 (Xfce, archive snapshot)",
+      "extends": "arch-history-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/archlinux-2014.01.05-dual.iso",
+      "iso_url": "https://archive.archlinux.org/iso/2014.01.05/archlinux-2014.01.05-dual.iso",
+      "iso_sha1": "4d43709987c3cf19059195f9450465de3b87a5cb",
+      "installer_boot": {
+        "kernel": "arch/boot/x86_64/vmlinuz",
+        "initrd": "arch/boot/x86_64/archiso.img"
+      },
+      "archinstall_config": {
+        "hostname": "arch-2014",
+        "archive_date": "2014/01/05",
+        "packages": [
+          "xf86-video-fbdev",
+          "xf86-video-vesa"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "arch-2014",
+        "ssh_host_port": 2330,
+        "key_type": "rsa",
+        "ssh_options": [
+          "HostKeyAlgorithms=+ssh-rsa",
+          "PubkeyAcceptedAlgorithms=+ssh-rsa",
+          "KexAlgorithms=+diffie-hellman-group-exchange-sha256"
+        ]
+      },
+      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2014 runs one. January 2014: kernel 3.12, systemd 208, Xfce 4.10, OpenSSH 6.4 (no ed25519 before 6.5: the RSA key and the legacy SSH options of the old Ubuntus). The dual i686/x86_64 medium with the pre-2020 kernel and initrd names. No bochs DRM driver before 3.14, so X runs on the UEFI framebuffer (xf86-video-fbdev)."
+    },
+    "arch-2019": {
+      "name": "Arch Linux 2019.11 (Xfce, archive snapshot)",
+      "extends": "arch-history-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/archlinux-2019.11.01-x86_64.iso",
+      "iso_url": "https://archive.archlinux.org/iso/2019.11.01/archlinux-2019.11.01-x86_64.iso",
+      "iso_sha1": "eaa165edab76243cd30a64db472a7a09c9c98a31",
+      "installer_boot": {
+        "kernel": "arch/boot/x86_64/vmlinuz",
+        "initrd": "arch/boot/x86_64/archiso.img"
+      },
+      "archinstall_config": {
+        "hostname": "arch-2019",
+        "archive_date": "2019/11/01"
+      },
+      "ssh_provision": {
+        "hostname": "arch-2019",
+        "ssh_host_port": 2331
+      },
+      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2019 runs one. November 2019: the month after base became a metapackage without a kernel (the kernel is named explicitly, as it is today); kernel 5.3, Xfce 4.14."
+    },
+    "arch-2022": {
+      "name": "Arch Linux 2022.01 (Xfce, archive snapshot)",
+      "extends": "arch-history-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/archlinux-2022.01.01-x86_64.iso",
+      "iso_url": "https://archive.archlinux.org/iso/2022.01.01/archlinux-2022.01.01-x86_64.iso",
+      "iso_sha1": "efc9c33087e756ba1c7f326e67bfaa685eb51be3",
+      "archinstall_config": {
+        "hostname": "arch-2022",
+        "archive_date": "2022/01/01"
+      },
+      "ssh_provision": {
+        "hostname": "arch-2022",
+        "ssh_host_port": 2332
+      },
+      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2022 runs one. January 2022: archinstall on the medium (this flow still installs with its own pacstrap script), kernel 5.15, Xfce 4.16."
+    },
+    "arch-2026": {
+      "name": "Arch Linux 2026.09 (Xfce, archive snapshot)",
+      "extends": "arch-history-base",
+      "meta": {
+        "status": "experimental",
+        "version": "1.0.0"
+      },
+      "iso": "isos/archlinux-2026.09.01-x86_64.iso",
+      "iso_url": "https://archive.archlinux.org/iso/2026.09.01/archlinux-2026.09.01-x86_64.iso",
+      "iso_sha256": "be8458032f8105e60ee2a3067f950b6e3c007ee51b38dac50e8b48e765561c91",
+      "archinstall_config": {
+        "hostname": "arch-2026",
+        "archive_date": "2026/09/01"
+      },
+      "ssh_provision": {
+        "hostname": "arch-2026",
+        "ssh_host_port": 2333
+      },
+      "notes": "Arch Linux as it was on one day: the archived ISO of that month from archive.archlinux.org and pacstrap from the Arch Linux Archive snapshot of the same day (archinstall_config.archive_date), so the installed system is the one of its era, not today's packages. The packagers' keys of that time have expired, so signature checks are off on these guests (SigLevel Never). Xfce on LightDM in every year, the same desktop to compare. Born experimental: vmctl check-vms arch-2026 runs one. September 2026, today's end of the series, pinned like the others to its own snapshot."
+    }
+  }
+}

@@ -27,6 +27,14 @@ def looks_like_html(path: Path) -> bool:
     return prefix.startswith(b"<!doctype html") or prefix.startswith(b"<html")
 
 
+def hash_file(path: Path, algorithm: str) -> str:
+    digest = hashlib.new(algorithm)
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as fh:
@@ -64,6 +72,13 @@ def validate_iso_file(path: Path, vm: dict[str, Any] | None = None) -> list[str]
         actual_sha256 = sha256_file(path)
         if actual_sha256.lower() != str(expected_sha256).lower():
             problems.append(f"sha256 is {actual_sha256}, expected {expected_sha256}")
+    # Some vendors published only SHA-1 for their old media (the Arch Linux archive before 2021);
+    # the pin is still the vendor's own manifest, never a hash computed from a local file.
+    expected_sha1 = vm.get("iso_sha1")
+    if expected_sha1:
+        actual_sha1 = hash_file(path, "sha1")
+        if actual_sha1.lower() != str(expected_sha1).lower():
+            problems.append(f"sha1 is {actual_sha1}, expected {expected_sha1}")
 
     return problems
 
