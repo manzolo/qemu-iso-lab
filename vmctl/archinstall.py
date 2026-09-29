@@ -235,6 +235,7 @@ def render_bootstrap_script(vm_name: str, vm: dict[str, Any]) -> str:
     bootstrap_chroot_commands: list[str] = list(cfg.get("bootstrap_chroot_commands") or [])
     inherit_live_pacman_conf = bool(cfg.get("inherit_live_pacman_conf", False))
     archive_date = str(cfg.get("archive_date") or "").strip()
+    insecure_tls = bool(cfg.get("archive_insecure_tls", False))
     if archive_date and not re.fullmatch(r"\d{4}/\d{2}/\d{2}", archive_date):
         raise VMError(f"archinstall_config.archive_date must be YYYY/MM/DD, not {archive_date!r}")
 
@@ -307,6 +308,13 @@ fi
 echo "==> Using the Arch Linux Archive snapshot of {archive_date}..."
 echo 'Server = {server}' > /etc/pacman.d/mirrorlist
 sed -i 's/^#*SigLevel.*/SigLevel = Never/' /etc/pacman.conf
+"""
+        if insecure_tls:
+            # OpenSSL 1.0.1 (arch-2014) rejects the archive's Let's Encrypt chain ("self signed
+            # certificate in certificate chain") whatever CA bundle it is given. Signatures are
+            # off on these guests already; the download goes through curl -k on the live system.
+            archive_block += """echo "==> Downloading without TLS verification (archive_insecure_tls)..."
+sed -i '/^\\[options\\]/a XferCommand = /usr/bin/curl -k -L -C - -f -o %o %u' /etc/pacman.conf
 """
         target_archive_block = f"""
 echo "==> Keeping the target on the {archive_date} snapshot..."

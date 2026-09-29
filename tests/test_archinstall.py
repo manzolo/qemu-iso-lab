@@ -362,6 +362,11 @@ class ArchinstallLiveIsoTests(BaseVmctlTestCase):
         self.assertIn("sed -i 's/^#*SigLevel.*/SigLevel = Never/' /mnt/etc/pacman.conf", script)
         self.assertIn('[ "$pacstrap_done" = 1 ] || pacstrap $pacstrap_opts /mnt', script)  # retried, the last try under the trap
         self.assertLess(script.index('SEED_DIR="$(dirname'), script.index("pacman -Syy"))  # the seed's CA bundle before any download
+        self.assertNotIn("curl -k", script)  # TLS stays verified unless the profile says otherwise
+        self.vm_config["archinstall_config"]["archive_insecure_tls"] = True
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        self.assertIn("XferCommand = /usr/bin/curl -k -L -C - -f -o %o %u' /etc/pacman.conf", script)
+        self.assertLess(script.index("XferCommand"), script.index("pacman -Syy"))
         self.vm_config["archinstall_config"]["archive_date"] = "2014-01-05"
         with self.assertRaisesRegex(vmctl.archinstall.VMError, "YYYY/MM/DD"):
             vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)

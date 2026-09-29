@@ -9,7 +9,7 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `alpine-ci` | `alpine-virt-3.24.1-x86_64.iso` | [Manifest](https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso.sha256) |
 | `alpine-ci-installed` | `alpine-virt-3.24.1-x86_64.iso` | [Manifest](https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso.sha256) |
 | `arch-2014` | `archlinux-2014.01.05-dual.iso` (SHA-1, `iso_sha1`: the archive publishes no SHA-256 for it) | [Manifest](https://archive.archlinux.org/iso/2014.01.05/sha1sums.txt) |
-| `arch-2019` | `archlinux-2019.11.01-x86_64.iso` (SHA-1, `iso_sha1`) | [Manifest](https://archive.archlinux.org/iso/2019.11.01/sha1sums.txt) |
+| `arch-2019` | `archlinux-2019.12.01-x86_64.iso` (SHA-1, `iso_sha1`) | [Manifest](https://archive.archlinux.org/iso/2019.12.01/sha1sums.txt) |
 | `arch-2022` | `archlinux-2022.01.01-x86_64.iso` (SHA-1, `iso_sha1`) | [Manifest](https://archive.archlinux.org/iso/2022.01.01/sha1sums.txt) |
 | `arch-2026` | `archlinux-2026.09.01-x86_64.iso` | [Manifest](https://archive.archlinux.org/iso/2026.09.01/sha256sums.txt) |
 | `debian-bios` | `debian-13.4.0-amd64-netinst.iso` | [Manifest](https://cdimage.debian.org/mirror/cdimage/archive/13.4.0/amd64/iso-cd/SHA256SUMS) |

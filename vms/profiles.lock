@@ -67,9 +67,14 @@
       ]
     },
     "arch-2014": {
-      "version": "1.0.2",
-      "fingerprint": "sha256:7b1d379353118c00fc4163d7ba7ace9979be9350a98b65271e67b969085f9311",
+      "version": "1.0.3",
+      "fingerprint": "sha256:36bfbff3356e820b4c9dc76a813479cbdd2bb8491954b0269ef611a0b2ece307",
       "history": [
+        {
+          "version": "1.0.3",
+          "date": "2026-09-29",
+          "note": "archive_insecure_tls: OpenSSL 1.0.1 rejects the archive's chain"
+        },
         {
           "version": "1.0.2",
           "date": "2026-09-29",
@@ -88,9 +93,14 @@
       ]
     },
     "arch-2019": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:72d5383db45e818719af6a503ccbd1245780299d40d19ffefa363fae4d66927f",
+      "version": "1.1.0",
+      "fingerprint": "sha256:b90dcd9294cc3f62734175d2aad19d26259c3a0b02bbae7f0ba54ec3e134ee28",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-29",
+          "note": "December 2019 ISO and the 2019/12/31 snapshot: November's libusbmuxd is gone from the archive"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-29",
