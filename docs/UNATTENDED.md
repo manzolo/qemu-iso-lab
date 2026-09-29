@@ -1304,7 +1304,8 @@ Slackware's `setup` is a dialog program without an answer file, but its install 
 complete shell: `rc.S` prints a decorative `slackware login:` (a plain `read`) and busybox
 init then spawns a root shell on the console. `vmctl/slackware.py` boots the DVD's huge
 kernel and initrd (`kernels/huge.s/bzImage`, `isolinux/initrd.img`) with the DVD's own
-command line plus `console=tty0 console=ttyS0,115200`, answers the login, mounts a seed CD
+command line plus `console=tty0 console=ttyS0,115200`, answers the keyboard-map question
+(`Enter 1 to select a keyboard map:`, Enter keeps the US map) and the login, mounts a seed CD
 (the second IDE CD-ROM) at the `:/# ` prompt and runs `install.sh` from it. The script,
 the same for 13.0 (2009) and 15.0 (2022):
 

@@ -2145,7 +2145,7 @@ def cmd_bootstrap_slackware(args: argparse.Namespace) -> int:
     try:
         qemu.run_and_expect(command, expected_text=slackware.BOOTSTRAP_COMPLETE_TOKEN,
                             timeout_sec=getattr(args, "timeout", 3600),
-                            auto_inputs=[(slackware.LIVE_LOGIN_PROMPT, "root\n"),
+                            auto_inputs=[(slackware.LIVE_KEYMAP_PROMPT, "\n"), (slackware.LIVE_LOGIN_PROMPT, "root\n"),
                                          (slackware.LIVE_SHELL_PROMPT, f"\n{slackware.live_trigger_command()}\n")],
                             dry_run=args.dry_run, log_path=serial_log)
     except VMError as exc:

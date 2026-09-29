@@ -28,6 +28,9 @@ BOOTSTRAP_FAILED_TOKEN = "==> Slackware installation FAILED"
 # (bash on 15.0, busybox ash on 13.0) prints PS1 `\u@\h:\w# ` from /etc/profile: the working
 # directory is / on both, the user and host parts differ (ash leaves \u empty; the hostname is
 # never set in the installer), so `:/# ` is what both shells print.
+# Before that, the initrd asks whether to load a non-US keyboard map (a `read` too): Enter keeps
+# the US map, the installed system gets `keymap` from the script (first live run, 2026-09-29).
+LIVE_KEYMAP_PROMPT = "Enter 1 to select a keyboard map: "
 LIVE_LOGIN_PROMPT = "slackware login: "
 LIVE_SHELL_PROMPT = ":/# "
 

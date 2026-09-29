@@ -105,5 +105,6 @@ class SlackwareTests(BaseVmctlTestCase):
         self.assertEqual(command[command.index("-append") + 1], slackware.LIVE_KERNEL_APPEND)
         self.assertEqual(run.call_args.kwargs["expected_text"], slackware.BOOTSTRAP_COMPLETE_TOKEN)
         prompts = [prompt for prompt, _ in run.call_args.kwargs["auto_inputs"]]
-        self.assertEqual(prompts, [slackware.LIVE_LOGIN_PROMPT, slackware.LIVE_SHELL_PROMPT])
+        self.assertEqual(prompts, [slackware.LIVE_KEYMAP_PROMPT, slackware.LIVE_LOGIN_PROMPT, slackware.LIVE_SHELL_PROMPT])
+        self.assertEqual(run.call_args.kwargs["auto_inputs"][0][1], "\n")  # Enter: the US map in the installer
         self.assertFalse((self.root / "artifacts" / self.vm_name / "disk.qcow2").exists())  # a dry run writes nothing

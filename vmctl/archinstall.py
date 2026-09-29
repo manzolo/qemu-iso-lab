@@ -469,7 +469,13 @@ if [ ! -s /mnt/boot/grub/grub.cfg ]; then
 fi
 
 test -s /mnt/boot/grub/grub.cfg
-arch-chroot /mnt grub-script-check /boot/grub/grub.cfg
+# A rejected config is printed whole, numbered: the checker names a line and the disk of a
+# failed row is gone before anyone can read it (arch-2014, GRUB 2.00: "Syntax error at line 160").
+if ! arch-chroot /mnt grub-script-check /boot/grub/grub.cfg; then
+    echo "==> grub-script-check rejected /boot/grub/grub.cfg:"
+    cat -n /mnt/boot/grub/grub.cfg
+    false
+fi
 
 # Replace the plain EFI loader with a standalone GRUB image that embeds the
 # first-stage config and the modules needed to find the root filesystem. This
