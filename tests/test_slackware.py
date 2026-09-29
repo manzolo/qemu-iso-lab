@@ -85,6 +85,7 @@ class SlackwareTests(BaseVmctlTestCase):
                 vm = self.profile(name)
                 script = slackware.render_install_script(name, vm, [])
                 self.assertIn(f'XINITRC={xinitrc}', script)
+                self.assertIn('FULL_SERIES="l"' if xinitrc == "xinitrc.kde" else 'FULL_SERIES=""', script)  # KDE needs the whole l series
                 self.assertIn(" kde" if xinitrc == "xinitrc.kde" else " xfce", script.split('SERIES="', 1)[1].split('"', 1)[0] + " ")
                 self.assertIn(f"-x {process} ", vm["ssh_provision"]["post_install_run"][0])
 

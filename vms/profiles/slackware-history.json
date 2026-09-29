@@ -195,7 +195,7 @@
       "extends": "slackware-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "iso": "isos/slackware64-14.2-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-14.2-iso/slackware64-14.2-install-dvd.iso",
@@ -211,7 +211,10 @@
           "xap",
           "kde"
         ],
-        "xinitrc": "xinitrc.kde"
+        "xinitrc": "xinitrc.kde",
+        "full_series": [
+          "l"
+        ]
       },
       "ssh_provision": {
         "hostname": "slackware-142",
@@ -220,14 +223,14 @@
           "for i in $(seq 1 90); do pgrep -u {{user}} -x plasma-desktop >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x plasma-desktop >/dev/null && { set -- /var/log/packages/kde-workspace-*; [ -e \"$1\" ]; }"
         ]
       },
-      "notes": "Slackware 14.2 (July 2016): kernel 4.4, OpenSSH 7.2 (the ed25519 key works), and KDE SC 4.14 (kde-workspace 4.11) from the kde series (186 ADD+REC packages; xinitrc.kde runs startkde, the check is the user's plasma-desktop). Born experimental: vmctl check-vms slackware-14.2 runs one."
+      "notes": "Slackware 14.2 (July 2016): kernel 4.4, OpenSSH 7.2 (the ed25519 key works), and KDE SC 4.14 (kde-workspace 4.11) from the kde series (186 ADD+REC packages; xinitrc.kde runs startkde, the check is the user's plasma-desktop). Born experimental: vmctl check-vms slackware-14.2 runs one. The l series is installed whole: the tagfiles leave libraries the KDE session needs at OPT (libsqlite3 for ksmserver, found live 2026-09-29)."
     },
     "slackware-15.0": {
       "name": "Slackware 15.0 (KDE Plasma 5.23, unattended, DVD script)",
       "extends": "slackware-history-base",
       "meta": {
         "status": "unattended",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "verified": "2026-09-29"
       },
       "iso": "isos/slackware64-15.0-install-dvd.iso",
@@ -244,7 +247,10 @@
           "xap",
           "kde"
         ],
-        "xinitrc": "xinitrc.kde"
+        "xinitrc": "xinitrc.kde",
+        "full_series": [
+          "l"
+        ]
       },
       "ssh_provision": {
         "hostname": "slackware-150",
@@ -253,7 +259,7 @@
           "for i in $(seq 1 90); do pgrep -u {{user}} -x plasmashell >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x plasmashell >/dev/null && { set -- /var/log/packages/plasma-workspace-*; [ -e \"$1\" ]; }"
         ]
       },
-      "notes": "Slackware 15.0 (February 2022): kernel 5.15, elogind, PAM, OpenSSH 8.8, and KDE Plasma 5.23 from the kde series (367 ADD+REC packages; xinitrc.kde runs startplasma-x11, the check is the user's plasmashell). The series shows three desktops: Xfce up to 14.1, KDE 4 on 14.2, Plasma on 15.0. The Xfce recipe passed live on 2026-09-29 (334 s: 966 packages from the DVD, LILO, tty1 autologin).",
+      "notes": "Slackware 15.0 (February 2022): kernel 5.15, elogind, PAM, OpenSSH 8.8, and KDE Plasma 5.23 from the kde series (367 ADD+REC packages; xinitrc.kde runs startplasma-x11, the check is the user's plasmashell). The series shows three desktops: Xfce up to 14.1, KDE 4 on 14.2, Plasma on 15.0. The Xfce recipe passed live on 2026-09-29 (334 s: 966 packages from the DVD, LILO, tty1 autologin). The l series is installed whole: the tagfiles leave libraries the KDE session needs at OPT (libFLAC for plasma_session, found live 2026-09-29).",
       "memory_mb": 3072
     }
   }

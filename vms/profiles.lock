@@ -1301,9 +1301,14 @@
       ]
     },
     "slackware-14.2": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:7913fbc2fcc192c9738b3c737fc101df6a994cac3be5fc2f6babff0df7300e21",
+      "version": "1.1.1",
+      "fingerprint": "sha256:7929d164f3d87325f4f0579df5d7aaca5b80c620835cddcd7cd70146dafbf829",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-29",
+          "note": "the l series installed whole: ksmserver needs libsqlite3, tagged OPT"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-29",
@@ -1322,9 +1327,14 @@
       ]
     },
     "slackware-15.0": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:e168f7f8de58331063c9b6561602f2fa00e252cc44b8f23d605aeecca3119419",
+      "version": "1.1.1",
+      "fingerprint": "sha256:067733cf558b2c8f913174f0f6c731d156e4bde48c209fb2b2d00790a043415b",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-29",
+          "note": "the l series installed whole: plasma_session needs libFLAC, tagged OPT"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-29",

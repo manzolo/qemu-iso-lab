@@ -79,7 +79,7 @@ def check_profile(vm_name: str, vm: dict[str, Any]) -> None:
         raise VMError(f"{vm_name}: the Slackware install targets the IDE disk (/dev/sda under libata on every release)")
     if not vm.get("ssh_provision"):
         raise VMError(f"{vm_name}: the Slackware bootstrap verifies the guest over SSH: ssh_provision is required")
-    for key in ("series", "packages", "exclude"):
+    for key in ("series", "full_series", "packages", "exclude"):
         value = cfg.get(key)
         if value is not None and (not isinstance(value, list) or not all(isinstance(v, str) and v.strip() for v in value)):
             raise VMError(f"{vm_name}: slackware_config.{key} must be a list of names")
@@ -106,6 +106,10 @@ def render_install_script(vm_name: str, vm: dict[str, Any], keys: list[str]) -> 
     xinitrc = str(cfg.get("xinitrc") or "xinitrc.xfce").strip()
     session_process = str(cfg.get("session_process") or "xfce4-session").strip()
     series = list(cfg.get("series") or DEFAULT_SERIES)
+    # Series installed whole (every package, not only the tagfile's ADD+REC): the KDE sessions need
+    # l-series libraries the tagfiles leave OPT (14.2's ksmserver wants libsqlite3, 15.0's
+    # plasma_session libFLAC, 2026-09-29).
+    full_series = [name for name in (cfg.get("full_series") or []) if name in series]
     packages = list(cfg.get("packages") or DEFAULT_PACKAGES)
     exclude = list(cfg.get("exclude") or DEFAULT_EXCLUDE)
     keys_text = "\n".join(k.strip() for k in keys if k.strip())
@@ -131,6 +135,7 @@ XKB_LAYOUT={shlex.quote(xkb)}
 LOCALE={shlex.quote(locale)}
 XINITRC={shlex.quote(xinitrc)}
 SERIES="{_sh_list(series)}"
+FULL_SERIES="{_sh_list(full_series)}"
 EXTRA_PACKAGES="{_sh_list(packages)}"
 EXCLUDE="{_sh_list(exclude)}"
 
@@ -203,6 +208,7 @@ for s in $SERIES; do
     done
     wanted=/tmp/vmctl-wanted-$s
     grep -E ':(ADD|REC)$' "$dir/tagfile" | cut -d: -f1 > "$wanted" || true
+    for f in $FULL_SERIES; do [ "$f" = "$s" ] && cut -d' ' -f1 "$index" > "$wanted"; done  # the whole series
     for p in $EXTRA_PACKAGES; do
         grep -q "^$p " "$index" && echo "$p" >> "$wanted" || true
     done
