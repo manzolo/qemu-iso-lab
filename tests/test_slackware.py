@@ -94,6 +94,7 @@ class SlackwareTests(BaseVmctlTestCase):
         self.write_config_dir()
         out = io.StringIO()
         with mock.patch.object(lifecycle.iso, "ensure_iso", return_value=self.root / "isos" / "dvd.iso"), \
+             mock.patch.object(lifecycle.runtime, "require_command"), \
              mock.patch.object(lifecycle, "ensure_vm_disk"), \
              mock.patch.object(slackware, "create_seed_iso", return_value=self.root / "seed.iso"), \
              mock.patch.object(slackware, "extract_boot_artifacts", return_value=(self.root / "bzImage", self.root / "initrd.img")), \
