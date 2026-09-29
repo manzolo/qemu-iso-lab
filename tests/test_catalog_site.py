@@ -1,5 +1,7 @@
 """The catalog site: built from the tracked catalog only, self-contained, every profile on it."""
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -58,3 +60,30 @@ class CatalogSiteTests(unittest.TestCase):
         self.assertEqual(by_name["serenityos"]["commands"][0], "vmctl prep serenityos")
         self.assertTrue(by_name["pfsense-lab"]["lab"])
         self.assertEqual(by_name["ubuntu-26.04"]["family_label"], "Debian, Ubuntu and flavours")
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed to exercise browser search")
+    def test_search_matches_os_releases_and_ranks_the_requested_profile_first(self):
+        # Execute the page's actual search against the tracked catalog, including notes
+        # and family labels that previously made "ubuntu 26" match old Debian profiles.
+        search = "function searchProfiles" + build_catalog_site.PAGE.split("function searchProfiles", 1)[1].split("function visible", 1)[0]
+        queries = ["ubuntu 26", "UBUNTU-26.04", "ubuntu", "debian 7", "fedora kde", "arch", "", "no-such-os-zzzzz"]
+        script = search + "\nconst profiles = " + json.dumps(self.data["profiles"]) + ";\n"
+        script += "console.log(JSON.stringify(" + json.dumps(queries) + ".map(q => searchProfiles(profiles, q).map(p => p.name))));"
+        result = subprocess.run(["node"], input=script, capture_output=True, text=True, check=True, timeout=10)
+        release, exact, ubuntu, debian, desktop, arch, all_profiles, empty = json.loads(result.stdout)
+        self.assertEqual(release[0], "ubuntu-26.04")
+        by_name = {p["name"]: p for p in self.data["profiles"]}
+        self.assertTrue(all("ubuntu" in name and "26.04" in by_name[name]["label"] for name in release), release)
+        self.assertIn("kubuntu-26.04", release)
+        self.assertNotIn("ubuntu-24.04", release)
+        self.assertEqual(exact[0], "ubuntu-26.04")
+        self.assertTrue(ubuntu)
+        self.assertFalse(any(name.startswith("debian") for name in ubuntu))
+        self.assertIn("debian-7", debian)
+        self.assertTrue(desktop)
+        self.assertTrue(all("fedora" in name for name in desktop))
+        self.assertTrue(arch)
+        self.assertIn("arch-2026", arch)
+        self.assertFalse(any(name.startswith("debian") for name in arch))
+        self.assertEqual(len(all_profiles), len(self.data["profiles"]))
+        self.assertEqual(empty, [])

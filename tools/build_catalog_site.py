@@ -130,24 +130,17 @@ button:hover { background:#2b3c50; }
 :focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
 button.primary,.primary-link { background:var(--accent); color:#10251f; border:1px solid var(--accent); font-weight:650; }
 .site-header,main { max-width:1320px; margin:auto; padding:0 36px; }
-.brand { display:flex; align-items:center; gap:12px; min-height:88px; border-bottom:1px solid var(--line); }
+.brand { display:flex; align-items:center; gap:12px; min-height:64px; border-bottom:1px solid var(--line); }
 .logo { width:36px; height:36px; border:1px solid #8aead050; border-radius:10px; display:grid; place-items:center; color:var(--accent); background:#8aead012; font:700 18px ui-monospace,monospace; }
 .brand-name { color:var(--text); font-size:17px; font-weight:700; letter-spacing:-.5px; }
 .brand-name b { color:var(--accent); }
 .brand-label { margin-left:4px; padding-left:16px; border-left:1px solid var(--line); color:var(--muted); font-size:12px; }
 .brand nav { margin-left:auto; display:flex; align-items:center; gap:24px; font-size:12px; }
 .brand nav a { color:var(--muted); } .brand nav a:hover { color:var(--accent); }
-.hero { display:grid; grid-template-columns:1.1fr 1fr; gap:64px; align-items:center; padding:58px 0 42px; }
-.eyebrow { color:var(--accent); font-size:10px; letter-spacing:.18em; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:9px; }
-.eyebrow::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 16px #8aead060; }
-h1 { font-size:clamp(36px,4.2vw,56px); line-height:1.1; letter-spacing:-2.5px; margin:18px 0; font-weight:750; }
-h1 span { color:var(--accent); }
-.lead { color:var(--muted); max-width:470px; margin:0 0 24px; font-size:14px; line-height:1.8; }
-.hero-actions { display:flex; align-items:center; gap:22px; font-size:12px; }
-.primary-link { display:inline-flex; align-items:center; gap:24px; border-radius:8px; padding:10px 16px; }
-.primary-link:hover { background:#a7f4df; text-decoration:none; }
-.secondary-link { color:var(--muted); }
-.start { min-width:0; background:linear-gradient(130deg,#17242e,#101820); border:1px solid #33454c; border-radius:14px; box-shadow:0 20px 60px #0003; overflow:hidden; transform:rotate(-1deg); }
+h1 { font-size:26px; line-height:1.2; letter-spacing:-.8px; margin:0 0 6px; }
+.start { margin:12px 0; max-width:680px; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.setup { margin:0 0 8px; }
+.setup > summary { width:fit-content; color:var(--accent); font-size:12px; }
 .terminal-bar { display:flex; align-items:center; gap:6px; border-bottom:1px solid var(--line); padding:13px 17px; background:#ffffff03; }
 .terminal-bar i { width:8px; height:8px; border-radius:50%; background:#ed8e86; } .terminal-bar i:nth-child(2) { background:#e5c17a; } .terminal-bar i:nth-child(3) { background:#88c4a4; }
 .terminal-bar span { color:var(--muted); font:11px ui-monospace,monospace; margin:auto; padding-right:36px; }
@@ -158,15 +151,10 @@ h1 span { color:var(--accent); }
 .terminal-step code::before { content:"$ "; color:var(--accent); }
 .terminal-note { padding:11px 22px; border-top:1px solid var(--line); color:var(--muted); font-size:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
 .terminal-note button { padding:3px 9px; font-size:10px; }
-.metrics { display:flex; gap:0; padding:22px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-.metric { display:flex; align-items:center; gap:12px; padding:0 30px; border-right:1px solid var(--line); }
-.metric:first-child { padding-left:0; } .metric:nth-child(3) { border:0; }
-.metric strong { font-size:26px; font-weight:650; letter-spacing:-1px; line-height:1.1; }
-.metric span { color:var(--muted); font-size:11px; }
-.metric-note { margin-left:auto; color:var(--muted); font-size:11px; display:flex; align-items:center; gap:7px; }
-.metric-note::before { content:"✓"; color:var(--accent); }
+.metrics { display:flex; flex-wrap:wrap; gap:6px 16px; color:var(--muted); font-size:11px; }
+.metrics strong { color:var(--text); font-weight:600; }
 main { padding-bottom:180px; }
-.catalog-heading { display:flex; align-items:center; justify-content:space-between; padding:36px 0 18px; gap:15px; }
+.catalog-heading { display:flex; align-items:center; justify-content:space-between; padding:22px 0 12px; gap:15px; }
 .catalog-heading h2 { font-size:23px; letter-spacing:-.6px; margin:0 0 2px; }
 .catalog-heading p { color:var(--muted); margin:0; font-size:12px; }
 #count { color:var(--muted); font:11px ui-monospace,monospace; white-space:nowrap; }
@@ -187,24 +175,24 @@ main { padding-bottom:180px; }
 #kind { background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:4px; }
 select { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:6px 28px 6px 10px; font-size:11px; max-width:100%; }
 #family { margin-left:auto; }
-h2.family { display:flex; gap:12px; align-items:center; font-size:14px; margin:30px 0 15px; font-weight:600; letter-spacing:-.15px; }
+h2.family { display:flex; gap:12px; align-items:center; font-size:14px; margin:18px 0 12px; font-weight:600; letter-spacing:-.15px; }
 h2.family span { font:10px ui-monospace,monospace; background:var(--panel2); color:var(--muted); padding:2px 7px; border-radius:5px; }
 h2.family::after { content:""; height:1px; background:var(--line); flex:1; margin-left:4px; }
 .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; align-items:start; }
 .card { min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; transition:border-color .2s,box-shadow .2s,transform .2s; }
 .card:hover { border-color:#526174; box-shadow:0 12px 30px #0003; transform:translateY(-3px); }
 .card.picked { border-color:var(--accent); box-shadow:0 0 0 1px #8aead050; }
-.cover { position:relative; height:124px; padding:16px; overflow:hidden; display:flex; align-items:flex-end; background:radial-gradient(ellipse at 80% 90%,color-mix(in srgb,var(--tint) 30%,transparent),transparent 75%),linear-gradient(125deg,#1a2634,#101820); border-bottom:1px solid #ffffff09; }
+.cover { position:relative; height:66px; padding:12px 16px; overflow:hidden; display:flex; align-items:flex-end; background:radial-gradient(ellipse at 80% 90%,color-mix(in srgb,var(--tint) 30%,transparent),transparent 75%),linear-gradient(125deg,#1a2634,#101820); border-bottom:1px solid #ffffff09; }
 .cover::before { content:""; position:absolute; width:180px; height:180px; right:-20px; top:-30px; border:1px solid #ffffff0c; border-radius:50%; box-shadow:0 0 0 27px #ffffff03,0 0 0 54px #ffffff02; }
-.cover > .catalog-icon { position:absolute; right:32px; top:28px; width:66px; height:66px; background:transparent; box-shadow:none; border-radius:0; color:color-mix(in srgb,var(--tint) 60%,white); transform:rotate(-10deg); }
-.cover > .catalog-icon svg { width:60px; height:60px; filter:drop-shadow(0 8px 14px #0004); }
+.cover > .catalog-icon { position:absolute; right:54px; top:10px; width:44px; height:44px; background:transparent; box-shadow:none; border-radius:0; color:color-mix(in srgb,var(--tint) 60%,white); transform:rotate(-10deg); }
+.cover > .catalog-icon svg { width:40px; height:40px; filter:drop-shadow(0 8px 14px #0004); }
 .cover-label { color:#d4dee9; text-transform:uppercase; letter-spacing:.15em; font-size:9px; z-index:1; }
 .cover-top { position:absolute; top:14px; left:16px; color:#c3cfda; font-size:9px; display:flex; align-items:center; gap:6px; }
 .cover-top::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--tint); }
 .pick { position:absolute; right:12px; top:12px; width:29px; height:29px; display:grid; place-items:center; border-radius:8px; font-size:19px; line-height:1; padding:0; background:#0b101766; border-color:#ffffff26; z-index:2; }
 .card.picked .pick { background:var(--accent); color:#10251f; border-color:var(--accent); }
 .card-body { padding:17px; display:flex; flex-direction:column; gap:13px; }
-.card-head { min-width:0; min-height:64px; }
+.card-head { min-width:0; min-height:48px; }
 .card-head .name { font-weight:650; font-size:15px; letter-spacing:-.25px; overflow-wrap:anywhere; line-height:1.4; }
 .card-head .desc { color:var(--muted); font-size:11px; margin-top:4px; overflow-wrap:anywhere; }
 .badges { display:flex; gap:5px; flex-wrap:wrap; font-size:10px; min-height:23px; align-items:flex-start; }
@@ -251,31 +239,27 @@ footer { color:var(--muted); font-size:11px; padding:30px 0 0; }
 .empty strong { display:block; color:var(--text); font-size:18px; margin-bottom:8px; }
 .empty button { margin-top:15px; }
 @media (min-width:1500px) { .site-header,main { max-width:1440px; } }
-@media (max-width:1050px) { .hero { gap:30px; } .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .metric-note { display:none; } .search-row { gap:10px; } #kind { flex-shrink:0; } }
-@media (max-width:760px) { .site-header,main { padding-left:22px; padding-right:22px; } .hero { grid-template-columns:1fr; padding:34px 0 28px; gap:28px; } h1 { font-size:44px; } .start { transform:none; } .lead { max-width:520px; } .brand nav { gap:14px; } .brand-label { display:none; } .metric { padding:0 20px; gap:8px; } .metric strong { font-size:23px; } .metric span { font-size:10px; } .catalog-heading { padding-top:28px; } #kind { width:100%; } #kind button { flex:1; } .filter-label { display:none; } .filter-row { gap:8px; } }
-@media (max-width:520px) { .site-header,main { padding-left:16px; padding-right:16px; } .brand { min-height:70px; } .brand nav a:first-child { display:none; } h1 { font-size:39px; letter-spacing:-1.8px; } .grid { grid-template-columns:1fr; } .metric { flex:1; flex-direction:column; align-items:flex-start; gap:4px; padding:0 16px; } .catalog-heading { align-items:flex-start; } .catalog-heading p { max-width:240px; } #count { padding-top:8px; font-size:10px; } .chips button { padding:6px 8px; font-size:10px; } #family { flex:1 1 100%; margin:0; } .cover { height:120px; } #basket { left:8px; right:8px; bottom:8px; padding:12px; gap:8px; } #basket .cmd { order:3; flex-basis:100%; } #basket small { order:4; } #basket-count { margin-right:auto; } .terminal-body { padding:18px 16px 8px; } }
+@media (max-width:1050px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .search-row { gap:10px; } #kind { flex-shrink:0; } }
+@media (max-width:760px) { .site-header,main { padding-left:22px; padding-right:22px; } .brand nav { gap:14px; } .brand-label { display:none; } #kind { width:100%; } #kind button { flex:1; } .filter-label { display:none; } .filter-row { gap:8px; } }
+@media (max-width:520px) { .site-header,main { padding-left:16px; padding-right:16px; } .brand nav a:first-child { display:none; } h1 { font-size:23px; } .grid { grid-template-columns:1fr; } .catalog-heading { align-items:flex-start; gap:8px; } #count { padding-top:5px; font-size:10px; } .chips button { padding:6px 8px; font-size:10px; } #family { flex:1 1 100%; margin:0; } #basket { left:8px; right:8px; bottom:8px; padding:12px; gap:8px; } #basket .cmd { order:3; flex-basis:100%; } #basket small { order:4; } #basket-count { margin-right:auto; } .terminal-body { padding:18px 16px 8px; } }
 @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .card { transition:none; } .card:hover { transform:none; } }
 </style>
 </head>
 <body>
 <header class="site-header">
   <div class="brand"><a class="logo" href="__REPO__" aria-label="QEMU ISO Lab repository">&gt;_</a><a class="brand-name" href="__REPO__">QEMU <b>ISO Lab</b></a><span class="brand-label">THE VM CATALOG</span><nav aria-label="Main navigation"><a href="__REPO__#readme">Documentation</a><a href="__REPO__">GitHub ↗</a></nav></div>
-  <section class="hero" aria-labelledby="hero-title">
-    <div><div class="eyebrow">Explore. Install. Make it yours.</div><h1 id="hero-title">Your next OS.<br><span>One command away.</span></h1>
-    <p class="lead">From your daily Linux desktop to your next homelab.<br>Explore Linux, BSD and Windows on QEMU/KVM, with ready-to-run profiles and automated installs.</p>
-    <div class="hero-actions"><a class="primary-link" href="#catalog">Explore the catalog <span aria-hidden="true">↓</span></a><a class="secondary-link" href="__REPO__#readme">How it works ↗</a></div></div>
+</header>
+<main id="catalog">
+  <div class="catalog-heading"><div><h1>Find your next machine</h1><div class="metrics"><span><strong id="m-profiles">—</strong> profiles</span><span><strong id="m-unattended">—</strong> automated</span><span><strong id="m-verified">—</strong> verified</span></div></div><span id="count" role="status" aria-live="polite"></span></div>
+  <details class="setup"><summary>New here? Get started</summary>
     <div class="start" id="get-started"><div class="terminal-bar"><i></i><i></i><i></i><span>your lab starts here</span></div><div class="terminal-body">
       <div class="terminal-step"><small>01 / Get the toolkit</small><code>git clone __REPO__.git</code><code>cd qemu-iso-lab</code></div>
       <div class="terminal-step"><small>02 / Set up your host</small><code>./setup.sh</code></div>
       <div class="terminal-step"><small>03 / Open your dashboard</small><code>vmctl web --open</code></div>
     </div><div class="terminal-note"><span>Linux + KVM · Windows 11 + WSL2</span><button data-copy="git clone __REPO__.git &amp;&amp; cd qemu-iso-lab&#10;./setup.sh&#10;vmctl web --open">Copy setup</button></div></div>
-  </section>
-  <div class="metrics"><div class="metric"><strong id="m-profiles">—</strong><span>OS profiles</span></div><div class="metric"><strong id="m-unattended">—</strong><span>Automated installs</span></div><div class="metric"><strong id="m-verified">—</strong><span>Verified live</span></div><span class="metric-note">Open source. Ready to explore.</span></div>
-</header>
-<main id="catalog">
-  <div class="catalog-heading"><div><h2>Find your next machine</h2><p>Pick your profiles. Copy one command. Build your lab.</p></div><span id="count" role="status" aria-live="polite"></span></div>
+  </details>
   <div id="toolbar">
-    <div class="search-row"><div class="search-wrap"><input id="search" type="search" placeholder="Search distributions, desktops, profiles…" autocomplete="off" aria-label="Search profiles"><kbd aria-hidden="true">/</kbd></div>
+    <div class="search-row"><div class="search-wrap"><input id="search" type="search" placeholder="Search profiles… e.g. ubuntu 26, fedora kde" autocomplete="off" aria-label="Search profiles"><kbd aria-hidden="true">/</kbd></div>
     <div class="chips" id="kind" role="group" aria-label="Kind of install"><button data-v="" class="active" aria-pressed="true">All profiles</button><button data-v="unattended" aria-pressed="false">Automated</button><button data-v="manual" aria-pressed="false">Manual</button><button data-v="experimental" aria-pressed="false">Experimental</button></div></div>
     <div class="filter-row"><span class="filter-label">BUILT FOR</span><div class="chips" id="role" role="group" aria-label="Role"><button data-v="" class="active" aria-pressed="true">Any role</button><button data-v="desktop" aria-pressed="false">Desktop</button><button data-v="server" aria-pressed="false">Server</button><button data-v="other" aria-pressed="false">Other</button></div>
     <select id="family" aria-label="Family"><option value="">All OS families</option></select></div>
@@ -301,10 +285,24 @@ const LABELS = [...new Set(DATA.families.map(f => DATA.profiles.find(p => p.fami
 for (const l of LABELS) { const o = document.createElement("option"); o.value = l; o.textContent = l + " (" + DATA.profiles.filter(p => p.family_label === l).length + ")"; $("family").appendChild(o); }
 const ram = (p) => p.memory_mb >= 1024 ? (p.memory_mb / 1024) + " GB" : p.memory_mb + " MB";
 const roleGroup = (p) => ["desktop", "server"].includes(p.role) ? p.role : "other";
+// Match the profile identity, never incidental mentions in notes or a broad family label.
+// Keep numeric release queries out of metadata (dates and recipe versions are not OS releases).
+function searchProfiles(profiles, query) {
+  const normalize = value => String(value || "").toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  const phrase = normalize(query), words = phrase.split(" ").filter(Boolean);
+  if (!words.length) return profiles;
+  return profiles.map(p => {
+    const name = normalize(p.name), label = normalize(p.label), identity = name + " " + label;
+    const tags = normalize([...(p.groups || []), p.role, p.family].join(" "));
+    if (!words.every(w => identity.includes(w) || (!/\d/.test(w) && tags.includes(w)))) return null;
+    const score = (name === phrase ? 1000 : name.startsWith(phrase) ? 500 : label.startsWith(phrase) ? 400 : 0)
+      + words.reduce((sum, w) => sum + (name.split(" ").some(t => t.startsWith(w)) ? 20 : identity.includes(w) ? 10 : 0), 0);
+    return {profile:p, score};
+  }).filter(Boolean).sort((a, b) => b.score - a.score || a.profile.name.localeCompare(b.profile.name, undefined, {numeric:true})).map(r => r.profile);
+}
 function visible() {
-  const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
-  return DATA.profiles.filter(p => words.every(w => (p.name + " " + p.label + " " + p.family + " " + p.family_label + " " + p.groups.join(" ") + " " + p.notes).toLowerCase().includes(w))
-    && (!kind || p.status === kind) && (!role || roleGroup(p) === role) && (!family || p.family_label === family));
+  return searchProfiles(DATA.profiles, $("search").value).filter(p =>
+    (!kind || p.status === kind) && (!role || roleGroup(p) === role) && (!family || p.family_label === family));
 }
 function clipBlock(p) {
   const c = p.clip; if (!c) return "";
@@ -351,7 +349,7 @@ function render() {
   const rows = visible(), byFamily = new Map();
   for (const p of rows) { if (!byFamily.has(p.family_label)) byFamily.set(p.family_label, []); byFamily.get(p.family_label).push(p); }
   $("count").textContent = `${rows.length} / ${DATA.profiles.length} profiles`;
-  $("list").innerHTML = rows.length ? [...byFamily].sort(([a], [b]) => LABELS.indexOf(a) - LABELS.indexOf(b)).map(([label, ps]) => `<h2 class="family">${esc(label)} <span>${ps.length}</span></h2><div class="grid">${ps.map(card).join("")}</div>`).join("") : `<div class="empty"><strong>No matching machines</strong>Try another search or give your filters a little more room.<br><button data-reset>Reset filters</button></div>`;
+  $("list").innerHTML = rows.length ? ($("search").value.trim() ? `<h2 class="family">Search results <span>${rows.length}</span></h2><div class="grid">${rows.map(card).join("")}</div>` : [...byFamily].sort(([a], [b]) => LABELS.indexOf(a) - LABELS.indexOf(b)).map(([label, ps]) => `<h2 class="family">${esc(label)} <span>${ps.length}</span></h2><div class="grid">${ps.map(card).join("")}</div>`).join("")) : `<div class="empty"><strong>No matching machines</strong>Try another search or give your filters a little more room.<br><button data-reset>Reset filters</button></div>`;
   renderBasket();
 }
 function renderBasket() {
