@@ -75,6 +75,24 @@ class FramesTests(BaseVmctlTestCase):
         self.assertEqual(frames[-1], "00051.png")
         self.assertNotIn("00052.png", frames)
 
+    def test_the_clip_never_ends_after_the_frame_the_row_settled_on(self):
+        # KDE's "Logging out in N seconds" countdown: graphical, one new frame a second, after the
+        # desktop (kubuntu-10.04/14.04/16.04, 2026-09-29). Without the mark the clip ends on it.
+        rec = recorder.Recording(self.root / "rec")
+        at = 0.0
+        for i in range(6):  # the desktop
+            rec.add(ppm(32, 32, (200, 120 + i, 60)), at); at += 2
+        for i in range(20):  # the countdown dialog
+            rec.add(ppm(32, 32, (190, 90, 40 + i)), at); at += 1
+        self.assertEqual(rec.final_index(), 25)
+        rec.settled = 5
+        self.assertEqual(rec.final_index(), 5)
+        self.assertEqual(rec.gif_frames(20)[-1].name, "00005.png")
+        rec.save_list(max_hold=4.0, period=1.0)
+        self.assertEqual(recorder.Recording.load(self.root / "rec").settled, 5)  # survives a re-encode
+        rec.settled = 99  # a mark past the end (a hand-edited file) is ignored
+        self.assertEqual(rec.final_index(), 25)
+
     def test_one_canvas_for_a_clip_whose_guest_changes_resolution(self):
         rec = recorder.Recording(self.root / "rec")
         rec.add(ppm(720, 400, (1, 1, 1)), 0.0)
@@ -208,6 +226,7 @@ class FramesTests(BaseVmctlTestCase):
             self.assertIn("no 5s of graphical screen", note)
             recorder._watch_update("vm", True, 3); recorder._watch_update("vm", True, 3)
             self.assertIn("6s of desktop recorded", recorder.linger("vm", seconds=5, timeout=1))
+            self.assertTrue(recorder._WATCHES["vm"]["settled"])  # the recorder marks the frame on screen
             recorder._watch_update("vm", False, 1)  # back to a console: the stretch starts again
             self.assertEqual(recorder._WATCHES["vm"]["graphic"], 0.0)
             try:

@@ -179,6 +179,10 @@ class Recording:
         self.captures = 0
         self.size = (0, 0)
         self._kinds: dict[Path, str] = {}
+        # The frame on screen when the row confirmed its desktop (``linger``): the clip never ends
+        # after it. KDE answers the ACPI power button with a "Logging out in N seconds" countdown,
+        # a new graphical frame every second, and kubuntu-10.04/14.04/16.04 ended on it (2026-09-29).
+        self.settled: int | None = None
 
     def add(self, ppm: bytes, at: float) -> bool:
         """Store the frame unless it repeats the previous one; either way, account for the time."""
@@ -236,15 +240,20 @@ class Recording:
         *window* seconds (PNG at least half the size of the largest), the longest-held."""
         if not self.frames:
             return -1
-        total = sum(held for _, held in self.frames)
+        frames = self.frames
+        if self.settled is not None and 0 <= self.settled < len(frames):
+            if self.kind(self.settled) == "graphic":
+                return self.settled  # the desktop the row confirmed (a KDE splash held longer came just before it)
+            frames = frames[:self.settled + 1]
+        total = sum(held for _, held in frames)
         start, candidates, late = 0.0, [], []
-        for i, (path, held) in enumerate(self.frames):
+        for i, (path, held) in enumerate(frames):
             if start >= total - window:
                 candidates.append(i)
             if start >= total / 2:
                 late.append(i)
             start += held
-        candidates = candidates or [len(self.frames) - 1]
+        candidates = candidates or [len(frames) - 1]
         hold = lambda i: (max(self.frames[i][1], 1.0), i)  # the last frame has no hold yet
         graphic = [i for i in candidates if self.kind(i) == "graphic"]
         if graphic:
@@ -304,6 +313,8 @@ class Recording:
     def save_list(self, max_hold: float, period: float) -> Path:
         listing = self.frames_dir / FRAMES_LIST
         listing.write_text(self.concat_list(max_hold, period), encoding="utf-8")
+        if self.settled is not None:
+            (self.frames_dir / SETTLED_FILE).write_text(f"{self.settled}\n", encoding="utf-8")
         return listing
 
     @classmethod
@@ -323,6 +334,10 @@ class Recording:
                 current = None
         rec.frames = seen
         rec.captures = len(seen)
+        settled = rec.frames_dir / SETTLED_FILE
+        if settled.is_file():
+            with contextlib.suppress(ValueError):
+                rec.settled = int(settled.read_text(encoding="utf-8").strip())
         return rec
 
 
@@ -433,6 +448,7 @@ def _point_latest(directory: Path) -> None:
 # to stop the guest seconds after the desktop check, and a dozen desktop clips of 2026-09-27 had
 # one frame of desktop or none.
 DESKTOP_LINGER_SEC = 15.0
+SETTLED_FILE = "settled"  # next to frames.ffconcat: the index of Recording.settled
 LINGER_TIMEOUT_SEC = 60.0
 _WATCHES: dict[str, dict[str, float]] = {}
 _WATCH_LOCK = threading.Lock()
@@ -462,6 +478,9 @@ def linger(vm_name: str, seconds: float = DESKTOP_LINGER_SEC, timeout: float = L
         with _WATCH_LOCK:
             seen = _WATCHES.get(vm_name, {}).get("graphic", 0.0)
         if seen >= seconds:
+            with _WATCH_LOCK:
+                if vm_name in _WATCHES:
+                    _WATCHES[vm_name]["settled"] = 1.0  # the recorder marks the frame on screen now
             waited = time.monotonic() - started
             return f"{vm_name}: {seen:.0f}s of desktop recorded" + (f" (waited {waited:.0f}s)" if waited >= 1 else "")
         if time.monotonic() >= deadline:
@@ -519,6 +538,9 @@ def record(vm_name: str, vm: dict[str, Any], *, fps: float = DEFAULT_FPS, max_ho
                         say(f"{stored} frames kept of {recording.captures} captures, {now - started:.0f}s")
                 if watch is not None:
                     _watch_update(watch, recording.kind(len(recording.frames) - 1) == "graphic", period)
+                    with _WATCH_LOCK:
+                        if recording.settled is None and _WATCHES.get(watch, {}).get("settled"):
+                            recording.settled = len(recording.frames) - 1
             elif now - last_seen > grace:
                 say(f"the VM has been gone for {grace:g}s: recording ends")
                 break
