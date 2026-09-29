@@ -34,6 +34,7 @@ FAMILY_LABELS = {
     "opensuse": "openSUSE", "nix": "NixOS", "alpine": "Alpine", "void": "Void", "mint": "Linux Mint", "kali": "Kali",
     "bsd": "BSD and pfSense", "proxmox": "Proxmox VE", "haiku": "Haiku", "reactos": "ReactOS", "windows": "Windows",
     "kolibrios": "Hobby systems", "redox": "Hobby systems", "menuetos": "Hobby systems", "serenityos": "Hobby systems",
+    "slackware": "Slackware",
 }
 FAMILY_ORDER = ["debian", "arch", "fedora", "rhel", "opensuse", "nix", "alpine", "void", "mint", "kali", "bsd",
                 "proxmox", "windows", "haiku", "reactos", "kolibrios", "redox", "menuetos", "serenityos"]
@@ -117,110 +118,170 @@ PAGE = r"""<!doctype html>
 <meta name="description" content="Every VM profile of QEMU ISO Lab: Linux, BSD and Windows on QEMU/KVM, installed with zero clicks. Pick the ones you want.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%237ddfc5'/%3E%3Cpath d='M7 8l4 4-4 4M12 16h5' stroke='%230c111b' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
-:root { color-scheme: dark; --bg:#0c111b; --panel:#141d2b; --panel2:#1b2738; --line:#2a374a; --text:#e6edf7; --muted:#9caec5; --accent:#7ddfc5; --ok:#7ddfc5; --warn:#efc582; --bad:#ff9aab; --btn:#223047; }
+:root { color-scheme:dark; --bg:#0b1017; --panel:#131c27; --panel2:#192432; --line:#293646; --text:#edf3fa; --muted:#9aabbe; --accent:#8aead0; --ok:#8aead0; --warn:#f1ca8a; --btn:#202d3d; }
 * { box-sizing:border-box; }
-body { margin:0; background:radial-gradient(ellipse at 80% 0%,#19283b 0,transparent 55%),var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; min-height:100vh; }
+html { scroll-behavior:smooth; scroll-padding-top:180px; }
+body { margin:0; background:radial-gradient(ellipse 70% 650px at 80% 0%,#19333765,transparent),var(--bg); color:var(--text); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
 code,pre,.mono { font-family:ui-monospace,"Cascadia Code",monospace; }
-a { color:var(--accent); }
+a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
 button,input,select { font:inherit; }
-button { cursor:pointer; background:var(--btn); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
-button:hover { background:#2a3a56; }
-button.primary { background:var(--accent); color:#0f1722; border-color:var(--accent); font-weight:600; }
-header { padding:28px 24px 12px; max-width:1240px; margin:0 auto; }
-.brand { display:flex; align-items:center; gap:12px; font-size:22px; font-weight:600; }
-.brand .logo { width:38px; height:38px; border-radius:10px; background:var(--accent); display:grid; place-items:center; color:#0c111b; font-weight:800; }
-.brand span b { color:var(--accent); }
-.brand small { color:var(--muted); font-size:13px; font-weight:400; margin-left:auto; }
-h1 { font-size:30px; margin:18px 0 6px; }
-.lead { color:var(--muted); max-width:760px; margin:0 0 16px; }
-.metrics { display:flex; gap:12px; flex-wrap:wrap; margin:14px 0 6px; }
-.metric { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 18px; min-width:110px; }
-.metric strong { display:block; font-size:24px; }
-.metric span { color:var(--muted); font-size:12px; }
-.start { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:14px 0 0; }
-.start pre { margin:6px 0 0; white-space:pre-wrap; font-size:13px; }
-main { max-width:1240px; margin:0 auto; padding:0 24px 120px; }
-#toolbar { position:sticky; top:0; z-index:5; background:rgba(12,17,27,.92); backdrop-filter:blur(6px); padding:12px 0; display:flex; gap:10px; flex-wrap:wrap; align-items:center; border-bottom:1px solid var(--line); }
-#search { flex:1 1 260px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:9px 12px; color:var(--text); }
-.chips { display:flex; gap:6px; flex-wrap:wrap; }
-.chips button { border-radius:999px; padding:5px 11px; font-size:12px; }
-.chips button.active { background:var(--accent); color:#0f1722; border-color:var(--accent); }
-select { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
-#count { color:var(--muted); font-size:12px; margin-left:auto; }
-h2.family { font-size:16px; margin:26px 0 10px; color:var(--muted); font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
-.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:12px; }
-.card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 14px 12px; display:flex; flex-direction:column; gap:8px; }
-.card.picked { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
-.card-head { display:flex; align-items:center; gap:12px; }
-.card-head .text { min-width:0; flex:1; }
-.card-head .name { font-weight:600; font-size:15px; overflow:hidden; text-overflow:ellipsis; }
-.card-head .desc { color:var(--muted); font-size:12.5px; }
-.pick { flex:0 0 auto; width:34px; height:34px; border-radius:10px; font-size:18px; line-height:1; padding:0; }
-.card.picked .pick { background:var(--accent); color:#0f1722; border-color:var(--accent); }
-.badges { display:flex; gap:6px; flex-wrap:wrap; font-size:11px; }
-.badge { border:1px solid currentColor; border-radius:6px; padding:1px 7px; font-weight:600; }
-.b-unattended { color:var(--ok); } .b-manual { color:var(--muted); } .b-experimental { color:var(--warn); } .b-version { color:#9ebdff; } .b-verified { color:var(--ok); } .b-medium { color:var(--warn); } .b-lab { color:#c9a7ff; } .b-base { color:var(--muted); }
-.facts { display:flex; gap:14px; flex-wrap:wrap; color:var(--muted); font-size:12.5px; }
-.facts b { color:var(--text); font-weight:600; }
-.cmds { background:#0f1622; border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-size:12.5px; position:relative; }
-.cmds pre { margin:0; white-space:pre-wrap; }
-.cmds button { position:absolute; top:6px; right:6px; padding:2px 8px; font-size:11px; }
-details { font-size:12.5px; color:var(--muted); }
-details summary { cursor:pointer; color:var(--text); }
-details p, details ul { margin:6px 0 0; }
-.history li { list-style:none; } .history { padding:0; }
-.history .v { color:#9ebdff; font-family:ui-monospace,monospace; margin-right:6px; }
-.catalog-icon { --icon-color:var(--accent); --icon-ink:#fff; display:inline-flex; align-items:center; justify-content:center; flex:0 0 40px; width:40px; height:40px; border-radius:11px; color:var(--icon-ink); background:linear-gradient(160deg, color-mix(in srgb,var(--icon-color) 92%,#fff), color-mix(in srgb,var(--icon-color) 78%,#0b1220)); box-shadow:inset 0 0 0 1px color-mix(in srgb,#fff 18%,transparent), 0 1px 2px rgba(0,0,0,.35); }
+button { cursor:pointer; background:var(--btn); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px 12px; }
+button:hover { background:#2b3c50; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+button.primary,.primary-link { background:var(--accent); color:#10251f; border:1px solid var(--accent); font-weight:650; }
+.site-header,main { max-width:1320px; margin:auto; padding:0 36px; }
+.brand { display:flex; align-items:center; gap:12px; min-height:88px; border-bottom:1px solid var(--line); }
+.logo { width:36px; height:36px; border:1px solid #8aead050; border-radius:10px; display:grid; place-items:center; color:var(--accent); background:#8aead012; font:700 18px ui-monospace,monospace; }
+.brand-name { color:var(--text); font-size:17px; font-weight:700; letter-spacing:-.5px; }
+.brand-name b { color:var(--accent); }
+.brand-label { margin-left:4px; padding-left:16px; border-left:1px solid var(--line); color:var(--muted); font-size:12px; }
+.brand nav { margin-left:auto; display:flex; align-items:center; gap:24px; font-size:12px; }
+.brand nav a { color:var(--muted); } .brand nav a:hover { color:var(--accent); }
+.hero { display:grid; grid-template-columns:1.1fr 1fr; gap:64px; align-items:center; padding:58px 0 42px; }
+.eyebrow { color:var(--accent); font-size:10px; letter-spacing:.18em; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:9px; }
+.eyebrow::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 16px #8aead060; }
+h1 { font-size:clamp(36px,4.2vw,56px); line-height:1.1; letter-spacing:-2.5px; margin:18px 0; font-weight:750; }
+h1 span { color:var(--accent); }
+.lead { color:var(--muted); max-width:470px; margin:0 0 24px; font-size:14px; line-height:1.8; }
+.hero-actions { display:flex; align-items:center; gap:22px; font-size:12px; }
+.primary-link { display:inline-flex; align-items:center; gap:24px; border-radius:8px; padding:10px 16px; }
+.primary-link:hover { background:#a7f4df; text-decoration:none; }
+.secondary-link { color:var(--muted); }
+.start { min-width:0; background:linear-gradient(130deg,#17242e,#101820); border:1px solid #33454c; border-radius:14px; box-shadow:0 20px 60px #0003; overflow:hidden; transform:rotate(-1deg); }
+.terminal-bar { display:flex; align-items:center; gap:6px; border-bottom:1px solid var(--line); padding:13px 17px; background:#ffffff03; }
+.terminal-bar i { width:8px; height:8px; border-radius:50%; background:#ed8e86; } .terminal-bar i:nth-child(2) { background:#e5c17a; } .terminal-bar i:nth-child(3) { background:#88c4a4; }
+.terminal-bar span { color:var(--muted); font:11px ui-monospace,monospace; margin:auto; padding-right:36px; }
+.terminal-body { padding:19px 22px 10px; }
+.terminal-step { margin-bottom:18px; }
+.terminal-step small { display:block; font-size:10px; color:var(--muted); margin-bottom:5px; letter-spacing:.04em; }
+.terminal-step code { display:block; font-size:11px; overflow-wrap:anywhere; color:#dbe7ef; }
+.terminal-step code::before { content:"$ "; color:var(--accent); }
+.terminal-note { padding:11px 22px; border-top:1px solid var(--line); color:var(--muted); font-size:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.terminal-note button { padding:3px 9px; font-size:10px; }
+.metrics { display:flex; gap:0; padding:22px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.metric { display:flex; align-items:center; gap:12px; padding:0 30px; border-right:1px solid var(--line); }
+.metric:first-child { padding-left:0; } .metric:nth-child(3) { border:0; }
+.metric strong { font-size:26px; font-weight:650; letter-spacing:-1px; line-height:1.1; }
+.metric span { color:var(--muted); font-size:11px; }
+.metric-note { margin-left:auto; color:var(--muted); font-size:11px; display:flex; align-items:center; gap:7px; }
+.metric-note::before { content:"✓"; color:var(--accent); }
+main { padding-bottom:180px; }
+.catalog-heading { display:flex; align-items:center; justify-content:space-between; padding:36px 0 18px; gap:15px; }
+.catalog-heading h2 { font-size:23px; letter-spacing:-.6px; margin:0 0 2px; }
+.catalog-heading p { color:var(--muted); margin:0; font-size:12px; }
+#count { color:var(--muted); font:11px ui-monospace,monospace; white-space:nowrap; }
+#toolbar { position:sticky; top:0; z-index:5; background:#0b1017f5; backdrop-filter:blur(14px); padding:14px 0; border-bottom:1px solid var(--line); }
+.search-row,.filter-row { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+.search-wrap { flex:1 1 280px; position:relative; }
+.search-wrap::before { content:""; position:absolute; left:16px; top:15px; width:10px; height:10px; border:1.5px solid var(--muted); border-radius:50%; }
+.search-wrap::after { content:""; position:absolute; left:26px; top:26px; width:5px; height:1.5px; background:var(--muted); transform:rotate(45deg); }
+#search { width:100%; background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:11px 40px; color:var(--text); font-size:12px; }
+#search::placeholder { color:var(--muted); }
+.search-wrap kbd { position:absolute; right:13px; top:12px; color:var(--muted); border:1px solid var(--line); border-radius:4px; font-size:10px; padding:0 5px; }
+.filter-row { margin-top:12px; gap:10px; }
+.filter-label { font-size:10px; color:var(--muted); margin-right:4px; }
+.chips { display:flex; gap:5px; flex-wrap:wrap; }
+.chips button { border-radius:6px; border-color:transparent; background:transparent; color:var(--muted); padding:6px 10px; font-size:11px; }
+.chips button:hover { color:var(--text); background:var(--panel2); }
+.chips button.active { background:#8aead015; color:var(--accent); border-color:#8aead033; }
+#kind { background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:4px; }
+select { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:6px 28px 6px 10px; font-size:11px; max-width:100%; }
+#family { margin-left:auto; }
+h2.family { display:flex; gap:12px; align-items:center; font-size:14px; margin:30px 0 15px; font-weight:600; letter-spacing:-.15px; }
+h2.family span { font:10px ui-monospace,monospace; background:var(--panel2); color:var(--muted); padding:2px 7px; border-radius:5px; }
+h2.family::after { content:""; height:1px; background:var(--line); flex:1; margin-left:4px; }
+.grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; align-items:start; }
+.card { min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; transition:border-color .2s,box-shadow .2s,transform .2s; }
+.card:hover { border-color:#526174; box-shadow:0 12px 30px #0003; transform:translateY(-3px); }
+.card.picked { border-color:var(--accent); box-shadow:0 0 0 1px #8aead050; }
+.cover { position:relative; height:124px; padding:16px; overflow:hidden; display:flex; align-items:flex-end; background:radial-gradient(ellipse at 80% 90%,color-mix(in srgb,var(--tint) 30%,transparent),transparent 75%),linear-gradient(125deg,#1a2634,#101820); border-bottom:1px solid #ffffff09; }
+.cover::before { content:""; position:absolute; width:180px; height:180px; right:-20px; top:-30px; border:1px solid #ffffff0c; border-radius:50%; box-shadow:0 0 0 27px #ffffff03,0 0 0 54px #ffffff02; }
+.cover > .catalog-icon { position:absolute; right:32px; top:28px; width:66px; height:66px; background:transparent; box-shadow:none; border-radius:0; color:color-mix(in srgb,var(--tint) 60%,white); transform:rotate(-10deg); }
+.cover > .catalog-icon svg { width:60px; height:60px; filter:drop-shadow(0 8px 14px #0004); }
+.cover-label { color:#d4dee9; text-transform:uppercase; letter-spacing:.15em; font-size:9px; z-index:1; }
+.cover-top { position:absolute; top:14px; left:16px; color:#c3cfda; font-size:9px; display:flex; align-items:center; gap:6px; }
+.cover-top::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--tint); }
+.pick { position:absolute; right:12px; top:12px; width:29px; height:29px; display:grid; place-items:center; border-radius:8px; font-size:19px; line-height:1; padding:0; background:#0b101766; border-color:#ffffff26; z-index:2; }
+.card.picked .pick { background:var(--accent); color:#10251f; border-color:var(--accent); }
+.card-body { padding:17px; display:flex; flex-direction:column; gap:13px; }
+.card-head { min-width:0; min-height:64px; }
+.card-head .name { font-weight:650; font-size:15px; letter-spacing:-.25px; overflow-wrap:anywhere; line-height:1.4; }
+.card-head .desc { color:var(--muted); font-size:11px; margin-top:4px; overflow-wrap:anywhere; }
+.badges { display:flex; gap:5px; flex-wrap:wrap; font-size:10px; min-height:23px; align-items:flex-start; }
+.badge { border:1px solid #ffffff10; background:#ffffff04; border-radius:5px; padding:2px 6px; font-weight:500; }
+.b-unattended,.b-verified { color:var(--ok); background:#8aead009; } .b-manual,.b-base { color:var(--muted); } .b-experimental,.b-medium { color:var(--warn); } .b-version { color:#aec4f0; } .b-lab { color:#d1b1f7; }
+.facts { display:flex; gap:15px; flex-wrap:wrap; color:var(--muted); font-size:11px; padding:11px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.facts b { color:var(--text); font-weight:550; }
+.cmds { background:#0b111a; border:1px solid #253242; border-radius:7px; overflow:hidden; }
+.cmd-bar { display:flex; justify-content:space-between; align-items:center; padding:5px 9px; border-bottom:1px solid #ffffff07; color:var(--muted); font-size:9px; }
+.cmds pre { margin:0; padding:9px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; line-height:1.8; color:#c5d6e7; }
+.cmds button { border:0; background:transparent; padding:1px 4px; font-size:9px; color:var(--accent); }
+.card-details { display:flex; flex-wrap:wrap; gap:8px 15px; }
+details { font-size:11px; color:var(--muted); min-width:0; } details[open] { flex-basis:100%; }
+details summary { cursor:pointer; } details summary:hover { color:var(--text); }
+details p,details ul { margin:8px 0 0; overflow-wrap:anywhere; }
+.history { padding:0; } .history li { list-style:none; margin-top:7px; } .history .v { color:#aec4f0; margin-right:6px; }
+.catalog-icon { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:40px; height:40px; color:var(--icon-ink,#fff); background:var(--icon-color,var(--accent)); border-radius:10px; }
 .catalog-icon svg { width:24px; height:24px; }
-.clip { position:relative; border-radius:10px; overflow:hidden; background:#000; border:1px solid var(--line); aspect-ratio:16/10; }
-.clip img, .clip video { display:block; width:100%; height:100%; object-fit:contain; background:#000; }
-.clip .play { position:absolute; inset:0; display:grid; place-items:center; background:linear-gradient(180deg,transparent 40%,#000a); color:#fff; cursor:pointer; border:0; padding:0; }
-.clip .play.mini { inset:auto 8px 8px auto; display:inline-flex; align-items:center; gap:6px; background:#ff0000e6; color:#fff; border-radius:999px; padding:5px 11px 5px 8px; font:600 11.5px system-ui; box-shadow:0 3px 12px #0009; }
-.clip .play.mini::before { content:""; border-style:solid; border-width:6px 0 6px 10px; border-color:transparent transparent transparent #fff; }
-.clip .play.mini:hover { background:#ff2b2b; }
-.clip .play span { width:58px; height:58px; border-radius:50%; background:#ff0000e6; display:grid; place-items:center; box-shadow:0 4px 18px #0008; }
-.clip .play span::after { content:""; border-style:solid; border-width:11px 0 11px 20px; border-color:transparent transparent transparent #fff; margin-left:5px; }
-.clip .play b { position:absolute; left:10px; bottom:8px; font:600 11px system-ui; text-shadow:0 1px 2px #000; }
-.clip .tag { position:absolute; top:8px; left:8px; font:600 10px system-ui; letter-spacing:.06em; text-transform:uppercase; color:#fff; background:#0009; padding:2px 6px; border-radius:4px; }
-.clip .len { position:absolute; right:8px; bottom:8px; font:600 11px ui-monospace,monospace; color:#fff; background:#000b; padding:1px 5px; border-radius:3px; }
-dialog#player { background:#0b0f16; color:var(--text); border:1px solid #2a374a; border-radius:14px; padding:0; width:min(1100px,94vw); box-shadow:0 30px 100px #000c; }
-dialog#player::backdrop { background:#000c; }
-dialog#player header { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid #1f2b3d; }
-dialog#player header .t { font-weight:600; } dialog#player header .s { color:var(--muted); font-size:12px; }
+.clip { position:relative; border-radius:8px; overflow:hidden; background:#000; border:1px solid #253242; aspect-ratio:16/10; }
+.clip img,.clip video { display:block; width:100%; height:100%; object-fit:contain; }
+.clip .play { position:absolute; inset:0; display:grid; place-items:center; background:linear-gradient(180deg,transparent 40%,#000a); color:#fff; border:0; padding:0; }
+.clip .play.mini { inset:auto 8px 8px auto; display:inline-flex; gap:6px; background:#172e28; border:1px solid #8aead080; color:var(--accent); border-radius:6px; padding:5px 10px; font-size:11px; }
+.clip .play.mini::before { content:"▶"; }
+.clip .play span { width:48px; height:48px; border-radius:50%; background:var(--accent); display:grid; place-items:center; }
+.clip .play span::after { content:"▶"; color:#10251f; margin-left:3px; }
+.clip .play b { position:absolute; left:10px; bottom:8px; font-size:11px; }
+.clip .tag { position:absolute; top:8px; left:8px; font-size:9px; color:#fff; background:#0009; padding:2px 6px; border-radius:4px; }
+dialog#player { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:14px; padding:0; width:min(1100px,94vw); box-shadow:0 30px 100px #000c; }
+dialog#player::backdrop { background:#000c; backdrop-filter:blur(6px); }
+dialog#player header { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:12px 16px; border-bottom:1px solid var(--line); }
+dialog#player .t { font-weight:600; } dialog#player .s { color:var(--muted); font-size:12px; }
 dialog#player header button { margin-left:auto; }
 dialog#player video { display:block; width:100%; max-height:76vh; background:#000; }
-dialog#player footer { padding:10px 16px; color:var(--muted); font-size:12px; display:flex; gap:14px; flex-wrap:wrap; }
-dialog#player footer a { color:var(--accent); }
-#basket { position:fixed; left:0; right:0; bottom:0; z-index:6; background:#16283a; border-top:1px solid var(--accent); padding:12px 24px; display:none; gap:12px; align-items:center; flex-wrap:wrap; }
+dialog#player footer { padding:10px 16px; display:flex; gap:14px; flex-wrap:wrap; }
+#basket { position:fixed; left:24px; right:24px; bottom:16px; max-width:1248px; margin:auto; z-index:6; background:#17252ef5; backdrop-filter:blur(16px); border:1px solid #8aead060; border-radius:12px; box-shadow:0 12px 50px #0008; padding:14px 18px; display:none; gap:12px; align-items:center; flex-wrap:wrap; }
 #basket.on { display:flex; }
-#basket .cmd { flex:1 1 320px; background:#0f1622; border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-size:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
-#basket small { color:var(--muted); flex-basis:100%; }
-footer { color:var(--muted); font-size:12px; padding:30px 0 0; }
-.empty { color:var(--muted); padding:30px 0; }
-@media (max-width:520px) { header, main { padding-left:16px; padding-right:16px; } .grid { grid-template-columns:1fr; } }
+#basket-count { font-size:12px; font-weight:600; }
+#basket .cmd { flex:1 1 320px; min-width:0; background:#0b111a; border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:11px; white-space:pre-wrap; overflow-wrap:anywhere; max-height:100px; overflow:auto; }
+#basket small { color:var(--muted); flex-basis:100%; font-size:10px; }
+footer { color:var(--muted); font-size:11px; padding:30px 0 0; }
+.site-footer { border-top:1px solid var(--line); margin-top:40px; display:flex; flex-wrap:wrap; gap:12px 36px; justify-content:space-between; }
+.site-footer details { max-width:760px; }
+.empty { text-align:center; padding:65px 20px; color:var(--muted); border:1px dashed var(--line); border-radius:12px; margin-top:24px; }
+.empty strong { display:block; color:var(--text); font-size:18px; margin-bottom:8px; }
+.empty button { margin-top:15px; }
+@media (min-width:1500px) { .site-header,main { max-width:1440px; } }
+@media (max-width:1050px) { .hero { gap:30px; } .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .metric-note { display:none; } .search-row { gap:10px; } #kind { flex-shrink:0; } }
+@media (max-width:760px) { .site-header,main { padding-left:22px; padding-right:22px; } .hero { grid-template-columns:1fr; padding:34px 0 28px; gap:28px; } h1 { font-size:44px; } .start { transform:none; } .lead { max-width:520px; } .brand nav { gap:14px; } .brand-label { display:none; } .metric { padding:0 20px; gap:8px; } .metric strong { font-size:23px; } .metric span { font-size:10px; } .catalog-heading { padding-top:28px; } #kind { width:100%; } #kind button { flex:1; } .filter-label { display:none; } .filter-row { gap:8px; } }
+@media (max-width:520px) { .site-header,main { padding-left:16px; padding-right:16px; } .brand { min-height:70px; } .brand nav a:first-child { display:none; } h1 { font-size:39px; letter-spacing:-1.8px; } .grid { grid-template-columns:1fr; } .metric { flex:1; flex-direction:column; align-items:flex-start; gap:4px; padding:0 16px; } .catalog-heading { align-items:flex-start; } .catalog-heading p { max-width:240px; } #count { padding-top:8px; font-size:10px; } .chips button { padding:6px 8px; font-size:10px; } #family { flex:1 1 100%; margin:0; } .cover { height:120px; } #basket { left:8px; right:8px; bottom:8px; padding:12px; gap:8px; } #basket .cmd { order:3; flex-basis:100%; } #basket small { order:4; } #basket-count { margin-right:auto; } .terminal-body { padding:18px 16px 8px; } }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .card { transition:none; } .card:hover { transform:none; } }
 </style>
 </head>
 <body>
-<header>
-  <div class="brand"><span class="logo">&gt;_</span><span>QEMU <b>ISO Lab</b> · catalog</span><small>vmctl __VMCTL__ · built __GENERATED____COMMIT__</small></div>
-  <h1>Pick the virtual machines you want</h1>
-  <p class="lead">Every profile of <a href="__REPO__">qemu-iso-lab</a>: Linux, BSD and Windows on QEMU/KVM, most of them installed with zero clicks. Tick the ones you care about, copy the command, and your dashboards open on them.</p>
-  <div class="metrics"><div class="metric"><strong id="m-profiles">—</strong><span>Profiles</span></div><div class="metric"><strong id="m-unattended">—</strong><span>Install themselves</span></div><div class="metric"><strong id="m-verified">—</strong><span>Verified live</span></div></div>
-  <div class="start"><b>Get started</b> · a Linux host with KVM, or Windows 11 with WSL2
-<pre>git clone __REPO__.git &amp;&amp; cd qemu-iso-lab
-./setup.sh              # links vmctl + vmtui, installs what is missing, checks the host
-vmctl web --open        # the dashboard: install, boot, use, checkpoint from the browser</pre></div>
+<header class="site-header">
+  <div class="brand"><a class="logo" href="__REPO__" aria-label="QEMU ISO Lab repository">&gt;_</a><a class="brand-name" href="__REPO__">QEMU <b>ISO Lab</b></a><span class="brand-label">THE VM CATALOG</span><nav aria-label="Main navigation"><a href="__REPO__#readme">Documentation</a><a href="__REPO__">GitHub ↗</a></nav></div>
+  <section class="hero" aria-labelledby="hero-title">
+    <div><div class="eyebrow">Explore. Install. Make it yours.</div><h1 id="hero-title">Your next OS.<br><span>One command away.</span></h1>
+    <p class="lead">From your daily Linux desktop to your next homelab.<br>Explore Linux, BSD and Windows on QEMU/KVM, with ready-to-run profiles and automated installs.</p>
+    <div class="hero-actions"><a class="primary-link" href="#catalog">Explore the catalog <span aria-hidden="true">↓</span></a><a class="secondary-link" href="__REPO__#readme">How it works ↗</a></div></div>
+    <div class="start" id="get-started"><div class="terminal-bar"><i></i><i></i><i></i><span>your lab starts here</span></div><div class="terminal-body">
+      <div class="terminal-step"><small>01 / Get the toolkit</small><code>git clone __REPO__.git</code><code>cd qemu-iso-lab</code></div>
+      <div class="terminal-step"><small>02 / Set up your host</small><code>./setup.sh</code></div>
+      <div class="terminal-step"><small>03 / Open your dashboard</small><code>vmctl web --open</code></div>
+    </div><div class="terminal-note"><span>Linux + KVM · Windows 11 + WSL2</span><button data-copy="git clone __REPO__.git &amp;&amp; cd qemu-iso-lab&#10;./setup.sh&#10;vmctl web --open">Copy setup</button></div></div>
+  </section>
+  <div class="metrics"><div class="metric"><strong id="m-profiles">—</strong><span>OS profiles</span></div><div class="metric"><strong id="m-unattended">—</strong><span>Automated installs</span></div><div class="metric"><strong id="m-verified">—</strong><span>Verified live</span></div><span class="metric-note">Open source. Ready to explore.</span></div>
 </header>
-<main>
+<main id="catalog">
+  <div class="catalog-heading"><div><h2>Find your next machine</h2><p>Pick your profiles. Copy one command. Build your lab.</p></div><span id="count" role="status" aria-live="polite"></span></div>
   <div id="toolbar">
-    <input id="search" type="search" placeholder="Search profiles, distributions, desktops…" autocomplete="off" aria-label="Search">
-    <div class="chips" id="kind" role="group" aria-label="Kind of install"><button data-v="" class="active">All</button><button data-v="unattended">Installs itself</button><button data-v="manual">Manual install</button><button data-v="experimental">Experimental</button></div>
-    <div class="chips" id="role" role="group" aria-label="Role"><button data-v="" class="active">Any role</button><button data-v="desktop">Desktop</button><button data-v="server">Server</button><button data-v="other">Other</button></div>
-    <select id="family" aria-label="Family"><option value="">Every family</option></select>
-    <span id="count"></span>
+    <div class="search-row"><div class="search-wrap"><input id="search" type="search" placeholder="Search distributions, desktops, profiles…" autocomplete="off" aria-label="Search profiles"><kbd aria-hidden="true">/</kbd></div>
+    <div class="chips" id="kind" role="group" aria-label="Kind of install"><button data-v="" class="active" aria-pressed="true">All profiles</button><button data-v="unattended" aria-pressed="false">Automated</button><button data-v="manual" aria-pressed="false">Manual</button><button data-v="experimental" aria-pressed="false">Experimental</button></div></div>
+    <div class="filter-row"><span class="filter-label">BUILT FOR</span><div class="chips" id="role" role="group" aria-label="Role"><button data-v="" class="active" aria-pressed="true">Any role</button><button data-v="desktop" aria-pressed="false">Desktop</button><button data-v="server" aria-pressed="false">Server</button><button data-v="other" aria-pressed="false">Other</button></div>
+    <select id="family" aria-label="Family"><option value="">All OS families</option></select></div>
   </div>
   <div id="list"></div>
-  <footer>Generated from <a href="__REPO__/tree/main/vms/profiles">vms/profiles</a> and <a href="__REPO__/blob/main/vms/profiles.lock">profiles.lock</a> by <code>tools/build_catalog_site.py</code>. Versions: a <i>patch</i> is a fix to the recipe, a <i>minor</i> adds something, a <i>major</i> means an installed VM is no longer comparable. "Verified live" is the last date the maintainer's validation matrix reinstalled the profile from scratch and it passed.</footer>
+  <footer class="site-footer"><span>QEMU ISO Lab · vmctl __VMCTL__<br>Updated __GENERATED____COMMIT__</span><details><summary>About this catalog &amp; verification</summary><p>Generated from <a href="__REPO__/tree/main/vms/profiles">vms/profiles</a> and <a href="__REPO__/blob/main/vms/profiles.lock">profiles.lock</a>. Versions: a <i>patch</i> fixes the recipe, a <i>minor</i> adds something, a <i>major</i> means an installed VM is no longer comparable. “Verified live” is the last date the maintainer's validation matrix reinstalled the profile from scratch and it passed.</p></details><a href="catalog.json">Catalog JSON ↗</a></footer>
 </main>
 <dialog id="player"><header><span class="t" id="player-title"></span><span class="s" id="player-sub"></span><button id="player-close">Close</button></header><video id="player-video" controls playsinline preload="metadata"></video><footer><span>Unattended install recorded with <code>vmctl record</code>: one frame a second, idle screens shortened.</span><a id="player-download" download>Download MP4</a><a id="player-gif" download>GIF</a></footer></dialog>
 <div id="basket"><span id="basket-count"></span><div class="cmd mono" id="basket-cmd"></div><button class="primary" id="basket-copy">Copy</button><button id="basket-clear">Clear</button><small>Run it in your checkout: the profiles land in My VMs (vms/profiles/local.json) and the dashboards open on them. Nothing is downloaded until you install one.</small></div>
@@ -235,24 +296,26 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const picked = new Set(JSON.parse(localStorage.getItem("qil-picked") || "[]").filter(n => DATA.profiles.some(p => p.name === n)));
 let kind = "", role = "", family = "";
 $("m-profiles").textContent = DATA.counts.profiles; $("m-unattended").textContent = DATA.counts.unattended; $("m-verified").textContent = DATA.counts.verified;
-for (const f of DATA.families) { const o = document.createElement("option"); o.value = f; o.textContent = DATA.profiles.find(p => p.family === f).family_label + " (" + DATA.profiles.filter(p => p.family === f).length + ")"; $("family").appendChild(o); }
+// Sections and the family filter go by label: several families can share one ("Hobby systems").
+const LABELS = [...new Set(DATA.families.map(f => DATA.profiles.find(p => p.family === f)?.family_label).filter(Boolean))];
+for (const l of LABELS) { const o = document.createElement("option"); o.value = l; o.textContent = l + " (" + DATA.profiles.filter(p => p.family_label === l).length + ")"; $("family").appendChild(o); }
 const ram = (p) => p.memory_mb >= 1024 ? (p.memory_mb / 1024) + " GB" : p.memory_mb + " MB";
 const roleGroup = (p) => ["desktop", "server"].includes(p.role) ? p.role : "other";
 function visible() {
   const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
   return DATA.profiles.filter(p => words.every(w => (p.name + " " + p.label + " " + p.family + " " + p.family_label + " " + p.groups.join(" ") + " " + p.notes).toLowerCase().includes(w))
-    && (!kind || p.status === kind) && (!role || roleGroup(p) === role) && (!family || p.family === family));
+    && (!kind || p.status === kind) && (!role || roleGroup(p) === role) && (!family || p.family_label === family));
 }
 function clipBlock(p) {
   const c = p.clip; if (!c) return "";
   const style = DATA.clip_style, parts = [];
   if (style === "combo") {
-    if (c.gif) return `<div class="clip"><span class="tag">install</span><img src="${esc(c.gif)}" alt="Time-lapse of the ${esc(p.name)} install" loading="lazy">${c.mp4 ? `<button class="play mini" data-play="${esc(p.name)}" aria-label="Play the install video of ${esc(p.name)}">Video</button>` : ""}</div>`;
-    if (c.mp4) return `<div class="clip"><span class="tag">install · video</span><img src="${esc(c.poster || "")}" alt="" loading="lazy"><button class="play" data-play="${esc(p.name)}" aria-label="Play the install of ${esc(p.name)}"><span></span><b>Watch the install</b></button></div>`;
+    if (c.gif) return `<div class="clip"><span class="tag">install</span><img src="${esc(c.gif)}" alt="Time-lapse of the ${esc(p.name)} install" loading="lazy" decoding="async">${c.mp4 ? `<button class="play mini" data-play="${esc(p.name)}" aria-label="Play the install video of ${esc(p.name)}">Video</button>` : ""}</div>`;
+    if (c.mp4) return `<div class="clip"><span class="tag">install · video</span><img src="${esc(c.poster || "")}" alt="" loading="lazy" decoding="async"><button class="play" data-play="${esc(p.name)}" aria-label="Play the install of ${esc(p.name)}"><span></span><b>Watch the install</b></button></div>`;
     return "";
   }
-  if ((style === "gif" || style === "both") && c.gif) parts.push(`<div class="clip"><span class="tag">install · gif</span><img src="${esc(c.gif)}" alt="Time-lapse of the ${esc(p.name)} install" loading="lazy"></div>`);
-  if ((style === "video" || style === "both") && c.mp4) parts.push(`<div class="clip"><span class="tag">install · video</span><img src="${esc(c.poster || c.gif || "")}" alt="" loading="lazy"><button class="play" data-play="${esc(p.name)}" aria-label="Play the install of ${esc(p.name)}"><span></span><b>Watch the install</b></button></div>`);
+  if ((style === "gif" || style === "both") && c.gif) parts.push(`<div class="clip"><span class="tag">install · gif</span><img src="${esc(c.gif)}" alt="Time-lapse of the ${esc(p.name)} install" loading="lazy" decoding="async"></div>`);
+  if ((style === "video" || style === "both") && c.mp4) parts.push(`<div class="clip"><span class="tag">install · video</span><img src="${esc(c.poster || c.gif || "")}" alt="" loading="lazy" decoding="async"><button class="play" data-play="${esc(p.name)}" aria-label="Play the install of ${esc(p.name)}"><span></span><b>Watch the install</b></button></div>`);
   return parts.join("");
 }
 function openPlayer(name) {
@@ -264,31 +327,31 @@ function openPlayer(name) {
 }
 $("player-close").onclick = () => $("player").close();
 $("player").addEventListener("close", () => { const v = $("player-video"); v.pause(); v.removeAttribute("src"); v.load(); });
+const familyColors = {debian:"#de769b",arch:"#60b5e8",fedora:"#749cf5",rhel:"#76bcc8",opensuse:"#8dc96e",nix:"#8aafe8",alpine:"#65afcc",void:"#91bf7f",mint:"#9fcf7c",kali:"#90a5de",bsd:"#eb9681",windows:"#70b8f8",proxmox:"#ecaa71",slackware:"#7fa6d9",haiku:"#f0c25a",reactos:"#6fb3e0"};
 function card(p) {
-  const badges = [`<span class="badge b-${p.status}">${p.status === "unattended" ? "installs itself" : p.status}</span>`];
+  const badges = [`<span class="badge b-${esc(p.status)}">${p.status === "unattended" ? "Auto install" : p.status === "manual" ? "Manual install" : esc(p.status)}</span>`];
   if (p.version) badges.push(`<span class="badge b-version" title="Profile version">v${esc(p.version)}</span>`);
-  if (p.verified) badges.push(`<span class="badge b-verified" title="Last live PASS of the validation matrix">verified ${esc(p.verified)}</span>`);
-  if (p.medium === "manual") badges.push(`<span class="badge b-medium" title="No public download: the profile says which medium to provide">your own ISO</span>`);
-  if (p.lab) badges.push(`<span class="badge b-lab">lab member</span>`);
-  if (p.extends) badges.push(`<span class="badge b-base" title="The shared recipe this profile extends (vms/profiles: bases)">on ${esc(p.extends)}</span>`);
-  const facts = [`<b>${esc(ram(p))}</b> RAM`, `<b>${esc(p.cpus)}</b> vCPU`, `<b>${esc(p.firmware)}</b>`, p.disk ? `<b>${esc(p.disk)}</b> disk` : "", p.ssh ? `SSH` : "", p.shared_dir ? `shared folder` : ""].filter(Boolean);
-  const history = p.history.length ? `<details><summary>Changes (${p.history.length})</summary><ul class="history">${p.history.map(h => `<li><span class="v">${esc(h.version)}</span>${esc(h.date)} · ${esc(h.note)}</li>`).join("")}</ul></details>` : "";
-  const notes = p.notes ? `<details><summary>Notes</summary><p>${esc(p.notes)}</p></details>` : "";
-  const help = p.iso_help ? `<details><summary>Which medium</summary><p>${esc(p.iso_help)}</p></details>` : "";
-  return `<article class="card${picked.has(p.name) ? " picked" : ""}" data-name="${esc(p.name)}">
-    <div class="card-head">${catalogIcon(osIconKey(p))}<div class="text"><div class="name mono">${esc(p.name)}</div><div class="desc">${esc(p.label)}</div></div><button class="pick" data-pick="${esc(p.name)}" title="${picked.has(p.name) ? "Remove from" : "Add to"} the command below" aria-pressed="${picked.has(p.name)}">${picked.has(p.name) ? "✓" : "+"}</button></div>
-    ${clipBlock(p)}
-    <div class="badges">${badges.join("")}</div>
-    <div class="facts">${facts.map(f => `<span>${f}</span>`).join("")}</div>
-    <div class="cmds"><pre>${p.commands.map(esc).join("\n")}</pre><button data-copy="${esc(p.commands.join("\n"))}">Copy</button></div>
-    ${history}${notes}${help}
+  if (p.verified) badges.push(`<span class="badge b-verified" title="Last live PASS of the validation matrix">✓ ${esc(p.verified)}</span>`);
+  if (p.medium === "manual") badges.push(`<span class="badge b-medium" title="The profile says which medium to provide">Your own ISO</span>`);
+  if (p.lab) badges.push(`<span class="badge b-lab">Lab member</span>`);
+  const facts = [`<b>${esc(ram(p))}</b> RAM`, `<b>${esc(p.cpus)}</b> vCPU`, `<b>${esc(p.firmware)}</b>`, p.disk ? `<b>${esc(p.disk)}</b> disk` : "", p.ssh ? "SSH" : "", p.shared_dir ? "Shared folder" : ""].filter(Boolean);
+  const history = p.history.length ? `<details><summary>Changelog · ${p.history.length}</summary><ul class="history">${p.history.map(h => `<li><span class="v">${esc(h.version)}</span>${esc(h.date)} · ${esc(h.note)}</li>`).join("")}</ul></details>` : "";
+  const notes = p.notes || p.extends ? `<details><summary>Profile notes</summary>${p.extends ? `<p>Based on <code>${esc(p.extends)}</code>.</p>` : ""}${p.notes ? `<p>${esc(p.notes)}</p>` : ""}</details>` : "";
+  const help = p.iso_help ? `<details><summary>Install medium</summary><p>${esc(p.iso_help)}</p></details>` : "";
+  const clips = clipBlock(p);
+  return `<article class="card${picked.has(p.name) ? " picked" : ""}" data-name="${esc(p.name)}" style="--tint:${familyColors[p.family] || "#b3a0df"}">
+    <div class="cover"><span class="cover-top">${esc(p.role || "Virtual machine")}</span>${catalogIcon(osIconKey(p))}<span class="cover-label">${esc(p.family_label)}</span><button class="pick" data-pick="${esc(p.name)}" aria-label="${picked.has(p.name) ? "Remove" : "Select"} ${esc(p.name)}" aria-pressed="${picked.has(p.name)}">${picked.has(p.name) ? "✓" : "+"}</button></div>
+    <div class="card-body"><div class="card-head"><div class="name">${esc(p.label)}</div><div class="desc mono">${esc(p.name)}</div></div>
+    <div class="badges">${badges.join("")}</div><div class="facts">${facts.map(f => `<span>${f}</span>`).join("")}</div>
+    <div class="cmds"><div class="cmd-bar"><span>RUN IN YOUR TERMINAL</span><button data-copy="${esc(p.commands.join("\n"))}" aria-label="Copy commands for ${esc(p.name)}">Copy ↗</button></div><pre>${p.commands.map(esc).join("\n")}</pre></div>
+    ${clips}<div class="card-details">${history}${notes}${help}</div></div>
   </article>`;
 }
 function render() {
   const rows = visible(), byFamily = new Map();
-  for (const p of rows) { if (!byFamily.has(p.family)) byFamily.set(p.family, []); byFamily.get(p.family).push(p); }
-  $("count").textContent = `${rows.length} of ${DATA.profiles.length}`;
-  $("list").innerHTML = rows.length ? [...byFamily].map(([f, ps]) => `<h2 class="family">${esc(ps[0].family_label)} · ${ps.length}</h2><div class="grid">${ps.map(card).join("")}</div>`).join("") : `<p class="empty">No profile matches. Try fewer words or another filter.</p>`;
+  for (const p of rows) { if (!byFamily.has(p.family_label)) byFamily.set(p.family_label, []); byFamily.get(p.family_label).push(p); }
+  $("count").textContent = `${rows.length} / ${DATA.profiles.length} profiles`;
+  $("list").innerHTML = rows.length ? [...byFamily].sort(([a], [b]) => LABELS.indexOf(a) - LABELS.indexOf(b)).map(([label, ps]) => `<h2 class="family">${esc(label)} <span>${ps.length}</span></h2><div class="grid">${ps.map(card).join("")}</div>`).join("") : `<div class="empty"><strong>No matching machines</strong>Try another search or give your filters a little more room.<br><button data-reset>Reset filters</button></div>`;
   renderBasket();
 }
 function renderBasket() {
@@ -304,16 +367,21 @@ async function copy(text, button) {
 }
 document.addEventListener("click", (e) => {
   const pick = e.target.closest("[data-pick]"), copyButton = e.target.closest("[data-copy]");
-  if (pick) { const n = pick.dataset.pick; picked.has(n) ? picked.delete(n) : picked.add(n); const c = pick.closest(".card"); c.classList.toggle("picked", picked.has(n)); pick.textContent = picked.has(n) ? "✓" : "+"; pick.setAttribute("aria-pressed", picked.has(n)); renderBasket(); }
+  if (pick) { const n = pick.dataset.pick; picked.has(n) ? picked.delete(n) : picked.add(n); const c = pick.closest(".card"); c.classList.toggle("picked", picked.has(n)); pick.textContent = picked.has(n) ? "✓" : "+"; pick.setAttribute("aria-pressed", picked.has(n)); pick.setAttribute("aria-label", `${picked.has(n) ? "Remove" : "Select"} ${n}`); renderBasket(); }
   if (copyButton) copy(copyButton.dataset.copy, copyButton);
+  if (e.target.closest("[data-reset]")) {
+    $("search").value = ""; $("family").value = ""; kind = role = family = "";
+    for (const group of ["kind", "role"]) for (const b of $(group).children) { b.classList.toggle("active", b.dataset.v === ""); b.setAttribute("aria-pressed", b.dataset.v === ""); }
+    render(); $("search").focus();
+  }
   const play = e.target.closest("[data-play]"); if (play) openPlayer(play.dataset.play);
 });
-for (const group of ["kind", "role"]) $(group).addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; [...$(group).children].forEach(x => x.classList.toggle("active", x === b)); if (group === "kind") kind = b.dataset.v; else role = b.dataset.v; render(); });
+for (const group of ["kind", "role"]) $(group).addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; [...$(group).children].forEach(x => { x.classList.toggle("active", x === b); x.setAttribute("aria-pressed", x === b); }); if (group === "kind") kind = b.dataset.v; else role = b.dataset.v; render(); });
 $("family").addEventListener("change", () => { family = $("family").value; render(); });
 $("search").addEventListener("input", render);
 $("basket-copy").onclick = () => copy($("basket-cmd").textContent, $("basket-copy"));
 $("basket-clear").onclick = () => { picked.clear(); render(); };
-document.addEventListener("keydown", (e) => { if (e.key === "/" && document.activeElement !== $("search")) { e.preventDefault(); $("search").focus(); } });
+document.addEventListener("keydown", (e) => { if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !$("player").open && !document.activeElement.matches("input,textarea,select,[contenteditable]")) { e.preventDefault(); $("search").focus(); } });
 render();
 </script>
 </body>
