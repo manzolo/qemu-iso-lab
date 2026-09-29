@@ -74,54 +74,41 @@
   },
   "vms": {
     "fedora-cinnamon": {
-      "name": "Fedora Cinnamon 42",
+      "name": "Fedora Cinnamon 42 (kickstart)",
+      "extends": "fedora-kickstart-base",
       "meta": {
         "slug": "fedora-workstation",
-        "family": "fedora",
-        "role": "desktop",
-        "release_model": "stable",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0"
       },
-      "iso": "isos/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
-      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso",
-      "disk": {
-        "path": "artifacts/fedora-cinnamon/disk.qcow2",
-        "size": "32G",
-        "format": "qcow2",
-        "interface": "virtio"
+      "iso": "isos/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+      "iso_sha256": "bd285201494dd0ba09b54d05ac707de1401668b8512a573edb5922dcf9d7067e",
+      "kickstart_config": {
+        "hostname": "fedora-cinnamon",
+        "inst_repo": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/",
+        "packages": [
+          "@cinnamon-desktop-environment",
+          "lightdm",
+          "openssh-server",
+          "sudo",
+          "NetworkManager",
+          "qemu-guest-agent",
+          "spice-vdagent"
+        ],
+        "post_commands": [
+          "install -d -m0755 /etc/lightdm/lightdm.conf.d\nprintf '[Seat:*]\\nautologin-user={{user}}\\nautologin-session=cinnamon\\n' > /etc/lightdm/lightdm.conf.d/50-autologin.conf",
+          "systemctl set-default graphical.target",
+          "systemctl enable --force lightdm.service sshd.service serial-getty@ttyS0.service"
+        ]
       },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/fedora-cinnamon/OVMF_VARS.fd"
+      "ssh_provision": {
+        "ssh_host_port": 2343,
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service lightdm.service --package-manager rpm --package cinnamon --process cinnamon"
+        ]
       },
-      "machine": "q35",
-      "memory_mb": 3072,
-      "cpus": 2,
-      "network": "user",
-      "audio": true,
-      "video": {
-        "default": "std",
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
-      },
-      "usb_tablet": true,
-      "iso_sha256": "673e96e3c8defa8245df35fd722bab207df74011c4fc32b71578294a33e979ba"
+      "notes": "Fedora 44 Cinnamon spin installed with kickstart from the Everything netinst: the @cinnamon-desktop-environment group on LightDM with autologin. Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms fedora-cinnamon runs one; the live ISO it used to boot by hand is a click away in the catalog's history."
     },
     "fedora-server": {
       "name": "Fedora Server 42 Netinst",
@@ -228,104 +215,78 @@
       "iso_sha256": "231f3e0d1dc8f565c01a9f641b3d16c49cae44530074bc2047fe2373a721c82f"
     },
     "fedora-workstation": {
-      "name": "Fedora Workstation 42",
+      "name": "Fedora Workstation 42 (kickstart)",
+      "extends": "fedora-kickstart-base",
       "meta": {
         "slug": "fedora-workstation",
-        "family": "fedora",
-        "role": "desktop",
-        "release_model": "stable",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0"
       },
-      "iso": "isos/Fedora-Workstation-Live-42-1.1.x86_64.iso",
-      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso",
-      "disk": {
-        "path": "artifacts/fedora-workstation/disk.qcow2",
-        "size": "36G",
-        "format": "qcow2",
-        "interface": "virtio"
+      "iso": "isos/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+      "iso_sha256": "bd285201494dd0ba09b54d05ac707de1401668b8512a573edb5922dcf9d7067e",
+      "kickstart_config": {
+        "hostname": "fedora-workstation",
+        "inst_repo": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/",
+        "packages": [
+          "@workstation-product-environment",
+          "openssh-server",
+          "sudo",
+          "NetworkManager",
+          "qemu-guest-agent",
+          "spice-vdagent"
+        ],
+        "post_commands": [
+          "install -d -m0755 /etc/gdm\ncat > /etc/gdm/custom.conf <<'GDMEOF'\n[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin={{user}}\nInitialSetupEnable=False\nGDMEOF",
+          "install -d -m0700 -o {{user}} -g {{user}} /home/{{user}}/.config && echo yes > /home/{{user}}/.config/gnome-initial-setup-done && chown {{user}}:{{user}} /home/{{user}}/.config/gnome-initial-setup-done",
+          "systemctl set-default graphical.target",
+          "systemctl enable --force gdm.service sshd.service serial-getty@ttyS0.service"
+        ]
       },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/fedora-workstation/OVMF_VARS.fd"
+      "ssh_provision": {
+        "ssh_host_port": 2342,
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service gdm.service --package-manager rpm --package gnome-shell --process gnome-shell"
+        ]
       },
-      "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 4,
-      "network": "user",
-      "audio": true,
-      "video": {
-        "default": "std",
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
-      },
-      "usb_tablet": true,
-      "iso_sha256": "98958d80e8a80eabe61275337f969c8e2212adc3a223d9bbdab9411bb1c95cba"
+      "notes": "Fedora 44 Workstation (GNOME) installed with kickstart from the Everything netinst, like fedora-kde: the @workstation-product-environment group, GDM autologin with the initial-setup wizard disabled. Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms fedora-workstation runs one; the live ISO it used to boot by hand is a click away in the catalog's history."
     },
     "fedora-xfce": {
-      "name": "Fedora Xfce 42",
+      "name": "Fedora Xfce 42 (kickstart)",
+      "extends": "fedora-kickstart-base",
       "meta": {
         "slug": "fedora-workstation",
-        "family": "fedora",
-        "role": "desktop",
-        "release_model": "stable",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0"
       },
-      "iso": "isos/Fedora-Xfce-Live-42-1.1.x86_64.iso",
-      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso",
-      "disk": {
-        "path": "artifacts/fedora-xfce/disk.qcow2",
-        "size": "28G",
-        "format": "qcow2",
-        "interface": "virtio"
+      "iso": "isos/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+      "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
+      "iso_sha256": "bd285201494dd0ba09b54d05ac707de1401668b8512a573edb5922dcf9d7067e",
+      "kickstart_config": {
+        "hostname": "fedora-xfce",
+        "inst_repo": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/",
+        "packages": [
+          "@xfce-desktop-environment",
+          "lightdm",
+          "openssh-server",
+          "sudo",
+          "NetworkManager",
+          "qemu-guest-agent",
+          "spice-vdagent"
+        ],
+        "post_commands": [
+          "install -d -m0755 /etc/lightdm/lightdm.conf.d\nprintf '[Seat:*]\\nautologin-user={{user}}\\nautologin-session=xfce\\n' > /etc/lightdm/lightdm.conf.d/50-autologin.conf",
+          "systemctl set-default graphical.target",
+          "systemctl enable --force lightdm.service sshd.service serial-getty@ttyS0.service"
+        ]
       },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/fedora-xfce/OVMF_VARS.fd"
+      "ssh_provision": {
+        "ssh_host_port": 2344,
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service lightdm.service --package-manager rpm --package xfce4-session --process xfce4-session"
+        ]
       },
-      "machine": "q35",
-      "memory_mb": 3072,
-      "cpus": 2,
-      "network": "user",
-      "audio": true,
-      "video": {
-        "default": "std",
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
-      },
-      "usb_tablet": true,
-      "iso_sha256": "c458667014c2e97e026a4bfc94b25899ee8777569734b0559665c50ae267a66d"
+      "notes": "Fedora 44 Xfce spin installed with kickstart from the Everything netinst: the @xfce-desktop-environment group on LightDM with autologin. Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms fedora-xfce runs one; the live ISO it used to boot by hand is a click away in the catalog's history."
     },
     "fedora-niri-dms": {
       "name": "Fedora 44 + niri + DankMaterialShell",

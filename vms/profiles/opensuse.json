@@ -1,26 +1,25 @@
 {
   "vms": {
     "opensuse-tumbleweed-kde": {
-      "name": "openSUSE Tumbleweed KDE Live",
+      "name": "openSUSE Tumbleweed KDE Plasma (AutoYaST)",
       "meta": {
-        "slug": "opensuse-tumbleweed",
+        "slug": "opensuse",
         "family": "opensuse",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0"
       },
-      "iso": "isos/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
-      "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
+      "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_urls": [
-        "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
-        "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso",
-        "https://mirror.dogado.de/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso"
+        "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+        "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+        "https://mirror.dogado.de/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso"
       ],
       "disk": {
         "path": "artifacts/opensuse-tumbleweed-kde/disk.qcow2",
-        "size": "36G",
+        "size": "40G",
         "format": "qcow2",
         "interface": "virtio"
       },
@@ -32,15 +31,19 @@
       },
       "machine": "q35",
       "memory_mb": 4096,
-      "cpus": 4,
+      "cpus": 2,
       "network": "user",
       "audio": true,
       "video": {
         "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
         "variants": {
           "std": [
-            "-vga",
-            "std",
+            "-device",
+            "qxl-vga",
             "-display",
             "gtk"
           ],
@@ -52,7 +55,71 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "guest_agent": true,
+      "clipboard": true,
+      "autoyast_config": {
+        "hostname": "tumbleweed-kde",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "english-us",
+        "language": "en_US",
+        "disk_device": "vda",
+        "install_repo": "https://download.opensuse.org/tumbleweed/repo/oss/",
+        "autologin": true,
+        "open_firewall_services": [
+          "ssh"
+        ],
+        "default_target": "graphical",
+        "products": [
+          "openSUSE"
+        ],
+        "patterns": [
+          "enhanced_base",
+          "kde",
+          "kde_plasma"
+        ],
+        "packages": [
+          "openssh",
+          "qemu-guest-agent",
+          "spice-vdagent",
+          "NetworkManager",
+          "iproute2",
+          "curl",
+          "vim",
+          "sddm"
+        ],
+        "enable_services": [
+          "NetworkManager",
+          "sshd",
+          "qemu-guest-agent"
+        ],
+        "chroot_commands": [
+          "sed -i 's/^DISPLAYMANAGER=.*/DISPLAYMANAGER=\"sddm\"/' /etc/sysconfig/displaymanager",
+          "install -d -m0755 /etc/sddm.conf.d && printf '[Autologin]\\nUser={{user}}\\nSession=plasma.desktop\\n' > /etc/sddm.conf.d/autologin.conf"
+        ],
+        "final_reboot": true
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2345,
+        "ssh_key": null,
+        "post_install_run": [
+          "cat /etc/os-release",
+          "systemctl is-active sshd",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager rpm --package plasma6-desktop --process plasmashell"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ]
+      },
+      "notes": "openSUSE Tumbleweed with KDE Plasma 6 through AutoYaST from the NET installer, like opensuse-tumbleweed-autoyast: the kde and kde_plasma patterns, SDDM as the display manager with autologin. Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms opensuse-tumbleweed-kde runs one."
     },
     "opensuse-tumbleweed-net": {
       "name": "openSUSE Tumbleweed NET",

@@ -285,9 +285,14 @@
       ]
     },
     "centos-7": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:ee3facae98e2ae193453c49d914115812259911c33b9f01c8c2beddd050013aa",
+      "version": "1.1.0",
+      "fingerprint": "sha256:a7611f24871d1765ee62f5ec8486c3f0c414cbbdb1e704e37b253680fb783c0c",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-29",
+          "note": "unattended recipe written ahead of the live run (kickstart / AutoYaST), experimental"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -296,9 +301,14 @@
       ]
     },
     "centos-8": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:df308093d30c00e94e045e74f34744737abdf13a02069b3a47d3304b4d501b5d",
+      "version": "1.1.0",
+      "fingerprint": "sha256:905831ec9f2412910ccc0faa752c074d9aa01a10b3ce3314859dc1cb03b4dad5",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-29",
+          "note": "unattended recipe written ahead of the live run (kickstart / AutoYaST), experimental"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -575,9 +585,14 @@
       ]
     },
     "fedora-cinnamon": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:698b42129f47539eb29d2752f210dc6e8a4aa5ba812b5ee7fb15a5703e4dbc7e",
+      "version": "1.1.0",
+      "fingerprint": "sha256:785c931f34aab96f562e0b0b43dd28a4e60d571505c55ee13c2bec035fe9fa39",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-29",
+          "note": "unattended recipe written ahead of the live run (kickstart / AutoYaST), experimental"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -652,9 +667,14 @@
       ]
     },
     "fedora-workstation": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:d75ed0cc7aedb0852932091e162af139084b650bcce61f49fe26fd8564dc8a1f",
+      "version": "1.1.0",
+      "fingerprint": "sha256:00f229e558027fa24232d294edbd202d36870bc06d45db34e8e055d94f4cacbd",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-29",
+          "note": "unattended recipe written ahead of the live run (kickstart / AutoYaST), experimental"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -663,9 +683,14 @@
       ]
     },
     "fedora-xfce": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:df9a1a797cb5dce9af2241f7fd33b6b88fc5ed45ba56baa9e29b22c424a12278",
+      "version": "1.1.0",
+      "fingerprint": "sha256:202f2365127b19ad864d30ae68ffe755933d07f82a4e3b99fde6fb198ced8c39",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-29",
+          "note": "unattended recipe written ahead of the live run (kickstart / AutoYaST), experimental"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -1081,9 +1106,14 @@
       ]
     },
     "opensuse-tumbleweed-kde": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:fa988ea8a00567e839d8dacc456ff47eb770d50bffeae942a3376fb858d47b6e",
+      "version": "1.1.0",
+      "fingerprint": "sha256:a3960869601c7cf0472085d688905d4251f3471c30b9c7daac1ff7374a65e1eb",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-29",
+          "note": "unattended recipe written ahead of the live run (kickstart / AutoYaST), experimental"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
