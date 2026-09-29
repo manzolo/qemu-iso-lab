@@ -168,7 +168,7 @@ mount -t ext4 "$PART" {TARGET}
 echo "==> Installing packages from the DVD..."
 INSTALLPKG="$(command -v installpkg || echo /usr/lib/setup/installpkg)"
 TERSE=""
-if "$INSTALLPKG" --help 2>&1 | grep -q -- '--terse'; then TERSE="--terse"; fi
+if "$INSTALLPKG" --help 2>&1 | grep -c -- '--terse' >/dev/null; then TERSE="--terse"; fi
 excluded() {{
     local name="$1" x
     for x in $EXCLUDE; do [ "$x" = "$name" ] && return 0; done
@@ -176,7 +176,7 @@ excluded() {{
 }}
 installed_log() {{
     # $1 = package name: is its entry in the target's package log? grep -c reads the whole
-    # listing: under pipefail, `ls | grep -q` quitting at the first match hands ls a SIGPIPE
+    # listing: under pipefail, ls piped into a grep -q that quits at the first match gets a SIGPIPE
     # once the listing outgrows the pipe, and iproute2 sits early in the alphabet (2026-09-29).
     [ "$(ls "{TARGET}/var/log/packages/" | grep -c "^$1-[^-]*-[^-]*-[^-]*$")" -gt 0 ]
 }}
@@ -306,7 +306,7 @@ cat > {TARGET}/usr/local/sbin/vmctl-autologin <<EOF
 exec /bin/login -f $USERNAME
 EOF
 chmod 755 {TARGET}/usr/local/sbin/vmctl-autologin
-if chroot {TARGET} /sbin/agetty --help 2>&1 | grep -q -- '--autologin'; then
+if chroot {TARGET} /sbin/agetty --help 2>&1 | grep -c -- '--autologin' >/dev/null; then
     sed -i "s|^c1:.*|c1:1235:respawn:/sbin/agetty --noclear --autologin $USERNAME 38400 tty1 linux|" {TARGET}/etc/inittab
 else
     # util-linux before 2.20 (Slackware 13.x): no --autologin, but -l runs any login program
@@ -331,7 +331,7 @@ chroot {TARGET} chown -R "$USERNAME:users" "/home/$USERNAME"
 [ -f {TARGET}/etc/X11/xinit/$XINITRC ] || {{ echo "$XINITRC is not on the target: is the desktop installed?"; false; }}
 
 echo "==> LILO..."
-KERNEL="$(cd {TARGET}/boot && ls vmlinuz-huge-* 2>/dev/null | head -1)"
+KERNEL="$(cd {TARGET}/boot && ls vmlinuz-huge-* 2>/dev/null | sed -n '1p')"
 [ -n "$KERNEL" ] || {{ echo "no huge kernel under /boot"; false; }}
 cat > {TARGET}/etc/lilo.conf <<EOF
 # vmctl: LILO on the MBR, the huge kernel (no initrd), the serial port as a console too
