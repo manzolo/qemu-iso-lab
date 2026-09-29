@@ -1136,8 +1136,11 @@ clip and sheet: a stashed VM gets its own artifacts again, any other install
 row loses its test install, so the space a matrix needs is that of the rows
 running together, not of the whole catalog (a full run on 2026-09-29 filled
 389 GB when everything waited for the end). `--keep` keeps every test install,
-`--keep-passed` only the ones that passed. A VM under `vmctl protect` is never
-cleaned: with or without `--restore` its artifacts are moved aside and back.
+`--keep-passed` only the ones that passed. A VM in *My VMs* (a star) that passes
+also keeps the install the row made, so it comes out of the matrix installed and ready;
+one that already had a disk is stashed and restored like a protected one. A VM under
+`vmctl protect` is never cleaned: with or without `--restore` its artifacts are moved
+aside and back.
 The dynamic scheduler also counts disk: a row starts only while the free space
 of `artifacts/` minus 30 GB and the running rows' disks holds its own disk.
 

@@ -184,6 +184,21 @@ class RowCleanupTests(BaseVmctlTestCase):
             cleanup.row_done("stashed", "failed")
             self.assertTrue(kept.exists())
 
+    def test_a_starred_row_that_passes_keeps_its_fresh_install(self):
+        # "fresh" is in My VMs (a star, no disk yet): the matrix installs it and leaves it
+        with mock.patch.object(lifecycle, "cmd_stop"), mock.patch.object(vmstate, "starred_names", return_value={"fresh"}):
+            cleanup = self.cleanup()
+            starred, other = self.install("fresh"), self.install("stashed")
+            cleanup.row_done("fresh", "passed")
+            cleanup.row_done("stashed", "passed")
+            self.assertTrue(starred.exists())
+            self.assertFalse(other.exists())
+            self.assertEqual(cleanup.kept_starred, ["fresh"])
+            cleanup = self.cleanup()
+            failed = self.install("fresh")
+            cleanup.row_done("fresh", "failed")  # a failed row leaves nothing, star or not
+            self.assertFalse(failed.exists())
+
     def test_cluster_nodes_wait_for_the_cluster_check(self):
         cleanup = self.cleanup()
         node = self.install("node1")

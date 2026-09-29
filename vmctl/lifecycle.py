@@ -4173,6 +4173,10 @@ class RowCleanup:
         self.candidates = set(candidates)
         self.keep = bool(getattr(args, "keep", False))
         self.keep_passed = bool(getattr(args, "keep_passed", False))
+        # A starred VM (My VMs) that passes keeps the install the row made: the star says "this one
+        # I use", so the matrix leaves it installed, verified and ready instead of cleaning it
+        # (Manzolo, 2026-09-29). A starred VM that already had a disk is stashed and restored.
+        self.starred = vmstate.starred_names()
         self.dry_run = bool(getattr(args, "dry_run", False))
         report_dir = getattr(args, "_report_dir", None)
         self.report_dir = Path(report_dir) if report_dir else None
@@ -4184,6 +4188,7 @@ class RowCleanup:
         self.restored: list[str] = []
         self.removed: list[str] = []
         self.kept: list[str] = []
+        self.kept_starred: list[str] = []
 
     def row_done(self, name: str, status: str) -> None:
         if name in self.deferred:
@@ -4203,9 +4208,11 @@ class RowCleanup:
             return
         if name not in self.candidates:
             return
-        if self.keep or (self.keep_passed and status == "passed"):
+        if self.keep or (self.keep_passed and status == "passed") or (status == "passed" and name in self.starred):
             with self.lock:
                 self.kept.append(name)
+                if not self.keep and not self.keep_passed:
+                    self.kept_starred.append(name)
             return
         self._keep_evidence(name, status)
         restore_local_test_artifacts({}, dry_run=self.dry_run, fresh=[name])
@@ -4240,6 +4247,8 @@ class RowCleanup:
             ui.print_kv("removed", f"{len(self.removed)} test install(s)")
         if self.kept:
             ui.print_kv("kept", ", ".join(sorted(self.kept)))
+        if self.kept_starred:
+            ui.print_note(f"installed and left ready because they are in My VMs: {', '.join(sorted(self.kept_starred))}")
 
 
 MATRIX_LOCK = ".check-vms.lock"
