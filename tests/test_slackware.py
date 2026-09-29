@@ -21,7 +21,7 @@ class SlackwareTests(BaseVmctlTestCase):
                 vm = self.profile(name)
                 self.assertEqual(lifecycle.local_test_mode(vm)[0], "bootstrap-slackware")
                 slackware.check_profile(name, vm)
-                self.assertEqual(vm["meta"]["status"], "unattended" if name in ("slackware-15.0", "slackware-14.0", "slackware-14.1") else "experimental")  # passed live 2026-09-29
+                self.assertEqual(vm["meta"]["status"], "unattended" if name in ("slackware-15.0", "slackware-14.0", "slackware-14.1", "slackware-14.2") else "experimental")  # passed live 2026-09-29
                 self.assertNotIn("systemctl", json.dumps(vm))  # sysvinit, no systemd anywhere
                 self.assertEqual(vm["ssh_provision"]["key_type" if name < "slackware-14.2" else "user"],
                                  "rsa" if name < "slackware-14.2" else "lab")  # OpenSSH before 7.2: RSA + legacy options

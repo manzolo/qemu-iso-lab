@@ -25,6 +25,12 @@ Add profiles that cover a new axis: firmware, installation flow, operating syste
   `ubuntu-flavors`, `debian-only`, `kali`, `windows-retro`, `netlab`, `smoke`). `vmctl list --groups`
   and [UNATTENDED.md](UNATTENDED.md#running-one-category-instead-of-the-whole-matrix) list them.
 
+## 2026-09-29: Slackware history, Arch 2014, the flavour series wrap-up
+
+- Slackware 15.0 (Plasma 5.23, 474 s), 14.2 (KDE 4.14, 280 s), 14.1 and 14.0 (Xfce 4.10, 231 s) passed live and are promoted with clips; 13.37 and 13.0 wait for their DVDs. What each live run taught: the initrd's keyboard-map question, `/etc/localtime-copied-from` as a symlink, `iproute2` OPT on the DVD, `ls` aliased in the login shell, `pipefail` + `grep -q` losing packages that sit early in the alphabet, the l-series libraries the KDE tagfiles leave OPT (`sqlite`, `flac` in ap).
+- arch-2014 passed (122 s with the host package cache): GRUB 2.00's `grub-script-check` verdict is advisory, X.Org 1.14 gets an fbdev snippet on efifb, systemd 208 gets a pgrep desktop check. Kept `experimental` by decision: the cache is built by the host on the first run.
+- haiku passed again after the identity fix; the full matrix of the afternoon was stopped at 104/165 (61 PASS) and is rerun overnight.
+
 ## Status semantics
 
 Every tracked profile has `meta.status`:
