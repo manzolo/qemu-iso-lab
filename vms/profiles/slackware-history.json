@@ -204,8 +204,9 @@
       "name": "Slackware 15.0 (Xfce 4.16, unattended, DVD script)",
       "extends": "slackware-history-base",
       "meta": {
-        "status": "experimental",
-        "version": "1.0.1"
+        "status": "unattended",
+        "version": "1.0.1",
+        "verified": "2026-09-29"
       },
       "iso": "isos/slackware64-15.0-install-dvd.iso",
       "iso_url": "https://mirrors.slackware.com/slackware/slackware-iso/slackware64-15.0-iso/slackware64-15.0-install-dvd.iso",
@@ -217,7 +218,7 @@
         "hostname": "slackware-150",
         "ssh_host_port": 2339
       },
-      "notes": "Slackware 15.0 (February 2022): kernel 5.15, Xfce 4.16, elogind, OpenSSH 8.8, PAM. Born experimental: vmctl check-vms slackware-15.0 runs one."
+      "notes": "Slackware 15.0 (February 2022): kernel 5.15, Xfce 4.16, elogind, OpenSSH 8.8, PAM. First live PASS 2026-09-29 (334 s: 966 packages from the DVD, LILO, tty1 autologin into Xfce)."
     }
   }
 }

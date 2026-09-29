@@ -67,9 +67,14 @@
       ]
     },
     "arch-2014": {
-      "version": "1.0.6",
-      "fingerprint": "sha256:395892a2574b1df5ff472b7d6566820fee7d13ffdc8d4d224eaaa1d3e9c0e77b",
+      "version": "1.0.7",
+      "fingerprint": "sha256:8051b534ec2770dca7cf8ee4ddea963b39d6e7354727e51de53e7f9bf972e3bc",
       "history": [
+        {
+          "version": "1.0.7",
+          "date": "2026-09-29",
+          "note": "The default Xfce 4.10 panel layout is installed for the user: no first-start panel question in the clip"
+        },
         {
           "version": "1.0.6",
           "date": "2026-09-29",
