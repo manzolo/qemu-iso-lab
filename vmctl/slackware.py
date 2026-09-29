@@ -311,7 +311,7 @@ cat > "$HOME_DIR/.bash_profile" <<'EOF'
 [ -f ~/.bashrc ] && . ~/.bashrc
 # vmctl: the console login on tty1 becomes the desktop session
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-    exec startx >/dev/null 2>&1
+    exec startx >"$HOME/.startx.log" 2>&1
 fi
 EOF
 ln -sf "$XINITRC" {TARGET}/etc/X11/xinit/xinitrc

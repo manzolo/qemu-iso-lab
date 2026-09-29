@@ -57,7 +57,7 @@ class SlackwareTests(BaseVmctlTestCase):
         order = ["Mounting the install DVD", "printf ',,L,*\\n' | sfdisk", "mkfs.ext4", "Installing packages", "installpkg",
                  "USE_DHCP[0]=\"yes\"", "root:$PASSWORD", "useradd -m -g users", "NOPASSWD: ALL", "ssh-rsa TESTKEY vmctl",
                  "UseDNS no", "agetty -L ttyS0 115200 vt100", "exec /bin/login -f $USERNAME", "--autologin",
-                 "exec startx", "exec /bin/sh /etc/X11/xinit/$XINITRC", "==> LILO", "chroot /mnt /sbin/lilo", "umount /mnt\nsync\n",
+                 "exec startx >\"$HOME/.startx.log\" 2>&1", "exec /bin/sh /etc/X11/xinit/$XINITRC", "==> LILO", "chroot /mnt /sbin/lilo", "umount /mnt\nsync\n",
                  slackware.BOOTSTRAP_COMPLETE_TOKEN, "vmctl_poweroff\n"]
         positions = [script.index(piece) for piece in order]
         self.assertEqual(positions, sorted(positions), order)
