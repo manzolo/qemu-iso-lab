@@ -95,6 +95,8 @@ class SlackwareTests(BaseVmctlTestCase):
         out = io.StringIO()
         with mock.patch.object(lifecycle.iso, "ensure_iso", return_value=self.root / "isos" / "dvd.iso"), \
              mock.patch.object(lifecycle, "ensure_vm_disk"), \
+             mock.patch.object(slackware, "create_seed_iso", return_value=self.root / "seed.iso"), \
+             mock.patch.object(slackware, "extract_boot_artifacts", return_value=(self.root / "bzImage", self.root / "initrd.img")), \
              mock.patch.object(lifecycle.qemu, "run_and_expect") as run, \
              mock.patch.object(lifecycle, "start_installed_vm_headless"), \
              mock.patch.object(lifecycle, "run_post_install"), \
