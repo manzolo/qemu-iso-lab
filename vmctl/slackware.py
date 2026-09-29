@@ -210,7 +210,15 @@ for s in $SERIES; do
 done
 echo "    $count packages installed"
 for p in $EXTRA_PACKAGES; do
-    ls {TARGET}/var/log/packages/ | grep -q "^$p-[^-]*-[^-]*-[^-]*$" || {{ echo "$p was not installed (not on the DVD?)"; false; }}
+    if ! ls {TARGET}/var/log/packages/ | grep -q "^$p-[^-]*-[^-]*-[^-]*$"; then
+        # not among the installed packages: say what the DVD has under that name and install it
+        # again, this time with installpkg's own output (14.1 lost iproute2 silently, 2026-09-29)
+        file="$(grep -h "^$p " /tmp/vmctl-index-* 2>/dev/null | head -1 | cut -d' ' -f2-)"
+        echo "$p is not in /var/log/packages after the series pass (${{file:-no such package on the DVD}})"
+        [ -n "$file" ] || false
+        "$INSTALLPKG" --root {TARGET} "$file"
+        ls {TARGET}/var/log/packages/ | grep -q "^$p-[^-]*-[^-]*-[^-]*$" || {{ echo "$p is still missing"; false; }}
+    fi
 done
 
 echo "==> Configuring the system..."
