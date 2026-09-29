@@ -111,12 +111,14 @@ def build_parser() -> argparse.ArgumentParser:
   vmctl catalog remove kali                drop one (its disk, if any, stays)
   vmctl catalog set debian-server          exactly this selection
   vmctl catalog clear                      back to the whole catalog
+  vmctl catalog hide windows-98 menuetos   leave these out of the dashboards' lists (unhide to show them again)
 
 The dashboards (vmctl web, vmtui) open on the My VMs filter while the selection has names: the
 chosen profiles, plus whatever is running right now so that a running VM never hides.
-An empty selection is the whole catalog. Only the view changes: vmctl list, check-vms and the
-groups still see every profile.""")
-    p.add_argument("action", nargs="?", default="list", choices=["list", "add", "remove", "set", "clear"], help="what to do (default: list)")
+An empty selection is the whole catalog. A hidden profile leaves the All / With disk lists (it
+still shows while it runs or holds a disk, and the Hidden filter lists them all); hiding takes
+the star away. Only the view changes: vmctl list, check-vms and the groups still see every profile.""")
+    p.add_argument("action", nargs="?", default="list", choices=["list", "add", "remove", "set", "clear", "hide", "unhide"], help="what to do (default: list)")
     p.add_argument("vms", nargs="*", metavar="vm", help="profile names (add, remove, set)")
     p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     p.add_argument("--names", action="store_true", help="list: only the names, one per line")

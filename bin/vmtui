@@ -673,6 +673,7 @@ state.ROOT = Path(sys.argv[1])
 state.CONFIG_DIR = Path(sys.argv[2])
 VMS = config.load_config()["vms"]
 MINE = set(catalog.selected())  # My VMs: the names chosen in local.json ("catalog")
+HIDDEN = set(catalog.hidden())  # vmctl catalog hide: left out of the lists unless running or with a disk
 FLAGGED = vmstate.flagged_names()  # vmctl protect; a starred VM with a disk is protected too (vmstate.protection_reason)
 
 
@@ -735,6 +736,7 @@ def facts(name, vm):
     return {
         "name": name,
         "mine": name in MINE,
+        "hidden": name in HIDDEN,
         "protected": protected_by is not None,
         "protected_by": protected_by,  # "flag" (vmctl protect) or "star" (My VMs + a disk with data)
         "job_status": tui_jobs.status(tui_jobs.job_dir(state.ROOT, name)),
@@ -915,6 +917,11 @@ running = sum(1 for f in rows if f["running"])
 
 if mode == "auto":
     mode = "mine" if any(f["mine"] for f in rows) else "all"
+if mode == "hidden":
+    rows = [f for f in rows if f["hidden"]]
+else:
+    # A hidden profile leaves every list, unless it runs or holds a disk (never out of sight then).
+    rows = [f for f in rows if not f["hidden"] or f["running"] or f["installed"]]
 if mode == "mine":
     # My VMs, plus whatever runs right now: a running VM never hides.
     rows = [f for f in rows if f["mine"] or f["running"]]
@@ -2693,12 +2700,14 @@ choose_filter() {
         "All"       "Every profile in the catalog" \
         "Installed" "Only VMs that have a disk image (installed or just prepared)" \
         "Running"   "Only VMs running right now" \
+        "Hidden"    "The profiles you hid (vmctl catalog hide); unhide to list them again" \
         "Family"    "Pick a distro family (arch, debian, fedora, ...)") || return 0
     case "$selected" in
         "My VMs") dash_mode="mine"; dash_value="" ;;
         All) dash_mode="all"; dash_value="" ;;
         Installed) dash_mode="installed"; dash_value="" ;;
         Running) dash_mode="running"; dash_value="" ;;
+        Hidden) dash_mode="hidden"; dash_value="" ;;
         Family)
             local -a family_items
             mapfile -t family_items < <(list_family_menu_items)

@@ -13,7 +13,11 @@ What the page offers:
 - **Profiles**: every profile with its live state, search (`/`) and the filters of the dashboard
   (My VMs, All, With disk, Running, Labs). The × in the search box clears the text and keeps the current filter.
 - **My VMs**: the profiles you chose out of the catalog (plus whatever is running right now,
-  so a running VM never hides). Choose them with *Add to My VMs* (right-click a row,
+  so a running VM never hides). Its opposite is **Hide from the lists** (right-click a row, or a
+  selection): a hidden profile leaves All and With disk, still shows while it runs or holds a
+  disk, and the *Hidden* chip (shown while there are any) lists them to bring them back;
+  hiding takes the star away. `vmctl catalog hide|unhide` from the terminal; `check-vms`,
+  groups and `vmctl list` still see every profile. Choose them with *Add to My VMs* (right-click a row,
   the ☆ button of the details panel, or a multiple selection), and the page opens on that view
   from then on; the chosen profiles carry a ★ in every view. The selection is
   `vmctl catalog add|remove|set|clear` and lives in `vms/profiles/local.json` under `catalog`
@@ -217,6 +221,7 @@ The page can delete disks and start anything `vmctl` can, so:
 | POST | `/api/vm/<vm>/files-upload?path=…&name=…` | raw file body, at most 256 MiB; returns the saved name/path/size without replacing existing files |
 | POST | `/api/vm/<vm>/files-session` / `files-session-close` | open (and close) one SFTP session that several sequential uploads share (`?session=` on `files-upload`); 8 sessions at most, idle ones expire after 60 s |
 | GET / POST | `/api/identity` | the guest identity of local.json: `{exists, path, identity: {user, realname, has_password, has_hash}, defaults}`; save `{"user", "password" (empty keeps the current one), "realname", "store_password"}`: creates the file on a fresh checkout, keeps every other key afterwards |
+| POST | `/api/catalog` | `{"action": add|remove|set|clear|hide|unhide, "names": [...]}`: My VMs and the hidden profiles (`vmctl catalog`), saved in local.json |
 | POST | `/api/protect` | `{"action": "add"|"remove", "names": [...]}`: `vmctl protect`/`unprotect`, saved in local.json; the 🔒 of the details panel. A VM in *My VMs* whose disk holds data is protected as well (`protected_by: star` in the rows): the star, not this call, unlocks it |
 | GET | `/api/vm/<vm>/connections` | the *Integration* panel's checks: console, SSH (key rejected / algorithm mismatch / port closed), guest agent, SFTP, clipboard channel; read-only probes of 3 s, cached 5 s |
 | POST | `/api/vm/<vm>/diagnostics` | a text report of fixed read-only commands (system, network, storage, services, logs, APT/DNF state; Windows has its own list; sysvinit guests get no `journalctl`), as root when `sudo -n` works, 10 s / 128 KiB per command, plus the tails of the serial logs; also saved as `artifacts/<vm>/logs/diagnostics-<utc>.txt` |

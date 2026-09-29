@@ -22,7 +22,10 @@ def visible_rows(rows: list[Facts], query: str, mode: str) -> list[Facts]:
                 and (mode != "disk" or row["prepared"])
                 and (mode != "running" or row["running"])
                 # My VMs: the selection, plus whatever runs right now (a running VM never hides).
-                and (mode != "mine" or row.get("mine") or row["running"])]
+                and (mode != "mine" or row.get("mine") or row["running"])
+                # Hidden profiles leave every list unless they run or hold a disk; "hidden" lists them.
+                and (row.get("hidden", False) if mode == "hidden"
+                     else not row.get("hidden") or row["running"] or row["installed"])]
     return sorted(selected, key=lambda row: (
         not row["running"], not row["installed"], not row["prepared"],
         natural_key(row["name"]),

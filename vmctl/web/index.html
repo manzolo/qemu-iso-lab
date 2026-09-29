@@ -655,7 +655,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 </section>
 <div id="toolbar">
   <div class="search-box"><input id="search" aria-label="Search profiles" placeholder="Search profiles or distributions…" autocomplete="off"><kbd>/</kbd><button id="search-clear" class="hidden" aria-label="Clear search" title="Clear search">×</button></div>
-  <div class="filters" role="group" aria-label="Profile filters"><button data-filter="mine" aria-pressed="false" title="The profiles you chose (plus whatever is running)">My VMs</button><button data-filter="all" class="active" aria-pressed="true">All</button><button data-filter="disk" aria-pressed="false">With disk</button><button data-filter="running" aria-pressed="false">Running</button><button data-filter="labs" aria-pressed="false">Labs</button></div>
+  <div class="filters" role="group" aria-label="Profile filters"><button data-filter="mine" aria-pressed="false" title="The profiles you chose (plus whatever is running)">My VMs</button><button data-filter="all" class="active" aria-pressed="true">All</button><button data-filter="disk" aria-pressed="false">With disk</button><button data-filter="running" aria-pressed="false">Running</button><button data-filter="labs" aria-pressed="false">Labs</button><button data-filter="hidden" aria-pressed="false" class="hidden" title="The profiles you hid from the lists (right-click a row to show it again)">Hidden</button></div>
   <button id="all-commands">Commands <kbd>F10</kbd></button>
 </div>
 <div id="activity-panel" popover="auto" role="region" aria-label="Latest activity details"><div class="activity-copy"><div class="eyebrow">Latest activity</div><strong id="activity-status" role="status"></strong><span id="activity-command"></span></div><div class="job-controls"><button id="activity-log">View log</button><button id="activity-cancel" class="danger hidden">Cancel job</button><button id="activity-dismiss" class="hidden" aria-label="Dismiss completed activity" title="Keep in Recent activity">Dismiss</button></div></div>
@@ -954,6 +954,7 @@ function actionsFor(r) {
   }
   if (!r.running && (r.prepared || r.installed)) a.push({ label: r.protected ? (r.protected_by === "star" ? "Clean: protected by My VMs (remove the star first)" : "Clean: protected (unprotect first)") : "Clean: delete the disk", args: ["clean", n], disabled:busy || !!r.protected, danger: true, icon:"trash", tone:"bad" });
   a.push({ label: r.mine ? "Remove from My VMs" : "Add to My VMs", mine: r.mine ? "remove" : "add", icon:"star", tone:"info" });
+  a.push({ label: r.hidden ? "Show in the lists again" : "Hide from the lists", hide: r.hidden ? "unhide" : "hide", icon:"list", tone:"info" });
   if (r.protected || r.prepared || r.installed) a.push(r.protected_by === "star" ? { label: "Protected by My VMs: remove the star to unlock", protect: "star", icon:"lock", tone:"info", disabled: true }
     : { label: r.protected ? "Unprotect the disk" : "Protect the disk", protect: r.protected ? "remove" : "add", icon:"lock", tone:"info" });
   a.push({ label: "All commands for " + n + "…", form: n, icon:"list" });
@@ -966,6 +967,16 @@ async function setMine(action, names) {
     const changed = [...result.added, ...result.removed];
     toast(changed.length ? `${result.added.length ? "Added to" : "Removed from"} My VMs: ${changed.join(", ")}` : "My VMs unchanged.");
     if (!result.selected.length && filter === "mine") setFilter("all");
+    await refresh(true);
+  } catch (e) { toast(e.message, true); }
+}
+// vmctl catalog hide / unhide: the lists leave the profile out (it still runs, installs and is checked); saved in local.json.
+async function setHidden(action, names) {
+  try {
+    const result = await api("/api/catalog", { action, names });
+    const changed = [...result.added, ...result.removed];
+    toast(changed.length ? `${result.added.length ? "Hidden from the lists" : "Shown again"}: ${changed.join(", ")}` : "Nothing changed.");
+    if (!result.selected.length && filter === "hidden") setFilter("all");
     await refresh(true);
   } catch (e) { toast(e.message, true); }
 }
@@ -1133,7 +1144,9 @@ function visible() {
   return S.vms.filter((r) => (!members || members.includes(r.name)) && words.every((w) => (r.name + " " + r.label + " " + r.family).toLowerCase().includes(w))
     && (filter !== "disk" || r.prepared) && (filter !== "running" || r.running)
     // My VMs: the chosen profiles plus whatever runs right now (a running VM never hides).
-    && (filter !== "mine" || r.mine || r.running))
+    && (filter !== "mine" || r.mine || r.running)
+    // Hidden profiles (vmctl catalog hide) leave every list unless they run or hold a disk; the Hidden filter lists them all.
+    && (filter === "hidden" ? r.hidden : (!r.hidden || r.running || r.installed)))
     .sort((x, y) => (y.running - x.running) || (y.installed - x.installed) || (y.prepared - x.prepared) || x.name.localeCompare(y.name, undefined, { numeric: true }));
 }
 function updateProfileRows(html) {
@@ -1175,7 +1188,9 @@ function render() {
   if (labs) return renderLabs();
   const rows = visible();
   const total = inLab ? S.labs.find(lab => lab.group === labProfile.group)?.members.length || 0 : all.length;
-  $("list-title").textContent = `${inLab ? "Lab machines" : filter === "mine" ? "My VMs" : "Profiles"}  ${rows.length} / ${total}`;
+  $("list-title").textContent = `${inLab ? "Lab machines" : filter === "mine" ? "My VMs" : filter === "hidden" ? "Hidden profiles" : "Profiles"}  ${rows.length} / ${total}`;
+  const hiddenCount = S.vms.filter(r => r.hidden).length, hiddenChip = document.querySelector('[data-filter="hidden"]');
+  if (hiddenChip) { hiddenChip.classList.toggle("hidden", !hiddenCount); hiddenChip.textContent = `Hidden ${hiddenCount || ""}`.trim(); }
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
   if (inLab) {
     $("lab-origin").textContent = labProfile.group;
@@ -1186,7 +1201,7 @@ function render() {
   if (dragVm || dragState.start) return;
   const focused = document.activeElement, focusedVm = focused.closest?.("#rows [data-vm]")?.dataset.vm;
   const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : null;
-  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.hidden ? '<span class="style-tag" title="Hidden from the lists: shown here because it runs or holds a disk, or because the Hidden filter is on">hidden</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : '<span class="style-tag" title="You install it by hand">manual</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">${filter === "mine" && !$("search").value ? "Nothing in My VMs yet. Choose All, then right-click a profile (or select several) and Add to My VMs." : "No matching profiles."}</td></tr>`);
   bindStateLogs($("rows"));
   if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
@@ -1227,7 +1242,7 @@ function renderDetails() {
   // The panel: All commands… stays in sight; the My VMs entry is the ★ button of the heading (the context menu keeps both).
   const secondary = a => !a.primary && (a.danger || a.screen || ["attach","checkpoint"].includes(a.args?.[0]));
   const actionButton = (x,i) => `<button aria-label="${esc(x.label)}" data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
-  const mainActions = actions.map((a,i) => secondary(a) || a.mine || a.protect ? "" : actionButton(a,i)).join("");
+  const mainActions = actions.map((a,i) => secondary(a) || a.mine || a.protect || a.hide ? "" : actionButton(a,i)).join("");
   const extraActions = actions.map((a,i) => ({a,i})).filter(({a}) => secondary(a)).sort((x,y) => Number(!!x.a.danger)-Number(!!y.a.danger));
   $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<div class="profile-title"><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div></div></div>${stateBadge(r)}
     <div class="actions primary-actions">${mainActions}</div>
@@ -1328,6 +1343,7 @@ function runAction(r, a) {
   if (a.help) { $("help-title").textContent = "ISO needed: " + r.name; $("help-text").textContent = (r.iso_help || "").replace(/\\n/g, "\n"); return $("help-dialog").showModal(); }
   if (a.form) return openCommands(a.form);
   if (a.mine) return setMine(a.mine, [r.name]);
+  if (a.hide) return setHidden(a.hide, [r.name]);
   if (a.protect) return setProtect(a.protect, [r.name]);
   run(a.args, a.danger);
 }
@@ -2629,6 +2645,9 @@ function selectionContextEntries() {
   });
   const [mineAction, mineNames] = selectionMine();
   entries.push({label:`${mineAction === "add" ? "Add selected to" : "Remove selected from"} My VMs (${mineNames.length})`, group:"Selection actions", icon:"star", disabled:!mineNames.length, run:()=>$("selection-mine").click()});
+  const hideRows = S.vms.filter(r => checkedVms.has(r.name)), toHide = hideRows.filter(r => !r.hidden).map(r => r.name);
+  const [hideAction, hideNames] = toHide.length ? ["hide", toHide] : ["unhide", hideRows.map(r => r.name)];
+  entries.push({label:`${hideAction === "hide" ? "Hide selected from the lists" : "Show selected again"} (${hideNames.length})`, group:"Selection actions", icon:"list", disabled:!hideNames.length, run:()=>setHidden(hideAction, hideNames)});
   entries.push({label:"Clear selection", group:"Selection", icon:"list", run:()=>$("selection-clear").click()});
   return entries;
 }

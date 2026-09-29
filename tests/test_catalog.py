@@ -76,6 +76,34 @@ class CatalogTests(BaseVmctlTestCase):
         self.assertEqual(code, 0)
         return output.getvalue()
 
+    def test_hidden_profiles_leave_the_lists_and_a_star_and_hidden_exclude_each_other(self):
+        from vmctl import tui_bridge
+        self.assertEqual(catalog.hidden(), [])
+        catalog.update("add", ["other", self.vm_name], self.cfg)
+        result = catalog.update_hidden("add", ["other", "third"], self.cfg)
+        self.assertEqual(result["added"], ["other", "third"])
+        self.assertEqual(self.local()["catalog"], {"selected": [self.vm_name], "hidden": ["other", "third"]})  # other lost its star
+        self.assertEqual(catalog.update("add", ["third"], self.cfg)["added"], ["third"])
+        self.assertEqual(self.local()["catalog"], {"selected": [self.vm_name, "third"], "hidden": ["other"]})  # the star unhides
+        catalog.update_hidden("remove", ["other"], self.cfg)
+        self.assertNotIn("hidden", self.local()["catalog"])
+        with self.assertRaisesRegex(VMError, "Not in the catalog"):
+            catalog.update_hidden("add", ["nope"], self.cfg)
+        # the dashboards: a hidden row leaves every list unless it runs or holds a disk; "hidden" lists them
+        row = lambda name, **kw: {"name": name, "label": name, "family": "x", "prepared": False, "installed": False, "running": False, "mine": False, "hidden": False, **kw}
+        rows = [row("a", hidden=True), row("b", hidden=True, running=True), row("c", hidden=True, installed=True, prepared=True), row("d")]
+        self.assertEqual([r["name"] for r in tui_bridge.visible_rows(rows, "", "all")], ["b", "c", "d"])
+        self.assertEqual([r["name"] for r in tui_bridge.visible_rows(rows, "", "hidden")], ["b", "c", "a"])
+        out = io.StringIO()
+        with redirect_stdout(out):
+            lifecycle.cmd_catalog(argparse.Namespace(action="hide", vms=["other"], json=False, names=False, dry_run=False))
+            lifecycle.cmd_catalog(argparse.Namespace(action="list", vms=[], json=True, names=False, dry_run=False))
+            lifecycle.cmd_catalog(argparse.Namespace(action="unhide", vms=["other"], json=False, names=False, dry_run=False))
+        text = out.getvalue()
+        self.assertIn("other: hidden from the lists", text)
+        self.assertEqual(json.loads(text[text.index("{"):text.index("}") + 1])["hidden"], ["other"])
+        self.assertIn("other: shown again", text)
+
     def test_the_command_lists_adds_removes_and_reports_names_that_left_the_catalog(self):
         ui.USE_COLOR = False
         self.assertIn("nothing chosen", self.run_catalog())
@@ -90,7 +118,7 @@ class CatalogTests(BaseVmctlTestCase):
         catalog.local_path().write_text(json.dumps({"vms": {}, "catalog": {"selected": ["other", "gone-clone"]}}))
         self.assertEqual(self.run_catalog(names=True).splitlines(), ["other"])
         self.assertIn("not in the catalog any more", self.run_catalog())
-        self.assertEqual(json.loads(self.run_catalog(json_out=True)), {"selected": ["other", "gone-clone"], "missing": ["gone-clone"]})
+        self.assertEqual(json.loads(self.run_catalog(json_out=True)), {"selected": ["other", "gone-clone"], "missing": ["gone-clone"], "hidden": []})
         with self.assertRaisesRegex(VMError, "takes no profile names"):
             self.run_catalog("list", ["other"])
         self.assertIn("Nothing changed", self.run_catalog("remove", ["third"]))

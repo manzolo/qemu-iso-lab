@@ -21,7 +21,8 @@ from vmctl import config, state, vmstate
 from vmctl.errors import VMError
 
 KEY = "catalog"
-ACTIONS = ("list", "add", "remove", "set", "clear")
+ACTIONS = ("list", "add", "remove", "set", "clear", "hide", "unhide")
+HIDDEN_FIELD = "hidden"  # "catalog": {"hidden": [...]}: the profiles the dashboards leave out of their lists
 _LOCK = threading.Lock()
 
 
@@ -89,6 +90,17 @@ def _atomic_write(path: Path, contents: bytes) -> None:
         Path(temporary).unlink(missing_ok=True)
 
 
+def hidden() -> list[str]:
+    """The profiles hidden from the dashboards' lists (``vmctl catalog hide``): the opposite of a
+    star, so a name is never in both. A hidden VM still shows while it runs or holds a disk."""
+    return selection_of(_document(), KEY, HIDDEN_FIELD)
+
+
+def update_hidden(action: str, names: list[str], cfg: dict[str, Any]) -> dict[str, Any]:
+    """``add``/``remove`` hidden profiles; hiding a starred VM takes its star away."""
+    return update(action, names, cfg, key=KEY, field=HIDDEN_FIELD)
+
+
 def protected() -> list[str]:
     """The protected VMs (``vmctl protect``): what vmstate.refuse_if_protected guards."""
     return selection_of(_document(), vmstate.PROTECTED_KEY, "vms")
@@ -131,9 +143,21 @@ def update(action: str, names: list[str], cfg: dict[str, Any], key: str = KEY, f
                   "removed": [n for n in current if n not in new]}
         if new == current:
             return result
+        section: dict[str, Any] = dict(document[key]) if isinstance(document.get(key), dict) else {}
         if new:
-            section: dict[str, Any] = document[key] if isinstance(document.get(key), dict) else {}
-            document[key] = {**section, field: new}
+            section[field] = new
+        else:
+            section.pop(field, None)
+        # A star and "hidden" exclude each other: the list just written wins over the other one.
+        other = {"selected": HIDDEN_FIELD, HIDDEN_FIELD: "selected"}.get(field)
+        if key == KEY and other and action in ("add", "set"):
+            kept = [name for name in selection_of(document, key, other) if name not in new]
+            if kept:
+                section[other] = kept
+            else:
+                section.pop(other, None)
+        if section:
+            document[key] = section
         else:
             document.pop(key, None)
         write_document(document)

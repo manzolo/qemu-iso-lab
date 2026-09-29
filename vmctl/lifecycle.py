@@ -129,6 +129,26 @@ def vm_owner_paths(name: str, vm: dict[str, Any]) -> list[str]:
     return paths
 
 
+def cmdline_mentions_path(cmdline: str, path: str | Path) -> bool:
+    """Whether a QEMU command line carries *path*: spelled as it is, or through another name of
+    the same place. The batch worktree runs its rows on ``../qemu-iso-lab-batch/artifacts/...``,
+    a symlink to this checkout's artifacts, and until 2026-09-29 the dashboard of the checkout
+    the rows were writing into did not see them as running while their installer ran (the
+    post-install phase leaves a PID file, which it did see). Every absolute token of the line
+    is compared by realpath, a directory owner path matching anything under it."""
+    wanted = str(path)
+    if wanted in cmdline:
+        return True
+    real = os.path.realpath(wanted)
+    for token in re.split(r"[ ,=]", cmdline):
+        if not token.startswith("/"):
+            continue
+        token_real = os.path.realpath(token)
+        if token_real == real or token_real.startswith(real + "/"):
+            return True
+    return False
+
+
 def find_qemu_process_by_hostfwd_port(port: int, owner_paths: list[str] | None = None) -> tuple[int | None, str | None]:
     """A QEMU forwarding this host port, and with `owner_paths`, only if it is this VM's own.
 
@@ -141,7 +161,7 @@ def find_qemu_process_by_hostfwd_port(port: int, owner_paths: list[str] | None =
     for pid, cmdline in iter_qemu_processes():
         if not any(needle in cmdline for needle in needles):
             continue
-        if owner_paths is not None and not any(path in cmdline for path in owner_paths):
+        if owner_paths is not None and not any(cmdline_mentions_path(cmdline, path) for path in owner_paths):
             continue  # same host port, someone else's VM: never ours to stop
         return pid, cmdline
     return None, None
@@ -164,9 +184,8 @@ def iter_qemu_processes() -> Iterator[tuple[int, str]]:
 
 
 def find_qemu_process_by_disk_path(disk_path: Path) -> tuple[int | None, str | None]:
-    needle = str(disk_path)
     for pid, cmdline in iter_qemu_processes():
-        if needle in cmdline:
+        if cmdline_mentions_path(cmdline, disk_path):
             return pid, cmdline
     return None, None
 
@@ -1309,17 +1328,19 @@ def cmd_protect(args: argparse.Namespace) -> int:
 
 
 def cmd_catalog(args: argparse.Namespace) -> int:
-    """``vmctl catalog [list|add|remove|set|clear] [vm...]``: My VMs, the personal selection."""
+    """``vmctl catalog [list|add|remove|set|clear|hide|unhide] [vm...]``: My VMs, the personal
+    selection, and the hidden profiles (the ones the dashboards leave out of their lists)."""
     cfg = config.load_config()
     action = args.action
     if action == "list":
         if args.vms:
             raise VMError("catalog list takes no profile names (did you mean: vmctl catalog add ...?)")
         chosen = catalog.selected()
+        hidden = catalog.hidden()
         known = [name for name in chosen if name in cfg["vms"]]
         gone = [name for name in chosen if name not in cfg["vms"]]
         if args.json:
-            print(json.dumps({"selected": chosen, "missing": gone}, indent=2))
+            print(json.dumps({"selected": chosen, "missing": gone, "hidden": hidden}, indent=2))
             return 0
         if args.names:
             for name in known:
@@ -1335,11 +1356,25 @@ def cmd_catalog(args: argparse.Namespace) -> int:
             print(f"  {name:<32} {str(vm.get('name', name))}")
         for name in gone:
             print(f"  {name:<32} (not in the catalog any more: vmctl catalog remove {name})")
+        if hidden:
+            print(f"  hidden from the lists ({len(hidden)}): {' '.join(hidden)}  (vmctl catalog unhide <vm>)")
         return 0
     if args.names:
         raise VMError("--names goes with catalog list")
     if getattr(args, "dry_run", False):
         print(f"  would {action} {' '.join(args.vms) or '(nothing)'} in {catalog.local_path()}")
+        return 0
+    if action in ("hide", "unhide"):
+        result = catalog.update_hidden("add" if action == "hide" else "remove", list(args.vms), cfg)
+        if args.json:
+            print(json.dumps(result, indent=2))
+            return 0
+        for name in result["added"]:
+            ui.print_status("ok", f"{name}: hidden from the lists (still installed, run and checked like any other)")
+        for name in result["removed"]:
+            ui.print_status("ok", f"{name}: shown again")
+        if not result["added"] and not result["removed"]:
+            ui.print_note("Nothing changed.")
         return 0
     result = catalog.update(action, list(args.vms), cfg)
     if args.json:

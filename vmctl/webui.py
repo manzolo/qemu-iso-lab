@@ -817,7 +817,11 @@ class Handler(BaseHTTPRequestHandler):
                 names = body.get("names") or []
                 if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
                     raise VMError("names must be a list of profile names")
-                result = catalog.update(str(body.get("action") or ""), names, config.load_config())
+                action = str(body.get("action") or "")
+                if action in ("hide", "unhide"):  # vmctl catalog hide / unhide: the dashboards' lists leave them out
+                    result = catalog.update_hidden("add" if action == "hide" else "remove", names, config.load_config())
+                else:
+                    result = catalog.update(action, names, config.load_config())
                 with self.snapshot.lock:
                     self.snapshot.value = None
                 self._json(result)

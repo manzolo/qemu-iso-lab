@@ -34,6 +34,27 @@ import vmctl.state  # noqa: E402
 from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
+class RunningVmByPathTests(BaseVmctlTestCase):
+    def test_a_qemu_started_through_another_name_of_the_same_directory_is_ours(self):
+        """The batch worktree's artifacts is a symlink to this checkout's: its rows count as running here."""
+        import os
+        real = self.root / "artifacts" / "vmx"
+        real.mkdir(parents=True)
+        (real / "disk.qcow2").write_bytes(b"x")
+        link_root = self.root / "worktree"
+        link_root.mkdir()
+        os.symlink(self.root / "artifacts", link_root / "artifacts")
+        via_link = f"qemu-system-x86_64 -drive file={link_root}/artifacts/vmx/disk.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2999-:22"
+        other = f"qemu-system-x86_64 -drive file={self.root}/elsewhere/vmx/disk.qcow2,if=virtio -netdev user,id=n0,hostfwd=tcp:127.0.0.1:2999-:22"
+        self.assertTrue(vmctl.lifecycle.cmdline_mentions_path(via_link, real / "disk.qcow2"))
+        self.assertTrue(vmctl.lifecycle.cmdline_mentions_path(via_link, real))  # the artifact directory owns what is under it
+        self.assertFalse(vmctl.lifecycle.cmdline_mentions_path(other, real))
+        with mock.patch.object(vmctl.lifecycle, "iter_qemu_processes", return_value=[(4242, other), (4243, via_link)]):
+            self.assertEqual(vmctl.lifecycle.find_qemu_process_by_disk_path(real / "disk.qcow2")[0], 4243)
+            self.assertEqual(vmctl.lifecycle.find_qemu_process_by_hostfwd_port(2999, [str(real)])[0], 4243)
+            self.assertEqual(vmctl.lifecycle.find_qemu_process_by_hostfwd_port(2999, [str(self.root / "nothing")])[0], None)
+
+
 class CancelInstallTests(BaseVmctlTestCase):
     def test_cancel_stops_remaining_qemu_without_deleting_disk(self):
         disk = self.create_disk()

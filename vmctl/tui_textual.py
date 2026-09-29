@@ -436,6 +436,7 @@ class Dashboard(App[None]):
                 yield Button("With disk", id="disk", classes="filter")
                 yield Button("Running", id="running", classes="filter")
                 yield Button("Labs", id="labs", classes="filter")
+                yield Button("Hidden", id="hidden", classes="filter")
                 yield Button("Tools…", id="tools")
         yield Static("Reading VM state…", id="notice", markup=False)
         with Horizontal(id="workspace"):
