@@ -1,6 +1,7 @@
 """ISO download, discovery, validation, and extraction."""
 from __future__ import annotations
 
+import bz2
 import gzip
 import hashlib
 import re
@@ -247,8 +248,8 @@ def download_file(url: str, destination: Path, dry_run: bool = False, vm: dict[s
 
 
 # zip and 7z hold members (ReactOS's zip on SourceForge, KolibriOS's nightly .7z with kolibri.iso),
-# gzip and zstd are one compressed stream (pfSense's .iso.gz, Redox's .iso.zst).
-ARCHIVE_SUFFIX = {"zip": "zip", "gzip": "gz", "7z": "7z", "zstd": "zst"}
+# gzip, bzip2 and zstd are one compressed stream (pfSense's .iso.gz, OPNsense's .iso.bz2, Redox's .iso.zst).
+ARCHIVE_SUFFIX = {"zip": "zip", "gzip": "gz", "bzip2": "bz2", "7z": "7z", "zstd": "zst"}
 
 
 def _extract_with(command: list[str], target: Path, what: str) -> None:
@@ -265,7 +266,7 @@ def _extract_with(command: list[str], target: Path, what: str) -> None:
 def archive_spec(vm: dict[str, Any]) -> dict[str, Any] | None:
     """``iso_archive``: the download is an archive holding the ISO. ``type`` is ``zip`` (with the
     ``member`` to extract: ReactOS ships its BootCD only as a zip on SourceForge) or ``gzip``
-    (pfSense CE, ``.iso.gz`` on Netgate's mirror). ``sha256`` optionally pins the archive itself,
+    (pfSense CE, ``.iso.gz`` on Netgate's mirror), ``bzip2`` (OPNsense's ``.iso.bz2``), ``7z`` or ``zstd``. ``sha256`` optionally pins the archive itself,
     for vendors who publish that hash and not the ISO's; ``iso_sha256`` still pins the ISO."""
     spec = vm.get("iso_archive")
     if spec is None:
@@ -310,6 +311,9 @@ def download_archive(url: str, destination: Path, spec: dict[str, Any], dry_run:
                 if not shutil.which("zstd"):
                     raise VMError("zstd is needed to unpack this ISO (Debian/Ubuntu: sudo apt install zstd)")
                 _extract_with(["zstd", "-dc", str(archive)], partial, url)
+            elif spec["type"] == "bzip2":
+                with bz2.open(archive, "rb") as source, partial.open("wb") as target:
+                    shutil.copyfileobj(source, target)
             else:
                 with gzip.open(archive, "rb") as source, partial.open("wb") as target:
                     shutil.copyfileobj(source, target)

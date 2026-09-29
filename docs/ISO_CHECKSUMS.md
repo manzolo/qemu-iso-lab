@@ -187,3 +187,15 @@ and it matched the ISO the maintainer had used for every live pfSense run.
 under the same file name, and on 2026-09-26 the `sha256sums.txt` next to it did not match the
 archive the server returned. `menuetos` is a user-supplied medium (Google Drive links behind a
 license page, no checksum published).
+
+## History installers and OPNsense (2026-09-29)
+
+Manual profiles added ahead of their unattended flows, each pinned to the vendor's own manifest:
+
+- `opensuse-leap-16`: `agama-installer.x86_64-Leap_16.0.iso`, SHA-256 `cf852fe260bf1c514550da271ca140d2e1e40f9f70f80d97ab0cdc6bb4f0e749` ([vendor .sha256](https://download.opensuse.org/distribution/leap/16.0/installer/iso/agama-installer.x86_64-Leap_16.0.iso.sha256)).
+- `devuan-netinst`: `devuan_excalibur_6.1.1_amd64_netinstall.iso`, SHA-256 `87be42bfcec010f90f86444b404c1efeefbdc9b08a2e82f766d6defefdf654e4` ([SHA256SUMS.txt](https://files.devuan.org/devuan_excalibur/installer-iso/SHA256SUMS.txt)).
+- `centos-5`: `CentOS-5.11-x86_64-netinstall.iso`, SHA-256 `9729c04a8a3ba57ed4e34ee5b96522879e6a3bcbf5582c3b6bcfd02bcfbacf8c` ([sha256sum.txt](https://vault.centos.org/5.11/isos/x86_64/sha256sum.txt)).
+- `centos-6`: `CentOS-6.10-x86_64-minimal.iso`, SHA-256 `7c0dee2a0494dabd84809b72ddb4b761f9ef92b78a506aef709b531c54d30770` ([sha256sum.txt](https://vault.centos.org/6.10/isos/x86_64/sha256sum.txt)).
+- `centos-7`: `CentOS-7-x86_64-Minimal-2009.iso`, SHA-256 `07b94e6b1a0b0260b94c83d6bb76b26bf7a310dc78d7a9c7432809fb9bc6194a` ([sha256sum.txt](https://vault.centos.org/7.9.2009/isos/x86_64/sha256sum.txt)).
+- `centos-8`: `CentOS-8.5.2111-x86_64-boot.iso`, SHA-256 `9602c69c52d93f51295c0199af395ca0edbe35e36506e32b8e749ce6c8f5b60a` ([CHECKSUM](https://vault.centos.org/8.5.2111/isos/x86_64/CHECKSUM)).
+- `opnsense`: the vendor hashes the compressed `OPNsense-25.7-dvd-amd64.iso.bz2`, SHA-256 `fa4b30df3f5fd7a2b1a1b2bdfaecfe02337ee42f77e2d0ae8a60753ea7eb153e` ([checksums](https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-checksums-amd64.sha256)), pinned in `iso_archive.sha256` like pfSense's `.iso.gz`; the unpacked ISO is validated as ISO 9660 only.

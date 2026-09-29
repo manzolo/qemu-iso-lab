@@ -1090,6 +1090,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `xubuntu-releases` | The Xubuntu history on the same media, 8.04 to 26.04 (`tools/gen_ubuntu_flavors.py`): born `experimental`, so the full matrix sets them aside until each passes when named |
 | `arch-releases` | Arch Linux as it was in 2014, 2019, 2022 and 2026 (`arch-history.json`): the archived ISO of the month and pacstrap from the Arch Linux Archive snapshot of that day (`archinstall_config.archive_date`), Xfce on LightDM throughout; born `experimental` |
 | `slackware-releases` | Slackware 13.0, 13.37, 14.0, 14.1, 14.2 and 15.0 on x86_64 (`slackware-history.json`, `bootstrap-slackware`): a script run from the install DVD's own shell, Xfce started from the console login; born `experimental` |
+| `centos-releases` | CentOS 5.11, 6.10, 7.9.2009 and 8.5.2111 installers from vault.centos.org (`centos-history.json`), manual: a `--group centos-releases` run records them as skipped until a kickstart flow is written for them |
 | `kubuntu-releases` | Kubuntu on the same media, 8.04 to 26.04 (kdm, then LightDM, then SDDM from 16.04), same generator and rule |
 | `lubuntu-releases` | Lubuntu 12.04 to 26.04 (LXDE on LightDM, LXQt on SDDM from 20.04), same generator and rule |
 | `ubuntu-mate-releases` | Ubuntu MATE 16.04 to 26.04 (LightDM), same generator and rule |

@@ -304,7 +304,7 @@ fifth is **declared** in `meta.groups` for what none of those can express. Decla
 `ubuntu` (Ubuntu and its official flavours, which all sit in `meta.family: debian` next to
 Debian and Kali), `ubuntu-releases` (one unattended desktop per release, 8.04 to 26.04;
 24.04's entry is `ubuntu-gnome-24.04`, there is no `ubuntu-24.04` profile),
-`ubuntu-flavors`, `debian-only`, `kali`, `windows-retro`, `netlab`, `hobby-os` (KolibriOS, Redox OS,
+`ubuntu-flavors`, `debian-only`, `kali`, `windows-retro`, `netlab`, `centos-releases` (CentOS 5.11, 6.10, 7.9 and 8.5 from vault.centos.org, `centos-history.json`, manual installers until a kickstart flow exists), `hobby-os` (KolibriOS, Redox OS,
 MenuetOS, SerenityOS from a built `disk_image`: manual systems, so a `--group hobby-os` run records them as skipped) and `smoke` (one profile
 per install flow that downloads its own medium, the lightest of each — run it before a full
 matrix). `group_index()`/`group_sources()` build the catalogue, `resolve_group_selection()`

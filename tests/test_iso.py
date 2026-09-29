@@ -1,4 +1,5 @@
 import argparse
+import bz2
 import gzip
 import hashlib
 import io
@@ -313,6 +314,14 @@ class IsoArchiveTests(BaseVmctlTestCase):
             with self.assertRaisesRegex(VMError, "does not match iso_archive.sha256"):
                 vmctl.iso.ensure_iso(bad)
         self.assertEqual(list((self.root / "isos").iterdir()), [])
+
+    def test_bzip2_archive_is_unpacked_with_the_stdlib(self):
+        packed = bz2.compress(self.PAYLOAD)  # OPNsense ships its DVD image as .iso.bz2
+        vm = self.vm(iso_archive={"type": "bzip2", "sha256": hashlib.sha256(packed).hexdigest()})
+        with mock.patch.object(vmctl.iso, "_fetch", side_effect=self.fetch_writing(packed)), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(vmctl.iso.ensure_iso(vm).read_bytes(), self.PAYLOAD)
+        self.assertEqual(sorted(p.name for p in (self.root / "isos").iterdir()), ["test.iso"])
 
     def test_7z_and_zstd_archives_run_their_extractor_and_verify_the_iso(self):
         # KolibriOS ships a nightly .7z holding kolibri.iso, Redox an .iso.zst: the tools are

@@ -1,0 +1,101 @@
+{
+  "bases": {
+    "centos-history-base": {
+      "meta": {
+        "family": "rhel",
+        "role": "installer",
+        "release_model": "stable",
+        "slug": "centos",
+        "groups": [
+          "centos-releases"
+        ]
+      },
+      "disk": {
+        "path": "artifacts/{{name}}/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "cpus": 2,
+      "memory_mb": 2048,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true
+    }
+  },
+  "vms": {
+    "centos-5": {
+      "name": "CentOS 5.11 (netinstall from the vault)",
+      "extends": "centos-history-base",
+      "meta": {
+        "status": "manual",
+        "version": "1.0.0"
+      },
+      "iso": "isos/CentOS-5.11-x86_64-netinstall.iso",
+      "iso_url": "https://vault.centos.org/5.11/isos/x86_64/CentOS-5.11-x86_64-netinstall.iso",
+      "iso_sha256": "9729c04a8a3ba57ed4e34ee5b96522879e6a3bcbf5582c3b6bcfd02bcfbacf8c",
+      "memory_mb": 1024,
+      "notes": "CentOS 5.11 (September 2014, the last of the 5 series, kernel 2.6.18): the netinstall CD asks where the repository is: HTTP, server vault.centos.org, directory /5.11/os/x86_64/. The 5.x kernel drives the virtio disk and NIC (since 5.3). Manual for now: almalinux-server's kickstart flow is the road to unattended, the anaconda of that era takes ks= on the serial console."
+    },
+    "centos-6": {
+      "name": "CentOS 6.10 (minimal)",
+      "extends": "centos-history-base",
+      "meta": {
+        "status": "manual",
+        "version": "1.0.0"
+      },
+      "iso": "isos/CentOS-6.10-x86_64-minimal.iso",
+      "iso_url": "https://vault.centos.org/6.10/isos/x86_64/CentOS-6.10-x86_64-minimal.iso",
+      "iso_sha256": "7c0dee2a0494dabd84809b72ddb4b761f9ef92b78a506aef709b531c54d30770",
+      "memory_mb": 1024,
+      "notes": "CentOS 6.10 (July 2018, kernel 2.6.32, the last 6): the minimal ISO installs a base system from itself. Afterwards yum needs the vault: replace mirrorlist with baseurl=http://vault.centos.org/6.10/os/x86_64/ in CentOS-Base.repo (mirrorlist.centos.org is gone)."
+    },
+    "centos-7": {
+      "name": "CentOS 7.9.2009 (minimal)",
+      "extends": "centos-history-base",
+      "meta": {
+        "status": "manual",
+        "version": "1.0.0"
+      },
+      "iso": "isos/CentOS-7-x86_64-Minimal-2009.iso",
+      "iso_url": "https://vault.centos.org/7.9.2009/isos/x86_64/CentOS-7-x86_64-Minimal-2009.iso",
+      "iso_sha256": "07b94e6b1a0b0260b94c83d6bb76b26bf7a310dc78d7a9c7432809fb9bc6194a",
+      "memory_mb": 2048,
+      "notes": "CentOS 7.9.2009 (November 2020, kernel 3.10, end of life June 2024): the minimal ISO installs from itself; yum then needs baseurl=http://vault.centos.org/7.9.2009/os/x86_64/."
+    },
+    "centos-8": {
+      "name": "CentOS Linux 8.5.2111 (boot ISO, vault repositories)",
+      "extends": "centos-history-base",
+      "meta": {
+        "status": "manual",
+        "version": "1.0.0"
+      },
+      "iso": "isos/CentOS-8.5.2111-x86_64-boot.iso",
+      "iso_url": "https://vault.centos.org/8.5.2111/isos/x86_64/CentOS-8.5.2111-x86_64-boot.iso",
+      "iso_sha256": "9602c69c52d93f51295c0199af395ca0edbe35e36506e32b8e749ce6c8f5b60a",
+      "memory_mb": 2048,
+      "notes": "CentOS Linux 8.5.2111 (November 2021, the last CentOS Linux 8, end of life December 2021): the boot ISO carries no packages, so set the installation source to https://vault.centos.org/8.5.2111/BaseOS/x86_64/os/ and add AppStream as an additional repository. centos-stream-10 is the living branch."
+    }
+  }
+}

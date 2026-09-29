@@ -46,6 +46,56 @@
       },
       "usb_tablet": true,
       "iso_sha256": "f564822bc72d420d1e1a6faacb72f6056d828fcf539dfafd52e08503ef5fab68"
+    },
+    "opnsense": {
+      "name": "OPNsense 25.7 (DVD installer)",
+      "meta": {
+        "slug": "opnsense",
+        "family": "bsd",
+        "role": "router",
+        "release_model": "stable",
+        "status": "manual",
+        "version": "1.0.0"
+      },
+      "iso": "isos/OPNsense-25.7-dvd-amd64.iso",
+      "iso_url": "https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-dvd-amd64.iso.bz2",
+      "iso_archive": {
+        "type": "bzip2",
+        "sha256": "fa4b30df3f5fd7a2b1a1b2bdfaecfe02337ee42f77e2d0ae8a60753ea7eb153e"
+      },
+      "disk": {
+        "path": "artifacts/opnsense/disk.qcow2",
+        "size": "16G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "OPNsense 25.7 (July 2025, FreeBSD 14.3), the DVD image unpacked from the vendor's .bz2: it boots a live system, log in as installer (password opnsense) to install to disk, root/opnsense for the live shell. With the single slirp NIC the interface is the WAN, where the web GUI is closed by default: add a NIC on a segment (vmctl link) or use the console menu. Manual for now: pfsense-lab's scripted install (config.xml + installerconfig) applies to OPNsense too, the road to an opnsense-lab next to pfsense-lab."
     }
   }
 }

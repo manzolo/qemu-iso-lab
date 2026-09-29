@@ -1,0 +1,51 @@
+{
+  "vms": {
+    "devuan-netinst": {
+      "name": "Devuan 6.1.1 Excalibur Netinstall",
+      "meta": {
+        "slug": "devuan",
+        "family": "debian",
+        "role": "installer",
+        "release_model": "stable",
+        "status": "manual",
+        "version": "1.0.0"
+      },
+      "iso": "isos/devuan_excalibur_6.1.1_amd64_netinstall.iso",
+      "iso_url": "https://files.devuan.org/devuan_excalibur/installer-iso/devuan_excalibur_6.1.1_amd64_netinstall.iso",
+      "iso_sha256": "87be42bfcec010f90f86444b404c1efeefbdc9b08a2e82f766d6defefdf654e4",
+      "disk": {
+        "path": "artifacts/devuan-netinst/disk.qcow2",
+        "size": "20G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "Devuan 6.1.1 Excalibur (April 2026): Debian 13 without systemd. The debian-installer asks which init to run (sysvinit, OpenRC or runit) and installs from deb.devuan.org. Manual for now: debian-server's preseed applies with the Devuan mirror and the init choice, the road to a bootstrap-preseed profile."
+    }
+  }
+}

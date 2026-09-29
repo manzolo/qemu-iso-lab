@@ -229,6 +229,56 @@
           }
         ]
       }
+    },
+    "opensuse-leap-16": {
+      "name": "openSUSE Leap 16.0 (Agama installer)",
+      "meta": {
+        "slug": "opensuse-leap",
+        "family": "opensuse",
+        "role": "installer",
+        "release_model": "stable",
+        "status": "manual",
+        "version": "1.0.0"
+      },
+      "iso": "isos/agama-installer.x86_64-Leap_16.0.iso",
+      "iso_url": "https://download.opensuse.org/distribution/leap/16.0/installer/iso/agama-installer.x86_64-Leap_16.0.iso",
+      "iso_sha256": "cf852fe260bf1c514550da271ca140d2e1e40f9f70f80d97ab0cdc6bb4f0e749",
+      "disk": {
+        "path": "artifacts/opensuse-leap-16/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/opensuse-leap-16/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "network": "user",
+      "audio": false,
+      "video": {
+        "default": "safe",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "openSUSE Leap 16.0 (October 2025) on Agama, the installer that replaced YaST: a web UI shown on the VM's console. The online installer fetches every package from download.opensuse.org, so it needs the network. Manual for now: Agama takes an unattended profile (JSON) over a kernel argument, the road to a bootstrap next to opensuse-tumbleweed-autoyast."
     }
   }
 }

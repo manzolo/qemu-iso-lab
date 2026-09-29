@@ -17,6 +17,7 @@ Add profiles that cover a new axis: firmware, installation flow, operating syste
 - Network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab`.
 - Non-Linux coverage: `freebsd-installer` (manual), `reactos` (unattend.inf install through `bootstrap-reactos`).
 - Ubuntu desktop history: nine manual profiles, one per LTS from 8.04 to 24.04, on the official desktop ISOs (`ubuntu-lts.json`). `ubuntu-8.04` to `ubuntu-18.04` install them with `bootstrap-preseed`, `ubuntu-20.04`/`ubuntu-22.04` with autoinstall like `ubuntu-gnome-24.04`, on the d-i alternate/server media (live PASS 2026-09-12, see below; 16.04 and 18.04 use the shared `verify-desktop`).
+- Manual installers added on 2026-09-29 ahead of their unattended flows: `opensuse-leap-16` (Agama), `devuan-netinst` (6.1.1 Excalibur), the CentOS history `centos-5`/`6`/`7`/`8` from vault.centos.org (group `centos-releases`) and `opnsense` (25.7 DVD, unpacked from the vendor's `.bz2`). Each profile's notes say which existing flow is the road to unattended.
 - Canonical names with legacy aliases, safe host-directory migration and pinned CI media with vendor checksums.
 - Profile categories for the matrix: `check-vms --group <name>` runs one slice instead of the
   full run. `meta.family`, `meta.status`, `meta.role` and the install flow act as categories on
