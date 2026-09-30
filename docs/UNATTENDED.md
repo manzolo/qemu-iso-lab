@@ -1171,6 +1171,38 @@ protections live in the same file but are read apart, so a starred VM is still s
 given back. `tests/test_locale_rendering.py` checks the same two variants on the rendered
 files alone, in seconds; the smoke runs are the live proof.
 
+
+### Does a manual profile's medium still boot? (`vmctl media-check`, `check-vms --media`)
+
+The matrix skips a manual profile, and a live system or the manual twin of an automated profile
+says nothing on the serial console, so `boot-check` has no token to wait for. `vmctl media-check
+<vm>` boots the profile's ISO headless with `-snapshot`. The disk and the EFI variables are scratch
+copies under `artifacts/<vm>/media-check/`, removed afterwards: the VM's own disk is never attached,
+and neither is its shared folder. The check watches for up to 180 s (`--timeout`).
+
+- **FAIL at once:** the firmware says it could not boot the medium. OVMF writes that on the serial
+  console (`BdsDxe: failed to load`, `No bootable option`). SeaBIOS writes it only on its debug
+  port (0x402, sent to `logs/media-check-seabios.log`): `Boot failed: Could not read from CDROM`,
+  or `Booting from ROM` once it falls through to the NIC's iPXE.
+- **FAIL at the end:** QEMU exited early, or the screen never got past a few console frames.
+- **PASS:** a graphical screen (`recorder.frame_kind`) that holds still after at least 45 s, or a
+  console that changed at least four times (a text-mode boot).
+
+The last frame is `artifacts/<vm>/logs/media-check.png`. `check-vms --media` gives this check to
+every manual profile of kind `live` or `twin` with an ISO, instead of a skip, and the frame becomes
+the row's screenshot. Checked on 2026-09-30:
+
+| Medium | Result |
+|---|---|
+| `debian-gnome-live` | PASS in 46 s |
+| `debian-netinst` | PASS |
+| `debian-bios` | PASS |
+| A non-bootable ISO under OVMF | FAIL on `BdsDxe: failed to load` |
+| A non-bootable ISO under SeaBIOS | FAIL on `Could not read from CDROM` |
+
+Before the debugcon log, the SeaBIOS case passed as a "text-mode boot": iPXE's DHCP attempts kept
+changing the screen.
+
 ### Occasional stalls, and how to tell one from a regression
 
 AutoYaST has a long window where silence is normal: between linuxrc's last line

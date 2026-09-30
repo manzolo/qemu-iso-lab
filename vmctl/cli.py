@@ -36,7 +36,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Groups", "a declared group (netlab, proxmox-lab...) as one stack: start, stop, network map",
      ["group"]),
     ("Verify", "smoke tests and the local validation matrix",
-     ["boot-check", "check-vms", "report-pdf"]),
+     ["boot-check", "media-check", "check-vms", "report-pdf"]),
     ("Physical disks", "DESTRUCTIVE, ask for sudo, require --confirm-device",
      ["flash", "import-device"]),
     ("Checkpoints and clones", "full copies of a stopped VM: named checkpoints to go back to, clones as new local profiles",
@@ -471,6 +471,11 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--timeout", type=int, help="override the boot-check timeout in seconds")
     p.set_defaults(func=lifecycle.cmd_boot_check)
 
+    p = _add(subparsers, "media-check", help="boot a profile's ISO headless with -snapshot on a scratch disk and watch the screen: does the medium still boot?")
+    p.add_argument("vms", nargs="+", metavar="vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=180, help="seconds to watch the screen (default: 180)")
+    p.set_defaults(func=lifecycle.cmd_media_check)
+
     p = _add(subparsers, "check-vms", aliases=["test-local"], help="run the local VM validation matrix")
     p.add_argument("vms", nargs="*", help="optional subset of VM profiles to test (the full matrix skips meta.status experimental profiles; naming one runs it)")
     p.add_argument("--group", action="append", metavar="NAME",
@@ -485,6 +490,7 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--no-clean-first", action="store_true", help="skip the unattended/bootstrap cleanup prompt and run with existing artifacts")
     p.add_argument("--restore", action="store_true", help="stash existing VM artifacts, run the matrix on a virgin state, then restore them (non-destructive alternative to --clean-first)")
     p.add_argument("--keep", action="store_true", help="keep every row's test install on disk (by default each row removes its install when it ends; a stashed or protected VM always gets its own disk back)")
+    p.add_argument("--media", action="store_true", help="boot the medium of every manual live profile and manual twin instead of skipping it (vmctl media-check): a PASS is a graphical screen or a text-mode boot")
     p.add_argument("--tracked-only", action="store_true", help="ignore local.json (identity, locale, per-VM overrides): the catalog as published; run the smoke group once with it and once without before a full matrix")
     p.add_argument("--keep-passed", action="store_true", help="keep the test installs of the rows that passed, remove the others")
     p.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS, help="preview without running the matrix")
@@ -510,6 +516,7 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
     p.add_argument("--report-dir", dest="_report_dir", help=argparse.SUPPRESS)
     p.add_argument("--document", action="store_true", help=argparse.SUPPRESS)
+    p.add_argument("--media", action="store_true", help=argparse.SUPPRESS)
     p.add_argument("--record", action="store_true", help=argparse.SUPPRESS)
     p.set_defaults(func=lifecycle.cmd_check_vm)
 

@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, opnsense, slackware, void, agama, popos, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
+from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, opnsense, slackware, void, agama, popos, mediacheck, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -671,7 +671,9 @@ def run_local_test_vm(
     prereq_skip = local_test_prereq_skip(vm_name, prepared_vm)
     if prereq_skip is not None:
         return ("skipped", prereq_skip)
-    mode, note = local_test_mode(prepared_vm)
+    mode, note = row_mode(prepared_vm, args)
+    if mode == "media-check":
+        return run_media_check_row(vm_name, prepared_vm, args)
     if mode == "skip":
         detail = note if prep_note is None else f"{note}; {prep_note}"
         return ("skipped", detail)
@@ -1059,8 +1061,45 @@ def linger_for_recording(vm_name: str) -> None:
 ROW_RECORD_GRACE_SEC = 3600.0
 
 
-def run_local_test_once(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> tuple[str, str]:
+def row_mode(vm: dict[str, Any], args: argparse.Namespace) -> tuple[str, str]:
+    """local_test_mode, except that check-vms --media boots the medium of a manual profile the
+    matrix would otherwise skip (vmctl/mediacheck.py)."""
     mode, note = local_test_mode(vm)
+    if mode == "skip" and getattr(args, "media", False) and mediacheck.eligible(vm):
+        return ("media-check", "the medium boots to a screen (QEMU -snapshot, scratch disk)")
+    return mode, note
+
+
+def run_media_check_row(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> tuple[str, str]:
+    args._report_phase = "media-check"
+    outcome = mediacheck.check_medium(vm_name, vm, dry_run=args.dry_run)
+    directory = getattr(args, "_report_dir", None)
+    if directory and outcome.final_png is not None and not args.dry_run:
+        # the check powers its VM off itself: its last frame is the row's screenshot
+        target = Path(directory) / "screens" / f"{vm_name}.png"
+        runtime.ensure_parent(target)
+        shutil.copyfile(outcome.final_png, target)
+    return ("passed" if outcome.passed else "failed", outcome.detail)
+
+
+def cmd_media_check(args: argparse.Namespace) -> int:
+    cfg = config.load_config()
+    failed = 0
+    for vm_name in args.vms:
+        vm = resolved_vm(argparse.Namespace(vm=vm_name), cfg)
+        if not vm.get("iso") or vm.get("disk_image"):
+            raise VMError(f"VM '{vm_name}' has no ISO medium to boot")
+        ui.print_header(f"Media check: {vm_name}")
+        outcome = mediacheck.check_medium(vm_name, vm, timeout_sec=args.timeout, dry_run=args.dry_run)
+        if outcome.final_png is not None:
+            ui.print_kv("screen", ui.pretty_path(outcome.final_png))
+        ui.print_status("ok" if outcome.passed else "fail", f"{vm_name}: {outcome.detail}", ok=outcome.passed)
+        failed += not outcome.passed
+    return 1 if failed else 0
+
+
+def run_local_test_once(vm_name: str, vm: dict[str, Any], args: argparse.Namespace) -> tuple[str, str]:
+    mode, note = row_mode(vm, args)
     ui.print_header(f"Test VM: {vm_name}")
     ui.print_kv("mode", mode)
     ui.print_kv("check", note)
@@ -1136,6 +1175,8 @@ def run_local_test_vm_subprocess(vm_name: str, args: argparse.Namespace) -> tupl
         cmd.append("--document")
     if getattr(args, "record", False):
         cmd.append("--record")
+    if getattr(args, "media", False):
+        cmd.append("--media")
     result = subprocess.run(
         cmd,
         check=False,
