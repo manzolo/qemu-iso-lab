@@ -1128,9 +1128,14 @@
       ]
     },
     "opensuse-leap-16": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:eb95f51252418954b48785366940f2b22a197d39fe860fc846baa994b9960b41",
+      "version": "1.1.1",
+      "fingerprint": "sha256:56391cff9748dd526dd979807fd75f1a4cb7cf9d2ea04f81a013027364d73efa",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-30",
+          "note": "the openSUSE Welcome window no longer autostarts"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-30",

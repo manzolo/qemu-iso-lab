@@ -364,8 +364,9 @@
         "family": "opensuse",
         "role": "desktop",
         "release_model": "stable",
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "verified": "2026-09-30",
+        "version": "1.1.1"
       },
       "iso": "isos/agama-installer.x86_64-Leap_16.0.iso",
       "iso_url": "https://download.opensuse.org/distribution/leap/16.0/installer/iso/agama-installer.x86_64-Leap_16.0.iso",
@@ -405,7 +406,7 @@
         }
       },
       "usb_tablet": true,
-      "notes": "openSUSE Leap 16.0 (October 2025) with GNOME, installed with bootstrap-agama: Agama, the installer that replaced YaST, reads autoinst.json from a seed CD labelled OEMDRV by itself (label://OEMDRV/autoinst.json); the host boots the ISO's kernel with inst.finish=poweroff and the serial console. The profile names the product (openSUSE_Leap), the whole virtio disk, the user and root by hash, the gnome pattern; its post scripts add the sudo rule, the project key, sshd, the ttyS0 getty, the firewall's ssh service and GDM autologin, label those files for SELinux with setfiles, and a last script outside the chroot syncs and prints the token. The online installer fetches every package from download.opensuse.org. Born experimental (2026-09-30): vmctl check-vms opensuse-leap-16 runs one.",
+      "notes": "openSUSE Leap 16.0 (October 2025) with GNOME, installed with bootstrap-agama: Agama, the installer that replaced YaST, reads autoinst.json from a seed CD labelled OEMDRV by itself (label://OEMDRV/autoinst.json); the host boots the ISO's kernel with inst.finish=poweroff and the serial console. The profile names the product (openSUSE_Leap), the whole virtio disk, the user and root by hash, the gnome pattern; its post scripts add the sudo rule, the project key, sshd, the ttyS0 getty, the firewall's ssh service and GDM autologin, label those files for SELinux with setfiles, and a last script outside the chroot syncs and prints the token. The online installer fetches every package from download.opensuse.org. First live PASS 2026-09-30 (697 s). The openSUSE Welcome window is kept from autostarting (it covered the desktop in the first clip).",
       "guest_agent": true,
       "clipboard": true,
       "agama_config": {
@@ -433,7 +434,10 @@
         "open_firewall_services": [
           "ssh"
         ],
-        "autologin": true
+        "autologin": true,
+        "chroot_commands": [
+          "rm -f /etc/xdg/autostart/*opensuse*welcome*.desktop /usr/share/gnome/autostart/*opensuse*welcome*.desktop"
+        ]
       },
       "ssh_provision": {
         "user": "lab",

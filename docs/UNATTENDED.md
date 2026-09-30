@@ -1302,6 +1302,33 @@ outcome and duration, the captioned frames, the final screen — plus an `index.
 
 `vmctl bootstrap-kickstart centos-stream-10 --timeout 3600` (SSH 2270). Server-only kickstart from the boot ISO and Stream 10 online repository. Requires an x86-64-v3 host CPU with KVM; QEMU uses the host CPU. SSH and ttyS0 getty are enabled. Experimental until a clean live PASS.
 
+## openSUSE Leap 16 on Agama (`bootstrap-agama`)
+
+Leap 16 replaced YaST with Agama, whose installer UI is a web page on the graphical console.
+Agama takes an unattended profile in JSON, and with no `inst.auto` on the kernel line its
+autoinstall service looks for `autoinst.json` at the root of a file system labelled `OEMDRV`
+(the list is in the medium's own `agama-autoinstall`). `vmctl/agama.py` renders the profile from
+`agama_config` into a seed CD with that label. The host boots `boot/x86_64/loader/linux` and
+`initrd` with `inst.finish=poweroff` and the serial console; the live root is built into the
+initrd. The rendered profile validates against the medium's `profile.schema.json`. It holds:
+
+- the product `openSUSE_Leap`;
+- the whole `/dev/vda`;
+- user and root by `$6$` hash;
+- the `gnome` pattern;
+- the localization, which comes from the `locale` block of local.json.
+
+Two post scripts follow:
+
+- **In the chroot:** the sudo rule, the project key, `sshd`, the ttyS0 getty, the firewall's ssh
+  service and GDM autologin. It relabels those files with `setfiles`, because Leap 16 is SELinux
+  by default.
+- **Outside the chroot:** `sync`, `blockdev --flushbufs`, then the token on `/dev/ttyS0`. Agama
+  unmounts the target and powers off afterwards, and `run_and_expect` waits
+  `SHUTDOWN_GRACE_SEC` (600 s) for that.
+
+First live run: 2026-09-30, `opensuse-leap-16`, PASS in 697 s.
+
 ## Slackware from the DVD's shell (`bootstrap-slackware`)
 
 Slackware's `setup` is a dialog program without an answer file, but its install DVD is a
