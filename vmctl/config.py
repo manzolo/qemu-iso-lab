@@ -104,6 +104,7 @@ USER_IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
     ("pfsense_config", "username"),
     ("freebsd_config", "username"),
     ("opnsense_config", "username"),
+    ("void_config", "username"),
     ("slackware_config", "username"),
 )
 
@@ -231,6 +232,7 @@ def locale_values(locale: dict[str, str]) -> dict[str, dict[str, str]]:
         "preseed_config": pick(keyboard_layout=keyboard, timezone=timezone),
         "proxmox_config": pick(keyboard=keyboard, country=country.lower() if country else None, timezone=timezone),
         "slackware_config": pick(keymap=keyboard, locale=language, timezone=timezone),
+        "void_config": pick(keymap=keyboard, locale=language, timezone=timezone),
         "ubiquity_config": pick(keyboard_layout=keyboard, locale=language, timezone=timezone),
         "windows_config": pick(input_locale=bcp47, timezone=WINDOWS_TIMEZONES.get(timezone or "")),
     }
