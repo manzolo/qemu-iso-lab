@@ -49,15 +49,16 @@
       "name": "CentOS 5.11 (legacy kickstart, netinstall from the vault)",
       "extends": "centos-history-base",
       "meta": {
-        "status": "experimental",
+        "status": "unattended",
         "version": "1.1.1",
-        "role": "server"
+        "role": "server",
+        "verified": "2026-09-30"
       },
       "iso": "isos/CentOS-5.11-x86_64-netinstall.iso",
       "iso_url": "https://vault.centos.org/5.11/isos/x86_64/CentOS-5.11-x86_64-netinstall.iso",
       "iso_sha256": "9729c04a8a3ba57ed4e34ee5b96522879e6a3bcbf5582c3b6bcfd02bcfbacf8c",
       "memory_mb": 1024,
-      "notes": "CentOS 5.11 (September 2014, kernel 2.6.18): bootstrap-kickstart in its legacy mode (kickstart_config.legacy el5): anaconda 11 reads the kickstart from the initrd and installs from the vault's plain-HTTP copy on linuxsoft.cern.ch (vault.centos.org redirects to HTTPS) (method= on the kernel line, url in the kickstart); no %end, zerombr yes, the sudoers rule in /etc/sudoers. OpenSSH 4.3: RSA key and the legacy SSH options. Its loader crashes on the host-name lookup after a DHCP lease from QEMU's user network, so the install uses the user network's fixed addresses and %post writes DHCP back. Born experimental (2026-09-30): vmctl check-vms centos-5 runs one.",
+      "notes": "CentOS 5.11 (September 2014, kernel 2.6.18): bootstrap-kickstart in its legacy mode (kickstart_config.legacy el5): anaconda 11 reads the kickstart from the initrd and installs from the vault's plain-HTTP copy on linuxsoft.cern.ch (vault.centos.org redirects to HTTPS) (method= on the kernel line, url in the kickstart); no %end, zerombr yes, the sudoers rule in /etc/sudoers. OpenSSH 4.3: RSA key and the legacy SSH options. Its loader crashes on the host-name lookup after a DHCP lease from QEMU's user network, so the install uses the user network's fixed addresses and %post writes DHCP back. First live PASS 2026-09-30 (450 s).",
       "installer_boot": {
         "kernel": "isolinux/vmlinuz",
         "initrd": "isolinux/initrd.img"
@@ -106,15 +107,16 @@
       "name": "CentOS 6.10 (legacy kickstart, minimal ISO)",
       "extends": "centos-history-base",
       "meta": {
-        "status": "experimental",
+        "status": "unattended",
         "version": "1.1.1",
-        "role": "server"
+        "role": "server",
+        "verified": "2026-09-30"
       },
       "iso": "isos/CentOS-6.10-x86_64-minimal.iso",
       "iso_url": "https://vault.centos.org/6.10/isos/x86_64/CentOS-6.10-x86_64-minimal.iso",
       "iso_sha256": "7c0dee2a0494dabd84809b72ddb4b761f9ef92b78a506aef709b531c54d30770",
       "memory_mb": 1024,
-      "notes": "CentOS 6.10 (July 2018, kernel 2.6.32, the last 6): bootstrap-kickstart in its legacy mode (kickstart_config.legacy el6): anaconda 13 reads the kickstart from the initrd (ks=file:/ks.cfg, no inst.* options before RHEL 7) and installs @core from the minimal ISO; %post points yum at the vault's plain-HTTP copy on linuxsoft.cern.ch (vault.centos.org now answers HTTP with a redirect to HTTPS, which the old loader and yum cannot follow). OpenSSH 5.3: RSA key and the legacy SSH options. Born experimental (2026-09-30): vmctl check-vms centos-6 runs one.",
+      "notes": "CentOS 6.10 (July 2018, kernel 2.6.32, the last 6): bootstrap-kickstart in its legacy mode (kickstart_config.legacy el6): anaconda 13 reads the kickstart from the initrd (ks=file:/ks.cfg, no inst.* options before RHEL 7) and installs @core from the minimal ISO; %post points yum at the vault's plain-HTTP copy on linuxsoft.cern.ch (vault.centos.org now answers HTTP with a redirect to HTTPS, which the old loader and yum cannot follow). OpenSSH 5.3: RSA key and the legacy SSH options. First live PASS 2026-09-30 (280 s).",
       "installer_boot": {
         "kernel": "isolinux/vmlinuz",
         "initrd": "isolinux/initrd.img"

@@ -308,7 +308,7 @@ fifth is **declared** in `meta.groups` for what none of those can express. Decla
 `ubuntu` (Ubuntu and its official flavours, which all sit in `meta.family: debian` next to
 Debian and Kali), `ubuntu-releases` (one unattended desktop per release, 8.04 to 26.04;
 24.04's entry is `ubuntu-gnome-24.04`, there is no `ubuntu-24.04` profile),
-`ubuntu-flavors`, `debian-only`, `kali`, `windows-retro`, `netlab`, `centos-releases` (CentOS 5.11, 6.10, 7.9 and 8.5 from vault.centos.org, `centos-history.json`, manual installers until a kickstart flow exists), `hobby-os` (KolibriOS, Redox OS,
+`ubuntu-flavors`, `debian-only`, `kali`, `windows-retro`, `netlab`, `centos-releases` (CentOS 5.11, 6.10, 7.9 and 8.5, `centos-history.json`, all unattended since 2026-09-30: 7 and 8 with the normal kickstart, 5 and 6 with `kickstart_config.legacy` el5/el6: `ks=file:/ks.cfg` appended to the initrd as a newc archive (`kickstart.add_to_legacy_initrd`, gzip or LZMA read with the standard library), the syntax of anaconda 11/13 (`render_legacy_kickstart`), el5 on the user network's fixed addresses because its loader segfaults on the host-name lookup after DHCP, the vault's plain-HTTP copy at linuxsoft.cern.ch because vault.centos.org redirects HTTP to HTTPS), `hobby-os` (KolibriOS, Redox OS,
 MenuetOS, SerenityOS from a built `disk_image`: manual systems, so a `--group hobby-os` run records them as skipped) and `smoke` (one profile
 per install flow that downloads its own medium, the lightest of each — run it before a full
 matrix). `group_index()`/`group_sources()` build the catalogue, `resolve_group_selection()`
