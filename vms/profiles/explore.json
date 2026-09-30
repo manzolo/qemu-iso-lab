@@ -7,7 +7,8 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "experimental",
+        "status": "unattended",
+        "verified": "2026-09-30",
         "version": "1.1.1"
       },
       "iso": "isos/pop-os_24.04_amd64_generic_22.iso",
@@ -84,7 +85,7 @@
           "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package cosmic-session --compositor cosmic-comp --process cosmic-panel"
         ]
       },
-      "notes": "Pop!_OS 24.04 with COSMIC, installed with bootstrap-popos: the casper live ISO boots on the serial console in multi-user mode, the host logs in as the live user pop-os and runs the seed's install.sh with sudo. distinst, the engine of pop-installer, copies the live squashfs onto GPT (EFI + ext4) and creates the user, locale, keyboard and time zone; a chroot adds openssh-server from the archive, the password hash, the sudo rule, the project key, greetd's initial session into COSMIC (start-cosmic) and the ttyS0 getty, and removes the first-login cosmic-initial-setup. Born experimental (2026-09-30): vmctl check-vms popos-cosmic runs one."
+      "notes": "Pop!_OS 24.04 with COSMIC, installed with bootstrap-popos: the casper live ISO boots on the serial console in multi-user mode, the host logs in as the live user pop-os and runs the seed's install.sh with sudo. distinst, the engine of pop-installer, copies the live squashfs onto GPT (EFI + ext4) and creates the user, locale, keyboard and time zone; a chroot adds openssh-server from the archive, the password hash, the sudo rule, the project key, greetd's initial session into COSMIC (start-cosmic) and the ttyS0 getty, and removes the first-login cosmic-initial-setup. First live PASS 2026-09-30 (259 s). greetd registers the COSMIC session as tty, so the desktop check names cosmic-comp as the compositor."
     },
     "pearos-nicecore-installer": {
       "name": "pearOS NiceC0re",
