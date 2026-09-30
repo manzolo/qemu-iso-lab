@@ -1128,9 +1128,14 @@
       ]
     },
     "opensuse-leap-16": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:7fce83faff22c26ad17a4ff2b502f18f041e205e43c9927e3c6b4b5c20e4007f",
+      "version": "1.1.0",
+      "fingerprint": "sha256:eb95f51252418954b48785366940f2b22a197d39fe860fc846baa994b9960b41",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-30",
+          "note": "Agama unattended recipe (bootstrap-agama): OEMDRV seed, GNOME, SSH verification"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",

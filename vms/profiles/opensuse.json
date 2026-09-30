@@ -358,22 +358,21 @@
       }
     },
     "opensuse-leap-16": {
-      "name": "openSUSE Leap 16.0 (Agama installer)",
+      "name": "openSUSE Leap 16.0 GNOME (Agama)",
       "meta": {
         "slug": "opensuse-leap",
         "family": "opensuse",
-        "role": "installer",
+        "role": "desktop",
         "release_model": "stable",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0"
       },
       "iso": "isos/agama-installer.x86_64-Leap_16.0.iso",
       "iso_url": "https://download.opensuse.org/distribution/leap/16.0/installer/iso/agama-installer.x86_64-Leap_16.0.iso",
       "iso_sha256": "cf852fe260bf1c514550da271ca140d2e1e40f9f70f80d97ab0cdc6bb4f0e749",
       "disk": {
         "path": "artifacts/opensuse-leap-16/disk.qcow2",
-        "size": "24G",
+        "size": "40G",
         "format": "qcow2",
         "interface": "virtio"
       },
@@ -387,9 +386,9 @@
       "memory_mb": 4096,
       "cpus": 2,
       "network": "user",
-      "audio": false,
+      "audio": true,
       "video": {
-        "default": "safe",
+        "default": "std",
         "variants": {
           "std": [
             "-vga",
@@ -406,7 +405,53 @@
         }
       },
       "usb_tablet": true,
-      "notes": "openSUSE Leap 16.0 (October 2025) on Agama, the installer that replaced YaST: a web UI shown on the VM's console. The online installer fetches every package from download.opensuse.org, so it needs the network. Manual for now: Agama takes an unattended profile (JSON) over a kernel argument, the road to a bootstrap next to opensuse-tumbleweed-autoyast."
+      "notes": "openSUSE Leap 16.0 (October 2025) with GNOME, installed with bootstrap-agama: Agama, the installer that replaced YaST, reads autoinst.json from a seed CD labelled OEMDRV by itself (label://OEMDRV/autoinst.json); the host boots the ISO's kernel with inst.finish=poweroff and the serial console. The profile names the product (openSUSE_Leap), the whole virtio disk, the user and root by hash, the gnome pattern; its post scripts add the sudo rule, the project key, sshd, the ttyS0 getty, the firewall's ssh service and GDM autologin, label those files for SELinux with setfiles, and a last script outside the chroot syncs and prints the token. The online installer fetches every package from download.opensuse.org. Born experimental (2026-09-30): vmctl check-vms opensuse-leap-16 runs one.",
+      "guest_agent": true,
+      "clipboard": true,
+      "agama_config": {
+        "hostname": "leap16",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "language": "en_US.UTF-8",
+        "keyboard": "us",
+        "timezone": "UTC",
+        "product": "openSUSE_Leap",
+        "patterns": [
+          "gnome"
+        ],
+        "packages": [
+          "openssh",
+          "qemu-guest-agent",
+          "spice-vdagent"
+        ],
+        "enable_services": [
+          "sshd",
+          "qemu-guest-agent",
+          "serial-getty@ttyS0"
+        ],
+        "open_firewall_services": [
+          "ssh"
+        ],
+        "autologin": true
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2355,
+        "ssh_key": null,
+        "post_install_run": [
+          "cat /etc/os-release",
+          "systemctl is-active sshd",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager rpm --package gnome-shell"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ]
+      }
     }
   }
 }

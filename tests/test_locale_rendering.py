@@ -12,7 +12,7 @@ import shutil
 from unittest import mock
 
 from tests._common import BaseVmctlTestCase, ROOT
-from vmctl import (alpine, archinstall, autoyast, cloud_init, config, kickstart, lifecycle, opnsense, preseed,
+from vmctl import (agama, alpine, archinstall, autoyast, cloud_init, config, kickstart, lifecycle, opnsense, preseed,
                    slackware, ssh, ubiquity, void, windows)
 
 PROBE_USER = "vmctlprobe"
@@ -56,6 +56,9 @@ def render(name: str, vm: dict) -> dict[str, str]:
         out["seed"] = ubiquity.render_seed(name, vm)
     elif flow == "bootstrap-void":
         out["install.sh"] = void.render_install_script(name, vm, [FAKE_KEY])
+    elif flow == "bootstrap-agama":
+        out["append"] = agama.KERNEL_APPEND
+        out["autoinst.json"] = agama.render_profile(name, vm, [FAKE_KEY])
     elif flow == "bootstrap-opnsense":
         out["config.xml"] = opnsense.render_config_xml(name, vm, [FAKE_KEY], password_hash="$2y$10$probe")
     elif flow == "bootstrap-windows" and windows.windows_config(vm) is not None:
