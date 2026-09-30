@@ -50,16 +50,6 @@
       "iso_sha256": "f564822bc72d420d1e1a6faacb72f6056d828fcf539dfafd52e08503ef5fab68"
     },
     "opnsense": {
-      "name": "OPNsense 25.7 (DVD installer)",
-      "meta": {
-        "slug": "opnsense",
-        "family": "bsd",
-        "role": "router",
-        "release_model": "stable",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
-      },
       "iso": "isos/OPNsense-25.7-dvd-amd64.iso",
       "iso_url": "https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-dvd-amd64.iso.bz2",
       "iso_archive": {
@@ -76,7 +66,6 @@
         "type": "bios"
       },
       "machine": "pc",
-      "memory_mb": 2048,
       "cpus": 2,
       "network": "user",
       "audio": false,
@@ -98,7 +87,32 @@
         }
       },
       "usb_tablet": true,
-      "notes": "OPNsense 25.7 (July 2025, FreeBSD 14.3), the DVD image unpacked from the vendor's .bz2: it boots a live system, log in as installer (password opnsense) to install to disk, root/opnsense for the live shell. With the single slirp NIC the interface is the WAN, where the web GUI is closed by default: add a NIC on a segment (vmctl link) or use the console menu. Manual for now: pfsense-lab's scripted install (config.xml + installerconfig) applies to OPNsense too, the road to an opnsense-lab next to pfsense-lab."
+      "name": "OPNsense 25.7 (the live DVD installs itself)",
+      "meta": {
+        "slug": "opnsense",
+        "family": "bsd",
+        "role": "router",
+        "release_model": "stable",
+        "status": "experimental",
+        "version": "1.1.0"
+      },
+      "memory_mb": 2048,
+      "opnsense_config": {
+        "hostname": "opnsense",
+        "username": "lab",
+        "password": "lab",
+        "timezone": "Etc/UTC"
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2349,
+        "post_install_run": [
+          "/usr/local/sbin/opnsense-version | grep -q '^OPNsense 25.7'",
+          "pgrep -x sshd >/dev/null && sudo -n true",
+          "[ \"$(sudo -n /usr/local/sbin/pluginctl -g interfaces.wan.if)\" = vtnet0 ] || sudo -n grep -q '<if>vtnet0</if>' /conf/config.xml"
+        ]
+      },
+      "notes": "OPNsense 25.7 (July 2025, FreeBSD 14.3) with bootstrap-opnsense: the live DVD (unpacked from the vendor's .bz2) runs a start hook grafted on a copy of the ISO, which clones the running system onto the disk like opnsense-install (GPT, freebsd-boot + UFS, cpdup of the same directories) and writes a config.xml of ours: WAN on vtnet0 with DHCP (no private-network block: QEMU's user network is 10.0.2.0/24), SSH with the project key for an admins user whose shell is /bin/sh, sudo without password for wheel, a WAN rule for port 22, the serial console. The web GUI answers on the WAN address inside the VM; a lab like pfsense-lab is the next step. Born experimental (2026-09-30): vmctl check-vms opnsense runs one."
     }
   }
 }

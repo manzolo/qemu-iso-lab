@@ -72,7 +72,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ```
 errors ← {state, profile_bases} ← {ui, runtime, profile_versions} ← {config, vmstate, iso, cloud_init, qemu, archinstall, disk_inspect} ← {checkpoint, catalog} ← clone
-      ← {alpine, autoyast, preseed, ubiquity, kickstart, haiku, nixos, omarchy, pearos, proxmox, slackware, windows} (archinstall ← arch_archive ← {state, ui, errors}) ← {flash, flash_progress, tui_devices, import_dev, ssh, host_setup, report} ← {netlab, pvecluster} ← labs ← {pfsense, freebsd, libvirt} ← lifecycle ← {profile_overrides, web_terminal, web_recording, web_files, integration} ← webui ← cli
+      ← {alpine, autoyast, preseed, ubiquity, kickstart, haiku, nixos, omarchy, pearos, proxmox, slackware, windows} (archinstall ← arch_archive ← {state, ui, errors}) ← {flash, flash_progress, tui_devices, import_dev, ssh, host_setup, report} ← {netlab, pvecluster} ← labs ← {pfsense, freebsd, libvirt} ← opnsense ← lifecycle ← {profile_overrides, web_terminal, web_recording, web_files, integration} ← webui ← cli
 ```
 
 Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always accessed as `state.ROOT`, never imported directly — a direct import captures a stale binding and breaks tests.

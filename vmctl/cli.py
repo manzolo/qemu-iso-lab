@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-slackware", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
+     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "agent", "attach", "link", "record"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -230,6 +230,11 @@ filesystem permission: a manual rm still deletes the files."""
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=3600, help="seconds to wait for the install to complete (default: 3600)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_windows)
+
+    p = _add(subparsers, "bootstrap-opnsense", help="OPNsense: the live DVD clones itself onto the disk with a config.xml of ours, then SSH verification")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="installer and SSH timeout in seconds (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_opnsense)
 
     p = _add(subparsers, "bootstrap-freebsd", help="FreeBSD disc1 scripted install + SSH verification")
     p.add_argument("vm", help=VM_HELP)

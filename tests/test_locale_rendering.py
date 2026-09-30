@@ -12,7 +12,7 @@ import shutil
 from unittest import mock
 
 from tests._common import BaseVmctlTestCase, ROOT
-from vmctl import (alpine, archinstall, autoyast, cloud_init, config, kickstart, lifecycle, preseed,
+from vmctl import (alpine, archinstall, autoyast, cloud_init, config, kickstart, lifecycle, opnsense, preseed,
                    slackware, ssh, ubiquity, windows)
 
 PROBE_USER = "vmctlprobe"
@@ -54,6 +54,8 @@ def render(name: str, vm: dict) -> dict[str, str]:
     elif flow == "bootstrap-ubiquity":
         out["append"] = ubiquity.kernel_append(vm)
         out["seed"] = ubiquity.render_seed(name, vm)
+    elif flow == "bootstrap-opnsense":
+        out["config.xml"] = opnsense.render_config_xml(name, vm, [FAKE_KEY], password_hash="$2y$10$probe")
     elif flow == "bootstrap-windows" and windows.windows_config(vm) is not None:
         out["autounattend.xml"] = windows.render_autounattend(name, vm)
     return out
