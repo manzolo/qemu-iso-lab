@@ -166,7 +166,10 @@ def render_install_hook() -> str:
         "# vmctl: install this live OPNsense onto the disk, then power off (vmctl/opnsense.py)",
         "[ -f /tmp/vmctl-install-started ] && exit 0",
         "touch /tmp/vmctl-install-started",
-        "(",
+        # The body runs detached (daemon -f: its own session, SIGHUP ignored): a background
+        # subshell died with the boot's process group halfway through newfs (2026-09-30).
+        "cat > /tmp/vmctl-install.sh <<'VMCTL_EOF'",
+        "#!/bin/sh",
         "exec > /dev/console 2>&1",
         "failed() {",
         f'    echo "{BOOTSTRAP_FAILED_TOKEN}: $*"',
@@ -205,7 +208,8 @@ def render_install_hook() -> str:
         "sync",
         f'echo "{BOOTSTRAP_COMPLETE_TOKEN}"',
         "/sbin/shutdown -p now",
-        ") &",
+        "VMCTL_EOF",
+        "/usr/sbin/daemon -f /bin/sh /tmp/vmctl-install.sh",
         "exit 0",
     ]
     return "\n".join(lines) + "\n"

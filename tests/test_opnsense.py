@@ -45,7 +45,7 @@ class OpnsenseTests(unittest.TestCase):
         hook = opnsense.render_install_hook()
         order = ["gpart create -s gpt", "gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1", "newfs -U -L rootfs",
                  "cpdup -i0 -o -s0", f"cp {opnsense.CONFIG_STAGE} /mnt/conf/config.xml", f"rm -f /mnt{opnsense.HOOK_PATH}",
-                 "run umount /mnt", opnsense.BOOTSTRAP_COMPLETE_TOKEN, "/sbin/shutdown -p now\n) &"]
+                 "run umount /mnt", opnsense.BOOTSTRAP_COMPLETE_TOKEN, "/sbin/shutdown -p now\nVMCTL_EOF", "/usr/sbin/daemon -f /bin/sh /tmp/vmctl-install.sh"]
         positions = [hook.index(piece) for piece in order]
         self.assertEqual(positions, sorted(positions), order)
         self.assertIn('failed() {', hook)
