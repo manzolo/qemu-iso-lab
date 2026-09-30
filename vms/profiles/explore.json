@@ -8,7 +8,7 @@
         "role": "desktop",
         "release_model": "lts",
         "status": "experimental",
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "iso": "isos/pop-os_24.04_amd64_generic_22.iso",
       "iso_url": "https://iso.pop-os.org/24.04/amd64/generic/22/pop-os_24.04_amd64_generic_22.iso",
@@ -81,7 +81,7 @@
         "post_install_run": [
           "cat /etc/os-release",
           "systemctl is-active ssh",
-          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package cosmic-session --process cosmic-comp"
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager dpkg --package cosmic-session --compositor cosmic-comp --process cosmic-panel"
         ]
       },
       "notes": "Pop!_OS 24.04 with COSMIC, installed with bootstrap-popos: the casper live ISO boots on the serial console in multi-user mode, the host logs in as the live user pop-os and runs the seed's install.sh with sudo. distinst, the engine of pop-installer, copies the live squashfs onto GPT (EFI + ext4) and creates the user, locale, keyboard and time zone; a chroot adds openssh-server from the archive, the password hash, the sudo rule, the project key, greetd's initial session into COSMIC (start-cosmic) and the ttyS0 getty, and removes the first-login cosmic-initial-setup. Born experimental (2026-09-30): vmctl check-vms popos-cosmic runs one."
@@ -246,7 +246,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "experimental",
+        "status": "unattended",
+        "verified": "2026-09-30",
         "version": "1.1.1"
       },
       "iso": "isos/EndeavourOS_Titan-2026.03.06.iso",
@@ -324,7 +325,7 @@
           "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager pacman --package plasma-desktop"
         ]
       },
-      "notes": "EndeavourOS (Arch with its own repository and tools) with KDE Plasma on SDDM, installed with bootstrap-archinstall the way CachyOS is: the live ISO boots on the serial console in multi-user mode (no live Plasma, no Calamares), the host logs in as the live root (no password) and runs a pacstrap script from a seed CD with the live pacman.conf and mirrorlists copied into the target, so [endeavouros] stays. Plasma, SDDM autologin into the plasma session, NetworkManager, the ttyS0 getty. The ISO is on the EndeavourOS mirrors (SHA-512 next to it). mkinitcpio is named explicitly: pacstrap otherwise takes the [endeavouros] dracut as the initramfs provider, and without the eos-dracut hooks Calamares adds nothing writes /boot/vmlinuz-linux or an initramfs, so GRUB had nothing to boot and returned to the firmware (first live run). Born experimental (2026-09-30): vmctl check-vms endeavouros runs one."
+      "notes": "EndeavourOS (Arch with its own repository and tools) with KDE Plasma on SDDM, installed with bootstrap-archinstall the way CachyOS is: the live ISO boots on the serial console in multi-user mode (no live Plasma, no Calamares), the host logs in as the live root (no password) and runs a pacstrap script from a seed CD with the live pacman.conf and mirrorlists copied into the target, so [endeavouros] stays. Plasma, SDDM autologin into the plasma session, NetworkManager, the ttyS0 getty. The ISO is on the EndeavourOS mirrors (SHA-512 next to it). mkinitcpio is named explicitly: pacstrap otherwise takes the [endeavouros] dracut as the initramfs provider, and without the eos-dracut hooks Calamares adds nothing writes /boot/vmlinuz-linux or an initramfs, so GRUB had nothing to boot and returned to the firmware (first live run). First live PASS 2026-09-30."
     },
     "kde-neon-user": {
       "name": "KDE neon User Edition",
