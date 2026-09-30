@@ -8,8 +8,9 @@
         "family": "debian",
         "role": "server",
         "release_model": "stable",
-        "status": "experimental",
-        "version": "1.1.1"
+        "status": "unattended",
+        "version": "1.1.1",
+        "verified": "2026-09-30"
       },
       "iso": "isos/devuan_excalibur_6.1.1_amd64_netinstall.iso",
       "iso_url": "https://files.devuan.org/devuan_excalibur/installer-iso/devuan_excalibur_6.1.1_amd64_netinstall.iso",
@@ -46,7 +47,7 @@
           "grep -q '^PRETTY_NAME=\"Devuan GNU/Linux 6' /etc/os-release"
         ]
       },
-      "notes": "Devuan 6.1.1 Excalibur (April 2026): Debian 13 without systemd, installed with bootstrap-preseed from the netinstall ISO (kernel and d-i initrd under /boot/isolinux). The preseed answers Devuan's own questions: choose-init/select_init sysvinit (openrc and runit are the other choices), the mirror and the security repository on deb.devuan.org/merged, suite excalibur; acpid for the ACPI power-off. The checks: PID 1 is sysvinit's init and no systemd runs, sshd, sudo, the Devuan release. Born experimental (2026-09-30): vmctl check-vms devuan-netinst runs one."
+      "notes": "Devuan 6.1.1 Excalibur (April 2026): Debian 13 without systemd, installed with bootstrap-preseed from the netinstall ISO (kernel and d-i initrd under /boot/isolinux). The preseed answers Devuan's own questions: choose-init/select_init sysvinit (openrc and runit are the other choices), the mirror and the security repository on deb.devuan.org/merged, suite excalibur; acpid for the ACPI power-off. The checks: PID 1 is sysvinit's init and no systemd runs, sshd, sudo, the Devuan release. First live PASS 2026-09-30 (450 s)."
     }
   }
 }
