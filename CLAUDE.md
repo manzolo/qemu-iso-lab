@@ -47,6 +47,7 @@ vmctl bootstrap-windowsxp windows-xp  # needs your own XP ISO + key in local.jso
 vmctl bootstrap-windowsnt4 windows-nt4  # needs your own NT 4 ISO + CD key in local.json, a FreeDOS 1.3 boot floppy image and a DOS CD-ROM driver + MSCDEX (extracted from a Windows 98 ISO if you name one), xorriso, mtools, mkfs.vfat; install only
 vmctl check-vms --report --document [names]   # validation run that also keeps a screenshot timeline and writes one PDF per profile
 vmctl check-vms --group ubuntu [--group rhel]  # run one category instead of the whole matrix (make validate-vms GROUP="ubuntu rhel")
+vmctl check-vms --group smoke --tracked-only  # local.json ignored (VMCTL_TRACKED_ONLY=1, row workers too): smoke once like this and once without before a full matrix
 vmctl list --groups                            # every category, its size, its members and where the membership comes from
 vmctl report-pdf [report-dir] --lang en,it      # the same PDFs from an existing report (final screens only if it ran without --document)
 vmctl clean-reports [--keep N] [--older-than DAYS] [--dry-run]   # housekeeping: drop old report directories, never one being written

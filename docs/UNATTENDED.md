@@ -1151,6 +1151,26 @@ so these jobs wait for pfSense to finish; unrelated VMs can still run alongside 
 The waiting message lists the conflicting ports. This coordination applies to
 jobs in the same `check-vms` invocation.
 
+
+### The smoke group twice before a full matrix
+
+`local.json` changes what the flows render: the `identity` block moves every profile to your
+user, and the `locale` block brings your language, keyboard and time zone. The public catalog
+is never rendered that way. The night matrix of 2026-09-29/30 lost every d-i row to it:
+`language=it` reached the serial console. Before a full matrix, run the one-per-flow `smoke`
+group in both variants:
+
+```bash
+vmctl check-vms --group smoke --tracked-only --report   # the catalog as published: local.json ignored
+vmctl check-vms --group smoke --report                  # with your identity and locale
+```
+
+`--tracked-only` sets `VMCTL_TRACKED_ONLY=1` for the run and for every row worker, and
+`config.load_config` then leaves `local.json` out. Only the profiles change: the stars and
+protections live in the same file but are read apart, so a starred VM is still stashed and
+given back. `tests/test_locale_rendering.py` checks the same two variants on the rendered
+files alone, in seconds; the smoke runs are the live proof.
+
 ### Occasional stalls, and how to tell one from a regression
 
 AutoYaST has a long window where silence is normal: between linuxrc's last line

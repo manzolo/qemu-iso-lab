@@ -4453,6 +4453,10 @@ def recover_orphan_stash(dry_run: bool = False) -> None:
 
 
 def cmd_test_local(args: argparse.Namespace) -> int:
+    if getattr(args, "tracked_only", False):
+        # inherited by every _check-vm worker (subprocess.run keeps the environment)
+        os.environ[config.TRACKED_ONLY_ENV] = "1"
+        ui.print_kv("catalog", "tracked profiles only: local.json (identity, locale, overrides) ignored")
     cfg = config.load_config()
     named = list(dict.fromkeys(getattr(args, "vms", None) or []))
     wanted_groups = list(dict.fromkeys(getattr(args, "group", None) or []))

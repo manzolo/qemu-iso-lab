@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import os
 import re
 import sys
 from datetime import date
@@ -555,6 +556,16 @@ def _ssh_port_conflicts(vms: dict[str, dict[str, Any]]) -> list[str]:
     return errors
 
 
+# check-vms --tracked-only sets it for itself and its row workers: the catalog as published, with
+# no identity, no locale block and no per-VM override of local.json (the default half of a smoke
+# run done twice, see docs/UNATTENDED.md).
+TRACKED_ONLY_ENV = "VMCTL_TRACKED_ONLY"
+
+
+def tracked_only() -> bool:
+    return os.environ.get(TRACKED_ONLY_ENV) == "1"
+
+
 def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, Any]:
     """Load profiles; an explicit local document allows validation before saving it."""
     profiles_dir = state.CONFIG_DIR / "profiles"
@@ -574,6 +585,8 @@ def load_config(*, local_profiles: dict[str, Any] | None = None) -> dict[str, An
     profile_paths = sorted(profiles_dir.glob("*.json"), key=lambda p: (p.name == "local.json", p.name))
     if local_profiles is not None and profiles_dir / "local.json" not in profile_paths:
         profile_paths.append(profiles_dir / "local.json")
+    if local_profiles is None and tracked_only():
+        profile_paths = [p for p in profile_paths if p.name != "local.json"]
     for path in profile_paths:
         profile_data = local_profiles if path.name == "local.json" and local_profiles is not None else runtime.load_json_file(path)
         if "vms" not in profile_data or not isinstance(profile_data["vms"], dict):

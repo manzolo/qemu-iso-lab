@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -252,6 +253,24 @@ class ConfigTests(BaseVmctlTestCase):
         self.write_config_dir()
         self.write_extra_profile("local.json", {"identity": {"user": "me"}, "vms": {}})
         self.assertEqual(self.vmctl.load_config()["vms"][self.vm_name]["ssh_provision"]["user"], "user")
+
+    def test_tracked_only_ignores_local_json_identity_locale_and_overrides(self):
+        # check-vms --tracked-only: the default half of a smoke run done twice
+        self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2222}
+        self.vm_config["preseed_config"] = {"username": "lab", "password_hash": "$6$lab", "timezone": "UTC"}
+        self.write_config_dir()
+        self.write_extra_profile("local.json", {
+            "identity": {"user": "me", "password_hash": "$6$me"},
+            "locale": {"language": "it_IT.UTF-8", "keyboard": "it", "timezone": "Europe/Rome"},
+            "vms": {self.vm_name: {"memory_mb": 12345}}})
+        personal = self.vmctl.load_config()["vms"][self.vm_name]
+        self.assertEqual((personal["ssh_provision"]["user"], personal["preseed_config"]["timezone"], personal["memory_mb"]),
+                         ("me", "Europe/Rome", 12345))
+        with mock.patch.dict(os.environ, {self.vmctl.TRACKED_ONLY_ENV: "1"}):
+            tracked = self.vmctl.load_config()["vms"][self.vm_name]
+        self.assertEqual(tracked["ssh_provision"]["user"], "lab")
+        self.assertEqual(tracked["preseed_config"]["timezone"], "UTC")
+        self.assertNotEqual(tracked.get("memory_mb"), 12345)
 
     def test_local_identity_is_validated(self):
         self.write_config_dir()
