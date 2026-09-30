@@ -1178,9 +1178,14 @@
       ]
     },
     "opnsense": {
-      "version": "1.1.0",
+      "version": "1.1.1",
       "fingerprint": "sha256:3fb8812b589d8c1d441fb1c48bf3c82cb044d09f0a835f74448c333c7341af8c",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-30",
+          "note": "parked: the live media powers itself off two minutes after boot, notes say where it stopped"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-30",

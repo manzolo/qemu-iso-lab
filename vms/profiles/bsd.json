@@ -94,7 +94,7 @@
         "role": "router",
         "release_model": "stable",
         "status": "experimental",
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "memory_mb": 2048,
       "opnsense_config": {
@@ -112,7 +112,7 @@
           "[ \"$(sudo -n /usr/local/sbin/pluginctl -g interfaces.wan.if)\" = vtnet0 ] || sudo -n grep -q '<if>vtnet0</if>' /conf/config.xml"
         ]
       },
-      "notes": "OPNsense 25.7 (July 2025, FreeBSD 14.3) with bootstrap-opnsense: the live DVD (unpacked from the vendor's .bz2) runs a start hook grafted on a copy of the ISO, which clones the running system onto the disk like opnsense-install (GPT, freebsd-boot + UFS, cpdup of the same directories) and writes a config.xml of ours: WAN on vtnet0 with DHCP (no private-network block: QEMU's user network is 10.0.2.0/24), SSH with the project key for an admins user whose shell is /bin/sh, sudo without password for wheel, a WAN rule for port 22, the serial console. The web GUI answers on the WAN address inside the VM; a lab like pfsense-lab is the next step. Born experimental (2026-09-30): vmctl check-vms opnsense runs one."
+      "notes": "OPNsense 25.7 (July 2025, FreeBSD 14.3) with bootstrap-opnsense: the live DVD (unpacked from the vendor's .bz2) runs a start hook grafted on a copy of the ISO, which clones the running system onto the disk like opnsense-install (GPT, freebsd-boot + UFS, cpdup of the same directories) and writes a config.xml of ours: WAN on vtnet0 with DHCP (no private-network block: QEMU's user network is 10.0.2.0/24), SSH with the project key for an admins user whose shell is /bin/sh, sudo without password for wheel, a WAN rule for port 22, the serial console. The web GUI answers on the WAN address inside the VM; a lab like pfsense-lab is the next step. Parked experimental on 2026-09-30 after three live runs: the hook partitions, formats and mounts the disk, but the live system powers itself off about two minutes after boot, right after its livemode 'Welcome' banner and while cpdup is starting; a traced hook that never powers off on its own errors showed the same shutdown, so it comes from the live media, not from the hook. Next idea if anyone resumes it: run the clone from the 'installer' login's shell instead of a boot hook."
     }
   }
 }
