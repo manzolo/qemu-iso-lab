@@ -263,9 +263,14 @@
       ]
     },
     "centos-5": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:4bea3f05c352fa6fc2259990f4967a9762d48f8a14e1d78714a19a441c6992c5",
+      "version": "1.1.0",
+      "fingerprint": "sha256:04876b13c42c0f74f20b14b1653159c1eb8f07c9af551a52c0b7c3900b31fe53",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-30",
+          "note": "unattended: legacy kickstart (anaconda 11), experimental until its live run"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
@@ -274,9 +279,14 @@
       ]
     },
     "centos-6": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:3f328a1f31de53ae51abd3165494c06f80abbf63d9d27136c6309b95b23ebbf3",
+      "version": "1.1.0",
+      "fingerprint": "sha256:6eb17c6bef0b7afc43fd4b222a73eba24297e2827028eb0fef3541201a5f831f",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-30",
+          "note": "unattended: legacy kickstart (anaconda 13), experimental until its live run"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",

@@ -46,32 +46,117 @@
   },
   "vms": {
     "centos-5": {
-      "name": "CentOS 5.11 (netinstall from the vault)",
+      "name": "CentOS 5.11 (legacy kickstart, netinstall from the vault)",
       "extends": "centos-history-base",
       "meta": {
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0",
+        "role": "server"
       },
       "iso": "isos/CentOS-5.11-x86_64-netinstall.iso",
       "iso_url": "https://vault.centos.org/5.11/isos/x86_64/CentOS-5.11-x86_64-netinstall.iso",
       "iso_sha256": "9729c04a8a3ba57ed4e34ee5b96522879e6a3bcbf5582c3b6bcfd02bcfbacf8c",
       "memory_mb": 1024,
-      "notes": "CentOS 5.11 (September 2014, the last of the 5 series, kernel 2.6.18): the netinstall CD asks where the repository is: HTTP, server vault.centos.org, directory /5.11/os/x86_64/. The 5.x kernel drives the virtio disk and NIC (since 5.3). Manual for now: almalinux-server's kickstart flow is the road to unattended, the anaconda of that era takes ks= on the serial console."
+      "notes": "CentOS 5.11 (September 2014, kernel 2.6.18): bootstrap-kickstart in its legacy mode (kickstart_config.legacy el5): anaconda 11 reads the kickstart from the initrd and installs from vault.centos.org (method= on the kernel line, url in the kickstart); no %end, zerombr yes, the sudoers rule in /etc/sudoers. OpenSSH 4.3: RSA key and the legacy SSH options. Born experimental (2026-09-30): vmctl check-vms centos-5 runs one.",
+      "installer_boot": {
+        "kernel": "isolinux/vmlinuz",
+        "initrd": "isolinux/initrd.img"
+      },
+      "network_device": "e1000",
+      "kickstart_config": {
+        "legacy": "el5",
+        "hostname": "centos-5",
+        "username": "lab",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "locale": "en_US.UTF-8",
+        "disk_device": "vda",
+        "selinux": "enforcing",
+        "inst_repo": "http://vault.centos.org/5.11/os/x86_64/",
+        "packages": [
+          "@core",
+          "openssh-server",
+          "sudo",
+          "acpid"
+        ],
+        "post_commands": [
+          "sed -i -e 's|^mirrorlist=|#mirrorlist=|' -e 's|^#baseurl=http://mirror.centos.org/centos/$releasever|baseurl=http://vault.centos.org/5.11|' /etc/yum.repos.d/CentOS-Base.repo",
+          "chkconfig acpid on",
+          "chkconfig sshd on"
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2348,
+        "key_type": "rsa",
+        "ssh_options": [
+          "HostKeyAlgorithms=+ssh-rsa",
+          "PubkeyAcceptedAlgorithms=+ssh-rsa",
+          "KexAlgorithms=+diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1"
+        ],
+        "post_install_run": [
+          "pgrep -x sshd >/dev/null && sudo -n true",
+          "grep -q 'CentOS release 5' /etc/redhat-release",
+          "grep -q vault.centos.org /etc/yum.repos.d/CentOS-Base.repo"
+        ]
+      }
     },
     "centos-6": {
-      "name": "CentOS 6.10 (minimal)",
+      "name": "CentOS 6.10 (legacy kickstart, minimal ISO)",
       "extends": "centos-history-base",
       "meta": {
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0",
+        "role": "server"
       },
       "iso": "isos/CentOS-6.10-x86_64-minimal.iso",
       "iso_url": "https://vault.centos.org/6.10/isos/x86_64/CentOS-6.10-x86_64-minimal.iso",
       "iso_sha256": "7c0dee2a0494dabd84809b72ddb4b761f9ef92b78a506aef709b531c54d30770",
       "memory_mb": 1024,
-      "notes": "CentOS 6.10 (July 2018, kernel 2.6.32, the last 6): the minimal ISO installs a base system from itself. Afterwards yum needs the vault: replace mirrorlist with baseurl=http://vault.centos.org/6.10/os/x86_64/ in CentOS-Base.repo (mirrorlist.centos.org is gone)."
+      "notes": "CentOS 6.10 (July 2018, kernel 2.6.32, the last 6): bootstrap-kickstart in its legacy mode (kickstart_config.legacy el6): anaconda 13 reads the kickstart from the initrd (ks=file:/ks.cfg, no inst.* options before RHEL 7) and installs @core from the minimal ISO; %post points yum at vault.centos.org. OpenSSH 5.3: RSA key and the legacy SSH options. Born experimental (2026-09-30): vmctl check-vms centos-6 runs one.",
+      "installer_boot": {
+        "kernel": "isolinux/vmlinuz",
+        "initrd": "isolinux/initrd.img"
+      },
+      "kickstart_config": {
+        "legacy": "el6",
+        "hostname": "centos-6",
+        "username": "lab",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "us",
+        "locale": "en_US.UTF-8",
+        "disk_device": "vda",
+        "selinux": "enforcing",
+        "inst_repo": "cdrom",
+        "packages": [
+          "@core",
+          "openssh-server",
+          "sudo",
+          "acpid"
+        ],
+        "post_commands": [
+          "sed -i -e 's|^mirrorlist=|#mirrorlist=|' -e 's|^#baseurl=http://mirror.centos.org/centos/$releasever|baseurl=http://vault.centos.org/6.10|' /etc/yum.repos.d/CentOS-Base.repo",
+          "chkconfig acpid on",
+          "chkconfig sshd on"
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2347,
+        "key_type": "rsa",
+        "ssh_options": [
+          "HostKeyAlgorithms=+ssh-rsa",
+          "PubkeyAcceptedAlgorithms=+ssh-rsa",
+          "KexAlgorithms=+diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1"
+        ],
+        "post_install_run": [
+          "pgrep -x sshd >/dev/null && sudo -n true",
+          "grep -q 'CentOS release 6' /etc/redhat-release",
+          "grep -q vault.centos.org /etc/yum.repos.d/CentOS-Base.repo"
+        ]
+      }
     },
     "centos-7": {
       "name": "CentOS 7.9.2009 (kickstart, minimal ISO)",

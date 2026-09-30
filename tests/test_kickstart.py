@@ -284,3 +284,49 @@ class NetworkOptionsTests(unittest.TestCase):
         self.assertIn("network --bootproto=dhcp --hostname=centos-7 --onboot=yes --activate\n", c7)
         c8 = kickstart.render_kickstart("centos-8", tracked["centos-8"])
         self.assertIn("network --bootproto=dhcp --hostname=centos-8\n", c8)
+
+
+class LegacyKickstartTests(unittest.TestCase):
+    def test_centos_5_and_6_render_the_syntax_of_their_anaconda(self):
+        from unittest import mock
+        from vmctl import config, kickstart
+        from tests._common import ROOT
+        tracked = config.load_tracked(ROOT / "vms" / "profiles")
+        with mock.patch.object(kickstart, "_resolve_ssh_pubkey", return_value="ssh-rsa AAAA probe"):
+            c6 = kickstart.render_kickstart("centos-6", tracked["centos-6"])
+            c5 = kickstart.render_kickstart("centos-5", tracked["centos-5"])
+        for ks in (c6, c5):
+            self.assertIn("\ncdrom\n" if ks is c6 else 'url --url="http://vault.centos.org/5.11/os/x86_64/"', ks)
+            self.assertNotIn("rootpw --lock", ks)
+            self.assertNotIn("--gecos", ks)
+            self.assertIn("NOPASSWD: ALL' >> /etc/sudoers", ks)
+            self.assertTrue(ks.rstrip().endswith(("%end", '"')))
+        self.assertIn("%end", c6)
+        self.assertNotIn("%end", c5)  # anaconda 11 predates it
+        self.assertIn("zerombr yes", c5)
+        self.assertIn("%post --erroronfail", c6)
+        self.assertNotIn("--erroronfail", c5)
+        a6, a5 = kickstart.kernel_append(tracked["centos-6"]), kickstart.kernel_append(tracked["centos-5"])
+        self.assertNotIn("inst.", a6 + a5)  # no inst.* options before RHEL 7
+        self.assertTrue(a6.startswith("ks=file:/ks.cfg text "))
+        self.assertIn("method=http://vault.centos.org/5.11/os/x86_64/", a5)
+
+    def test_the_kickstart_is_appended_to_a_gzip_or_lzma_initrd(self):
+        import gzip, lzma, tempfile
+        from pathlib import Path
+        from vmctl import kickstart
+        base = kickstart.cpio_newc({"init": b"#!/bin/sh\n"})
+        for packed in (gzip.compress(base), lzma.compress(base, format=lzma.FORMAT_ALONE)):
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "initrd.img"
+                path.write_bytes(packed)
+                kickstart.add_to_legacy_initrd(path, {"ks.cfg": "install\n"})
+                data = gzip.decompress(path.read_bytes())
+                self.assertTrue(data.startswith(base))  # the original archive first, untouched
+                tail = data[len(base):]
+                self.assertTrue(tail.startswith(b"070701"))
+                self.assertIn(b"ks.cfg\0", tail)
+                self.assertIn(b"install\n", tail)
+                self.assertIn(b"TRAILER!!!", tail)
+                size = int(tail[6 + 8 * 6:6 + 8 * 7], 16)  # c_filesize of the first entry
+                self.assertEqual(size, len(b"install\n"))

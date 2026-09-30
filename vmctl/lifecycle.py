@@ -2989,6 +2989,9 @@ def cmd_bootstrap_kickstart(args: argparse.Namespace) -> int:
         ui.print_status("ok", f"ostree ref: {ostree_ref}")
     seed_iso = kickstart.create_kickstart_iso(args.vm, vm, dry_run=args.dry_run, ostree_ref=ostree_ref)
     kernel_path, initrd_path = kickstart.extract_kickstart_boot_artifacts(vm, iso_path, dry_run=args.dry_run)
+    if kickstart.legacy_release(vm) and not args.dry_run:
+        # anaconda 11/13 read the kickstart from the initrd (ks=file:/ks.cfg)
+        kickstart.add_to_legacy_initrd(initrd_path, {kickstart.LEGACY_KS_PATH: kickstart.render_kickstart(args.vm, vm)})
     stage2 = kickstart.resolve_stage2(iso_path, dry_run=args.dry_run)
     if stage2:
         ui.print_status("ok", f"installer runtime from the medium: {stage2}")
