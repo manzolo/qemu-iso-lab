@@ -212,7 +212,7 @@ class ConfigTests(BaseVmctlTestCase):
 
     def test_local_identity_applies_to_every_tracked_profile_but_per_vm_overrides_win(self):
         # 2026-09-28: fifteen new history profiles were born lab/lab because no per-VM entry named them.
-        self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2222}
+        self.vm_config["ssh_provision"] = {"user": "lab", "ssh_host_port": 2222, "sudo_password": "lab"}
         self.vm_config["preseed_config"] = {"username": "lab", "password_hash": "$6$lab"}
         import copy
         def variant(name, port, **sections):
@@ -238,6 +238,7 @@ class ConfigTests(BaseVmctlTestCase):
 
         vms = self.vmctl.load_config()["vms"]
         self.assertEqual(vms[self.vm_name]["ssh_provision"]["user"], "me")
+        self.assertEqual(vms[self.vm_name]["ssh_provision"]["sudo_password"], "secret")  # what vmctl types to sudo
         self.assertEqual(vms[self.vm_name]["preseed_config"], {"username": "me", "password_hash": "$6$me"})
         self.assertNotIn("windows_config", vms[self.vm_name])  # sections are never created
         self.assertEqual(vms["win"]["windows_config"]["username"], "me")

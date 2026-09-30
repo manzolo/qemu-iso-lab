@@ -281,7 +281,8 @@ def apply_identity(vm: dict[str, Any], identity: dict[str, str], explicit: dict[
 
     Only sections that exist are touched (a profile without ``windows_config`` gets none), only
     the user name and the credential fields the section already carries (``password_hash``,
-    ``password``, ``realname``): the per-VM override of ``local.json`` still wins field by field.
+    ``password``, ``realname``, and ``sudo_password`` from the plain ``password``): the per-VM
+    override of ``local.json`` still wins field by field.
     """
     if vm.get("haiku_config") is not None:
         return  # Haiku has one user, `user` (haiku.SSH_USER): the identity cannot move it (matrix of 2026-09-29)
@@ -297,6 +298,10 @@ def apply_identity(vm: dict[str, Any], identity: dict[str, str], explicit: dict[
         for key in ("password_hash", "password"):
             if key in sec and key in identity:
                 values[key] = identity[key]
+        # the password vmctl types to sudo over SSH (arch-omarchy-nvidia): left at the catalog's
+        # "lab" it failed the post-install once the guest had the identity's password (2026-09-30)
+        if "sudo_password" in sec and "password" in identity:
+            values["sudo_password"] = identity["password"]
         if "realname" in sec:
             values["realname"] = identity.get("realname", identity["user"])
         for key, value in values.items():
