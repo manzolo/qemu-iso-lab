@@ -674,9 +674,14 @@
       ]
     },
     "fedora-server": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:c24742d87c61f521aff4762e843b30b0c0ef0084c180bc28915b0dad61f4a50e",
+      "version": "1.1.0",
+      "fingerprint": "sha256:090c3554997533d1fa51521766fb322475f46cbed1856c7acee6a8f3714cb850",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-30",
+          "note": "unattended recipe (kickstart, BIOS), experimental until its live run"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -685,9 +690,14 @@
       ]
     },
     "fedora-server-efi": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:15dd59a77dd664533b89ef290b0df03d3f9534b708a9774718b528b603f2ec17",
+      "version": "1.1.0",
+      "fingerprint": "sha256:6fd8e9685984b91621aeef9cc9624d167d4153bc1c22b5651135b32782748dad",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-30",
+          "note": "unattended recipe (kickstart, UEFI), experimental until its live run"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -1129,9 +1139,14 @@
       ]
     },
     "opensuse-slowroll": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:b9bf5e5194947005af4d0b18afa23aff009f368a7a796ad4e1914b98427a7fe0",
+      "version": "1.1.0",
+      "fingerprint": "sha256:74c29f52f935e8982737a25582856dfc1ef1429b7d07df0f94d329f51c9d2849",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-30",
+          "note": "unattended recipe (AutoYaST), experimental until its live run"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -1167,9 +1182,14 @@
       ]
     },
     "opensuse-tumbleweed-net": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:bd37264a95783afa378b0c10e83d91f4fe3e7f8dbd56a92a1bc3ab08f2ec5c9d",
+      "version": "1.1.0",
+      "fingerprint": "sha256:e239eb2913ec77806f7d0fdae7247cca1c4b9be93a61f7c4f5e4ad101c912677",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-30",
+          "note": "unattended recipe (AutoYaST), experimental until its live run"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",

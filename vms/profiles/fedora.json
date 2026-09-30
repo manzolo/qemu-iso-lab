@@ -112,108 +112,94 @@
       "notes": "Fedora 44 Cinnamon spin installed with kickstart from the Everything netinst: the @cinnamon-desktop-environment group on LightDM with autologin. First live PASS 2026-09-30 (654 s)."
     },
     "fedora-server": {
-      "name": "Fedora Server 42 Netinst",
-      "meta": {
-        "slug": "fedora-workstation",
-        "family": "fedora",
-        "role": "server",
-        "release_model": "stable",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
-      },
-      "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
-      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
-      "disk": {
-        "path": "artifacts/fedora-server/disk.qcow2",
-        "size": "20G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/fedora-server/OVMF_VARS.fd"
-      },
-      "machine": "q35",
-      "memory_mb": 2048,
-      "cpus": 2,
-      "network": "user",
-      "audio": false,
-      "video": {
-        "default": "safe",
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
-      },
-      "usb_tablet": true,
-      "iso_sha256": "231f3e0d1dc8f565c01a9f641b3d16c49cae44530074bc2047fe2373a721c82f"
-    },
-    "fedora-server-efi": {
-      "name": "Fedora Server 42 EFI Baseline",
+      "name": "Fedora 42 Server (BIOS, kickstart)",
+      "extends": "fedora-kickstart-base",
       "meta": {
         "slug": "fedora-server",
-        "family": "fedora",
         "role": "server",
-        "release_model": "stable",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
-      "disk": {
-        "path": "artifacts/fedora-server-efi/disk.qcow2",
-        "size": "20G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
-      "firmware": {
-        "type": "efi",
-        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
-        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/fedora-server-efi/OVMF_VARS.fd"
-      },
-      "machine": "q35",
+      "iso_sha256": "231f3e0d1dc8f565c01a9f641b3d16c49cae44530074bc2047fe2373a721c82f",
       "memory_mb": 2048,
-      "cpus": 2,
-      "network": "user",
       "audio": false,
-      "video": {
-        "default": "safe",
-        "installer_order": [
-          "std",
-          "safe"
-        ],
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
+      "disk": {
+        "size": "20G"
       },
-      "usb_tablet": true,
-      "iso_sha256": "231f3e0d1dc8f565c01a9f641b3d16c49cae44530074bc2047fe2373a721c82f"
+      "kickstart_config": {
+        "hostname": "fedora-server",
+        "inst_repo": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Everything/x86_64/os/",
+        "packages": [
+          "@core",
+          "openssh-server",
+          "sudo",
+          "qemu-guest-agent"
+        ],
+        "post_commands": [
+          "systemctl enable sshd.service serial-getty@ttyS0.service",
+          "systemctl set-default multi-user.target"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2350,
+        "copy_from_host": [],
+        "post_install_run": [
+          "systemctl is-active sshd.service",
+          "sudo -n true",
+          "grep -q '^VERSION_ID=42' /etc/os-release",
+          "[ ! -d /sys/firmware/efi ]"
+        ]
+      },
+      "notes": "Fedora 42 Server on BIOS (pc), installed with bootstrap-kickstart from the Server netinst and the release's Everything repository in the archive: @core, sshd, sudo and the guest agent, multi-user target. The pair covers both firmware paths of anaconda (debian-bios/debian-efi do the same for d-i). Born experimental (2026-09-30): vmctl check-vms fedora-server runs one.",
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "pc"
+    },
+    "fedora-server-efi": {
+      "name": "Fedora 42 Server (UEFI, kickstart)",
+      "extends": "fedora-kickstart-base",
+      "meta": {
+        "slug": "fedora-server",
+        "role": "server",
+        "status": "experimental",
+        "version": "1.1.0"
+      },
+      "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
+      "iso_sha256": "231f3e0d1dc8f565c01a9f641b3d16c49cae44530074bc2047fe2373a721c82f",
+      "memory_mb": 2048,
+      "audio": false,
+      "disk": {
+        "size": "20G"
+      },
+      "kickstart_config": {
+        "hostname": "fedora-server-efi",
+        "inst_repo": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Everything/x86_64/os/",
+        "packages": [
+          "@core",
+          "openssh-server",
+          "sudo",
+          "qemu-guest-agent"
+        ],
+        "post_commands": [
+          "systemctl enable sshd.service serial-getty@ttyS0.service",
+          "systemctl set-default multi-user.target"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2351,
+        "copy_from_host": [],
+        "post_install_run": [
+          "systemctl is-active sshd.service",
+          "sudo -n true",
+          "grep -q '^VERSION_ID=42' /etc/os-release",
+          "[ -d /sys/firmware/efi ]"
+        ]
+      },
+      "notes": "Fedora 42 Server on UEFI (q35 + OVMF), installed with bootstrap-kickstart from the Server netinst and the release's Everything repository in the archive: @core, sshd, sudo and the guest agent, multi-user target. The pair covers both firmware paths of anaconda (debian-bios/debian-efi do the same for d-i). Born experimental (2026-09-30): vmctl check-vms fedora-server-efi runs one."
     },
     "fedora-workstation": {
       "name": "Fedora Workstation 42 (kickstart)",

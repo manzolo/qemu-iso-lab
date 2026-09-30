@@ -376,15 +376,14 @@
       "iso_sha256": "40ff378e6cbc74680b30eb0af0003af0abc750b2589f18d4733f9f30bcc79d5b"
     },
     "opensuse-slowroll": {
-      "name": "openSUSE Slowroll DVD",
+      "name": "openSUSE Slowroll Xfce (AutoYaST, DVD)",
       "meta": {
         "slug": "opensuse-slowroll",
         "family": "opensuse",
         "role": "desktop",
         "release_model": "slow-rolling",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0"
       },
       "iso": "isos/openSUSE-Slowroll-DVD-x86_64-Media.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",
@@ -393,7 +392,6 @@
         "https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",
         "https://mirror.dogado.de/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso"
       ],
-      "iso_size": 4655677440,
       "disk": {
         "path": "artifacts/opensuse-slowroll/disk.qcow2",
         "size": "36G",
@@ -407,16 +405,19 @@
         "vars_path": "artifacts/opensuse-slowroll/OVMF_VARS.fd"
       },
       "machine": "q35",
-      "memory_mb": 4096,
-      "cpus": 4,
+      "cpus": 2,
       "network": "user",
       "audio": true,
       "video": {
         "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
         "variants": {
           "std": [
-            "-vga",
-            "std",
+            "-device",
+            "qxl-vga",
             "-display",
             "gtk"
           ],
@@ -428,7 +429,74 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "guest_agent": true,
+      "clipboard": true,
+      "installer_boot": {
+        "kernel": "boot/x86_64/loader/linux",
+        "initrd": "boot/x86_64/loader/initrd"
+      },
+      "memory_mb": 4096,
+      "autoyast_config": {
+        "hostname": "slowroll",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "english-us",
+        "language": "en_US",
+        "disk_device": "vda",
+        "install_repo": "",
+        "autologin": true,
+        "open_firewall_services": [
+          "ssh"
+        ],
+        "default_target": "graphical",
+        "products": [
+          "openSUSE"
+        ],
+        "patterns": [
+          "enhanced_base",
+          "xfce"
+        ],
+        "packages": [
+          "openssh",
+          "qemu-guest-agent",
+          "spice-vdagent",
+          "NetworkManager",
+          "lightdm",
+          "iproute2",
+          "curl",
+          "vim"
+        ],
+        "enable_services": [
+          "NetworkManager",
+          "sshd",
+          "qemu-guest-agent"
+        ],
+        "chroot_commands": [
+          "sed -i 's/^DISPLAYMANAGER=.*/DISPLAYMANAGER=\"lightdm\"/' /etc/sysconfig/displaymanager"
+        ],
+        "final_reboot": true
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2353,
+        "ssh_key": null,
+        "post_install_run": [
+          "grep -qi slowroll /etc/os-release",
+          "systemctl is-active sshd",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager rpm --package xfce4-session --process xfce4-session"
+        ],
+        "copy_from_host": [
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
+          }
+        ]
+      },
+      "notes": "openSUSE Slowroll (the slow-rolling Tumbleweed) with Xfce on LightDM through AutoYaST, installing from the DVD itself (no install= source: the medium carries the packages). Born experimental (2026-09-30): vmctl check-vms opensuse-slowroll runs one."
     }
   }
 }

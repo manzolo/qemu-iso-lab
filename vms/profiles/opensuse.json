@@ -123,15 +123,14 @@
       "notes": "openSUSE Tumbleweed with KDE Plasma 6 through AutoYaST from the NET installer, like opensuse-tumbleweed-autoyast: the kde and kde_plasma patterns, SDDM as the display manager with autologin. First live PASS 2026-09-30 (728 s)."
     },
     "opensuse-tumbleweed-net": {
-      "name": "openSUSE Tumbleweed NET",
+      "name": "openSUSE Tumbleweed Server (AutoYaST, NET installer)",
       "meta": {
         "slug": "opensuse-tumbleweed",
         "family": "opensuse",
-        "role": "installer",
+        "role": "server",
         "release_model": "rolling",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.0"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
@@ -142,7 +141,7 @@
       ],
       "disk": {
         "path": "artifacts/opensuse-tumbleweed-net/disk.qcow2",
-        "size": "24G",
+        "size": "40G",
         "format": "qcow2",
         "interface": "virtio"
       },
@@ -153,16 +152,19 @@
         "vars_path": "artifacts/opensuse-tumbleweed-net/OVMF_VARS.fd"
       },
       "machine": "q35",
-      "memory_mb": 2048,
       "cpus": 2,
       "network": "user",
       "audio": false,
       "video": {
-        "default": "safe",
+        "default": "std",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
         "variants": {
           "std": [
-            "-vga",
-            "std",
+            "-device",
+            "qxl-vga",
             "-display",
             "gtk"
           ],
@@ -174,7 +176,61 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "guest_agent": true,
+      "clipboard": true,
+      "installer_boot": {
+        "kernel": "boot/x86_64/loader/linux",
+        "initrd": "boot/x86_64/loader/initrd"
+      },
+      "memory_mb": 2048,
+      "autoyast_config": {
+        "hostname": "tumbleweed-server",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keyboard_layout": "english-us",
+        "language": "en_US",
+        "disk_device": "vda",
+        "install_repo": "https://download.opensuse.org/tumbleweed/repo/oss/",
+        "autologin": false,
+        "open_firewall_services": [
+          "ssh"
+        ],
+        "default_target": "multi-user",
+        "products": [
+          "openSUSE"
+        ],
+        "patterns": [
+          "enhanced_base"
+        ],
+        "packages": [
+          "openssh",
+          "qemu-guest-agent",
+          "iproute2",
+          "curl",
+          "vim",
+          "sudo"
+        ],
+        "enable_services": [
+          "sshd",
+          "qemu-guest-agent"
+        ],
+        "chroot_commands": [],
+        "final_reboot": true
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2352,
+        "post_install_run": [
+          "systemctl is-active sshd",
+          "sudo -n true",
+          "grep -q 'openSUSE Tumbleweed' /etc/os-release",
+          "[ \"$(systemctl get-default)\" = multi-user.target ]"
+        ]
+      },
+      "notes": "openSUSE Tumbleweed as a server through AutoYaST from the NET installer (the flow of opensuse-tumbleweed-autoyast, without a desktop): enhanced_base, sshd, the guest agent, multi-user target. Born experimental (2026-09-30): vmctl check-vms opensuse-tumbleweed-net runs one."
     },
     "opensuse-tumbleweed-autoyast": {
       "name": "openSUSE Tumbleweed GNOME (AutoYaST)",
