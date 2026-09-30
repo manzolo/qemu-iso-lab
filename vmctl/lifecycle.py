@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, opnsense, slackware, void, agama, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
+from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, opnsense, slackware, void, agama, popos, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 
@@ -467,6 +467,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         return ("bootstrap-freebsd", "FreeBSD bsdinstall + SSH verification")
     if opnsense.opnsense_config(vm) is not None:
         return ("bootstrap-opnsense", "OPNsense live DVD installs itself + SSH verification")
+    if popos.popos_config(vm) is not None:
+        return ("bootstrap-popos", "Pop!_OS live ISO + distinst script + SSH verification")
     if agama.agama_config(vm) is not None:
         return ("bootstrap-agama", "Agama profile from an OEMDRV seed + SSH verification")
     if void.void_config(vm) is not None:
@@ -594,7 +596,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -797,8 +799,8 @@ def run_local_test_vm(
         if prep_note is not None:
             detail = f"{detail}; {prep_note}"
         return ("passed", detail)
-    if mode in {"bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-haiku", "bootstrap-proxmox"}:
-        handler = {"bootstrap-freebsd": cmd_bootstrap_freebsd, "bootstrap-opnsense": cmd_bootstrap_opnsense, "bootstrap-slackware": cmd_bootstrap_slackware, "bootstrap-void": cmd_bootstrap_void, "bootstrap-agama": cmd_bootstrap_agama,
+    if mode in {"bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox"}:
+        handler = {"bootstrap-freebsd": cmd_bootstrap_freebsd, "bootstrap-opnsense": cmd_bootstrap_opnsense, "bootstrap-slackware": cmd_bootstrap_slackware, "bootstrap-void": cmd_bootstrap_void, "bootstrap-agama": cmd_bootstrap_agama, "bootstrap-popos": cmd_bootstrap_popos,
                    "bootstrap-haiku": cmd_bootstrap_haiku, "bootstrap-proxmox": cmd_bootstrap_proxmox}[mode]
         try:
             handler(
@@ -2258,6 +2260,46 @@ def cmd_bootstrap_agama(args: argparse.Namespace) -> int:
                         timeout_sec=getattr(args, "timeout", 3600), dry_run=args.dry_run, log_path=serial_log,
                         exit_grace_sec=agama.SHUTDOWN_GRACE_SEC)
     vmstate.complete_install(args.vm, "bootstrap-agama", vm, dry_run=args.dry_run)
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
+    report.phase(args, "post-install")
+    run_post_install(args.vm, vm, getattr(args, "timeout", 3600), dry_run=args.dry_run)
+    return 0
+
+
+def cmd_bootstrap_popos(args: argparse.Namespace) -> int:
+    """Pop!_OS from its live ISO: the host boots the casper kernel on the serial console, logs in
+    as the live user and runs the seed's install.sh with sudo: distinst, then the chroot
+    configuration (vmctl/popos.py); then the disk boots for the SSH checks."""
+    vm = resolved_vm(args, config.load_config())
+    popos.check_profile(args.vm, vm)
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap Pop!_OS (distinst from the live ISO's shell): {args.vm}")
+    iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    ensure_vm_disk(vm, dry_run=args.dry_run)
+    vmstate.begin_install(args.vm, "bootstrap-popos", dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+    media = popos.resolve_live_media_path(vm, iso_path, dry_run=args.dry_run)
+    keys = popos.resolve_ssh_pubkey(vm, dry_run=args.dry_run)
+    seed_iso = popos.create_seed_iso(args.vm, vm, keys, media, dry_run=args.dry_run)
+    kernel_path, initrd_path = popos.extract_boot_artifacts(vm, iso_path, media, dry_run=args.dry_run)
+    command = qemu.common_args(vm, None, dry_run=args.dry_run, accel=automation_accel(vm), headless=True,
+                               serial_stdio=True, no_reboot=True, allow_missing_disk=args.dry_run and not disk_exists,
+                               enable_clipboard=False, network_phase="install")
+    command += ["-cdrom", str(iso_path)]
+    command += popos.seed_iso_drive_args(seed_iso)
+    command += ["-kernel", str(kernel_path), "-initrd", str(initrd_path), "-append", popos.kernel_append(media)]
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    report.phase(args, "install")
+    try:
+        qemu.run_and_expect(command, expected_text=popos.BOOTSTRAP_COMPLETE_TOKEN,
+                            timeout_sec=getattr(args, "timeout", 3600),
+                            auto_inputs=[(popos.LIVE_LOGIN_PROMPT, popos.LIVE_USER + "\n"), (popos.LIVE_PASSWORD_PROMPT, "\n"),
+                                         (popos.LIVE_SHELL_PROMPT, f"\n{popos.live_trigger_command()}\n")],
+                            dry_run=args.dry_run, log_path=serial_log)
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, popos.BOOTSTRAP_FAILED_TOKEN, "Pop!_OS", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-popos", vm, dry_run=args.dry_run)
     start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
     report.phase(args, "post-install")
     run_post_install(args.vm, vm, getattr(args, "timeout", 3600), dry_run=args.dry_run)

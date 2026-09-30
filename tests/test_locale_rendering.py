@@ -12,7 +12,7 @@ import shutil
 from unittest import mock
 
 from tests._common import BaseVmctlTestCase, ROOT
-from vmctl import (agama, alpine, archinstall, autoyast, cloud_init, config, kickstart, lifecycle, opnsense, preseed,
+from vmctl import (agama, alpine, archinstall, autoyast, cloud_init, config, kickstart, lifecycle, opnsense, popos, preseed,
                    slackware, ssh, ubiquity, void, windows)
 
 PROBE_USER = "vmctlprobe"
@@ -56,6 +56,8 @@ def render(name: str, vm: dict) -> dict[str, str]:
         out["seed"] = ubiquity.render_seed(name, vm)
     elif flow == "bootstrap-void":
         out["install.sh"] = void.render_install_script(name, vm, [FAKE_KEY])
+    elif flow == "bootstrap-popos":
+        out["install.sh"] = popos.render_install_script(name, vm, [FAKE_KEY], popos.DEFAULT_LIVE_MEDIA_PATH)
     elif flow == "bootstrap-agama":
         out["append"] = agama.KERNEL_APPEND
         out["autoinst.json"] = agama.render_profile(name, vm, [FAKE_KEY])
