@@ -11,7 +11,7 @@ lifecycle from the page, screen by screen, read [From zero to a running VM](FIRS
 What the page offers:
 
 - **Profiles**: every profile with its live state, search (`/`) and the filters of the dashboard
-  (My VMs, All, With disk, Running, Labs). The × in the search box clears the text and keeps the current filter.
+  (the workspace tabs My VMs, Catalog and Labs, then the machine filters All, Running, Stopped, To install, With disk and Hidden while there are hidden profiles). The × in the search box clears the text and keeps the current filter.
 - **My VMs**: the profiles you chose out of the catalog (plus whatever is running right now,
   so a running VM never hides). Its opposite is **Hide from the lists** (right-click a row, or a
   selection): a hidden profile leaves All and With disk, still shows while it runs or holds a

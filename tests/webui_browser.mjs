@@ -9,13 +9,13 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const root = fileURLToPath(new URL('../', import.meta.url));
 const html = readFileSync(root + 'vmctl/web/index.html');
 const catalog = JSON.parse(execFileSync('python3', ['-c', 'import json; from vmctl.webui import command_catalog; print(json.dumps(command_catalog()))'], { cwd: root }));
-const machine = (name, extra = {}) => ({ name, label: 'Arch Linux + Noctalia 5', family:'arch', memory_mb:8192, cpus:4, firmware:'EFI', running:false, installed:true, prepared:true, install_label:'verified', install_detail:'Boot verified by post-install; installed by bootstrap-archinstall.', disk_host:'7.8G', disk_capacity:'32G', iso_source:'cached', ssh_port:2226, has_ssh:true, has_archinstall:true, unattended_flow:'bootstrap-archinstall', ...extra });
-const state = { version:'0.4.0', vms:[machine('arch-noctalia',{running:true}),machine('debian-server'),machine('proxmox-ve',{family:'proxmox'}),machine('proxmox-ve-node2',{family:'proxmox'}),machine('alpine-ci',{installed:false,prepared:false,install_label:'no disk'})], labs:[{group:'proxmox-lab', members:['proxmox-ve','proxmox-ve-node2'],start_order:['proxmox-ve','proxmox-ve-node2'],addresses:{'proxmox-ve':'10.10.10.2/24','proxmox-ve-node2':'10.10.10.3/24'}},{group:'new-lab',members:['alpine-ci'],start_order:['alpine-ci']}] };
+const machine = (name, extra = {}) => ({ name, label: 'Arch Linux + Noctalia 5', family:'arch', role:'desktop', memory_mb:8192, cpus:4, firmware:'EFI', running:false, installed:true, prepared:true, install_label:'verified', install_detail:'Boot verified by post-install; installed by bootstrap-archinstall.', disk_host:'7.8G', disk_capacity:'32G', iso_source:'cached', ssh_port:2226, has_ssh:true, has_archinstall:true, unattended_flow:'bootstrap-archinstall', ...extra });
+const state = { version:'0.4.0', vms:[machine('arch-noctalia',{running:true}),machine('debian-server',{role:'server'}),machine('proxmox-ve',{family:'proxmox',role:'hypervisor'}),machine('proxmox-ve-node2',{family:'proxmox',role:'hypervisor'}),machine('alpine-ci',{installed:false,prepared:false,install_label:'no disk'})], labs:[{group:'proxmox-lab', members:['proxmox-ve','proxmox-ve-node2'],start_order:['proxmox-ve','proxmox-ve-node2'],addresses:{'proxmox-ve':'10.10.10.2/24','proxmox-ve-node2':'10.10.10.3/24'}},{group:'new-lab',members:['alpine-ci'],start_order:['alpine-ci']}] };
 let requests = [], failRun = false, failState = false, sshLaunches = 0, overrideRevision = 1, savedOverride = {};
 let jobStatus = 'completed', jobCommand = 'vmctl start arch-noctalia --headless --background', cancelRequests = [], failCancel = false, cancelResult = true;
 let jobId = 'web:fixture', holdRun = false, releaseRun;
 let hideJobs = false, recording = null, recordingExports = [], failExport = false;
-let clipboardChannel = true, consoleRunning = true, failFiles = false;
+let clipboardChannel = true, consoleRunning = true, failConsoleInfo = false, failFiles = false;
 let connectionChecks = 0, guestCommands = [], uploadSessions = 0, uploadSessionIds = [];
 const guestFiles = new Map([['hello.txt',Buffer.from('hello from guest')],['.hidden',Buffer.from('hidden')]]);
 let screenDelay = 700;
@@ -47,7 +47,7 @@ const server = createServer(async (req,res) => {
     return res.end(JSON.stringify({name,path:query.get('path')+'/'+name,size:guestFiles.get(name).length}));
   }
   if(req.url.includes('/file?')) {const name=new URL(req.url,'http://fixture').searchParams.get('path').split('/').at(-1);res.setHeader('Content-Type','application/octet-stream');return res.end(guestFiles.get(name));}
-  if (req.url.endsWith('/console-info')) return res.end(JSON.stringify({running:consoleRunning,clipboard_channel:clipboardChannel,clipboard_enabled:true}));
+  if (req.url.endsWith('/console-info')) { res.statusCode=failConsoleInfo ? 503 : 200; return res.end(JSON.stringify(failConsoleInfo ? {error:'Host unreachable'} : {running:consoleRunning,clipboard_channel:clipboardChannel,clipboard_enabled:true})); }
   if (req.url.endsWith('/files-session')) return res.end(JSON.stringify({session:'upload-'+(++uploadSessions)}));
   if (req.url.endsWith('/files-session-close')) return res.end(JSON.stringify({closed:true}));
   if (req.url.endsWith('/connections')) {
@@ -129,13 +129,41 @@ try {
   await page.routeWebSocket(/\/api\/vm\/.*\/ssh\?/, ws=>{sshSocket=ws;ws.onMessage(message=>{const value=JSON.parse(message);terminalMessages.push(value); if(value.type==='input') { if(value.data==='\x04' || value.data==='exit\r') ws.close({code:1000,reason:'SSH session ended'}); else ws.send('fixture-user'); }});});
   page.on('pageerror', e=>errors.push(e.message));
   const check = (label) => console.log('PASS',label);
-  const shot = async (name) => page.screenshot({path:root+'artifacts/webui-review/'+name+'.png',fullPage:true});
+  const shot = async (name) => page.screenshot({path:root+'artifacts/webui-review/'+name+'.png',fullPage:!await page.locator('#hover-shot').isVisible()});
   mkdirSync(root+'artifacts/webui-review',{recursive:true});
   await page.goto(`http://127.0.0.1:${server.address().port}/?token=fixture`);
   await page.locator('#rows [data-vm]').first().waitFor();
   assert.equal(await page.locator('#running-count').textContent(),'1');
   assert.equal(await page.locator('#details .name').textContent(),'arch-noctalia');
   await shot('dashboard'); check('dashboard and profile');
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(),'Stopped');
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .installation-status').textContent(),'Boot verified ✓');
+  assert.equal(await page.locator('#workspace-nav button').allTextContents().then(x=>x.join(',')),'My VMs,Catalog,Labs');
+  await page.locator('[data-status-filter=running]').click();
+  assert.deepEqual(await page.locator('#rows tr[data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia']);
+  await page.locator('[data-status-filter=stopped]').click();
+  assert.equal(await page.locator('#rows tr[data-vm]').count(),3);
+  await page.locator('[data-status-filter=install]').click();
+  assert.deepEqual(await page.locator('#rows tr[data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['alpine-ci']);
+  assert(await page.getByRole('button',{name:'Install automatically',exact:true}).isVisible());
+  await page.locator('[data-filter=mine]').click();
+  assert.deepEqual(await page.locator('#rows tr[data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia']);
+  await page.locator('[data-status-filter=stopped]').click();
+  assert.equal(await page.locator('#rows tr[data-vm]').count(),0);
+  await page.locator('[data-filter=all]').click();
+  assert.equal(await page.locator('[data-status-filter=all]').getAttribute('aria-pressed'),'true');
+  await page.locator('#rows [data-vm="debian-server"] .profile-name').click();
+  assert.equal(await page.locator('#details .main-action').getAttribute('aria-label'),'Start');
+  assert.deepEqual(await page.evaluate(()=>actionsFor({...S.vms[1],running:true}).slice(0,2).map(a=>a.label)),['Open SSH','Open console']);
+  assert(await page.locator('[data-section=checkpoints] summary').isVisible());
+  await page.locator('[data-section=checkpoints] summary').click();
+  await page.locator('[data-command=checkpoint]').click();
+  assert.equal(await page.evaluate(()=>pal.cmd),'checkpoint');
+  await page.locator('#cmd-dialog [data-close]').click();
+  await page.locator('[data-section=configuration] summary').click();
+  assert((await page.locator('[data-section=configuration]').textContent()).includes('Firmware'));
+  await page.locator('#rows [data-vm="arch-noctalia"] .profile-name').click();
+  check('runtime and installation states are separate; navigation scopes filters; server actions and machine sections are discoverable');
   await page.locator('#search').fill('debian');
   assert.equal(await page.locator('#rows [data-vm]').count(),1);
   await page.locator('#search').press('Enter');
@@ -228,6 +256,15 @@ try {
   await page.locator('#ssh-copy').click(); assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'bin/vmctl shell arch-noctalia');
   await page.locator('#ssh-launch').click(); await page.waitForFunction(()=>document.getElementById('ssh-result').textContent.includes('requested')); assert.equal(sshLaunches,1);
   await page.locator('#ssh-browser').click(); await page.waitForFunction(()=>document.getElementById('terminal-status').textContent==='Session open');
+  for (const width of [1440,934,390]) {
+    await page.setViewportSize({width,height:900});
+    const buttons=await page.locator('#terminal-shell .console-toolbar button').evaluateAll(nodes=>nodes.map(n=>({height:n.getBoundingClientRect().height,icon:n.querySelector('svg').getBoundingClientRect().width})));
+    assert(buttons.every(b=>b.height<=40 && b.icon===15));
+    assert(await page.locator('#terminal-shell').evaluate(el=>el.scrollWidth<=el.clientWidth));
+    await shot('ssh-toolbar-'+width);
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  check('SSH toolbar icons stay 15px and buttons stay compact at desktop, screenshot and phone widths');
   await page.evaluate(()=>terminal.input('whoami\r')); await page.waitForFunction(()=>Array.from({length:terminal.buffer.active.length},(_,i)=>terminal.buffer.active.getLine(i)?.translateToString()).join(' ').includes('fixture-user'));
   assert(terminalMessages.some(m=>m.type==='input'&&m.data==='whoami\r')); assert(terminalMessages.some(m=>m.type==='resize'));
   await shot('ssh-browser');
@@ -309,9 +346,9 @@ try {
   assert(await page.locator('#profile-save').isDisabled());
   await page.locator('#profile-dialog [data-close]').click();
   check('profile tabs, presets, per-field inheritance, validation, save/reset and fixed footer at four viewport sizes');
-  await page.locator('.install-details summary').click();
+  await page.locator('[data-section=installation] summary').click();
   await page.evaluate(()=>render());
-  assert.equal(await page.locator('.install-details').getAttribute('open'),''); check('polling preserves expanded profile');
+  assert.equal(await page.locator('[data-section=installation]').getAttribute('open'),''); check('polling preserves expanded profile');
   await page.locator('[data-filter=labs]').click();
   assert.equal(await page.locator('.lab').first().locator('.buttons button').first().textContent(),'Start stack');
   assert.equal(await page.locator('.lab').nth(1).locator('.buttons button').first().textContent(),'Install lab…');
@@ -372,7 +409,7 @@ try {
   assert(await page.evaluate(()=>window.labContextPrevented));
   assert.equal(await page.locator('#vm-context .context-title').textContent(),'proxmox-ve-node2');
   assert(await page.locator('#labs-view').isVisible());
-  assert(await page.locator('#vm-context').getByRole('menuitem',{name:'Boot headless',exact:true}).isVisible());
+  assert(await page.locator('#vm-context').getByRole('menuitem',{name:'Start',exact:true}).isVisible());
   await page.keyboard.press('Escape');
   assert.equal(await page.evaluate(()=>document.activeElement.dataset.member),'proxmox-ve-node2');
   await page.locator('[data-member="proxmox-ve-node2"]').press('Shift+F10');
@@ -381,7 +418,7 @@ try {
   await page.locator('#ssh-dialog [data-close]').click();
   await page.locator('#labs-view [data-vm="proxmox-ve"] .state').click({button:'right'});
   assert.equal(await page.locator('#vm-context .context-title').textContent(),'proxmox-ve');
-  await page.locator('#vm-context').getByRole('menuitem',{name:'All commands for proxmox-ve…',exact:true}).click();
+  await page.locator('#vm-context').getByRole('menuitem',{name:'More commands…',exact:true}).click();
   assert((await page.locator('#cmd-count').textContent()).endsWith('proxmox-ve'));
   await page.locator('#cmd-dialog [data-close]').click();
   assert.equal(requests.length,0);
@@ -557,14 +594,28 @@ try {
   await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:false}})));
   await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Reconnecting');
   assert(await page.locator('#vnc-screenshot').isDisabled());
+  assert(await page.locator('#console-connection').isVisible());
+  await shot('console-reconnecting');
   await page.waitForFunction(count=>window.rfbCount>count && document.getElementById('vnc-status').textContent==='Connected',beforeRetry);
   await page.locator('#vnc-auto').uncheck();
-  const noRetry=await page.evaluate(()=>window.rfbCount); consoleRunning=false;
-  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:true}})));
-  await page.waitForFunction(()=>document.getElementById('vnc-note').textContent.includes('VM is stopped'));
+  const noRetry=await page.evaluate(()=>window.rfbCount);
+  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:false}})));
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Disconnected');
+  assert(await page.locator('#console-connection').isVisible());
+  assert.equal(await page.locator('#console-connection-title').textContent(),'Console disconnected');
   await page.waitForTimeout(2300); assert.equal(await page.evaluate(()=>window.rfbCount),noRetry);
-  consoleRunning=true; await page.locator('#vnc-auto').check();
+  await page.locator('#console-retry').click();
   await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  consoleRunning=false;
+  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:true}})));
+  await page.waitForFunction(()=>!document.getElementById('vnc-dialog').open);
+  assert((await page.locator('#toast').textContent()).includes('is stopped. Console closed.'));
+  const stoppedConsoleCount=await page.evaluate(()=>window.rfbCount);
+  await page.waitForTimeout(2300); assert.equal(await page.evaluate(()=>window.rfbCount),stoppedConsoleCount);
+  consoleRunning=true;
+  await page.evaluate(()=>openConsole('arch-noctalia'));
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  await page.locator('#vnc-auto').check();
   await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:false}})));
   await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Reconnecting');
   await page.locator('#vnc-close').click(); const closedCount=await page.evaluate(()=>window.rfbCount);
@@ -577,7 +628,24 @@ try {
   await page.evaluate(()=>openConsole('arch-noctalia')); await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
   await page.evaluate(()=>window.oldConsoleClient.dispatchEvent(new CustomEvent('clipboard',{detail:{text:'stale clipboard'}})));
   assert.equal(await page.locator('#console-clipboard-send').inputValue(),'');
-  check('missing clipboard channel, automatic recovery, stopped VM explanation, retry opt-out and cleanup on close');
+  check('missing clipboard channel, automatic recovery, automatic close on confirmed shutdown, retry opt-out and cleanup on close');
+  failConsoleInfo=true;
+  await page.locator('#vnc-auto').uncheck();
+  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:false}})));
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Disconnected');
+  assert(await page.locator('#vnc-dialog').isVisible());
+  assert(await page.locator('#console-connection').isVisible());
+  failConsoleInfo=false; consoleRunning=false;
+  await page.evaluate(()=>{vmJobs.set('arch-noctalia',{command:'bootstrap-archinstall',status:'running'});});
+  await page.locator('#vnc-auto').check();
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  await page.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:true}})));
+  await page.waitForFunction(()=>document.getElementById('console-connection-note').textContent.includes('current operation'));
+  assert(await page.locator('#vnc-dialog').isVisible());
+  consoleRunning=true; await page.evaluate(()=>{vmJobs.delete('arch-noctalia');});
+  await page.locator('#console-retry').click();
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  check('an unreachable host and an install restart keep the console open');
   assert.equal(connectionChecks,0); // dashboard refresh and console reconnect never probe guest integration
   await page.evaluate(()=>window.keyEvents=[]);
   await page.locator('#vnc-integration').click();
@@ -695,7 +763,7 @@ try {
   await page.waitForFunction(()=>!submittingVms.has('arch-noctalia'));
   await page.evaluate(()=>refreshJobs()); await page.evaluate(()=>refresh());
   assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Stopping');
-  assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(),'Boot verified');
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(),'Stopped');
   await shot('vm-stopping');
   await page.locator('#rows [data-vm="arch-noctalia"] .state').click();
   await page.waitForFunction(()=>document.getElementById('log').textContent.includes('Fixture job output'));
@@ -706,7 +774,7 @@ try {
   await page.waitForFunction(()=>!S.vms[0].running && vmJobs.get('arch-noctalia')?.status==='cancelled');
   assert.equal(cancelRequests.at(-1),'/api/jobs/vm%3Aarch-noctalia/cancel');
   assert(!(await page.locator('#rows [data-vm="arch-noctalia"] .state').evaluate(el=>el.classList.contains('busy'))));
-  assert(await page.locator('#details').getByRole('button',{name:'Boot headless',exact:false}).isVisible());
+  assert(await page.locator('#details').getByRole('button',{name:'Start in separate console',exact:true}).isVisible());
   state.vms[0].running=true; jobId='web:fixture'; jobStatus='completed';
   await page.evaluate(()=>{ vmJobs.clear(); }); await page.evaluate(()=>refresh());
   check('row progress is immediate, survives stale snapshots, keeps controls visible and supports confirmed force stop');
@@ -744,14 +812,29 @@ try {
   await page.evaluate(()=>refresh(true));
   assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Stopped');
   assert(!(await page.locator('#job-bar').isVisible()));
-  await page.keyboard.press('F2'); await page.waitForFunction(()=>!submittingVms.size);
+  const startingWindowEvent=page.waitForEvent('popup');
+  await page.keyboard.press('F2');
+  const startingWindow=await startingWindowEvent;
+  await startingWindow.getByRole('heading',{name:'Starting arch-noctalia…'}).waitFor();
+  await page.waitForFunction(()=>!submittingVms.size);
   jobStatus='completed'; failState=true;
   await page.evaluate(()=>refreshJobs()); await page.waitForFunction(()=>stateRefresh===null);
   assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Starting');
   assert(await page.locator('#job-bar').isVisible());
+  assert(!(await page.locator('#vnc-dialog').isVisible()));
   failState=false; state.vms[0].running=true; await page.evaluate(()=>refresh(true));
   assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .state').textContent(),'Running');
   assert(!(await page.locator('#job-bar').isVisible()));
+  await startingWindow.waitForFunction(()=>document.getElementById('vnc-status')?.textContent==='Connected');
+  assert.equal(await startingWindow.locator('#vnc-title').textContent(),'arch-noctalia');
+  assert(await startingWindow.locator('body').evaluate(el=>el.classList.contains('console-detached')));
+  assert(!(await page.locator('#vnc-dialog').isVisible()));
+  assert.equal(await page.evaluate(()=>pendingConsoles.size),0);
+  consoleRunning=false;
+  const shutdownWindow=startingWindow.waitForEvent('close');
+  await startingWindow.evaluate(()=>window.fixtureRfb.dispatchEvent(new CustomEvent('disconnect',{detail:{clean:true}})));
+  await shutdownWindow; consoleRunning=true;
+  check('F2 reserves a separate console, waits for confirmed running state and closes the window on guest shutdown');
   // A successful command with an unexpected state must eventually explain the mismatch.
   await page.keyboard.press('F8'); await page.waitForFunction(()=>!submittingVms.size);
   jobStatus='completed'; await page.waitForFunction(()=>!jobsRefreshing); await page.evaluate(()=>refreshJobs());
@@ -888,6 +971,7 @@ try {
   await shot('multi-selection-mobile');
   await page.setViewportSize({width:1440,height:1000});
   // Starting a selected group submits only stopped, eligible machines.
+  jobStatus="completed"; await page.evaluate(()=>refreshJobs());
   await page.evaluate(()=>{vmJobs.clear();});
   state.vms[0].running=false; state.vms[1].running=false;
   await page.evaluate(()=>refresh(true));
@@ -977,5 +1061,39 @@ try {
   await page.locator('#selection-clear').click();
   await page.evaluate(()=>refresh(true));
   check('My VMs: context menu, filter, details button and selection bar');
+  await page.setViewportSize({width:1440,height:1000});
+  state.vms[0].running=false; jobId='vm:arch-noctalia'; jobStatus='completed';
+  await page.evaluate(()=>{vmJobs.clear();}); await page.evaluate(()=>refresh(true));
+  await page.locator('#rows [data-vm="arch-noctalia"] .profile-name').click();
+  failRun=true;
+  const rejectedWindowEvent=page.waitForEvent('popup');
+  await page.locator('#details .main-action').click();
+  const rejectedWindow=await rejectedWindowEvent;
+  if (!rejectedWindow.isClosed()) await rejectedWindow.waitForEvent('close');
+  await page.waitForFunction(()=>!submittingVms.size);
+  assert.equal(await page.evaluate(()=>pendingConsoles.size),0);
+  failRun=false;
+  for (const result of ['failed (1)','cancelled']) {
+    const failedWindowEvent=page.waitForEvent('popup');
+    await page.locator('#details .main-action').click();
+    const failedWindow=await failedWindowEvent;
+    await page.waitForFunction(()=>!submittingVms.size && !jobsRefreshing);
+    const closed=failedWindow.waitForEvent('close'); jobStatus=result;
+    await page.evaluate(()=>refreshJobs()); await closed;
+    await page.waitForFunction(()=>stateRefresh===null);
+    assert.equal(await page.evaluate(()=>pendingConsoles.size),0);
+    assert(!(await page.locator('#vnc-dialog').isVisible()));
+  }
+  // The explicit background alternative submits the same start without a browser window.
+  await page.locator('[data-section=start] summary').click();
+  const pagesBeforeBackground=context.pages().length;
+  await page.getByRole('button',{name:'Start without opening console',exact:true}).click();
+  await page.waitForFunction(()=>!submittingVms.size);
+  state.vms[0].running=true; jobStatus='completed';
+  await page.evaluate(()=>refreshJobs()); await page.waitForFunction(()=>stateRefresh===null);
+  await page.evaluate(()=>refresh(true));
+  assert.equal(context.pages().length,pagesBeforeBackground);
+  assert(!(await page.locator('#vnc-dialog').isVisible()));
+  check('rejected, failed and cancelled starts close pending windows; background start opens no console');
   assert.deepEqual(errors,[]); check('no browser JavaScript errors');
 } finally { if (browser) await browser.close(); server.closeAllConnections(); await new Promise(resolve=>server.close(resolve)); }

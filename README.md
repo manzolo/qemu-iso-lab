@@ -185,7 +185,7 @@ the access token.
 
 | From the dashboard | What you can do |
 |--------------------|-----------------|
-| **Profiles** | Search and filter (My VMs, All, With disk, Running, Labs), inspect RAM/CPU/disk, and install, boot or stop a VM. Right-click a row for its actions. |
+| **Profiles** | Navigate My VMs, Catalog and Labs; filter machines by Running, Stopped, To install or With disk. Runtime state is separate from installation verification. Right-click a row for its actions. |
 | **My VMs** | The ★ of a profile adds it to your selection; the page opens on it from then on. |
 | **Multiple selection** | Ctrl/Cmd+click or Shift+click several VMs to start, stop, link or unlink them together (F2/F8 act on the selection). |
 | **Live console** | Desktop with keyboard shortcuts, clipboard, file upload/download, PNG screenshots, recording, automatic reconnect and docked SSH. Detach consoles to work with several VMs side by side. |
@@ -193,12 +193,20 @@ the access token.
 | **SSH** | Open an interactive terminal in the browser or on the host, or copy the connection command. |
 | **Link** | Connect two or more VMs on a private network from a machine's network button (click or drag). |
 | **Commands** | Browse suggestions and recent commands, filter by category, edit parameters, then copy or run the preview. |
-| **Customize** | Change RAM, CPU or other JSON settings in a local override, keeping the catalog as a template. |
+| **Machine details** | Access console/SSH and resources directly; expand Checkpoints, Network, Configuration or Maintenance for other operations. Customize RAM, CPU or JSON settings in a local override. |
 | **Labs** | Install a new lab or start an installed stack, inspect its members and open its network map. |
 | **Recent activity** | Follow job output live; jobs are shared with the TUI and keep running when you close the page. |
 
-Choose **Boot headless**, then **Open console** to interact with a desktop without
-opening a separate QEMU window. The same console lets you watch unattended installs.
+Choose **Start in separate console** (F2) for a desktop: a separate browser window waits
+for the VM to start, then opens its console. **Other ways to start** offers an inline
+console, background-only start or a QEMU window on the host. Server profiles start in
+the background and offer **Open SSH** when running. Multiple selection keeps F2 as a
+background start for the selected machines.
+
+A temporary display disconnection shows a central reconnect status. When the server
+confirms that the guest has stopped, the console closes automatically (including
+separate windows); an active install/start operation continues waiting through guest
+restarts. The console also lets you watch unattended installs.
 
 ![The live browser console connected to the Ubuntu 26.04 desktop](docs/screenshots/web-console.png)
 
