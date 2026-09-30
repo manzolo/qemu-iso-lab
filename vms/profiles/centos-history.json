@@ -78,14 +78,14 @@
       "extends": "centos-history-base",
       "meta": {
         "status": "experimental",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "role": "server"
       },
       "iso": "isos/CentOS-7-x86_64-Minimal-2009.iso",
       "iso_url": "https://vault.centos.org/7.9.2009/isos/x86_64/CentOS-7-x86_64-Minimal-2009.iso",
       "iso_sha256": "07b94e6b1a0b0260b94c83d6bb76b26bf7a310dc78d7a9c7432809fb9bc6194a",
       "memory_mb": 2048,
-      "notes": "CentOS 7.9.2009 (November 2020, kernel 3.10, end of life June 2024): bootstrap-kickstart from the minimal ISO (packages on the medium, inst.repo=cdrom), @core plus sshd and the guest agent; %post points yum at vault.centos.org (mirror.centos.org is gone). Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms centos-7 runs one. CentOS 5 and 6 stay manual: their anaconda takes ks= and method= instead of inst.*, a legacy kickstart flow still to write.",
+      "notes": "CentOS 7.9.2009 (November 2020, kernel 3.10, end of life June 2024): bootstrap-kickstart from the minimal ISO (packages on the medium, inst.repo=cdrom), @core plus sshd and the guest agent; %post points yum at vault.centos.org (mirror.centos.org is gone). Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms centos-7 runs one. CentOS 5 and 6 stay manual: their anaconda takes ks= and method= instead of inst.*, a legacy kickstart flow still to write. Anaconda 21 predates autopart --noswap (line 15 of the kickstart stopped the first live run, 2026-09-30): the profile asks for --type=plain alone.",
       "guest_agent": true,
       "kickstart_config": {
         "username": "lab",
@@ -109,7 +109,8 @@
           "sed -i -e 's|^mirrorlist=|#mirrorlist=|' -e 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|' /etc/yum.repos.d/CentOS-*.repo",
           "systemctl enable sshd.service serial-getty@ttyS0.service",
           "systemctl set-default multi-user.target"
-        ]
+        ],
+        "autopart_options": "--type=plain"
       },
       "ssh_provision": {
         "user": "lab",

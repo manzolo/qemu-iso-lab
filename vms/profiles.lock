@@ -285,9 +285,14 @@
       ]
     },
     "centos-7": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:a7611f24871d1765ee62f5ec8486c3f0c414cbbdb1e704e37b253680fb783c0c",
+      "version": "1.1.1",
+      "fingerprint": "sha256:16e145cd31d7203e20c482dc4e24453c31587e1f6345e9ed9393dc62206df387",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-30",
+          "note": "autopart --type=plain without --noswap: anaconda 21 does not know that option"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-29",
