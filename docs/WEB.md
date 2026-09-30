@@ -28,6 +28,14 @@ What the page offers:
   *Checkpoint now*, *Clean*. F2 boots the selected machine headlessly. Right-click a row (or Shift+F10)
   to open the same actions, SSH access and profile customization. This also works on VM
   names, addresses and state badges inside lab cards.
+- **Start options**: an installed machine starts in a separate console window by default. The
+  other ways are under *Other ways to start*:
+  - **Start and open console here**;
+  - **Start without opening console**;
+  - **Start in a host window**;
+  - **Start ephemeral (changes discarded)**: `vmctl start --ephemeral`, QEMU `-snapshot`. The
+    session writes to temporary files and the disk and EFI variables stay as they were when it
+    stops; the shared folder is the host's own directory and keeps what is written into it.
 - **Customize**: three tabs separate **Resources**, **Advanced JSON** and the read-only
   **Catalog template**. Memory and vCPUs have presets, editable values and **Use catalog**
   buttons to restore each field independently. Empty fields inherit the catalog; local values

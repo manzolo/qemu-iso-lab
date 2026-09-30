@@ -1383,6 +1383,7 @@ build_vm_menu_items() {
         emit_section "RUN"
         emit_action "Boot Desktop" "Start the VM with display"
         emit_action "Boot Headless" "Start the VM in the background"
+        emit_action "Boot Ephemeral" "Start in the background with QEMU -snapshot: every change is discarded at stop"
         if [[ $has_ssh == "1" ]]; then
             emit_action "SSH Console" "Open a shell inside the VM"
             emit_action "Serial Console" "Attach to the serial port (ttyS0 login, pfSense menu); Ctrl-] detaches"
@@ -1569,7 +1570,7 @@ is_na_action() {
     local tag="$1"
     local vm_name="$2"
     case "$tag" in
-        "Boot Desktop"|"Boot Headless")
+        "Boot Desktop"|"Boot Headless"|"Boot Ephemeral")
             local disk
             disk=$(vm_disk_path "$vm_name")
             if [[ -z "$disk" ]]; then
@@ -1595,7 +1596,7 @@ msg_na_action() {
     local tag="$1"
     local vm_name="$2"
     case "$tag" in
-        "Boot Desktop"|"Boot Headless")
+        "Boot Desktop"|"Boot Headless"|"Boot Ephemeral")
             msg_box "VM Not Installed" "VM '$vm_name' has no installed disk yet.\n\nRun an INSTALL action first (Bootstrap, Guided Provision, or Unattended Install)."
             ;;
         "Stop VM")
@@ -2016,6 +2017,7 @@ resolve_action() {
         "Guided Install"|"Guided Provision") printf '%s\n' provision ;;
         "Boot Desktop") printf '%s\n' start ;;
         "Boot Headless") printf '%s\n' start-headless ;;
+        "Boot Ephemeral") printf '%s\n' start-ephemeral ;;
         "Remote SPICE") printf '%s\n' remote-spice ;;
         "SSH Console") printf '%s\n' shell ;;
         "Serial Console") printf '%s\n' console ;;
@@ -2269,6 +2271,13 @@ run_action() {
         start-headless)
             if run_vmctl start "$current_vm" --headless --background && [[ "${FACTS[has_ssh]:-0}" == "1" ]]; then
                 if confirm_box "Headless VM Started" "'$current_vm' is booting in the background.\n\nOpen an SSH console now? (waits for the guest to accept connections)"; then
+                    run_vmctl shell "$current_vm" || true
+                fi
+            fi
+            ;;
+        start-ephemeral)
+            if run_vmctl start "$current_vm" --headless --background --ephemeral && [[ "${FACTS[has_ssh]:-0}" == "1" ]]; then
+                if confirm_box "Ephemeral VM Started" "'$current_vm' is booting in the background on a throwaway overlay: nothing reaches its disk.\n\nOpen an SSH console now?"; then
                     run_vmctl shell "$current_vm" || true
                 fi
             fi

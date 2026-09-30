@@ -319,6 +319,7 @@ Windows 10/11 guests are given their address over SSH. The linked VMs appear und
 | choose my profiles | `vmctl catalog add <vm> [<vm>...]`, `vmctl catalog` |
 | see the VMs and their state | `vmctl list`, `vmctl status`, `vmctl show <vm>` |
 | boot, enter, stop | `vmctl start <vm>`, `vmctl shell <vm>`, `vmctl stop <vm>` |
+| try something and throw it away | `vmctl start <vm> --ephemeral --headless --background`: QEMU `-snapshot`, nothing reaches the disk or the EFI variables (web: *Other ways to start* → *Start ephemeral*; vmtui: *Boot Ephemeral*) |
 | watch a headless VM, even mid-install | `vmctl attach <vm>` (screen), `vmctl console <vm>` (serial) |
 | record an install as a time-lapse | `vmctl record <vm>` while a bootstrap runs (a 30 s GIF, `--mp4` for the video, under `artifacts/<vm>/recording/`); `check-vms --record` does it for the whole matrix |
 | keep a copy to go back to | `vmctl checkpoint create <vm> clean`, later `restore` ([guide](docs/CHECKPOINTS.md)) |

@@ -361,6 +361,7 @@ filesystem permission: a manual rm still deletes the files."""
     p.add_argument("--headless", action="store_true", help="start the installed guest without a display")
     p.add_argument("--background", action="store_true", help="detach the installed guest into the background")
     p.add_argument("--spice-port", type=int, help="expose a SPICE display on 127.0.0.1:PORT")
+    p.add_argument("--ephemeral", action="store_true", help="QEMU -snapshot: every write (disk, EFI variables) goes to temporary files and is gone when the VM stops")
     p.set_defaults(func=lifecycle.cmd_start)
 
     p = _add(subparsers, "stop", help="stop a running VM")

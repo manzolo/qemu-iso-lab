@@ -484,6 +484,28 @@ class VmctlTests(BaseVmctlTestCase):
         self.assertIn("-netdev", qemu_cmd)
         self.assertIn("user,id=n1", qemu_cmd)
 
+    def test_cmd_start_ephemeral_adds_snapshot_and_refuses_an_empty_disk(self):
+        # QEMU -snapshot: every write (disk, pflash) goes to temporary files
+        self.create_disk()
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=True, background=False,
+                                  dry_run=True, ephemeral=True)
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
+            self.assertEqual(self.vmctl.cmd_start(args), 0)
+        self.assertIn("-snapshot", run_cmd.call_args.args[0])
+        args.ephemeral = False
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
+            self.vmctl.cmd_start(args)
+        self.assertNotIn("-snapshot", run_cmd.call_args.args[0])
+        args.ephemeral, args.dry_run = True, False
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd, \
+             mock.patch.object(vmctl.vmstate, "artifact_disk_has_data", return_value=False):
+            with self.assertRaisesRegex(vmctl.VMError, "nothing installed"):
+                self.vmctl.cmd_start(args)
+        run_cmd.assert_not_called()
+
     def test_cmd_start_headless_dry_run_uses_no_display(self):
         self.create_disk()
         args = argparse.Namespace(vm=self.vm_name, video="std", cloud_init=False, headless=True, background=False, dry_run=True)

@@ -1015,6 +1015,8 @@ function actionsFor(r) {
     if (!prefersSsh(r)) a.push({label:"Start and open console here", args:["start",n,"--headless","--background"], afterStart:"inline", alternative:true, icon:"console", tone:"info"});
     if (!prefersSsh(r)) a.push({label:"Start without opening console", args:["start",n,"--headless","--background"], alternative:true, icon:"play", tone:"info"});
     a.push({ label: "Start in a host window", args: ["start", n], alternative:true, icon:"display", tone:"info" });
+    // QEMU -snapshot: every write goes to temporary files, the disk is untouched when it stops
+    a.push({ label: "Start ephemeral (changes discarded)", args: ["start", n, "--headless", "--background", "--ephemeral"], afterStart:prefersSsh(r) ? false : "detached", alternative:true, icon:"play", tone:"info" });
     a.push({ label: "Checkpoint now", args: ["checkpoint", "create", n, "web-" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")], icon:"bookmark", tone:"info" });
   } else if (r.job_status !== "running" && r.has_disk_image) {
     // Built, not installed (SerenityOS): the prepared image becomes the disk, then it boots.

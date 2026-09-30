@@ -3388,6 +3388,14 @@ def cmd_start(args: argparse.Namespace) -> int:
             return 1
 
     spice_port = getattr(args, "spice_port", None)
+    ephemeral = bool(getattr(args, "ephemeral", False))
+    if ephemeral:
+        if not args.dry_run and not vmstate.artifact_disk_has_data(args.vm):
+            raise VMError(f"VM '{args.vm}' has nothing installed: --ephemeral boots an existing disk without changing it")
+        ui.print_status("warn", "Ephemeral boot (QEMU -snapshot): nothing this session writes reaches the disk or the EFI variables", ok=False)
+    # -snapshot covers every -drive, pflash included; the shared folder (virtiofs) is the host's own
+    # directory and stays writable.
+    snapshot_args = ["-snapshot"] if ephemeral else []
     cloud_init_args: list[str] = []
     if args.cloud_init:
         cloud_init_args = cloud_init.cloud_init_drive_args(
@@ -3395,7 +3403,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         )
     link_args = vmlink.boot_args(args.vm, vm)  # segments this VM was linked on while stopped
     qemu_args = qemu.common_args(vm, args.video, dry_run=args.dry_run, headless=args.headless, spice_port=spice_port)
-    qemu_args += cloud_init_args + link_args
+    qemu_args += cloud_init_args + link_args + snapshot_args
     if args.background:
         if not args.headless and spice_port is None:
             raise VMError("--background currently requires --headless or --spice-port")
@@ -3409,7 +3417,7 @@ def cmd_start(args: argparse.Namespace) -> int:
                 serial_socket=qemu.serial_socket_path(vm),
                 serial_log=serial_log_path(args.vm),
             )
-            qemu_args += cloud_init_args + link_args
+            qemu_args += cloud_init_args + link_args + snapshot_args
             ui.print_kv("serial", f"{ui.pretty_path(serial_log_path(args.vm))}  (interactive: vmctl console {args.vm})")
         pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
         stderr_log = companion_stderr_log_path(log_path)

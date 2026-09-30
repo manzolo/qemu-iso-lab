@@ -440,6 +440,7 @@ run_vm_menu_action "Video Profile"
         output = self._unified_menu("test-ssh")
         self.assertIn("Boot Desktop", output)
         self.assertIn("Boot Headless", output)
+        self.assertIn("Boot Ephemeral", output)
         self.assertIn("SSH Console", output)
         self.assertNotIn("Stop VM", output)  # not running
         self.assertTrue(self._description_of(output, "Boot Desktop").startswith("▶ "))
