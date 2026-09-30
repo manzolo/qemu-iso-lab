@@ -224,7 +224,10 @@ def locale_values(locale: dict[str, str]) -> dict[str, dict[str, str]]:
         "nixos_config": pick(keymap=keyboard, locale=language, timezone=timezone),
         "pearos_config": pick(keymap=keyboard, locale=language, timezone=timezone),
         "pfsense_config": pick(timezone=timezone),
-        "preseed_config": pick(keyboard_layout=keyboard, locale=language, language=lang2, country=country, timezone=timezone),
+        # d-i works on the serial console, where only an ASCII language is accepted: `language=it`
+        # made every preseed row ask "Language:" for an hour (matrix of 2026-09-29/30). The installer
+        # keeps its language; the installed system gets the locale through a late command instead.
+        "preseed_config": pick(keyboard_layout=keyboard, timezone=timezone),
         "proxmox_config": pick(keyboard=keyboard, country=country.lower() if country else None, timezone=timezone),
         "slackware_config": pick(keymap=keyboard, locale=language, timezone=timezone),
         "ubiquity_config": pick(keyboard_layout=keyboard, locale=language, timezone=timezone),
@@ -232,10 +235,20 @@ def locale_values(locale: dict[str, str]) -> dict[str, dict[str, str]]:
     }
 
 
+def preseed_locale_command(language: str) -> str:
+    """The late command that gives a d-i installed system its locale (the installer itself stays
+    in English on the serial console): enable it in /etc/locale.gen where that file exists,
+    generate it (Ubuntu's locale-gen takes the name, Debian's regenerates the file) and make it
+    the default. Never fatal: a medium without the locales package installs all the same."""
+    return (f"(grep -q '^# *{language}' /etc/locale.gen 2>/dev/null && sed -i 's/^# *{language}/{language}/' /etc/locale.gen; "
+            f"locale-gen {language} >/dev/null 2>&1 || locale-gen >/dev/null 2>&1; update-locale LANG={language}) || true")
+
+
 def apply_locale(vm: dict[str, Any], locale: dict[str, str], explicit: dict[str, Any]) -> None:
     """Move the language, keyboard and time zone of every installer section the profile has to
     the ``locale`` block, like ``apply_identity``: only the fields the section already carries,
-    a per-VM override of local.json still wins field by field."""
+    a per-VM override of local.json still wins field by field. A preseed profile gets the
+    system locale as a late command (see ``locale_values``)."""
     for section, values in locale_values(locale).items():
         sec = vm.get(section)
         if not isinstance(sec, dict) or not values:
@@ -245,6 +258,14 @@ def apply_locale(vm: dict[str, Any], locale: dict[str, str], explicit: dict[str,
         for key, value in values.items():
             if key in sec and key not in kept:
                 sec[key] = value
+    preseed = vm.get("preseed_config")
+    if isinstance(preseed, dict) and locale.get("language"):
+        command = preseed_locale_command(locale["language"])
+        commands = preseed.get("late_commands")
+        if not isinstance(commands, list):
+            commands = []
+        if command not in commands:
+            preseed["late_commands"] = [*commands, command]
 
 
 def apply_identity(vm: dict[str, Any], identity: dict[str, str], explicit: dict[str, Any]) -> None:
@@ -256,6 +277,8 @@ def apply_identity(vm: dict[str, Any], identity: dict[str, str], explicit: dict[
     """
     if vm.get("haiku_config") is not None:
         return  # Haiku has one user, `user` (haiku.SSH_USER): the identity cannot move it (matrix of 2026-09-29)
+    if vm.get("proxmox_config") is not None:
+        return  # Proxmox VE has only root over SSH (proxmox.check_profile): the three nodes failed at once, matrix of 2026-09-29/30
     for section, field in USER_IDENTITY_FIELDS:
         sec = vm.get(section)
         if not isinstance(sec, dict):

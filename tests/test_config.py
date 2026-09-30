@@ -11,6 +11,19 @@ if str(ROOT) not in sys.path:
 from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
+class IdentitySkipsRootOnlyGuestsTests(BaseVmctlTestCase):
+    def test_proxmox_and_haiku_keep_their_only_user(self):
+        from vmctl import config
+        vm = {"proxmox_config": {"hostname": "pve"}, "ssh_provision": {"user": "root"}}
+        config.apply_identity(vm, {"user": "tester", "password_hash": "x"}, {})
+        self.assertEqual(vm["ssh_provision"]["user"], "root")
+        vm = {"haiku_config": {"user": "user"}, "ssh_provision": {"user": "user"}}
+        config.apply_identity(vm, {"user": "tester"}, {})
+        self.assertEqual(vm["ssh_provision"]["user"], "user")
+        vm = {"ssh_provision": {"user": "lab"}}
+        config.apply_identity(vm, {"user": "tester"}, {})
+        self.assertEqual(vm["ssh_provision"]["user"], "tester")
+
 class LocaleBlockTests(BaseVmctlTestCase):
     def test_validate_locale_accepts_posix_names_and_rejects_the_rest(self):
         from vmctl import config
@@ -31,7 +44,14 @@ class LocaleBlockTests(BaseVmctlTestCase):
               "archinstall_config": {"locale_lang": "en_US", "locale_enc": "UTF-8", "keyboard_layout": "us"},
               "kickstart_config": {"locale": "en_US.UTF-8"}, "haiku_config": {"user": "user"}}
         config.apply_locale(vm, locale, {"windows_config": {"timezone": "GMT Standard Time"}})
-        self.assertEqual(vm["preseed_config"], {"locale": "it_IT.UTF-8", "language": "it", "country": "IT", "keyboard_layout": "it", "timezone": "Europe/Rome"})
+        # d-i: the installer stays in English on the serial console (it asked "Language:" for an hour with language=it),
+        # keyboard and time zone move, the system locale comes as a late command
+        self.assertEqual({k: v for k, v in vm["preseed_config"].items() if k != "late_commands"},
+                         {"locale": "en_US.UTF-8", "language": "en", "country": "US", "keyboard_layout": "it", "timezone": "Europe/Rome"})
+        self.assertEqual(vm["preseed_config"]["late_commands"], [config.preseed_locale_command("it_IT.UTF-8")])
+        self.assertIn("update-locale LANG=it_IT.UTF-8", vm["preseed_config"]["late_commands"][0])
+        config.apply_locale(vm, locale, {"windows_config": {"timezone": "GMT Standard Time"}})  # applied twice: the late command is added once
+        self.assertEqual(len(vm["preseed_config"]["late_commands"]), 1)
         self.assertEqual(vm["autoyast_config"], {"language": "it_IT", "keyboard_layout": "italian", "timezone": "Europe/Rome"})
         self.assertEqual(vm["windows_config"], {"language": "en-US", "input_locale": "it-IT", "timezone": "UTC"})  # an overridden field is left alone (the override merges on top), the UI language stays
         self.assertEqual(vm["archinstall_config"], {"locale_lang": "it_IT", "locale_enc": "UTF-8", "keyboard_layout": "it"})  # no timezone field: none added
@@ -50,7 +70,8 @@ class LocaleBlockTests(BaseVmctlTestCase):
                  "vms": {"withpreseed": {"preseed_config": {"timezone": "Europe/Berlin"}},
                          "mine": {**self.vm_config, "name": "M", "preseed_config": {"username": "lab", "locale": "en_US.UTF-8"}, "disk": {**self.vm_config["disk"], "path": "artifacts/mine/disk.qcow2"}}}}
         cfg = config.load_config(local_profiles=local)
-        self.assertEqual(cfg["vms"]["withpreseed"]["preseed_config"]["locale"], "it_IT.UTF-8")
+        self.assertEqual(cfg["vms"]["withpreseed"]["preseed_config"]["locale"], "en_US.UTF-8")  # the installer's own language stays
+        self.assertIn("LANG=it_IT.UTF-8", cfg["vms"]["withpreseed"]["preseed_config"]["late_commands"][0])
         self.assertEqual(cfg["vms"]["withpreseed"]["preseed_config"]["timezone"], "Europe/Berlin")  # the per-VM entry wins
         self.assertEqual(cfg["vms"]["mine"]["preseed_config"]["locale"], "en_US.UTF-8")  # a local-only VM is untouched
 

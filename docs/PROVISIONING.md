@@ -161,8 +161,9 @@ as its *Welcome* page while no `local.json` exists (the *Identity* button edits 
 The same form (and `vmctl identity --language it_IT.UTF-8 --keyboard it --timezone Europe/Rome`)
 writes a top-level `locale` block that moves the language, keyboard layout and time zone of
 every installer section that has them, each in its own format (AutoYaST's keyboard names,
-preseed's `country`, Windows' time zone names for the common zones; Windows' display language
-is never touched, it must be on the medium). A per-VM entry under `vms` still wins field by field. `local.json` is deep-merged over
+Windows' time zone names for the common zones; Windows' display language is never touched,
+it must be on the medium; a d-i installer keeps its English on the serial console, where only an
+ASCII language is accepted, and the installed system gets the locale through a late command). A per-VM entry under `vms` still wins field by field. `local.json` is deep-merged over
 the tracked profiles: dicts merge key by key, lists concatenate, scalars
 replace. A minimal override looks like this:
 
