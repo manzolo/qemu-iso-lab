@@ -1,52 +1,52 @@
 {
   "vms": {
     "devuan-netinst": {
-      "name": "Devuan 6.1.1 Excalibur Netinstall",
+      "name": "Devuan 6.1.1 Excalibur Server (preseed, sysvinit)",
+      "extends": "debian-preseed-base",
       "meta": {
         "slug": "devuan",
         "family": "debian",
-        "role": "installer",
+        "role": "server",
         "release_model": "stable",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
+        "status": "experimental",
+        "version": "1.1.1"
       },
       "iso": "isos/devuan_excalibur_6.1.1_amd64_netinstall.iso",
       "iso_url": "https://files.devuan.org/devuan_excalibur/installer-iso/devuan_excalibur_6.1.1_amd64_netinstall.iso",
       "iso_sha256": "87be42bfcec010f90f86444b404c1efeefbdc9b08a2e82f766d6defefdf654e4",
+      "installer_boot": {
+        "kernel": "boot/isolinux/linux",
+        "initrd": "boot/isolinux/initrd.gz"
+      },
       "disk": {
-        "path": "artifacts/devuan-netinst/disk.qcow2",
-        "size": "20G",
-        "format": "qcow2",
-        "interface": "virtio"
+        "size": "20G"
       },
-      "firmware": {
-        "type": "bios"
-      },
-      "machine": "pc",
       "memory_mb": 2048,
-      "cpus": 2,
-      "network": "user",
-      "audio": false,
-      "video": {
-        "default": "safe",
-        "variants": {
-          "std": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ],
-          "safe": [
-            "-vga",
-            "std",
-            "-display",
-            "gtk"
-          ]
-        }
+      "preseed_config": {
+        "hostname": "devuan",
+        "mirror_hostname": "deb.devuan.org",
+        "mirror_directory": "/merged",
+        "packages": [
+          "acpid"
+        ],
+        "extra": [
+          "d-i mirror/suite string excalibur",
+          "d-i choose-init/select_init select sysvinit",
+          "d-i apt-setup/security_host string deb.devuan.org",
+          "d-i apt-setup/security_path string /merged"
+        ],
+        "keyboard_layout": "us",
+        "timezone": "UTC"
       },
-      "usb_tablet": true,
-      "notes": "Devuan 6.1.1 Excalibur (April 2026): Debian 13 without systemd. The debian-installer asks which init to run (sysvinit, OpenRC or runit) and installs from deb.devuan.org. Manual for now: debian-server's preseed applies with the Devuan mirror and the init choice, the road to a bootstrap-preseed profile."
+      "ssh_provision": {
+        "ssh_host_port": 2346,
+        "post_install_run": [
+          "[ \"$(cat /proc/1/comm)\" = init ] && [ ! -d /run/systemd/system ]",
+          "pgrep -x sshd >/dev/null && sudo -n true",
+          "grep -q '^PRETTY_NAME=\"Devuan GNU/Linux 6' /etc/os-release"
+        ]
+      },
+      "notes": "Devuan 6.1.1 Excalibur (April 2026): Debian 13 without systemd, installed with bootstrap-preseed from the netinstall ISO (kernel and d-i initrd under /boot/isolinux). The preseed answers Devuan's own questions: choose-init/select_init sysvinit (openrc and runit are the other choices), the mirror and the security repository on deb.devuan.org/merged, suite excalibur; acpid for the ACPI power-off. The checks: PID 1 is sysvinit's init and no systemd runs, sshd, sudo, the Devuan release. Born experimental (2026-09-30): vmctl check-vms devuan-netinst runs one."
     }
   }
 }

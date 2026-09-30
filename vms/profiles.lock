@@ -507,9 +507,19 @@
       ]
     },
     "devuan-netinst": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:73bbae2083555695df2e6f4e2d042fd2876e641254bde4a4dcad5608cbe60ca4",
+      "version": "1.1.1",
+      "fingerprint": "sha256:228ab5cd458a4bd6264083d1baa2741a2d56bba4768082a8847271997184ab23",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-30",
+          "note": "keyboard and time zone declared, so the locale block reaches them"
+        },
+        {
+          "version": "1.1.0",
+          "date": "2026-09-30",
+          "note": "unattended: bootstrap-preseed with Devuan's init question, mirror and security on deb.devuan.org"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-29",
