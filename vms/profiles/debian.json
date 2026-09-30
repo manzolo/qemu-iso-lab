@@ -578,12 +578,12 @@
         "family": "debian",
         "role": "desktop",
         "release_model": "lts",
-        "status": "experimental",
+        "status": "unattended",
         "groups": [
           "ubuntu"
         ],
         "slug": "ubuntu",
-        "verified": "2026-09-09",
+        "verified": "2026-09-30",
         "version": "1.0.0"
       },
       "iso": "isos/ubuntu-26.04-live-server-amd64.iso",
@@ -691,7 +691,7 @@
         ]
       },
       "iso_sha256": "dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9",
-      "notes": "Ubuntu 26.04 with niri and DankMaterialShell, installed unattended from the server ISO. greetd logs the user straight into niri-session on the vt the packaged unit owns (tty7 on Debian and Ubuntu), waybar stays disabled because dms brings its own bar, and the compositor needs the virtio GPU: with the standard VGA there is no render node and niri runs with no output at all. The desktop is asserted after a reboot, which is also how you meet the VM."
+      "notes": "Ubuntu 26.04 with niri and DankMaterialShell, installed unattended from the server ISO. greetd logs the user straight into niri-session on the vt the packaged unit owns (tty7 on Debian and Ubuntu), waybar stays disabled because dms brings its own bar, and the compositor needs the virtio GPU: with the standard VGA there is no render node and niri runs with no output at all. The desktop is asserted after a reboot, which is also how you meet the VM. Promoted again 2026-09-30 (live PASS, 781 s). The first login shows niri's Important Hotkeys overlay and the DMS welcome window over the desktop."
     },
     "debian-xfce": {
       "name": "Debian 13 Xfce (Preseed)",
