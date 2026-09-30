@@ -614,9 +614,14 @@
       ]
     },
     "endeavouros": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:f2bef043e856fd863b8d26fc51704a0503763e97f75d09b94d21d18fc8192e6c",
+      "version": "1.1.0",
+      "fingerprint": "sha256:4d3148ded185642cc0256d7c878ab09702b59010647a61bacc25b5b75ca612a5",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-09-30",
+          "note": "unattended recipe on bootstrap-archinstall (KDE Plasma, the live pacman.conf inherited)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
