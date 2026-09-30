@@ -39,6 +39,7 @@ class PopOSTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions), order)
         self.assertIn("probe ALL=(ALL) NOPASSWD: ALL", script)
         self.assertIn("--username probe", script)
+        self.assertIn('--profile_icon "$ICON"', script)  # distinst requires it with --username
 
 
 if __name__ == "__main__":

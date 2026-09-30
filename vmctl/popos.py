@@ -111,13 +111,19 @@ DISK=/dev/vda
 echo "==> Waiting for the live network..."
 for i in $(seq 1 60); do getent hosts archive.ubuntu.com >/dev/null 2>&1 && break; sleep 2; done
 echo "==> distinst: {media}/filesystem.squashfs onto $DISK..."
+# distinst wants an account picture with --username (copied to AccountsService): any PNG of the live
+ICON=
+for f in /usr/share/icons/hicolor/256x256/apps/*.png /usr/share/icons/hicolor/*/apps/*.png /usr/share/pixmaps/*.png; do
+    [ -f "$f" ] && ICON=$f && break
+done
+[ -n "$ICON" ]
 # the password is replaced by the hash below; distinst only takes plain text
 distinst -s {media}/filesystem.squashfs -r {media}/filesystem.manifest-remove \\
     -h {q(hostname)} -k {q(keyboard)} -l {q(locale)} --tz {q(timezone)} \\
     -b $DISK -t "$DISK:gpt" \\
     -n "$DISK:primary:start:1024M:fat32:mount=/boot/efi:flags=esp" \\
     -n "$DISK:primary:1024M:end:ext4:mount=/" \\
-    --username {q(username)} --realname {q(realname)} --password vmctl-temporary
+    --username {q(username)} --realname {q(realname)} --password vmctl-temporary --profile_icon "$ICON"
 echo "==> Configuring the installed system..."
 mkdir -p /mnt/vmctl
 mount ${{DISK}}2 /mnt/vmctl
