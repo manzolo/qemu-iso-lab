@@ -78,8 +78,9 @@
       "extends": "fedora-kickstart-base",
       "meta": {
         "slug": "fedora-workstation",
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "version": "1.1.0",
+        "verified": "2026-09-30"
       },
       "iso": "isos/Fedora-Everything-netinst-x86_64-44-1.7.iso",
       "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
@@ -108,7 +109,7 @@
           "~/bin/verify-desktop --user \"{{user}}\" --service lightdm.service --package-manager rpm --package cinnamon --process cinnamon"
         ]
       },
-      "notes": "Fedora 44 Cinnamon spin installed with kickstart from the Everything netinst: the @cinnamon-desktop-environment group on LightDM with autologin. Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms fedora-cinnamon runs one; the live ISO it used to boot by hand is a click away in the catalog's history."
+      "notes": "Fedora 44 Cinnamon spin installed with kickstart from the Everything netinst: the @cinnamon-desktop-environment group on LightDM with autologin. First live PASS 2026-09-30 (654 s)."
     },
     "fedora-server": {
       "name": "Fedora Server 42 Netinst",
@@ -219,8 +220,9 @@
       "extends": "fedora-kickstart-base",
       "meta": {
         "slug": "fedora-workstation",
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "version": "1.1.1",
+        "verified": "2026-09-30"
       },
       "iso": "isos/Fedora-Everything-netinst-x86_64-44-1.7.iso",
       "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
@@ -234,7 +236,8 @@
           "sudo",
           "NetworkManager",
           "qemu-guest-agent",
-          "spice-vdagent"
+          "spice-vdagent",
+          "-gnome-tour"
         ],
         "post_commands": [
           "install -d -m0755 /etc/gdm\ncat > /etc/gdm/custom.conf <<'GDMEOF'\n[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin={{user}}\nInitialSetupEnable=False\nGDMEOF",
@@ -249,15 +252,16 @@
           "~/bin/verify-desktop --user \"{{user}}\" --service gdm.service --package-manager rpm --package gnome-shell --process gnome-shell"
         ]
       },
-      "notes": "Fedora 44 Workstation (GNOME) installed with kickstart from the Everything netinst, like fedora-kde: the @workstation-product-environment group, GDM autologin with the initial-setup wizard disabled. Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms fedora-workstation runs one; the live ISO it used to boot by hand is a click away in the catalog's history."
+      "notes": "Fedora 44 Workstation (GNOME) installed with kickstart from the Everything netinst, like fedora-kde: the @workstation-product-environment group, GDM autologin with the initial-setup wizard disabled. First live PASS 2026-09-30 (712 s). gnome-tour is left out: its welcome window covered the desktop at the first login."
     },
     "fedora-xfce": {
       "name": "Fedora Xfce 42 (kickstart)",
       "extends": "fedora-kickstart-base",
       "meta": {
         "slug": "fedora-workstation",
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "version": "1.1.0",
+        "verified": "2026-09-30"
       },
       "iso": "isos/Fedora-Everything-netinst-x86_64-44-1.7.iso",
       "iso_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-44-1.7.iso",
@@ -286,7 +290,7 @@
           "~/bin/verify-desktop --user \"{{user}}\" --service lightdm.service --package-manager rpm --package xfce4-session --process xfce4-session"
         ]
       },
-      "notes": "Fedora 44 Xfce spin installed with kickstart from the Everything netinst: the @xfce-desktop-environment group on LightDM with autologin. Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms fedora-xfce runs one; the live ISO it used to boot by hand is a click away in the catalog's history."
+      "notes": "Fedora 44 Xfce spin installed with kickstart from the Everything netinst: the @xfce-desktop-environment group on LightDM with autologin. First live PASS 2026-09-30 (640 s)."
     },
     "fedora-niri-dms": {
       "name": "Fedora 44 + niri + DankMaterialShell",

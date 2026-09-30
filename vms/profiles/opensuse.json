@@ -7,8 +7,9 @@
         "family": "opensuse",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "version": "1.1.0",
+        "verified": "2026-09-30"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
@@ -119,7 +120,7 @@
           }
         ]
       },
-      "notes": "openSUSE Tumbleweed with KDE Plasma 6 through AutoYaST from the NET installer, like opensuse-tumbleweed-autoyast: the kde and kde_plasma patterns, SDDM as the display manager with autologin. Born experimental (written 2026-09-29 ahead of a live run): vmctl check-vms opensuse-tumbleweed-kde runs one."
+      "notes": "openSUSE Tumbleweed with KDE Plasma 6 through AutoYaST from the NET installer, like opensuse-tumbleweed-autoyast: the kde and kde_plasma patterns, SDDM as the display manager with autologin. First live PASS 2026-09-30 (728 s)."
     },
     "opensuse-tumbleweed-net": {
       "name": "openSUSE Tumbleweed NET",

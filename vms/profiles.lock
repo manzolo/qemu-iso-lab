@@ -672,9 +672,14 @@
       ]
     },
     "fedora-workstation": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:00f229e558027fa24232d294edbd202d36870bc06d45db34e8e055d94f4cacbd",
+      "version": "1.1.1",
+      "fingerprint": "sha256:bf2b179dc3e1b86e4bd3ae6b2ef7ac2c4815ef6752f0846cc8e670485f6b80df",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-30",
+          "note": "without gnome-tour: its welcome window covered the desktop at the first login"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-29",
