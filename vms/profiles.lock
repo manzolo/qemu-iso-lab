@@ -614,9 +614,14 @@
       ]
     },
     "endeavouros": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:4d3148ded185642cc0256d7c878ab09702b59010647a61bacc25b5b75ca612a5",
+      "version": "1.1.1",
+      "fingerprint": "sha256:c7e99cbf05262105f482e67300d5e149e6c072a59cc2945f8959fd4fc13b59cb",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-30",
+          "note": "mkinitcpio as the initramfs provider (the [endeavouros] dracut left /boot without kernel and initramfs)"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-30",
