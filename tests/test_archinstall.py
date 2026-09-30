@@ -145,6 +145,14 @@ class ArchinstallBootstrapTests(BaseVmctlTestCase):
         self.assertIn("Europe/Rome", script)
         self.assertIn("it_IT", script)
 
+    def test_a_live_mirrorlist_with_no_active_server_gets_the_geo_mirror_before_pacstrap(self):
+        # EndeavourOS ships it fully commented (2026-09-30): "no servers configured for repository"
+        self._arch_vm()
+        script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)
+        line = "grep -q '^[[:space:]]*Server' /etc/pacman.d/mirrorlist || echo 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch'"
+        self.assertIn(line, script)
+        self.assertLess(script.index(line), script.index("pacman -Syy"))
+
     def test_render_bootstrap_script_contains_sgdisk_and_pacstrap(self):
         self._arch_vm()
         script = vmctl.archinstall.render_bootstrap_script(self.vm_name, self.vm_config)

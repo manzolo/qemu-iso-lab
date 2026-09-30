@@ -363,6 +363,11 @@ for attempt in $(seq 1 60); do
 done
 
 {archive_block}
+# EndeavourOS ships the Arch mirrorlist fully commented (its live session ranks mirrors when the
+# desktop starts, which a multi-user boot never does): pacstrap then stops on "no servers
+# configured for repository" (2026-09-30). A live medium with no active mirror gets the geo one.
+grep -q '^[[:space:]]*Server' /etc/pacman.d/mirrorlist || echo 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
+
 echo "==> Partitioning /dev/vda..."
 sgdisk --zap-all /dev/vda
 sgdisk --new=1:0:+512MiB --typecode=1:ef00 --change-name=1:EFI /dev/vda
