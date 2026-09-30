@@ -263,9 +263,14 @@
       ]
     },
     "centos-5": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:04876b13c42c0f74f20b14b1653159c1eb8f07c9af551a52c0b7c3900b31fe53",
+      "version": "1.1.1",
+      "fingerprint": "sha256:be82a1b25c552a0df2be6fefc2e9e081a06d6ce65d402329c1304a940ddba96d",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-30",
+          "note": "yum and the install source on the vault's plain-HTTP copy at linuxsoft.cern.ch"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-30",
@@ -279,9 +284,14 @@
       ]
     },
     "centos-6": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:6eb17c6bef0b7afc43fd4b222a73eba24297e2827028eb0fef3541201a5f831f",
+      "version": "1.1.1",
+      "fingerprint": "sha256:f43fc576b66a5ae90a01c6820decfd54958cde6c9469773a37ffe017422d3208",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-09-30",
+          "note": "yum and the install source on the vault's plain-HTTP copy at linuxsoft.cern.ch"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-30",

@@ -296,7 +296,7 @@ class LegacyKickstartTests(unittest.TestCase):
             c6 = kickstart.render_kickstart("centos-6", tracked["centos-6"])
             c5 = kickstart.render_kickstart("centos-5", tracked["centos-5"])
         for ks in (c6, c5):
-            self.assertIn("\ncdrom\n" if ks is c6 else 'url --url="http://vault.centos.org/5.11/os/x86_64/"', ks)
+            self.assertIn("\ncdrom\n" if ks is c6 else 'url --url="http://linuxsoft.cern.ch/centos-vault/5.11/os/x86_64"', ks)
             self.assertNotIn("rootpw --lock", ks)
             self.assertNotIn("--gecos", ks)
             self.assertIn("NOPASSWD: ALL' >> /etc/sudoers", ks)
@@ -309,7 +309,8 @@ class LegacyKickstartTests(unittest.TestCase):
         a6, a5 = kickstart.kernel_append(tracked["centos-6"]), kickstart.kernel_append(tracked["centos-5"])
         self.assertNotIn("inst.", a6 + a5)  # no inst.* options before RHEL 7
         self.assertTrue(a6.startswith("ks=file:/ks.cfg text "))
-        self.assertIn("method=http://vault.centos.org/5.11/os/x86_64/", a5)
+        self.assertIn("method=http://linuxsoft.cern.ch/centos-vault/5.11/os/x86_64 ", a5)
+        self.assertIn("--bootproto=static --ip=10.0.2.15", c5)  # el5 loader: no DHCP host-name lookup
 
     def test_the_kickstart_is_appended_to_a_gzip_or_lzma_initrd(self):
         import gzip, lzma, tempfile

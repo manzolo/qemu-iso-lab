@@ -192,6 +192,17 @@ def render_legacy_kickstart(vm_name: str, vm: dict[str, Any], release: str) -> s
     end = "\n%end" if release == "el6" else ""
     zerombr = "zerombr" if release == "el6" else "zerombr yes"
     post_header = "%post --erroronfail" if release == "el6" else "%post"
+    # el5's loader crashes (SIGSEGV) on "Determining host name and domain" after a DHCP lease
+    # from QEMU's user network, with any form of the network line (verified by hand, 2026-09-30):
+    # the install runs on the user network's fixed addresses and %post writes DHCP back.
+    if release == "el5":
+        network_line = (f"network --device=eth0 --bootproto=static --ip=10.0.2.15 --netmask=255.255.255.0 "
+                        f"--gateway=10.0.2.2 --nameserver=10.0.2.3 --hostname={hostname}.local --onboot=yes")
+        dhcp_back = ("printf 'DEVICE=eth0\\nBOOTPROTO=dhcp\\nONBOOT=yes\\n' > /etc/sysconfig/network-scripts/ifcfg-eth0\n"
+                     f"sed -i 's/^HOSTNAME=.*/HOSTNAME={hostname}/' /etc/sysconfig/network")
+    else:
+        network_line = f"network --device=eth0 --bootproto=dhcp --onboot=yes --hostname={hostname}"
+        dhcp_back = ""
     pubkey = _resolve_ssh_pubkey(vm)
     key_block = ""
     if pubkey:
@@ -208,7 +219,7 @@ install
 lang {locale}
 keyboard {kb_layout}
 timezone --utc {timezone}
-network --device=eth0 --bootproto=dhcp --onboot=yes --hostname={hostname}
+{network_line}
 firewall --enabled --ssh
 selinux --{selinux}
 authconfig --enableshadow --passalgo=sha512
@@ -233,6 +244,7 @@ poweroff
 echo '{username} ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 sed -i 's/^Defaults *requiretty/# &/' /etc/sudoers
 grep -q '^UseDNS' /etc/ssh/sshd_config && sed -i 's/^UseDNS.*/UseDNS no/' /etc/ssh/sshd_config || echo 'UseDNS no' >> /etc/ssh/sshd_config
+{dhcp_back}
 {commands}
 sync
 blockdev --flushbufs /dev/{disk_device} || true
@@ -270,6 +282,7 @@ def add_to_legacy_initrd(initrd_path: Path, files: dict[str, str]) -> None:
     else:
         cpio = lzma.decompress(raw, format=lzma.FORMAT_ALONE)
     extra = cpio_newc({name: text.encode() for name, text in files.items()})
+    initrd_path.chmod(0o644)  # extracted from the ISO read-only (centos-6, 2026-09-30)
     initrd_path.write_bytes(gzip.compress(cpio + extra, compresslevel=6))
 
 
