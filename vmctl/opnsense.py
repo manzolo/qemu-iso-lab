@@ -1,8 +1,7 @@
 """OPNsense from its DVD: the live system installs itself (bootstrap-opnsense).
 
 The DVD boots a live OPNsense whose /usr/local/etc/rc runs the scripts of
-/usr/local/etc/rc.syshook.d/start at every boot. The host grafts one there with growisofs
-(like the FreeBSD flow), plus a loader.conf that puts the console on the serial port. The
+/usr/local/etc/rc.syshook.d/start at every boot. The host grafts one there with xorriso, plus a loader.conf that puts the console on the serial port. The
 script does what the vendor's opnsense-install does behind its dialogs: partitions the disk
 (GPT, freebsd-boot + UFS), clones the running system onto it with cpdup (the same list of
 directories), then writes a config.xml of ours instead of the factory one: WAN on vtnet0 with
@@ -240,7 +239,6 @@ def ensure_install_iso(vm_name: str, vm: dict[str, Any], source: Path, keys: lis
     if stamp and dest.is_file() and stamp_path.is_file() and stamp_path.read_text() == stamp:
         return dest
     runtime.require_command("xorriso")
-    runtime.require_command("growisofs")
     work = directory / "iso-work"
     if not dry_run:
         work.mkdir(parents=True, exist_ok=True)
@@ -256,10 +254,12 @@ def ensure_install_iso(vm_name: str, vm: dict[str, Any], source: Path, keys: lis
         (work / "config.xml").write_text(config_xml)
         (work / "config.xml").chmod(0o600)
     partial = dest.with_suffix(".iso.part")
-    runtime.run(["cp", str(source), str(partial)], dry_run=dry_run, quiet=True)
-    runtime.run(["growisofs", "-M", str(partial), "-d", "-l", "-r", "-V", label, "-graft-points",
-                 f"{HOOK_PATH}={work / 'hook'}", f"{CONFIG_STAGE}={work / 'config.xml'}",
-                 f"/boot/loader.conf={loader}"], dry_run=dry_run, quiet=True)
+    # xorriso rewrites the image keeping its El Torito records: growisofs -M (the FreeBSD flow)
+    # fails on this DVD, whose deep directories genisoimage relocates into colliding .rr_moved
+    # entries (2026-09-30).
+    runtime.run(["xorriso", "-indev", str(source), "-outdev", str(partial), "-boot_image", "any", "keep",
+                 "-volid", label, "-map", str(work / "hook"), HOOK_PATH, "-map", str(work / "config.xml"), CONFIG_STAGE,
+                 "-map", str(loader), "/boot/loader.conf", "-commit"], dry_run=dry_run, quiet=True)
     if not dry_run:
         partial.replace(dest)
         shutil.rmtree(work)
