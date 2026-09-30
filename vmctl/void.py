@@ -22,7 +22,9 @@ BOOTSTRAP_FAILED_TOKEN = "==> Void Linux installation FAILED"
 LIVE_LOGIN_PROMPT = "void-live login: "
 LIVE_PASSWORD_PROMPT = "Password: "
 LIVE_PASSWORD = "voidlinux"
-LIVE_SHELL_PROMPT = "void-live ~]# "
+# root's live shell is sh with the plain "# " prompt (first live run, 2026-09-30); the banner
+# above it has no line starting with "# ", so the newline anchors the match.
+LIVE_SHELL_PROMPT = "\n# "
 SEED_VOLUME_ID = "VMCTLVOID"
 SEED_MOUNTPOINT = "/vmctl-seed"
 KERNEL_MEMBER = "boot/vmlinuz"
