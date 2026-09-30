@@ -273,3 +273,14 @@ class KickstartOstreeTests(BaseVmctlTestCase):
         # a profile without ostree has no ref at all
         self.vm_config["kickstart_config"].pop("ostree")
         self.assertIsNone(vmctl.kickstart.resolve_ostree_ref(self.vm_config, iso_path))
+
+
+class NetworkOptionsTests(unittest.TestCase):
+    def test_network_options_are_appended_to_the_network_line_only_when_set(self):
+        from vmctl import config, kickstart
+        from tests._common import ROOT
+        tracked = config.load_tracked(ROOT / "vms" / "profiles")
+        c7 = kickstart.render_kickstart("centos-7", tracked["centos-7"])
+        self.assertIn("network --bootproto=dhcp --hostname=centos-7 --onboot=yes --activate\n", c7)
+        c8 = kickstart.render_kickstart("centos-8", tracked["centos-8"])
+        self.assertIn("network --bootproto=dhcp --hostname=centos-8\n", c8)

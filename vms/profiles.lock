@@ -285,9 +285,14 @@
       ]
     },
     "centos-7": {
-      "version": "1.1.1",
-      "fingerprint": "sha256:16e145cd31d7203e20c482dc4e24453c31587e1f6345e9ed9393dc62206df387",
+      "version": "1.1.2",
+      "fingerprint": "sha256:1efd65133af0dde70d0cee9c308b0e49e09afeab9293b98711565afc52b27e53",
       "history": [
+        {
+          "version": "1.1.2",
+          "date": "2026-09-30",
+          "note": "network --onboot=yes --activate: anaconda 21 left eth0 at ONBOOT=no"
+        },
         {
           "version": "1.1.1",
           "date": "2026-09-30",

@@ -169,6 +169,10 @@ def render_kickstart(vm_name: str, vm: dict[str, Any], ostree_ref: str | None = 
     ostree = ostree_config(vm)
     autopart_options = str(cfg.get("autopart_options") or ("--noswap" if ostree else "--type=plain --noswap")).strip()
     bootloader_options = str(cfg.get("bootloader_options") or '--append="crashkernel=auto"').strip()
+    # Extra options of the network line: CentOS 7's anaconda 21 writes ONBOOT=no without
+    # --onboot=yes, and the installed system then boots with no network (2026-09-30).
+    network_options = str(cfg.get("network_options") or "").strip()
+    network_options = f" {network_options}" if network_options else ""
 
     if not username:
         raise VMError("kickstart_config.username is required")
@@ -232,7 +236,7 @@ lang {locale}
 keyboard {kb_layout}
 timezone {timezone} --utc
 {source_directive}
-network --bootproto=dhcp --hostname={hostname}
+network --bootproto=dhcp --hostname={hostname}{network_options}
 firewall --{firewall}
 selinux --{selinux}
 
