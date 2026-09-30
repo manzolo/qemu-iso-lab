@@ -69,7 +69,7 @@ class CatalogSiteTests(unittest.TestCase):
         queries = ["ubuntu 26", "UBUNTU-26.04", "ubuntu", "debian 7", "fedora kde", "arch", "", "no-such-os-zzzzz"]
         script = search + "\nconst profiles = " + json.dumps(self.data["profiles"]) + ";\n"
         script += "console.log(JSON.stringify(" + json.dumps(queries) + ".map(q => searchProfiles(profiles, q).map(p => p.name))));"
-        result = subprocess.run(["node"], input=script, capture_output=True, text=True, check=True, timeout=10)
+        result = subprocess.run(["node"], input=script, capture_output=True, text=True, check=True, timeout=60)  # a busy CI runner took more than 10 s (v0.14.0 on Python 3.13)
         release, exact, ubuntu, debian, desktop, arch, all_profiles, empty = json.loads(result.stdout)
         self.assertEqual(release[0], "ubuntu-26.04")
         by_name = {p["name"]: p for p in self.data["profiles"]}

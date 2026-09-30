@@ -129,8 +129,9 @@
         "family": "opensuse",
         "role": "server",
         "release_model": "rolling",
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "version": "1.1.0",
+        "verified": "2026-09-30"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
@@ -230,7 +231,7 @@
           "[ \"$(systemctl get-default)\" = multi-user.target ]"
         ]
       },
-      "notes": "openSUSE Tumbleweed as a server through AutoYaST from the NET installer (the flow of opensuse-tumbleweed-autoyast, without a desktop): enhanced_base, sshd, the guest agent, multi-user target. Born experimental (2026-09-30): vmctl check-vms opensuse-tumbleweed-net runs one."
+      "notes": "openSUSE Tumbleweed as a server through AutoYaST from the NET installer (the flow of opensuse-tumbleweed-autoyast, without a desktop): enhanced_base, sshd, the guest agent, multi-user target. First live PASS 2026-09-30 (501 s)."
     },
     "opensuse-tumbleweed-autoyast": {
       "name": "openSUSE Tumbleweed GNOME (AutoYaST)",

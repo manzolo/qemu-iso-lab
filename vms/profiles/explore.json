@@ -325,25 +325,9 @@
       "usb_tablet": true
     },
     "void-xfce": {
-      "name": "Void Linux Xfce",
-      "meta": {
-        "slug": "void-linux",
-        "family": "void",
-        "role": "desktop",
-        "release_model": "rolling",
-        "status": "manual",
-        "version": "1.0.0",
-        "manual": "todo"
-      },
       "iso": "isos/void-live-x86_64-20250202-xfce.iso",
       "iso_url": "https://repo-default.voidlinux.org/live/current/void-live-x86_64-20250202-xfce.iso",
-      "iso_size": 1446789120,
-      "disk": {
-        "path": "artifacts/void-xfce/disk.qcow2",
-        "size": "24G",
-        "format": "qcow2",
-        "interface": "virtio"
-      },
+      "iso_sha256": "40ff378e6cbc74680b30eb0af0003af0abc750b2589f18d4733f9f30bcc79d5b",
       "firmware": {
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
@@ -351,10 +335,14 @@
         "vars_path": "artifacts/void-xfce/OVMF_VARS.fd"
       },
       "machine": "q35",
-      "memory_mb": 2048,
+      "disk": {
+        "path": "artifacts/void-xfce/disk.qcow2",
+        "size": "24G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
       "cpus": 2,
       "network": "user",
-      "audio": true,
       "video": {
         "default": "safe",
         "variants": {
@@ -373,7 +361,35 @@
         }
       },
       "usb_tablet": true,
-      "iso_sha256": "40ff378e6cbc74680b30eb0af0003af0abc750b2589f18d4733f9f30bcc79d5b"
+      "name": "Void Linux Xfce (glibc, xbps from the live ISO)",
+      "meta": {
+        "slug": "void-linux",
+        "family": "void",
+        "role": "desktop",
+        "release_model": "rolling",
+        "status": "experimental",
+        "version": "1.1.0"
+      },
+      "memory_mb": 3072,
+      "audio": true,
+      "void_config": {
+        "hostname": "void",
+        "username": "lab",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "keymap": "us",
+        "locale": "en_US.UTF-8",
+        "session": "xfce"
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2354,
+        "post_install_run": [
+          "for i in $(seq 1 90); do pgrep -u {{user}} -x xfce4-session >/dev/null && break; sleep 2; done; pgrep -u {{user}} -x xfce4-session >/dev/null && xbps-query xfce4-session >/dev/null",
+          "sudo -n true && [ -L /var/service/sshd ]"
+        ]
+      },
+      "notes": "Void Linux (glibc, runit) with Xfce on LightDM, installed with bootstrap-void: the live ISO's kernel boots on the serial console, the host logs in as the live root (password voidlinux), mounts a seed CD and runs install.sh: GPT with EFI, ext4, xbps-install -r /mnt of base-system, Xfce, LightDM and OpenSSH from repo-default.voidlinux.org, then locale, time zone, the user with sudo and the project key, the runit services (dhcpcd, sshd, dbus, lightdm, the ttyS0 getty), LightDM autologin, GRUB for EFI. Born experimental (2026-09-30): vmctl check-vms void-xfce runs one."
     },
     "opensuse-slowroll": {
       "name": "openSUSE Slowroll Xfce (AutoYaST, DVD)",
@@ -382,8 +398,9 @@
         "family": "opensuse",
         "role": "desktop",
         "release_model": "slow-rolling",
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "version": "1.1.1",
+        "verified": "2026-09-30"
       },
       "iso": "isos/openSUSE-Slowroll-DVD-x86_64-Media.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso",
@@ -475,7 +492,8 @@
           "qemu-guest-agent"
         ],
         "chroot_commands": [
-          "sed -i 's/^DISPLAYMANAGER=.*/DISPLAYMANAGER=\"lightdm\"/' /etc/sysconfig/displaymanager"
+          "sed -i 's/^DISPLAYMANAGER=.*/DISPLAYMANAGER=\"lightdm\"/' /etc/sysconfig/displaymanager",
+          "rm -f /etc/xdg/autostart/*opensuse*welcome*.desktop"
         ],
         "final_reboot": true
       },
@@ -496,7 +514,7 @@
           }
         ]
       },
-      "notes": "openSUSE Slowroll (the slow-rolling Tumbleweed) with Xfce on LightDM through AutoYaST, installing from the DVD itself (no install= source: the medium carries the packages). Born experimental (2026-09-30): vmctl check-vms opensuse-slowroll runs one."
+      "notes": "openSUSE Slowroll (the slow-rolling Tumbleweed) with Xfce on LightDM through AutoYaST, installing from the DVD itself (no install= source: the medium carries the packages). First live PASS 2026-09-30 (461 s). The openSUSE Welcome window is kept from autostarting (it covered the desktop in the first clip)."
     }
   }
 }

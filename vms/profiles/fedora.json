@@ -117,8 +117,9 @@
       "meta": {
         "slug": "fedora-server",
         "role": "server",
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "version": "1.1.0",
+        "verified": "2026-09-30"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
@@ -152,7 +153,7 @@
           "[ ! -d /sys/firmware/efi ]"
         ]
       },
-      "notes": "Fedora 42 Server on BIOS (pc), installed with bootstrap-kickstart from the Server netinst and the release's Everything repository in the archive: @core, sshd, sudo and the guest agent, multi-user target. The pair covers both firmware paths of anaconda (debian-bios/debian-efi do the same for d-i). Born experimental (2026-09-30): vmctl check-vms fedora-server runs one.",
+      "notes": "Fedora 42 Server on BIOS (pc), installed with bootstrap-kickstart from the Server netinst and the release's Everything repository in the archive: @core, sshd, sudo and the guest agent, multi-user target. The pair covers both firmware paths of anaconda (debian-bios/debian-efi do the same for d-i). First live PASS 2026-09-30 (398 s).",
       "firmware": {
         "type": "bios"
       },
@@ -164,8 +165,9 @@
       "meta": {
         "slug": "fedora-server",
         "role": "server",
-        "status": "experimental",
-        "version": "1.1.0"
+        "status": "unattended",
+        "version": "1.1.0",
+        "verified": "2026-09-30"
       },
       "iso": "isos/Fedora-Server-netinst-x86_64-42-1.1.iso",
       "iso_url": "https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso",
@@ -199,7 +201,7 @@
           "[ -d /sys/firmware/efi ]"
         ]
       },
-      "notes": "Fedora 42 Server on UEFI (q35 + OVMF), installed with bootstrap-kickstart from the Server netinst and the release's Everything repository in the archive: @core, sshd, sudo and the guest agent, multi-user target. The pair covers both firmware paths of anaconda (debian-bios/debian-efi do the same for d-i). Born experimental (2026-09-30): vmctl check-vms fedora-server-efi runs one."
+      "notes": "Fedora 42 Server on UEFI (q35 + OVMF), installed with bootstrap-kickstart from the Server netinst and the release's Everything repository in the archive: @core, sshd, sudo and the guest agent, multi-user target. The pair covers both firmware paths of anaconda (debian-bios/debian-efi do the same for d-i). First live PASS 2026-09-30 (389 s)."
     },
     "fedora-workstation": {
       "name": "Fedora Workstation 42 (kickstart)",
