@@ -2924,14 +2924,8 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
     )
     install_qemu_args += ["-cdrom", str(iso_path)]
 
-    locale = cfg_obj.get("locale", "en_US.UTF-8")
-    keymap = cfg_obj.get("keyboard_layout", "us")
-    language = cfg_obj.get("language", "en")
-    country = cfg_obj.get("country", "US")
-    append_str = preseed.PRESEED_KERNEL_APPEND.format(
-        locale=locale, language=language, country=country, keymap=keymap,
-    )
-    
+    append_str = preseed.kernel_append(vm)
+
     install_qemu_args += [
         "-kernel", str(kernel_path),
         "-initrd", str(initrd_path),

@@ -36,6 +36,16 @@ PRESEED_KERNEL_APPEND = (
 )
 
 
+def kernel_append(vm: dict[str, Any]) -> str:
+    """The d-i kernel line: the installer's language comes from the preseed section and must
+    stay ASCII (the serial console; see config.locale_values)."""
+    cfg = preseed_config(vm) or {}
+    return PRESEED_KERNEL_APPEND.format(
+        locale=cfg.get("locale", "en_US.UTF-8"), language=cfg.get("language", "en"),
+        country=cfg.get("country", "US"), keymap=cfg.get("keyboard_layout", "us"),
+    )
+
+
 def _resolve_ssh_pubkey(vm: dict[str, Any]) -> str | None:
     ssh_cfg = vm.get("ssh_provision")
     if not isinstance(ssh_cfg, dict):
