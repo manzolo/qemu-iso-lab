@@ -367,7 +367,8 @@
         "family": "void",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "experimental",
+        "status": "unattended",
+        "verified": "2026-09-30",
         "version": "1.1.0"
       },
       "memory_mb": 3072,
@@ -389,7 +390,7 @@
           "sudo -n true && [ -L /var/service/sshd ]"
         ]
       },
-      "notes": "Void Linux (glibc, runit) with Xfce on LightDM, installed with bootstrap-void: the live ISO's kernel boots on the serial console, the host logs in as the live root (password voidlinux), mounts a seed CD and runs install.sh: GPT with EFI, ext4, xbps-install -r /mnt of base-system, Xfce, LightDM and OpenSSH from repo-default.voidlinux.org, then locale, time zone, the user with sudo and the project key, the runit services (dhcpcd, sshd, dbus, lightdm, the ttyS0 getty), LightDM autologin, GRUB for EFI. Born experimental (2026-09-30): vmctl check-vms void-xfce runs one."
+      "notes": "Void Linux (glibc, runit) with Xfce on LightDM, installed with bootstrap-void: the live ISO's kernel boots on the serial console, the host logs in as the live root (password voidlinux), mounts a seed CD and runs install.sh: GPT with EFI, ext4, xbps-install -r /mnt of base-system, Xfce, LightDM and OpenSSH from repo-default.voidlinux.org, then locale, time zone, the user with sudo and the project key, the runit services (dhcpcd, sshd, dbus, lightdm, the ttyS0 getty), LightDM autologin, GRUB for EFI. First live PASS 2026-09-30 in 376 s (the live root prompt is sh's plain \"# \")."
     },
     "opensuse-slowroll": {
       "name": "openSUSE Slowroll Xfce (AutoYaST, DVD)",
