@@ -48,6 +48,7 @@ vmctl bootstrap-windowsnt4 windows-nt4  # needs your own NT 4 ISO + CD key in lo
 vmctl check-vms --report --document [names]   # validation run that also keeps a screenshot timeline and writes one PDF per profile
 vmctl check-vms --group ubuntu [--group rhel]  # run one category instead of the whole matrix (make validate-vms GROUP="ubuntu rhel")
 vmctl media-check <vm> [<vm>...]           # a manual profile's ISO boots headless with -snapshot on a scratch disk (/tmp/vmctl-mc-<hash>/, removed: socket paths stop at 107 bytes): FAIL on an OVMF/SeaBIOS boot failure (serial, debugcon 0x402) or a screen stuck at the firmware, PASS on a graphical screen or a text-mode boot; last frame in artifacts/<vm>/logs/media-check.png
+vmctl check-vms --retry-failed N [...]     # default 1: the failed rows run again from blank disks at the end of the matrix (lifecycle.retry_failed_rows; RowCleanup.prepare_retry stashes a protected VM's disk again first); a pass on a retry is reported flaky, RETRY_NEVER failures (no ISO, SSH negotiation, profile errors) are not retried; 0 disables
 vmctl check-vms --media [...]              # the live and manual-twin profiles (mediacheck.eligible) get that check instead of a skip
 vmctl check-vms --group smoke --tracked-only  # local.json ignored (VMCTL_TRACKED_ONLY=1, row workers too): smoke once like this and once without before a full matrix
 vmctl list --groups                            # every category, its size, its members and where the membership comes from

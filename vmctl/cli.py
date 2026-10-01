@@ -490,6 +490,8 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--no-clean-first", action="store_true", help="skip the unattended/bootstrap cleanup prompt and run with existing artifacts")
     p.add_argument("--restore", action="store_true", help="stash existing VM artifacts, run the matrix on a virgin state, then restore them (non-destructive alternative to --clean-first)")
     p.add_argument("--keep", action="store_true", help="keep every row's test install on disk (by default each row removes its install when it ends; a stashed or protected VM always gets its own disk back)")
+    p.add_argument("--retry-failed", type=int, default=1, metavar="N",
+                   help="run the rows that failed again, from blank disks, up to N more times at the end of the matrix (default: 1; 0 disables); a row that passes on a retry is reported as flaky")
     p.add_argument("--media", action="store_true", help="boot the medium of every manual live profile and manual twin instead of skipping it (vmctl media-check): a PASS is a graphical screen or a text-mode boot")
     p.add_argument("--tracked-only", action="store_true", help="ignore local.json (identity, locale, per-VM overrides): the catalog as published; run the smoke group once with it and once without before a full matrix")
     p.add_argument("--keep-passed", action="store_true", help="keep the test installs of the rows that passed, remove the others")

@@ -524,6 +524,25 @@ def record(vm_name: str, vm: dict[str, Any], args: argparse.Namespace, status: s
     destination.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
 
 
+def annotate_retry(args: argparse.Namespace, vm_name: str, attempt: int, first: str, passed: bool) -> None:
+    """check-vms --retry-failed: the row's result (written by the retry) says which attempt this is
+    and what the first one hit; a row that passed only on a retry is marked flaky."""
+    directory = getattr(args, "_report_dir", None)
+    if not directory or args.dry_run:
+        return
+    path = Path(directory) / "results" / f"{vm_name}.json"
+    try:
+        result = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    result["attempt"] = attempt
+    result["first_attempt"] = first
+    result["flaky"] = passed
+    prefix = f"flaky: PASS on attempt {attempt}; attempt 1: {first}" if passed else f"failed {attempt} times; attempt 1: {first}"
+    result["detail"] = f"{prefix} | {result.get('detail', '')}"
+    path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+
+
 def record_group_row(row_id: str, name: str, primary: dict[str, Any], args: argparse.Namespace,
                      status: str, detail: str, seconds: float, flow: str) -> None:
     """A row that belongs to several profiles (a cluster check): no framebuffer of its own, so a

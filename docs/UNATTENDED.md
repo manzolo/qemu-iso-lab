@@ -1152,6 +1152,28 @@ The waiting message lists the conflicting ports. This coordination applies to
 jobs in the same `check-vms` invocation.
 
 
+### Failed rows run again by themselves (`--retry-failed`)
+
+A row that fails runs once more at the end of the matrix, from a blank disk, unless
+`--retry-failed 0`. On 2026-10-01 all five failures of the day matrix were hiccups: a mirror,
+the security archive, an SSH start. Three of them passed on a rerun by hand an hour later. Now
+the report says which kind each failure was:
+
+- **PASS** on the first attempt.
+- **flaky:** the row passed only on the retry. The detail quotes what attempt 1 hit, and the
+  summary lists these rows apart.
+- **failed N times:** the regression to read.
+
+Some failures are never retried, because they would come back identical (`RETRY_NEVER`):
+
+- a medium vmctl cannot fetch;
+- an SSH algorithm the two sides cannot agree on;
+- a profile that lacks what its flow needs.
+
+The nodes of a Proxmox cluster run are not retried either. A protected or starred VM that got
+its own disk back when its row ended is moved aside again before the retry, and a failed row
+that `--keep` left on disk is cleaned first: its logs are kept in the report.
+
 ### The smoke group twice before a full matrix
 
 `local.json` changes what the flows render: the `identity` block moves every profile to your

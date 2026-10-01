@@ -4434,6 +4434,26 @@ class RowCleanup:
         with self.lock:
             self.removed.append(name)
 
+    def prepare_retry(self, name: str) -> None:
+        """Before check-vms --retry-failed runs a failed row again: a stashed VM already got its
+        own artifacts back when the row ended, so they go aside again (the retry must never install
+        over them); a failed row --keep left on disk is cleaned, its logs kept in the report first."""
+        with self.lock:
+            was_restored = name in self.restored
+            was_kept = name in self.kept
+        if was_restored:
+            cmd_stop(argparse.Namespace(vm=name, dry_run=self.dry_run))
+            again = stash_local_test_artifacts([name], dry_run=self.dry_run)
+            with self.lock:
+                self.restored.remove(name)
+                self.stashed.update(again)
+            return
+        if was_kept:
+            with self.lock:
+                self.kept.remove(name)
+            self._keep_evidence(name, "failed")
+            restore_local_test_artifacts({}, dry_run=self.dry_run, fresh=[name])
+
     def _keep_evidence(self, name: str, status: str) -> None:
         """A row that did not pass keeps its logs in the report before its artifacts go: the
         serial log is the diagnosis (arch-2014's missing network, 2026-09-29, was read there)."""
@@ -4464,6 +4484,74 @@ class RowCleanup:
             ui.print_kv("kept", ", ".join(sorted(self.kept)))
         if self.kept_starred:
             ui.print_note(f"installed and left ready because they are in My VMs: {', '.join(sorted(self.kept_starred))}")
+
+
+# A failure that would come back identical is not retried: a medium vmctl cannot fetch, a profile
+# that does not define what its flow needs, an SSH algorithm the two sides cannot agree on.
+RETRY_NEVER = ("Unable to fetch ISO", "vmctl cannot download it", "Unable to negotiate", "does not define")
+RETRY_NOTE = "PASS on attempt {attempt} (flaky); attempt 1 failed: {first}"
+
+
+def retry_candidates(results: list[tuple[str, str, str]], deferred: set[str]) -> list[str]:
+    return [name for name, status, detail in results
+            if status == "failed" and name not in deferred and not any(text in detail for text in RETRY_NEVER)]
+
+
+def retry_failed_rows(results: list[tuple[str, str, str]], cfg: dict[str, Any], args: argparse.Namespace,
+                      cleanup: RowCleanup, matrix_scheduler: scheduler.DynamicScheduler | None,
+                      parallel: int | None) -> None:
+    """check-vms --retry-failed N: the rows that failed run again, from blank disks, at the end of
+    the matrix. On 2026-10-01 every failure of the day matrix was a hiccup of a mirror or of the
+    security archive and three of five passed on a rerun by hand the next hour; a row that passes
+    on a later attempt is reported as flaky, one that fails every time is the regression to read."""
+    rounds = max(0, int(getattr(args, "retry_failed", 0) or 0))
+    for attempt in range(2, rounds + 2):
+        names = retry_candidates(results, cleanup.deferred)
+        if not names:
+            return
+        ui.print_header(f"Retry the failed rows (attempt {attempt})")
+        ui.print_kv("profiles", ", ".join(names))
+        first = {name: detail for name, status, detail in results if name in names}
+        for name in names:
+            cleanup.prepare_retry(name)
+        retried: dict[str, tuple[str, str]] = {}
+        if parallel == 1 or matrix_scheduler is None:
+            for name in names:
+                status = "failed"
+                try:
+                    status, detail = run_local_test_once(name, config.get_vm(cfg, name), args)
+                    retried[name] = (status, detail)
+                finally:
+                    cleanup.row_done(name, status)
+        else:
+            def row(name: str) -> tuple[str, str, str]:
+                status = "failed"
+                try:
+                    outcome = run_local_test_vm_subprocess(name, args)
+                    status = outcome[0]
+                    return outcome
+                finally:
+                    cleanup.row_done(name, status)
+            jobs = [(name, scheduler.vm_cost(config.get_vm(cfg, name))) for name in names]
+            for name, outcome in matrix_scheduler.run(jobs, row):
+                if isinstance(outcome, BaseException):
+                    retried[name] = ("failed", str(outcome))
+                    continue
+                status, detail, output = outcome
+                if output:
+                    print(output, end="" if output.endswith("\n") else "\n")
+                retried[name] = (status, detail)
+        for index, (name, status, detail) in enumerate(results):
+            if name not in retried:
+                continue
+            new_status, new_detail = retried[name]
+            summary = first[name].splitlines()[0][:300] if first[name] else ""
+            if new_status == "passed":
+                new_detail = RETRY_NOTE.format(attempt=attempt, first=summary)
+            else:
+                new_detail = f"{new_detail} (failed {attempt} times; attempt 1: {summary})"
+            results[index] = (name, new_status, new_detail)
+            report.annotate_retry(args, name, attempt, summary, new_status == "passed")
 
 
 MATRIX_LOCK = ".check-vms.lock"
@@ -4639,6 +4727,7 @@ def cmd_test_local(args: argparse.Namespace) -> int:
                         print(output, end="" if output.endswith("\n") else "\n")
                     results.append((vm_name, status, detail))
                 ui.print_kv("peak concurrency", str(matrix_scheduler.peak_running))
+            retry_failed_rows(results, cfg, args, cleanup, matrix_scheduler, parallel)
             # On the rows' own disks, before --restore puts the stashed ones back.
             run_cluster_checks(cfg, selected_names, results, args)
         finally:
@@ -4655,9 +4744,10 @@ def cmd_test_local(args: argparse.Namespace) -> int:
     passed = sum(1 for _, status, _ in results if status == "passed")
     failed = sum(1 for _, status, _ in results if status == "failed")
     skipped = sum(1 for _, status, _ in results if status == "skipped")
+    flaky = [name for name, status, detail in results if status == "passed" and "(flaky)" in detail]
 
     ui.print_header("Local VM test summary")
-    ui.print_kv("passed", str(passed))
+    ui.print_kv("passed", str(passed) + (f" ({len(flaky)} only on a retry: {', '.join(flaky)})" if flaky else ""))
     ui.print_kv("failed", str(failed))
     ui.print_kv("skipped", str(skipped))
 
