@@ -2173,9 +2173,14 @@
       ]
     },
     "xubuntu-12.04": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:b7014e956e2d1cd960f9ba25df787f4673c3af0e898a889867ae8967ea32f867",
+      "version": "1.0.2",
+      "fingerprint": "sha256:72b5cadf4975eb2f989587ba47e74ba376a1723d97798455db8ed949d80d283e",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-10-01",
+          "note": "the stale precise Release of the CD's base removed, precise-security on old-releases, conffiles kept"
+        },
         {
           "version": "1.0.1",
           "date": "2026-10-01",
