@@ -367,6 +367,32 @@ class ReportHousekeepingTests(BaseVmctlTestCase):
         self.assertTrue(any(line.startswith("Would free") for line in lines), lines)
         self.assertTrue(matrix.exists())
 
+    def test_the_latest_full_matrix_survives_newer_one_row_reruns(self):
+        # 2026-10-01: five one-row reruns pushed the night's 173-row matrix out of --keep 5
+        base = self.root / "artifacts/check-vms"
+        old_matrix = self.make_report("20260929-000000", rows=report.FULL_MATRIX_ROWS, age_sec=3 * 86400)
+        matrix = self.make_report("20260930-000000", rows=report.FULL_MATRIX_ROWS + 5, age_sec=2 * 86400)
+        reruns = [self.make_report(f"20261001-00000{i}", rows=1, age_sec=86400 - i * 60) for i in range(3)]
+        removed, _ = report.prune_reports(1, base=base, now=1_000_000.0)
+        self.assertTrue(matrix.exists(), "the latest full matrix is kept whatever --keep says")
+        self.assertFalse(old_matrix.exists(), "only the latest one")
+        self.assertTrue(reruns[-1].exists())
+        self.assertEqual(sorted(d for d, _ in removed), sorted([old_matrix, reruns[0], reruns[1]]))
+
+    def test_the_command_lists_and_asks_before_deleting(self):
+        old = self.make_report("20260901-000000", rows=2, age_sec=86400)
+        self.make_report("20260914-000000")
+        args = argparse.Namespace(keep=1, older_than=None, dry_run=False, yes=False)
+        with mock.patch.object(lifecycle.runtime, "confirm_default_no", return_value=False), \
+             mock.patch.object(lifecycle.ui, "print_note"):
+            with self.assertRaises(lifecycle.VMError):
+                lifecycle.cmd_clean_reports(args)
+        self.assertTrue(old.exists(), "not confirmed: nothing is removed")
+        args.yes = True
+        with mock.patch.object(lifecycle.ui, "print_note"), mock.patch.object(lifecycle.ui, "print_status"):
+            self.assertEqual(lifecycle.cmd_clean_reports(args), 0)
+        self.assertFalse(old.exists())
+
     def test_finished_report_points_at_the_cleanup_only_when_it_is_worth_it(self):
         base = self.root / "artifacts/check-vms"
         self.make_report("20260914-000000", payload=b"x" * 4096)

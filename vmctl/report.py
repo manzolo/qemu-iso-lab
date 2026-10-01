@@ -359,6 +359,7 @@ def latest_report_dir() -> Path:
 
 # Housekeeping. One full matrix costs 50-80 MB (the HTML embeds every screenshot it shows) and
 # --document adds the timeline frames on top, so a directory of reports grows by a run a day.
+FULL_MATRIX_ROWS = 50  # a report this large is a matrix, kept whatever --keep says
 REPORT_ACTIVE_SEC = 600.0
 REPORTS_SIZE_HINT = 1024 ** 3
 
@@ -398,13 +399,27 @@ def discover_reports(base: Path | None = None) -> list[Path]:
     return sorted(found, key=lambda directory: (report_modified(directory), str(directory)))
 
 
+def report_rows(directory: Path) -> int:
+    return len(list((directory / "results").glob("*.json")))
+
+
+def latest_full_matrix(reports: list[Path]) -> Path | None:
+    """The newest report with at least FULL_MATRIX_ROWS rows (the reports come oldest first)."""
+    return next((directory for directory in reversed(reports) if report_rows(directory) >= FULL_MATRIX_ROWS), None)
+
+
 def prune_reports(keep: int, older_than_days: float | None = None, *, base: Path | None = None,
                   now: float | None = None, dry_run: bool = False) -> tuple[list[tuple[Path, int]], list[Path]]:
-    """Remove old reports, keeping the newest `keep` of them and anything still being written."""
+    """Remove old reports, keeping the newest `keep` of them, the latest full matrix and anything
+    still being written. --keep counts reports, not rows: on 2026-10-01 five one-row reruns of the
+    morning pushed the night's 173-row matrix (3 GB) out of `--keep 5` and it was deleted."""
     root = reports_root(base)
     reports = discover_reports(base)
     moment = time.time() if now is None else now
     protected = set(reports[len(reports) - keep:]) if keep > 0 else set()
+    full = latest_full_matrix(reports)
+    if full is not None:
+        protected.add(full)
     removed: list[tuple[Path, int]] = []
     active: list[Path] = []
     for directory in reports:

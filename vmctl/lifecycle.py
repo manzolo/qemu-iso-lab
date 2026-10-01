@@ -4242,6 +4242,15 @@ def cmd_clean_reports(args: argparse.Namespace) -> int:
     total = report.discover_reports()
     ui.print_kv("reports", str(len(total)))
     ui.print_kv("policy", f"keep the {keep} newest" + (f", remove what is older than {older_than} days" if older_than else ""))
+    full = report.latest_full_matrix(total)
+    if full is not None:
+        ui.print_kv("kept", f"{ui.pretty_path(full)} (the latest full matrix, {report.report_rows(full)} rows)")
+    # Show first, then ask: the deletion is immediate and cannot be undone.
+    planned, _ = report.prune_reports(keep, older_than, dry_run=True)
+    if planned and not args.dry_run:
+        for directory, size in planned:
+            ui.print_note(f"  {ui.pretty_path(directory)} ({report.report_rows(directory)} rows, {runtime.format_bytes(size)})")
+        confirm_or_yes(args, f"Remove these {len(planned)} report(s), {runtime.format_bytes(sum(s for _, s in planned))}?")
     removed, active = report.prune_reports(keep, older_than, dry_run=args.dry_run)
     for directory in active:
         ui.print_note(f"Written less than {int(report.REPORT_ACTIVE_SEC / 60)} minutes ago, kept: {ui.pretty_path(directory)}")

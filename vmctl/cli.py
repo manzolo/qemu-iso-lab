@@ -624,6 +624,7 @@ NixOS. A failure leaves the origin untouched and publishes no clone. See docs/CL
     p.add_argument("--keep", type=int, default=5, help="how many of the newest reports to keep (default: 5)")
     p.add_argument("--older-than", type=int, metavar="DAYS", help="remove only reports older than DAYS days")
     p.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS, help="list what would be removed without deleting it")
+    p.add_argument("--yes", action="store_true", help="remove without asking (the list is printed first; the latest full matrix is always kept)")
     p.set_defaults(func=lifecycle.cmd_clean_reports)
 
     p = _add(subparsers, "clean-stale", help="remove stale runtime state such as dead bootstrap PID files")
