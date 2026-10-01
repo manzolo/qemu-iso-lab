@@ -3,13 +3,17 @@ name: Catalog site
 # The catalog as a static page (https://manzolo.github.io/qemu-iso-lab/): every tracked profile,
 # its version and history, the commands to run. Built by tools/build_catalog_site.py from the
 # profiles and the lock, nothing else; needs no VM, ISO or QEMU. Pages source: GitHub Actions.
+# The install clips live on the orphan branch "media" (one commit, force-pushed by
+# tools/collect_media.py --publish) and are checked out into docs/media/ here.
 on:
   push:
-    branches: [main]
+    branches: [main, media]
     paths:
       - "vms/profiles/**"
       - "vms/profiles.lock"
-      - "docs/media/**"
+      - "**/recording.gif"
+      - "**/recording.mp4"
+      - "**/poster.png"
       - "tools/build_catalog_site.py"
       - "vmctl/web/icons.js"
       - "vmctl/web/distro-icons.svg"
@@ -32,6 +36,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: main
+      - name: Checkout the clips (branch media)
+        uses: actions/checkout@v6
+        with:
+          ref: media
+          path: docs/media
       - name: Python
         uses: actions/setup-python@v6
         with:
