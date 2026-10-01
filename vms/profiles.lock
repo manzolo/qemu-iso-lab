@@ -1847,9 +1847,14 @@
       ]
     },
     "ubuntu-budgie-20.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:9501a2ab765fe3f2984faeee787d21766f176f2b1daf37926df58d946d18910f",
+      "version": "1.0.1",
+      "fingerprint": "sha256:7e543dcd5a5cc388bc692806344b4bc884f401a6b511689256cba7df6a7614c1",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "security pocket skipped during the install, enabled again after (run_unattended_upgrades failed twice)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2247,9 +2252,14 @@
       ]
     },
     "xubuntu-20.04": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:7469c4a86a2cae2ed5cbeb6c5958163794ef125763250bdd0e56680823cb2852",
+      "version": "1.0.2",
+      "fingerprint": "sha256:eaa797eb431dfc829f2cdf1897439db6bb6a306de680be2677bdc526b9698b27",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-10-01",
+          "note": "security pocket skipped during the install, enabled again after (run_unattended_upgrades failed twice)"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-28",
