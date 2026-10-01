@@ -40,3 +40,13 @@ sudo systemctl enable nvidia-suspend nvidia-hibernate nvidia-resume
 test -s /etc/modprobe.d/nvidia.conf
 test -s /etc/mkinitcpio.conf.d/nvidia.conf
 dkms status | grep -q nvidia
+
+# Omarchy turns SDDM autologin on only with disk encryption (the LUKS password is the login then):
+# this lab profile installs with encrypt false and stopped at the Omarchy-themed SDDM greeter, so a
+# row passed while its last screen was a password box (2026-09-30). Log the user into the UWSM
+# Hyprland session, then let SDDM pick the drop-in up.
+autologin_cfg="$(mktemp)"
+printf '[Autologin]\nUser=%s\nSession=hyprland-uwsm\n' "$(id -un)" > "$autologin_cfg"
+sudo install -D -m 0644 "$autologin_cfg" /etc/sddm.conf.d/50-vmctl-autologin.conf
+rm -f "$autologin_cfg"
+sudo systemctl restart sddm

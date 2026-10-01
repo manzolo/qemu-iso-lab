@@ -806,7 +806,7 @@
         "release_model": "rolling",
         "status": "experimental",
         "verified": "2026-09-09",
-        "version": "1.0.0"
+        "version": "1.1.0"
       },
       "iso": "isos/omarchy-4.0.2.iso",
       "iso_url": "https://iso.omarchy.org/omarchy-4.0.2.iso",
@@ -884,16 +884,23 @@
             "source": "vms/profile-files/arch-omarchy-nvidia/bin/arch-omarchy-nvidia-post-install",
             "dest": "/home/{{user}}/bin/arch-omarchy-nvidia-post-install",
             "dest_mode": "755"
+          },
+          {
+            "source": "vms/profile-files/common/bin/verify-desktop",
+            "dest": "/home/{{user}}/bin/verify-desktop",
+            "dest_mode": "755"
           }
         ],
         "post_install_run": [
           "~/bin/arch-omarchy-nvidia-post-install",
+          "~/bin/verify-desktop --user \"{{user}}\" --service display-manager.service --package-manager pacman --package hyprland --compositor Hyprland --process quickshell",
           "omarchy version || true",
           "Hyprland --version || true",
           "pacman -Q nvidia-open-dkms nvidia-utils && dkms status",
           "nvidia-smi 2>/dev/null || echo 'nvidia-smi: no NVIDIA GPU in this VM (expected; the driver is here for bare metal)'"
         ]
-      }
+      },
+      "notes": " The post-install turns SDDM autologin on into hyprland-uwsm (Omarchy does it only with disk encryption: the first runs ended on the SDDM greeter) and verify-desktop checks the Wayland session, Hyprland and the quickshell bar (2026-10-01)."
     }
   }
 }

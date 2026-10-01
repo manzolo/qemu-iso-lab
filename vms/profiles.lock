@@ -219,9 +219,14 @@
       ]
     },
     "arch-omarchy-nvidia": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:53a3eed8c2fb6e8461d59257759372853c6c321e0fbf967dac169b846e072ef9",
+      "version": "1.1.0",
+      "fingerprint": "sha256:c3034f58c224e08707dd087763b8a33d5d0819e741dd5f6ad6125bdd74689926",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-01",
+          "note": "SDDM autologin into hyprland-uwsm and a verify-desktop check (it stopped at the greeter)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
