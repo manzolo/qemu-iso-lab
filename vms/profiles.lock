@@ -893,9 +893,14 @@
       ]
     },
     "kubuntu-12.04": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:61e0c02ec6da9c77c7543271078ede87473c857d6cd5be62730b821fe75dca12",
+      "version": "1.0.2",
+      "fingerprint": "sha256:3c8a2cc0b9c0ed8d3f67a0dfdeb36d92e2107bb9fcfd377136368d660e4864da",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-10-01",
+          "note": "KDM autologin (Kubuntu 12.04 still ships KDM)"
+        },
         {
           "version": "1.0.1",
           "date": "2026-10-01",

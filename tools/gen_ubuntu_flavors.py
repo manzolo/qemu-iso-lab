@@ -45,7 +45,7 @@ FLAVOURS: dict[str, dict[str, Any]] = {
                 "session": "xubuntu", "screensaver": "xfce"},
     # KDE 3 on 8.04, KDE 4 with kdm on 10.04, LightDM on 12.04/14.04 (kde-plasma), SDDM from 15.04.
     "kubuntu": {"label": "Kubuntu", "desktop": "KDE", "package": "kubuntu-desktop", "process": "ksmserver",
-                "releases": RELEASES, "dm": {"8.04": "kdm", "10.04": "kdm", "12.04": L, "14.04": L, "16.04": "sddm", "18.04": "sddm",
+                "releases": RELEASES, "dm": {"8.04": "kdm", "10.04": "kdm", "12.04": "kdm", "14.04": L, "16.04": "sddm", "18.04": "sddm",
                                              "20.04": "sddm", "22.04": "sddm", "26.04": "sddm"},
                 "session": {"8.04": "kde", "10.04": "kde", "12.04": "kde-plasma", "14.04": "kde-plasma", "default": "plasma"},
                 "screensaver": ""},
