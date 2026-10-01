@@ -1,0 +1,37 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:14.922
+A database is easier to understand once you have queried a real one. The MySQL lab is one server with MySQL 8, a small shop database already loaded, and phpMyAdmin to see it in the browser.
+
+00:00:15.022 --> 00:00:43.883
+One cloud image; the install adds MySQL, Apache and phpMyAdmin, and loads the sample data.
+
+00:00:43.983 --> 00:01:35.290
+The service runs, and root logs in through the socket with no password. testdb holds two tables, users and orders; the lab account reads its password from my.cnf.
+
+00:01:35.390 --> 00:01:51.100
+SELECT reads, WHERE filters, ORDER BY sorts: the most expensive order first.
+
+00:01:51.200 --> 00:02:20.102
+JOIN matches each order to its user. LEFT JOIN keeps every user, even Dana, who never ordered: NULL where nothing matches. GROUP BY folds the orders into totals.
+
+00:02:20.202 --> 00:02:42.583
+Inside a transaction the new row is there, but nothing is final: ROLLBACK takes it back. And the foreign key refuses to delete a user who still has orders.
+
+00:02:42.683 --> 00:03:09.082
+An account gets exactly what it needs: reader may SELECT from testdb and nothing else. The INSERT is denied.
+
+00:03:09.182 --> 00:03:35.982
+A second database, testlab, with a students table. EXPLAIN shows how a query runs: every row read before the index, straight to the match after it.
+
+00:03:36.082 --> 00:04:04.145
+mysqldump writes the database as SQL statements. Drop the table, read the file back, and the table is there again.
+
+00:04:04.245 --> 00:04:24.108
+The same data in the browser: phpMyAdmin, forwarded to the host. Log in as labuser and open the users table.
+
+00:04:24.208 --> 00:04:39.265
+Six tests, one per exercise, each leaving the database as the lab hands it to you.
+
+00:04:39.365 --> 00:04:48.742 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

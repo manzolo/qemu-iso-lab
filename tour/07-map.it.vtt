@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:09.450
+Un lab acceso è anche una rete. Questo è il netlab: un router pfSense, un Pi-hole e un client su un segmento privato.
+
+00:00:09.550 --> 00:00:20.264
+Map disegna la topologia dal vivo: l'host con i suoi inoltri, le macchine, il segmento isolato in basso.
+
+00:00:20.364 --> 00:00:27.779
+I cavi si accendono solo con il traffico misurato, e ogni porta mostra i suoi byte al secondo.
+
+00:00:27.879 --> 00:00:37.650
+La lente su un cavo apre l'ispettore dei pacchetti: ogni riga è un frame visto su quel cavo, con protocollo, indirizzi e porte.
+
+00:00:37.750 --> 00:00:48.547
+Facciamo una richiesta web dal client al Pi-hole, dal terminale dell'host.
+
+00:00:48.647 --> 00:00:54.193
+Eccola sul cavo: TCP verso la porta ottanta, mentre succede.
+
+00:00:54.293 --> 00:01:02.406
+I filtri restringono la lista: solo TCP, o solo ciò che riguarda la porta ottanta.
+
+00:01:02.506 --> 00:01:06.515
+Pausa ferma la lista; la cattura continua.
+
+00:01:06.615 --> 00:01:20.732
+Un clic sulla riga apre il pacchetto: Ethernet, IP, TCP, campo per campo, e i byte delle intestazioni. Il contenuto non viene mai registrato.
+
+00:01:20.832 --> 00:01:29.646
+Lo stesso per ogni lab, e per due macchine unite con vmctl link.

@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:10.637
+Say you want to try firewall rules: a router, a server behind it, a client. Not in the catalog? Make it your own lab.
+
+00:00:10.737 --> 00:00:19.582
+One command names the lab and its members, each built on a catalog base. First a dry run…
+
+00:00:19.682 --> 00:00:28.897
+…which shows what it would cost: memory, CPUs, disk, the private network and the SSH ports it picked.
+
+00:00:28.997 --> 00:00:36.675
+For real now. Nothing in the repository changes: the profiles go in your private local.json…
+
+00:00:36.775 --> 00:00:44.693
+…and the lab gets its own folder: a guide in two languages, the exercises, and tests that check them.
+
+00:00:44.793 --> 00:00:53.132
+In the dashboard it is a lab like the others: its card appears next to the catalog's.
+
+00:00:53.232 --> 00:01:18.693
+Install lab: three cloud images, a couple of minutes each.
+
+00:01:18.793 --> 00:01:39.627
+Run tests: every member reaches the others on the private network, and the Internet through its own NAT.
+
+00:01:39.727 --> 00:01:48.642
+Now the laboratory part. Add an exercise to lab.json: a rule on the router that drops ping from the client…
+
+00:01:48.742 --> 00:02:08.272
+…and a test that installs nftables, applies the rule and expects the ping to fail. Run it: the rule works.
+
+00:02:08.372 --> 00:02:19.049 line:6%
+Add machines, exercises and tests as you go; group remove takes the lab away when you are done.

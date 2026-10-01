@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:29.834
+Last episode: moving data. On the pool, the web dataset with its small site; the disks in DISKS, as in episode one, for the cleanup at the end.
+
+00:00:29.934 --> 00:00:51.203
+zfs send turns a snapshot into a stream of bytes, and zfs receive builds a dataset out of it. Here the copy lands in the same pool; on a real network the stream crosses ssh to another machine.
+
+00:00:51.303 --> 00:01:11.476
+The second time, send only the difference between two snapshots, with -i. The dry run with -nv estimates the size first: a few kilobytes instead of the whole dataset.
+
+00:01:11.576 --> 00:01:26.859
+The backup has the new page and both snapshots: that is how ZFS backups and replication work. Proxmox does exactly this every minute, in the Proxmox lab.
+
+00:01:26.959 --> 00:01:37.937
+A whole pool moves too. zpool export closes it and marks it free: the disks could now go into another server.
+
+00:01:38.037 --> 00:02:02.393
+zpool import with no name searches the disks and lists the pools it finds. Import it under another name: tank comes back as archive, with all its datasets.
+
+00:02:02.493 --> 00:02:19.623
+The end of the course: destroy the pool and wipe the labels, and the four disks are empty again, as the lab started.
+
+00:02:19.723 --> 00:02:37.233
+And the lab's own tests confirm it: seven scripts, all green.
+
+00:02:37.333 --> 00:02:46.866 line:6%
+Every command of the course is in the ZFS lab's guide, in English and Italian.

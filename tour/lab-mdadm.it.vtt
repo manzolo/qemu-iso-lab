@@ -1,0 +1,46 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.205
+Il RAID tiene i tuoi dati quando un disco muore. mdadm è il RAID software del kernel Linux, senza controller. Il lab mdadm è un server con quattro dischi vuoti: costruiamo array, li rompiamo e li guardiamo guarire.
+
+00:00:17.305 --> 00:00:40.675
+Una cloud image più quattro dischi da 2 gigabyte.
+
+00:00:40.775 --> 00:01:25.986
+I quattro dischi del lab, scelti per dimensione in una variabile, DISKS; set dà loro nomi brevi, da dollaro uno a dollaro quattro.
+
+00:01:26.086 --> 00:01:42.874
+/proc/mdstat è il cruscotto: i livelli RAID che il kernel sa gestire, e ancora nessun array. I nostri array usano solo 256 megabyte di ogni disco, così ogni sincronizzazione dura pochi secondi.
+
+00:01:42.974 --> 00:01:57.887
+Un mirror: due dischi, ogni blocco scritto su entrambi. La prima sincronizzazione copia un disco sull'altro; U U vuol dire che i membri sono su entrambi. L'array è un dispositivo a blocchi come un altro.
+
+00:01:57.987 --> 00:02:12.916
+Formattalo, montalo, scrivici un file.
+
+00:02:13.016 --> 00:02:29.648
+Ora un disco muore: segnalo guasto. L'array è degradato, U trattino, e il file si legge ancora.
+
+00:02:29.748 --> 00:02:44.707
+Togli il membro morto, aggiungi un disco, e il kernel ricostruisce il mirror sopra: di nuovo U U.
+
+00:02:44.807 --> 00:03:17.596
+RAID5: dati e parità distribuiti su tre dischi, lo spazio di due, uno qualsiasi può guastarsi. Il quarto disco è dichiarato spare a caldo e aspetta.
+
+00:03:17.696 --> 00:03:41.556
+Fai fallire un membro, e nessuno deve essere sveglio: la ricostruzione sullo spare parte da sola. Di nuovo tre dispositivi attivi, il file intatto.
+
+00:03:41.656 --> 00:04:11.533
+Allargalo a caldo: il disco guasto torna come nuovo membro e l'array si rimodella da tre dispositivi a quattro, restando montato. resize2fs prende lo spazio nuovo.
+
+00:04:11.633 --> 00:04:38.071
+detail scan stampa la riga che mdadm.conf vuole per il prossimo boot. Ferma l'array, riassemblalo dai superblocchi sui suoi membri: il file c'è.
+
+00:04:38.171 --> 00:04:56.215
+Azzerare i superblocchi è ciò che chiude un array. Di nuovo quattro dischi vuoti.
+
+00:04:56.315 --> 00:05:13.071
+I sei test del lab rifanno tutto, aspettando ogni sincronizzazione, e lasciano i dischi vuoti.
+
+00:05:13.171 --> 00:05:22.486 line:6%
+Ogni comando è nella guida, in inglese e in italiano, dalla card del lab.

@@ -1,0 +1,49 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:15.061
+Kubernetes runs containers on many machines as if they were one. To learn it you need a real cluster: the k8s lab is three virtual machines with MicroK8s, a control plane and two workers.
+
+00:00:15.161 --> 00:01:27.386
+One command installs the three of them: a cloud image each, with the MicroK8s snap.
+
+00:01:27.486 --> 00:01:42.763
+Then they start on their own network segment, and the workers join the control plane by themselves. Nothing to type.
+
+00:01:42.863 --> 00:02:06.503
+Three nodes, ready. In kube-system run the cluster's own pods: Calico, the pod network, one on every node, and CoreDNS. The NODE column says where each one runs.
+
+00:02:06.603 --> 00:02:24.073
+A Deployment keeps three nginx pods running, and the scheduler spreads them over the nodes.
+
+00:02:24.173 --> 00:02:49.890
+A NodePort Service opens port 30080 on every node: ask node one or node two, nginx answers from both.
+
+00:02:49.990 --> 00:02:57.366
+The control plane's port is forwarded to the host: the same page, in the browser.
+
+00:02:57.466 --> 00:03:40.053
+A new image starts a rolling update: new pods in, old pods out, a few at a time. Every change is a revision, and rollout undo goes back.
+
+00:03:40.153 --> 00:04:18.019
+Maintenance on a node: drain it. Its pods are evicted and recreated on the other two. Uncordon gives it back to the scheduler.
+
+00:04:18.119 --> 00:04:59.925
+Configuration lives outside the image. A ConfigMap and a Secret reach the pod as variables and as files.
+
+00:05:00.025 --> 00:05:19.072
+And a Secret is only base64: anyone who may read it decodes it in one command. It is not encryption.
+
+00:05:19.172 --> 00:05:52.891
+A pod's files die with it. A persistent volume claim does not: MariaDB keeps its data on a volume of its own.
+
+00:05:52.991 --> 00:06:18.372
+Write a row from the MariaDB client. Then delete the pod: the Deployment starts a new one, on the same volume.
+
+00:06:18.472 --> 00:06:43.057
+A new pod, and the row is still there.
+
+00:06:43.157 --> 00:07:05.721
+Six tests, one per exercise, and each leaves the cluster as it found it.
+
+00:07:05.821 --> 00:07:15.183 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

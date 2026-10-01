@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:06.559
+La macchina è accesa. Open console mostra il suo schermo direttamente nel browser.
+
+00:00:06.659 --> 00:00:17.888
+È uno schermo con una tastiera vera: si entra con l'utente scelto all'inizio.
+
+00:00:17.988 --> 00:00:27.894
+Keyboard manda le combinazioni che il browser si terrebbe: Ctrl+Alt+Canc, i tasti funzione, gli altri terminali.
+
+00:00:27.994 --> 00:00:41.130
+SSH apre un vero terminale accanto allo schermo, con la chiave del progetto: senza password.
+
+00:00:41.230 --> 00:00:49.287
+Files sfoglia le cartelle della macchina: si trascinano i file per caricarli, si clicca per scaricarli.
+
+00:00:49.387 --> 00:00:58.162
+Screenshot, registrazione e la console in una finestra a parte sono a un clic.
+
+00:00:58.262 --> 00:01:06.200
+Prossimo passo: un lab con due macchine sulla loro rete.

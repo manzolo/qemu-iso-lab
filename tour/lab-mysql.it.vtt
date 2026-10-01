@@ -1,0 +1,37 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:14.922
+Un database si capisce meglio dopo averne interrogato uno vero. Il lab MySQL è un server con MySQL 8, un piccolo database di un negozio già caricato, e phpMyAdmin per vederlo nel browser.
+
+00:00:15.022 --> 00:00:43.883
+Una cloud image; l'installazione aggiunge MySQL, Apache e phpMyAdmin, e carica i dati di esempio.
+
+00:00:43.983 --> 00:01:35.290
+Il servizio gira, e root entra dal socket senza password. testdb contiene due tabelle, users e orders; l'account del lab legge la sua password da my.cnf.
+
+00:01:35.390 --> 00:01:51.100
+SELECT legge, WHERE filtra, ORDER BY ordina: prima l'ordine più caro.
+
+00:01:51.200 --> 00:02:20.102
+JOIN abbina ogni ordine al suo utente. LEFT JOIN tiene tutti gli utenti, anche Dana, che non ha mai ordinato: NULL dove non c'è corrispondenza. GROUP BY riduce gli ordini a totali.
+
+00:02:20.202 --> 00:02:42.583
+Dentro una transazione la nuova riga c'è, ma niente è definitivo: ROLLBACK la annulla. E la chiave esterna rifiuta di cancellare un utente che ha ancora degli ordini.
+
+00:02:42.683 --> 00:03:09.082
+Un account riceve esattamente ciò che gli serve: reader può fare SELECT su testdb e nient'altro. L'INSERT viene negato.
+
+00:03:09.182 --> 00:03:35.982
+Un secondo database, testlab, con una tabella students. EXPLAIN mostra come viene eseguita una query: ogni riga letta prima dell'indice, dritto al risultato dopo.
+
+00:03:36.082 --> 00:04:04.145
+mysqldump scrive il database come istruzioni SQL. Cancelliamo la tabella, rileggiamo il file, e la tabella torna.
+
+00:04:04.245 --> 00:04:24.108
+Gli stessi dati nel browser: phpMyAdmin, inoltrato all'host. Entra come labuser e apri la tabella users.
+
+00:04:24.208 --> 00:04:39.265
+Sei test, uno per esercizio, e ognuno lascia il database come il lab te lo consegna.
+
+00:04:39.365 --> 00:04:48.742 line:6%
+Ogni comando è nella guida, in inglese e in italiano, dalla card del lab.

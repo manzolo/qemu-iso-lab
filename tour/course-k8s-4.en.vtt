@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:22.538
+Episode four: where the application keeps its files. An object store speaks S3, the protocol of Amazon's storage: buckets and objects over HTTP. The best known one to run yourself was MinIO; in 2025 it stopped publishing its images, so we use RustFS, which speaks the same S3.
+
+00:00:22.638 --> 00:00:37.750
+First the keys. A Secret holds credentials apart from the manifests: here an access key and a secret key.
+
+00:00:37.850 --> 00:00:47.662
+Careful: a Secret is only encoded in base64, not encrypted. Whoever may read Secrets in the namespace reads the password.
+
+00:00:47.762 --> 00:01:04.689
+The RustFS manifest takes the two keys from the Secret as environment variables, asks for a one-gigabyte volume, and publishes two Services: the S3 API inside the cluster, and the web console on NodePort 30081.
+
+00:01:04.789 --> 00:01:20.267
+Redis and RustFS run side by side on the control plane, each with its claim.
+
+00:01:20.367 --> 00:01:39.652
+The lab forwards the console to the host. We log in with the keys of the Secret: no bucket yet. The application will create its own.
+
+00:01:39.752 --> 00:01:49.559 line:6%
+Next episode: the application itself, on three pods, and in the browser.

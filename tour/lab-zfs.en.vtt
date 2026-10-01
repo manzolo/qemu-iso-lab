@@ -1,0 +1,40 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.386
+ZFS is the volume manager and the file system in one: a pool of disks, file systems cut from it, a checksum on every block. The ZFS lab is one server with four empty disks to pool, break a little, and wipe.
+
+00:00:17.486 --> 00:00:32.376
+One cloud image plus four 2-gigabyte disks; the install loads the zfs module and the tools.
+
+00:00:32.476 --> 00:01:13.636
+The four lab disks, picked by size into a variable, DISKS, never by name; set gives them short names, dollar one to dollar four. No pool yet.
+
+00:01:13.736 --> 00:01:32.058
+One command makes the pool: RAIDZ over the four disks, data striped with one disk of parity, any one may fail. It is already mounted at /tank: no partitions, no mkfs, no fstab.
+
+00:01:32.158 --> 00:01:45.230
+A dataset is a file system cut from the pool, with its own properties and no size to decide. Turn on lz4 compression and copy the system's documentation into it…
+
+00:01:45.330 --> 00:01:57.530
+…and the compression ratio says how much less of it reached the disk. That is free.
+
+00:01:57.630 --> 00:02:22.960
+Snapshots: freeze the dataset, change a file, and zfs diff shows what moved since. Rollback puts it back as it was.
+
+00:02:23.060 --> 00:02:40.079
+Now break it. One disk goes offline: the pool is DEGRADED and keeps serving; a write still lands.
+
+00:02:40.179 --> 00:02:56.957
+The disk comes back and ZFS resilvers only the blocks it missed. Then a scrub reads every block against its checksum: repaired nothing, no known data errors.
+
+00:02:57.057 --> 00:03:16.422
+send turns a snapshot into a stream, receive makes a dataset out of it: a backup here, a replica on another machine through ssh.
+
+00:03:16.522 --> 00:03:44.173
+Last, the other layout: two mirrored pairs. Less space than RAIDZ over the same disks, but a resilver copies one whole disk at full speed. Then the disks go back empty.
+
+00:03:44.273 --> 00:04:02.120
+The lab's seven tests do all of this again and leave the disks empty for the next run.
+
+00:04:02.220 --> 00:04:11.589 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

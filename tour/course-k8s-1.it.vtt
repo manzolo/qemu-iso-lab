@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:20.265
+Un corso su Kubernetes in otto puntate, sul lab Kubernetes: tre macchine virtuali con MicroK8s. Puntata dopo puntata costruiamo una piccola applicazione, una lista della spesa con Redis e un object storage, e guardiamo i suoi pod spostarsi nel cluster.
+
+00:00:20.365 --> 00:00:36.474
+Lavoriamo sul control plane. kubectl get nodes: tre nodi, tutti Ready. Con o wide, l'indirizzo interno di ognuno sulla rete del lab, e il sistema operativo.
+
+00:00:36.574 --> 00:00:50.135
+Anche il cluster gira su dei pod. Nel namespace kube-system: calico-node, la rete, uno per nodo; CoreDNS, il DNS del cluster; e gli altri pezzi aggiuntivi del control plane.
+
+00:00:50.235 --> 00:01:01.999
+Un namespace è una stanza del cluster: nomi, permessi e quote restano lì dentro. La nostra applicazione ne ha uno suo, che si chiama shop.
+
+00:01:02.099 --> 00:01:14.370
+Per non doverlo scrivere in ogni comando, rendiamo shop il namespace corrente. Per ora è vuoto.
+
+00:01:14.470 --> 00:01:30.042
+Tutto quello che fa kubectl è una richiesta all'API server. api-resources elenca i tipi di oggetti che conosce: pod, service, deployment, e molti altri. Incontreremo i più importanti.
+
+00:01:30.142 --> 00:01:39.934 line:6%
+Nella prossima puntata: un primo Deployment, e i pod che si distribuiscono sui nodi.

@@ -1,0 +1,40 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:15.851
+Non hai mai usato Git? Questa lezione parte da zero: un repository che fai tu, i primi commit, una modifica, un ripensamento, un ramo, un remote. Dieci minuti dei gesti che userai ogni giorno.
+
+00:00:15.951 --> 00:00:56.917
+Il lab Git è un piccolo server. Lo installiamo, poi apriamo una shell sopra.
+
+00:00:57.017 --> 00:01:08.002
+Git scrive nome ed email dentro ogni commit. Nel lab sono già impostati; altrove li si imposta una volta con git config.
+
+00:01:08.102 --> 00:01:24.196
+Un repository dal nulla: git init crea una directory nascosta, punto git. git status è il comando da ripetere a ogni dubbio: dice il ramo e lo stato di ogni file.
+
+00:01:24.296 --> 00:01:52.639
+Un file nuovo è untracked. git add lo mette nell'indice, la lista di ciò che entrerà nel prossimo commit; git commit scatta l'istantanea, con un messaggio che dice perché.
+
+00:01:52.739 --> 00:02:17.944
+Modifichiamo il file: git diff mostra riga per riga cosa è diverso dall'ultimo commit. Di nuovo add e commit; il log è la storia in breve.
+
+00:02:18.044 --> 00:02:52.130
+Un ripensamento: git restore butta via una modifica non ancora committata. Con l'opzione staged toglie soltanto il file dall'indice. E commit con l'opzione a aggiunge da solo ogni file tracciato che è cambiato.
+
+00:02:52.230 --> 00:03:13.809
+Un ramo è una linea di lavoro separata. Ci provi un'idea, e main non si muove.
+
+00:03:13.909 --> 00:03:35.371
+Quando funziona, la unisci a main. Main non si era mosso, quindi Git lo sposta soltanto in avanti: un fast-forward. Il ramo può andare.
+
+00:03:35.471 --> 00:04:00.574
+File temporanei, build, segreti: un file punto gitignore li fa sparire da status, e add li salta.
+
+00:04:00.674 --> 00:04:16.764
+Un remote. Un server Git è soltanto un repository bare, qui una directory: su GitHub cambia solo l'indirizzo. remote add gli dà un nome, push manda il ramo.
+
+00:04:16.864 --> 00:04:54.154
+clone ne fa una copia completa altrove, come farebbe un collega. Un altro commit, pushato; pull lo porta nella copia.
+
+00:04:54.254 --> 00:05:11.207 line:6%
+Questo è il giro di ogni giorno: status, add, commit, push, pull. Per andare oltre c'è il corso Git in sei puntate, con calma; la guida ha ogni comando, in inglese e in italiano.

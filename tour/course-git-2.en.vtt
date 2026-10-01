@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:18.382
+Episode two: inside the .git directory. Same repository as the first episode, four commits. Today we open them.
+
+00:00:18.482 --> 00:00:30.299
+In .git: objects holds every version of every file and every commit; refs holds the branches and the tags; HEAD says where you are.
+
+00:00:30.399 --> 00:00:46.867
+A commit is an object, and git cat-file prints any object. Its type: commit. Its content: a tree, the parent commit, author, committer, and the message. Nothing else.
+
+00:00:46.967 --> 00:00:57.091
+The tree is the directory as it was at that moment: for every file, its mode, its type, the hash of its content, and its name.
+
+00:00:57.191 --> 00:01:19.266
+The blob is the content of the file, and only that: no name, no date. Its hash is computed from the content: hash-object gives the same hash for the same bytes, on any machine.
+
+00:01:19.366 --> 00:01:36.787
+The parent line chains the commits: HEAD tilde one is the commit before. The whole history is this chain, back to the first commit, which has no parent.
+
+00:01:36.887 --> 00:02:01.446
+And a branch? A file with one hash in it, nothing more. HEAD names the branch you are on; rev-parse turns any name into the hash it points at.
+
+00:02:01.546 --> 00:02:21.413
+Nothing is ever changed in place. Amend the last commit's message: the log shows a new hash. Git made a new commit and moved the branch onto it.
+
+00:02:21.513 --> 00:02:34.861
+The old one is still there: the reflog lists every position HEAD has had, the commit before the amend included. That is the safety net we will use in episode five.
+
+00:02:34.961 --> 00:02:43.155 line:6%
+Next episode: branches, merges, and the first conflict.

@@ -1,0 +1,46 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.205
+RAID keeps your data when a disk dies. mdadm is the Linux kernel's own software RAID, no controller needed. The mdadm lab is one server with four empty disks: we build arrays, break them, and watch them heal.
+
+00:00:17.305 --> 00:00:40.675
+One cloud image plus four 2-gigabyte disks.
+
+00:00:40.775 --> 00:01:25.986
+The four lab disks, picked by size into a variable, DISKS; set gives them short names, dollar one to dollar four.
+
+00:01:26.086 --> 00:01:42.874
+/proc/mdstat is the dashboard: the RAID levels the kernel can run, and no array yet. Our arrays use only 256 megabytes of each disk, so every sync takes seconds.
+
+00:01:42.974 --> 00:01:57.887
+A mirror: two disks, every block written to both. The first sync copies one disk onto the other; U U means both members are up. The array is a block device like any other.
+
+00:01:57.987 --> 00:02:12.916
+Format it, mount it, write a file.
+
+00:02:13.016 --> 00:02:29.648
+Now a disk dies: mark it faulty. The array is degraded, U underscore, and the file is still readable.
+
+00:02:29.748 --> 00:02:44.707
+Remove the dead member, add a disk, and the kernel rebuilds the mirror onto it: U U again.
+
+00:02:44.807 --> 00:03:17.596
+RAID5: data and parity striped over three disks, the space of two, any one may fail. The fourth disk is declared a hot spare and waits.
+
+00:03:17.696 --> 00:03:41.556
+Fail a member, and nobody has to be awake: the rebuild onto the spare starts by itself. Three active devices again, the file intact.
+
+00:03:41.656 --> 00:04:11.533
+Grow it online: the failed disk comes back as a new member and the array reshapes from three devices to four, mounted all along. resize2fs takes the new space.
+
+00:04:11.633 --> 00:04:38.071
+detail scan prints the line mdadm.conf wants for the next boot. Stop the array, assemble it again from the superblocks on its members: the file is there.
+
+00:04:38.171 --> 00:04:56.215
+Zeroing the superblocks is what ends an array. Four empty disks again.
+
+00:04:56.315 --> 00:05:13.071
+The lab's six tests do all of this again, waiting for every sync, and leave the disks empty.
+
+00:05:13.171 --> 00:05:22.486 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

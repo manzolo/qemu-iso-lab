@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:11.708
+Seconda puntata: un primo Deployment. L'immagine è un piccolo servizio web, demo-go: a ogni richiesta risponde col nome e l'IP del pod che l'ha servita.
+
+00:00:11.808 --> 00:00:19.764
+Un Deployment tiene in vita un certo numero di pod identici: qui tre. Kubernetes scarica l'immagine e li avvia.
+
+00:00:19.864 --> 00:00:30.961
+Con o wide: ogni pod ha il suo IP, e lo scheduler li ha messi su nodi diversi.
+
+00:00:31.061 --> 00:00:45.801
+I pod vanno e vengono, i loro IP cambiano. Un Service dà loro un indirizzo stabile. Questo è un NodePort: la porta 30080, aperta su ogni nodo.
+
+00:00:45.901 --> 00:01:04.704
+Chiediamoglielo qualche volta: ogni risposta arriva da un pod diverso, col suo nome e il suo IP. Il Service distribuisce le richieste.
+
+00:01:04.804 --> 00:01:16.587
+Il lab inoltra quella porta all'host: lo stesso servizio nel browser. Ricarichi, e il pod cambia.
+
+00:01:16.687 --> 00:01:33.891
+Sei repliche invece di tre: tre pod nuovi, sui nodi che hanno posto.
+
+00:01:33.991 --> 00:01:53.028
+Ora cancelliamo tutti i pod del Deployment. Non si arrende: nascono subito pod nuovi, con nomi nuovi e IP nuovi, magari su altri nodi. Il Deployment ne vuole sei, e sei saranno.
+
+00:01:53.128 --> 00:02:11.164
+La demo ha fatto il suo lavoro: cancelliamo Deployment e Service. Il namespace torna vuoto, pronto per l'applicazione vera.
+
+00:02:11.264 --> 00:02:21.561 line:6%
+Nella prossima puntata: Redis, il primo pezzo dell'applicazione, con i dati su un volume.

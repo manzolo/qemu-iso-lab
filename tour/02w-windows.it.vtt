@@ -1,0 +1,52 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:16.041
+vmctl ha bisogno di Linux: KVM, /proc, i socket Unix. Su Windows 11 vive in WSL2, un vero kernel Linux accanto a Windows. Questo è un Windows su cui non c'è ancora niente.
+
+00:00:16.141 --> 00:00:26.041
+Dal sito del catalogo si scarica l'installer per Windows.
+
+00:00:26.141 --> 00:00:52.041
+Edge avverte: è uno script, non è firmato. Conservalo e aprilo.
+
+00:00:52.141 --> 00:01:30.041
+Windows chiede conferma: Esegui. Attenzione, il pulsante predefinito è Annulla.
+
+00:01:30.141 --> 00:02:05.041
+Primo giro: installa WSL. Windows chiede i diritti di amministratore, poi vuole un riavvio.
+
+00:02:05.141 --> 00:03:03.041
+Riavvia e rilancia lo stesso installer.
+
+00:03:03.141 --> 00:04:09.791
+Secondo giro: scarica e installa Ubuntu 24.04.
+
+00:04:09.891 --> 00:04:37.791
+Al primo avvio Ubuntu chiede un utente Linux: propone il nome di Windows, Invio lo accetta. Poi una password, due volte: tra poco la chiederà sudo.
+
+00:04:37.891 --> 00:05:39.458
+Esci e rilancia una terza volta: ora clona il progetto dentro Ubuntu e lancia setup.sh, come su qualsiasi Linux.
+
+00:05:39.558 --> 00:06:35.458
+setup.sh elenca cosa installerebbe e chiede prima: y, poi la password per sudo.
+
+00:06:35.558 --> 00:07:02.791
+QEMU, il firmware, gli strumenti. Qualche minuto, senza domande.
+
+00:07:02.891 --> 00:07:24.791
+La schermata di benvenuto: Invio, l'installer non ha ancora finito.
+
+00:07:24.891 --> 00:07:58.791
+Ultimo passo: il tuo utente Linux entra nel gruppo kvm, e QEMU ISO Lab arriva sul desktop e nel menu Start.
+
+00:07:58.891 --> 00:08:42.291
+Da qui in poi basta un doppio clic.
+
+00:08:42.391 --> 00:09:11.291
+La prima volta la dashboard chiede l'utente ospite delle macchine.
+
+00:09:11.391 --> 00:09:24.291
+Ed ecco tutto il catalogo, da Windows: lo stesso lab che su Linux.
+
+00:09:24.391 --> 00:09:38.321
+Tre giri, poi un'icona. I dettagli sono nel README.

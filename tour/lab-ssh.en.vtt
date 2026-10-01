@@ -1,0 +1,43 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:16.181
+SSH is how you reach every server you own, so it is the door everyone else tries first. The SSH lab is a server to harden and a client to probe it from, on a private segment.
+
+00:00:16.281 --> 00:00:37.676
+Two cloud images: the server at 172.20.2.1, the client at 172.20.2.2, with fail2ban, knockd and nmap already installed.
+
+00:00:37.776 --> 00:01:21.071
+On the server: the sshd service, and the three settings that matter most in sshd_config: public keys, passwords, root login.
+
+00:01:21.171 --> 00:01:50.328
+On the client, keys. ssh-keygen makes a pair: ed25519 is short and fast, a 4096-bit RSA key the heavier classic. The fingerprint line names the type.
+
+00:01:50.428 --> 00:02:05.637
+Scan the server's port 22 from the segment: filtered, nobody answers. This server hides SSH behind port knocking: a sequence of three ports opens it for your address only.
+
+00:02:05.737 --> 00:02:18.000
+knock 7000, 8000, 9000: now the port answers. The reverse sequence closes it again.
+
+00:02:18.100 --> 00:02:52.394
+Hardening, in a file of its own under sshd_config.d: no root login, three authentication tries. Always sshd -t before a reload, so a typo never leaves you locked out; then reload, and check what sshd really uses.
+
+00:02:52.494 --> 00:03:03.053
+fail2ban watches the auth log and bans an address after a few failures. The sshd jail is active, with nobody banned yet.
+
+00:03:03.153 --> 00:03:28.069
+From the client, three logins with a wrong password: sshpass types it for us…
+
+00:03:28.169 --> 00:03:50.290
+…and the server's jail lists the client's address. Unban it, or the next exercise cannot connect.
+
+00:03:50.390 --> 00:04:11.159
+What a scan sees: nmap finds the port, and with version detection reads the SSH banner. Then the knock is closed and the keys removed.
+
+00:04:11.259 --> 00:04:26.596
+Every attempt left a trace in the server's journal: this is what you read when you wonder who knocked.
+
+00:04:26.696 --> 00:04:45.044
+The lab's six tests do all of this again, in order, and tell you if the server still defends itself.
+
+00:04:45.144 --> 00:04:54.479 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

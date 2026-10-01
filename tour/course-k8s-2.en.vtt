@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:11.708
+Episode two: a first Deployment. The image is a tiny web service, demo-go: to every request it answers with the name and the IP of the pod that served it.
+
+00:00:11.808 --> 00:00:19.764
+A Deployment keeps a number of identical pods alive: here three. Kubernetes downloads the image and starts them.
+
+00:00:19.864 --> 00:00:30.961
+With -o wide: every pod has its own IP, and the scheduler has put them on different nodes.
+
+00:00:31.061 --> 00:00:45.801
+Pods come and go, their IPs change. A Service gives them one stable address. This one is a NodePort: port 30080, open on every node.
+
+00:00:45.901 --> 00:01:04.704
+Ask it a few times: each answer comes from a different pod, with its own name and IP. The Service spreads the requests.
+
+00:01:04.804 --> 00:01:16.587
+The lab forwards that port to the host: the same service in the browser. Reload, and the pod changes.
+
+00:01:16.687 --> 00:01:33.891
+Six replicas instead of three: three new pods, on the nodes with room for them.
+
+00:01:33.991 --> 00:01:53.028
+Now delete every pod of the Deployment. It does not give up: new pods are born at once, with new names and new IPs, maybe on other nodes. The Deployment wants six, and six there will be.
+
+00:01:53.128 --> 00:02:11.164
+The demo has done its job: delete the Deployment and the Service. The namespace is empty again, ready for the real application.
+
+00:02:11.264 --> 00:02:21.561 line:6%
+Next episode: Redis, the first piece of the application, with its data on a volume.

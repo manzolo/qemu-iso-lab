@@ -1,0 +1,52 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:16.041
+vmctl needs Linux: KVM, /proc, Unix sockets. On Windows 11 it lives in WSL2, a real Linux kernel next to Windows. This is a Windows with nothing on it yet.
+
+00:00:16.141 --> 00:00:26.041
+From the catalog site, download the Windows installer.
+
+00:00:26.141 --> 00:00:52.041
+Edge warns: it is a script, nobody signed it. Keep it, then open it.
+
+00:00:52.141 --> 00:01:30.041
+Windows asks once more. Choose Run: the default button is Cancel.
+
+00:01:30.141 --> 00:02:05.041
+First run: it installs WSL. Windows asks for administrator rights, then wants a restart.
+
+00:02:05.141 --> 00:03:03.041
+Restart, and run the same installer again.
+
+00:03:03.141 --> 00:04:09.791
+Second run: it downloads and installs Ubuntu 24.04.
+
+00:04:09.891 --> 00:04:37.791
+At its first start Ubuntu asks for a Linux user: it proposes your Windows name, Enter accepts it. Then a password, twice: sudo will ask for it in a minute.
+
+00:04:37.891 --> 00:05:39.458
+Exit, and run it a third time: now it clones the project inside Ubuntu and runs setup.sh, as on any Linux.
+
+00:05:39.558 --> 00:06:35.458
+setup.sh lists what it would install and asks first: y, then the Linux password for sudo.
+
+00:06:35.558 --> 00:07:02.791
+QEMU, the firmware, the tools. A few minutes, no questions.
+
+00:07:02.891 --> 00:07:24.791
+The welcome screen: Enter, the installer has not finished yet.
+
+00:07:24.891 --> 00:07:58.791
+Last step: your Linux user joins the kvm group, and QEMU ISO Lab lands on the desktop and in the Start menu.
+
+00:07:58.891 --> 00:08:42.291
+From here on, one double-click.
+
+00:08:42.391 --> 00:09:11.291
+The first time the dashboard asks for the guest user of your machines.
+
+00:09:11.391 --> 00:09:24.291
+And here is the whole catalog, from Windows: the same lab as on Linux.
+
+00:09:24.391 --> 00:09:38.321
+Three runs, then an icon. The details are in the README.

@@ -1,0 +1,25 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.502
+Terza puntata: il primo pezzo dell'applicazione, Redis, un database in memoria molto veloce. Terrà la lista della spesa.
+
+00:00:17.602 --> 00:00:36.304
+Questa volta niente comandi lunghi: un manifest, un file YAML che descrive gli oggetti. Tre: un PersistentVolumeClaim, la richiesta di un po' di disco; un Deployment con una replica di Redis, fissata sul control plane; e un Service che si chiama redis.
+
+00:00:36.404 --> 00:00:50.254
+kubectl apply consegna il file al cluster, che crea quello che manca. Riapplicalo più tardi, e si aggiorna solo quello che è cambiato.
+
+00:00:50.354 --> 00:01:01.798
+Il claim è Bound: l'add-on hostpath-storage gli ha dato una directory sul disco del nodo. Redis ci scrive i suoi dati, così sopravvivono al pod.
+
+00:01:01.898 --> 00:01:21.987
+Gli altri pod trovano Redis col nome del Service. Un pod usa e getta con redis-cli chiede all'host che si chiama redis: PONG. Il DNS del cluster ha trasformato il nome nell'indirizzo del Service.
+
+00:01:22.087 --> 00:01:36.075
+kubectl exec esegue un comando dentro il pod in esecuzione: scriviamo una chiave, la rileggiamo.
+
+00:01:36.175 --> 00:01:58.809
+Cancelliamo il pod. Il Deployment ne crea uno nuovo, che monta lo stesso volume: la chiave c'è ancora.
+
+00:01:58.909 --> 00:02:09.449 line:6%
+Nella prossima puntata: un object storage per i file, RustFS, e un Secret per le sue chiavi.

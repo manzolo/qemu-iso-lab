@@ -1,0 +1,37 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:18.447
+Last episode: git flow. A way to organise the branches of a project, where every branch has a role, and a tool that does the branching, merging and tagging for you.
+
+00:00:18.547 --> 00:00:31.687
+The roles: main holds only the released versions; develop is where the work comes together; feature branches start from develop, and release and hotfix branches lead to main.
+
+00:00:31.787 --> 00:00:55.751
+git flow init with the defaults creates develop, and writes the names of the roles into the repository's configuration. One more setting: version tags start with a v, like the v1.0 of episode five.
+
+00:00:55.851 --> 00:01:12.277
+A feature: feature start makes a branch from develop and moves onto it. One commit, a new recipe.
+
+00:01:12.377 --> 00:01:31.382
+feature finish merges it into develop, deletes the branch, and leaves us on develop. Main has not moved: the dessert is not released yet.
+
+00:01:31.482 --> 00:01:49.822
+A release: release start one point one, a branch where the version is prepared. Here, a VERSION file.
+
+00:01:49.922 --> 00:02:07.659
+release finish does four things: merges into main, tags v1.1, merges back into develop, and deletes the branch. git tag shows the new version.
+
+00:02:07.759 --> 00:02:23.541
+And an urgent fix on a released version: a hotfix starts from main, not from develop.
+
+00:02:23.641 --> 00:02:41.366
+hotfix finish brings it to main with the tag v1.1.1, and to develop too, so the fix is not lost at the next release.
+
+00:02:41.466 --> 00:03:02.571
+The graph shows the two lines: main with one merge per version, develop with everything. Push both, and the tags.
+
+00:03:02.671 --> 00:03:21.118
+Six episodes: commits, the objects inside .git, branches and conflicts, stash and remotes, rebase, tags and reflog, and git flow. The whole history of the list is here.
+
+00:03:21.218 --> 00:03:32.066 line:6%
+The Git lab's guide has every command of the course, in English and Italian, from the lab's card.

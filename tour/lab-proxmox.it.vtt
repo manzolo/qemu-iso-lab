@@ -1,0 +1,46 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:35.714
+Tre nodi Proxmox in cluster, e un client sulla stessa rete. Uno dei container sopravviverà alla morte del suo nodo.
+
+00:00:35.814 --> 00:00:47.066
+Un comando installa tutto: tre installazioni Proxmox automatiche, il client, poi il cluster. Una quarantina di minuti, quindi eccolo già acceso.
+
+00:00:47.166 --> 00:01:10.242
+Il cluster: tre nodi, con il quorum. Corosync passa sul segmento del lab, e il quorum è la maggioranza: bastano due nodi su tre.
+
+00:01:10.342 --> 00:01:26.991
+Il nodo uno fa girare due container LXC. Il primo, IT-Tools, ha il disco su ZFS e un indirizzo sulla rete del lab.
+
+00:01:27.091 --> 00:01:58.026
+Il suo disco vive solo sul nodo uno. Due job di replica lo mandano agli altri nodi con ZFS, poi ogni minuto solo le modifiche.
+
+00:01:58.126 --> 00:02:12.375
+Ora l'alta affidabilità: il cluster si prende cura del container, e lo riavvia altrove se il suo nodo sparisce.
+
+00:02:12.475 --> 00:02:40.029
+L'interfaccia web del nodo due mostra lo stesso: il container sotto il nodo uno, gestito dall'alta affidabilità.
+
+00:02:40.129 --> 00:03:01.665
+Sul client, un ciclo chiede la pagina ogni cinque secondi.
+
+00:03:01.765 --> 00:03:12.465
+E ora stacchiamo la corrente al nodo uno: tieni premuto il pulsante di accensione per due secondi, e QEMU si ferma subito. Nessuno shutdown.
+
+00:03:12.565 --> 00:03:21.033
+Gli altri due tengono il quorum. Dopo un minuto, l'alta affidabilità segna il nodo morto da isolare, e aspetta che scada il suo lock.
+
+00:03:21.133 --> 00:03:35.538
+Due minuti e mezzo dopo il container gira sul nodo due, dall'ultima replica.
+
+00:03:35.638 --> 00:03:47.019
+E il client? Qualche minuto senza risposta, poi la stessa pagina, allo stesso indirizzo.
+
+00:03:47.119 --> 00:04:37.496
+Il nodo uno torna e rientra nel cluster. Ora la replica va nel verso opposto, e un comando riporta a casa il container.
+
+00:04:37.596 --> 00:05:30.164
+Cinque test, uno per esercizio. L'ultimo stacca di nuovo la corrente, da solo.
+
+00:05:30.264 --> 00:05:39.456 line:6%
+Ogni comando è nella guida, in inglese e in italiano, dalla card del lab.
