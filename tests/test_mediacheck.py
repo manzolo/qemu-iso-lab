@@ -19,6 +19,10 @@ class MediaCheckTests(unittest.TestCase):
         passed, detail = mediacheck.classify(2, 0, False, None, None, 180)
         self.assertFalse(passed)
         self.assertIn("never got past the firmware", detail)
+        # Mint 22.3's GRUB menu has no timeout: the medium's loader is up, it waits for Enter
+        passed, detail = mediacheck.classify(2, 0, False, None, None, 180, loader="GNU GRUB")
+        self.assertTrue(passed)
+        self.assertIn("GNU GRUB", detail)
 
     def test_firmware_lines_are_whole_and_free_of_escape_sequences(self):
         raw = '\x1b[2J\x1b[001;001H\x1b[=3hBdsDxe: failed to load Boot0001 "UEFI QEMU DVD-ROM": Not Found\r\n'

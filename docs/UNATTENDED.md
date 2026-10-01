@@ -1177,7 +1177,7 @@ files alone, in seconds; the smoke runs are the live proof.
 The matrix skips a manual profile, and a live system or the manual twin of an automated profile
 says nothing on the serial console, so `boot-check` has no token to wait for. `vmctl media-check
 <vm>` boots the profile's ISO headless with `-snapshot`. The disk and the EFI variables are scratch
-copies under `artifacts/<vm>/media-check/`, removed afterwards: the VM's own disk is never attached,
+copies in a short temporary directory (`/tmp/vmctl-mc-<hash>/`, removed afterwards; unix socket paths stop at 107 bytes): the VM's own disk is never attached,
 and neither is its shared folder. The check watches for up to 180 s (`--timeout`).
 
 - **FAIL at once:** the firmware says it could not boot the medium. OVMF writes that on the serial

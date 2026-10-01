@@ -3,7 +3,7 @@
 A manual profile (a live system, the manual twin of an automated one) has nothing the matrix can
 install or verify, and its medium says nothing on the serial console, so ``boot-check`` has no
 token to wait for. This check boots the ISO headless with ``-snapshot`` on a scratch disk and
-scratch EFI variables under ``artifacts/<vm>/media-check/`` (removed afterwards: the VM's own
+scratch EFI variables in a short directory under the system temp dir (``work_dir``, removed afterwards: the VM's own
 disk is never attached), and watches two things for ``timeout`` seconds:
 
 - the serial console, where OVMF reports a medium it cannot boot (``BdsDxe: failed to load``,
@@ -23,6 +23,7 @@ import hashlib
 import selectors
 import shutil
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -43,6 +44,9 @@ FIRMWARE_FAILURES = ("No bootable option", "No bootable device", "BdsDxe: failed
 # iPXE, starts as "Booting from ROM". Without this a BIOS profile on a medium that does not boot
 # passed as a "text-mode boot", iPXE's DHCP attempts changing the screen (negative check, 2026-09-30).
 SEABIOS_FALLTHROUGH = ("Booting from ROM",)
+# The medium's own boot loader, seen on the serial console: Linux Mint 22.3's GRUB menu has no
+# timeout and waits for Enter forever, a medium that boots all the same (night of 2026-09-30).
+LOADER_BANNERS = ("GNU GRUB", "ISOLINUX", "SYSLINUX", "systemd-boot")
 ANSI = re.compile(r"\x1b\[[0-9;?=]*[A-Za-z]|\x1b[()][A-Z0-9]")
 # the manual reasons whose medium is an ISO worth booting (config.MANUAL_REASONS): templates import
 # a device, image profiles need a build, ci has its own serial boot-check
@@ -67,7 +71,12 @@ def eligible(vm: dict[str, Any]) -> bool:
 
 
 def work_dir(vm_name: str) -> Path:
-    return runtime.vm_artifact_base(vm_name) / "media-check"
+    """Short on purpose: QMP and VNC live in <work_dir>/runtime/, and a unix socket path stops at
+    107 bytes. Under artifacts/<vm>/media-check/ of the batch worktree the long names reached 108
+    and 113: QEMU refused the socket or the captures never connected, and 12 media checks of the
+    night of 2026-09-30 failed on a medium that boots (0 frames, "QEMU exited after 0 s")."""
+    digest = hashlib.sha1(str(runtime.vm_artifact_base(vm_name)).encode()).hexdigest()[:10]
+    return Path(tempfile.gettempdir()) / f"vmctl-mc-{digest}"
 
 
 def scratch_profile(vm_name: str, vm: dict[str, Any]) -> dict[str, Any]:
@@ -95,7 +104,7 @@ def failure_line(text: str, needles: tuple[str, ...]) -> str | None:
 
 
 def classify(frames: int, graphic: int, settled: bool, early_exit: str | None, firmware_line: str | None,
-             seconds: float) -> tuple[bool, str]:
+             seconds: float, loader: str | None = None) -> tuple[bool, str]:
     """The verdict from what the watch saw (pure: tested on its own)."""
     if firmware_line:
         return False, f"the firmware could not boot the medium: {firmware_line.strip()}"
@@ -106,6 +115,8 @@ def classify(frames: int, graphic: int, settled: bool, early_exit: str | None, f
         return True, f"graphical screen after {round(seconds)} s ({graphic} graphical of {frames} distinct frames, {state})"
     if frames >= TEXT_BOOT_FRAMES:
         return True, f"text-mode boot: {frames} distinct console frames in {round(seconds)} s"
+    if loader:
+        return True, f"the medium's boot loader ({loader}) is up and waits at its menu"
     return False, f"the screen never got past the firmware: {frames} distinct console frame(s) in {round(seconds)} s"
 
 
@@ -213,6 +224,8 @@ def check_medium(vm_name: str, vm: dict[str, Any], timeout_sec: int = DEFAULT_TI
         if last_png is not None and keep_frame:
             final_png.write_bytes(last_png)
         shutil.rmtree(base, ignore_errors=True)
-    passed, detail = classify(frames, graphic, settled, early_exit, firmware_line, seconds)
+    text = ANSI.sub("\n", serial.decode("utf-8", "replace"))
+    loader = next((banner for banner in LOADER_BANNERS if banner in text), None)
+    passed, detail = classify(frames, graphic, settled, early_exit, firmware_line, seconds, loader)
     tail = [line for line in serial.decode("utf-8", "replace").splitlines() if line.strip()][-10:]
     return Outcome(passed, detail, seconds, final_png if last_png is not None else None, frames, graphic, tail)
