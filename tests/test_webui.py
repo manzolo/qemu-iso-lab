@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 import threading
+from unittest import mock
 import time
 import unittest
 from pathlib import Path
@@ -529,12 +530,13 @@ class ServerTests(BaseVmctlTestCase):
         self.assertEqual(status, 200)
         self.assertIn("started", json.loads(body)["text"])
 
-    def test_a_lab_map_is_served_only_for_a_plain_group_name(self):
-        page = vmctl.state.ROOT / "artifacts/labs/netlab/network.html"
-        page.parent.mkdir(parents=True)
-        page.write_text("<html>map</html>")
-        self.assertEqual(self.get("/labs/netlab/map"), (200, b"<html>map</html>"))
-        self.assertEqual(self.get("/labs/nothing/map")[0], 404)
+    def test_a_lab_map_is_rendered_on_request_for_a_plain_group_name(self):
+        # Until 2026-10-01 the page served only what `group map` had written: 404 on a fresh checkout.
+        with mock.patch.object(vmctl.webui, "lab_map_page", side_effect=lambda g: b"<html>map</html>" if g == "netlab" else None) as page:
+            self.assertEqual(self.get("/labs/netlab/map"), (200, b"<html>map</html>"))
+            self.assertEqual(self.get("/labs/nothing/map")[0], 404)
+        page.assert_any_call("netlab")
+        self.assertIsNone(vmctl.webui.lab_map_page("../etc"))
 
 
 if __name__ == "__main__":

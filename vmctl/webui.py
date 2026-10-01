@@ -345,6 +345,24 @@ def open_ssh_terminal(vm_name: str) -> str:
     ssh.ssh_target(vm)  # validate access without creating keys or opening a connection
     return open_host_terminal([str(state.ROOT / "bin" / "vmctl"), "shell", vm_name])
 
+def lab_map_page(group: str) -> bytes | None:
+    """The lab's network map, rendered now from the profiles and the live states.
+
+    Serving only the file `group map` left behind answered 404 until someone ran it, and a
+    map written earlier showed the states of that moment; the file is refreshed on the way.
+    """
+    from vmctl import labs, lifecycle
+
+    if Path(group).name != group or not group:
+        return None
+    cfg = config.load_config()
+    names = labs.group_members(cfg, group)
+    if not names:
+        return None
+    path = labs.write_map(labs.model(cfg, group, lifecycle.group_states(cfg, names)))
+    return path.read_bytes()
+
+
 def console_info(vm_name: str) -> dict[str, Any]:
     """Inspect the running process/channel, not just the next-boot profile."""
     from vmctl import lifecycle
@@ -614,12 +632,12 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._send(HTTPStatus.OK, image, "image/png")
             elif path.startswith("/labs/") and path.endswith("/map"):
-                group = path.split("/")[2]
-                page = state.ROOT / "artifacts" / "labs" / group / "network.html"
-                if Path(group).name != group or not page.is_file():
-                    self._error(f"No map for {group} yet: run 'group map {group}' first", HTTPStatus.NOT_FOUND)
+                group = unquote(path.split("/")[2])
+                page = lab_map_page(group)
+                if page is None:
+                    self._error(f"No lab called {group}", HTTPStatus.NOT_FOUND)
                 else:
-                    self._send(HTTPStatus.OK, page.read_bytes(), "text/html; charset=utf-8")
+                    self._send(HTTPStatus.OK, page, "text/html; charset=utf-8")
             else:
                 self._error("Not found", HTTPStatus.NOT_FOUND)
         except VMError as exc:
