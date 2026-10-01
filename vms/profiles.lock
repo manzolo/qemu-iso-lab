@@ -564,9 +564,14 @@
       ]
     },
     "edubuntu-12.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:d122d847d8bef999264298df990dc139b2a9237edfcc1ba53f4143b9735dd03e",
+      "version": "1.0.1",
+      "fingerprint": "sha256:502642b8fb19acc778a0f51d2b81feedc9ebbf802ece67ad9b5abd9024416e76",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "desktop metapackage in a late command past the stale precise Release"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -888,9 +893,14 @@
       ]
     },
     "kubuntu-12.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:16d405767bfce4e4c1192fb2817d5293473508587a89997fbea32db35fbc5085",
+      "version": "1.0.1",
+      "fingerprint": "sha256:61e0c02ec6da9c77c7543271078ede87473c857d6cd5be62730b821fe75dca12",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "desktop metapackage in a late command past the stale precise Release"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1009,9 +1019,14 @@
       ]
     },
     "lubuntu-12.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:7f08621e30664e1e245fd3e709895b836c2a123495d8d66acc76b241711c8ed1",
+      "version": "1.0.1",
+      "fingerprint": "sha256:346a7ba263b63e8b0c17c09f9cb52023eb7399e85dfb036ed70e5382855feca5",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "desktop metapackage in a late command past the stale precise Release"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",

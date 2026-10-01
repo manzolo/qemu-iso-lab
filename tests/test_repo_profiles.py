@@ -142,6 +142,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # The other flavour series, first run of the night of 2026-09-28/29 (tools/gen_ubuntu_flavors.py).
         verified_flavours_0929 = set("""arch-2019 arch-2022 arch-2026 kubuntu-20.04 lubuntu-20.04 edubuntu-8.04 edubuntu-10.04 edubuntu-14.04 edubuntu-26.04 kubuntu-8.04 kubuntu-10.04 kubuntu-14.04 kubuntu-16.04 kubuntu-18.04 kubuntu-22.04 kubuntu-26.04 lubuntu-14.04 lubuntu-16.04 lubuntu-18.04 lubuntu-22.04 lubuntu-26.04 ubuntu-budgie-18.04 ubuntu-budgie-20.04 ubuntu-budgie-22.04 ubuntu-budgie-26.04 ubuntu-cinnamon-26.04 ubuntu-mate-16.04 ubuntu-mate-18.04 ubuntu-mate-20.04 ubuntu-mate-22.04 ubuntu-mate-26.04 ubuntu-unity-26.04""".split())
         verified_flavours_0929 |= {"haiku", "arch-2014", "slackware-15.0", "slackware-14.0", "slackware-14.1", "slackware-14.2", "slackware-13.37", "slackware-13.0"}
+        verified_1001 = {"arch-omarchy-nvidia", "xubuntu-12.04"}  # the desktop check on Omarchy, the stale precise Release on 12.04
         verified_0930 = {"fedora-server", "fedora-server-efi", "opensuse-tumbleweed-net", "opensuse-slowroll", "devuan-netinst", "centos-5", "centos-6", "centos-7", "centos-8", "fedora-xfce", "fedora-cinnamon", "fedora-workstation", "opensuse-tumbleweed-kde", "void-xfce", "opensuse-leap-16", "endeavouros", "popos-cosmic", "arch-2014", "ubuntu-niri"}  # the recipes written ahead, first live run  # PASS on 2026-09-29 (haiku after the identity fix; arch-2014 with the host cache, kept experimental)
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))
@@ -155,7 +156,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                     self.assertIn(twin["meta"]["status"], ("unattended", "experimental"), name)
             else:
                 self.assertNotIn("manual", vm["meta"], name)
-            expected_date = ("2026-09-30" if name in verified_0930
+            expected_date = ("2026-10-01" if name in verified_1001
+                             else "2026-09-30" if name in verified_0930
                              else "2026-09-29" if name in verified_flavours_0929
                              else "2026-09-28" if name in verified_xubuntu_history
                              else "2026-09-26" if name in verified_matrix_0926

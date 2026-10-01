@@ -804,8 +804,8 @@
         "family": "arch",
         "role": "desktop",
         "release_model": "rolling",
-        "status": "experimental",
-        "verified": "2026-09-09",
+        "status": "unattended",
+        "verified": "2026-10-01",
         "version": "1.1.0"
       },
       "iso": "isos/omarchy-4.0.2.iso",
@@ -900,7 +900,7 @@
           "nvidia-smi 2>/dev/null || echo 'nvidia-smi: no NVIDIA GPU in this VM (expected; the driver is here for bare metal)'"
         ]
       },
-      "notes": " The post-install turns SDDM autologin on into hyprland-uwsm (Omarchy does it only with disk encryption: the first runs ended on the SDDM greeter) and verify-desktop checks the Wayland session, Hyprland and the quickshell bar (2026-10-01)."
+      "notes": " The post-install turns SDDM autologin on into hyprland-uwsm (Omarchy does it only with disk encryption: the first runs ended on the SDDM greeter) and verify-desktop checks the Wayland session, Hyprland and the quickshell bar (2026-10-01). First live PASS with the desktop check 2026-10-01 (485 s)."
     }
   }
 }
