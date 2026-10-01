@@ -198,6 +198,7 @@ h2.family::after { content:""; height:1px; background:var(--line); flex:1; margi
 .card-head .desc { color:var(--muted); font-size:11px; margin-top:4px; overflow-wrap:anywhere; }
 .badges { display:flex; gap:5px; flex-wrap:wrap; font-size:10px; min-height:23px; align-items:flex-start; }
 .badge { border:1px solid #ffffff10; background:#ffffff04; border-radius:5px; padding:2px 6px; font-weight:500; }
+.b-link-ok { color:var(--ok); } .b-link-warn { color:var(--warn); border-color:#f1ca8a55; } .b-link-bad { color:#f39a9a; border-color:#f39a9a66; background:#f39a9a12; }
 .b-unattended,.b-verified { color:var(--ok); background:#8aead009; } .b-manual,.b-base { color:var(--muted); } .b-manual a { color:var(--accent); } .b-todo { color:var(--warn); border-color:#f1ca8a55; background:#f1ca8a10; } .b-experimental,.b-medium { color:var(--warn); } .b-version { color:#aec4f0; } .b-lab { color:#d1b1f7; }
 .facts { display:flex; gap:15px; flex-wrap:wrap; color:var(--muted); font-size:11px; padding:11px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .facts b { color:var(--text); font-weight:550; }
@@ -261,7 +262,7 @@ footer { color:var(--muted); font-size:11px; padding:30px 0 0; }
   </details>
   <div id="toolbar">
     <div class="search-row"><div class="search-wrap"><input id="search" type="search" placeholder="Search profiles… e.g. ubuntu 26, fedora kde" autocomplete="off" aria-label="Search profiles"><kbd aria-hidden="true">/</kbd></div>
-    <div class="chips" id="kind" role="group" aria-label="Kind of install"><button data-v="" class="active" aria-pressed="true">All profiles</button><button data-v="unattended" aria-pressed="false">Automated</button><button data-v="manual" aria-pressed="false">Manual</button><button data-v="experimental" aria-pressed="false">Experimental</button><button data-v="todo" aria-pressed="false" title="Manual profiles whose automation is still to write">To automate</button></div></div>
+    <div class="chips" id="kind" role="group" aria-label="Kind of install"><button data-v="" class="active" aria-pressed="true">All profiles</button><button data-v="unattended" aria-pressed="false">Automated</button><button data-v="manual" aria-pressed="false">Manual</button><button data-v="experimental" aria-pressed="false">Experimental</button><button data-v="todo" aria-pressed="false" title="Manual profiles whose automation is still to write">To automate</button><button data-v="links" id="links-chip" aria-pressed="false" title="Profiles whose ISO download link is broken or answers only from an alternate source (checked by tools/check_iso_urls.py)">Broken links</button></div></div>
     <div class="filter-row"><span class="filter-label">BUILT FOR</span><div class="chips" id="role" role="group" aria-label="Role"><button data-v="" class="active" aria-pressed="true">Any role</button><button data-v="desktop" aria-pressed="false">Desktop</button><button data-v="server" aria-pressed="false">Server</button><button data-v="other" aria-pressed="false">Other</button></div>
     <select id="family" aria-label="Family"><option value="">All OS families</option></select></div>
   </div>
@@ -280,6 +281,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const picked = new Set(JSON.parse(localStorage.getItem("qil-picked") || "[]").filter(n => DATA.profiles.some(p => p.name === n)));
 let kind = "", role = "", family = "";
+if (!DATA.profiles.some(p => p.link && p.link.verdict !== "OK")) $("links-chip").style.display = "none";
 $("m-profiles").textContent = DATA.counts.profiles; $("m-unattended").textContent = DATA.counts.unattended; $("m-verified").textContent = DATA.counts.verified;
 // Sections and the family filter go by label: several families can share one ("Hobby systems").
 const LABELS = [...new Set(DATA.families.map(f => DATA.profiles.find(p => p.family === f)?.family_label).filter(Boolean))];
@@ -303,7 +305,7 @@ function searchProfiles(profiles, query) {
 }
 function visible() {
   return searchProfiles(DATA.profiles, $("search").value).filter(p =>
-    (!kind || (kind === "todo" ? p.manual === "todo" : p.status === kind)) && (!role || roleGroup(p) === role) && (!family || p.family_label === family));
+    (!kind || (kind === "todo" ? p.manual === "todo" : kind === "links" ? (p.link && p.link.verdict !== "OK") : p.status === kind)) && (!role || roleGroup(p) === role) && (!family || p.family_label === family));
 }
 function clipBlock(p) {
   const c = p.clip; if (!c) return "";
@@ -340,6 +342,12 @@ function card(p) {
   if (p.version) badges.push(`<span class="badge b-version" title="Profile version">v${esc(p.version)}</span>`);
   if (p.verified) badges.push(`<span class="badge b-verified" title="Last live PASS of the validation matrix">✓ ${esc(p.verified)}</span>`);
   if (p.medium === "manual") badges.push(`<span class="badge b-medium" title="The profile says which medium to provide">Your own ISO</span>`);
+  if (p.link) {
+    const when = DATA.links_checked ? ` (checked ${DATA.links_checked})` : "";
+    if (p.link.verdict === "OK") badges.push(`<span class="badge b-link-ok" title="The ISO download link answers${esc(when)}">ISO link ✓</span>`);
+    else if (p.link.verdict === "DEGRADED") badges.push(`<span class="badge b-link-warn" title="Only an alternate source answers${esc(when)}: ${esc(p.link.why)}">ISO link: alternate only</span>`);
+    else badges.push(`<span class="badge b-link-bad" title="No download source answers${esc(when)}: ${esc(p.link.why)}">ISO link broken</span>`);
+  }
   if (p.lab) badges.push(`<span class="badge b-lab">Lab member</span>`);
   const facts = [`<b>${esc(ram(p))}</b> RAM`, `<b>${esc(p.cpus)}</b> vCPU`, `<b>${esc(p.firmware)}</b>`, p.disk ? `<b>${esc(p.disk)}</b> disk` : "", p.ssh ? "SSH" : "", p.shared_dir ? "Shared folder" : ""].filter(Boolean);
   const history = p.history.length ? `<details><summary>Changelog · ${p.history.length}</summary><ul class="history">${p.history.map(h => `<li><span class="v">${esc(h.version)}</span>${esc(h.date)} · ${esc(h.note)}</li>`).join("")}</ul></details>` : "";
@@ -415,12 +423,31 @@ def collect_media(root: Path, out: Path, media: Path | None, names: list[str]) -
     return found
 
 
-def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "combo") -> dict[str, Any]:
+def link_status(links: Path | None) -> tuple[dict[str, dict[str, str]], str | None]:
+    """Per profile, what tools/check_iso_urls.py --json found: verdict (OK, DEGRADED, BROKEN), the
+    first bad source's reason. The Pages workflow runs the check right before the build."""
+    if links is None or not links.is_file():
+        return {}, None
+    try:
+        report = json.loads(links.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, None
+    status: dict[str, dict[str, str]] = {}
+    for row in report.get("profiles", []):
+        bad = next((source for source in row.get("sources", []) if not source.get("good")), None)
+        status[row["vm"]] = {"verdict": row["verdict"], "why": f"{bad['url']}: {bad['reason']}" if bad and row["verdict"] != "OK" else ""}
+    return status, _dt.date.fromtimestamp(links.stat().st_mtime).isoformat()
+
+
+def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "combo", links: Path | None = None) -> dict[str, Any]:
     data = catalog_data(root)
     out.mkdir(parents=True, exist_ok=True)
     clips = collect_media(root, out, media, [p["name"] for p in data["profiles"]])
+    status, checked = link_status(links)
+    data["links_checked"] = checked
     for profile in data["profiles"]:
         profile["clip"] = clips.get(profile["name"])
+        profile["link"] = status.get(profile["name"])
     data["clip_style"] = clip_style
     (out / "catalog.json").write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     web = root / "vmctl" / "web"
@@ -440,9 +467,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=ROOT / "site", help="output directory (default: site/)")
     parser.add_argument("--media", type=Path, default=None, help="directory with <vm>/recording.mp4|recording.gif|poster.png (default: docs/media)")
     parser.add_argument("--clip-style", choices=["combo", "gif", "video", "both"], default="combo", help="how a profile's install clip is shown on its card: combo = the GIF loops in the card and a small button opens the video player (default), gif, video (poster + play), both")
+    parser.add_argument("--links", type=Path, default=None, metavar="FILE", help="tools/check_iso_urls.py --json output: a badge per card says whether the ISO link works")
     parser.add_argument("--root", type=Path, default=ROOT, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
-    data = build(args.root, args.out, media=args.media, clip_style=args.clip_style)
+    data = build(args.root, args.out, media=args.media, clip_style=args.clip_style, links=args.links)
     print(f"{args.out}: {data['counts']['profiles']} profiles, {data['counts']['unattended']} unattended, {data['counts']['verified']} verified")
     return 0
 

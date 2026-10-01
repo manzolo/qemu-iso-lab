@@ -40,6 +40,25 @@ class CatalogSiteTests(unittest.TestCase):
                     self.assertTrue(profile["flow"].startswith("bootstrap-"), f"{profile['name']} is unattended without a flow")
         self.assertEqual(self.data["counts"]["profiles"], len(names))
 
+    def test_iso_link_status_reaches_the_cards(self):
+        # the Pages workflow runs tools/check_iso_urls.py --json and hands it to the build
+        links = Path(self.tempdir.name) / "links.json"
+        links.write_text(json.dumps({"profiles": [
+            {"vm": "debian-server", "verdict": "BROKEN", "sources": [{"url": "https://x/a.iso", "good": False, "reason": "HTTP 404"}]},
+            {"vm": "kali", "verdict": "OK", "sources": [{"url": "https://x/k.iso", "good": True, "reason": "3000 MiB"}]},
+        ], "user_supplied": []}))
+        out = Path(self.tempdir.name) / "site-links"
+        data = build_catalog_site.build(ROOT, out, links=links)
+        by_name = {p["name"]: p for p in data["profiles"]}
+        self.assertEqual(by_name["debian-server"]["link"], {"verdict": "BROKEN", "why": "https://x/a.iso: HTTP 404"})
+        self.assertEqual(by_name["kali"]["link"]["verdict"], "OK")
+        self.assertIsNone(by_name["alpine-ci"]["link"])
+        self.assertIsNotNone(data["links_checked"])
+        page = (out / "index.html").read_text(encoding="utf-8")
+        self.assertIn("ISO link broken", page)
+        self.assertIn('id="links-chip"', page)
+        self.assertIsNone(self.data["links_checked"])  # without --links there is no badge at all
+
     def test_the_page_is_self_contained_and_ships_the_dashboard_icons(self):
         html = (self.out / "index.html").read_text(encoding="utf-8")
         for asset in ("icons.js", ".nojekyll", "catalog.json"):

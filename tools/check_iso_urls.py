@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import contextlib
 import json
 import re
 import sys
@@ -77,10 +78,12 @@ def probe(url: str) -> tuple[int | None, str, int | None, str | None]:
 
 
 def profile_sources(vm: dict[str, Any]) -> list[str]:
-    try:
-        return iso.iso_url_candidates(vm, allow_discovery=True)
-    except Exception:  # a broken discovery index must not hide the static sources
-        return iso.iso_url_candidates(vm, allow_discovery=False)
+    # iso.py reports a failed discovery on stdout: it would corrupt --json, so it goes to stderr
+    with contextlib.redirect_stdout(sys.stderr):
+        try:
+            return iso.iso_url_candidates(vm, allow_discovery=True)
+        except Exception:  # a broken discovery index must not hide the static sources
+            return iso.iso_url_candidates(vm, allow_discovery=False)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -19,6 +19,8 @@ on:
       - "vmctl/web/distro-icons.svg"
       - "vmctl/__init__.py"
       - ".github/workflows/pages.yml"
+  schedule:
+    - cron: "37 5 * * 1"   # weekly, so the cards' ISO link badges stay current without a push
   workflow_dispatch:
 
 permissions:
@@ -47,8 +49,10 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Check the ISO links (a badge per card; never fails the build)
+        run: python3 tools/check_iso_urls.py --json > links.json || true
       - name: Build the site
-        run: python3 tools/build_catalog_site.py --out site
+        run: python3 tools/build_catalog_site.py --out site --links links.json
       - name: Upload
         uses: actions/upload-pages-artifact@v3
         with:
