@@ -286,11 +286,10 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "manual",
-        "version": "1.0.1",
+        "version": "1.0.3",
         "manual": "live"
       },
       "iso": "isos/kali-linux-2026.2-live-amd64.iso",
-      "iso_url": "https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-live-amd64.iso",
       "disk": {
         "path": "artifacts/kali-live/disk.qcow2",
         "size": "32G",
@@ -326,7 +325,8 @@
         }
       },
       "usb_tablet": true,
-      "iso_sha256": "49e90e694d1b3dedd47f94afbe99dfdd5afb41c8462b638bbd332929769c773a"
+      "iso_sha256": "49e90e694d1b3dedd47f94afbe99dfdd5afb41c8462b638bbd332929769c773a",
+      "iso_help": "Kali publishes the 2026.2 live ISO as a torrent only (cdimage.kali.org and its mirrors serve kali-linux-2026.2-live-amd64.iso.torrent, the plain path answers 404 or hands out the torrent): download https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-live-amd64.iso.torrent with a BitTorrent client and put the ISO at isos/kali-linux-2026.2-live-amd64.iso; vmctl checks it against the sha256 of the vendor's SHA256SUMS."
     },
     "rocky-9": {
       "name": "Rocky Linux 9.8 (Kickstart)",

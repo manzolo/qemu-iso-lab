@@ -819,9 +819,19 @@
       ]
     },
     "kali-live": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:0d5c90e49a1eff7f21ceb91f1813bff09861f176ea9a38f8bc86cb9df5089ed5",
+      "version": "1.0.3",
+      "fingerprint": "sha256:0148f3ee283b946090b76018685f2b3c83b650ea1729053ebacbddde0c20a3f0",
       "history": [
+        {
+          "version": "1.0.3",
+          "date": "2026-10-01",
+          "note": "the 2026.2 live ISO is a torrent only: user-supplied, iso_help explains"
+        },
+        {
+          "version": "1.0.2",
+          "date": "2026-10-01",
+          "note": "the live ISO from the RWTH Aachen Kali mirror (cdimage.kali.org now offers it as a torrent only)"
+        },
         {
           "version": "1.0.1",
           "date": "2026-10-01",

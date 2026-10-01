@@ -46,6 +46,11 @@ FIRMWARE_FAILURES = ("No bootable option", "No bootable device", "BdsDxe: failed
 SEABIOS_FALLTHROUGH = ("Booting from ROM",)
 # The medium's own boot loader, seen on the serial console: Linux Mint 22.3's GRUB menu has no
 # timeout and waits for Enter forever, a medium that boots all the same (night of 2026-09-30).
+# A boot menu without a timeout (KDE neon, the GRUB 2.02 of Ubuntu 14.04/16.04 desktop media, Mint
+# 22.3) holds one console frame forever, often drawn on the screen only. After NUDGE_AFTER_SEC of the
+# same console frame the check presses Enter once, as a person would: the default entry boots and
+# the rest of the watch sees the real boot. Nothing is at stake, the disk is a -snapshot scratch.
+NUDGE_AFTER_SEC = 30
 LOADER_BANNERS = ("GNU GRUB", "ISOLINUX", "SYSLINUX", "systemd-boot")
 ANSI = re.compile(r"\x1b\[[0-9;?=]*[A-Za-z]|\x1b[()][A-Z0-9]")
 # the manual reasons whose medium is an ISO worth booting (config.MANUAL_REASONS): templates import
@@ -159,6 +164,8 @@ def check_medium(vm_name: str, vm: dict[str, Any], timeout_sec: int = DEFAULT_TI
     early_exit: str | None = None
     firmware_line: str | None = None
     settled = False
+    nudged = False
+    still_since = started
     next_capture = started + INTERVAL_SEC
     try:
         with serial_log.open("wb") as log:
@@ -192,7 +199,7 @@ def check_medium(vm_name: str, vm: dict[str, Any], timeout_sec: int = DEFAULT_TI
                 if digest == last_hash:
                     same += 1
                 else:
-                    same, last_hash = 0, digest
+                    same, last_hash, still_since = 0, digest, now
                 if digest not in seen:
                     seen.add(digest)
                     frames += 1
@@ -205,6 +212,14 @@ def check_medium(vm_name: str, vm: dict[str, Any], timeout_sec: int = DEFAULT_TI
                     scratch_png.write_bytes(png)
                     if recorder.frame_kind(scratch_png) == "graphic":
                         graphic += 1
+                if not nudged and not graphic and frames and now - still_since >= NUDGE_AFTER_SEC:
+                    nudged = True
+                    ui.print_note("The medium holds one screen (a boot menu without a timeout?): pressing Enter once")
+                    try:
+                        with qemu.QMP_LOCK:
+                            qemu.qmp_execute(sock, "send-key", arguments={"keys": [{"type": "qcode", "data": "ret"}]}, timeout=5.0)
+                    except (VMError, OSError):
+                        pass
                 if graphic and same >= SETTLED_CAPTURES - 1 and elapsed >= MIN_SEC:
                     settled = True
                     break
@@ -227,5 +242,7 @@ def check_medium(vm_name: str, vm: dict[str, Any], timeout_sec: int = DEFAULT_TI
     text = ANSI.sub("\n", serial.decode("utf-8", "replace"))
     loader = next((banner for banner in LOADER_BANNERS if banner in text), None)
     passed, detail = classify(frames, graphic, settled, early_exit, firmware_line, seconds, loader)
+    if nudged:
+        detail += " (after one Enter at a screen that held still)"
     tail = [line for line in serial.decode("utf-8", "replace").splitlines() if line.strip()][-10:]
     return Outcome(passed, detail, seconds, final_png if last_png is not None else None, frames, graphic, tail)
