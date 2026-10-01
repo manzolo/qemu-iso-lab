@@ -13,6 +13,8 @@ from vmctl.errors import VMError
 
 
 BOOTSTRAP_COMPLETE_TOKEN = "==> Debian preseed install complete!"
+# d-i's text frontend opens a blocking error with this and then waits for Enter (qemu.run_and_expect fail_on)
+DI_FAILURES = ("!! ERROR:",)
 
 # Used in lifecycle.py to build QEMU args. The preseed.cfg and late_command.sh
 # are injected into the initrd via _inject_files_into_initrd, so d-i finds

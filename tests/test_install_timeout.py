@@ -87,6 +87,24 @@ class TimeoutEvidenceTests(BaseVmctlTestCase):
         self.assertIn("the installer reported a failure: An error occurred", message)
         self.assertIn("curtin command in-target", message)  # the lines before it say which step
 
+    def test_run_and_expect_fails_at_once_on_an_installer_error_screen(self):
+        # d-i "!! ERROR: Architecture not supported" then "[Press enter to continue]": an hour each
+        # for ubuntu-10.04 and edubuntu-10.04 on 2026-10-01
+        import time
+        script = ("import time,sys; print('Configuring apt', flush=True); "
+                  "print('!! ERROR: Architecture not supported', flush=True); "
+                  "print('The specified Ubuntu archive mirror does not seem to support your architecture.', flush=True); "
+                  "print('[Press enter to continue]', flush=True); time.sleep(60)")
+        started = time.monotonic()
+        with mock.patch("sys.stdout", new_callable=io.StringIO):
+            with self.assertRaises(self.vmctl.VMError) as caught:
+                self.vmctl.run_and_expect([sys.executable, "-c", script], "==> Debian preseed install complete!", 60,
+                                          fail_on=self.vmctl.DI_FAILURES)
+        self.assertLess(time.monotonic() - started, 20)
+        message = str(caught.exception)
+        self.assertIn("stopped on its own error: !! ERROR: Architecture not supported", message)
+        self.assertIn("does not seem to support your architecture", message)  # the lines after it settled in
+
     def test_a_guest_console_with_nul_padding_and_broken_utf8_is_still_readable(self):
         log = self.root / "logs" / "serial.log"
         log.parent.mkdir(parents=True, exist_ok=True)

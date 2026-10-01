@@ -929,12 +929,21 @@ def common_args(
     return args
 
 
+FAIL_ON_SETTLE_SEC = 5.0
+
+
 def run_and_expect(
     cmd: list[str], expected_text: str, timeout_sec: int,
     auto_inputs: list[tuple[str, str]] | None = None, dry_run: bool = False,
-    log_path: Path | None = None, exit_grace_sec: int = 30,
+    log_path: Path | None = None, exit_grace_sec: int = 30, fail_on: tuple[str, ...] = (),
 ) -> None:
     """Drive QEMU on the serial console until *expected_text* appears, then let the guest power off.
+
+    *fail_on*: text an installer prints when it stops on its own error and waits for a keypress
+    (d-i's "!! ERROR:" ... "[Press enter to continue]"). The run then fails FAIL_ON_SETTLE_SEC
+    later, once the message is complete, instead of at the timeout: ubuntu-10.04 and
+    edubuntu-10.04 sat an hour each on "Architecture not supported" (a mirror hiccup) on
+    2026-10-01.
 
     *exit_grace_sec* is how long the guest gets to exit on its own after the token (Windows
     prints it right before its own shutdown, which takes minutes, hence the parameter).
@@ -954,11 +963,17 @@ def run_and_expect(
     assert process.stdin is not None
     captured: list[str] = []
     sent_inputs: set[tuple[str, str]] = set()
+    failing_since: float | None = None
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ)
     try:
         while True:
             remaining = deadline - time.monotonic()
+            if failing_since is not None and time.monotonic() - failing_since >= FAIL_ON_SETTLE_SEC:
+                text = _strip_ansi("".join(captured))
+                needle = next(n for n in fail_on if n in text)
+                line = text[text.rindex(needle):].splitlines()[0].strip()
+                raise VMError(f"The installer stopped on its own error: {line}. Captured output:\n{''.join(captured)[-4000:]}")
             if remaining <= 0:
                 raise VMError(f"Timed out after {timeout_sec}s waiting for '{expected_text}'. Captured output:\n{''.join(captured)[-4000:]}")
             events = selector.select(timeout=min(0.2, remaining))
@@ -987,6 +1002,8 @@ def run_and_expect(
                                 if log_file is not None:
                                     log_file.write(f"\n[run_and_expect] matched {match_text!r} -> sent {send_text!r}\n")
                                     log_file.flush()
+                    if failing_since is None and fail_on and any(n in full_output_clean for n in fail_on):
+                        failing_since = time.monotonic()
                     if expected_text in full_output_clean:
                         try:
                             process.wait(timeout=exit_grace_sec)

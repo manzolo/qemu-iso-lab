@@ -3134,6 +3134,7 @@ def cmd_bootstrap_preseed(args: argparse.Namespace) -> int:
         timeout_sec=getattr(args, "timeout", 1800),
         dry_run=args.dry_run,
         log_path=serial_log,
+        fail_on=preseed.DI_FAILURES,
     )
     vmstate.complete_install(args.vm, "bootstrap-preseed", vm, dry_run=args.dry_run)
     ui.print_status("ok", "Installation complete — starting installed VM for post-install")
