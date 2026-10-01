@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -78,11 +79,14 @@ def confirm_default_no(prompt: str) -> bool:
     return answer in {"s", "si", "sì", "y", "yes"}
 
 
-def _stream_pipe(pipe: Any, stream: Any, log_fh: Any) -> None:
+def _stream_pipe(pipe: Any, stream: Any, log_fh: Any, needles: tuple[str, ...] = (),
+                 found: list[str] | None = None) -> None:
     try:
         for chunk in iter(pipe.readline, ""):
             if not chunk:
                 break
+            if found is not None and not found and any(needle in chunk for needle in needles):
+                found.append(chunk.strip())
             if stream is not None:
                 stream.write(chunk)
                 stream.flush()
@@ -94,6 +98,16 @@ def _stream_pipe(pipe: Any, stream: Any, log_fh: Any) -> None:
 
 
 TERMINATE_GRACE_SEC = 15
+
+
+def _stop(process: subprocess.Popen[str]) -> None:
+    # SIGTERM first: QEMU closes the qcow2 on it, SIGKILL would not.
+    process.terminate()
+    try:
+        process.wait(timeout=TERMINATE_GRACE_SEC)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
 # Same budget `qemu.run_and_expect` gives its own "Captured output:" tail.
 TIMEOUT_TAIL_CHARS = 4000
 
@@ -141,8 +155,13 @@ def run(
     show_command: bool = True,
     capture_error_output: bool = False,
     timeout_sec: float | None = None,
+    fail_on: tuple[str, ...] = (),
 ) -> None:
-    """Run *cmd* to completion. ``timeout_sec`` bounds the wait and is what the unattended
+    """Run *cmd* to completion. ``fail_on`` (with ``stdout_log``): a line of output holding one
+    of these strings ends the run at once as a failure, the console tail in the error: an
+    installer that reports its own failure and then waits for a keypress would otherwise hold
+    the caller until ``timeout_sec`` (subiquity's "Press enter to start a shell" cost an hour
+    per row twice on the night of 2026-09-30). ``timeout_sec`` bounds the wait and is what the unattended
     install phases pass: a guest that never powers itself off would otherwise hold the
     caller forever (an Ubuntu 20.04 autoinstall spinning in subiquity's network loop held a
     full check-vms run for five hours on 2026-09-20, because this wait had no bound while
@@ -195,9 +214,10 @@ def run(
 
             stdout_stream = None if quiet else sys.stdout
             stderr_stream = None if quiet else sys.stderr
+            found: list[str] = []
             stdout_thread = threading.Thread(
                 target=_stream_pipe,
-                args=(process.stdout, stdout_stream, stdout_fh),
+                args=(process.stdout, stdout_stream, stdout_fh, fail_on, found),
                 daemon=True,
             )
             stderr_thread = threading.Thread(
@@ -212,7 +232,24 @@ def run(
                 process.stdin.write(stdin_text)
                 process.stdin.close()
             try:
-                returncode = process.wait(timeout=timeout_sec)
+                deadline = None if timeout_sec is None else time.monotonic() + timeout_sec
+                while True:
+                    remaining = None if deadline is None else deadline - time.monotonic()
+                    if remaining is not None and remaining <= 0:
+                        raise subprocess.TimeoutExpired(cmd, timeout_sec or 0)
+                    try:
+                        returncode = process.wait(timeout=1.0 if remaining is None else min(1.0, remaining))
+                        break
+                    except subprocess.TimeoutExpired:
+                        if found:
+                            _stop(process)
+                            stdout_thread.join(timeout=5)
+                            stderr_thread.join(timeout=5)
+                            if stdout_fh is not None:
+                                stdout_fh.flush()
+                            tail = log_tail(stdout_log)
+                            raise VMError(f"{Path(cmd[0]).name}: the installer reported a failure: {found[0]}"
+                                          + (f"\nCaptured output:\n{tail}" if tail.strip() else "")) from None
             except subprocess.TimeoutExpired as exc:
                 # SIGTERM first: QEMU closes the qcow2 on it, SIGKILL would not.
                 process.terminate()

@@ -71,6 +71,22 @@ class TimeoutEvidenceTests(BaseVmctlTestCase):
         log.unlink()
         self.assertIn("console line 499", message)
 
+    def test_an_installer_that_reports_its_failure_ends_the_run_at_once(self):
+        # subiquity's "Press enter to start a shell" waited an hour per row (night of 2026-09-30)
+        import time
+        log = self.root / "logs" / "install.log"
+        script = ("import time; print('curtin command in-target', flush=True); "
+                  "print('An error occurred. Press enter to start a shell', flush=True); time.sleep(60)")
+        started = time.monotonic()
+        with mock.patch("sys.stdout", new_callable=io.StringIO):
+            with self.assertRaises(self.vmctl.VMError) as caught:
+                self.vmctl.run([sys.executable, "-c", script], stdout_log=log, quiet=True, timeout_sec=60,
+                               fail_on=self.vmctl.SUBIQUITY_FAILURES)
+        self.assertLess(time.monotonic() - started, 20)
+        message = str(caught.exception)
+        self.assertIn("the installer reported a failure: An error occurred", message)
+        self.assertIn("curtin command in-target", message)  # the lines before it say which step
+
     def test_a_guest_console_with_nul_padding_and_broken_utf8_is_still_readable(self):
         log = self.root / "logs" / "serial.log"
         log.parent.mkdir(parents=True, exist_ok=True)

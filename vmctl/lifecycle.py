@@ -3330,6 +3330,11 @@ def cmd_install_archinstall(args: argparse.Namespace) -> int:
     return 0
 
 
+# subiquity's own failure screen: after it the installer waits for Enter until the row's timeout
+# (kubuntu-24.04 and ubuntu-budgie-20.04 on the night of 2026-09-30, a curtin in-target command).
+SUBIQUITY_FAILURES = ("An error occurred. Press enter to start a shell",)
+
+
 def cmd_install_unattended(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = resolved_vm(args, cfg)
@@ -3366,8 +3371,9 @@ def cmd_install_unattended(args: argparse.Namespace) -> int:
     stdout_log, stderr_log = announce_phase_logs(args.vm, "install-unattended")
     # Bounded only when a bootstrap drives it: `vmctl install-unattended <vm>` by hand stays unbounded,
     # because someone is watching the installer and may take as long as they like.
+    timeout = getattr(args, "timeout", None)
     runtime.run(qemu_args, dry_run=args.dry_run, stdout_log=stdout_log, stderr_log=stderr_log,
-                timeout_sec=getattr(args, "timeout", None))
+                timeout_sec=timeout, fail_on=SUBIQUITY_FAILURES if timeout is not None else ())
     vmstate.complete_install(args.vm, flow, vm, dry_run=args.dry_run)
     return 0
 
