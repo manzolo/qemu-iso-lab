@@ -1847,9 +1847,14 @@
       ]
     },
     "ubuntu-budgie-20.04": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:7e543dcd5a5cc388bc692806344b4bc884f401a6b511689256cba7df6a7614c1",
+      "version": "1.0.2",
+      "fingerprint": "sha256:441a04e05481a388ef8518a1af13caf34320b52e61e7ecf2a5ae7a36ce92284c",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-10-01",
+          "note": "the late command re-enables the -security lines curtin commented out"
+        },
         {
           "version": "1.0.1",
           "date": "2026-10-01",
@@ -2252,9 +2257,14 @@
       ]
     },
     "xubuntu-20.04": {
-      "version": "1.0.2",
-      "fingerprint": "sha256:eaa797eb431dfc829f2cdf1897439db6bb6a306de680be2677bdc526b9698b27",
+      "version": "1.0.3",
+      "fingerprint": "sha256:facbc138d96f3941475e5236c08d2f627484cfc522c0531b706dcfa5ad0e493b",
       "history": [
+        {
+          "version": "1.0.3",
+          "date": "2026-10-01",
+          "note": "the late command re-enables the -security lines curtin commented out"
+        },
         {
           "version": "1.0.2",
           "date": "2026-10-01",
