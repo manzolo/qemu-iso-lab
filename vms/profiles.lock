@@ -623,6 +623,17 @@
         }
       ]
     },
+    "elementaryos": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:2918bb409be4df077304fb79e6d2dc41e0efb5ee67b43f8b7069c73236943aaa",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-01",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "endeavouros": {
       "version": "1.1.1",
       "fingerprint": "sha256:c7e99cbf05262105f482e67300d5e149e6c072a59cc2945f8959fd4fc13b59cb",
@@ -1023,6 +1034,17 @@
         }
       ]
     },
+    "lmde-cinnamon": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c77bd38b2ec6adc11e70d3e9c762105d3e5721add59f76d1b07f55294e1c1035",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-01",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "lubuntu-12.04": {
       "version": "1.0.1",
       "fingerprint": "sha256:346a7ba263b63e8b0c17c09f9cb52023eb7399e85dfb036ed70e5382855feca5",
@@ -1134,6 +1156,17 @@
         {
           "version": "1.0.0",
           "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "mx-linux-xfce": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:463480d5efaa90aa25371831f6da1ad4a32e2d9718431883c0880fb3421f95ce",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-01",
           "note": "first versioned catalog"
         }
       ]
@@ -1633,6 +1666,17 @@
         {
           "version": "1.0.0",
           "date": "2026-09-29",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "solus-budgie": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:2799c6bc3efa30448ac2cf2118bf9f9876a834c00f18870ec59b6b16bd043295",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-01",
           "note": "first versioned catalog"
         }
       ]

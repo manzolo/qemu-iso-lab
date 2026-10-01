@@ -577,6 +577,236 @@
         ]
       },
       "notes": "openSUSE Slowroll (the slow-rolling Tumbleweed) with Xfce on LightDM through AutoYaST, installing from the DVD itself (no install= source: the medium carries the packages). First live PASS 2026-09-30 (461 s). The openSUSE Welcome window is kept from autostarting (it covered the desktop in the first clip)."
+    },
+    "lmde-cinnamon": {
+      "name": "LMDE 7 Cinnamon (Linux Mint Debian Edition)",
+      "meta": {
+        "slug": "lmde",
+        "family": "mint",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "manual",
+        "manual": "live",
+        "version": "1.0.0"
+      },
+      "iso": "isos/lmde-7-cinnamon-64bit.iso",
+      "iso_url": "https://mirrors.edge.kernel.org/linuxmint/debian/lmde-7-cinnamon-64bit.iso",
+      "iso_size": 2960867328,
+      "iso_sha256": "520b9de3e06871d69292f0e82a5979b62088ad83fdf4dce1d19100118a7033e4",
+      "disk": {
+        "path": "artifacts/lmde-cinnamon/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/lmde-cinnamon/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "Linux Mint Debian Edition 7 (Debian 13 base) live with Cinnamon. Manual: its live-installer has no answer file or automatic mode; install from the live session. SHA-256 from the Mint mirror's sha256sum.txt."
+    },
+    "mx-linux-xfce": {
+      "name": "MX Linux 25.3 Xfce",
+      "meta": {
+        "slug": "mx-linux",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "manual",
+        "manual": "live",
+        "version": "1.0.0"
+      },
+      "iso": "isos/MX-25.3_Xfce_x64.iso",
+      "iso_url": "https://ftp.fau.de/mxlinux-cd/MX/Final/Xfce/MX-25.3_Xfce_x64.iso",
+      "iso_size": 2927624192,
+      "iso_sha256": "25b5ce20caeee1b0e50507291df5ac8a8211b1b9999d8dd7416da9b66ed9fbf9",
+      "disk": {
+        "path": "artifacts/mx-linux-xfce/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/mx-linux-xfce/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "MX Linux 25.3 (Debian 13 base, Xfce) live. Manual: the MX installer (minstall) has no unattended mode; install from the live session. SHA-256 from the vendor's .sha256 next to the ISO."
+    },
+    "solus-budgie": {
+      "name": "Solus Budgie",
+      "meta": {
+        "slug": "solus",
+        "family": "solus",
+        "role": "desktop",
+        "release_model": "rolling",
+        "status": "manual",
+        "manual": "live",
+        "version": "1.0.0"
+      },
+      "iso": "isos/Solus-Budgie-Release-2026-04-18.iso",
+      "iso_url": "https://downloads.getsol.us/isos/2026-04-18/Solus-Budgie-Release-2026-04-18.iso",
+      "iso_size": 4338690048,
+      "iso_sha256": "b99324e51d20d029f35932770a7d0f43dad64dc9bca11ec34a6b83cea603b579",
+      "disk": {
+        "path": "artifacts/solus-budgie/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/solus-budgie/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "Solus (independent, eopkg, curated rolling) live with Budgie. Manual: its installer has no answer file; install from the live session. SHA-256 from the vendor's .sha256sum next to the ISO."
+    },
+    "elementaryos": {
+      "name": "elementary OS 8.1",
+      "meta": {
+        "slug": "elementary",
+        "family": "debian",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "manual",
+        "manual": "live",
+        "version": "1.0.0"
+      },
+      "iso": "isos/elementaryos-8.1-stable-amd64.20260219.iso",
+      "iso_help": "elementary.io hands out the ISO through signed, expiring links (dl.elementaryos.org/<token>/...): download elementaryos-8.1-stable-amd64.20260219.iso from https://elementary.io (the price can be set to 0) and put it at isos/elementaryos-8.1-stable-amd64.20260219.iso.",
+      "disk": {
+        "path": "artifacts/elementaryos/disk.qcow2",
+        "size": "32G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/elementaryos/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 4096,
+      "cpus": 4,
+      "network": "user",
+      "audio": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "virtio-gl": [
+            "-device",
+            "virtio-vga-gl",
+            "-display",
+            "gtk,gl=on"
+          ]
+        }
+      },
+      "usb_tablet": true,
+      "notes": "elementary OS 8.1 (Ubuntu 24.04 base, Pantheon) live. Manual: its installer has no automatic mode; install from the live session. The ISO is user-supplied (signed download links, like pearOS)."
     }
   }
 }
