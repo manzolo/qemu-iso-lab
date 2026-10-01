@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:07.956
+A first machine: a small Ubuntu 24.04 server, built from the official cloud image.
+
+00:00:08.056 --> 00:00:14.764
+Its card says what it needs: memory, CPUs, disk, and how it installs.
+
+00:00:14.864 --> 00:00:19.663
+The star adds it to My VMs, your own short list.
+
+00:00:19.763 --> 00:00:25.681
+Install automatically: no questions, no installer to click through.
+
+00:00:25.781 --> 00:00:32.410
+Every action is a job with a live log, and it keeps running if you close the page.
+
+00:00:32.510 --> 00:00:42.025
+It downloads the image and checks it, boots it once with cloud-init, then logs in over SSH to verify it.
+
+00:00:42.125 --> 00:00:49.265
+Done: installed and verified.
+
+00:00:49.365 --> 00:00:54.990
+It is in My VMs, and already running.
+
+00:00:55.090 --> 00:01:02.197
+Next: its console, in the browser.

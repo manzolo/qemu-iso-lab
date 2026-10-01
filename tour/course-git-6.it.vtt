@@ -1,0 +1,37 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:18.447
+Ultima puntata: git flow. Un modo di organizzare i rami di un progetto, dove ogni ramo ha un ruolo, e uno strumento che crea, unisce ed etichetta i rami al posto tuo.
+
+00:00:18.547 --> 00:00:31.687
+I ruoli: main contiene solo le versioni rilasciate; develop è dove il lavoro si riunisce; i rami feature partono da develop, e i rami release e hotfix portano a main.
+
+00:00:31.787 --> 00:00:55.751
+git flow init con le scelte predefinite crea develop, e scrive i nomi dei ruoli nella configurazione del repository. Un'impostazione in più: le etichette delle versioni cominciano con una v, come la v1.0 della quinta puntata.
+
+00:00:55.851 --> 00:01:12.277
+Una feature: feature start crea un ramo da develop e ci si sposta. Un commit, una ricetta nuova.
+
+00:01:12.377 --> 00:01:31.382
+feature finish la unisce a develop, cancella il ramo, e ci lascia su develop. Main non si è mosso: il dolce non è ancora rilasciato.
+
+00:01:31.482 --> 00:01:49.822
+Una release: release start uno punto uno, un ramo dove si prepara la versione. Qui, un file VERSION.
+
+00:01:49.922 --> 00:02:07.659
+release finish fa quattro cose: unisce a main, mette l'etichetta v1.1, riunisce a develop, e cancella il ramo. git tag mostra la versione nuova.
+
+00:02:07.759 --> 00:02:23.541
+E una correzione urgente su una versione già rilasciata: un hotfix parte da main, non da develop.
+
+00:02:23.641 --> 00:02:41.366
+hotfix finish la porta su main con l'etichetta v1.1.1, e anche su develop, così la correzione non si perde alla prossima release.
+
+00:02:41.466 --> 00:03:02.571
+Il grafo mostra le due linee: main con un merge per ogni versione, develop con tutto. Pushiamo entrambi, e le etichette.
+
+00:03:02.671 --> 00:03:21.118
+Sei puntate: i commit, gli oggetti dentro punto git, rami e conflitti, stash e remote, rebase, tag e reflog, e git flow. Tutta la storia della lista è qui.
+
+00:03:21.218 --> 00:03:32.066 line:6%
+La guida del lab Git ha ogni comando del corso, in inglese e in italiano, dalla card del lab.

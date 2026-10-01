@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:09.908
+Machines can also come as labs: here two VMs on their own private network, a VPN server and its client.
+
+00:00:10.008 --> 00:00:18.817
+Install lab installs every member, in order.
+
+00:00:18.917 --> 00:00:35.336
+Two cloud images, provisioned and verified one after the other.
+
+00:00:35.436 --> 00:00:41.278
+Both are running, each with its address on the lab network.
+
+00:00:41.378 --> 00:01:00.300
+Consoles opens them side by side, in one page.
+
+00:01:00.400 --> 00:01:09.612
+The guide walks through the exercises, in English and Italian…
+
+00:01:09.712 --> 00:01:25.856
+…and Run tests checks, inside the machines, that every exercise really works.
+
+00:01:25.956 --> 00:01:31.117
+Every test script passed.
+
+00:01:31.217 --> 00:01:41.246
+That is qemu-iso-lab: pick a machine, or a lab, from the catalog and try it.

@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.554
+Episode three: snapshots. On the pool there is a dataset, web, with a small site in it.
+
+00:00:17.654 --> 00:00:30.613
+A snapshot is the dataset frozen at one instant, read-only. It is taken in no time, and it costs nothing: it shares every block with the dataset.
+
+00:00:30.713 --> 00:00:52.226
+Now change things: rewrite the home page, delete the stylesheet, add a page. zfs diff lists what changed since the snapshot: M modified, minus removed, plus added.
+
+00:00:52.326 --> 00:01:15.559
+Every snapshot can be browsed, in the hidden .zfs directory. Get one file back by copying it, without touching anything else.
+
+00:01:15.659 --> 00:01:44.552
+A snapshot keeps what it saw. Write a hundred megabytes, take a snapshot, delete the file: the space does not come back, because the snapshot still holds those blocks.
+
+00:01:44.652 --> 00:02:09.987
+Rollback puts the dataset back as it was at a snapshot. Going back past a later snapshot needs -r, and destroys that later one: the hundred megabytes are free again.
+
+00:02:10.087 --> 00:02:31.499
+A hold protects a snapshot: while it has one, zfs destroy refuses. Useful for the snapshot a backup still needs. Release it, and it can go.
+
+00:02:31.599 --> 00:02:51.937
+A clone is a writable dataset born from a snapshot: a copy of the site for a test, made in an instant and taking no space until it diverges. Its origin is the snapshot.
+
+00:02:52.037 --> 00:03:14.042
+While the clone exists, its snapshot cannot be destroyed. Destroy the clone, and everything is as before.
+
+00:03:14.142 --> 00:03:27.600 line:6%
+Next episode: faults. A disk offline, silent corruption, a scrub, and the spare taking a disk's place.

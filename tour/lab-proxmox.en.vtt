@@ -1,0 +1,46 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:35.714
+Three Proxmox nodes in a cluster, and a client on the same network. One of the containers will survive the death of its node.
+
+00:00:35.814 --> 00:00:47.066
+One command installs it all: three automated Proxmox installs, the client, then the cluster. About forty minutes, so here it is already running.
+
+00:00:47.166 --> 00:01:10.242
+The cluster: three nodes, quorate. Corosync runs on the lab segment, and the quorum is the majority: two nodes out of three are enough.
+
+00:01:10.342 --> 00:01:26.991
+Node one runs two LXC containers. The first, IT-Tools, has its disk on ZFS and an address on the lab network.
+
+00:01:27.091 --> 00:01:58.026
+Its disk lives on node one only. Two replication jobs send it to the other nodes with ZFS, then every minute only the changes.
+
+00:01:58.126 --> 00:02:12.375
+Now high availability: the cluster takes care of the container, and restarts it elsewhere if its node disappears.
+
+00:02:12.475 --> 00:02:40.029
+The web interface of node two shows the same: the container under node one, managed by HA.
+
+00:02:40.129 --> 00:03:01.665
+On the client, a loop asks for the page every five seconds.
+
+00:03:01.765 --> 00:03:12.465
+And now we pull the plug on node one: hold the power button for two seconds, and QEMU stops at once. No shutdown.
+
+00:03:12.565 --> 00:03:21.033
+The other two keep the quorum. After a minute, HA marks the dead node to be fenced, and waits for its lock to expire.
+
+00:03:21.133 --> 00:03:35.538
+Two and a half minutes later the container runs on node two, from the last replica.
+
+00:03:35.638 --> 00:03:47.019
+And the client? A few minutes without an answer, then the same page, at the same address.
+
+00:03:47.119 --> 00:04:37.496
+Node one comes back and rejoins. The replication now runs the other way, and one command brings the container home.
+
+00:04:37.596 --> 00:05:30.164
+Five tests, one per exercise. The last one pulls the plug again, by itself.
+
+00:05:30.264 --> 00:05:39.456 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

@@ -1,0 +1,46 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:18.749
+LVM, Logical Volume Management, è il modo in cui Linux smette di trattare un disco come una scatola fissa: lo spazio diventa un serbatoio da cui ritagliare volumi, da ridimensionare dopo. Il lab LVM è un server con tre dischi vuoti su cui fare pratica.
+
+00:00:18.849 --> 00:00:34.053
+Si installa dal terminale: una cloud image più tre dischi da 2 gigabyte, pronti in un paio di minuti.
+
+00:00:34.153 --> 00:00:59.364
+vmctl shell apre una sessione sul server. Da qui in poi è LVM puro, uguale su qualsiasi Linux.
+
+00:00:59.464 --> 00:01:15.140
+lsblk elenca i dispositivi a blocchi: il disco di sistema con le sue partizioni, e tre dischi nudi da 2 gigabyte. Li teniamo in una variabile, DISKS, scelti per dimensione, mai per nome.
+
+00:01:15.240 --> 00:01:28.540
+LVM ha tre strati. I physical volume: dischi etichettati per LVM. Il volume group: il serbatoio che li somma. I logical volume: le fette che formatti e monti.
+
+00:01:28.640 --> 00:01:38.825
+pvcreate scrive l'etichetta LVM su ogni disco. pvs li mostra: tre physical volume, ancora in nessun gruppo.
+
+00:01:38.925 --> 00:01:50.091
+vgcreate li mette insieme in un gruppo chiamato labvg: circa 6 gigabyte, la somma dei tre, meno un po' di metadati.
+
+00:01:50.191 --> 00:02:05.165
+lvcreate ritaglia un logical volume da 1 gigabyte chiamato data, e un altro chiamato logs. Ognuno è un dispositivo a blocchi: lo si formatta come una partizione.
+
+00:02:05.265 --> 00:02:34.615
+ext4 su uno, xfs sull'altro, montati sotto /mnt. df mostra due file system da 1 gigabyte; nel gruppo ne restano 4 liberi.
+
+00:02:34.715 --> 00:02:47.632
+Ecco il senso di LVM. Scrivi un file, poi allarga il volume di 1 gigabyte mentre è montato: lvextend con resizefs ingrandisce volume e file system in un colpo solo.
+
+00:02:47.732 --> 00:02:58.723
+df dice 2 gigabyte adesso, e il file è ancora lì. Niente smontaggio, niente fermo.
+
+00:02:58.823 --> 00:03:57.740
+Gli snapshot: congeli il volume com'è, cambi il file, poi fai rientrare lo snapshot. La modifica è annullata.
+
+00:03:57.840 --> 00:04:18.828
+Si torna a tre dischi vuoti: via il gruppo, via le etichette, pulizia. Il lab è pronto per il prossimo giro.
+
+00:04:18.928 --> 00:04:36.440
+Gli stessi passi sono i test del lab: vmctl group test li esegue tutti e sette e ti dice se il tuo LVM si comporta ancora bene.
+
+00:04:36.540 --> 00:04:47.821 line:6%
+La guida, in inglese e in italiano, ha ogni comando con la sua spiegazione: si apre dalla card del lab.

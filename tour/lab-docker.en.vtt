@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:18.080
+A container is a process with its own file system, network and limits, started from an image in a second. The Docker lab is one server with Docker Engine and Compose, and two small images already pulled.
+
+00:00:18.180 --> 00:00:32.250
+One cloud image; the install also pulls the images, so the exercises need no network.
+
+00:00:32.350 --> 00:01:15.075
+The engine is a daemon the docker command talks to over a socket. The lab user is in the docker group: that is why no sudo is needed.
+
+00:01:15.175 --> 00:01:27.865
+An image is the read-only template, made of layers: history shows how alpine was built.
+
+00:01:27.965 --> 00:01:50.450
+docker run starts a container from it. With --rm it is removed when the command ends; with -d it stays up: here nginx, its port 80 published on 8080.
+
+00:01:50.550 --> 00:02:10.404
+exec runs a second process inside, logs reads what the main one printed, port shows how it is published. rm -f stops and removes it.
+
+00:02:10.504 --> 00:02:29.660
+A container's own layer disappears with it. A named volume survives: one container writes, a second one reads.
+
+00:02:29.760 --> 00:03:02.422
+Compose describes several containers in one file: image, ports, volumes. up -d brings them up together, down takes them away.
+
+00:03:02.522 --> 00:03:26.910
+And your own image: a Dockerfile, each instruction a layer. build it, run it, remove it.
+
+00:03:27.010 --> 00:03:41.591
+Clean again, the lab's six tests repeat every step and tell you the engine still behaves.
+
+00:03:41.691 --> 00:03:51.060 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

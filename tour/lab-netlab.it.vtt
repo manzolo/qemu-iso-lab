@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:15.537
+Una piccola rete come quella di casa o di un ufficio: un router pfSense davanti, Pi-hole che fa DNS e DHCP sulla LAN, e un desktop Lubuntu come utente. Il lab di rete costruisce le tre macchine e le collega.
+
+00:00:15.637 --> 00:00:54.884
+Questa è l'installazione lunga: pfSense dalla sua ISO, poi Pi-hole e il desktop con l'autoinstall di Ubuntu. Mezz'ora, senza domande.
+
+00:00:54.984 --> 00:02:34.743
+Su Pi-hole: FTL risponde al DNS sulla porta 53, il blocco è attivo, ed è il server DHCP della LAN con il suo intervallo di indirizzi. pfSense gli affida i client e gli chiede i propri nomi.
+
+00:02:34.843 --> 00:02:58.902
+Sul desktop: il suo DNS è Pi-hole, 192.168.0.10, nel dominio qlan. pfsense.qlan risolve nel router, e un nome pubblico è risposto da Pi-hole attraverso pfSense.
+
+00:02:59.002 --> 00:03:12.718
+Il client raggiunge Internet solo attraverso il router: la sua rotta di default è 192.168.0.1, e pfSense traduce gli indirizzi sulla sua WAN.
+
+00:03:12.818 --> 00:03:27.003
+pfSense stesso, via SSH: vtnet1 è il lato LAN a 192.168.0.1; la tabella di routing manda tutto il resto fuori dalla WAN.
+
+00:03:27.103 --> 00:03:40.337
+Dall'host, il lab si raggiunge attraverso i forward del router: la GUI di pfSense, l'interfaccia di Pi-hole e l'SSH di ogni membro. vmctl lab check li verifica tutti e cinque.
+
+00:03:40.437 --> 00:03:52.098
+La mappa di rete disegna quello che hai appena letto: il segmento, gli indirizzi, i forward e gli esercizi.
+
+00:03:52.198 --> 00:04:03.949
+I test del lab controllano le stesse cose via SSH, su tutti e tre i membri.
+
+00:04:04.049 --> 00:04:13.723 line:6%
+La guida, in inglese e in italiano, accompagna in ogni membro dalla card del lab.

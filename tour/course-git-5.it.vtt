@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:18.417
+Quinta puntata: il rebase, un'alternativa al merge; i tag, per dare un nome a una versione; e il reflog, per recuperare ciò che sembrava perso.
+
+00:00:18.517 --> 00:00:53.885
+Un ramo recipes con il suo commit; intanto si muove anche main. Il grafo si biforca, come nella terza puntata.
+
+00:00:53.985 --> 00:01:14.286
+Questa volta, invece di un merge commit, il rebase: Git rigioca i commit del ramo sopra main. Il grafo torna una linea dritta.
+
+00:01:14.386 --> 00:01:24.486
+Il commit rigiocato ha un hash nuovo: è un commit nuovo. Da qui la regola: mai fare rebase di commit che altri hanno già.
+
+00:01:24.586 --> 00:01:40.416
+Ora main lo può prendere con un semplice fast-forward.
+
+00:01:40.516 --> 00:02:06.223
+Un tag dà a un commit un nome che non si sposta mai: versione uno punto zero. Con l'opzione a è un tag annotato, con autore, data e messaggio. I tag vanno sul remote solo quando li pushi.
+
+00:02:06.323 --> 00:02:25.021
+E ora un errore: reset con l'opzione hard di due commit indietro. Il log li ha persi, e anche i file.
+
+00:02:25.121 --> 00:02:54.791
+Ma il reflog ricorda ogni posizione di HEAD: la riga prima del reset è dove eravamo. Un reset con l'opzione hard lì, e torna tutto.
+
+00:02:54.891 --> 00:03:06.741 line:6%
+Nell'ultima puntata: git flow, un modo di organizzare i rami di un progetto, con versioni e correzioni urgenti.

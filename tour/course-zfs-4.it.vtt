@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:23.700
+Quarta puntata: le cose si rompono. Come nella prima puntata, i quattro dischi vanno in DISKS, e in dollaro uno, dollaro quattro.
+
+00:00:23.800 --> 00:00:38.029
+Sul pool, trecento megabyte di dati, e il loro checksum, per accorgerci se cambia anche un solo byte.
+
+00:00:38.129 --> 00:00:57.546
+Un disco va offline. Il pool è DEGRADED, e continua a funzionare: i dati si leggono ancora, e una scrittura arriva lo stesso.
+
+00:00:57.646 --> 00:01:13.348
+Il disco torna. ZFS lo risincronizza con un resilver: copia solo i blocchi che il disco ha perso mentre era via, non tutto il disco.
+
+00:01:13.448 --> 00:01:26.280
+Ora il guasto peggiore: la corruzione silenziosa. Scriviamo byte casuali in mezzo a un disco, alle spalle di ZFS. Non fatelo mai su un disco vero.
+
+00:01:26.380 --> 00:01:41.985
+Uno scrub legge ogni blocco del pool e lo confronta con il suo checksum. Trova i blocchi danneggiati, li ricostruisce dalla parità, e li conta nella colonna CKSUM. Nessun dato perso.
+
+00:01:42.085 --> 00:02:01.373
+Il checksum del file è lo stesso di prima. zpool clear azzera i contatori. Ubuntu fa già uno scrub ogni mese, da cron.
+
+00:02:01.473 --> 00:02:20.464
+Un disco che continua a dare errori va sostituito. Qui lo spare prende il suo posto: zpool replace, e il resilver scrive sullo spare quello che c'era su quel disco.
+
+00:02:20.564 --> 00:02:34.274
+Stacchiamo il vecchio disco, e lo spare diventa un membro a tutti gli effetti del RAIDZ. Di nuovo tre dischi, nessuno spare: il pool è sano, e i dati intatti.
+
+00:02:34.374 --> 00:02:45.366 line:6%
+Ultima puntata: spostare i dati con send e receive, e spostare un pool intero con export e import.

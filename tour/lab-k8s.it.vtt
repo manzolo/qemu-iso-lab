@@ -1,0 +1,49 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:15.061
+Kubernetes fa girare i container su tante macchine come se fossero una sola. Per impararlo serve un cluster vero: il lab k8s sono tre macchine virtuali con MicroK8s, un control plane e due worker.
+
+00:00:15.161 --> 00:01:27.386
+Un comando le installa tutte e tre: una cloud image ciascuna, con lo snap di MicroK8s.
+
+00:01:27.486 --> 00:01:42.763
+Poi partono sul loro segmento di rete, e i worker si uniscono al control plane da soli. Niente da digitare.
+
+00:01:42.863 --> 00:02:06.503
+Tre nodi, pronti. In kube-system girano i pod del cluster stesso: Calico, la rete dei pod, uno su ogni nodo, e CoreDNS. La colonna NODE dice dove gira ciascuno.
+
+00:02:06.603 --> 00:02:24.073
+Un Deployment tiene in vita tre pod nginx, e lo scheduler li distribuisce sui nodi.
+
+00:02:24.173 --> 00:02:49.890
+Un Service NodePort apre la porta 30080 su ogni nodo: chiedi al nodo uno o al nodo due, nginx risponde da tutti e due.
+
+00:02:49.990 --> 00:02:57.366
+La porta del control plane è inoltrata all'host: la stessa pagina, nel browser.
+
+00:02:57.466 --> 00:03:40.053
+Un'immagine nuova avvia un rolling update: entrano i pod nuovi, escono i vecchi, pochi alla volta. Ogni modifica è una revisione, e rollout undo torna indietro.
+
+00:03:40.153 --> 00:04:18.019
+Manutenzione su un nodo: lo si svuota con drain. I suoi pod vengono sfrattati e ricreati sugli altri due. Uncordon lo restituisce allo scheduler.
+
+00:04:18.119 --> 00:04:59.925
+La configurazione sta fuori dall'immagine. Una ConfigMap e un Secret arrivano al pod come variabili e come file.
+
+00:05:00.025 --> 00:05:19.072
+E un Secret è solo base64: chi può leggerlo lo decodifica con un comando. Non è cifratura.
+
+00:05:19.172 --> 00:05:52.891
+I file di un pod muoiono con lui. Una persistent volume claim no: MariaDB tiene i suoi dati su un volume tutto suo.
+
+00:05:52.991 --> 00:06:18.372
+Scriviamo una riga dal client di MariaDB. Poi cancelliamo il pod: il Deployment ne avvia uno nuovo, sullo stesso volume.
+
+00:06:18.472 --> 00:06:43.057
+Un pod nuovo, e la riga è ancora lì.
+
+00:06:43.157 --> 00:07:05.721
+Sei test, uno per esercizio, e ognuno lascia il cluster come l'ha trovato.
+
+00:07:05.821 --> 00:07:15.183 line:6%
+Ogni comando è nella guida, in inglese e in italiano, dalla card del lab.

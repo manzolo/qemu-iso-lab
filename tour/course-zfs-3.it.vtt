@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.554
+Terza puntata: gli snapshot. Sul pool c'è un dataset, web, con dentro un piccolo sito.
+
+00:00:17.654 --> 00:00:30.613
+Uno snapshot è il dataset congelato in un istante, in sola lettura. Si prende in un attimo, e non costa niente: condivide ogni blocco con il dataset.
+
+00:00:30.713 --> 00:00:52.226
+Ora cambiamo qualcosa: riscriviamo la home page, cancelliamo il foglio di stile, aggiungiamo una pagina. zfs diff elenca cosa è cambiato dallo snapshot: M modificato, meno rimosso, più aggiunto.
+
+00:00:52.326 --> 00:01:15.559
+Ogni snapshot si può sfogliare, nella directory nascosta .zfs. Recuperi un file copiandolo, senza toccare nient'altro.
+
+00:01:15.659 --> 00:01:44.552
+Uno snapshot tiene quello che ha visto. Scriviamo cento megabyte, prendiamo uno snapshot, cancelliamo il file: lo spazio non torna, perché lo snapshot tiene ancora quei blocchi.
+
+00:01:44.652 --> 00:02:09.987
+Il rollback rimette il dataset com'era a uno snapshot. Tornare indietro oltre uno snapshot più recente richiede -r, e distrugge quello più recente: i cento megabyte tornano liberi.
+
+00:02:10.087 --> 00:02:31.499
+Un hold protegge uno snapshot: finché ce l'ha, zfs destroy rifiuta. Utile per lo snapshot che serve ancora a un backup. Lo rilasci, e può essere distrutto.
+
+00:02:31.599 --> 00:02:51.937
+Un clone è un dataset scrivibile nato da uno snapshot: una copia del sito per una prova, fatta in un istante e senza occupare spazio finché non diverge. La sua origine è lo snapshot.
+
+00:02:52.037 --> 00:03:14.042
+Finché il clone esiste, il suo snapshot non si può distruggere. Distruggi il clone, e tutto torna come prima.
+
+00:03:14.142 --> 00:03:27.600 line:6%
+Nella prossima puntata: i guasti. Un disco offline, una corruzione silenziosa, uno scrub, e lo spare che prende il posto di un disco.
