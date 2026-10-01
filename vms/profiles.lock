@@ -2168,9 +2168,14 @@
       ]
     },
     "xubuntu-12.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:0b4781b7060cfd4c582320633ad7dda957210a5b021d03d39c4a82d830fafb8b",
+      "version": "1.0.1",
+      "fingerprint": "sha256:b7014e956e2d1cd960f9ba25df787f4673c3af0e898a889867ae8967ea32f867",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "experiment: xubuntu-desktop installed in a late command after dropping the cdrom source (the precise indexes failed their hashes in pkgsel)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
