@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:13.347
+Ultima puntata: i tre pezzi che lavorano insieme. Un backup pianificato prende i dati di Redis e li salva in RustFS.
+
+00:00:13.447 --> 00:00:41.597
+Un CronJob esegue un Job a orari fissi, scritti come in cron: qui ogni due minuti. Nel Job, un init container chiede a Redis una fotografia dei dati; poi il container principale la carica in un bucket che si chiama backups, col codice S3 dell'app stessa.
+
+00:00:41.697 --> 00:00:49.518
+Non serve aspettare l'orario: creiamo subito un Job dal CronJob, e aspettiamo che finisca.
+
+00:00:49.618 --> 00:01:04.268
+Il suo log: l'oggetto che ha scritto, e la sua dimensione. Il pod del Job resta, Completed, così il suo log si può ancora leggere.
+
+00:01:04.368 --> 00:01:25.859
+Nella console di RustFS: il bucket backups, con la fotografia di Redis.
+
+00:01:25.959 --> 00:01:51.889
+Dove stanno davvero i dati? Ogni claim è legato a un volume, e con lo storage hostpath un volume è una directory sul disco di un nodo. Per questo Redis e RustFS sono fissati sul control plane: non potrebbero seguire un drain su un altro nodo. Un cluster vero usa uno storage di rete, Ceph o un disco cloud, che qualunque nodo può montare.
+
+00:01:51.989 --> 00:02:06.349
+Tutta l'applicazione, in un elenco: Deployment, ReplicaSet, pod, Service, l'autoscaler, il CronJob.
+
+00:02:06.449 --> 00:02:20.883
+E quando non serve più, un comando: cancellare il namespace cancella tutto quello che contiene, volumi compresi.
+
+00:02:20.983 --> 00:02:35.488
+Otto puntate: il cluster, i pod sui nodi, Redis e i volumi, object storage e Secret, l'app da un ConfigMap, i pod che si spostano, salute e autoscaling, backup e dati.
+
+00:02:35.588 --> 00:02:48.225 line:6%
+Ogni manifest del corso è nel lab, e la guida ha ogni comando, in inglese e in italiano, dalla card del lab.

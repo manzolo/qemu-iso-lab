@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:18.382
+Seconda puntata: dentro la directory punto git. Lo stesso repository della prima puntata, quattro commit. Oggi li apriamo.
+
+00:00:18.482 --> 00:00:30.299
+In punto git: objects contiene ogni versione di ogni file e ogni commit; refs contiene i rami e le etichette; HEAD dice dove sei.
+
+00:00:30.399 --> 00:00:46.867
+Un commit è un oggetto, e git cat-file stampa qualsiasi oggetto. Il tipo: commit. Il contenuto: un tree, il commit genitore, autore, committer, e il messaggio. Nient'altro.
+
+00:00:46.967 --> 00:00:57.091
+Il tree è la directory com'era in quel momento: per ogni file, i permessi, il tipo, l'hash del contenuto, e il nome.
+
+00:00:57.191 --> 00:01:19.266
+Il blob è il contenuto del file, e solo quello: niente nome, niente data. Il suo hash si calcola dal contenuto: hash-object dà lo stesso hash per gli stessi byte, su qualsiasi macchina.
+
+00:01:19.366 --> 00:01:36.787
+La riga parent concatena i commit: HEAD tilde uno è il commit precedente. Tutta la storia è questa catena, fino al primo commit, che non ha genitore.
+
+00:01:36.887 --> 00:02:01.446
+E un ramo? Un file con dentro un hash, niente di più. HEAD nomina il ramo su cui sei; rev-parse trasforma qualsiasi nome nell'hash a cui punta.
+
+00:02:01.546 --> 00:02:21.413
+Niente viene mai modificato sul posto. Correggiamo il messaggio dell'ultimo commit: il log mostra un hash nuovo. Git ha fatto un commit nuovo e ci ha spostato il ramo.
+
+00:02:21.513 --> 00:02:34.861
+Il vecchio è ancora lì: il reflog elenca ogni posizione che HEAD ha avuto, compreso il commit di prima della correzione. È la rete di sicurezza che useremo nella quinta puntata.
+
+00:02:34.961 --> 00:02:43.155 line:6%
+Nella prossima puntata: rami, merge, e il primo conflitto.

@@ -1,0 +1,64 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:12.633
+Ogni app che usi ti chiede chi sei. Se ognuna si tiene le sue password, tu hai dieci password, e chi le gestisce ha dieci posti dove aggiungere o togliere una persona.
+
+00:00:12.733 --> 00:00:28.590
+Keycloak è un posto solo che sa chi sei. Le app non vedono mai la tua password: ti mandano da lui e si fidano della risposta. Il lab ha due macchine: un server con Keycloak, e un client con una piccola app web.
+
+00:00:28.690 --> 00:00:39.295
+Un comando le installa tutte e due, da immagini cloud. Qui vado veloce.
+
+00:00:39.395 --> 00:00:46.103
+Questa è l'app. Non ha un modulo di login suo: solo un pulsante, Login.
+
+00:00:46.203 --> 00:00:55.834
+Il pulsante ti porta qui, da Keycloak. La password la dai a Keycloak, mai all'app. Entro come Alice.
+
+00:00:55.934 --> 00:01:03.424
+Alice è dentro, e l'app lo sa senza aver mai visto la sua password. La pagina protetta si apre.
+
+00:01:03.524 --> 00:01:09.587
+La pagina dell'editor è per chi ha il ruolo editor. Alice ce l'ha: si apre.
+
+00:01:09.687 --> 00:01:16.389
+Esco, ed entro come Bob.
+
+00:01:16.489 --> 00:01:29.693
+Bob è entrato come Alice, ma non ha il ruolo editor: 403, vietato. È la differenza tra autenticazione, chi sei, e autorizzazione, cosa puoi fare.
+
+00:01:29.793 --> 00:01:43.193
+Dietro c'è il server. La sua console di amministrazione è dove Alice, Bob e il ruolo editor sono stati creati.
+
+00:01:43.293 --> 00:01:51.623
+Un realm è un mondo a sé, con i suoi utenti e le sue app. Il nostro si chiama lab: due utenti.
+
+00:01:51.723 --> 00:02:03.709
+E le app registrate. lab-web è la nostra, con l'indirizzo a cui Keycloak può rimandare il browser. Un'app che non è in questa lista non può chiedere un login.
+
+00:02:03.809 --> 00:02:13.677
+Le stesse cose si fanno da riga di comando, con kcadm. Qui do a Bob il ruolo editor.
+
+00:02:13.777 --> 00:02:22.847
+Ora Bob ce l'ha. E glielo tolgo subito: nel lab, Bob resta senza.
+
+00:02:22.947 --> 00:02:38.243
+Che cosa ha ricevuto l'app, al posto della password? Un token: un biglietto firmato da Keycloak. Dentro: chi l'ha emesso, per chi, fino a quando, e i ruoli. L'app controlla la firma e si fida.
+
+00:02:38.343 --> 00:02:50.345
+Come fa l'app a conoscere le chiavi per controllare la firma? Le chiede a Keycloak, a un indirizzo pubblico: la discovery.
+
+00:02:50.445 --> 00:03:02.629
+Non solo persone: anche un programma può farsi riconoscere, con un segreto suo. Questo token vive cinque secondi, e in questo momento è attivo.
+
+00:03:02.729 --> 00:03:10.638
+Sei secondi dopo non vale più niente. Anche un token rubato vale poco.
+
+00:03:10.738 --> 00:03:18.345
+E con un segreto sbagliato, Keycloak dice di no: 401.
+
+00:03:18.445 --> 00:03:32.013
+Il lab ha sette test che rifanno tutto questo da soli, login compreso, e ti dicono se funziona ancora.
+
+00:03:32.113 --> 00:03:42.350 line:6%
+Comandi e spiegazioni sono nella guida, in italiano e in inglese, dalla card del lab.

@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:07.124
+qemu-iso-lab is a catalog of virtual machines that install themselves, on plain QEMU.
+
+00:00:07.224 --> 00:00:15.998
+Almost two hundred profiles: most install unattended, and most were verified live.
+
+00:00:16.098 --> 00:00:20.259
+Search by name or version…
+
+00:00:20.359 --> 00:00:29.137
+Every card tells how the machine installs, its version, when it last passed, and what it needs.
+
+00:00:29.237 --> 00:00:34.295
+The clip is the real install, recorded during a test run.
+
+00:00:34.395 --> 00:00:39.310
+And these are the two commands that install and start it.
+
+00:00:39.410 --> 00:00:48.962
+Filters narrow the list: desktops, servers, a family of systems…
+
+00:00:49.062 --> 00:00:56.353
+Pick a few machines with the plus button…
+
+00:00:56.453 --> 00:01:01.725 line:6%
+…and the catalog writes the command that adds them to your lab.
+
+00:01:01.825 --> 00:01:09.903
+Next: installing qemu-iso-lab on your computer.

@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:09.918
+Una macchina del lab può anche passare a libvirt, per usarla in virt-manager. Questo piccolo server Alpine è installato e spento.
+
+00:00:10.018 --> 00:00:20.950
+export-libvirt con copy-to-pool copia il suo disco in un pool di libvirt: una macchina indipendente, il disco di vmctl resta com'era.
+
+00:00:21.050 --> 00:00:25.534
+Ora libvirt la conosce.
+
+00:00:25.634 --> 00:00:58.101
+Si avvia come ogni macchina di libvirt, e virt-manager ne mostra la console.
+
+00:00:58.201 --> 00:01:07.018
+La si spegne da libvirt.
+
+00:01:07.118 --> 00:01:16.098
+Supponiamo di toglierla da vmctl: clean cancella il disco di vmctl, ma tiene le chiavi SSH che la copia conosce.
+
+00:01:16.198 --> 00:01:25.114
+Il ritorno: unexport-libvirt scarica la copia come disco di vmctl, rimette le chiavi e la toglie da libvirt.
+
+00:01:25.214 --> 00:02:03.152
+È di nuovo una macchina di vmctl: si avvia…
+
+00:02:03.252 --> 00:02:08.306
+…e risponde via SSH, con la stessa chiave di prima.
+
+00:02:08.406 --> 00:02:19.874
+Senza copy-to-pool l'export è collegato: libvirt usa il disco stesso di vmctl, e unexport lo restituisce.

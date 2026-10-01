@@ -1,0 +1,52 @@
+WEBVTT
+
+00:00:00.002 --> 00:00:07.873
+QEMU ISO Lab: macchine virtuali e laboratori interi su QEMU, da una dashboard nel browser.
+
+00:00:07.973 --> 00:00:16.929
+Il catalogo ha quasi duecento profili pronti. Prendiamo Ubuntu 26.04 Desktop.
+
+00:00:17.029 --> 00:00:22.755
+Install automatically: nessun installer da cliccare, nessuna domanda.
+
+00:00:22.855 --> 00:00:54.703
+Ogni azione è un job con il suo log dal vivo. Qui l'installazione, accelerata.
+
+00:00:54.803 --> 00:01:00.807
+Installata, verificata e accesa. La riga sale in cima e si illumina.
+
+00:01:00.907 --> 00:01:09.823
+Basta fermare il puntatore sull'icona: un'anteprima dal vivo dello schermo, ovunque sia il desktop in quel momento.
+
+00:01:09.923 --> 00:01:25.092
+Open console: il desktop nel browser, con tastiera, appunti, file e screenshot.
+
+00:01:25.192 --> 00:01:37.178
+Oppure da un terminale: vmctl shell esegue comandi nella macchina via SSH, con la chiave del progetto.
+
+00:01:37.278 --> 00:01:49.646
+Una seconda macchina: un piccolo server Ubuntu. Si selezionano tutte e due e si avviano in console.
+
+00:01:49.746 --> 00:02:16.358
+Le loro console affiancate. Link network le mette su una rete privata tutta loro.
+
+00:02:16.458 --> 00:02:28.108
+La i dice chi ha quale indirizzo.
+
+00:02:28.208 --> 00:02:37.026
+La mappa disegna quella rete dal vivo: le due macchine, i loro indirizzi, il segmento privato.
+
+00:02:37.126 --> 00:02:56.374
+Dalla mappa, SSH apre un terminale nella macchina. Un ping verso l'altra, e i cavi si accendono.
+
+00:02:56.474 --> 00:03:23.643
+La lente sul cavo apre l'ispettore dei pacchetti, come Wireshark: richieste e risposte ICMP, campo per campo.
+
+00:03:23.743 --> 00:03:43.370
+Ogni macchina ha il suo pulsante di accensione. Tenuto premuto due secondi, la macchina si spegne subito.
+
+00:03:43.470 --> 00:03:54.738
+Un clic la riaccende, e la lista la segue.
+
+00:03:54.838 --> 00:04:04.615
+Laboratori, checkpoint, il catalogo e molto altro: QEMU ISO Lab, su GitHub.

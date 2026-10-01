@@ -1,0 +1,25 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.502
+Episode three: the first piece of the application, Redis, a fast in-memory database. It will hold the shopping list.
+
+00:00:17.602 --> 00:00:36.304
+This time no long commands: a manifest, a YAML file that describes the objects. Three of them: a PersistentVolumeClaim, a request for a little disk; a Deployment with one Redis replica, pinned to the control plane; and a Service called redis.
+
+00:00:36.404 --> 00:00:50.254
+kubectl apply hands the file to the cluster, which creates what is missing. Apply it again later, and only what changed is updated.
+
+00:00:50.354 --> 00:01:01.798
+The claim is Bound: the hostpath-storage add-on gave it a directory on the node's disk. Redis writes its data there, so they survive the pod.
+
+00:01:01.898 --> 00:01:21.987
+Other pods find Redis by the Service's name. A throwaway pod with redis-cli asks the host called redis: PONG. The cluster's DNS turned the name into the Service's address.
+
+00:01:22.087 --> 00:01:36.075
+kubectl exec runs a command inside the running pod: write a key, read it back.
+
+00:01:36.175 --> 00:01:58.809
+Delete the pod. The Deployment makes a new one, which mounts the same volume: the key is still there.
+
+00:01:58.909 --> 00:02:09.449 line:6%
+Next episode: an object store for files, RustFS, and a Secret for its keys.

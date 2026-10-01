@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:08.845
+Two machines are running: an Ubuntu server and a Debian one. Each has its own network: they cannot see each other.
+
+00:00:08.945 --> 00:00:20.114
+Every row has a network socket. Grab it and drag: a cable follows the pointer.
+
+00:00:20.214 --> 00:00:27.989
+Drop it on the other machine: vmctl asks first, and shows the command it will run.
+
+00:00:28.089 --> 00:00:36.218
+Both get a new network card on a private segment, while they run, each with its own address.
+
+00:00:36.318 --> 00:00:44.775
+From a terminal, link status shows the segment and the addresses…
+
+00:00:44.875 --> 00:00:53.783
+…and the Ubuntu server reaches the Debian one.
+
+00:00:53.883 --> 00:01:10.470
+The link is a lab of its own now: its card, and its map with the cable lit by the traffic.
+
+00:01:10.570 --> 00:01:28.296
+Dragging the socket onto the same machine again unlinks them.
+
+00:01:28.396 --> 00:01:37.817
+Nothing is saved in the profiles: the link lasts until you take it away.

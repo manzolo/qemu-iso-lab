@@ -1,0 +1,37 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:13.257
+Settima puntata: come fa Kubernetes a sapere che un pod sta bene, quanto può consumare, e come aggiunge pod da solo quando il carico cresce.
+
+00:00:13.357 --> 00:00:35.073
+Due sonde nel manifest. La liveness chiede: il processo è vivo? Se no, il pod viene riavviato. La readiness chiede: può servire? Per la nostra app, pronta vuol dire che Redis risponde. E le risorse: quanto chiede ogni pod, e il suo limite.
+
+00:00:35.173 --> 00:00:55.201
+Spegniamo Redis: zero repliche. In pochi secondi i pod dell'app sono in esecuzione ma non pronti, zero su uno: escono dal Service, che resta senza endpoint.
+
+00:00:55.301 --> 00:01:04.466
+Nel browser non risponde nessuno: meglio di una pagina d'errore da pod che funzionano a metà.
+
+00:01:04.566 --> 00:01:30.482
+Redis riacceso: la sonda di readiness torna a passare, i pod rientrano da soli nel Service, e la lista è ancora lì, sul volume di Redis.
+
+00:01:30.582 --> 00:01:51.195
+Per scalare sul carico, il cluster deve misurarlo: l'add-on metrics-server. kubectl top mostra CPU e memoria, dei nodi e dei pod.
+
+00:01:51.295 --> 00:02:04.180
+Un HorizontalPodAutoscaler: tenere la CPU media dell'app alla metà di quella richiesta, con da tre a nove repliche.
+
+00:02:04.280 --> 00:02:10.696
+E un po' di carico: due pod che chiedono all'app un lavoro pesante, senza sosta.
+
+00:02:10.796 --> 00:02:32.729
+L'autoscaler vede la CPU sopra l'obiettivo, e aggiunge repliche: da tre a nove, distribuite sui nodi.
+
+00:02:32.829 --> 00:02:45.948
+Nel pannello si alternano molti più pod.
+
+00:02:46.048 --> 00:03:01.527
+Fermiamo il carico. L'autoscaler aspetta qualche minuto prima di togliere pod, perché una pausa breve non rimpicciolisca l'app troppo presto.
+
+00:03:01.627 --> 00:03:11.633 line:6%
+Nell'ultima puntata: un backup pianificato, dove stanno davvero i dati, e le pulizie.

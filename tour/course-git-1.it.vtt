@@ -1,0 +1,43 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:15.765
+Un corso su Git in sei puntate, con calma, sul lab Git: un piccolo server. Un solo repository dal primo comando all'ultimo: una lista della spesa. Questa prima puntata lo crea, e scatta le prime istantanee.
+
+00:00:15.865 --> 00:00:28.405
+Git scrive un nome e un'email dentro ogni commit. Nel lab sono già impostati; sul tuo computer li imposti una volta con git config.
+
+00:00:28.505 --> 00:00:52.031
+Una directory, e git init: il repository è nato. Tutto Git vive nella directory nascosta punto git. git status è il comando da ripetere a ogni dubbio: il ramo, main, e ancora niente da committare.
+
+00:00:52.131 --> 00:01:04.635
+Un primo file. Git lo vede, ma non lo segue ancora: è untracked.
+
+00:01:04.735 --> 00:01:16.467
+git add lo mette nell'indice, la lista di ciò che entrerà nel prossimo commit. Lo dice status: modifiche pronte per il commit.
+
+00:01:16.567 --> 00:01:32.724
+git commit scatta l'istantanea, con un messaggio che dice perché. Il log la mostra: un hash lungo che le dà un nome, l'autore, la data e il messaggio.
+
+00:01:32.824 --> 00:01:52.958
+Ora modifichiamo il file. Status in forma breve lo segna modificato, e git diff mostra riga per riga cosa è diverso dall'ultimo commit: i più sono le righe nuove.
+
+00:01:53.058 --> 00:02:09.033
+Dopo git add, il diff semplice è vuoto: la modifica è passata nell'indice. diff con l'opzione staged mostra cosa conterrà il commit.
+
+00:02:09.133 --> 00:02:31.152
+Secondo commit. Il log breve ha una riga per commit, il più recente in alto; git show ne apre uno, con la modifica dentro.
+
+00:02:31.252 --> 00:02:51.212
+Un ripensamento. Una riga sbagliata, non ancora aggiunta: git restore la butta via e il file torna com'era nell'ultimo commit.
+
+00:02:51.312 --> 00:03:14.731
+Una riga aggiunta all'indice troppo presto: restore con l'opzione staged la toglie dall'indice, e la modifica resta nel file. Poi commit con l'opzione a aggiunge da solo ogni file tracciato che è cambiato.
+
+00:03:14.831 --> 00:03:43.394
+File temporanei, build, segreti: Git non li deve seguire. Un punto gitignore li elenca, e status smette di mostrarli. Il punto gitignore stesso si committa, per tutti.
+
+00:03:43.494 --> 00:03:52.867
+Quattro istantanee, quattro commit: la storia della lista.
+
+00:03:52.967 --> 00:04:02.487 line:6%
+Nella prossima puntata: dentro la directory punto git, cos'è davvero un commit.

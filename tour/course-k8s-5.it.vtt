@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:13.298
+Quinta puntata: l'applicazione. Una piccola web app in Python: la lista in Redis, le note in RustFS, e in ogni pagina il pod che ha risposto, il suo IP e il suo nodo.
+
+00:00:13.398 --> 00:00:26.882
+Nessuna immagine da costruire: il codice va in un ConfigMap, e i pod lo eseguono sull'immagine Python standard. Un ConfigMap contiene file o impostazioni che non sono segreti.
+
+00:00:26.982 --> 00:00:45.308
+Il Deployment: tre repliche; Redis e RustFS col nome dei loro Service; le chiavi dal Secret; e la downward API, che dice a ogni pod il suo IP e il nodo su cui gira.
+
+00:00:45.408 --> 00:01:02.451
+Tre pod di shop, distribuiti sui tre nodi, e un Service NodePort sulla 30080.
+
+00:01:02.551 --> 00:01:17.221
+Nel browser. In alto, il pod che ha costruito questa pagina. Sotto, un pannello che chiede ogni secondo chi risponde: tre pod che si alternano, ognuno col suo colore, il suo nodo e il suo IP.
+
+00:01:17.321 --> 00:01:39.765
+Aggiungiamo qualcosa alla lista, e una nota. La lista va in Redis, la nota diventa un oggetto in RustFS; qualunque pod risponda, vedono tutti gli stessi dati.
+
+00:01:39.865 --> 00:02:01.716
+Nella console di RustFS, il bucket dell'app, notes, con la nota come oggetto.
+
+00:02:01.816 --> 00:02:14.771
+E i log: kubectl logs con l'etichetta dell'app legge tutti e tre i pod insieme, ogni riga col nome del suo pod.
+
+00:02:14.871 --> 00:02:25.033 line:6%
+Nella prossima puntata: scaliamo l'app, svuotiamo un nodo, e guardiamo i pod spostarsi.

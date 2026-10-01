@@ -1,0 +1,43 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:15.765
+A Git course in six episodes, slowly, on the Git lab: one small server. One repository from the first command to the last: a shopping list. This first episode makes it, and takes the first snapshots.
+
+00:00:15.865 --> 00:00:28.405
+Git writes a name and an e-mail into every commit. In the lab they are set already; on your machine, git config does it once.
+
+00:00:28.505 --> 00:00:52.031
+A directory, and git init: the repository is born. All of Git lives in the hidden .git directory. git status is the command to repeat at every doubt: the branch, main, and nothing to commit yet.
+
+00:00:52.131 --> 00:01:04.635
+A first file. Git sees it, but does not follow it yet: it is untracked.
+
+00:01:04.735 --> 00:01:16.467
+git add puts it in the index, the list of what goes into the next commit. Status says it: changes to be committed.
+
+00:01:16.567 --> 00:01:32.724
+git commit takes the snapshot, with a message that says why. The log shows it: a long hash that names it, the author, the date and the message.
+
+00:01:32.824 --> 00:01:52.958
+Now change the file. Status in short form marks it modified, and git diff shows line by line what differs from the last commit: the plus signs are the new lines.
+
+00:01:53.058 --> 00:02:09.033
+After git add, plain diff is empty: the change has moved into the index. diff --staged shows what the commit will contain.
+
+00:02:09.133 --> 00:02:31.152
+Second commit. The short log has one line per commit, the newest first; git show opens one of them, change included.
+
+00:02:31.252 --> 00:02:51.212
+An undo. A wrong line, not yet added: git restore throws it away and the file is back as in the last commit.
+
+00:02:51.312 --> 00:03:14.731
+A line added to the index too early: restore --staged takes it out of the index, and the change stays in the file. commit -a then adds every tracked file that changed, by itself.
+
+00:03:14.831 --> 00:03:43.394
+Temporary files, builds, secrets: Git must not track them. A .gitignore lists them, and status stops showing them. The .gitignore itself is committed, for everyone.
+
+00:03:43.494 --> 00:03:52.867
+Four snapshots, four commits: the history of the list.
+
+00:03:52.967 --> 00:04:02.487 line:6%
+Next episode: inside the .git directory, what a commit really is.

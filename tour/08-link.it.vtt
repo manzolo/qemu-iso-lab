@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:08.845
+Due macchine accese: un server Ubuntu e uno Debian. Ognuna ha la sua rete: non si vedono.
+
+00:00:08.945 --> 00:00:20.114
+Ogni riga ha una presa di rete. La si afferra e si trascina: un cavo segue il puntatore.
+
+00:00:20.214 --> 00:00:27.989
+La si lascia sull'altra macchina: vmctl chiede conferma e mostra il comando che eseguirà.
+
+00:00:28.089 --> 00:00:36.218
+Entrambe ricevono una nuova scheda di rete su un segmento privato, a caldo, ognuna con il suo indirizzo.
+
+00:00:36.318 --> 00:00:44.775
+Da un terminale, link status mostra il segmento e gli indirizzi…
+
+00:00:44.875 --> 00:00:53.783
+…e il server Ubuntu raggiunge quello Debian.
+
+00:00:53.883 --> 00:01:10.470
+Ora il collegamento è un lab a sé: la sua scheda, e la sua mappa con il cavo acceso dal traffico.
+
+00:01:10.570 --> 00:01:28.296
+Trascinando di nuovo la presa sulla stessa macchina, le si scollega.
+
+00:01:28.396 --> 00:01:37.817
+Nei profili non si salva nulla: il collegamento dura finché non lo si toglie.

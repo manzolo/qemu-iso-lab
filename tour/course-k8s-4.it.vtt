@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:22.538
+Quarta puntata: dove l'applicazione tiene i suoi file. Un object storage parla S3, il protocollo dello storage di Amazon: bucket e oggetti via HTTP. Il più noto da installare in casa era MinIO; nel 2025 ha smesso di pubblicare le sue immagini, quindi usiamo RustFS, che parla lo stesso S3.
+
+00:00:22.638 --> 00:00:37.750
+Prima le chiavi. Un Secret tiene le credenziali separate dai manifest: qui una access key e una secret key.
+
+00:00:37.850 --> 00:00:47.662
+Attenzione: un Secret è solo codificato in base64, non cifrato. Chi può leggere i Secret del namespace legge la password.
+
+00:00:47.762 --> 00:01:04.689
+Il manifest di RustFS prende le due chiavi dal Secret come variabili d'ambiente, chiede un volume da un gigabyte, e pubblica due Service: l'API S3 dentro il cluster, e la console web sul NodePort 30081.
+
+00:01:04.789 --> 00:01:20.267
+Redis e RustFS girano fianco a fianco sul control plane, ognuno col suo claim.
+
+00:01:20.367 --> 00:01:39.652
+Il lab inoltra la console all'host. Entriamo con le chiavi del Secret: ancora nessun bucket. L'applicazione creerà il suo.
+
+00:01:39.752 --> 00:01:49.559 line:6%
+Nella prossima puntata: l'applicazione vera e propria, su tre pod, e nel browser.

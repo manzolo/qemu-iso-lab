@@ -1,0 +1,46 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:18.749
+LVM, Logical Volume Management, is how Linux stops a disk from being a fixed box: storage becomes a pool you cut volumes from, and resize later. The LVM lab is one server with three empty disks to practise on.
+
+00:00:18.849 --> 00:00:34.053
+Install it from the terminal: one cloud image plus three 2-gigabyte disks, ready in a couple of minutes.
+
+00:00:34.153 --> 00:00:59.364
+vmctl shell opens a session on the server. From here on, everything is plain LVM, the same on any Linux.
+
+00:00:59.464 --> 00:01:15.140
+lsblk lists the block devices: the system disk with its partitions, and three bare 2-gigabyte disks. We keep those in a variable, DISKS, picked by size, never by name.
+
+00:01:15.240 --> 00:01:28.540
+LVM has three layers. Physical volumes: disks labelled for LVM. A volume group: the pool that adds them up. Logical volumes: the slices you format and mount.
+
+00:01:28.640 --> 00:01:38.825
+pvcreate writes the LVM label on each disk. pvs shows them: three physical volumes, not yet in any group.
+
+00:01:38.925 --> 00:01:50.091
+vgcreate pools them into a group called labvg: about 6 gigabytes, the sum of the three, minus a little metadata.
+
+00:01:50.191 --> 00:02:05.165
+lvcreate cuts a logical volume of 1 gigabyte called data, and another called logs. Each is a block device: format it like a partition.
+
+00:02:05.265 --> 00:02:34.615
+ext4 on one, xfs on the other, mounted under /mnt. df shows two file systems of 1 gigabyte each; the group still has 4 free.
+
+00:02:34.715 --> 00:02:47.632
+Here is the point of LVM. Write a file, then grow the volume by 1 gigabyte while it is mounted: lvextend with resizefs enlarges the volume and the file system in one step.
+
+00:02:47.732 --> 00:02:58.723
+df says 2 gigabytes now, and the file is still there. No unmount, no downtime.
+
+00:02:58.823 --> 00:03:57.740
+Snapshots: freeze the volume as it is, change the file, then merge the snapshot back. The change is undone.
+
+00:03:57.840 --> 00:04:18.828
+Back to three empty disks: remove the group, remove the labels, wipe. The lab is ready for the next run.
+
+00:04:18.928 --> 00:04:36.440
+The same steps are the lab's tests: vmctl group test runs all seven and tells you if your LVM still behaves.
+
+00:04:36.540 --> 00:04:47.821 line:6%
+The guide, in English and Italian, has every command with its explanation: open it from the lab's card.

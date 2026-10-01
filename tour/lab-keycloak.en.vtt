@@ -1,0 +1,64 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:12.633
+Every app you use asks who you are. If each one keeps its own passwords, you have ten passwords, and whoever runs them has ten places to add or remove a person.
+
+00:00:12.733 --> 00:00:28.590
+Keycloak is one place that knows who you are. The apps never see your password: they send you to Keycloak and trust its answer. The lab has two machines: a server with Keycloak, and a client with a small web app.
+
+00:00:28.690 --> 00:00:39.295
+One command installs both, from cloud images. I will go fast here.
+
+00:00:39.395 --> 00:00:46.103
+This is the app. It has no login form of its own: just a Login button.
+
+00:00:46.203 --> 00:00:55.834
+The button brings you here, to Keycloak. The password goes to Keycloak, never to the app. I sign in as Alice.
+
+00:00:55.934 --> 00:01:03.424
+Alice is in, and the app knows it without ever seeing her password. The protected page opens.
+
+00:01:03.524 --> 00:01:09.587
+The editor page is for people with the role editor. Alice has it: it opens.
+
+00:01:09.687 --> 00:01:16.389
+I log out, and sign in as Bob.
+
+00:01:16.489 --> 00:01:29.693
+Bob signed in just like Alice, but he has no editor role: 403, forbidden. This is the difference between authentication, who you are, and authorization, what you may do.
+
+00:01:29.793 --> 00:01:43.193
+Behind all this is the server. Its admin console is where Alice, Bob and the role editor were created.
+
+00:01:43.293 --> 00:01:51.623
+A realm is a world of its own, with its users and its apps. Ours is called lab: two users.
+
+00:01:51.723 --> 00:02:03.709
+And the registered apps. lab-web is ours, with the address Keycloak may send the browser back to. An app that is not in this list cannot ask for a login.
+
+00:02:03.809 --> 00:02:13.677
+The same things can be done from the command line, with kcadm. Here I give Bob the role editor.
+
+00:02:13.777 --> 00:02:22.847
+Now Bob has it. And I take it back at once: in the lab, Bob stays without.
+
+00:02:22.947 --> 00:02:38.243
+What did the app receive instead of a password? A token: a signed ticket from Keycloak. Inside: who issued it, for whom, until when, and the roles. The app checks the signature and trusts it.
+
+00:02:38.343 --> 00:02:50.345
+How does the app know the keys that check the signature? It asks Keycloak, at a public address: the discovery.
+
+00:02:50.445 --> 00:03:02.629
+Not only people: a program can identify itself too, with a secret of its own. This token lives five seconds, and right now it is active.
+
+00:03:02.729 --> 00:03:10.638
+Six seconds later it is worth nothing. A stolen token is worth little too.
+
+00:03:10.738 --> 00:03:18.345
+And with a wrong secret, Keycloak says no: 401.
+
+00:03:18.445 --> 00:03:32.013
+The lab has seven tests that do all of this on their own, the login included, and tell you if it still works.
+
+00:03:32.113 --> 00:03:42.350 line:6%
+Commands and explanations are in the guide, in English and Italian, from the lab's card.

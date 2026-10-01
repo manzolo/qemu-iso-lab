@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.610
+Episode six: pods that move. We keep an eye on the app's panel: who answers, from which node.
+
+00:00:17.710 --> 00:00:26.046
+Now three pods, one per node.
+
+00:00:26.146 --> 00:00:41.224
+Scale to six replicas. Three new pods start, with new names and new IPs...
+
+00:00:41.324 --> 00:00:53.503
+...and in the panel, within seconds, the new pods answer too.
+
+00:00:53.603 --> 00:01:46.798
+Maintenance on node two. Drain cordons it, so nothing new lands there, and evicts its pods: the Deployment recreates them on the other nodes.
+
+00:01:46.898 --> 00:01:59.026
+In the panel, node two has disappeared: only main and node one answer, and the app never stopped.
+
+00:01:59.126 --> 00:02:12.760
+Maintenance done: uncordon gives the node back to the scheduler. The pods already moved stay where they are; new ones may go there again.
+
+00:02:12.860 --> 00:02:33.519
+A new version: a different title and colour, set as environment variables. Every change of the pod template is a rolling update: new pods come up while the old ones go away, a few at a time.
+
+00:02:33.619 --> 00:02:44.836
+The page shows the new version, and the panel the new pods.
+
+00:02:44.936 --> 00:03:13.448
+Not convinced? Every rolling update is a revision, and rollout undo goes back to the previous one.
+
+00:03:13.548 --> 00:03:23.733 line:6%
+Next episode: health checks, resources, and the autoscaler under load.

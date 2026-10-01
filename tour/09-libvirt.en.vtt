@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:09.918
+A machine of the lab can also go to libvirt, to keep using it in virt-manager. This small Alpine server is installed and stopped.
+
+00:00:10.018 --> 00:00:20.950
+export-libvirt with copy-to-pool copies its disk into a libvirt pool: an independent machine, vmctl's own disk stays as it was.
+
+00:00:21.050 --> 00:00:25.534
+libvirt knows it now.
+
+00:00:25.634 --> 00:00:58.101
+It starts like any libvirt machine, and virt-manager shows its console.
+
+00:00:58.201 --> 00:01:07.018
+Shut it down from libvirt.
+
+00:01:07.118 --> 00:01:16.098
+Say you remove it from vmctl: clean deletes vmctl's disk, but keeps the SSH keys the copy knows.
+
+00:01:16.198 --> 00:01:25.114
+The way back: unexport-libvirt downloads the copy as vmctl's disk, puts the keys back, and removes it from libvirt.
+
+00:01:25.214 --> 00:02:03.152
+It is vmctl's machine again: it starts…
+
+00:02:03.252 --> 00:02:08.306
+…and answers over SSH, with the same key as before.
+
+00:02:08.406 --> 00:02:19.874
+Without copy-to-pool the export is linked instead: libvirt runs vmctl's own disk, and unexport hands it back.

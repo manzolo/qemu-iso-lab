@@ -1,0 +1,31 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:23.700
+Episode four: things break. As in episode one, the four disks go into DISKS, and into dollar one to dollar four.
+
+00:00:23.800 --> 00:00:38.029
+On the pool, three hundred megabytes of data, and their checksum, so we can tell whether a single byte changes.
+
+00:00:38.129 --> 00:00:57.546
+A disk goes offline. The pool is DEGRADED, and it keeps working: the data is still readable, and a write still lands.
+
+00:00:57.646 --> 00:01:13.348
+The disk comes back. ZFS resilvers it: it copies only the blocks the disk missed while it was away, not the whole disk.
+
+00:01:13.448 --> 00:01:26.280
+Now the worst kind of fault: silent corruption. We write random bytes in the middle of one disk, behind ZFS's back. Never do this to a real disk.
+
+00:01:26.380 --> 00:01:41.985
+A scrub reads every block of the pool and compares it with its checksum. It finds the damaged blocks, rebuilds them from parity, and counts them in the CKSUM column. No data lost.
+
+00:01:42.085 --> 00:02:01.373
+The file's checksum is the same as before. zpool clear resets the counters. Ubuntu already runs a scrub every month, from cron.
+
+00:02:01.473 --> 00:02:20.464
+A disk that keeps returning errors gets replaced. Here the spare takes its place: zpool replace, and the resilver writes onto the spare what that disk held.
+
+00:02:20.564 --> 00:02:34.274
+Detach the old disk, and the spare is a full member of the RAIDZ. Three disks again, no spare left: the pool is healthy, and its data intact.
+
+00:02:34.374 --> 00:02:45.366 line:6%
+Last episode: moving data with send and receive, and moving a whole pool with export and import.

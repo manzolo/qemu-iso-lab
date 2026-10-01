@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:12.367
+Terza puntata: i rami. Un ramo è una linea di lavoro separata: ci provi un'idea, e main non si muove finché non decidi tu.
+
+00:00:12.467 --> 00:00:33.990
+git branch li elenca: solo main, con l'asterisco. switch con l'opzione c crea un ramo e ci si sposta; ora HEAD nomina weekend.
+
+00:00:34.090 --> 00:00:51.397
+Un commit su weekend. Il grafo mostra i due puntatori: weekend avanti di un commit, main dov'era.
+
+00:00:51.497 --> 00:01:11.125
+Torniamo su main, e merge. Main non si era mosso, quindi Git lo sposta soltanto in avanti fino a weekend: un fast-forward, nessun commit nuovo.
+
+00:01:11.225 --> 00:01:45.175
+Ora due linee che si muovono entrambe. Un ramo party aggiunge una riga alla lista; intanto main riceve un file nuovo, drinks. Il grafo si biforca.
+
+00:01:45.275 --> 00:02:02.031
+Questo merge non può essere un fast-forward: Git scrive un merge commit, un commit con due genitori, e il grafo si richiude.
+
+00:02:02.131 --> 00:02:34.186
+E un conflitto. Il menù dice pizza. Un ramo veggie cambia la stessa riga in salad; main la cambia in pasta.
+
+00:02:34.286 --> 00:03:01.293
+Il merge si ferma: CONFLICT in menu.txt. Status lo elenca fra i percorsi non uniti. Nel file Git ha scritto entrambe le versioni: la nostra fra i segni di minore e gli uguali, la loro fino ai segni di maggiore.
+
+00:03:01.393 --> 00:03:19.023
+Risolvere vuol dire scrivere il contenuto che vuoi, senza i segni. add lo segna risolto, e commit chiude il merge, col messaggio che Git ha preparato.
+
+00:03:19.123 --> 00:03:43.405
+Il grafo racconta tutta la storia. I rami uniti possono andare: branch con l'opzione d rifiuta un ramo non ancora unito.
+
+00:03:43.505 --> 00:03:52.566 line:6%
+Nella prossima puntata: lo stash, e un remote per condividere il lavoro.

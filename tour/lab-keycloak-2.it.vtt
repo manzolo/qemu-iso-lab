@@ -1,0 +1,55 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:17.428
+Nella prima lezione hai visto il login. Ora il patto tra l'app e Keycloak: dove ognuno scrive gli indirizzi, cosa succede se non combaciano, e che cosa c'è davvero dentro un token. Il lab è già installato.
+
+00:00:17.528 --> 00:00:33.225
+L'app è un file Python. Dal suo lato sa tre cose: chi è l'emittente, Keycloak; chi è lei, lab-web; e a quali indirizzi vuole tornare, dopo il login e dopo il logout.
+
+00:00:33.325 --> 00:00:49.994
+Dal lato di Keycloak, la scheda del client lab-web dice le stesse cose: gli indirizzi di ritorno ammessi dopo il login, e dopo il logout. Devono combaciare lettera per lettera.
+
+00:00:50.094 --> 00:00:59.366
+E sotto Credentials, il segreto con cui l'app si presenta a Keycloak: lo stesso scritto nel file Python.
+
+00:00:59.466 --> 00:01:13.971
+Da riga di comando la stessa scheda si legge con kcadm: prima l'id del client, poi i suoi due indirizzi.
+
+00:01:14.071 --> 00:01:24.630
+Rompiamo il patto. Cambio l'indirizzo di ritorno ammesso: non più callback, ma altrove. L'app, dal suo lato, non ne sa niente.
+
+00:01:24.730 --> 00:01:38.573
+Login dall'app: Keycloak si ferma prima ancora di chiedere la password. Indirizzo di ritorno non valido. Il codice di accesso non finisce mai a un indirizzo che non è stato registrato.
+
+00:01:38.673 --> 00:01:44.183
+Rimetto callback, e il patto torna.
+
+00:01:44.283 --> 00:01:50.822
+Login come Alice: di nuovo dentro.
+
+00:01:50.922 --> 00:02:02.888
+Da dentro, l'app mostra i claim del token di Alice, già verificati: chi è, chi l'ha emesso, per chi, fino a quando, e i suoi ruoli.
+
+00:02:02.988 --> 00:02:18.260
+Anche il logout passa da Keycloak: l'app ci manda il browser con il token in mano, Keycloak chiude la sessione e lo rimanda all'indirizzo di uscita registrato. Senza quell'indirizzo, si fermerebbe.
+
+00:02:18.360 --> 00:02:33.209
+Ora apriamo un token. Quello di servizio nel lab vive cinque secondi, troppo pochi per guardarlo: con kcadm gli do cinque minuti. Anche questa è una riga nella scheda del client.
+
+00:02:33.309 --> 00:02:50.033
+Dal client chiedo un token e lo guardo grezzo: una stringa lunga, tre pezzi separati da un punto. Intestazione, contenuto, firma. Qui ne vedi i primi sessanta caratteri.
+
+00:02:50.133 --> 00:03:04.361
+Il primo pezzo è solo base64, non è cifrato: dice con quale algoritmo è firmato e con quale chiave, kid. La chiave che l'app va a prendere dalla discovery.
+
+00:03:04.461 --> 00:03:20.086
+Il secondo pezzo è il contenuto, anche questo leggibile da chiunque. Emesso da, per chi, da quale app, quando, fino a quando, e i ruoli. Un token non nasconde niente: non è il posto per i segreti.
+
+00:03:20.186 --> 00:03:31.620
+Allora lo falsifico: riscrivo il contenuto con un'ora di vita in più, e lo rimetto tra la stessa intestazione e la stessa firma.
+
+00:03:31.720 --> 00:03:49.033
+Chiedo a Keycloak dei due token: il vero è attivo, il falso no. La firma copre il contenuto: cambi un carattere, e non torna più. Per questo l'app può fidarsi di quello che legge.
+
+00:03:49.133 --> 00:04:00.481 line:6%
+Nella guida: esercizi 3, 4 e 7, discovery e claim, il giro del login e del logout, gli errori.

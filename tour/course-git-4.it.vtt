@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:19.377
+Quarta puntata: mettere da parte il lavoro con lo stash, poi un remote, per condividere il repository con un collega.
+
+00:00:19.477 --> 00:00:29.785
+Lavoro in corso: una riga nella lista, non committata. E arriva una cosa urgente, che non c'entra niente.
+
+00:00:29.885 --> 00:00:46.069
+git stash mette le modifiche non committate su uno scaffale: la copia di lavoro torna pulita, e stash list mostra lo scaffale.
+
+00:00:46.169 --> 00:00:55.679
+La modifica urgente, committata da sola.
+
+00:00:55.779 --> 00:01:13.236
+stash pop riprende il lavoro dallo scaffale, e lo stash torna vuoto. Ora si può committare anche quello.
+
+00:01:13.336 --> 00:01:27.617
+Ora un remote. Un server Git è soltanto un repository bare: la storia senza una copia di lavoro. Qui è una directory; su GitHub o GitLab cambia solo l'indirizzo.
+
+00:01:27.717 --> 00:01:53.544
+remote add gli dà il nome origin. push con l'opzione u manda main e ci lega il nostro ramo. branch con l'opzione a ora mostra anche remotes/origin/main: il nostro ricordo di dov'è il main del remote.
+
+00:01:53.644 --> 00:02:22.139
+Un collega clona il remote: una copia completa, storia compresa. Aggiunge una riga e la pusha.
+
+00:02:22.239 --> 00:02:45.535
+Torniamo nel nostro repository. fetch scarica le novità senza toccare il nostro ramo: status dice che siamo indietro di un commit, e il log mostra quale.
+
+00:02:45.635 --> 00:03:01.652
+pull è fetch più merge: la riga del collega è nella nostra lista.
+
+00:03:01.752 --> 00:03:11.600 line:6%
+Nella prossima puntata: rebase, tag, e come recuperare un commit che credevi perso.

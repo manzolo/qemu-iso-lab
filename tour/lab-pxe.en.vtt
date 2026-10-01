@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:13.994
+A machine with an empty disk and no ISO installs Debian by itself, over the network. The PXE lab: a server that is every piece of a network install, and a diskless client.
+
+00:00:14.094 --> 00:00:25.026
+On the map, the two machines share a private segment. The server answers DHCP, TFTP and HTTP there, and nowhere else.
+
+00:00:25.126 --> 00:00:34.899
+The lens on the client's cable opens the packet inspector. The filter keeps the first steps of a network boot: DHCP and TFTP.
+
+00:00:34.999 --> 00:00:54.941
+From the host, wipe the client and install it again over the network.
+
+00:00:55.041 --> 00:01:11.179
+The client's network card boots iPXE, and DHCP appears on the cable, read from the bottom: discover, broadcast by the client; offer, from the server; request; acknowledge. Pause freezes the list.
+
+00:01:11.279 --> 00:01:22.168
+On the client's console: pxelinux came over TFTP with the lab's menu, and its default entry loads the Debian installer over HTTP.
+
+00:01:22.268 --> 00:01:44.133
+The installer talks on the serial console, which the host's terminal shows. It fetches its answers from the server, and packages from the Debian mirror through the server's NAT. Nobody types anything.
+
+00:01:44.233 --> 00:02:03.497
+Meanwhile on the server: dnsmasq logged the four DHCP messages, discover, offer, request, acknowledge, and every file it sent over TFTP.
+
+00:02:03.597 --> 00:02:14.614
+The lease it handed out, and nginx's log: the kernel, the initrd and the answers, over HTTP.
+
+00:02:14.714 --> 00:02:28.700
+The installer powers the machine off, and it boots its own disk. Debian 13, installed from nothing but the network.
+
+00:02:28.800 --> 00:02:39.021 line:6%
+Seven exercises and six tests come with the lab, in English and Italian, from its card.

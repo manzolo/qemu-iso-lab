@@ -1,0 +1,28 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:18.417
+Episode five: rebase, an alternative to merge; tags, to name a release; and the reflog, to get back what seemed lost.
+
+00:00:18.517 --> 00:00:53.885
+A recipes branch with its commit; meanwhile main moves too. The graph forks, as in episode three.
+
+00:00:53.985 --> 00:01:14.286
+This time, instead of a merge commit, rebase: Git replays the branch's commits on top of main. The graph is a straight line again.
+
+00:01:14.386 --> 00:01:24.486
+The replayed commit has a new hash: it is a new commit. That is the rule: never rebase commits other people already have.
+
+00:01:24.586 --> 00:01:40.416
+Now main can take it with a plain fast-forward.
+
+00:01:40.516 --> 00:02:06.223
+A tag gives a commit a name that never moves: version one point zero. With -a it is an annotated tag, with author, date and message. Tags go to the remote only when you push them.
+
+00:02:06.323 --> 00:02:25.021
+And now a mistake: reset --hard two commits back. The log has lost them, and the files too.
+
+00:02:25.121 --> 00:02:54.791
+But the reflog remembers every position of HEAD: the line before the reset is where we were. reset --hard to it, and everything is back.
+
+00:02:54.891 --> 00:03:06.741 line:6%
+Last episode: git flow, a way to organise the branches of a project, with releases and hotfixes.

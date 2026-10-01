@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:06.473
+To try it you need a Linux computer with KVM. One line in a terminal is enough.
+
+00:00:06.573 --> 00:00:40.591
+It fetches the project into your home folder and starts the setup.
+
+00:00:40.691 --> 00:00:49.236
+Whatever is missing is installed only after asking: here, two optional tools.
+
+00:00:49.336 --> 00:00:56.087
+QEMU, KVM, the installer tools, the firmware: all there.
+
+00:00:56.187 --> 00:01:01.359
+Setup ends with a short guide to the next steps.
+
+00:01:01.459 --> 00:01:09.052
+Everything goes through one command, vmctl. Its web dashboard runs on your own computer only.
+
+00:01:09.152 --> 00:01:15.638
+The first time, it asks for the user and password your virtual machines will get…
+
+00:01:15.738 --> 00:01:21.295
+…kept in a private file of your checkout, never in the repository.
+
+00:01:21.395 --> 00:01:27.843
+And here is the lab: the whole catalog, ready to install.
+
+00:01:27.943 --> 00:01:34.549
+From now on, QEMU ISO Lab is in your applications menu too.
+
+00:01:34.649 --> 00:01:41.596
+Next: the first virtual machine.

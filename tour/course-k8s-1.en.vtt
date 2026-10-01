@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:20.265
+A Kubernetes course in eight episodes, on the Kubernetes lab: three virtual machines running MicroK8s. Episode by episode we build a small application, a shopping list with Redis and an object store, and we watch its pods move around the cluster.
+
+00:00:20.365 --> 00:00:36.474
+We work on the control plane. kubectl get nodes: three nodes, all Ready. With -o wide, each one's internal address on the lab network, and the operating system.
+
+00:00:36.574 --> 00:00:50.135
+The cluster runs on pods too. In the kube-system namespace: calico-node, the network, one per node; CoreDNS, the cluster's DNS; and the other pieces of the control plane's add-ons.
+
+00:00:50.235 --> 00:01:01.999
+A namespace is a room of the cluster: names, permissions and quotas stay inside it. Our application gets its own, called shop.
+
+00:01:02.099 --> 00:01:14.370
+So that we do not have to write it on every command, we make shop the current namespace. For now it is empty.
+
+00:01:14.470 --> 00:01:30.042
+Everything kubectl does is a request to the API server. api-resources lists the kinds of objects it knows: pods, services, deployments, and many more. We will meet the most important ones.
+
+00:01:30.142 --> 00:01:39.934 line:6%
+Next episode: a first Deployment, and pods that spread over the nodes.
