@@ -9,10 +9,10 @@
         "release_model": "rolling",
         "status": "unattended",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
-      "iso": "isos/CentOS-Stream-10-20260914.0-x86_64-boot.iso",
-      "iso_url": "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/CentOS-Stream-10-20260914.0-x86_64-boot.iso",
+      "iso": "isos/CentOS-Stream-10-20260930.0-x86_64-boot.iso",
+      "iso_url": "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/CentOS-Stream-10-20260930.0-x86_64-boot.iso",
       "disk": {
         "path": "artifacts/centos-stream-10/disk.qcow2",
         "size": "24G",
@@ -81,7 +81,7 @@
           ". /etc/os-release; printf '%s\\n' \"$PRETTY_NAME\""
         ]
       },
-      "iso_sha256": "ede5601165eb5585d4a680fe1c88aa08efd8d78f9f3676e05eb5d1c35ff12485",
+      "iso_sha256": "74eb19bda86f842911c2662945ff95d968d686a6e1ec3ebaa8a5b1037905a16a",
       "guest_agent": true,
       "notes": "Server-only kickstart from the boot ISO and Stream 10 online repository. Requires an x86-64-v3 host CPU with KVM; QEMU uses the host CPU. SSH and ttyS0 getty are enabled. Experimental pending clean live validation."
     }

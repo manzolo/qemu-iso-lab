@@ -352,9 +352,14 @@
       ]
     },
     "centos-stream-10": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:3ec43dcd16001f9ec247b905fc7cb8e82aef25f50c09a34e57c88937a518004e",
+      "version": "1.0.1",
+      "fingerprint": "sha256:bebd89c5ba50c8c56c869f08fec2430f2b4985a669dccfd490a9450de37ee63d",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "the 20260930.0 compose (20260914.0 left the mirror)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -785,9 +790,14 @@
       ]
     },
     "freebsd": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:101586007693194fb21dcac0ff63ae1ff932d54698c945af4081366927262bbb",
+      "version": "1.0.1",
+      "fingerprint": "sha256:4f055dfbff698d261facb460102330c2b9eb118fd8a21e52da1c35a38e1691da",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "14.3 moved to ftp-archive.freebsd.org (same sha256)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -796,9 +806,14 @@
       ]
     },
     "freebsd-installer": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:a9e2039d6159d7d4287d97cbf32df09057a3f9c3d91be9f242156a89e96cb455",
+      "version": "1.0.1",
+      "fingerprint": "sha256:6230c5cbd0d84ddd34dad0c1671d776a2a095390157552bc5587632b5f651b5c",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "14.3 moved to ftp-archive.freebsd.org (same sha256)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",

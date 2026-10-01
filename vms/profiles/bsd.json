@@ -8,12 +8,12 @@
         "role": "server",
         "release_model": "stable",
         "status": "manual",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "manual": "twin",
         "automated_as": "freebsd"
       },
       "iso": "isos/FreeBSD-14.3-RELEASE-amd64-disc1.iso",
-      "iso_url": "https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/FreeBSD-14.3-RELEASE-amd64-disc1.iso",
+      "iso_url": "http://ftp-archive.freebsd.org/pub/FreeBSD-Archive/old-releases/amd64/amd64/ISO-IMAGES/14.3/FreeBSD-14.3-RELEASE-amd64-disc1.iso",
       "disk": {
         "path": "artifacts/freebsd-installer/disk.qcow2",
         "size": "24G",

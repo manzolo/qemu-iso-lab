@@ -29,7 +29,7 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `fedora-silverblue` | `Fedora-Silverblue-ostree-x86_64-44-1.7.iso` | [Manifest](https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Silverblue/x86_64/iso/Fedora-Silverblue-44-1.7-x86_64-CHECKSUM) |
 | `fedora-workstation` | `Fedora-Workstation-Live-42-1.1.x86_64.iso` | [Manifest](https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-42-1.1-x86_64-CHECKSUM) |
 | `fedora-xfce` | `Fedora-Xfce-Live-42-1.1.x86_64.iso` | [Manifest](https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Spins-42-1.1-x86_64-CHECKSUM) |
-| `freebsd-installer` | `FreeBSD-14.3-RELEASE-amd64-disc1.iso` | [Manifest](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64) |
+| `freebsd-installer` | `FreeBSD-14.3-RELEASE-amd64-disc1.iso` | [Manifest](http://ftp-archive.freebsd.org/pub/FreeBSD-Archive/old-releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64) |
 | `redox` | `redox_desktop_x86_64_2024-09-07_1225_livedisk.iso` (from its `.iso.zst`) | [SHA256SUM](https://static.redox-os.org/releases/0.9.0/x86_64/SHA256SUM), hash of the `.zst` archive in `iso_archive.sha256` |
 | `kali-live` | `kali-linux-2026.2-live-amd64.iso` | [Manifest](https://cdimage.kali.org/kali-2026.2/SHA256SUMS) |
 | `kde-neon-user` | `neon-desktop-20260707-0147.iso` | [Vendor .sha256sum](https://files.kde.org/neon/images/desktop/20260707-0147/neon-desktop-20260707-0147.sha256sum) |
@@ -159,13 +159,13 @@ MISSING void-live-x86_64-20250202-xfce.iso
 
 - `kali`: `kali-linux-2026.2-installer-netinst-amd64.iso`, SHA-256 `d32f929dacc48134a31461a09f2160d13ad1d26b820cee920446813ca979b39b`. [Vendor SHA256SUMS](https://cdimage.kali.org/kali-2026.2/SHA256SUMS); fetched through current/SHA256SUMS on 2026-09-13. [Official preseed examples](https://www.kali.org/docs/general-use/kali-preseeding/) and [Xfce answer file](https://gitlab.com/kalilinux/recipes/kali-preseed-examples/-/blob/main/xfce-default.cfg) provide the task selection and mirror.
 
-- `centos-stream-10`: `CentOS-Stream-10-20260914.0-x86_64-boot.iso`, SHA-256 `ede5601165eb5585d4a680fe1c88aa08efd8d78f9f3676e05eb5d1c35ff12485`. [Vendor SHA256SUM](https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/SHA256SUM), retrieved 2026-09-16. The dated ISO may age out of this rolling directory; update URL and vendor checksum together, never attach this hash to latest.
+- `centos-stream-10`: `CentOS-Stream-10-20260930.0-x86_64-boot.iso`, SHA-256 `74eb19bda86f842911c2662945ff95d968d686a6e1ec3ebaa8a5b1037905a16a`. [Vendor SHA256SUM](https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/SHA256SUM), retrieved 2026-10-01 (found by tools/check_iso_urls.py: 20260914.0 had left the mirror). The dated ISO may age out of this rolling directory; update URL and vendor checksum together, never attach this hash to latest.
 
 ## Batch B: FreeBSD
 
 `freebsd` reuses the vendor-pinned FreeBSD 14.3 disc1 and SHA-256
 `f564822bc72d420d1e1a6faacb72f6056d828fcf539dfafd52e08503ef5fab68`
-from the [release manifest](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64),
+from the [release manifest](http://ftp-archive.freebsd.org/pub/FreeBSD-Archive/old-releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64),
 re-fetched and matched on 2026-09-14, as already recorded for the manual `freebsd-installer` profile. Generated install media carry no vendor hash.
 
 ## Archives: pfSense CE and ReactOS (2026-09-26)
