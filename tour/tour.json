@@ -1,0 +1,1109 @@
+{
+  "clips": [
+    {
+      "id": "01-catalog",
+      "title": {
+        "en": "1 · The catalog: pick a machine",
+        "it": "1 · Il catalogo: scegliere una macchina"
+      },
+      "duration": 67.2,
+      "lab": null,
+      "series": "tour",
+      "video": {
+        "it": "01-catalog.it.mp4",
+        "en": "01-catalog.en.mp4"
+      },
+      "poster": "01-catalog.jpg",
+      "subtitles": {
+        "en": "01-catalog.en.vtt",
+        "it": "01-catalog.it.vtt"
+      }
+    },
+    {
+      "id": "02-setup",
+      "title": {
+        "en": "2 · Install qemu-iso-lab",
+        "it": "2 · Installare qemu-iso-lab"
+      },
+      "duration": 71.8,
+      "lab": null,
+      "series": "tour",
+      "video": {
+        "it": "02-setup.it.mp4",
+        "en": "02-setup.en.mp4"
+      },
+      "poster": "02-setup.jpg",
+      "subtitles": {
+        "en": "02-setup.en.vtt",
+        "it": "02-setup.it.vtt"
+      }
+    },
+    {
+      "id": "03-first-vm",
+      "title": {
+        "en": "3 · The first virtual machine",
+        "it": "3 · La prima macchina virtuale"
+      },
+      "duration": 61.9,
+      "lab": null,
+      "series": "tour",
+      "video": {
+        "it": "03-first-vm.it.mp4",
+        "en": "03-first-vm.en.mp4"
+      },
+      "poster": "03-first-vm.jpg",
+      "subtitles": {
+        "en": "03-first-vm.en.vtt",
+        "it": "03-first-vm.it.vtt"
+      }
+    },
+    {
+      "id": "04-console",
+      "title": {
+        "en": "4 · The console in the browser",
+        "it": "4 · La console nel browser"
+      },
+      "duration": 65.3,
+      "lab": null,
+      "series": "tour",
+      "video": {
+        "it": "04-console.it.mp4",
+        "en": "04-console.en.mp4"
+      },
+      "poster": "04-console.jpg",
+      "subtitles": {
+        "en": "04-console.en.vtt",
+        "it": "04-console.it.vtt"
+      }
+    },
+    {
+      "id": "05-lab",
+      "title": {
+        "en": "5 · A lab: two machines, one network",
+        "it": "5 · Un lab: due macchine, una rete"
+      },
+      "duration": 96.5,
+      "lab": "vpn-lab",
+      "series": "tour",
+      "video": {
+        "it": "05-lab.it.mp4",
+        "en": "05-lab.en.mp4"
+      },
+      "poster": "05-lab.jpg",
+      "subtitles": {
+        "en": "05-lab.en.vtt",
+        "it": "05-lab.it.vtt"
+      }
+    },
+    {
+      "id": "06-your-lab",
+      "title": {
+        "en": "6 · Your own lab",
+        "it": "6 · Il tuo lab"
+      },
+      "duration": 136.4,
+      "lab": null,
+      "series": "tour",
+      "video": {
+        "it": "06-your-lab.it.mp4",
+        "en": "06-your-lab.en.mp4"
+      },
+      "poster": "06-your-lab.jpg",
+      "subtitles": {
+        "en": "06-your-lab.en.vtt",
+        "it": "06-your-lab.it.vtt"
+      }
+    },
+    {
+      "id": "lab-docker",
+      "title": {
+        "en": "Docker from the first container: the Docker lab",
+        "it": "Docker dal primo container: il lab Docker"
+      },
+      "duration": 231.3,
+      "lab": "docker-lab",
+      "series": "labs",
+      "steps": [
+        {
+          "t": 0.01,
+          "cmd": "cd qemu-iso-lab"
+        },
+        {
+          "t": 15.84,
+          "cmd": "vmctl group install docker-lab --yes"
+        },
+        {
+          "t": 32.52,
+          "cmd": "vmctl shell docker-lab-server"
+        },
+        {
+          "t": 59.37,
+          "cmd": "systemctl is-active docker; docker version --format 'server {{.Server.Version}}'"
+        },
+        {
+          "t": 65.28,
+          "cmd": "docker info --format '{{.Driver}} storage, {{.Containers}} containers, {{.Images}} images'"
+        },
+        {
+          "t": 71.38,
+          "cmd": "id -nG | tr ' ' '\\n' | grep -x docker    # why no sudo is needed"
+        },
+        {
+          "t": 77.47,
+          "cmd": "docker image ls"
+        },
+        {
+          "t": 82.86,
+          "cmd": "docker image history alpine:3.20"
+        },
+        {
+          "t": 89.61,
+          "cmd": "docker run --rm --pull never alpine:3.20 cat /etc/os-release | head -2"
+        },
+        {
+          "t": 96.06,
+          "cmd": "docker run -d --name lab-web -p 8080:80 --pull never nginx:1.27-alpine"
+        },
+        {
+          "t": 102.05,
+          "cmd": "docker ps"
+        },
+        {
+          "t": 107.55,
+          "cmd": "curl -s localhost:8080 | grep -o '<title>.*</title>'"
+        },
+        {
+          "t": 114.08,
+          "cmd": "docker exec lab-web nginx -v"
+        },
+        {
+          "t": 119.0,
+          "cmd": "docker logs --tail 3 lab-web"
+        },
+        {
+          "t": 125.01,
+          "cmd": "docker inspect -f '{{.State.Status}} {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' lab-web"
+        },
+        {
+          "t": 132.19,
+          "cmd": "docker rm -f lab-web"
+        },
+        {
+          "t": 136.17,
+          "cmd": "docker volume create lab-data"
+        },
+        {
+          "t": 139.89,
+          "cmd": "docker run --rm --pull never -v lab-data:/data alpine:3.20 sh -c 'echo kept > /data/note'"
+        },
+        {
+          "t": 145.3,
+          "cmd": "docker run --rm --pull never -v lab-data:/data alpine:3.20 cat /data/note    # a second container reads it"
+        },
+        {
+          "t": 152.56,
+          "cmd": "docker volume rm lab-data"
+        },
+        {
+          "t": 156.17,
+          "cmd": "mkdir -p ~/compose-demo/html && echo '<h1>hello from compose</h1>' > ~/compose-demo/html/index.html"
+        },
+        {
+          "t": 160.99,
+          "cmd": "cat > ~/compose-demo/compose.yaml <<'EOF'\nservices:\n  web:\n    image: nginx:1.27-alpine\n    pull_policy: never\n    ports:\n      - \"8081:80\"\n    volumes:\n      - ./html:/usr/share/nginx/html:ro\nEOF"
+        },
+        {
+          "t": 167.7,
+          "cmd": "cd ~/compose-demo && docker compose up -d"
+        },
+        {
+          "t": 172.62,
+          "cmd": "docker compose ps; curl -s localhost:8081"
+        },
+        {
+          "t": 179.04,
+          "cmd": "docker compose down && cd && rm -rf ~/compose-demo"
+        },
+        {
+          "t": 184.19,
+          "cmd": "mkdir -p ~/build-demo && cd ~/build-demo && printf 'FROM alpine:3.20\\nRUN echo built-in-the-lab > /message\\nCMD [\"cat\", \"/message\"]\\n' > Dockerfile && cat Dockerfile"
+        },
+        {
+          "t": 192.75,
+          "cmd": "docker build -q -t lab-hello . && docker run --rm lab-hello"
+        },
+        {
+          "t": 200.93,
+          "cmd": "docker image rm lab-hello >/dev/null && cd && rm -rf ~/build-demo && docker ps -a"
+        },
+        {
+          "t": 206.89,
+          "cmd": "exit"
+        },
+        {
+          "t": 208.85,
+          "cmd": "vmctl group test docker-lab"
+        }
+      ],
+      "video": {
+        "it": "lab-docker.it.mp4",
+        "en": "lab-docker.en.mp4"
+      },
+      "poster": "lab-docker.jpg",
+      "subtitles": {
+        "en": "lab-docker.en.vtt",
+        "it": "lab-docker.it.vtt"
+      }
+    },
+    {
+      "id": "lab-git",
+      "title": {
+        "en": "Git from underneath: the Git lab",
+        "it": "Git visto da sotto: il lab Git"
+      },
+      "duration": 271.4,
+      "lab": "git-lab",
+      "series": "labs",
+      "steps": [
+        {
+          "t": 0.01,
+          "cmd": "cd qemu-iso-lab"
+        },
+        {
+          "t": 16.4,
+          "cmd": "vmctl group install git-lab --yes"
+        },
+        {
+          "t": 32.9,
+          "cmd": "vmctl shell git-lab-server"
+        },
+        {
+          "t": 60.47,
+          "cmd": "cd ~/workspace && ls -a .git"
+        },
+        {
+          "t": 65.65,
+          "cmd": "ls /srv/git/lab.git    # the bare remote: the same files, no working tree"
+        },
+        {
+          "t": 72.76,
+          "cmd": "clear; git log --oneline --graph --all | head -20"
+        },
+        {
+          "t": 80.39,
+          "cmd": "git cat-file -p HEAD    # the commit object"
+        },
+        {
+          "t": 87.9,
+          "cmd": "git cat-file -p HEAD^{tree}    # the tree: a directory listing"
+        },
+        {
+          "t": 95.28,
+          "cmd": "git cat-file -p HEAD:hello.txt    # the blob: bytes, no name"
+        },
+        {
+          "t": 102.13,
+          "cmd": "clear; cat .git/HEAD; cat .git/refs/heads/main"
+        },
+        {
+          "t": 108.73,
+          "cmd": "git branch -a"
+        },
+        {
+          "t": 114.61,
+          "cmd": "git log --merges --oneline"
+        },
+        {
+          "t": 120.27,
+          "cmd": "git show --stat --format='%h %s%nMerge: %p' HEAD~3 | head -4"
+        },
+        {
+          "t": 127.63,
+          "cmd": "clear; git switch -c branch-a && echo 'Version A' > clash.txt && git add clash.txt && git commit -q -m 'branch-a: clash.txt'"
+        },
+        {
+          "t": 133.8,
+          "cmd": "git switch main && echo 'Version B' > clash.txt && git add clash.txt && git commit -q -m 'main: clash.txt'"
+        },
+        {
+          "t": 139.63,
+          "cmd": "git merge branch-a; cat clash.txt    # the markers"
+        },
+        {
+          "t": 147.33,
+          "cmd": "echo 'Resolved version' > clash.txt && git add clash.txt && git commit -q -m 'Merge: resolve clash.txt' && git log --oneline --graph -4"
+        },
+        {
+          "t": 156.28,
+          "cmd": "git reset -q --hard origin/main && git branch -D branch-a    # back as it was"
+        },
+        {
+          "t": 162.03,
+          "cmd": "clear; git switch feature/stash && echo 'More work in progress' >> wip.txt && git stash push -m 'WIP: my in-progress work'"
+        },
+        {
+          "t": 168.8,
+          "cmd": "git status --short; cat wip.txt; git stash list"
+        },
+        {
+          "t": 175.47,
+          "cmd": "git stash pop && cat wip.txt"
+        },
+        {
+          "t": 181.19,
+          "cmd": "git checkout -- wip.txt && git switch main"
+        },
+        {
+          "t": 185.17,
+          "cmd": "clear; git remote -v"
+        },
+        {
+          "t": 189.7,
+          "cmd": "git fetch origin && git log --oneline HEAD..origin/main    # there, not here (nothing)"
+        },
+        {
+          "t": 196.09,
+          "cmd": "echo pushed > pushed.txt && git add pushed.txt && git commit -q -m 'Add pushed.txt' && git log --oneline origin/main..HEAD    # here, not pushed yet"
+        },
+        {
+          "t": 204.79,
+          "cmd": "git reset -q --hard HEAD~1    # undo"
+        },
+        {
+          "t": 208.63,
+          "cmd": "clear; git log --oneline --graph main feature/stash | head -8"
+        },
+        {
+          "t": 216.53,
+          "cmd": "git log --merges main..feature/stash --oneline | wc -l    # 0: linear"
+        },
+        {
+          "t": 223.06,
+          "cmd": "clear; git flow version; git tag"
+        },
+        {
+          "t": 228.32,
+          "cmd": "git log --oneline --merges main"
+        },
+        {
+          "t": 234.09,
+          "cmd": "git log --oneline --graph develop -6"
+        },
+        {
+          "t": 240.97,
+          "cmd": "bash ~/reset-git-lab.sh"
+        },
+        {
+          "t": 246.72,
+          "cmd": "exit"
+        },
+        {
+          "t": 249.8,
+          "cmd": "vmctl group test git-lab"
+        }
+      ],
+      "video": {
+        "it": "lab-git.it.mp4",
+        "en": "lab-git.en.mp4"
+      },
+      "poster": "lab-git.jpg",
+      "subtitles": {
+        "en": "lab-git.en.vtt",
+        "it": "lab-git.it.vtt"
+      }
+    },
+    {
+      "id": "lab-lvm",
+      "title": {
+        "en": "LVM from scratch: the LVM lab",
+        "it": "LVM da zero: il lab LVM"
+      },
+      "duration": 268.2,
+      "lab": "lvm-lab",
+      "series": "labs",
+      "steps": [
+        {
+          "t": 0.03,
+          "cmd": "cd qemu-iso-lab"
+        },
+        {
+          "t": 21.73,
+          "cmd": "vmctl group install lvm-lab --yes"
+        },
+        {
+          "t": 37.68,
+          "cmd": "vmctl shell lvm-lab-server"
+        },
+        {
+          "t": 64.62,
+          "cmd": "lsblk"
+        },
+        {
+          "t": 71.33,
+          "cmd": "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS"
+        },
+        {
+          "t": 78.59,
+          "cmd": "sudo pvs; sudo vgs; sudo lvs    # nothing yet"
+        },
+        {
+          "t": 92.62,
+          "cmd": "sudo pvcreate $DISKS"
+        },
+        {
+          "t": 97.16,
+          "cmd": "sudo pvs"
+        },
+        {
+          "t": 102.41,
+          "cmd": "sudo vgcreate labvg $DISKS"
+        },
+        {
+          "t": 107.04,
+          "cmd": "sudo vgs labvg"
+        },
+        {
+          "t": 113.79,
+          "cmd": "sudo lvcreate -L 1G -n data labvg"
+        },
+        {
+          "t": 118.61,
+          "cmd": "sudo lvcreate -L 1G -n logs labvg"
+        },
+        {
+          "t": 123.37,
+          "cmd": "sudo lvs labvg"
+        },
+        {
+          "t": 128.26,
+          "cmd": "sudo mkfs.ext4 -q /dev/labvg/data && sudo mkfs.xfs -q /dev/labvg/logs"
+        },
+        {
+          "t": 135.35,
+          "cmd": "sudo mkdir -p /mnt/lab-data /mnt/lab-logs && sudo mount /dev/labvg/data /mnt/lab-data && sudo mount /dev/labvg/logs /mnt/lab-logs"
+        },
+        {
+          "t": 142.25,
+          "cmd": "df -h /mnt/lab-data /mnt/lab-logs; sudo vgs labvg"
+        },
+        {
+          "t": 149.94,
+          "cmd": "echo before-growth | sudo tee /mnt/lab-data/keep"
+        },
+        {
+          "t": 154.54,
+          "cmd": "sudo lvextend -L +1G --resizefs labvg/data"
+        },
+        {
+          "t": 162.91,
+          "cmd": "df -h /mnt/lab-data; cat /mnt/lab-data/keep"
+        },
+        {
+          "t": 170.67,
+          "cmd": "echo version-1 | sudo tee /mnt/lab-data/file"
+        },
+        {
+          "t": 175.01,
+          "cmd": "sudo lvcreate -s -L 256M -n data-snap labvg/data"
+        },
+        {
+          "t": 180.18,
+          "cmd": "echo version-2 | sudo tee /mnt/lab-data/file    # the change to undo"
+        },
+        {
+          "t": 185.03,
+          "cmd": "sudo umount /mnt/lab-data; sudo lvconvert --merge labvg/data-snap"
+        },
+        {
+          "t": 205.75,
+          "cmd": "sudo lvchange -an labvg/data; sudo lvchange -ay labvg/data; sudo lvs labvg    # the snapshot is gone: merged"
+        },
+        {
+          "t": 213.69,
+          "cmd": "sudo mount /dev/labvg/data /mnt/lab-data; cat /mnt/lab-data/file    # version-1 again"
+        },
+        {
+          "t": 221.6,
+          "cmd": "sudo umount /mnt/lab-data /mnt/lab-logs; sudo vgremove -fy labvg"
+        },
+        {
+          "t": 228.05,
+          "cmd": "sudo pvremove -y $DISKS; sudo wipefs -a $DISKS"
+        },
+        {
+          "t": 233.7,
+          "cmd": "lsblk"
+        },
+        {
+          "t": 239.07,
+          "cmd": "exit"
+        },
+        {
+          "t": 240.93,
+          "cmd": "vmctl group test lvm-lab"
+        }
+      ],
+      "video": {
+        "it": "lab-lvm.it.mp4",
+        "en": "lab-lvm.en.mp4"
+      },
+      "poster": "lab-lvm.jpg",
+      "subtitles": {
+        "en": "lab-lvm.en.vtt",
+        "it": "lab-lvm.it.vtt"
+      }
+    },
+    {
+      "id": "lab-netlab",
+      "title": {
+        "en": "A router, a DNS and a client: the network lab",
+        "it": "Un router, un DNS e un client: il lab di rete"
+      },
+      "duration": 237.3,
+      "lab": "netlab",
+      "series": "labs",
+      "steps": [
+        {
+          "t": 0.01,
+          "cmd": "cd qemu-iso-lab"
+        },
+        {
+          "t": 15.75,
+          "cmd": "vmctl group install netlab --yes"
+        },
+        {
+          "t": 59.39,
+          "cmd": "vmctl shell pihole-lab"
+        },
+        {
+          "t": 124.27,
+          "cmd": "sudo pihole status"
+        },
+        {
+          "t": 130.36,
+          "cmd": "sudo pihole-FTL --config dhcp.active; sudo pihole-FTL --config dhcp.start; sudo pihole-FTL --config dhcp.end"
+        },
+        {
+          "t": 139.07,
+          "cmd": "exit"
+        },
+        {
+          "t": 140.12,
+          "cmd": "vmctl shell lubuntu-lab"
+        },
+        {
+          "t": 146.9,
+          "cmd": "resolvectl status | grep -A3 'Link.*enp'"
+        },
+        {
+          "t": 153.55,
+          "cmd": "resolvectl query pfsense.qlan"
+        },
+        {
+          "t": 159.4,
+          "cmd": "resolvectl query example.org"
+        },
+        {
+          "t": 165.29,
+          "cmd": "ip route | head -1"
+        },
+        {
+          "t": 170.39,
+          "cmd": "curl -sI https://example.org | head -1    # through the pfSense NAT"
+        },
+        {
+          "t": 176.77,
+          "cmd": "exit"
+        },
+        {
+          "t": 178.86,
+          "cmd": "vmctl shell pfsense-lab -- 'ifconfig vtnet1 | grep inet'"
+        },
+        {
+          "t": 184.83,
+          "cmd": "vmctl shell pfsense-lab -- 'netstat -rn | head -5'"
+        },
+        {
+          "t": 191.52,
+          "cmd": "vmctl lab check"
+        },
+        {
+          "t": 204.82,
+          "cmd": "vmctl group map netlab --open"
+        },
+        {
+          "t": 217.4,
+          "cmd": "vmctl group test netlab"
+        }
+      ],
+      "video": {
+        "it": "lab-netlab.it.mp4",
+        "en": "lab-netlab.en.mp4"
+      },
+      "poster": "lab-netlab.jpg",
+      "subtitles": {
+        "en": "lab-netlab.en.vtt",
+        "it": "lab-netlab.it.vtt"
+      }
+    },
+    {
+      "id": "lab-ssh",
+      "title": {
+        "en": "Hardening SSH: the SSH lab",
+        "it": "Blindare SSH: il lab SSH"
+      },
+      "duration": 299.0,
+      "lab": "ssh-lab",
+      "series": "labs",
+      "steps": [
+        {
+          "t": 0.01,
+          "cmd": "cd qemu-iso-lab"
+        },
+        {
+          "t": 15.35,
+          "cmd": "vmctl group install ssh-lab --yes"
+        },
+        {
+          "t": 42.5,
+          "cmd": "vmctl shell ssh-lab-server"
+        },
+        {
+          "t": 68.63,
+          "cmd": "systemctl is-active ssh"
+        },
+        {
+          "t": 72.65,
+          "cmd": "grep -E '^#?(PubkeyAuthentication|PasswordAuthentication|PermitRootLogin)' /etc/ssh/sshd_config"
+        },
+        {
+          "t": 80.42,
+          "cmd": "exit"
+        },
+        {
+          "t": 81.39,
+          "cmd": "vmctl shell ssh-lab-client"
+        },
+        {
+          "t": 88.03,
+          "cmd": "ssh-keygen -t ed25519 -f ~/.ssh/lab_key -N '' -C lab"
+        },
+        {
+          "t": 93.68,
+          "cmd": "ssh-keygen -l -f ~/.ssh/lab_key.pub"
+        },
+        {
+          "t": 98.95,
+          "cmd": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/lab_rsa -N '' -C lab -q && ssh-keygen -l -f ~/.ssh/lab_rsa.pub"
+        },
+        {
+          "t": 109.06,
+          "cmd": "timeout 3 bash -c 'echo > /dev/tcp/172.20.2.1/22' || echo 'port 22: closed from the segment'"
+        },
+        {
+          "t": 121.4,
+          "cmd": "knock 172.20.2.1 7000 8000 9000 && sleep 2"
+        },
+        {
+          "t": 126.73,
+          "cmd": "timeout 3 bash -c 'echo > /dev/tcp/172.20.2.1/22' && echo 'port 22: open for 172.20.2.2'"
+        },
+        {
+          "t": 134.4,
+          "cmd": "exit"
+        },
+        {
+          "t": 135.37,
+          "cmd": "vmctl shell ssh-lab-server"
+        },
+        {
+          "t": 142.25,
+          "cmd": "sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak"
+        },
+        {
+          "t": 146.22,
+          "cmd": "sudo sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin no/; s/^#\\?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config"
+        },
+        {
+          "t": 151.87,
+          "cmd": "sudo sshd -t && echo 'config valid' && sudo systemctl reload ssh"
+        },
+        {
+          "t": 157.34,
+          "cmd": "grep -E '^(PermitRootLogin|MaxAuthTries)' /etc/ssh/sshd_config"
+        },
+        {
+          "t": 163.86,
+          "cmd": "sudo cp /etc/ssh/sshd_config.bak /etc/ssh/sshd_config && sudo systemctl reload ssh    # back as it was"
+        },
+        {
+          "t": 170.19,
+          "cmd": "sudo fail2ban-client status sshd"
+        },
+        {
+          "t": 177.22,
+          "cmd": "exit"
+        },
+        {
+          "t": 180.28,
+          "cmd": "vmctl shell ssh-lab-client"
+        },
+        {
+          "t": 187.01,
+          "cmd": "for i in 1 2 3 4; do sshpass -p nope ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no demo@172.20.2.1 true 2>/dev/null; echo \"attempt $i refused\"; done"
+        },
+        {
+          "t": 203.75,
+          "cmd": "exit"
+        },
+        {
+          "t": 204.77,
+          "cmd": "vmctl shell ssh-lab-server"
+        },
+        {
+          "t": 211.48,
+          "cmd": "sleep 3; sudo fail2ban-client status sshd | grep -A2 'Banned IP'"
+        },
+        {
+          "t": 222.69,
+          "cmd": "sudo fail2ban-client set sshd unbanip 172.20.2.2"
+        },
+        {
+          "t": 227.48,
+          "cmd": "exit"
+        },
+        {
+          "t": 228.48,
+          "cmd": "vmctl shell ssh-lab-client"
+        },
+        {
+          "t": 235.23,
+          "cmd": "nmap -p 22 172.20.2.1"
+        },
+        {
+          "t": 241.29,
+          "cmd": "nmap -sV -p 22 172.20.2.1 | grep -E 'open|Service'"
+        },
+        {
+          "t": 248.4,
+          "cmd": "knock 172.20.2.1 9000 8000 7000; rm -f ~/.ssh/lab_key ~/.ssh/lab_key.pub ~/.ssh/lab_rsa ~/.ssh/lab_rsa.pub"
+        },
+        {
+          "t": 253.96,
+          "cmd": "exit"
+        },
+        {
+          "t": 254.95,
+          "cmd": "vmctl shell ssh-lab-server"
+        },
+        {
+          "t": 261.74,
+          "cmd": "sudo journalctl -u ssh --no-pager -n 8 -o short"
+        },
+        {
+          "t": 270.02,
+          "cmd": "exit"
+        },
+        {
+          "t": 272.0,
+          "cmd": "vmctl group test ssh-lab"
+        }
+      ],
+      "video": {
+        "it": "lab-ssh.it.mp4",
+        "en": "lab-ssh.en.mp4"
+      },
+      "poster": "lab-ssh.jpg",
+      "subtitles": {
+        "en": "lab-ssh.en.vtt",
+        "it": "lab-ssh.it.vtt"
+      }
+    },
+    {
+      "id": "lab-vpn",
+      "title": {
+        "en": "A VPN by hand: WireGuard on the VPN lab",
+        "it": "Una VPN a mano: WireGuard sul lab VPN"
+      },
+      "duration": 287.7,
+      "lab": "vpn-lab",
+      "series": "labs",
+      "steps": [
+        {
+          "t": 0.01,
+          "cmd": "cd qemu-iso-lab"
+        },
+        {
+          "t": 19.78,
+          "cmd": "vmctl group install vpn-lab --yes"
+        },
+        {
+          "t": 42.08,
+          "cmd": "vmctl shell vpn-lab-server"
+        },
+        {
+          "t": 68.14,
+          "cmd": "wg genkey | tee privatekey | wg pubkey > publickey && cat publickey"
+        },
+        {
+          "t": 75.17,
+          "cmd": "exit"
+        },
+        {
+          "t": 76.15,
+          "cmd": "vmctl shell vpn-lab-client"
+        },
+        {
+          "t": 82.86,
+          "cmd": "wg genkey | tee privatekey | wg pubkey > publickey && cat publickey"
+        },
+        {
+          "t": 89.68,
+          "cmd": "sudo tee /etc/wireguard/wg0.conf >/dev/null <<EOF\n[Interface]\nAddress = 10.10.0.2/24\nPrivateKey = $(cat privatekey)\n\n[Peer]\nPublicKey = FLqNJTEonX+sxsd+PgPOJaOehl1o4jNXLfKubRor2BM=\nEndpoint = 172.20.1.1:51820\nAllowedIPs = 10.10.0.1/32\nPersistentKeepalive = 25\nEOF"
+        },
+        {
+          "t": 105.13,
+          "cmd": "sudo wg-quick up wg0"
+        },
+        {
+          "t": 109.66,
+          "cmd": "ping -c 2 -W 2 10.10.0.1    # nobody home yet"
+        },
+        {
+          "t": 117.63,
+          "cmd": "exit"
+        },
+        {
+          "t": 118.6,
+          "cmd": "vmctl shell vpn-lab-server"
+        },
+        {
+          "t": 125.33,
+          "cmd": "sudo tee /etc/wireguard/wg0.conf >/dev/null <<EOF\n[Interface]\nAddress = 10.10.0.1/24\nListenPort = 51820\nPrivateKey = $(cat privatekey)\n\n[Peer]\nPublicKey = 5sMBy/vBZNpRKoVOIUxoVJ6R5JGO4vGhJiCei7YPJ2g=\nAllowedIPs = 10.10.0.2/32\nEOF"
+        },
+        {
+          "t": 133.45,
+          "cmd": "sudo wg-quick up wg0"
+        },
+        {
+          "t": 137.98,
+          "cmd": "sleep 3; sudo wg show"
+        },
+        {
+          "t": 147.43,
+          "cmd": "exit"
+        },
+        {
+          "t": 148.4,
+          "cmd": "vmctl shell vpn-lab-client"
+        },
+        {
+          "t": 155.14,
+          "cmd": "ping -c 3 10.10.0.1"
+        },
+        {
+          "t": 162.42,
+          "cmd": "sudo wg-quick down wg0 && ping -c 1 -W 2 10.10.0.1; sudo wg-quick up wg0"
+        },
+        {
+          "t": 171.1,
+          "cmd": "exit"
+        },
+        {
+          "t": 172.09,
+          "cmd": "vmctl shell vpn-lab-server"
+        },
+        {
+          "t": 178.89,
+          "cmd": "sudo timeout 6 tcpdump -ni vpn-lan udp port 51820 -c 6    # while the client pings 10.10.0.1"
+        },
+        {
+          "t": 187.96,
+          "cmd": "sudo timeout 6 tcpdump -ni wg0 -c 6    # the same pings, in clear"
+        },
+        {
+          "t": 196.38,
+          "cmd": "sudo iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT; sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT; sudo iptables -A INPUT -p udp --dport 51820 -j ACCEPT; sudo iptables -A INPUT -j DROP"
+        },
+        {
+          "t": 204.97,
+          "cmd": "sudo iptables -L INPUT -n -v"
+        },
+        {
+          "t": 211.38,
+          "cmd": "exit"
+        },
+        {
+          "t": 212.4,
+          "cmd": "vmctl shell vpn-lab-client"
+        },
+        {
+          "t": 219.13,
+          "cmd": "ping -c 1 -W 2 172.20.1.1 || echo 'dropped by the server, as intended'"
+        },
+        {
+          "t": 227.56,
+          "cmd": "ping -c 2 10.10.0.1    # the tunnel still works"
+        },
+        {
+          "t": 244.58,
+          "cmd": "sudo wg-quick down wg0; sudo rm -f /etc/wireguard/wg0.conf privatekey publickey"
+        },
+        {
+          "t": 249.58,
+          "cmd": "exit"
+        },
+        {
+          "t": 250.59,
+          "cmd": "vmctl shell vpn-lab-server"
+        },
+        {
+          "t": 257.4,
+          "cmd": "sudo iptables -F; sudo wg-quick down wg0; sudo rm -f /etc/wireguard/wg0.conf privatekey publickey"
+        },
+        {
+          "t": 263.2,
+          "cmd": "exit"
+        },
+        {
+          "t": 265.21,
+          "cmd": "vmctl group test vpn-lab"
+        }
+      ],
+      "video": {
+        "it": "lab-vpn.it.mp4",
+        "en": "lab-vpn.en.mp4"
+      },
+      "poster": "lab-vpn.jpg",
+      "subtitles": {
+        "en": "lab-vpn.en.vtt",
+        "it": "lab-vpn.it.vtt"
+      }
+    },
+    {
+      "id": "lab-zfs",
+      "title": {
+        "en": "ZFS from the first pool: the ZFS lab",
+        "it": "ZFS dal primo pool: il lab ZFS"
+      },
+      "duration": 256.8,
+      "lab": "zfs-lab",
+      "series": "labs",
+      "steps": [
+        {
+          "t": 0.01,
+          "cmd": "cd qemu-iso-lab"
+        },
+        {
+          "t": 17.79,
+          "cmd": "vmctl group install zfs-lab --yes"
+        },
+        {
+          "t": 34.99,
+          "cmd": "vmctl shell zfs-lab-server"
+        },
+        {
+          "t": 62.54,
+          "cmd": "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS"
+        },
+        {
+          "t": 69.84,
+          "cmd": "sudo zpool list"
+        },
+        {
+          "t": 74.33,
+          "cmd": "sudo zpool create -f tank raidz $DISKS && sudo zpool status tank"
+        },
+        {
+          "t": 84.27,
+          "cmd": "sudo zpool list -o name,size,alloc,free,health tank; df -h /tank"
+        },
+        {
+          "t": 91.98,
+          "cmd": "clear; sudo zfs create tank/data && sudo zfs set compression=lz4 tank/data"
+        },
+        {
+          "t": 97.18,
+          "cmd": "yes 'the same line, again and again, compresses very well' | head -c 50M | sudo tee /tank/data/text.bin >/dev/null; sync"
+        },
+        {
+          "t": 105.67,
+          "cmd": "sudo zfs get -H -o value compressratio tank/data"
+        },
+        {
+          "t": 111.84,
+          "cmd": "sudo zfs list -o name,used,avail,refer,mountpoint"
+        },
+        {
+          "t": 119.11,
+          "cmd": "clear; echo version-1 | sudo tee /tank/data/file && sudo zfs snapshot tank/data@v1"
+        },
+        {
+          "t": 124.49,
+          "cmd": "echo version-2 | sudo tee /tank/data/file && sudo zfs diff tank/data@v1"
+        },
+        {
+          "t": 131.16,
+          "cmd": "sudo zfs rollback tank/data@v1 && cat /tank/data/file    # version-1 again"
+        },
+        {
+          "t": 138.33,
+          "cmd": "clear; sudo zpool offline tank $(echo $DISKS | cut -d' ' -f1) && sudo zpool status tank"
+        },
+        {
+          "t": 147.79,
+          "cmd": "echo written-while-degraded | sudo tee /tank/data/degraded"
+        },
+        {
+          "t": 153.13,
+          "cmd": "sudo zpool online tank $(echo $DISKS | cut -d' ' -f1) && sleep 3 && sudo zpool status tank"
+        },
+        {
+          "t": 165.02,
+          "cmd": "clear; sudo zpool scrub tank && sleep 4 && sudo zpool status tank"
+        },
+        {
+          "t": 177.94,
+          "cmd": "clear; sudo zfs snapshot tank/data@backup && sudo zfs send tank/data@backup | sudo zfs receive tank/copy"
+        },
+        {
+          "t": 186.73,
+          "cmd": "sudo zfs list; cat /tank/copy/file"
+        },
+        {
+          "t": 193.62,
+          "cmd": "sudo zfs destroy -r tank/copy"
+        },
+        {
+          "t": 201.13,
+          "cmd": "clear; sudo zpool destroy tank && sudo zpool create -f tank mirror $(echo $DISKS | cut -d' ' -f1,2) mirror $(echo $DISKS | cut -d' ' -f3,4)"
+        },
+        {
+          "t": 209.2,
+          "cmd": "sudo zpool status tank; sudo zfs list tank"
+        },
+        {
+          "t": 217.75,
+          "cmd": "sudo zpool destroy tank; for d in $DISKS; do sudo zpool labelclear -f $d; sudo wipefs -a $d; done; lsblk"
+        },
+        {
+          "t": 228.73,
+          "cmd": "exit"
+        },
+        {
+          "t": 230.79,
+          "cmd": "vmctl group test zfs-lab"
+        }
+      ],
+      "video": {
+        "it": "lab-zfs.it.mp4",
+        "en": "lab-zfs.en.mp4"
+      },
+      "poster": "lab-zfs.jpg",
+      "subtitles": {
+        "en": "lab-zfs.en.vtt",
+        "it": "lab-zfs.it.vtt"
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:06.557
+The machine is running. Open console shows its screen right in the browser.
+
+00:00:06.657 --> 00:00:17.916
+It is a real screen and keyboard: log in with the user chosen at the start.
+
+00:00:18.016 --> 00:00:28.108
+Keyboard sends the combinations the browser would keep for itself: Ctrl+Alt+Del, function keys, the other terminals.
+
+00:00:28.208 --> 00:00:41.473
+SSH opens a real terminal next to the screen, with the project's own key: no password.
+
+00:00:41.573 --> 00:00:49.630
+Files browses the machine's folders: drop files to upload them, click to download.
+
+00:00:49.730 --> 00:00:58.378
+Screenshot, recording, and the console in its own window are one click away.
+
+00:00:58.478 --> 00:01:05.166
+Next: a lab with two machines on their own network.

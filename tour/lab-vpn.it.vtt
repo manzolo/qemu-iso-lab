@@ -1,0 +1,43 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:19.657
+Una VPN è una rete privata stesa sopra un'altra: i pacchetti viaggiano cifrati fra due estremi e dentro escono in chiaro. Il lab VPN sono due macchine su un segmento privato, WireGuard installato, niente configurato. Il tunnel lo costruiamo a mano.
+
+00:00:19.757 --> 00:00:40.973
+Due cloud image: il server a 172.20.1.1, il client a 172.20.1.2.
+
+00:00:41.073 --> 00:01:16.034
+WireGuard si regge su coppie di chiavi. Sul server, wg genkey crea la chiave privata e wg pubkey ne ricava la pubblica. Viaggiano solo le chiavi pubbliche.
+
+00:01:16.134 --> 00:01:29.280
+Lo stesso sul client. Ora ogni lato ha un segreto, e della controparte gli basta conoscere la chiave pubblica.
+
+00:01:29.380 --> 00:01:44.728
+Il wg0.conf del client: il suo indirizzo nel tunnel, la sua chiave privata, e un Peer: la chiave pubblica del server, dove raggiungerlo sul segmento, e quali indirizzi stanno dietro di lui.
+
+00:01:44.828 --> 00:01:58.484
+wg-quick up crea l'interfaccia. Ancora non risponde nessuno: il server non sa nulla di questo client.
+
+00:01:58.584 --> 00:02:28.287
+Sul server, l'immagine speculare: in ascolto sulla 51820, e un Peer con la chiave pubblica del client. wg show: l'handshake è di pochi secondi fa.
+
+00:02:28.387 --> 00:02:51.977
+Dal client, 10.10.0.1 è il server attraverso il tunnel. Tira giù il tunnel e l'indirizzo sparisce; tiralo su ed è di nuovo lì in un secondo.
+
+00:02:52.077 --> 00:03:07.546
+Cosa vede il cavo. tcpdump sul segmento, mentre il client fa ping attraverso il tunnel: solo UDP sulla porta 51820, cifrato.
+
+00:03:07.646 --> 00:03:15.934
+La stessa cattura su wg0: i ping, in chiaro. Ecco una VPN in due catture.
+
+00:03:16.034 --> 00:03:32.285
+Infine, recinta il server con iptables: traffico stabilito, SSH, la porta di WireGuard, poi scarta tutto il resto.
+
+00:03:32.385 --> 00:04:24.062
+Dal client, l'indirizzo del server sul segmento non risponde più al ping, ma il tunnel sì: la 51820 è permessa. Poi le regole vengono tolte.
+
+00:04:24.162 --> 00:04:39.426
+Tunnel giù, chiavi rimosse, e i cinque test del lab ricostruiscono e verificano tutto, OpenVPN compreso: nella guida c'è anche quel secondo tunnel.
+
+00:04:39.526 --> 00:04:47.648 line:6%
+Ogni comando è nella guida, in inglese e in italiano, dalla card del lab.

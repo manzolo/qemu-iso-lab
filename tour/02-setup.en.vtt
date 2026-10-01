@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:06.293
+To try it you need a Linux computer with KVM, git and Python.
+
+00:00:06.393 --> 00:00:15.190
+Clone the repository…
+
+00:00:15.290 --> 00:00:21.347
+…and run setup: it links the vmctl command and checks the host.
+
+00:00:21.447 --> 00:00:30.007
+Whatever is missing is installed only after asking: here, two optional tools.
+
+00:00:30.107 --> 00:00:35.791
+QEMU, KVM, the installer tools, the firmware: all there.
+
+00:00:35.891 --> 00:00:40.664
+Setup ends with a short guide to the next steps.
+
+00:00:40.764 --> 00:00:48.678
+Everything goes through one command, vmctl. Its web dashboard runs on your own computer only.
+
+00:00:48.778 --> 00:00:55.264
+The first time, it asks for the user and password your virtual machines will get…
+
+00:00:55.364 --> 00:01:00.922
+…kept in a private file of your checkout, never in the repository.
+
+00:01:01.022 --> 00:01:05.820
+And here is the lab: the whole catalog, ready to install.
+
+00:01:05.920 --> 00:01:11.688
+Next: the first virtual machine.

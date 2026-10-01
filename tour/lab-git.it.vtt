@@ -1,0 +1,49 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:16.277
+Git è più facile dopo aver visto cosa conserva. Il lab Git è un server con un repository già pronto: rami veri, una storia con merge, un conflitto risolto, un remote. Lo leggiamo da sotto, poi ci esercitiamo.
+
+00:00:16.377 --> 00:00:31.756
+Una cloud image; l'installazione costruisce il repository per il tuo utente e un remote bare accanto.
+
+00:00:31.856 --> 00:01:12.346
+Un repository è una directory .git: objects, refs, HEAD, config. Il remote bare ha esattamente gli stessi file e nessun albero di lavoro: un server Git non è altro che questo.
+
+00:01:12.446 --> 00:01:27.481
+La storia come grafo. Poi cat-file apre un commit: un tree, due genitori, un autore, un messaggio. Due genitori è ciò che lo rende un merge: nient'altro lo contrassegna.
+
+00:01:27.581 --> 00:01:41.712
+Il tree è un elenco di directory: modo, tipo, hash, nome. Il blob sono i byte del file e nient'altro: niente nome, niente storia. Il nome vive nel tree.
+
+00:01:41.812 --> 00:01:54.190
+Un ramo è un file con dentro un hash. HEAD è un file che nomina il ramo su cui sei. Creare un ramo non copia niente: ecco perché è istantaneo.
+
+00:01:54.290 --> 00:02:07.211
+I merge: quando entrambi i lati si sono mossi, Git scrive un commit con due genitori. feature/hello è stato unito così; show stampa i due genitori.
+
+00:02:07.311 --> 00:02:26.877
+Ora un conflitto, fatto apposta: due rami cambiano la stessa riga. Il merge si ferma e Git scrive le due versioni fra i marcatori.
+
+00:02:26.977 --> 00:02:41.595
+Decidi tu il contenuto, add, commit: il commit di merge registra la risoluzione. Poi si torna dov'eravamo.
+
+00:02:41.695 --> 00:03:04.758
+Lo stash mette da parte una modifica che non sei pronto a committare: l'albero è pulito, la modifica aspetta su una pila, pop la riporta.
+
+00:03:04.858 --> 00:03:28.232
+Il remote. fetch aggiorna la tua copia dei suoi rami; questi due intervalli rispondono alle sole domande che contano: cosa c'è di là e non di qua, cosa c'è di qua e non di là.
+
+00:03:28.332 --> 00:03:42.654
+Il rebase riapplica i commit sopra un altro ramo: feature/stash sta sull'hotfix di main in linea retta, senza commit di merge. Hash nuovi: mai fare rebase di ciò che altri hanno già.
+
+00:03:42.754 --> 00:04:00.566
+Git flow dà ruoli ai rami: develop integra, le feature rientrano lì, una release rientra in main e lascia un tag. La release 1.0 del lab è taggata v1.0.
+
+00:04:00.666 --> 00:04:08.652
+Gli esercizi cambiano la storia apposta. Uno script ricostruisce tutto il repository in pochi secondi.
+
+00:04:08.752 --> 00:04:23.370
+Nove test, uno per esercizio, controllano che il repository sia come il lab te lo consegna.
+
+00:04:23.470 --> 00:04:31.300 line:6%
+Ogni comando è nella guida, in inglese e in italiano, dalla card del lab.

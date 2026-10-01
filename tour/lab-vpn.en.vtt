@@ -1,0 +1,43 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:19.657
+A VPN is a private network laid over another one: packets travel encrypted between two ends and come out in clear inside. The VPN lab is two machines on a private segment, WireGuard installed, nothing configured. We build the tunnel by hand.
+
+00:00:19.757 --> 00:00:40.973
+Two cloud images: the server at 172.20.1.1, the client at 172.20.1.2.
+
+00:00:41.073 --> 00:01:16.034
+WireGuard is built on key pairs. On the server, wg genkey makes the private key and wg pubkey derives the public one. Only public keys ever travel.
+
+00:01:16.134 --> 00:01:29.280
+The same on the client. Now each side has a secret and the other side's public key is all it needs to know.
+
+00:01:29.380 --> 00:01:44.728
+The client's wg0.conf: its tunnel address, its private key, and a Peer: the server's public key, where to reach it on the segment, and which addresses live behind it.
+
+00:01:44.828 --> 00:01:58.484
+wg-quick up creates the interface. Nothing answers yet: the server knows nothing about this client.
+
+00:01:58.584 --> 00:02:28.287
+On the server, the mirror image: listen on 51820, and a Peer with the client's public key. wg show: the handshake happened seconds ago.
+
+00:02:28.387 --> 00:02:51.977
+From the client, 10.10.0.1 is the server through the tunnel. Take the tunnel down and the address is gone; bring it up and it is back in a second.
+
+00:02:52.077 --> 00:03:07.546
+What the wire sees. tcpdump on the segment, while the client pings through the tunnel: only UDP on port 51820, ciphertext.
+
+00:03:07.646 --> 00:03:15.934
+The same capture on wg0: the pings, in clear. That is a VPN in two captures.
+
+00:03:16.034 --> 00:03:32.285
+Last, fence the server with iptables: established traffic, SSH, the WireGuard port, then drop everything else.
+
+00:03:32.385 --> 00:04:24.062
+From the client, the server's segment address no longer answers a ping, but the tunnel still does: 51820 is allowed. Then the rules come off.
+
+00:04:24.162 --> 00:04:39.426
+Tunnels down, keys removed, and the lab's five tests rebuild and verify all of it, OpenVPN included: the guide has that second tunnel too.
+
+00:04:39.526 --> 00:04:47.648 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

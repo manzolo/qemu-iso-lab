@@ -1,0 +1,43 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:15.207
+SSH is how you reach every server you own, so it is the door everyone else tries first. The SSH lab is a server to harden and a client to probe it from, on a private segment.
+
+00:00:15.307 --> 00:00:41.402
+Two cloud images: the server at 172.20.2.1, the client at 172.20.2.2, with fail2ban, knockd and nmap already installed.
+
+00:00:41.502 --> 00:01:21.278
+On the server: the sshd service, and the three settings that matter most in sshd_config: public keys, passwords, root login.
+
+00:01:21.378 --> 00:01:48.364
+On the client, keys. ssh-keygen makes a pair: ed25519 is short and fast, a 4096-bit RSA key the heavier classic. The fingerprint line names the type.
+
+00:01:48.464 --> 00:02:00.809
+Try the server's port 22 from the segment: closed. This server hides SSH behind port knocking: a sequence of three ports opens it for your address only.
+
+00:02:00.908 --> 00:02:15.256
+knock 7000, 8000, 9000: now the port answers. The reverse sequence closes it again.
+
+00:02:15.356 --> 00:02:49.724
+Hardening: no root login, three authentication tries. Always sshd -t before a reload, so a typo never leaves you locked out; then reload, check, and put the file back.
+
+00:02:49.824 --> 00:03:00.168
+fail2ban watches the auth log and bans an address after a few failures. The sshd jail is active, with nobody banned yet.
+
+00:03:00.268 --> 00:03:24.658
+From the client, four wrong passwords in a row…
+
+00:03:24.758 --> 00:03:48.360
+…and the server's jail lists the client's address. Unban it, or the next exercise cannot connect.
+
+00:03:48.460 --> 00:04:14.836
+What a scan sees: nmap finds the port, and with version detection reads the SSH banner. Then close the knock and remove the keys.
+
+00:04:14.936 --> 00:04:30.888
+Every attempt left a trace in the server's journal: this is what you read when you wonder who knocked.
+
+00:04:30.988 --> 00:04:50.646
+The lab's six tests do all of this again, in order, and tell you if the server still defends itself.
+
+00:04:50.746 --> 00:04:58.900 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

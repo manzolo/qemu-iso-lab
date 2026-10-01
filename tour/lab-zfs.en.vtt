@@ -1,0 +1,40 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.664
+ZFS is the volume manager and the file system in one: a pool of disks, file systems cut from it, a checksum on every block. The ZFS lab is one server with four empty disks to pool, break a little, and wipe.
+
+00:00:17.764 --> 00:00:33.842
+One cloud image plus four 2-gigabyte disks; the install loads the zfs module and the tools.
+
+00:00:33.942 --> 00:01:13.887
+The four lab disks, picked by size, never by name. No pool yet.
+
+00:01:13.987 --> 00:01:31.552
+One command makes the pool: RAIDZ over the four disks, data striped with one disk of parity, any one may fail. It is already mounted at /tank: no partitions, no mkfs, no fstab.
+
+00:01:31.652 --> 00:01:45.211
+A dataset is a file system cut from the pool, with its own properties and no size to decide. Turn on lz4 compression and write fifty megabytes of repetitive text…
+
+00:01:45.311 --> 00:01:58.681
+…and the compression ratio says how much of it was ever written to disk. That is free.
+
+00:01:58.781 --> 00:02:17.913
+Snapshots: freeze the dataset, change a file, and zfs diff shows what moved since. Rollback puts it back as it was.
+
+00:02:18.013 --> 00:02:32.703
+Now break it. One disk goes offline: the pool is DEGRADED and keeps serving; a write still lands.
+
+00:02:32.803 --> 00:02:57.507
+The disk comes back and ZFS resilvers only the blocks it missed. Then a scrub reads every block against its checksum: repaired nothing, no known data errors.
+
+00:02:57.607 --> 00:03:20.703
+send turns a snapshot into a stream, receive makes a dataset out of it: a backup here, a replica on another machine through ssh.
+
+00:03:20.803 --> 00:03:49.629
+Last, the other layout: two mirrored pairs. Less space than RAIDZ over the same disks, but a resilver copies one whole disk at full speed. Then the disks go back empty.
+
+00:03:49.729 --> 00:04:08.575
+The lab's seven tests do all of this again and leave the disks empty for the next run.
+
+00:04:08.675 --> 00:04:16.701 line:6%
+Every command is in the guide, in English and Italian, from the lab's card.

@@ -1,0 +1,43 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:15.207
+SSH è il modo in cui raggiungi ogni tuo server, quindi è la porta che tutti gli altri provano per prima. Il lab SSH è un server da blindare e un client da cui metterlo alla prova, su un segmento privato.
+
+00:00:15.307 --> 00:00:41.402
+Due cloud image: il server a 172.20.2.1, il client a 172.20.2.2, con fail2ban, knockd e nmap già installati.
+
+00:00:41.502 --> 00:01:21.278
+Sul server: il servizio sshd, e le tre impostazioni che contano di più in sshd_config: chiavi pubbliche, password, login di root.
+
+00:01:21.378 --> 00:01:48.364
+Sul client, le chiavi. ssh-keygen crea una coppia: ed25519 è corta e veloce, una RSA a 4096 bit è il classico più pesante. La riga del fingerprint ne dice il tipo.
+
+00:01:48.464 --> 00:02:00.809
+Prova la porta 22 del server dal segmento: chiusa. Questo server nasconde SSH dietro il port knocking: una sequenza di tre porte la apre solo per il tuo indirizzo.
+
+00:02:00.908 --> 00:02:15.256
+knock 7000, 8000, 9000: ora la porta risponde. La sequenza al contrario la richiude.
+
+00:02:15.356 --> 00:02:49.724
+Blindatura: niente login di root, tre tentativi di autenticazione. Sempre sshd -t prima di un reload, così un refuso non ti chiude mai fuori; poi reload, verifica, e il file torna com'era.
+
+00:02:49.824 --> 00:03:00.168
+fail2ban guarda il log di autenticazione e bandisce un indirizzo dopo qualche fallimento. La jail sshd è attiva, ancora nessun bandito.
+
+00:03:00.268 --> 00:03:24.658
+Dal client, quattro password sbagliate di fila…
+
+00:03:24.758 --> 00:03:48.360
+…e la jail del server elenca l'indirizzo del client. Toglilo dal bando, o il prossimo esercizio non si collega.
+
+00:03:48.460 --> 00:04:14.836
+Cosa vede una scansione: nmap trova la porta, e con il rilevamento della versione legge il banner SSH. Poi chiudi il knock e rimuovi le chiavi.
+
+00:04:14.936 --> 00:04:30.888
+Ogni tentativo ha lasciato traccia nel journal del server: è quello che leggi quando ti chiedi chi ha bussato.
+
+00:04:30.988 --> 00:04:50.646
+I sei test del lab rifanno tutto questo, in ordine, e ti dicono se il server si difende ancora.
+
+00:04:50.746 --> 00:04:58.900 line:6%
+Ogni comando è nella guida, in inglese e in italiano, dalla card del lab.

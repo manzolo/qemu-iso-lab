@@ -1,0 +1,40 @@
+WEBVTT
+
+00:00:00.001 --> 00:00:17.664
+ZFS è volume manager e file system insieme: un pool di dischi, file system ritagliati da lì, un checksum su ogni blocco. Il lab ZFS è un server con quattro dischi vuoti da mettere in pool, rompere un po' e ripulire.
+
+00:00:17.764 --> 00:00:33.842
+Una cloud image più quattro dischi da 2 gigabyte; l'installazione carica il modulo zfs e gli strumenti.
+
+00:00:33.942 --> 00:01:13.887
+I quattro dischi del lab, scelti per dimensione, mai per nome. Ancora nessun pool.
+
+00:01:13.987 --> 00:01:31.552
+Un comando crea il pool: RAIDZ sui quattro dischi, dati distribuiti con un disco di parità, uno qualsiasi può guastarsi. È già montato in /tank: niente partizioni, niente mkfs, niente fstab.
+
+00:01:31.652 --> 00:01:45.211
+Un dataset è un file system ritagliato dal pool, con le sue proprietà e nessuna dimensione da decidere. Accendi la compressione lz4 e scrivi cinquanta megabyte di testo ripetitivo…
+
+00:01:45.311 --> 00:01:58.681
+…e il rapporto di compressione dice quanto ne è finito davvero su disco. È gratis.
+
+00:01:58.781 --> 00:02:17.913
+Gli snapshot: congeli il dataset, cambi un file, e zfs diff mostra cosa si è mosso da allora. Il rollback lo rimette com'era.
+
+00:02:18.013 --> 00:02:32.703
+Ora rompiamolo. Un disco va offline: il pool è DEGRADED e continua a servire; una scrittura arriva lo stesso.
+
+00:02:32.803 --> 00:02:57.507
+Il disco torna e ZFS risincronizza solo i blocchi che gli mancavano. Poi uno scrub legge ogni blocco confrontandolo col checksum: niente da riparare, nessun errore.
+
+00:02:57.607 --> 00:03:20.703
+send trasforma uno snapshot in un flusso, receive ne ricava un dataset: un backup qui, una replica su un'altra macchina via ssh.
+
+00:03:20.803 --> 00:03:49.629
+Infine l'altra disposizione: due coppie in mirror. Meno spazio del RAIDZ sugli stessi dischi, ma un resilver copia un disco intero a piena velocità. Poi i dischi tornano vuoti.
+
+00:03:49.729 --> 00:04:08.575
+I sette test del lab rifanno tutto questo e lasciano i dischi vuoti per il prossimo giro.
+
+00:04:08.675 --> 00:04:16.701 line:6%
+Ogni comando è nella guida, in inglese e in italiano, dalla card del lab.
