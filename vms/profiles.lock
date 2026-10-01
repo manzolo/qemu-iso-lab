@@ -819,9 +819,14 @@
       ]
     },
     "kali-live": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:18ca96f4982db9fb1d23f1893cdd85eaf4a28f4cd552b3c777a615bb9ed6f3aa",
+      "version": "1.0.1",
+      "fingerprint": "sha256:0d5c90e49a1eff7f21ceb91f1813bff09861f176ea9a38f8bc86cb9df5089ed5",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "Kali 2026.2 live (2026.1 left the mirror)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -830,9 +835,14 @@
       ]
     },
     "kde-neon-user": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:53a63417f185b4800d34e38aab94750862fe2e8944088d16660d3407cf28d11b",
+      "version": "1.0.1",
+      "fingerprint": "sha256:bdbaa70199bb7be944b317546eb1a18892aff2b2d96d4bda39bf01448dd2967d",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-01",
+          "note": "neon desktop image 20260707-0147, pinned (the user images were renamed desktop)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",

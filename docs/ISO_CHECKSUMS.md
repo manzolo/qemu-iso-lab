@@ -31,7 +31,8 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `fedora-xfce` | `Fedora-Xfce-Live-42-1.1.x86_64.iso` | [Manifest](https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Spins-42-1.1-x86_64-CHECKSUM) |
 | `freebsd-installer` | `FreeBSD-14.3-RELEASE-amd64-disc1.iso` | [Manifest](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.3/CHECKSUM.SHA256-FreeBSD-14.3-RELEASE-amd64) |
 | `redox` | `redox_desktop_x86_64_2024-09-07_1225_livedisk.iso` (from its `.iso.zst`) | [SHA256SUM](https://static.redox-os.org/releases/0.9.0/x86_64/SHA256SUM), hash of the `.zst` archive in `iso_archive.sha256` |
-| `kali-live` | `kali-linux-2026.1-live-amd64.iso` | [Manifest](https://cdimage.kali.org/kali-2026.1/SHA256SUMS) |
+| `kali-live` | `kali-linux-2026.2-live-amd64.iso` | [Manifest](https://cdimage.kali.org/kali-2026.2/SHA256SUMS) |
+| `kde-neon-user` | `neon-desktop-20260707-0147.iso` | [Vendor .sha256sum](https://files.kde.org/neon/images/desktop/20260707-0147/neon-desktop-20260707-0147.sha256sum) |
 | `kubuntu-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `linuxmint-cinnamon` | `linuxmint-22.3-cinnamon-64bit.iso` | [Manifest](https://mirrors.edge.kernel.org/linuxmint/stable/22.3/sha256sum.txt) |
 | `lubuntu-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
@@ -125,7 +126,7 @@ MISSING alpine-virt-3.24.1-x86_64.iso
 PASS alpine-virt-latest-stable-x86_64.iso: e73a6241bd5f3c5c2d4d38c02cc52c378c0415a7c888bd292066bf36e0f41a39
 PASS debian-13.4.0-amd64-netinst.iso: 0b813535dd76f2ea96eff908c65e8521512c92a0631fd41c95756ffd7d4896dc
 PASS debian-live-13.4.0-amd64-gnome.iso: 2c87761c60115c9323f306f386c2253eb4fc21e050187ab2bceede9da64713e3
-MISSING kali-linux-2026.1-live-amd64.iso
+MISSING kali-linux-2026.2-live-amd64.iso
 PASS linuxmint-22.3-cinnamon-64bit.iso: a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4
 PASS omarchy-4.0.2.iso: 2ef8e624aa1bec7e277e28056b8535a6c9373ba48d7ede3f1a01cb6d2373cfb8
 MISSING pop-os_24.04_amd64_generic_22.iso

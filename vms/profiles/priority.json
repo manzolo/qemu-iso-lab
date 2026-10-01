@@ -286,11 +286,11 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "manual",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "manual": "live"
       },
-      "iso": "isos/kali-linux-2026.1-live-amd64.iso",
-      "iso_url": "https://cdimage.kali.org/kali-2026.1/kali-linux-2026.1-live-amd64.iso",
+      "iso": "isos/kali-linux-2026.2-live-amd64.iso",
+      "iso_url": "https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-live-amd64.iso",
       "disk": {
         "path": "artifacts/kali-live/disk.qcow2",
         "size": "32G",
@@ -326,7 +326,7 @@
         }
       },
       "usb_tablet": true,
-      "iso_sha256": "c2096dc2194c915cf94c273b907a84043ea6adfcba18509f15a8c1d1bbfb211c"
+      "iso_sha256": "49e90e694d1b3dedd47f94afbe99dfdd5afb41c8462b638bbd332929769c773a"
     },
     "rocky-9": {
       "name": "Rocky Linux 9.8 (Kickstart)",

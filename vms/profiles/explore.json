@@ -336,12 +336,12 @@
         "role": "desktop",
         "release_model": "rolling-desktop",
         "status": "manual",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "manual": "live"
       },
-      "iso": "isos/neon-user-current.iso",
-      "iso_url": "https://files.kde.org/neon/images/user/current/neon-user-current.iso",
-      "iso_size": 3244294144,
+      "iso": "isos/neon-desktop-20260707-0147.iso",
+      "iso_url": "https://files.kde.org/neon/images/desktop/20260707-0147/neon-desktop-20260707-0147.iso",
+      "iso_size": 3286237184,
       "disk": {
         "path": "artifacts/kde-neon-user/disk.qcow2",
         "size": "32G",
@@ -382,7 +382,8 @@
           ]
         }
       },
-      "usb_tablet": true
+      "usb_tablet": true,
+      "iso_sha256": "ce5a614082c19bb084d411dbc98ead1ba33af88490568ec97dabaffc761ff205"
     },
     "void-xfce": {
       "iso": "isos/void-live-x86_64-20250202-xfce.iso",
