@@ -160,7 +160,10 @@ class CloudImageDiskTests(BaseVmctlTestCase):
         def fake_run_and_expect(cmd, **kwargs):
             commands.append((cmd, kwargs))
 
+        # The bare CI runner has no OVMF: fake the EFI firmware so common_args does not need it on disk.
+        fw = (self.root / "OVMF_CODE.fd", self.root / "OVMF_VARS.fd", self.root / "artifacts" / "ubuntu-24.04-cloud" / "OVMF_VARS.fd")
         with mock.patch.object(lifecycle.qemu, "run_and_expect", side_effect=fake_run_and_expect), \
+                mock.patch.object(lifecycle.qemu, "resolve_efi_firmware", return_value=fw), \
                 mock.patch.object(lifecycle, "start_installed_vm_headless"), mock.patch.object(lifecycle, "run_post_install"), \
                 mock.patch.object(cloudimg, "resolve_ssh_pubkey", return_value=[KEY]), \
                 mock.patch("shutil.which", return_value="/usr/bin/tool"):

@@ -192,6 +192,12 @@ Common choices for all eight, unless a lab says otherwise:
 
 **ssh-lab**
 
+**Status (2026-10-02): ported and live, `vmctl group test ssh-lab` 6/6 (29 checks).** `vms/profiles/ssh-lab.json` (two members on `ubuntu-cloud-base`; the
+server's seed writes the fail2ban jail with `ignoreip` the NAT side, the knockd config and the
+`KNOCKD_SSH` chain as a boot unit bound to `ssh-lan`), `vms/labs/ssh-lab/` (six exercises, six tests,
+both guides). Addresses 172.20.2.1/.2. The two cautions of the plan are built in: the project key
+stays in `authorized_keys` and `PubkeyAuthentication` on, and every test restores/unbans/closes.
+
 - Members: `ssh-lab-server` (the target), `ssh-lab-client` (the attacker), 1 GB each. Packages:
   `openssh-server fail2ban knockd nmap hydra` (hydra on the client only).
 - Exercises: anatomy, key auth and password login off, `sshd_config` hardening, fail2ban (trigger

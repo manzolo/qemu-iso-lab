@@ -1716,6 +1716,38 @@
         }
       ]
     },
+    "ssh-lab-client": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:2bef9afa6dcb899190682658868c52e9f5830e4a6b1b04c74ec6c0e7fa877c23",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-02",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ssh-lab-server": {
+      "version": "1.0.2",
+      "fingerprint": "sha256:79a6a50ba7122ffc69f95d35354ab778e63ae026c035fb7db274f64075dc8a45",
+      "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-10-02",
+          "note": "knockd chain as a boot unit, knockd bound to ssh-lan"
+        },
+        {
+          "version": "1.0.1",
+          "date": "2026-10-02",
+          "note": "knockd iptables chain and interface setup"
+        },
+        {
+          "version": "1.0.0",
+          "date": "2026-10-02",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "ubuntu-10.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:a557cec423e71e07039aadb7eb1233dab0bf669c071505f80a4e3f7213bb3614",

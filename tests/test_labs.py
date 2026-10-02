@@ -15,7 +15,7 @@ class LabsTests(BaseVmctlTestCase):
 
     def test_only_groups_whose_members_all_share_a_segment_are_labs(self):
         cfg = self.tracked_config()
-        self.assertEqual(labs.lab_groups(cfg), ["netlab", "proxmox-lab", "vpn-lab"])
+        self.assertEqual(labs.lab_groups(cfg), ["netlab", "proxmox-lab", "ssh-lab", "vpn-lab"])
 
     def test_start_order_puts_infrastructure_then_services_first(self):
         cfg = self.tracked_config()

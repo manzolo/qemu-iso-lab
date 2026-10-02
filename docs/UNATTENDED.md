@@ -1142,6 +1142,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `windows-retro` | Windows NT 4.0, 98, 2000 and XP. Windows 7, 10 and 11 stay in `windows` |
 | `netlab` | The network lab: `pfsense-lab`, `pihole-lab`, `lubuntu-lab` |
 | `vpn-lab` | The VPN lab (vms/labs/vpn-lab/): `vpn-lab-server`, `vpn-lab-client`, two cloud images on the `vpn-lan` segment |
+| `ssh-lab` | The SSH hardening lab (vms/labs/ssh-lab/): `ssh-lab-server`, `ssh-lab-client`, two cloud images on the `ssh-lan` segment |
 | `proxmox-lab` | The Proxmox lab: `proxmox-ve` (ZFS mirror over two disks) and `proxmox-lab-client` (Xfce + Firefox), joined by the `pve-lan` segment |
 | `hobby-os` | Hobby operating systems to boot and explore, all manual live systems: `kolibrios`, `redox`, `menuetos`, and `serenityos` (a `disk_image` built from source). A `--group hobby-os` run records them as skipped (no unattended flow); boot one with `vmctl provision <name>` |
 | `smoke` | One profile per install flow that downloads its own medium, the lightest of each: `alpine-ci`, `ubuntu-server-ci`, `debian-server`, `almalinux-server`, `alpine-niri`, `arch-noctalia`, `opensuse-tumbleweed-autoyast`, `nixos-server`, `freebsd`. Run it before a full matrix: it answers "is every bootstrap flow still working" without the desktop installs |
@@ -1711,7 +1712,7 @@ what went wrong first (all verified live on 2026-09-24):
 ## Groups as stacks and the lab map (`vmctl group`)
 
 A declared group (`meta.groups`) can be run as one stack. A **lab** is a group whose members are
-all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab` and `vpn-lab` (`vmctl group list --labs`).
+all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab`, `vpn-lab` and `ssh-lab` (`vmctl group list --labs`).
 
 ```bash
 vmctl group list [--labs] [--json]

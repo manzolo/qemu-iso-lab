@@ -1,0 +1,96 @@
+{
+  "title": "SSH hardening lab: tighten a server, watch it defend itself",
+  "summary": "An SSH server to harden and a client to probe it from, on an isolated segment (172.20.2.0/24). The exercises tighten sshd_config, let fail2ban ban the client after a few wrong logins and then clear it, hide SSH behind a port-knock sequence, and look at the server the way a scan would. fail2ban ignores the host-facing NAT network, so nothing here ever cuts off vmctl's own SSH. Ported from qlab's ssh-lab.",
+  "members": ["ssh-lab-server", "ssh-lab-client"],
+  "exercises": [
+    {
+      "title": "SSH anatomy",
+      "text": "What the server runs and what the client carries. SSH from the segment is gated by the port-knock chain (exercise 5), so a plain connection is refused until a knock; vmctl reaches both over their NAT NIC regardless.",
+      "blocks": [
+        {"kind": "check", "where": "ssh-lab-server", "commands": [
+          "systemctl is-active ssh",
+          "grep -E '^#?(PubkeyAuthentication|PasswordAuthentication|PermitRootLogin)' /etc/ssh/sshd_config"
+        ]},
+        {"kind": "check", "where": "ssh-lab-client", "commands": [
+          "command -v ssh-keygen nmap knock sshpass",
+          "timeout 3 bash -c 'echo > /dev/tcp/172.20.2.1/22' || echo 'closed until a knock (exercise 5); vmctl reaches it over NAT'"
+        ]}
+      ]
+    },
+    {
+      "title": "Key-based authentication",
+      "text": "Generate a key pair on the client and read its type. ed25519 is short and fast; a 4096-bit RSA key is the heavier classic.",
+      "blocks": [
+        {"kind": "do", "where": "ssh-lab-client", "commands": [
+          "ssh-keygen -t ed25519 -f ~/.ssh/lab_key -N '' -C lab",
+          "ssh-keygen -l -f ~/.ssh/lab_key.pub    # the fingerprint line names ED25519",
+          "ssh-keygen -t rsa -b 4096 -f ~/.ssh/lab_rsa -N '' -C lab && ssh-keygen -l -f ~/.ssh/lab_rsa.pub"
+        ]},
+        {"kind": "do", "where": "ssh-lab-client", "commands": [
+          "rm -f ~/.ssh/lab_key ~/.ssh/lab_key.pub ~/.ssh/lab_rsa ~/.ssh/lab_rsa.pub    # leave the home as you found it"
+        ]}
+      ]
+    },
+    {
+      "title": "Hardening sshd_config",
+      "text": "Tighten the server and reload it, then put the file back. Validate with sshd -t before every reload so a typo never leaves the server unable to start.",
+      "blocks": [
+        {"kind": "try", "where": "ssh-lab-server", "commands": [
+          "sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak",
+          "sudo sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config",
+          "sudo sed -i 's/^#\\?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config",
+          "sudo sshd -t && echo 'config valid'",
+          "sudo systemctl reload ssh",
+          "grep -E '^(PermitRootLogin|MaxAuthTries)' /etc/ssh/sshd_config",
+          "sudo cp /etc/ssh/sshd_config.bak /etc/ssh/sshd_config && sudo systemctl reload ssh    # back to the start"
+        ]}
+      ]
+    },
+    {
+      "title": "fail2ban bans a noisy client",
+      "text": "fail2ban watches the auth log and bans an address after a few failures. The ban is on the lab segment only (172.20.2.0/24): the NAT side is in ignoreip, so vmctl's SSH is never touched. Always unban at the end.",
+      "blocks": [
+        {"kind": "check", "where": "ssh-lab-server", "commands": [
+          "sudo fail2ban-client status sshd    # the jail, its findtime/bantime and who is banned"
+        ]},
+        {"kind": "try", "where": "ssh-lab-client", "commands": [
+          "for i in 1 2 3 4; do sshpass -p nope ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no lab@172.20.2.1 true 2>/dev/null; done    # four wrong passwords"
+        ]},
+        {"kind": "check", "where": "ssh-lab-server", "commands": [
+          "sleep 3; sudo fail2ban-client status sshd | grep -A2 'Banned IP'    # 172.20.2.2 is now on the list"
+        ]},
+        {"kind": "try", "where": "ssh-lab-server", "commands": [
+          "sudo fail2ban-client set sshd unbanip 172.20.2.2    # clear it, or the next exercise cannot connect"
+        ]}
+      ]
+    },
+    {
+      "title": "Port knocking",
+      "text": "SSH from the segment starts closed (an iptables chain that DROPs); knockd opens it for a source only after the sequence 7000, 8000, 9000, and the reverse sequence closes it again. vmctl's SSH comes over NAT and never enters the chain.",
+      "blocks": [
+        {"kind": "check", "where": "ssh-lab-server", "commands": [
+          "systemctl is-active knockd",
+          "sudo iptables -S KNOCKD_SSH    # DROP by default; a knock inserts an ACCEPT above it"
+        ]},
+        {"kind": "try", "where": "ssh-lab-client", "commands": [
+          "knock 172.20.2.1 7000 8000 9000 && sleep 1    # open",
+          "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 lab@172.20.2.1 'echo the knock worked'",
+          "knock 172.20.2.1 9000 8000 7000    # close again"
+        ]}
+      ]
+    },
+    {
+      "title": "What a scan sees",
+      "text": "Look at the server from the client the way an outside scan would, and find the trace it leaves in the server's journal.",
+      "blocks": [
+        {"kind": "check", "where": "ssh-lab-client", "commands": [
+          "nmap -p 22 172.20.2.1",
+          "nmap -sV -p 22 172.20.2.1    # the SSH banner and version"
+        ]},
+        {"kind": "check", "where": "ssh-lab-server", "commands": [
+          "sudo journalctl -u ssh --no-pager -n 20    # the connection attempts from the client"
+        ]}
+      ]
+    }
+  ]
+}

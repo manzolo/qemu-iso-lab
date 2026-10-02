@@ -1,0 +1,133 @@
+{
+  "vms": {
+    "ssh-lab-server": {
+      "name": "SSH hardening lab server (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "ssh-lab"
+        ],
+        "version": "1.0.2",
+        "verified": "2026-10-02"
+      },
+      "notes": "The target of the ssh-lab (vms/labs/ssh-lab/): an SSH server to harden, with fail2ban and knockd installed. The exercises tighten sshd_config, trigger and clear a fail2ban ban from the client on the lab segment, and hide SSH behind a port-knock sequence. fail2ban ignores the host-facing NAT network (10.0.2.0/24), so a demonstration ban on the segment never cuts off vmctl's own SSH. Ubuntu 24.04 minimal cloud image. Ported from qlab's ssh-lab.",
+      "cloudimg_config": {
+        "packages": [
+          "openssh-server",
+          "fail2ban",
+          "knockd",
+          "iptables",
+          "rsyslog"
+        ],
+        "write_files": [
+          {
+            "path": "/etc/fail2ban/jail.local",
+            "permissions": "0644",
+            "content": "[DEFAULT]\nignoreip = 127.0.0.1/8 10.0.2.0/24\nbantime = 600\nfindtime = 600\nmaxretry = 3\n\n[sshd]\nenabled = true\nport = ssh\nbackend = systemd\n"
+          },
+          {
+            "path": "/etc/knockd.conf",
+            "permissions": "0644",
+            "content": "[options]\n\tUseSyslog\n\n[openSSH]\n\tsequence    = 7000,8000,9000\n\tseq_timeout = 5\n\tcommand     = /usr/sbin/iptables -I KNOCKD_SSH -s %IP% -p tcp --dport 22 -j ACCEPT\n\ttcpflags    = syn\n\n[closeSSH]\n\tsequence    = 9000,8000,7000\n\tseq_timeout = 5\n\tcommand     = /usr/sbin/iptables -D KNOCKD_SSH -s %IP% -p tcp --dport 22 -j ACCEPT\n\ttcpflags    = syn\n"
+          },
+          {
+            "path": "/usr/local/sbin/ssh-lab-knock-chain",
+            "permissions": "0755",
+            "content": "#!/bin/sh\n# SSH from the lab segment starts closed; a knock from the client opens it for that address.\n# vmctl's own SSH arrives on the NAT NIC (10.0.2.x) and never enters this chain.\niptables -N KNOCKD_SSH 2>/dev/null || iptables -F KNOCKD_SSH\niptables -A KNOCKD_SSH -j DROP\niptables -C INPUT -s 172.20.2.0/24 -p tcp --dport 22 -j KNOCKD_SSH 2>/dev/null || iptables -I INPUT -s 172.20.2.0/24 -p tcp --dport 22 -j KNOCKD_SSH\n"
+          },
+          {
+            "path": "/etc/systemd/system/ssh-lab-knock-chain.service",
+            "permissions": "0644",
+            "content": "[Unit]\nDescription=ssh-lab: SSH from the lab segment closed until a port knock\nBefore=knockd.service\nAfter=network-pre.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/local/sbin/ssh-lab-knock-chain\n\n[Install]\nWantedBy=multi-user.target\n"
+          },
+          {
+            "path": "/etc/systemd/system/knockd.service.d/vmctl.conf",
+            "permissions": "0644",
+            "content": "[Unit]\nAfter=network-online.target ssh-lab-knock-chain.service\nWants=network-online.target\n\n[Service]\n# ssh-lan appears only at the runtime boot: retry until it is there.\nRestart=on-failure\nRestartSec=5\n"
+          },
+          {
+            "path": "/etc/default/knockd",
+            "permissions": "0644",
+            "content": "START_KNOCKD=1\nKNOCKD_OPTS=\"-i ssh-lan\"\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl enable rsyslog fail2ban ssh-lab-knock-chain.service knockd.service"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2361,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "systemctl is-active ssh",
+          "systemctl is-active fail2ban",
+          "command -v knockd",
+          "test -f /etc/netplan/60-vmctl-ssh-lan.yaml",
+          "grep -rq '10.0.2.0/24' /etc/fail2ban/jail.d/ /etc/fail2ban/jail.local"
+        ]
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "ssh-lan",
+          "phase": "runtime",
+          "address": "172.20.2.1/24"
+        }
+      ]
+    },
+    "ssh-lab-client": {
+      "name": "SSH hardening lab client (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "client",
+        "status": "unattended",
+        "groups": [
+          "ssh-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-02"
+      },
+      "notes": "The client of the ssh-lab (vms/labs/ssh-lab/): the machine the exercises drive to probe the server on the lab segment (nmap, knock, and a few deliberately wrong logins to show fail2ban react). Ubuntu 24.04 minimal cloud image.",
+      "cloudimg_config": {
+        "packages": [
+          "openssh-client",
+          "nmap",
+          "knockd",
+          "sshpass"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2362,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "command -v nmap knock sshpass",
+          "test -f /etc/netplan/60-vmctl-ssh-lan.yaml"
+        ]
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "ssh-lan",
+          "phase": "runtime",
+          "address": "172.20.2.2/24"
+        }
+      ]
+    }
+  }
+}
