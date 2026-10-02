@@ -193,12 +193,25 @@ def refuse_if_protected(vm_name: str, action: str) -> None:
                       f"vmctl catalog remove {vm_name} first if that is really what you want.")
 
 
+def qcow2_has_backing_file(path: Path) -> bool:
+    """A qcow2 header whose backing_file_offset is set: the image is an overlay (a cloud image
+    VM, vmctl/cloudimg.py). Read from the first 16 bytes, no qemu-img: the dashboards ask this
+    for every disk on every refresh."""
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(16)
+    except OSError:
+        return False
+    return len(header) == 16 and header[:4] == b"QFI\xfb" and int.from_bytes(header[8:16], "big") != 0
+
+
 def artifact_disk_has_data(vm_name: str) -> bool:
-    """Whether artifacts/<vm>/ holds a disk image with data (any format, allocated blocks)."""
+    """Whether artifacts/<vm>/ holds a disk image with data (any format, allocated blocks; an
+    overlay counts whatever it has written, its base is the data)."""
     base = runtime.vm_artifact_base(vm_name)
     for path in base.glob("disk.*") if base.is_dir() else ():
         try:
-            if path.is_file() and path.stat().st_blocks * 512 > DATA_MIN_BYTES:
+            if path.is_file() and (path.stat().st_blocks * 512 > DATA_MIN_BYTES or qcow2_has_backing_file(path)):
                 return True
         except OSError:
             continue
@@ -351,7 +364,7 @@ def image_facts(path: Path, fmt: str) -> dict[str, Any]:
         return facts
     facts["present"] = True
     facts["host_bytes"] = int(st.st_blocks) * 512
-    facts["has_data"] = facts["host_bytes"] >= DATA_MIN_BYTES
+    facts["has_data"] = facts["host_bytes"] >= DATA_MIN_BYTES or qcow2_has_backing_file(path)
     if fmt == "raw":
         facts["virtual_bytes"] = int(st.st_size)
     elif shutil.which("qemu-img") is not None:

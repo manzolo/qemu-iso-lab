@@ -1,6 +1,7 @@
 # Importing the qlab labs (plan)
 
-Written on 2026-09-27. Nothing here is started. It plans how eight of the teaching labs built in
+Written on 2026-09-27; F1 started on 2026-10-02 (branch `feature/qlab-import`, see the status
+under each foundation). It plans how eight of the teaching labs built in
 [qlab](https://github.com/manzolo/qlab) (`~/Workspaces/qemu/qlab`, one `qlab-plugin-<name>-lab`
 repository each) become labs of this project: vpn, ssh, pxe, pam, mysql, lvm, docker, apache.
 The other ideas, which are new labs rather than ports, are in [LAB_IDEAS.md](LAB_IDEAS.md).
@@ -38,6 +39,17 @@ foundations, one of which (network boot) only the pxe lab needs.
 Build these once, before the first lab, each with its unit tests and a live run.
 
 ### F1. A cloud-image flow (`bootstrap-cloudimg`)
+
+**Status (2026-10-02): done, live PASS** (49 s after the download), `vmctl/cloudimg.py` + `ubuntu-24.04-cloud` (`vms/profiles/cloud.json`),
+documented in [UNATTENDED.md](UNATTENDED.md#cloud-images-bootstrap-cloudimg). What changed from the
+plan below: the image is named with the ISO fields (`iso`, `iso_url`, `iso_sha256_url`) instead of
+a `cloud_image.url` block, so the download, the cache, the catalog site's "public download" and
+every ISO test work unchanged, and the flow's own section is `cloudimg_config` like the other
+flows; the base of the overlay is a hard link by content under `isos/.cloudimg/`, because
+`ensure_iso` deletes a cached file the vendor's SUMS no longer matches; later boots have no seed,
+so `provision.sh` disables cloud-init for them. Debian waits for a `sha512` field
+(`genericcloud` publishes `SHA512SUMS` only).
+
 
 The lab members are small Ubuntu/Debian servers; installing each from the ISO costs 8-15 minutes
 and a full lab would take longer than qlab's whole session. A profile gets a `cloud_image` block:

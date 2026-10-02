@@ -1870,6 +1870,17 @@
         }
       ]
     },
+    "ubuntu-24.04-cloud": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:2430592796c306598e22ea8868089f49c711acb656a06a84386560c204e94382",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-02",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "ubuntu-24.04-desktop": {
       "version": "1.0.0",
       "fingerprint": "sha256:7b2eb071683d0c34617cdfcf18946c1ac44bb3fb04b75f304c40677c5f35d407",

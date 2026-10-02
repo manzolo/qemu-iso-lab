@@ -12,7 +12,7 @@ import shutil
 from unittest import mock
 
 from tests._common import BaseVmctlTestCase, ROOT
-from vmctl import (agama, alpine, archinstall, autoyast, cloud_init, config, kickstart, lifecycle, opnsense, popos, preseed,
+from vmctl import (agama, alpine, archinstall, autoyast, cloud_init, cloudimg, config, kickstart, lifecycle, opnsense, popos, preseed,
                    slackware, ssh, ubiquity, void, windows)
 
 PROBE_USER = "vmctlprobe"
@@ -51,6 +51,8 @@ def render(name: str, vm: dict) -> dict[str, str]:
         out["install.sh"] = slackware.render_install_script(name, vm, [FAKE_KEY])
     elif flow == "bootstrap-unattended":
         out["user-data"] = cloud_init.render_autoinstall_user_data(name, vm, dry_run=True)
+    elif flow == "bootstrap-cloudimg":
+        out["user-data"] = cloudimg.render_user_data(name, vm, [FAKE_KEY])
     elif flow == "bootstrap-ubiquity":
         out["append"] = ubiquity.kernel_append(vm)
         out["seed"] = ubiquity.render_seed(name, vm)
