@@ -11,11 +11,16 @@ from __future__ import annotations
 import html
 import ipaddress
 import json
+import os
+import re
+import subprocess
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from vmctl import cloud_init, config, netlab, proxmox, pvecluster, qemu, runtime, ui
+from vmctl import cloud_init, config, netlab, proxmox, pvecluster, qemu, runtime, state, ui
 from vmctl.errors import VMError
 
 # The tracked profiles' shared password ("lab"): a hash the map can recognise without cracking it.
@@ -424,6 +429,54 @@ def runbook(cfg: dict[str, Any], lab: dict[str, Any]) -> list[dict[str, Any]]:
         for block in phase["blocks"]:
             block["ssh"] = ssh_of.get(block["where"], "")
     return phases
+
+
+_CHECK_LINE = re.compile(r"^\s*(?:\x1b\[[0-9;]*m)*\s*\[(PASS|FAIL)\]")
+
+
+def run_lab_tests(content: dict[str, Any], dry_run: bool = False, stream: bool = True) -> list[dict[str, Any]]:
+    """``vms/labs/<lab>/tests/test_*.sh`` in order, each with bash from the checkout root and
+    ``VMCTL`` pointing at this checkout's vmctl, its output shown as it comes (and counted:
+    ``[PASS]``/``[FAIL]`` lines are _common.sh's). A script's exit status is its number of failed
+    checks; a status that is not that count is an error of the script itself (SSH down, bash
+    error), told apart from a failed check."""
+    results: list[dict[str, Any]] = []
+    env = {**os.environ, "VMCTL": str(state.ROOT / "bin" / "vmctl"), "NO_COLOR": "1"}
+    for script in content["tests"]:
+        path = runtime.resolve_path(f"{content['dir']}/tests/{script}")
+        if dry_run:
+            ui.print_note(f"Would run bash {ui.pretty_path(path)}")
+            results.append({"script": script, "status": "skipped", "passed": 0, "failed": 0, "exit": 0, "seconds": 0.0})
+            continue
+        started = time.monotonic()
+        passed = failed = 0
+        with subprocess.Popen(["bash", str(path)], cwd=str(state.ROOT), env=env, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, text=True, errors="replace") as process:
+            assert process.stdout is not None
+            for line in process.stdout:
+                mark = _CHECK_LINE.match(line)
+                if mark:
+                    passed += mark.group(1) == "PASS"
+                    failed += mark.group(1) == "FAIL"
+                if stream:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+            code = process.wait()
+        status = "passed" if code == 0 and failed == 0 else "failed" if code == failed and failed else "error"
+        results.append({"script": script, "status": status, "passed": passed, "failed": failed, "exit": code,
+                        "seconds": round(time.monotonic() - started, 3)})
+    return results
+
+
+def tests_summary(results: list[dict[str, Any]]) -> tuple[str, str]:
+    """(status, detail) over a lab's scripts: passed only when every script passed."""
+    ok = sum(r["status"] == "passed" for r in results)
+    checks = sum(r["passed"] for r in results), sum(r["failed"] for r in results)
+    errors = [r["script"] for r in results if r["status"] == "error"]
+    detail = f"{ok}/{len(results)} scripts passed, {checks[0]} checks passed, {checks[1]} failed"
+    if errors:
+        detail += f"; script error: {', '.join(errors)}"
+    return ("passed" if ok == len(results) and results else "failed", detail)
 
 
 # --- the map ---------------------------------------------------------------------------------

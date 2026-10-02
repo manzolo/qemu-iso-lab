@@ -118,3 +118,96 @@ class LabContentTests(BaseVmctlTestCase):
             self.assertEqual((entries["netlab"]["title"], entries["netlab"]["tests"], entries["netlab"]["guides"]),
                              ("Network lab: pfSense, Pi-hole and a client", 2, ["en", "it"]))
             self.assertNotIn("title", entries["proxmox-lab"])
+
+
+class LabTestRunnerTests(BaseVmctlTestCase):
+    def setUp(self):
+        super().setUp()
+        self.profiles = self.root / "vms" / "profiles"
+        self.profiles.mkdir(parents=True, exist_ok=True)
+        for source in (ROOT / "vms" / "profiles").glob("*.json"):
+            if source.name != "local.json":
+                shutil.copy(source, self.profiles / source.name)
+        (self.root / "bin").mkdir(exist_ok=True)
+        (self.root / "bin" / "vmctl").write_text("#!/bin/sh\necho stub\n")
+        self.lab = self.root / "vms" / "labs" / "netlab"
+        (self.lab / "tests").mkdir(parents=True)
+        (self.lab / "lab.json").write_text(json.dumps({"title": "Net", "members": ["pfsense-lab", "pihole-lab", "lubuntu-lab"],
+                                                       "exercises": [{"title": "x"}]}))
+        scripts = {
+            "test_01_ok.sh": 'echo "  [PASS] one"; echo "  [PASS] two"; echo "vmctl=$VMCTL"; exit 0\n',
+            "test_02_fail.sh": 'echo "  [PASS] one"; echo "  [FAIL] two (expected: x)"; exit 1\n',
+            "test_03_crash.sh": 'echo "  [PASS] one"; exit 127\n',
+        }
+        for name, body in scripts.items():
+            (self.lab / "tests" / name).write_text("#!/usr/bin/env bash\n" + body)
+
+    def cfg(self):
+        with mock.patch.object(state, "CONFIG_DIR", self.profiles.parent):
+            return config.load_config()
+
+    def test_scripts_run_in_order_and_their_outcome_is_told_from_their_exit_status(self):
+        content = labs.load_content("netlab")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            results = labs.run_lab_tests(content)
+        self.assertEqual([(r["script"], r["status"], r["passed"], r["failed"], r["exit"]) for r in results],
+                         [("test_01_ok.sh", "passed", 2, 0, 0), ("test_02_fail.sh", "failed", 1, 1, 1), ("test_03_crash.sh", "error", 1, 0, 127)])
+        self.assertIn(f"vmctl={self.root / 'bin' / 'vmctl'}", out.getvalue())
+        self.assertEqual(labs.tests_summary(results), ("failed", "1/3 scripts passed, 4 checks passed, 1 failed; script error: test_03_crash.sh"))
+        self.assertEqual(labs.tests_summary(results[:1]), ("passed", "1/1 scripts passed, 2 checks passed, 0 failed"))
+        self.assertEqual(labs.run_lab_tests(content, dry_run=True)[0]["status"], "skipped")
+
+    def test_group_test_starts_a_stopped_stack_waits_for_ssh_and_exits_1_on_a_failure(self):
+        cfg = self.cfg()
+        states = {name: {"running": False, "install": "verified"} for name in labs.group_members(cfg, "netlab")}
+        states["pfsense-lab"]["running"] = True
+        namespace = dict(action="test", group="netlab", labs=False, json=False, open=False, output=None, dry_run=False, timeout=3600, yes=False, lang=None)
+        with mock.patch.object(lifecycle.config, "load_config", return_value=cfg), \
+             mock.patch.object(lifecycle, "group_states", return_value=states), \
+             mock.patch.object(lifecycle, "cmd_start") as start, \
+             mock.patch.object(lifecycle.ssh, "wait_for_ssh") as wait, \
+             contextlib.redirect_stdout(io.StringIO()):
+            rc = lifecycle.cmd_group(argparse.Namespace(**namespace))
+        self.assertEqual(rc, 1)
+        self.assertEqual([call.args[0].vm for call in start.call_args_list], ["pihole-lab", "lubuntu-lab"])
+        self.assertEqual(wait.call_count, 3)
+        self.assertEqual(wait.call_args.args[1], 600)
+        for script in ("test_02_fail.sh", "test_03_crash.sh"):
+            (self.lab / "tests" / script).unlink()
+        out = io.StringIO()
+        with mock.patch.object(lifecycle.config, "load_config", return_value=cfg), \
+             mock.patch.object(lifecycle, "group_states", return_value={n: {"running": True, "install": "verified"} for n in states}), \
+             mock.patch.object(lifecycle, "cmd_start") as start, mock.patch.object(lifecycle.ssh, "wait_for_ssh"), \
+             contextlib.redirect_stdout(out):
+            rc = lifecycle.cmd_group(argparse.Namespace(**{**namespace, "json": True}))
+        self.assertEqual(rc, 0)
+        start.assert_not_called()
+        payload = json.loads(out.getvalue())
+        self.assertEqual((payload["status"], payload["scripts"][0]["script"]), ("passed", "test_01_ok.sh"))
+
+    def test_check_vms_adds_a_lab_row_when_every_member_was_in_the_run(self):
+        cfg = self.cfg()
+        members = ["pfsense-lab", "pihole-lab", "lubuntu-lab"]
+        args = argparse.Namespace(dry_run=False, timeout=60, _report_dir=None)
+        results = [(name, "passed", "ok") for name in members]
+        with mock.patch.object(lifecycle, "group_states", return_value={n: {"running": False} for n in members}), \
+             mock.patch.object(lifecycle, "cmd_start") as start, mock.patch.object(lifecycle, "cmd_stop") as stop, \
+             mock.patch.object(lifecycle.ssh, "wait_for_ssh"), mock.patch.object(lifecycle.report, "record_group_row") as record, \
+             contextlib.redirect_stdout(io.StringIO()):
+            lifecycle.run_lab_test_rows(cfg, members, results, args)
+        self.assertEqual(results[-1][:2], ("lab-netlab", "failed"))
+        self.assertEqual([c.args[0].vm for c in start.call_args_list], members)
+        self.assertEqual([c.args[0].vm for c in stop.call_args_list], list(reversed(members)))
+        self.assertEqual(record.call_args.args[:2], ("lab-netlab", "Lab netlab: 3 test script(s) over pfsense-lab + pihole-lab + lubuntu-lab"))
+        # A member that did not pass: the row is a skip, nothing starts.
+        results = [(name, "passed", "ok") for name in members[:-1]] + [("lubuntu-lab", "failed", "no")]
+        with mock.patch.object(lifecycle, "cmd_start") as start, mock.patch.object(lifecycle.report, "record_group_row"), \
+             contextlib.redirect_stdout(io.StringIO()):
+            lifecycle.run_lab_test_rows(cfg, members, results, args)
+        self.assertEqual(results[-1][:2], ("lab-netlab", "skipped"))
+        start.assert_not_called()
+        # Only some members in the run: no row at all.
+        results = [("pihole-lab", "passed", "ok")]
+        lifecycle.run_lab_test_rows(cfg, ["pihole-lab"], results, args)
+        self.assertEqual(len(results), 1)

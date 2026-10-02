@@ -3132,6 +3132,31 @@ def cmd_group(args: argparse.Namespace) -> int:
             clean_vm(member["name"], vm, dry_run=args.dry_run)
         ui.print_status("ok", f"{args.group} cleaned; reinstall it with: vmctl group install {args.group}")
         return 0
+    if action == "test":
+        content = lab.get("content") or {}
+        if not content.get("tests"):
+            raise VMError(f"{args.group} has no tests: vms/labs/{args.group}/tests/test_NN_*.sh would be them (docs/LABS.md)")
+        stopped = [m["name"] for m in lab["members"] if not m["running"]]
+        if stopped:
+            # Like group cluster: the stack comes up first, infrastructure first.
+            cmd_group(argparse.Namespace(**{**vars(args), "action": "up"}))
+        for member in lab["members"]:
+            vm = config.get_vm(cfg, member["name"])
+            if cloud_init.ssh_access_config(vm) is not None:
+                ssh.wait_for_ssh(vm, min(int(getattr(args, "timeout", 600) or 600), 600), dry_run=args.dry_run)
+        if not args.json:
+            ui.print_header(f"Test {args.group}: {', '.join(content['tests'])}")
+        results = labs.run_lab_tests(content, dry_run=args.dry_run, stream=not args.json)
+        status, detail = labs.tests_summary(results)
+        if args.json:
+            print(json.dumps({"group": args.group, "status": status, "detail": detail, "scripts": results}, indent=2))
+        elif args.dry_run:
+            ui.print_note(f"Dry run: nothing ran in {args.group}")
+        else:
+            for result in results:
+                ui.print_status("ok" if result["status"] == "passed" else "fail", f"{result['script']}: {result['status']} ({result['passed']} passed, {result['failed']} failed)", ok=result["status"] == "passed")
+            ui.print_status("ok" if status == "passed" else "fail", f"{args.group}: {detail}", ok=status == "passed")
+        return 0 if status == "passed" or args.dry_run else 1
     if action == "guide":
         content = lab.get("content") or {}
         if not content.get("guides"):
@@ -4543,6 +4568,62 @@ def cluster_row_id(cluster: str) -> str:
     return f"cluster-{cluster}"
 
 
+def lab_row_id(group: str) -> str:
+    return f"lab-{group}"
+
+
+def run_lab_test_rows(cfg: dict[str, Any], selected_names: list[str],
+                      results: list[tuple[str, str, str]], args: argparse.Namespace) -> None:
+    """The tests of every lab whose members were all in this run (vms/labs/<lab>/tests/, F4 of
+    docs/QLAB_IMPORT.md), like the cluster row: the members start on their fresh disks in start
+    order, SSH is waited for, the scripts run in order, one ``lab-<name>`` row records the
+    outcome; a member that did not pass makes the row a skip."""
+    outcomes = {name: status for name, status, _ in results}
+    selected = set(selected_names)
+    for group in labs.content_groups():
+        content = labs.load_content(group)
+        members = labs.group_members(cfg, group)
+        if content is None or not content["tests"] or not members or not selected.issuperset(members):
+            continue
+        row = lab_row_id(group)
+        order = labs.start_order(cfg, members)
+        primary = config.get_vm(cfg, order[0])
+        label = f"Lab {group}: {len(content['tests'])} test script(s) over {' + '.join(order)}"
+        ui.print_header(f"Test lab: {group}")
+        not_passed = [name for name in order if outcomes.get(name) != "passed"]
+        if not_passed:
+            detail = f"skipped: {', '.join(not_passed)} did not pass"
+            ui.print_status("skip", f"{row}: {detail}")
+            results.append((row, "skipped", detail))
+            report.record_group_row(row, label, primary, args, "skipped", detail, 0.0, "group test")
+            continue
+        started = time.monotonic()
+        try:
+            states = group_states(cfg, order)
+            for name in order:
+                if not states[name]["running"]:
+                    cmd_start(argparse.Namespace(vm=name, headless=True, background=True, video=None,
+                                                 cloud_init=False, spice_port=None, dry_run=args.dry_run))
+            for name in order:
+                vm = config.get_vm(cfg, name)
+                if cloud_init.ssh_access_config(vm) is not None:
+                    ssh.wait_for_ssh(vm, 600, dry_run=args.dry_run)
+            status, detail = labs.tests_summary(labs.run_lab_tests(content, dry_run=args.dry_run))
+            if args.dry_run:
+                status, detail = "skipped", "dry run"
+        except (VMError, subprocess.SubprocessError, OSError) as exc:
+            status, detail = "failed", str(exc)
+        finally:
+            for name in reversed(order):
+                try:
+                    cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+                except VMError as exc:
+                    ui.print_status("warn", f"{name}: {exc}", ok=False)
+        ui.print_status("ok" if status == "passed" else "fail", f"{row}: {detail}", ok=status == "passed")
+        results.append((row, status, detail))
+        report.record_group_row(row, label, primary, args, status, detail, time.monotonic() - started, "group test")
+
+
 def run_cluster_checks(cfg: dict[str, Any], selected_names: list[str],
                        results: list[tuple[str, str, str]], args: argparse.Namespace) -> None:
     """The cross-VM step the rows cannot see: a Proxmox cluster whose nodes were all in this run
@@ -4939,6 +5020,7 @@ def cmd_test_local(args: argparse.Namespace) -> int:
             retry_failed_rows(results, cfg, args, cleanup, matrix_scheduler, parallel)
             # On the rows' own disks, before --restore puts the stashed ones back.
             run_cluster_checks(cfg, selected_names, results, args)
+            run_lab_test_rows(cfg, selected_names, results, args)
         finally:
             cleanup.finish()
 

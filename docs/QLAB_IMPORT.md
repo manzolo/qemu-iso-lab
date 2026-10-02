@@ -25,7 +25,7 @@ This project already has most of the machinery a lab needs:
 | per-VM cloud-init | `cloud_init` seed + `ssh_provision` / `post_install_run` | done, but only after a full install |
 | the VM image | an unattended install from the ISO (8-15 min per member) | **gap: no cloud-image flow** |
 | `qlab shell <vm>` | `vmctl shell <vm> [-- command]`, web SSH terminal | done (F2, 2026-10-02) |
-| `qlab test <lab>` | `vmctl group cluster` + the `cluster-<name>` row of `check-vms` | **gap: no per-lab tests** |
+| `qlab test <lab>` | `vmctl group test <lab>` + the `lab-<name>` row of `check-vms` | done (F4, 2026-10-02) |
 | guide.md, walkthrough PDF | `vmctl group map` (map + do/check/try runbook), `make guides`, `profiledoc` | runbook is code in `labs.py`, not data |
 | extra disks (lvm) | `extra_disks` (`qemu.extra_disks`) | done (Proxmox ZFS mirror) |
 | a clean restart of an exercise | `vmctl checkpoint create/restore` per VM | done per VM, not per group |
@@ -124,6 +124,11 @@ script is), and `tests/test_repo_profiles.py` checks that every lab directory na
 members and every member of a lab has its directory.
 
 ### F4. `vmctl group test <lab>` and a matrix row
+
+**Status (2026-10-02): done.** `labs.run_lab_tests`/`tests_summary`, `vmctl group test <lab> [--json]`
+(stack up + SSH wait first, exit 1 on a failed check, a script error told from a failed check),
+`lifecycle.run_lab_test_rows` after the cluster checks of `check-vms` (`lab-<name>` row, SKIP when a
+member did not pass), the web lab card's *Run tests* and *Guide* buttons; `tests/test_lab_content.py`.
 
 Runs `tests/test_*.sh` of the lab in order against the running stack (starting it if needed,
 like `group cluster`), prints `[PASS]/[FAIL]` per check and a summary, exits non-zero on any

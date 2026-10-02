@@ -29,6 +29,7 @@ vmctl group install proxmox-lab         # install what is missing, start the sta
 vmctl group status proxmox-lab          # running / installed, addresses on the segment
 vmctl group map proxmox-lab --open      # the network map below, with the Access table and a runbook
 vmctl group guide netlab --lang it      # the lab's walkthrough (vms/labs/netlab/guide.it.md)
+vmctl group test netlab                 # the lab's tests/test_NN_*.sh over the running stack (started if needed); exit 1 on a failed check
 vmctl group down proxmox-lab            # stop every member, in reverse start order
 vmctl group clean proxmox-lab           # delete the members' disks (asks first; ISOs are kept)
 ```
@@ -67,6 +68,16 @@ after what vmctl derives from the profiles and before *Run the stack*, and the m
 with the lab's title and summary. A group with content is a lab even without a segment (a
 one-server lab). `vmctl group guide <lab> [--lang it]` prints the guide; `vmctl group list --labs
 --json` carries `title`, `content`, `guides` and `tests`. The first content is `netlab`'s.
+
+**`vmctl group test <lab>`** runs `tests/test_NN_*.sh` in order against the running stack (a
+stopped member is started first, infrastructure first, and SSH is waited for), shows each
+script's output as it comes, counts its `[PASS]`/`[FAIL]` lines and ends with one line per script
+and one for the lab; the exit status is 1 when a check failed. A script whose exit status is not
+its number of failed checks (SSH down, a bash error) is reported as an *error*, not as a failed
+check. `--json` prints the same as data (the web's *Run tests* button on the lab card runs it as
+a job). `check-vms` runs the tests too: when every member of a lab with tests was in the run and
+passed, the members start on their fresh disks and a `lab-<name>` row records the outcome (SKIP
+when a member did not pass), like the `cluster-<name>` row of a Proxmox cluster.
 
 ## Temporary links between VMs (`vmctl link`)
 
