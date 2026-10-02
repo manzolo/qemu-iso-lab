@@ -144,6 +144,9 @@ What the page offers:
   shows **Labs / lab / VM** and **← Labs** returns to the original lab search and member.
   On small screens, the machine's details appear before the member list. Choose **All** to
   return to the full catalog.
+- **Double-click** on a row runs its main action, the one the machine panel shows first: the
+  console (SSH for server roles) of a running VM, Start of an installed one, the automatic
+  install or the ISO dialog of a VM without a disk. Nothing runs while a job holds the VM.
 - **Multiple selection**: Ctrl/Cmd+click toggles machines, Shift+click selects a range. Clicking a distribution icon
   toggles it too (Enter/Space when focused). Selected rows have a teal edge and a check badge
   on the icon. Right-click a selected row for a menu scoped to the entire selection; right-click

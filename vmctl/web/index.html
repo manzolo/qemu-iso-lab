@@ -747,7 +747,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <main id="profiles-view">
   <nav id="lab-navigation" class="lab-navigation hidden" aria-label="Lab navigation"><button id="back-to-labs">← Labs</button><span aria-hidden="true">/</span><span id="lab-origin" class="mono"></span><span aria-hidden="true">/</span><span id="lab-current-vm" class="mono" aria-current="page"></span></nav>
   <section class="card"><h2 id="list-title">Profiles</h2>
-    <p id="selection-hint">Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
+    <p id="selection-hint">Double-click to open · Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
     <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-console" title="Start the selected machines and open their consoles side by side on one page">Start in console</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
@@ -3176,6 +3176,20 @@ $("details").addEventListener("click", async (e) => {
 window.addEventListener("scroll", hideHoverShot, true);
 window.addEventListener("resize", hideHoverShot);
 document.addEventListener("visibilitychange", () => { if (document.hidden) hideHoverShot(); });
+// Double-click: the row's main action, the one the machine panel shows first (console or SSH
+// of a running VM, Start of an installed one, the install of a VM without a disk).
+function mainAction(r) {
+  return actionsFor(r).find(a => !a.disabled && !a.alternative && !a.danger && !a.warn && !a.job && !a.cancelJob && !a.mine && !a.hide && !a.protect && !a.screen && !(a.args && a.args[0] === "checkpoint"));
+}
+$("rows").ondblclick = (e) => {
+  if (e.target.closest(".link-handle, .vm-select")) return;
+  const tr = e.target.closest("[data-vm]"), r = tr && S.vms.find(v => v.name === tr.dataset.vm);
+  if (!r) return;
+  const action = mainAction(r);
+  if (!action) { toast(r.name + ": a job is running, open its log from the panel."); return; }
+  selected = r.name; checkedVms.clear(); render();
+  runAction(r, action);
+};
 $("rows").onclick = (e) => { if (suppressLinkClick) return; if (e.target.closest(".link-handle")) { openLinkPicker(e.target.closest("[data-vm]").dataset.vm); return; } const tr = e.target.closest("[data-vm]"); if (tr) selectRow(tr.dataset.vm, e); };
 $("search-clear").onclick = () => { $("search").value = ""; $("search").oninput(); $("search").focus(); };
 $("search").oninput = () => { checkedVms.clear(); selectionAnchor = ""; render(); };
