@@ -3062,8 +3062,14 @@ def cmd_group(args: argparse.Namespace) -> int:
                                      "start_order": labs.start_order(cfg, members)}
             if entry["lab"]:
                 # Addresses for the TUI's lab panel; live state stays with the dashboard's own rows.
+                lab = labs.model(cfg, group)
                 entry["addresses"] = {member["name"]: [nic["address"] for nic in member["nics"] if nic["type"] == "segment"]
-                                      for member in labs.model(cfg, group)["members"]}
+                                      for member in lab["members"]}
+                if lab.get("content"):
+                    entry["title"] = lab["content"]["title"]
+                    entry["content"] = lab["content"]["dir"]
+                    entry["guides"] = sorted(lab["content"]["guides"])
+                    entry["tests"] = len(lab["content"]["tests"])
             entries.append(entry)
         # Running VMs joined by `vmctl link` are a lab too, for as long as they run.
         entries += vmlink.session_labs()
@@ -3125,6 +3131,15 @@ def cmd_group(args: argparse.Namespace) -> int:
                 cmd_stop(argparse.Namespace(vm=member["name"], dry_run=args.dry_run))
             clean_vm(member["name"], vm, dry_run=args.dry_run)
         ui.print_status("ok", f"{args.group} cleaned; reinstall it with: vmctl group install {args.group}")
+        return 0
+    if action == "guide":
+        content = lab.get("content") or {}
+        if not content.get("guides"):
+            raise VMError(f"{args.group} has no guide: vms/labs/{args.group}/guide.en.md (or guide.it.md) would be one")
+        lang = getattr(args, "lang", None) or ("en" if "en" in content["guides"] else sorted(content["guides"])[0])
+        if lang not in content["guides"]:
+            raise VMError(f"{args.group} has no guide in '{lang}' (available: {', '.join(sorted(content['guides']))})")
+        print(runtime.resolve_path(content["guides"][lang]).read_text(encoding="utf-8"), end="")
         return 0
     if action == "map":
         dest = Path(args.output).expanduser() if args.output else None

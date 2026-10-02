@@ -1,0 +1,44 @@
+{
+  "title": "Network lab: pfSense, Pi-hole and a client",
+  "summary": "A router (pfSense CE) in front of an isolated LAN where Pi-hole serves DNS and DHCP and a Lubuntu desktop is the user. The exercises read what the three members do for each other; the tests check the same things over SSH.",
+  "members": ["pfsense-lab", "pihole-lab", "lubuntu-lab"],
+  "exercises": [
+    {
+      "title": "DNS and DHCP from Pi-hole",
+      "text": "Pi-hole is the LAN's DNS and DHCP server: pfSense hands the clients to it and asks it for its own names. Everything here is read-only.",
+      "blocks": [
+        {"kind": "check", "where": "pihole-lab", "commands": [
+          "pihole status                              # blocking enabled",
+          "sudo pihole-FTL --config dhcp.active       # true: Pi-hole is the LAN's DHCP server",
+          "sudo pihole-FTL --config dhcp.hosts        # the fixed leases of the members"
+        ]},
+        {"kind": "check", "where": "lubuntu-lab", "commands": [
+          "resolvectl status | grep -A3 'Link.*enp'    # DNS 192.168.0.10, domain qlan",
+          "resolvectl query pfsense.qlan              # CNAME firewall.qlan -> 192.168.0.1",
+          "resolvectl query example.org                # a public name, answered by Pi-hole through pfSense"
+        ]},
+        {"kind": "try", "where": "pihole-lab", "commands": [
+          "sudo pihole -g                              # refresh the blocklists (gravity): a few seconds, nothing else changes"
+        ]}
+      ]
+    },
+    {
+      "title": "Through the firewall",
+      "text": "The client reaches the Internet only through pfSense: its default route is the router's LAN address and the router NATs on its WAN (the slirp network of the host).",
+      "blocks": [
+        {"kind": "check", "where": "lubuntu-lab", "commands": [
+          "ip route | head -1                          # default via 192.168.0.1",
+          "curl -sI https://example.org | head -1       # HTTP/2 200 through the pfSense NAT",
+          "systemd-analyze                              # the boot time of a client that waits for no network"
+        ]},
+        {"kind": "check", "where": "pfsense-lab", "commands": [
+          "ifconfig vtnet1 | grep inet                  # the LAN side, 192.168.0.1",
+          "netstat -rn | head -5                        # the default route over the WAN"
+        ]},
+        {"kind": "check", "where": "host", "commands": [
+          "vmctl lab check                              # the five forwards on 127.0.0.1: pfSense GUI 8080, Pi-hole UI 8081, SSH 2237/2238/2239"
+        ]}
+      ]
+    }
+  ]
+}

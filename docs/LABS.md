@@ -28,6 +28,7 @@ vmctl group list --labs                 # the labs and their members
 vmctl group install proxmox-lab         # install what is missing, start the stack, form the cluster
 vmctl group status proxmox-lab          # running / installed, addresses on the segment
 vmctl group map proxmox-lab --open      # the network map below, with the Access table and a runbook
+vmctl group guide netlab --lang it      # the lab's walkthrough (vms/labs/netlab/guide.it.md)
 vmctl group down proxmox-lab            # stop every member, in reverse start order
 vmctl group clean proxmox-lab           # delete the members' disks (asks first; ISOs are kept)
 ```
@@ -42,6 +43,30 @@ a **runbook** walks through the lab step by step (each block marked *run*, *chec
 ![Map of the Proxmox lab: three nodes and the client on pve-lan, forwards for SSH and the web GUIs](screenshots/lab-map-proxmox.png)
 
 ![Map of the network lab: pfSense in front, Pi-hole and Lubuntu behind it, forwards through the router's WAN](screenshots/lab-map-netlab.png)
+
+## Lab content: `vms/labs/<lab>/`
+
+A lab is a declared group (`meta.groups`) and, when it has something to teach, a directory next
+to the profiles ([QLAB_IMPORT.md](QLAB_IMPORT.md), F3):
+
+```
+vms/labs/netlab/
+├── lab.json          # title, summary, members (must match the profiles declaring the group), exercises
+├── guide.en.md       # the walkthrough, both languages kept in sync
+├── guide.it.md
+├── provision/        # files the members copy in (copy_from_host; part of their profile fingerprint)
+└── tests/
+    ├── test_01_dns.sh    # over vms/labs/_common.sh: on <vm> <command>, assert, report_results
+    └── test_02_firewall.sh
+```
+
+An exercise is `title`, `text` and `blocks`, each `kind` *do* / *check* (read-only) / *try*
+(reversible), `where` a member or `host`, and `commands`. `labs.load_content` validates the file
+(an unknown member or kind fails loudly), the exercises join the runbook of `vmctl group map`
+after what vmctl derives from the profiles and before *Run the stack*, and the map page opens
+with the lab's title and summary. A group with content is a lab even without a segment (a
+one-server lab). `vmctl group guide <lab> [--lang it]` prints the guide; `vmctl group list --labs
+--json` carries `title`, `content`, `guides` and `tests`. The first content is `netlab`'s.
 
 ## Temporary links between VMs (`vmctl link`)
 

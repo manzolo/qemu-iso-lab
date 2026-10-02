@@ -94,6 +94,12 @@ instead of `ssh_server` / `ssh_client` with hard-coded ports.
 
 ### F3. Lab content as data: `vms/labs/<lab>/`
 
+**Status (2026-10-02): done.** `labs.load_content`/`content_groups` (validated `lab.json`, guides, tests,
+provision), the exercises in `labs.runbook` before *Run the stack* and on the map page, `vmctl group
+guide`, `lab_groups` counting a group with content as a lab, `profile_versions.referenced_files`
+fingerprinting `vms/labs/` sources, `tests/test_lab_content.py`. First content: `vms/labs/netlab/`
+(two exercises, two tests, both guides). Docs: [LABS.md](LABS.md#lab-content-vmslabslab).
+
 Today the runbook of `vmctl group map` is Python in `labs.runbook()`, written for netlab and the
 Proxmox cluster. An imported lab brings its own content, in a directory next to the profiles
 (outside `vms/profiles/`, or `load_config` would parse it):
