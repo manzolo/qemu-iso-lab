@@ -162,6 +162,14 @@ def ssh_shell_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     return ["ssh"] + opts + ["-p", str(port), f"{user}@{host}"]
 
 
+def ssh_command_cmd(vm: dict[str, Any], command: str, dry_run: bool = False) -> list[str]:
+    """``vmctl shell <vm> -- <command>``: the interactive command plus ``BatchMode=yes`` (never a
+    password prompt: a lab test that cannot log in fails, it does not hang) and ``LogLevel=ERROR``
+    (no "Permanently added" line in a test's captured output), the command as ssh takes it."""
+    cmd = ssh_shell_cmd(vm, dry_run=dry_run)
+    return cmd[:-1] + ["-o", "BatchMode=yes", "-o", "LogLevel=ERROR", cmd[-1], command]
+
+
 def scp_base_cmd(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
     _, port, _ = ssh_target(vm)
     cfg = cloud_init.ssh_access_config(vm)

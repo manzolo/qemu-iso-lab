@@ -53,7 +53,7 @@ class CloudImageSeedTests(unittest.TestCase):
         self.assertEqual((user["name"], user["sudo"], user["lock_passwd"], user["ssh_authorized_keys"]),
                          ("lab", ["ALL=(ALL) NOPASSWD:ALL"], False, [KEY]))
         self.assertTrue(user["passwd"].startswith("$6$"))
-        self.assertEqual(payload["hostname"], "ubuntu-24.04-cloud")
+        self.assertEqual((payload["hostname"], payload["fqdn"], payload["prefer_fqdn_over_hostname"]), ("ubuntu-24.04-cloud",) * 2 + (True,))
         self.assertIn("openssh-server", payload["packages"])
         self.assertEqual(payload["runcmd"], [["sh", cloudimg.PROVISION_SCRIPT]])
         self.assertEqual(payload["power_state"]["mode"], "poweroff")

@@ -24,7 +24,7 @@ This project already has most of the machinery a lab needs:
 | `qlab run <lab>` | `vmctl group install/up/down/status <group>` (start order by role) | done |
 | per-VM cloud-init | `cloud_init` seed + `ssh_provision` / `post_install_run` | done, but only after a full install |
 | the VM image | an unattended install from the ISO (8-15 min per member) | **gap: no cloud-image flow** |
-| `qlab shell <vm>` | `vmctl shell <vm>`, web SSH terminal | done (no command argument yet) |
+| `qlab shell <vm>` | `vmctl shell <vm> [-- command]`, web SSH terminal | done (F2, 2026-10-02) |
 | `qlab test <lab>` | `vmctl group cluster` + the `cluster-<name>` row of `check-vms` | **gap: no per-lab tests** |
 | guide.md, walkthrough PDF | `vmctl group map` (map + do/check/try runbook), `make guides`, `profiledoc` | runbook is code in `labs.py`, not data |
 | extra disks (lvm) | `extra_disks` (`qemu.extra_disks`) | done (Proxmox ZFS mirror) |
@@ -81,6 +81,11 @@ and a full lab would take longer than qlab's whole session. A profile gets a `cl
   single `ubuntu-24.04-cloud` profile, which is useful on its own as the fastest VM of the catalog.
 
 ### F2. Commands inside a member: `vmctl shell <vm> -- <command>`
+
+**Status (2026-10-02): done.** `lifecycle.cmd_shell` + `ssh.ssh_command_cmd` (BatchMode, LogLevel=ERROR,
+the command's exit status returned), `vms/labs/_common.sh` (`on`, `assert`, `assert_fail`,
+`assert_contains`, `assert_not_contains`, `report_results`; `VMCTL` overrides the binary),
+`tests/test_lab_common.py` runs it against a stub.
 
 The tests and the runbooks run commands in the guests. `vmctl shell` gets an optional command
 (`ssh.ssh_shell_cmd` + the command, exit status passed through, `BatchMode=yes`, never a password

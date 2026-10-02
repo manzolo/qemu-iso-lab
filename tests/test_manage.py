@@ -66,6 +66,22 @@ class ManageTests(BaseVmctlTestCase):
         self.assertNotIn("BatchMode=yes", ssh_cmd)
         self.assertEqual(ssh_cmd[-1], "tester@127.0.0.1")
 
+    def test_cmd_shell_with_a_command_runs_it_in_batch_mode_and_returns_its_status(self):
+        self.vm_config["ssh_provision"] = {"user": "tester", "ssh_host_port": 2223}
+        self.write_config_dir()
+        with mock.patch("subprocess.call", return_value=3) as call:
+            exit_code = self.vmctl.cmd_shell(argparse.Namespace(vm=self.vm_name, dry_run=False, command=["--", "systemctl", "is-active", "ssh"]))
+        self.assertEqual(exit_code, 3)
+        ssh_cmd = call.call_args.args[0]
+        self.assertEqual(ssh_cmd[0], "ssh")
+        self.assertIn("BatchMode=yes", ssh_cmd)
+        self.assertIn("LogLevel=ERROR", ssh_cmd)
+        self.assertEqual(ssh_cmd[-2:], ["tester@127.0.0.1", "systemctl is-active ssh"])
+        with mock.patch.object(vmctl.runtime, "run") as run_cmd, mock.patch("subprocess.call") as call:
+            self.assertEqual(self.vmctl.cmd_shell(argparse.Namespace(vm=self.vm_name, dry_run=True, command=["true"])), 0)
+        call.assert_not_called()
+        self.assertEqual(run_cmd.call_args.args[0][-1], "true")
+
     def test_cmd_shell_runs_with_ssh_provision(self):
         self.vm_config["ssh_provision"] = {
             "user": "tester",

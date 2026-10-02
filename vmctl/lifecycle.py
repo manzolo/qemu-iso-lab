@@ -4262,10 +4262,22 @@ def cmd_unexport_libvirt(args: argparse.Namespace) -> int:
 
 
 def cmd_shell(args: argparse.Namespace) -> int:
+    """An interactive SSH session, or with ``-- <command>`` one command in the guest: output and
+    exit status are the command's own (ssh's 255 when the connection fails), which is what the
+    lab tests of vms/labs/ build on (``on <vm> <command>`` in _common.sh)."""
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
-    runtime.run(ssh.ssh_shell_cmd(vm, dry_run=args.dry_run), dry_run=args.dry_run)
-    return 0
+    words = list(getattr(args, "command", None) or [])
+    if words and words[0] == "--":
+        words = words[1:]
+    if not words:
+        runtime.run(ssh.ssh_shell_cmd(vm, dry_run=args.dry_run), dry_run=args.dry_run)
+        return 0
+    cmd = ssh.ssh_command_cmd(vm, " ".join(words), dry_run=args.dry_run)
+    if args.dry_run:
+        runtime.run(cmd, dry_run=True)
+        return 0
+    return subprocess.call(cmd)
 
 
 def cmd_boot_check(args: argparse.Namespace) -> int:

@@ -161,7 +161,11 @@ def render_user_data(vm_name: str, vm: dict[str, Any], keys: list[str]) -> str:
     write_files = [dict(entry) for entry in (cfg.get("write_files") or [])]
     write_files.append({"path": PROVISION_SCRIPT, "permissions": "0755", "content": render_provision_script(vm_name, vm)})
     payload: dict[str, Any] = {
+        # A name with dots (ubuntu-24.04-cloud) is a host name here, not host + domain: without
+        # fqdn + prefer_fqdn_over_hostname cloud-init wrote "ubuntu-24" (live, 2026-10-02).
         "hostname": hostname,
+        "fqdn": hostname,
+        "prefer_fqdn_over_hostname": True,
         "manage_etc_hosts": True,
         "users": [user],
         "ssh_pwauth": True,

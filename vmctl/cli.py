@@ -438,8 +438,9 @@ drag it onto another machine) and from a multiple selection (Link network).""")
             p.add_argument("--autostart", action="store_true", help="enable libvirt autostart")
         p.set_defaults(func=handler)
 
-    p = _add(subparsers, "shell", help="SSH into a running VM")
+    p = _add(subparsers, "shell", help="SSH into a running VM, or run one command in it: vmctl shell <vm> -- <command> (its exit status is returned)")
     p.add_argument("vm", help=VM_HELP)
+    p.add_argument("command", nargs=argparse.REMAINDER, help="after --, a command to run in the guest instead of an interactive session")
     p.set_defaults(func=lifecycle.cmd_shell)
 
     p = _add(subparsers, "record", help="time-lapse of a VM's screen (also during a bootstrap) as a small GIF, and an MP4 on request: one screendump per second until the VM is gone",
