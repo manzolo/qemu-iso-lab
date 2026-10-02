@@ -96,8 +96,9 @@ What the page offers:
   The browser shows upload progress followed by **Saving in VM** until SFTP confirms completion.
   If a connection fails, refresh the folder before retrying. A lost SSH connection may leave a
   hidden `.vmctl-upload-*.part` file when cleanup cannot reach the guest.
-  **Stop** asks the guest to power off (`vmctl stop`, confirmed in the page's own dialog): the
-  console shows the shutdown and closes by itself once the VM is off.
+  **Stop** asks the guest to power off (`vmctl stop`, confirmed in the page's own dialog, with a
+  **Force** checkbox that turns it into `vmctl stop --force` for a guest that answers nothing):
+  the console shows the shutdown and closes by itself once the VM is off.
   **Detach** moves the console into its own window, leaving the dashboard free to open another
   VM. Each window has its own display, tools and docked SSH session; closing one does not stop
   its VM or close the other consoles. Allow pop-ups for the local dashboard if prompted by

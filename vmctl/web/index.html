@@ -267,6 +267,9 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .parts tr.free td { color:var(--ok); } .parts .s-muted { color:var(--muted); }
 .disk-foot { margin-top:6px; font-size:11px; color:var(--muted); }
 .field label.check { display:flex; gap:10px; align-items:center; font-weight:400; color:var(--text); cursor:pointer; }
+#confirm-dialog .confirm-option { display:flex; gap:10px; align-items:flex-start; margin:14px 0 4px; font-size:13px; line-height:1.45; color:var(--muted); cursor:pointer; }
+#confirm-dialog .confirm-option input { margin-top:3px; accent-color:var(--bad); }
+#confirm-dialog .confirm-option.hidden { display:none; }
 .help { color:var(--muted); font-size:12px; }
 .required { color:var(--accent); font-size:10px; margin-left:7px; font-weight:400; }
 .advanced { margin-top:22px; border-top:1px solid var(--line); }
@@ -833,7 +836,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   </aside></div>
   <div class="console-footer"><span id="vnc-status" class="state s-warn" role="status">Connecting</span><p id="vnc-note">Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave.</p><label class="console-auto"><input id="vnc-auto" type="checkbox" checked>Auto reconnect</label><button id="vnc-reconnect">Reconnect</button></div>
 </div></dialog>
-<dialog id="confirm-dialog" aria-labelledby="confirm-title"><div class="body"><div class="eyebrow bad" id="confirm-eyebrow">Confirm</div><h1 id="confirm-title">Are you sure?</h1><p id="confirm-message"></p><pre id="confirm-command" class="hidden"></pre><dl id="confirm-facts" class="hidden"></dl><div class="confirm-buttons"><button id="confirm-no">Cancel</button><button id="confirm-yes" class="danger">Continue</button></div></div></dialog>
+<dialog id="confirm-dialog" aria-labelledby="confirm-title"><div class="body"><div class="eyebrow bad" id="confirm-eyebrow">Confirm</div><h1 id="confirm-title">Are you sure?</h1><p id="confirm-message"></p><pre id="confirm-command" class="hidden"></pre><dl id="confirm-facts" class="hidden"></dl><label id="confirm-option-row" class="check confirm-option hidden"><input id="confirm-option" type="checkbox"><span id="confirm-option-label"></span></label><div class="confirm-buttons"><button id="confirm-no">Cancel</button><button id="confirm-yes" class="danger">Continue</button></div></div></dialog>
 <dialog id="ssh-dialog" aria-labelledby="ssh-title"><header><div><div class="eyebrow">Terminal access</div><h1 id="ssh-title">SSH console</h1></div><button data-close>Close</button></header><div class="body"><p id="ssh-description" class="s-muted"></p><pre id="ssh-command"></pre><p class="help">Run from the project directory. Uses the profile’s SSH user, port and key.</p><div class="command-buttons"><button id="ssh-browser" class="primary">Open in browser</button><button id="ssh-launch">Open SSH terminal on host ↗</button><button id="ssh-copy">Copy command</button></div><p id="ssh-result" class="help" role="status"></p></div></dialog>
 <dialog id="terminal-dialog" aria-labelledby="terminal-title"><div id="terminal-shell"><header><div><div class="eyebrow">SSH terminal</div><h1 id="terminal-title">SSH</h1></div><div class="console-toolbar"><span id="terminal-status" class="state s-warn" role="status">Connecting</span><button id="terminal-reconnect">Reconnect</button><button id="terminal-full">Full screen</button><button id="terminal-close">Close</button></div></header><div id="terminal-frame"><div id="terminal-screen"></div></div><div class="console-footer"><p id="terminal-note">Interactive SSH to the guest. Closing this terminal disconnects SSH; the VM keeps running.</p></div></div></dialog>
 <dialog id="profile-dialog" aria-labelledby="profile-title">
@@ -1456,15 +1459,24 @@ function renderLabs() {
 }
 
 // A styled confirmation instead of window.confirm: the command, what it touches, one red button.
-function askConfirm({ eyebrow = "Destructive command", title, message, command, facts = [], button = "Continue" }) {
+// option: {label, command, button} adds a checkbox (a flag of the command, --force for a stop);
+// the command preview and the button follow it, and the answer is then {option: checked}.
+function askConfirm({ eyebrow = "Destructive command", title, message, command, facts = [], button = "Continue", option = null }) {
   const d = $("confirm-dialog");
   $("confirm-eyebrow").textContent = eyebrow; $("confirm-title").textContent = title; $("confirm-message").textContent = message || "";
   $("confirm-command").textContent = command || ""; $("confirm-command").classList.toggle("hidden", !command);
   $("confirm-facts").innerHTML = facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join(""); $("confirm-facts").classList.toggle("hidden", !facts.length);
   $("confirm-yes").textContent = button;
+  $("confirm-option-row").classList.toggle("hidden", !option); $("confirm-option").checked = false;
+  $("confirm-option-label").textContent = option?.label || "";
+  $("confirm-option").onchange = () => {
+    const on = $("confirm-option").checked;
+    $("confirm-command").textContent = (on && option.command) || command || "";
+    $("confirm-yes").textContent = (on && option.button) || button;
+  };
   return new Promise((resolve) => {
     let answer = false;
-    $("confirm-yes").onclick = () => { answer = true; d.close(); };
+    $("confirm-yes").onclick = () => { answer = option ? {option: $("confirm-option").checked} : true; d.close(); };
     $("confirm-no").onclick = () => d.close();
     d.onclose = () => { d.onclose = null; resolve(answer); };
     d.showModal(); $("confirm-no").focus();
@@ -2189,8 +2201,11 @@ $("vnc-files").onclick = () => toggleConsolePanel("files");
 $("vnc-integration").onclick = () => toggleConsolePanel("integration");
 $("vnc-stop").onclick = async () => {
   const vm = consoleVm;
-  if (!vm || !await askConfirm({eyebrow:"Console", title:`Stop ${vm}?`, message:"Ask the guest to power off: the guest agent, then ACPI, then SSH. The console shows the shutdown and closes when the VM is off; Force stop is in the machine panel.", command:`vmctl stop ${vm}`, button:"Stop machine"})) return;
-  if (await run(["stop", vm])) consoleStatus("Connected", "s-ok", "Power-off requested. The console closes when the VM is off.");
+  if (!vm) return;
+  const answer = await askConfirm({eyebrow:"Console", title:`Stop ${vm}?`, message:"Ask the guest to power off: the guest agent, then ACPI, then SSH. The console shows the shutdown and closes when the VM is off.", command:`vmctl stop ${vm}`, button:"Stop machine",
+    option:{label:"Force: signal QEMU directly, no guest shutdown (a guest at a boot menu or stuck in an installer answers nothing; unsaved guest changes are lost)", command:`vmctl stop ${vm} --force`, button:"Force stop"}});
+  if (!answer) return;
+  if (await run(answer.option ? ["stop", vm, "--force"] : ["stop", vm])) consoleStatus("Connected", "s-ok", (answer.option ? "Force stop" : "Power-off") + " requested. The console closes when the VM is off.");
 };
 $("vnc-detach").onclick = () => {
   const url = new URL(location.href); url.search = "";

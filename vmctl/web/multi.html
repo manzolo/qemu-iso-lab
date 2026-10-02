@@ -67,6 +67,9 @@ dialog h2 { margin:0 0 8px; font-size:16px; }
 dialog p { margin:0 0 12px; color:var(--muted); font-size:13px; }
 dialog pre { margin:0 0 16px; padding:10px 12px; background:#0c1522; border:1px solid #33465e; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
 dialog .buttons { display:flex; justify-content:flex-end; gap:8px; }
+dialog .option { display:flex; gap:10px; align-items:flex-start; margin:0 0 16px; font-size:12px; line-height:1.45; color:var(--muted); cursor:pointer; }
+dialog .option[hidden] { display:none; }
+dialog .option input { margin-top:3px; accent-color:var(--bad); }
 #toast { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); margin:0; padding:10px 16px; border:1px solid var(--line); border-radius:10px; background:#1b2738; color:var(--text); font-size:13px; max-width:80vw; }
 #toast.bad { border-color:#6a3b48; color:var(--bad); }
 @media(max-width:720px) { .brand h1 { max-width:200px; } #network-status { max-width:180px; } main#panes.columns { grid-auto-flow:row; grid-auto-columns:auto; } }
@@ -84,7 +87,7 @@ dialog .buttons { display:flex; justify-content:flex-end; gap:8px; }
   </div>
 </header>
 <main id="panes" class="columns"></main>
-<dialog id="confirm"><h2 id="confirm-title"></h2><p id="confirm-message"></p><pre id="confirm-command" class="mono"></pre><div class="buttons"><button id="confirm-no">Cancel</button><button id="confirm-yes" class="primary">Run</button></div></dialog>
+<dialog id="confirm"><h2 id="confirm-title"></h2><p id="confirm-message"></p><pre id="confirm-command" class="mono"></pre><label id="confirm-option-row" class="option" hidden><input id="confirm-option" type="checkbox"><span id="confirm-option-label"></span></label><div class="buttons"><button id="confirm-no">Cancel</button><button id="confirm-yes" class="primary">Run</button></div></dialog>
 <div id="toast" popover="manual" role="status"></div>
 <script src="/assets/icons.js"></script>
 <script>
@@ -108,12 +111,15 @@ function toast(message, bad = false) {
   try { t.showPopover(); } catch (_) { t.style.display = "block"; }
   clearTimeout(t._h); t._h = setTimeout(() => { try { t.hidePopover(); } catch (_) { t.style.display = "none"; } }, bad ? 7000 : 4000);
 }
-function ask({title, message, command, button = "Run"}) {
+// option: {label, command, button} adds a checkbox (--force on a stop); the answer is then {option: checked}.
+function ask({title, message, command, button = "Run", option = null}) {
   $("confirm-title").textContent = title; $("confirm-message").textContent = message || "";
   $("confirm-command").textContent = command || ""; $("confirm-command").hidden = !command; $("confirm-yes").textContent = button;
+  $("confirm-option-row").hidden = !option; $("confirm-option").checked = false; $("confirm-option-label").textContent = option?.label || "";
+  $("confirm-option").onchange = () => { const on = $("confirm-option").checked; $("confirm-command").textContent = (on && option.command) || command || ""; $("confirm-yes").textContent = (on && option.button) || button; };
   return new Promise((resolve) => {
     const d = $("confirm"); let answer = false;
-    $("confirm-yes").onclick = () => { answer = true; d.close(); };
+    $("confirm-yes").onclick = () => { answer = option ? {option: $("confirm-option").checked} : true; d.close(); };
     $("confirm-no").onclick = () => d.close();
     d.onclose = () => { d.onclose = null; resolve(answer); };
     d.showModal(); $("confirm-no").focus();
@@ -207,9 +213,11 @@ async function paneAction(name, act) {
   if (act === "reload") { const f = frames.get(name)?.querySelector("iframe"); if (f) f.src = consoleUrl(name); return; }
   if (act === "start") return startVm(name);
   if (act === "stop" && r?.running) {
-    if (!await ask({ title: `Stop ${name}?`, message: "Request a normal shutdown of the guest (ACPI, then the guest agent or SSH).", command: `vmctl stop ${name}`, button: "Stop" })) return;
+    const answer = await ask({ title: `Stop ${name}?`, message: "Ask the guest to power off: the guest agent, then ACPI, then SSH.", command: `vmctl stop ${name}`, button: "Stop",
+      option: { label: "Force: signal QEMU directly, no guest shutdown (a guest at a boot menu or stuck in an installer answers nothing; unsaved guest changes are lost)", command: `vmctl stop ${name} --force`, button: "Force stop" } });
+    if (!answer) return;
     local.set(name, "stop"); render();
-    try { await api("/api/run", { args: ["stop", name] }); } catch (e) { local.delete(name); toast(e.message, true); }
+    try { await api("/api/run", { args: answer.option ? ["stop", name, "--force"] : ["stop", name] }); } catch (e) { local.delete(name); toast(e.message, true); }
     schedulePoll(0);
   }
 }
