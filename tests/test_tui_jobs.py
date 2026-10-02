@@ -160,3 +160,39 @@ class TuiJobTests(unittest.TestCase):
         for name in ("", ".", "..", "../outside", "/tmp/outside"):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 tui_jobs.job_dir(Path("/tmp"), name)
+
+
+class ConcurrentStatusTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_readers_never_see_each_other_as_a_running_job(self):
+        # The web page, its /multi panes and vmtui read the same slot at once: with an exclusive
+        # probe the second reader answered "running" (2 active jobs with nothing running, 2026-10-02).
+        import threading
+        directory = tui_jobs.job_dir(self.root, "testvm")
+        directory.mkdir(parents=True)
+        (directory / "lock").write_bytes(b"")
+        (directory / "status").write_text("completed\n")
+        seen = set()
+        def worker():
+            for _ in range(200):
+                seen.add(tui_jobs.status(directory))
+        threads = [threading.Thread(target=worker) for _ in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(seen, {"completed"})
+
+    def test_a_worker_still_holds_the_slot_against_a_second_start(self):
+        import fcntl
+        directory = tui_jobs.job_dir(self.root, "testvm")
+        directory.mkdir(parents=True)
+        with (directory / "lock").open("a+b") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            self.assertEqual(tui_jobs.status(directory), "running")
+            with (directory / "lock").open("a+b") as second, self.assertRaises(BlockingIOError):
+                tui_jobs._lock_exclusive(second, attempts=3, pause=0.001)

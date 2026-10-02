@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator
+from typing import BinaryIO
 
 
 def job_dir(root: Path, name: str) -> Path:
@@ -40,16 +41,35 @@ HISTORY_KEEP = 100  # archived runs kept per VM under runtime/tui-job/history/
 
 
 def status(directory: Path) -> str:
+    """The slot's state: "running" while the worker holds the lock, else what it wrote last.
+
+    The probe is a *shared* lock: two dashboards reading the same slot at once (the web page,
+    its /multi panes, vmtui) must not see each other as the worker. With an exclusive probe
+    the second reader found the first one's lock and answered "running": the web header showed
+    "2 active jobs" with nothing running (2026-10-02, 4564 of 12600 concurrent reads)."""
     try:
         with (directory / "lock").open("rb") as lock:
             try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
             except BlockingIOError:
                 return "running"
             result = (directory / "status").read_text().strip()
             return "interrupted" if result == "running" else result
     except FileNotFoundError:
         return ""
+
+
+def _lock_exclusive(lock: BinaryIO, attempts: int = 25, pause: float = 0.02) -> None:
+    """Take the slot's lock for a worker or a cancellation. A reader's shared probe (status) holds
+    it for microseconds, so a refused attempt is retried a few times before it means a job."""
+    for attempt in range(attempts):
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(pause)
 
 
 def command(directory: Path) -> list[str]:
@@ -87,7 +107,7 @@ def start(root: Path, name: str, command: list[str]) -> Path:
 def _start(root: Path, name: str, directory: Path, command: list[str]) -> Path:
     with (directory / "lock").open("a+b") as lock:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _lock_exclusive(lock)
         except BlockingIOError:
             raise RuntimeError(f"A job is already running for '{name}'; open its log or wait for it to finish") from None
         log_path = directory / "output.log"
@@ -191,7 +211,7 @@ def cancel(root: Path, name: str, stop_vm: Callable[[], None], grace_sec: float 
         # cannot advance to another phase or launch a replacement VM.
         with (directory / "lock").open("a+b") as lock:
             try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                _lock_exclusive(lock)
             except BlockingIOError:
                 raise RuntimeError("Installation lock is still held; cancellation is incomplete") from None
             stop_vm()
