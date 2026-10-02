@@ -24,6 +24,7 @@ from typing import Any, Iterator
 from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, opnsense, slackware, void, agama, popos, mediacheck, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
+from vmctl import isofile
 
 
 # --- background-VM tracking ----------------------------------------------------
@@ -1568,6 +1569,12 @@ def cmd_delete_iso(args: argparse.Namespace) -> int:
     vm = config.get_vm(cfg, args.vm)
     iso_path = iso.medium_path(vm)
     partial_path = iso_path.with_name(iso_path.name + ".part")
+    if iso_path.exists() and not isofile.in_cache(iso_path):
+        # A medium set with `vmctl iso set` (or by hand in local.json) is the user's own file,
+        # in their own library: vmctl removes only what it keeps under isos/.
+        raise VMError(f"{iso_path} is not in vmctl's ISO cache (isos/): it is your file, set for '{args.vm}' in "
+                      f"vms/profiles/local.json. Delete it yourself if you mean it, or point the profile elsewhere "
+                      f"with vmctl iso set {args.vm} <path>")
 
     removed = False
     for path in [iso_path, partial_path]:
@@ -1583,6 +1590,45 @@ def cmd_delete_iso(args: argparse.Namespace) -> int:
         ui.print_status("ok", f"ISO cache removed for '{args.vm}'")
     else:
         ui.print_status("ok", f"No cached ISO found for '{args.vm}'")
+    return 0
+
+
+def cmd_iso(args: argparse.Namespace) -> int:
+    """vmctl iso browse|check|set: hand vmctl an ISO you already have (isofile.py)."""
+    if args.action == "browse":
+        listing = isofile.browse(args.path or args.vm)
+        if args.json:
+            print(json.dumps(listing, indent=2))
+            return 0
+        ui.print_header(f"ISOs in {listing['path']}")
+        for entry in listing["entries"]:
+            if entry["kind"] == "dir":
+                print(f"  {entry['name']}/")
+            else:
+                print(f"  {entry['name']}  ({entry['size'] / 1e9:.2f} GB)")
+        return 0
+    if not args.vm or not args.path:
+        raise VMError(f"vmctl iso {args.action} <vm> <path>")
+    if args.action == "check":
+        result = isofile.check(args.vm, args.path)
+        if args.json:
+            print(json.dumps(result, indent=2))
+            return 0 if not result["problems"] else 1
+        ui.print_header(f"ISO check for {result['vm']}")
+        ui.print_kv("file", result["path"])
+        if result.get("editions"):
+            ui.print_kv("editions", ", ".join(result["editions"]))
+            ui.print_kv("languages", ", ".join(result.get("languages") or []))
+        for note in result["notes"]:
+            ui.print_note(note)
+        for problem in result["problems"]:
+            ui.print_status("fail", problem, ok=False)
+        if not result["problems"]:
+            ui.print_status("ok", f"usable: vmctl iso set {result['vm']} {shlex.quote(result['path'])}")
+        return 0 if not result["problems"] else 1
+    result = isofile.set_iso(args.vm, args.path, move=args.move, force=args.force, dry_run=args.dry_run)
+    if args.json:
+        print(json.dumps(result, indent=2))
     return 0
 
 
@@ -2098,6 +2144,9 @@ def cmd_bootstrap_windows(args: argparse.Namespace) -> int:
     ui.print_header(f"Bootstrap Windows (autounattend): {args.vm}")
 
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    # Edition and language of the medium, before anything boots: a language the ISO lacks
+    # parks Setup on its first page until the timeout (an it-IT ISO, the catalog's en-US).
+    vm = isofile.reconcile_windows_medium(args.vm, vm, iso_path, dry_run=args.dry_run)
     install_iso = windows.ensure_noprompt_iso(iso_path, dry_run=args.dry_run, legacy=windows.is_legacy_windows(windows.windows_config(vm) or {}))
     virtio_iso = windows.ensure_virtio_iso(vm, dry_run=args.dry_run)
     disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()

@@ -24,7 +24,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Discover", "what is configured, what exists on disk, what the host can run",
      ["list", "status", "show", "catalog", "protect", "unprotect", "identity", "setup", "welcome"]),
     ("Install by hand", "boot an installer and drive it yourself",
-     ["provision", "fetch-iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
+     ["provision", "fetch-iso", "iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
      ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
@@ -158,7 +158,25 @@ filesystem permission: a manual rm still deletes the files."""
     p.add_argument("vm", help=VM_HELP)
     p.set_defaults(func=lifecycle.cmd_fetch_iso)
 
-    p = _add(subparsers, "delete-iso", help="remove the cached ISO for one VM")
+    p = _add(subparsers, "iso", help="hand vmctl an ISO you already have: check it, use it where it is (local.json) or move it into isos/",
+             epilog="""examples:
+  vmctl iso browse ~/Scaricati                                   ISO files and folders of one directory
+  vmctl iso check windows-11 ~/Scaricati/Win11_26H2_Italian.iso  ISO 9660? pinned hashes? Windows: edition and language
+  vmctl iso set windows-11 ~/Scaricati/Win11_26H2_Italian.iso    use it where it is: "iso" in vms/profiles/local.json
+  vmctl iso set windows-11 ~/Scaricati/Win11_26H2_Italian.iso --move   rename it to the profile's isos/ name
+
+check reads a Windows ISO's install.wim image list once (streamed through 7z, cached under
+isos/.wiminfo/): the edition must be in it; Setup's language follows the medium. delete-iso
+removes only files under isos/, never a medium set here.""")
+    p.add_argument("action", choices=["browse", "check", "set"], help="what to do")
+    p.add_argument("vm", nargs="?", help=VM_HELP + " (browse: the directory)")
+    p.add_argument("path", nargs="?", help="the ISO file (browse: the directory; default: your downloads folder)")
+    p.add_argument("--move", action="store_true", help="set: move the file to the name the profile expects in isos/ (copies across file systems)")
+    p.add_argument("--force", action="store_true", help="set: use the file even if the check finds problems")
+    p.add_argument("--json", action="store_true", help="machine-readable output")
+    p.set_defaults(func=lifecycle.cmd_iso)
+
+    p = _add(subparsers, "delete-iso", help="remove the cached ISO for one VM (only files under isos/)")
     p.add_argument("vm", help=VM_HELP)
     p.set_defaults(func=lifecycle.cmd_delete_iso)
 
