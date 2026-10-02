@@ -42,6 +42,14 @@ What the page offers:
   - **Start ephemeral (changes discarded)**: `vmctl start --ephemeral`, QEMU `-snapshot`. The
     session writes to temporary files and the disk and EFI variables stay as they were when it
     stops; the shared folder is the host's own directory and keeps what is written into it.
+  - **Start from the ISO (rescue, live)**: `vmctl start --boot-iso`, shown when the profile's ISO
+    is on the host. The ISO is inserted and booted first with the installed disk attached, like a
+    Windows repair DVD; the install record is untouched.
+
+  A hand-driven install (`vmctl install`, `vmctl provision`) puts the disk first and the ISO second:
+  the firmware reaches the ISO only while the disk is empty, so the reboot an installer asks for
+  ("remove the installation medium, then press ENTER") lands on the installed system. Over a
+  disk that already holds a system, `--boot-iso` boots the ISO first for a reinstall.
 - **Customize**: three tabs separate **Resources**, **Advanced JSON** and the read-only
   **Catalog template**. Memory and vCPUs have presets, editable values and **Use catalog**
   buttons to restore each field independently. Empty fields inherit the catalog; local values

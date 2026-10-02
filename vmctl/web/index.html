@@ -1049,6 +1049,8 @@ function actionsFor(r) {
     a.push({ label: "Start in a host window", args: ["start", n], alternative:true, icon:"display", tone:"info" });
     // QEMU -snapshot: every write goes to temporary files, the disk is untouched when it stops
     a.push({ label: "Start ephemeral (changes discarded)", args: ["start", n, "--headless", "--background", "--ephemeral"], afterStart:prefersSsh(r) ? false : "detached", alternative:true, icon:"play", tone:"info" });
+    // vmctl start --boot-iso: the profile's ISO inserted and booted first, the disk attached (rescue, live session)
+    if (r.iso_source === "cached" && !r.has_disk_image) a.push({ label: "Start from the ISO (rescue, live)", args: ["start", n, "--headless", "--background", "--boot-iso"], afterStart:"detached", alternative:true, icon:"disc", tone:"info" });
     a.push({ label: "Checkpoint now", args: ["checkpoint", "create", n, "web-" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")], icon:"bookmark", tone:"info" });
   } else if (r.job_status !== "running" && r.has_disk_image) {
     // Built, not installed (SerenityOS): the prepared image becomes the disk, then it boots.

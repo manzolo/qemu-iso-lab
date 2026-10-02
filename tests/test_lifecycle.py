@@ -365,9 +365,10 @@ class VmctlTests(BaseVmctlTestCase):
         qemu_cmd = run_cmd.call_args_list[1].args[0]
         self.assertEqual(qemu_img_cmd[:3], ["qemu-img", "create", "-f"])
         self.assertEqual(qemu_cmd[0], "qemu-system-x86_64")
-        self.assertIn("-cdrom", qemu_cmd)
-        self.assertEqual(qemu_cmd[qemu_cmd.index("-cdrom") + 1], str(iso_path))
-        self.assertIn(f"file={self.root / self.vm_config['disk']['path']},format=qcow2,if=virtio", qemu_cmd)
+        self.assertIn("ide-cd,drive=installcd,bootindex=2", qemu_cmd)  # a new disk boots first, the ISO second
+        self.assertIn(f"id=installcd,file={iso_path},format=raw,if=none,media=cdrom,readonly=on", qemu_cmd)
+        self.assertIn(f"id=disk0,file={self.root / self.vm_config['disk']['path']},format=qcow2,if=none", qemu_cmd)
+        self.assertIn("virtio-blk-pci,drive=disk0,bootindex=1", qemu_cmd)
 
     def test_cmd_provision_no_start_only_prepares_artifacts(self):
         iso_path = self.root / self.vm_config["iso"]
@@ -399,11 +400,44 @@ class VmctlTests(BaseVmctlTestCase):
         qemu_cmd = run_cmd.call_args.args[0]
         self.assertEqual(run_cmd.call_args.kwargs["dry_run"], True)
         self.assertEqual(qemu_cmd[0], "qemu-system-x86_64")
-        self.assertIn(f"file={disk_path},format=qcow2,if=virtio", qemu_cmd)
-        self.assertIn("-cdrom", qemu_cmd)
-        self.assertEqual(qemu_cmd[qemu_cmd.index("-cdrom") + 1], str(iso_path))
+        # An empty disk boots first, the ISO second: the firmware reaches the CD once, and the
+        # installer's "remove the medium, press ENTER" reboot lands on the installed system.
+        self.assertIn(f"id=disk0,file={disk_path},format=qcow2,if=none", qemu_cmd)
+        self.assertIn("virtio-blk-pci,drive=disk0,bootindex=1", qemu_cmd)
+        self.assertIn(f"id=installcd,file={iso_path},format=raw,if=none,media=cdrom,readonly=on", qemu_cmd)
+        self.assertIn("ide-cd,drive=installcd,bootindex=2", qemu_cmd)
+        self.assertNotIn("-cdrom", qemu_cmd)
         self.assertIn("-vga", qemu_cmd)
         self.assertIn("std", qemu_cmd)
+
+        disk_path.write_bytes(b"\1" * (vmctl.vmstate.DATA_MIN_BYTES + 8192))  # a system on the disk: it boots first
+        for boot_iso, disk_index, cd_index in ((False, 1, 2), (True, 2, 1)):  # --boot-iso: a reinstall
+            with self.subTest(boot_iso=boot_iso), \
+                 mock.patch.object(vmctl.iso, "download_file"), \
+                 mock.patch.object(vmctl.runtime, "require_command"), \
+                 mock.patch.object(vmctl.runtime, "run") as run_cmd:
+                self.vmctl.cmd_install(argparse.Namespace(vm=self.vm_name, video="std", cloud_init=False, dry_run=True, boot_iso=boot_iso))
+                qemu_cmd = run_cmd.call_args.args[0]
+                self.assertIn(f"virtio-blk-pci,drive=disk0,bootindex={disk_index}", qemu_cmd)
+                self.assertIn(f"ide-cd,drive=installcd,bootindex={cd_index}", qemu_cmd)
+
+    def test_start_boot_iso_inserts_the_medium_first_and_keeps_the_install_record(self):
+        disk_path = self.create_disk()
+        disk_path.write_bytes(b"\1" * (vmctl.vmstate.DATA_MIN_BYTES + 8192))
+        iso_path = self.root / self.vm_config["iso"]
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_bytes(b"iso")
+        args = argparse.Namespace(vm=self.vm_name, video=None, cloud_init=False, headless=False, background=False,
+                                  spice_port=None, ephemeral=False, boot_iso=True, dry_run=True)
+        with mock.patch.object(vmctl.runtime, "require_command"), \
+             mock.patch.object(vmctl.vmstate, "begin_install") as begin, \
+             mock.patch.object(vmctl.runtime, "run") as run_cmd:
+            self.vmctl.cmd_start(args)
+        qemu_cmd = run_cmd.call_args.args[0]
+        self.assertIn("virtio-blk-pci,drive=disk0,bootindex=2", qemu_cmd)
+        self.assertIn("ide-cd,drive=installcd,bootindex=1", qemu_cmd)
+        self.assertIn(f"id=installcd,file={iso_path},format=raw,if=none,media=cdrom,readonly=on", qemu_cmd)
+        begin.assert_not_called()
 
     def test_cmd_install_defaults_to_std_video_for_non_ubuntu_installer(self):
         self.create_disk()

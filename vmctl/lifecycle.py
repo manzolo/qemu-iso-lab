@@ -1652,6 +1652,28 @@ def refuse_disk_image(vm: dict[str, Any], vm_name: str) -> None:
                       f"creates its disk from the image, vmctl start {vm_name} boots it")
 
 
+def iso_boot_media(iso_path: Path, iso_first: bool) -> tuple[int, list[str]]:
+    """The medium as a CD-ROM with an explicit place in the firmware boot order, and the main
+    disk's place (OVMF ignores ``-boot order``; with bootindex both firmwares follow it)."""
+    cd = ["-drive", f"id=installcd,file={iso_path},format=raw,if=none,media=cdrom,readonly=on",
+          "-device", f"ide-cd,drive=installcd,bootindex={1 if iso_first else 2}"]
+    return (2 if iso_first else 1), cd
+
+
+def interactive_installer_media(vm_name: str, iso_path: Path, boot_iso: bool = False) -> tuple[int, list[str]]:
+    """Boot order of a hand-driven install: the disk first and the ISO second, so the firmware
+    falls through to the CD while the disk is empty and the reboot an installer asks for
+    ("remove the installation medium, then press ENTER": elementary OS, 2026-10-02) lands on the
+    installed system instead of the live CD again. ``--boot-iso`` puts the ISO first: a
+    reinstall over a disk that already holds a system."""
+    if boot_iso:
+        ui.print_note("--boot-iso: the ISO boots first, the disk stays attached")
+    elif vmstate.artifact_disk_has_data(vm_name):
+        ui.print_note(f"The disk already holds data and boots first; the ISO is attached second (boot menu: Esc/F12). "
+                      f"Reinstall with --boot-iso; once installed, boot it with: vmctl start {vm_name}")
+    return iso_boot_media(iso_path, boot_iso)
+
+
 def cmd_provision(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -1681,6 +1703,7 @@ def cmd_provision(args: argparse.Namespace) -> int:
         ui.print_note(f"  vmctl stop {args.vm} && vmctl start {args.vm}  — restart with display")
         return 1
 
+    disk_bootindex, media = interactive_installer_media(args.vm, iso_path, getattr(args, "boot_iso", False))
     qemu_args = qemu.common_args(
         vm,
         qemu.installer_video_variant(vm, args.video),
@@ -1688,8 +1711,9 @@ def cmd_provision(args: argparse.Namespace) -> int:
         allow_missing_disk=args.dry_run and not disk_exists,
         enable_clipboard=False,
         spice_port=getattr(args, "spice_port", None),
+        disk_bootindex=disk_bootindex,
     )
-    qemu_args += ["-cdrom", str(iso_path)]
+    qemu_args += media
     vmstate.begin_install(args.vm, "provision", interactive=True, dry_run=args.dry_run)
     runtime.run(qemu_args, dry_run=args.dry_run)
     return 0
@@ -1701,14 +1725,16 @@ def cmd_install(args: argparse.Namespace) -> int:
     refuse_disk_image(vm, args.vm)
     runtime.ensure_vm_dirs(args.vm)
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
+    disk_bootindex, media = interactive_installer_media(args.vm, iso_path, getattr(args, "boot_iso", False))
     qemu_args = qemu.common_args(
         vm,
         qemu.installer_video_variant(vm, args.video),
         dry_run=args.dry_run,
         enable_clipboard=False,
         spice_port=getattr(args, "spice_port", None),
+        disk_bootindex=disk_bootindex,
     )
-    qemu_args += ["-cdrom", str(iso_path)]
+    qemu_args += media
     if args.cloud_init:
         qemu_args += cloud_init.cloud_init_drive_args(cloud_init.create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run))
     stdout_log, stderr_log = announce_phase_logs(args.vm, "install")
@@ -3499,7 +3525,16 @@ def cmd_start(args: argparse.Namespace) -> int:
             cloud_init.create_cloud_init_seed(args.vm, vm, dry_run=args.dry_run)
         )
     link_args = vmlink.boot_args(args.vm, vm)  # segments this VM was linked on while stopped
-    qemu_args = qemu.common_args(vm, args.video, dry_run=args.dry_run, headless=args.headless, spice_port=spice_port)
+    # --boot-iso: the profile's ISO inserted and booted first, the installed disk still attached
+    # (a rescue or recovery session, like Windows' repair from its DVD); the install record is untouched.
+    disk_bootindex: int | None = None
+    if getattr(args, "boot_iso", False):
+        refuse_disk_image(vm, args.vm)
+        disk_bootindex, iso_args = iso_boot_media(iso.ensure_iso(vm, dry_run=args.dry_run), iso_first=True)
+        cloud_init_args += iso_args
+        ui.print_note("--boot-iso: the ISO boots first, the disk stays attached")
+    qemu_args = qemu.common_args(vm, args.video, dry_run=args.dry_run, headless=args.headless, spice_port=spice_port,
+                                 disk_bootindex=disk_bootindex)
     qemu_args += cloud_init_args + link_args + snapshot_args
     if args.background:
         if not args.headless and spice_port is None:
@@ -3513,6 +3548,7 @@ def cmd_start(args: argparse.Namespace) -> int:
                 spice_port=spice_port,
                 serial_socket=qemu.serial_socket_path(vm),
                 serial_log=serial_log_path(args.vm),
+                disk_bootindex=disk_bootindex,
             )
             qemu_args += cloud_init_args + link_args + snapshot_args
             ui.print_kv("serial", f"{ui.pretty_path(serial_log_path(args.vm))}  (interactive: vmctl console {args.vm})")
