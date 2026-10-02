@@ -25,7 +25,13 @@ What the page offers:
   sense for the selected VM: *Unattended install* (the flow `check-vms` would run), *Get the ISO…*
   for a medium only you can provide, *Download the ISO*, *Boot headless*, *Boot with display*
   (a QEMU window on the host), *Console*, *Screenshot*, *Open viewer on the host*, *Stop*,
-  *Checkpoint now*, *Clean*. F2 boots the selected machine headlessly. Right-click a row (or Shift+F10)
+  *Checkpoint now*, *Clean*. *Get the ISO…* shows where to download the medium (the links open
+  in a new tab) and a **Choose ISO…** button: a picker over this computer's folders (Home,
+  Downloads, `isos/` and the folders your other profiles' media already live in, `GET /api/fs`),
+  with the file checked on the spot (`POST /api/vm/<vm>/iso-check`: ISO 9660, pinned hashes, for
+  Windows the editions and languages of `install.wim`), then *Use it where it is* (`vmctl iso set`:
+  the path in `local.json`, nothing copied) or *Move into isos/* (`--move`). The ISO never travels
+  through the browser. F2 boots the selected machine headlessly. Right-click a row (or Shift+F10)
   to open the same actions, SSH access and profile customization. This also works on VM
   names, addresses and state badges inside lab cards.
 - **Start options**: an installed machine starts in a separate console window by default. The

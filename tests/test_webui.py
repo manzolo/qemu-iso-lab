@@ -365,6 +365,28 @@ class ServerTests(BaseVmctlTestCase):
         conn.close()
         self.assertIsNone(self.server.RequestHandlerClass.snapshot.value)
 
+    def test_iso_picker_lists_host_folders_and_checks_a_file_in_place(self):
+        folder = self.root / 'library'
+        (folder / 'sub').mkdir(parents=True)
+        image = bytearray(64 * 1024)
+        image[16 * 2048 + 1:16 * 2048 + 6] = b'CD001'
+        (folder / 'Win.iso').write_bytes(bytes(image))
+        status, body = self.get('/api/fs?path=' + str(folder))
+        self.assertEqual(status, 200)
+        self.assertEqual([(e['name'], e['kind']) for e in json.loads(body)['entries']], [('sub', 'dir'), ('Win.iso', 'iso')])
+        self.assertEqual(self.get('/api/fs?path=relative')[0], 400)
+        self.assertEqual(self.get('/api/fs?path=' + str(folder), token='wrong')[0], 401)
+        for payload, code in (({'path': str(folder / 'Win.iso')}, 200), ({'path': 5}, 400)):
+            conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+            conn.request('POST', '/api/vm/testvm/iso-check', body=json.dumps(payload), headers={'X-Vmctl-Token': 'secret-token'})
+            response = conn.getresponse()
+            self.assertEqual(response.status, code)
+            data = json.loads(response.read())
+            conn.close()
+            if code == 200:
+                self.assertEqual(data['problems'], [])
+        self.assertIn('iso', [c['name'] for c in webui.command_catalog()])  # vmctl iso set runs as a job
+
     def test_identity_endpoint_creates_local_json_and_invalidates_cached_state(self):
         status, body = self.get('/api/identity')
         self.assertEqual(status, 200)

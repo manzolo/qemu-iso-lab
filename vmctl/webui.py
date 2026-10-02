@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import catalog, config, integration, local_identity, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording
+from vmctl import catalog, config, integration, isofile, local_identity, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
@@ -598,6 +598,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(local_identity.read())
             elif path == "/api/devices":
                 self._json(run_json(["list-target-devices", "--json"]))
+            elif path == "/api/fs":
+                # The "Choose ISO" picker: one host directory (subfolders and .iso files). The medium
+                # never travels through the browser; vmctl iso set reads it where it already is.
+                self._json(isofile.browse((query.get("path") or [""])[0] or None))
             elif path.startswith("/api/vm/") and path.endswith("/override"):
                 self._json(profile_overrides.read_override(path[len("/api/vm/"):-len("/override")]))
             elif path == "/api/jobs":
@@ -791,6 +795,11 @@ class Handler(BaseHTTPRequestHandler):
                 kind = str(body.get("format", ""))
                 data = session.export(kind)
                 self._send(HTTPStatus.OK, data, "image/gif" if kind == "gif" else "video/mp4")
+            elif path.startswith("/api/vm/") and path.endswith("/iso-check"):
+                medium = body.get("path")
+                if not isinstance(medium, str) or not medium:
+                    raise VMError("path must be the ISO file to check")
+                self._json(isofile.check(path[len("/api/vm/"):-len("/iso-check")], medium))
             elif path == "/api/run":
                 command, vm = prepare_command(list(body.get("args") or []), bool(body.get("confirmed")))
                 job_id = start_job(command, vm)

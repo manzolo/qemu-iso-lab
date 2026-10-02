@@ -164,6 +164,22 @@ button.state:hover { background:#453c28; }
 .actions button.primary .ai { --ai:#102c29; }
 button.warn { color:var(--warn); border-color:#5a4a2c; background:#2c2620; }
 button.warn:hover { background:#3a3128; border-color:#7a6440; }
+.iso-have { display:flex; gap:14px; align-items:center; justify-content:space-between; margin-top:14px; padding-top:12px; border-top:1px solid var(--line, #333); }
+.iso-have h2 { font-size:14px; margin:0 0 4px; }
+.iso-places { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.iso-places button { font-size:12px; padding:3px 9px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.iso-pathbar { display:flex; gap:6px; margin-bottom:8px; }
+.iso-pathbar input { flex:1; min-width:0; }
+.iso-list { list-style:none; margin:0; padding:0; max-height:42dvh; overflow:auto; border:1px solid var(--line, #333); border-radius:6px; }
+.iso-list li button { display:flex; flex-wrap:wrap; width:100%; justify-content:space-between; column-gap:12px; text-align:left; border:0; border-radius:0; background:transparent; padding:6px 10px; }
+.iso-list li button > span:first-child { min-width:0; overflow-wrap:anywhere; }
+.iso-list li button:hover, .iso-list li button[aria-pressed="true"] { background:var(--panel2); }
+.iso-list .iso-meta { color:var(--muted); font-size:12px; white-space:nowrap; margin-left:auto; }
+.iso-list .iso-empty { padding:10px; color:var(--muted); font-size:13px; }
+.iso-result { margin:10px 0; font-size:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.iso-result .ok { color:var(--ok); } .iso-result .bad { color:var(--bad); } .iso-result .warn { color:var(--warn); }
+.iso-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.note a, .iso-result a { color:inherit; text-decoration:underline; overflow-wrap:anywhere; }
 .note { background:var(--panel2); border-left:3px solid var(--warn); padding:10px 12px; border-radius:6px; white-space:pre-wrap; font-size:13px; margin:10px 0; }
 #jobs { margin:0 24px 24px; }
 .section-heading { display:flex; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); align-items:center; }
@@ -882,7 +898,17 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <dialog id="unlink-dialog" aria-labelledby="unlink-title"><header><h1 id="unlink-title">Choose network to unlink</h1><button data-close>Close</button></header><div class="body"><p id="unlink-members" class="mono"></p><p>These machines share multiple networks. Choose the network to disconnect.</p><label for="unlink-segment">Network</label><select id="unlink-segment"></select><p class="help">Only the listed machines will be removed from this network.</p><button id="unlink-review">Review unlink…</button></div></dialog>
 <dialog id="link-dialog" aria-labelledby="link-title"><header><h1 id="link-title">Network connection</h1><button data-close>Close</button></header><div class="body"><p id="link-source" class="mono"></p><label for="link-target">Connect to</label><select id="link-target"></select><p class="help">Link to a machine, or unlink an existing connection. Stopped machines join new links at their next start.</p><button id="link-review" class="primary">Review link…</button></div></dialog>
 <dialog id="help-dialog"><header><h1 id="help-title">ISO needed</h1><button data-close>Close</button></header>
-  <div class="body"><div class="note" id="help-text"></div></div></dialog>
+  <div class="body"><div class="note" id="help-text"></div>
+    <div class="iso-have"><div><h2>Already downloaded it?</h2><p class="help">Pick the file on this computer: vmctl checks it, then uses it where it is or moves it into isos/.</p></div><button id="help-choose" class="primary">Choose ISO…</button></div></div></dialog>
+<dialog id="iso-dialog" aria-labelledby="iso-title"><header><h1 id="iso-title">Choose the ISO</h1><button data-close>Close</button></header>
+  <div class="body">
+    <div id="iso-places" class="iso-places" aria-label="Places"></div>
+    <form id="iso-go" class="iso-pathbar"><button type="button" id="iso-up" title="Parent folder" aria-label="Parent folder">↑</button><input id="iso-path" class="mono" spellcheck="false" aria-label="Folder or ISO path"><button type="submit">Go</button></form>
+    <ul id="iso-list" class="iso-list" aria-label="Folder contents"></ul>
+    <div id="iso-result" class="iso-result" role="status" aria-live="polite"></div>
+    <div class="iso-actions"><button id="iso-use" class="primary" disabled>Use it where it is</button><button id="iso-move" disabled>Move into isos/</button></div>
+    <p class="help">"Use it where it is" writes the path in vms/profiles/local.json, nothing is copied. "Move" renames the file to the name the profile expects under isos/ (a copy when it is on another disk).</p>
+  </div></dialog>
 <dialog id="record-dialog" aria-labelledby="record-title"><header><h1 id="record-title">Console recording</h1><button data-close>Close</button></header><div class="body"><p id="record-info" role="status"></p><div id="record-downloads"><label for="record-format">Download as</label><select id="record-format"><option value="gif">GIF · 1 frame per second</option><option value="mp4">MP4 · original resolution</option></select><button id="record-download" class="primary">Download</button><button id="record-new">Done</button></div><p class="help">Frames are kept on the host. You can download both formats from the same recording.</p></div></dialog>
 <aside id="job-bar" class="hidden" aria-label="Active job"><div class="job-bar-copy"><span id="job-bar-status" class="state busy s-warn" role="status"></span><span id="job-bar-command" class="mono"></span></div><div class="job-controls"><button id="job-bar-log">View job</button><button id="job-bar-cancel" class="danger">Cancel job</button></div></aside>
 
@@ -909,6 +935,12 @@ async function api(path, body) {
     error.status = res.status; throw error;
   }
   return data;
+}
+// Plain text with its http(s) URLs as links: every piece is escaped, only http(s) becomes a link
+// (iso_help and notes come from profile files, never trusted as HTML).
+function linkHtml(text) {
+  const parts = String(text ?? "").split(/(https?:\/\/[^\s<>"'()]+[^\s<>"'().,;:!?])/g);
+  return parts.map((part, i) => i % 2 ? `<a href="${esc(part)}" target="_blank" rel="noopener noreferrer">${esc(part)}</a>` : esc(part)).join("");
 }
 function toast(msg, err) { const t = $("toast"); t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block"; t.showPopover?.(); clearTimeout(t._h); t._h = setTimeout(() => { t.hidePopover?.(); t.style.display = "none"; }, err ? 9000 : 3500); }
 
@@ -1356,7 +1388,7 @@ function renderDetails() {
     ${section("network", "Network", network.length ? factList(network) + '<button id="machine-link">Connect another VM…</button>' : `<p class="help">No private VM links.</p><button id="machine-link" ${!r.installed && !r.running ? "disabled" : ""}>Connect another VM…</button>`)}
     ${section("configuration", "Configuration", factList(config) + '<button id="machine-config">Edit configuration…</button>')}
     ${section("installation", "Installation details", `<p class="help">${esc(r.install_detail || installationOf(r)[0])}</p>${r.verify_at ? `<p class="help">Verified: ${esc(r.verify_at)}</p>` : ""}`)}
-    ${r.iso_source === "manual" && !r.installed ? `<div class="note">${esc((r.iso_help || "").replace(/\\n/g, "\n"))}</div>` : ""}
+    ${r.iso_source === "manual" && !r.installed ? `<div class="note">${linkHtml((r.iso_help || "").replace(/\\n/g, "\n"))}</div>` : ""}
     ${section("maintenance", "Maintenance", `<div class="actions">${buttons(a => isExtra(a) && !a.alternative && a.args?.[0] !== "checkpoint")}${r.installed ? '<button data-command="clone">Clone machine…</button>' : ""}</div>`)}
     <div class="more-commands">${more}</div>`;
   $("details").querySelectorAll("details").forEach(el => { el.open = expanded.includes(el.dataset.section); });
@@ -1489,13 +1521,75 @@ function runAction(r, a) {
   if (a.screen) return openScreen(r.name);
   if (a.console) return openConsole(r.name);
   if (a.ssh) return openBrowserSsh(r.name);
-  if (a.help) { $("help-title").textContent = "ISO needed: " + r.name; $("help-text").textContent = (r.iso_help || "").replace(/\\n/g, "\n"); return $("help-dialog").showModal(); }
+  if (a.help) { $("help-title").textContent = "ISO needed: " + r.name; $("help-text").innerHTML = linkHtml((r.iso_help || "").replace(/\\n/g, "\n")); $("help-choose").onclick = () => { $("help-dialog").close(); openIsoPicker(r.name); }; return $("help-dialog").showModal(); }
   if (a.form) return openCommands(a.form);
   if (a.mine) return setMine(a.mine, [r.name]);
   if (a.hide) return setHidden(a.hide, [r.name]);
   if (a.protect) return setProtect(a.protect, [r.name]);
   return run(a.args, a.danger, a.afterStart);
 }
+
+// --- "Choose ISO": a host-side picker over /api/fs; the medium never goes through the browser
+const isoPick = { vm: "", dir: "", parent: null, file: "", result: null };
+function fmtSize(n) { return n >= 1e9 ? (n / 1e9).toFixed(2) + " GB" : (n / 1e6).toFixed(0) + " MB"; }
+async function openIsoPicker(vm, dir) {
+  Object.assign(isoPick, { vm, file: "", result: null });
+  $("iso-title").textContent = "Choose the ISO for " + vm;
+  isoResult(""); isoButtons(false);
+  $("iso-dialog").showModal();
+  await isoBrowse(dir || "");
+}
+async function isoBrowse(dir) {
+  try {
+    const data = await api("/api/fs?path=" + encodeURIComponent(dir || ""));
+    Object.assign(isoPick, { dir: data.path, parent: data.parent });
+    $("iso-path").value = data.path;
+    $("iso-up").disabled = !data.parent;
+    $("iso-places").innerHTML = (data.places || []).map(p => `<button type="button" data-dir="${esc(p.path)}" title="${esc(p.path)}">${esc(p.label)}</button>`).join("");
+    const rows = data.entries.map(e => e.kind === "dir"
+      ? `<li><button type="button" data-dir="${esc(data.path + "/" + e.name)}"><span>📁 ${esc(e.name)}/</span></button></li>`
+      : `<li><button type="button" data-file="${esc(data.path + "/" + e.name)}" aria-pressed="${isoPick.file === data.path + "/" + e.name}"><span>💿 ${esc(e.name)}</span><span class="iso-meta">${fmtSize(e.size)} · ${new Date(e.mtime * 1000).toLocaleDateString()}</span></button></li>`);
+    $("iso-list").innerHTML = rows.join("") || `<li class="iso-empty">No folders or .iso files here.</li>`;
+    if (data.truncated) $("iso-list").insertAdjacentHTML("beforeend", `<li class="iso-empty">Only the first entries are shown: type a narrower path.</li>`);
+  } catch (e) { isoResult(`<span class="bad">${esc(e.message)}</span>`); }
+}
+function isoResult(html) { $("iso-result").innerHTML = html; }
+function isoButtons(on) { $("iso-use").disabled = $("iso-move").disabled = !on; }
+async function isoCheck(file) {
+  isoPick.file = file; isoPick.result = null; isoButtons(false);
+  document.querySelectorAll("#iso-list [data-file]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.file === file)));
+  isoResult(`<span class="warn">Checking ${esc(file.split("/").pop())}…</span> <span class="help">(a Windows ISO is read once, about 10 s)</span>`);
+  try {
+    const r = await api(`/api/vm/${encodeURIComponent(isoPick.vm)}/iso-check`, { path: file });
+    if (isoPick.file !== file) return;
+    isoPick.result = r;
+    const lines = [];
+    if (r.editions) lines.push(`Editions: ${esc(r.editions.join(", "))}`, `Languages: ${esc((r.languages || []).join(", "))}`);
+    (r.notes || []).forEach(n => lines.push(`<span class="warn">${esc(n)}</span>`));
+    (r.problems || []).forEach(p => lines.push(`<span class="bad">✗ ${esc(p)}</span>`));
+    if (!r.problems.length) lines.unshift(`<span class="ok">✓ Usable for ${esc(r.vm)}</span> · ${fmtSize(r.size || 0)}`);
+    isoResult(lines.join("\n"));
+    isoButtons(!r.problems.length);
+  } catch (e) { if (isoPick.file === file) isoResult(`<span class="bad">${esc(e.message)}</span>`); }
+}
+async function isoSet(move) {
+  if (!isoPick.result || isoPick.result.problems.length) return;
+  const args = ["iso", "set", isoPick.vm, isoPick.file, ...(move ? ["--move"] : [])];
+  if (await run(args)) { $("iso-dialog").close(); toast(move ? "Moving the ISO into isos/…" : "ISO set for " + isoPick.vm); }
+}
+$("iso-list").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.dir) isoBrowse(b.dataset.dir); else if (b.dataset.file) isoCheck(b.dataset.file);
+});
+$("iso-places").addEventListener("click", (ev) => { const b = ev.target.closest("button[data-dir]"); if (b) isoBrowse(b.dataset.dir); });
+$("iso-up").onclick = () => { if (isoPick.parent) isoBrowse(isoPick.parent); };
+$("iso-go").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const value = $("iso-path").value.trim();
+  if (/\.iso$/i.test(value)) { isoBrowse(value.replace(/\/[^/]*$/, "") || "/").then(() => isoCheck(value)); } else isoBrowse(value);
+});
+$("iso-use").onclick = () => isoSet(false);
+$("iso-move").onclick = () => isoSet(true);
 
 // --- jobs and logs
 let activityJob = null, jobsRefreshing = false, jobsRevision = 0, logSession = 0, logTimer;

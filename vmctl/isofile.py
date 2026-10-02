@@ -65,6 +65,7 @@ def places(cfg: dict[str, Any] | None = None) -> list[dict[str, str]]:
     seen: set[str] = set()
 
     def add(label: str, path: Path) -> None:
+        path = path.resolve()
         key = str(path)
         if key not in seen and path.is_dir():
             seen.add(key)
@@ -79,8 +80,9 @@ def places(cfg: dict[str, Any] | None = None) -> list[dict[str, str]]:
             medium = iso.medium_path(vm)
         except (KeyError, TypeError):
             continue
-        if medium.is_file() and medium.resolve().parent != cache:
-            add(ui.pretty_path(medium.parent), medium.parent)
+        folder = medium.resolve().parent
+        if medium.is_file() and folder != cache:
+            add("/".join(folder.parts[-2:]), folder)  # "Iso/Windows"; the page shows the full path on hover
     return found
 
 

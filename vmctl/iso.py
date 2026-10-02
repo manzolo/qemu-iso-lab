@@ -385,8 +385,14 @@ def missing_iso_message(vm: dict[str, Any], vm_name: str | None = None) -> str:
     # read as a key to put in local.json ("set iso for 'MenuetOS 64 (your CD image)'"): say "this profile".
     target = f"'{vm_name}'" if vm_name else "this profile"
     key = "disk_image.path" if image else "iso"
-    lines += ["", f"Save it as {ui.pretty_path(path)}, or keep it where it is and set \"{key}\" for "
-              f"{target} in vms/profiles/local.json (see local.json.example)."]
+    if image:
+        lines += ["", f"Save it as {ui.pretty_path(path)}, or keep it where it is and set \"{key}\" for "
+                  f"{target} in vms/profiles/local.json (see local.json.example)."]
+    else:
+        # vmctl iso set checks the file first (ISO 9660, pinned hashes, Windows edition and language).
+        command = f"vmctl iso set {vm_name} <path>" if vm_name else "vmctl iso set <vm> <path>"
+        lines += ["", f"Save it as {ui.pretty_path(path)}, or keep it where it is: {command} checks it and "
+                  f"writes \"iso\" for {target} in vms/profiles/local.json (--move puts it in isos/ instead)."]
     return "\n".join(lines)
 
 

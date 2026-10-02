@@ -432,7 +432,7 @@ class IsoArchiveTests(BaseVmctlTestCase):
         text = str(raised.exception)
         self.assertIn("cannot download: isos/xp.iso", text)
         self.assertIn("Use your own CD and its key.", text)
-        self.assertIn('set "iso"', text)
+        self.assertIn('vmctl iso set <vm> <path> checks it and writes "iso"', text)
         (self.root / "isos").mkdir(exist_ok=True)
         (self.root / "isos/xp.iso").write_bytes(self.PAYLOAD)
         self.assertEqual(vmctl.iso.iso_source_kind(manual), "cached")
