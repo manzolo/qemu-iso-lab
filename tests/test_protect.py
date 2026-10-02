@@ -78,6 +78,23 @@ class ProtectTests(BaseVmctlTestCase):
         self.assertFalse(other.exists())
         self.assertIn(f"{self.vm_name}: protected, left as it is", out.getvalue())
 
+    def test_clean_refuses_a_vm_defined_in_libvirt_and_clean_all_skips_it(self):
+        # 2026-10-01: clean --all deleted windows-11's disk under a libvirt domain and its snapshot.
+        mine, other = self.disk(self.vm_name), self.disk("other")
+        with mock.patch.object(lifecycle, "libvirt_domain_names", return_value={self.vm_name}), \
+             mock.patch.object(lifecycle, "cmd_stop") as stop:
+            with self.assertRaisesRegex(VMError, "defined in libvirt; vmctl unexport-libvirt"):
+                lifecycle.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False, checkpoints=False, remove_profile=False))
+            stop.assert_not_called()
+            with self.assertRaisesRegex(VMError, "defined in libvirt"):
+                lifecycle.clean_vm(self.vm_name, config.get_vm(self.cfg, self.vm_name))
+            out = io.StringIO()
+            with redirect_stdout(out):
+                lifecycle.cmd_clean(argparse.Namespace(vm=None, all=True, dry_run=False, checkpoints=False, remove_profile=False))
+        self.assertTrue(mine.exists())
+        self.assertFalse(other.exists())
+        self.assertIn(f"{self.vm_name}: defined in libvirt, left as it is", out.getvalue())
+
     def test_a_new_install_refuses_a_protected_disk_with_data_only(self):
         catalog.update_protected("add", [self.vm_name], self.cfg)
         path = self.disk(self.vm_name, data=False)

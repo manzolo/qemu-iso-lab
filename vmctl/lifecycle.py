@@ -4852,8 +4852,10 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return 1
 
 
-def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: bool = False) -> None:
+def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: bool = False, check_libvirt: bool = True) -> None:
     vmstate.refuse_if_protected(name, "delete its disk")
+    if check_libvirt:
+        refuse_if_libvirt(name, "delete the disk")
     # A web/TUI clean is itself a job under runtime/. Keep its open log and lock
     # reachable until the supervisor writes the result (also prevents a new job racing it).
     job = tui_jobs.job_dir(state.ROOT, name)
@@ -4939,12 +4941,16 @@ def cmd_clean(args: argparse.Namespace) -> int:
         if remove_profile:
             raise VMError("--remove-profile applies to one VM, not to --all")
         guarded = vmstate.protected_names()
+        exported = libvirt_domain_names()
         for name, vm in config.sorted_vm_items(cfg):
             if name in guarded:
                 ui.print_note(f"{name}: protected, left as it is (vmctl unprotect {name})")
                 continue
+            if name in exported:
+                ui.print_note(f"{name}: defined in libvirt, left as it is (vmctl unexport-libvirt {name})")
+                continue
             cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
-            clean_vm(name, vm, dry_run=args.dry_run, checkpoints=checkpoints)
+            clean_vm(name, vm, dry_run=args.dry_run, checkpoints=checkpoints, check_libvirt=False)
         return 0
     name = config.canonical_vm_name(args.vm)
     vm = config.get_vm(cfg, name)
@@ -4953,6 +4959,7 @@ def cmd_clean(args: argparse.Namespace) -> int:
         if name in clone.tracked_profile_names():
             raise VMError(f"'{name}' is a tracked profile; --remove-profile removes only profiles that live in local.json alone (clones)")
     vmstate.refuse_if_protected(name, "delete its disk")  # before the force-stop, not after it
+    refuse_if_libvirt(name, "delete the disk")
     cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
     clean_vm(name, vm, dry_run=args.dry_run, checkpoints=remove_profile or checkpoints)
     if remove_profile:
@@ -4962,15 +4969,26 @@ def cmd_clean(args: argparse.Namespace) -> int:
 
 # --- checkpoints ---------------------------------------------------------------------------
 
-def libvirt_domain_defined(vm_name: str, uri: str = "qemu:///system") -> bool:
-    """Whether the VM was handed to libvirt (export-libvirt): its disk is then libvirt's to run."""
+def libvirt_domain_names(uri: str = "qemu:///system") -> set[str]:
+    """Every domain libvirt knows (one virsh call); empty without virsh or a reachable daemon."""
     if shutil.which("virsh") is None:
-        return False
+        return set()
     try:
         names = libvirt.virsh_output(uri, "list", "--all", "--name").splitlines()
     except (VMError, subprocess.CalledProcessError, OSError):
-        return False
-    return libvirt.domain_name(vm_name) in names
+        return set()
+    return {name.strip() for name in names if name.strip()}
+
+
+def libvirt_domain_defined(vm_name: str, uri: str = "qemu:///system") -> bool:
+    """Whether the VM was handed to libvirt (export-libvirt): its disk is then libvirt's to run."""
+    return libvirt.domain_name(vm_name) in libvirt_domain_names(uri)
+
+
+def refuse_if_libvirt(vm_name: str, action: str) -> None:
+    """A domain defined over the disk owns it (and maybe snapshots layered on it): leave it alone."""
+    if libvirt_domain_defined(vm_name):
+        raise VMError(f"Cannot {action} of '{vm_name}': it is defined in libvirt; vmctl unexport-libvirt {vm_name} first")
 
 
 def ensure_vm_quiescent(vm_name: str, vm: dict[str, Any], action: str) -> None:
