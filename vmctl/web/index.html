@@ -399,6 +399,7 @@ button .console-button-icon svg { width:100%; height:100%; }
 #console-shell > header #vnc-record.recording { background:#442737; border-color:#985162; color:#ffbdc2; }
 #console-shell > header #vnc-record-fps { background:#101b2a; color:#99aec4; font-size:11px; }
 #console-shell > header .console-window-actions button { background:transparent; border-color:transparent; color:#95a9bf; }
+#console-shell > header #vnc-stop:hover { background:#432b39; border-color:#754353; color:#ffb9c5; }
 #console-shell > header #vnc-close:hover { background:#432b39; border-color:#754353; color:#ffb9c5; }
 #console-shell button:disabled { opacity:.4; }
 #console-shell > .console-footer { padding:9px 16px; gap:12px; background:#101a28; }
@@ -489,7 +490,7 @@ body.console-detached { overflow:hidden; }
 body.console-detached > :not(dialog):not(#toast):not(script) { display:none !important; }
 body.console-detached #vnc-dialog { position:fixed; inset:0; margin:0; width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border:0; border-radius:0; }
 body.console-detached #vnc-detach { display:none; }
-body.console-embedded #vnc-close,body.console-embedded #console-back { display:none; }
+body.console-embedded #vnc-close,body.console-embedded #console-back,body.console-embedded #vnc-stop { display:none; }
 @media(min-width:1251px) and (max-width:1450px) {
   #console-shell > header { grid-template-columns:minmax(0,1fr) auto; gap:12px; }
   #console-shell > header > .console-toolbar { grid-row:2; grid-column:1/-1; justify-content:flex-start; }
@@ -777,7 +778,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
       </div>
       <div class="console-action-group console-capture"><button id="vnc-screenshot" disabled>Screenshot</button><select id="vnc-record-fps" aria-label="Recording frame rate" title="Capture frame rate for MP4; GIF exports at 1 fps"><option value="1">1 fps</option><option value="5">5 fps</option><option value="10" selected>10 fps</option><option value="15">15 fps</option></select>
       <button id="vnc-record" disabled>Record</button></div>
-    </div><div class="console-window-actions"><button id="vnc-detach" title="Open console in a separate window">Detach</button><button id="vnc-full" title="Toggle full screen">Full screen</button><button id="vnc-close" title="Close console">Close</button></div>
+    </div><div class="console-window-actions"><button id="vnc-stop" title="Ask the guest to power off (vmctl stop)">Stop</button><button id="vnc-detach" title="Open console in a separate window">Detach</button><button id="vnc-full" title="Toggle full screen">Full screen</button><button id="vnc-close" title="Close console">Close</button></div>
   </header>
   <div id="console-workspace"><div id="console-desktop"><div id="console-stage"><div id="vnc-screen"></div>
     <div id="console-connection" hidden><div class="console-connection-card"><span class="console-connection-symbol" aria-hidden="true"></span><h2 id="console-connection-title" role="status">Connecting to VM</h2><p id="console-connection-note"></p><div class="console-connection-actions"><button id="console-retry" class="primary">Reconnect now</button><button id="console-back">Back to machines</button></div></div></div></div>
@@ -1896,6 +1897,7 @@ if (consoleEmbedded) document.body.classList.add("console-embedded");
 const consoleIconPaths = {
   files:'<path d="M3 7V4h6l2 3h10v13H3z"/><path d="M3 7h8"/>',
   detach:'<path d="M14 3h7v7m0-7L11 13M10 3H3v18h18v-7"/>',
+  power:'<path d="M12 3v9M6.3 7.3a8 8 0 1 0 11.4 0"/>',
   up:'<path d="m6 10 6-6 6 6M12 4v16"/>',
   home:'<path d="m3 10 9-7 9 7v11h-7v-7h-4v7H3z"/>',
 
@@ -1921,7 +1923,7 @@ function consoleButton(id, label, icon) {
 }
 for (const [id,label,icon] of [
   ["vnc-fit","Fit to window","fit"],["vnc-keyboard","Keyboard","keyboard"],["vnc-clipboard","Clipboard","clipboard"],
-  ["vnc-files","Files","files"],["vnc-detach","Detach","detach"],["vnc-ssh","SSH","terminal"],["vnc-screenshot","Screenshot","camera"],["vnc-full","Full screen","expand"],["vnc-close","Close","close"],
+  ["vnc-files","Files","files"],["vnc-stop","Stop","power"],["vnc-detach","Detach","detach"],["vnc-ssh","SSH","terminal"],["vnc-screenshot","Screenshot","camera"],["vnc-full","Full screen","expand"],["vnc-close","Close","close"],
   ["vnc-integration","Integration","integration"],["integration-refresh","Refresh","reconnect"],
   ["integration-history-refresh","Refresh","reconnect"],["integration-diagnostics","Download diagnostics","download"],["integration-run","Review command…","terminal"],
   ["vnc-reconnect","Reconnect","reconnect"],["terminal-reconnect","Reconnect","reconnect"],["terminal-close","Close","close"],["terminal-full","Full screen","expand"],
@@ -2185,6 +2187,11 @@ $("vnc-keyboard").onclick = () => toggleConsolePanel("keyboard");
 $("vnc-clipboard").onclick = () => toggleConsolePanel("clipboard");
 $("vnc-files").onclick = () => toggleConsolePanel("files");
 $("vnc-integration").onclick = () => toggleConsolePanel("integration");
+$("vnc-stop").onclick = async () => {
+  const vm = consoleVm;
+  if (!vm || !await askConfirm({eyebrow:"Console", title:`Stop ${vm}?`, message:"Ask the guest to power off: the guest agent, then ACPI, then SSH. The console shows the shutdown and closes when the VM is off; Force stop is in the machine panel.", command:`vmctl stop ${vm}`, button:"Stop machine"})) return;
+  if (await run(["stop", vm])) consoleStatus("Connected", "s-ok", "Power-off requested. The console closes when the VM is off.");
+};
 $("vnc-detach").onclick = () => {
   const url = new URL(location.href); url.search = "";
   url.searchParams.set("token", TOKEN); url.searchParams.set("detached", "1");
