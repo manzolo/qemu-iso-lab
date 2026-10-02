@@ -136,6 +136,62 @@ class IsoTests(BaseVmctlTestCase):
         self.assertFalse(iso_path.exists())
         download_file.assert_called_once_with(self.vm_config["iso_url"], iso_path, dry_run=False, vm=self.vm_config)
 
+    def _published(self, text):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = text.encode()
+        return mock.patch.object(urllib.request, "urlopen", return_value=response)
+
+    def test_rolling_iso_is_replaced_when_the_vendor_publishes_a_new_image(self):
+        # 2026-10-02: a 13-day-old Tumbleweed NET image against today's repository stopped YaST.
+        iso_path = self.root / self.vm_config["iso"]
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_bytes(b"old image")
+        self.vm_config["iso_sha256_url"] = self.vm_config["iso_url"] + ".sha256"
+        new = hashlib.sha256(b"new image").hexdigest()
+        with self._published(f"{new}  openSUSE-Tumbleweed-NET-x86_64-Snapshot20260930-Media.iso\n"), \
+             mock.patch.object(vmctl.iso, "download_file") as download_file:
+            self.vmctl.ensure_iso(self.vm_config)
+        self.assertFalse(iso_path.exists())
+        download_file.assert_called_once()
+        self.assertEqual(download_file.call_args.kwargs["vm"]["iso_sha256"], new)  # the download is pinned too
+
+    def test_rolling_iso_is_kept_when_current_or_when_the_checksum_is_unreachable(self):
+        iso_path = self.root / self.vm_config["iso"]
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_bytes(b"same image")
+        self.vm_config["iso_sha256_url"] = self.vm_config["iso_url"] + ".sha256"
+        with self._published(hashlib.sha256(b"same image").hexdigest() + "  x.iso\n"), \
+             mock.patch.object(vmctl.iso, "download_file") as download_file:
+            self.vmctl.ensure_iso(self.vm_config)
+        download_file.assert_not_called()
+        with mock.patch.object(urllib.request, "urlopen", side_effect=OSError("offline")), \
+             mock.patch.object(vmctl.iso, "download_file") as download_file:
+            self.vmctl.ensure_iso(self.vm_config)  # offline: the cache is used as it is
+        download_file.assert_not_called()
+        with mock.patch.object(urllib.request, "urlopen") as urlopen:
+            self.vmctl.ensure_iso(self.vm_config, dry_run=True)  # a dry run never goes to the network
+        urlopen.assert_not_called()
+        self.assertTrue(iso_path.exists())
+
+    def test_extracted_member_follows_the_iso_it_came_from(self):
+        iso_path = self.root / "isos/rolling.iso"
+        iso_path.parent.mkdir(parents=True, exist_ok=True)
+        iso_path.write_bytes(b"first")
+        dest = self.root / "artifacts/vm/installer/linux"
+        calls = []
+
+        def extract(iso, member, target, dry_run):
+            calls.append(iso.read_bytes())
+            target.write_bytes(b"kernel of " + iso.read_bytes())
+
+        with mock.patch.object(vmctl.iso, "_extract_member", side_effect=extract):
+            vmctl.iso.extract_iso_member(iso_path, "boot/linux", dest)
+            vmctl.iso.extract_iso_member(iso_path, "boot/linux", dest)  # same medium: kept
+            iso_path.write_bytes(b"second image")  # the medium was refreshed
+            vmctl.iso.extract_iso_member(iso_path, "boot/linux", dest)
+        self.assertEqual(calls, [b"first", b"second image"])
+        self.assertEqual(dest.read_bytes(), b"kernel of second image")
+
     def test_ensure_iso_uses_discovered_url_before_hardcoded_fallback(self):
         iso_path = self.root / self.vm_config["iso"]
         self.vm_config["iso_discovery"] = {

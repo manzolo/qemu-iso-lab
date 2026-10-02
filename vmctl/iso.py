@@ -390,6 +390,33 @@ def missing_iso_message(vm: dict[str, Any], vm_name: str | None = None) -> str:
     return "\n".join(lines)
 
 
+ROLLING_SHA256_TIMEOUT_SEC = 20
+
+
+def published_sha256(vm: dict[str, Any]) -> str | None:
+    """``iso_sha256_url``: the vendor's checksum file for an ISO published under a moving name
+    (openSUSE's ``-Current.iso``/``-Media.iso``). The cached copy is checked against it on every
+    use: a NET image 13 days behind the rolling repository booted an initrd whose ``libhd`` the
+    repository's installation system no longer matched, YaST could not detect the architecture
+    and refused ``grub2-efi`` in a dialog nobody answered (three Tumbleweed rows, 2026-10-01/02).
+    None without the field, or when the file cannot be read: offline, the cache is used as it is."""
+    url = vm.get("iso_sha256_url")
+    if not url:
+        return None
+    try:
+        request = urllib.request.Request(str(url), headers={"User-Agent": state.HTTP_USER_AGENT})
+        with urllib.request.urlopen(request, timeout=ROLLING_SHA256_TIMEOUT_SEC) as response:
+            text = response.read(65536).decode("utf-8", errors="replace")
+    except (OSError, ValueError) as exc:
+        ui.print_status("warn", f"Cannot read {ui.pretty_url(str(url))} ({exc}): the cached ISO is used without checking that it is current", ok=False)
+        return None
+    match = re.search(r"\b[0-9a-fA-F]{64}\b", text)
+    if match is None:
+        ui.print_status("warn", f"No SHA-256 in {ui.pretty_url(str(url))}: the cached ISO is used without checking that it is current", ok=False)
+        return None
+    return match.group(0).lower()
+
+
 def ensure_iso(vm: dict[str, Any], dry_run: bool = False) -> Path:
     if vm.get("disk_image"):
         # A raw disk image must never go through the ISO checks below: they delete an "invalid" ISO.
@@ -399,8 +426,14 @@ def ensure_iso(vm: dict[str, Any], dry_run: bool = False) -> Path:
             return image
         raise VMError(missing_iso_message(vm))
     iso_path = runtime.resolve_path(vm["iso"])
+    published = None if dry_run else published_sha256(vm)
+    if published and not vm.get("iso_sha256"):
+        # The checksum the vendor publishes today pins both the cached copy and a new download.
+        vm = {**vm, "iso_sha256": published}
     if iso_path.is_file():
         problems = validate_iso_file(iso_path, vm)
+        if problems and published:
+            ui.print_note(f"{ui.pretty_url(str(vm['iso_sha256_url']))} names a newer image than the cached one")
         if problems:
             ui.print_status("warn", f"Removing invalid cached ISO: {ui.pretty_path(iso_path)} ({'; '.join(problems)})", ok=False)
             if not dry_run:
@@ -440,11 +473,38 @@ def installer_artifact_dir(vm: dict[str, Any]) -> Path:
     return runtime.resolve_path(vm["disk"]["path"]).parent / "installer"
 
 
-def extract_iso_member(iso_path: Path, member_path: str, dest_path: Path, dry_run: bool = False) -> None:
-    runtime.ensure_parent(dest_path)
-    if dest_path.exists() and not dry_run:
-        return
+def _member_stamp(iso_path: Path) -> str | None:
+    try:
+        st = iso_path.stat()
+    except OSError:
+        return None
+    return f"{iso_path.resolve()}|{st.st_size}|{st.st_mtime_ns}\n"
 
+
+def extract_iso_member(iso_path: Path, member_path: str, dest_path: Path, dry_run: bool = False) -> None:
+    """Extract once per medium: a ``.source`` stamp next to the member names the ISO it came from,
+    so a refreshed "Current" ISO (``iso_sha256_url``) never boots its predecessor's kernel."""
+    runtime.ensure_parent(dest_path)
+    stamp = dest_path.with_name(dest_path.name + ".source")
+    if dry_run:
+        _extract_member(iso_path, member_path, dest_path, dry_run)
+        return
+    current = _member_stamp(iso_path)
+    if dest_path.exists():
+        if current is None:
+            return  # nothing to compare with: keep what was extracted
+        try:
+            if stamp.read_text() == current:
+                return
+        except OSError:
+            pass
+        dest_path.unlink()
+    _extract_member(iso_path, member_path, dest_path, dry_run)
+    if dest_path.exists() and current is not None:
+        stamp.write_text(current)
+
+
+def _extract_member(iso_path: Path, member_path: str, dest_path: Path, dry_run: bool) -> None:
     if shutil.which("xorriso"):
         runtime.run(
             ["xorriso", "-osirrox", "on", "-indev", str(iso_path), "-extract", f"/{member_path}", str(dest_path)],

@@ -8,11 +8,12 @@
         "role": "desktop",
         "release_model": "rolling",
         "status": "unattended",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "verified": "2026-09-30"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_sha256_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso.sha256",
       "iso_urls": [
         "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
         "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
@@ -130,11 +131,12 @@
         "role": "server",
         "release_model": "rolling",
         "status": "unattended",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "verified": "2026-09-30"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_sha256_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso.sha256",
       "iso_urls": [
         "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
         "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
@@ -245,10 +247,11 @@
           "smoke"
         ],
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
       "iso_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
+      "iso_sha256_url": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso.sha256",
       "iso_urls": [
         "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",
         "https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso",

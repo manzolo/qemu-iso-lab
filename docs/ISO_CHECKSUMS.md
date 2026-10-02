@@ -200,3 +200,24 @@ Manual profiles added ahead of their unattended flows, each pinned to the vendor
 - `centos-7`: `CentOS-7-x86_64-Minimal-2009.iso`, SHA-256 `07b94e6b1a0b0260b94c83d6bb76b26bf7a310dc78d7a9c7432809fb9bc6194a` ([sha256sum.txt](https://vault.centos.org/7.9.2009/isos/x86_64/sha256sum.txt)).
 - `centos-8`: `CentOS-8.5.2111-x86_64-boot.iso`, SHA-256 `9602c69c52d93f51295c0199af395ca0edbe35e36506e32b8e749ce6c8f5b60a` ([CHECKSUM](https://vault.centos.org/8.5.2111/isos/x86_64/CHECKSUM)).
 - `opnsense`: the vendor hashes the compressed `OPNsense-25.7-dvd-amd64.iso.bz2`, SHA-256 `fa4b30df3f5fd7a2b1a1b2bdfaecfe02337ee42f77e2d0ae8a60753ea7eb153e` ([checksums](https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-checksums-amd64.sha256)), pinned in `iso_archive.sha256` like pfSense's `.iso.gz`; the unpacked ISO is validated as ISO 9660 only.
+
+## Rolling media: checked against the vendor on every use (2026-10-02)
+
+openSUSE publishes Tumbleweed's NET image and Slowroll's DVD under names that never change
+(`openSUSE-Tumbleweed-NET-x86_64-Current.iso`, `openSUSE-Slowroll-DVD-x86_64-Media.iso`), so no
+hash can be pinned in the profile. These profiles carry `iso_sha256_url` instead, the vendor's
+`.sha256` next to the image: `iso.ensure_iso` reads it before every use, replaces a cached copy
+that no longer matches and validates the new download against it. Offline (or with no hash in
+the file) the cache is used as it is, with a warning. Kernel and initrd extracted from a medium
+carry a `.source` stamp and are extracted again when the medium changes.
+
+Why: on 2026-10-01/02 the three Tumbleweed rows of the matrix stopped for an hour each on a YaST
+dialog refusing `grub2-efi` "on this architecture". The cached NET image was 13 days old; its
+initrd no longer matched the installation system linuxrc loads from today's repository
+(`libpy2ag_hwprobe.so.2: libhd.so.26: cannot open shared object file`), so YaST could not detect
+the architecture. With the current image (Snapshot20260930) `opensuse-tumbleweed-net` passed in 12 minutes.
+
+| Profile | ISO | Vendor checksum |
+|---|---|---|
+| `opensuse-tumbleweed-autoyast`, `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net` | `openSUSE-Tumbleweed-NET-x86_64-Current.iso` | [.sha256](https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso.sha256) |
+| `opensuse-slowroll` | `openSUSE-Slowroll-DVD-x86_64-Media.iso` | [.sha256](https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso.sha256) |

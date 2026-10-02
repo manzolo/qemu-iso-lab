@@ -1252,9 +1252,14 @@
       ]
     },
     "opensuse-slowroll": {
-      "version": "1.1.1",
-      "fingerprint": "sha256:8946f0f60f83a26989451bb7bab99a487f7ab9876007f3dea1b044dc26305dbd",
+      "version": "1.1.2",
+      "fingerprint": "sha256:dc71581a723de7c96530107d93aaee61ce2161a71981c9d5ded744826fbce37a",
       "history": [
+        {
+          "version": "1.1.2",
+          "date": "2026-10-02",
+          "note": "iso_sha256_url: the cached rolling ISO is checked against the vendor's published SHA-256 and replaced when a new image is out"
+        },
         {
           "version": "1.1.1",
           "date": "2026-09-30",
@@ -1273,9 +1278,14 @@
       ]
     },
     "opensuse-tumbleweed-autoyast": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:ba40bada0f4fe2229e92f7166ee42a93ce4e7cd7cce9773a6ce486f7d0245798",
+      "version": "1.0.1",
+      "fingerprint": "sha256:6dcf05e23c98c5f391c5cbd2e0d6cf2d3e265069c92cc34e2c535d70ac557786",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-02",
+          "note": "iso_sha256_url: the cached rolling ISO is checked against the vendor's published SHA-256 and replaced when a new image is out"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -1284,9 +1294,14 @@
       ]
     },
     "opensuse-tumbleweed-kde": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:a3960869601c7cf0472085d688905d4251f3471c30b9c7daac1ff7374a65e1eb",
+      "version": "1.1.1",
+      "fingerprint": "sha256:0a96ad9b6b48248c1f735f33850116592dfae2d858859611f84a7d3c72faa29c",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-10-02",
+          "note": "iso_sha256_url: the cached rolling ISO is checked against the vendor's published SHA-256 and replaced when a new image is out"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-29",
@@ -1300,9 +1315,14 @@
       ]
     },
     "opensuse-tumbleweed-net": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:e239eb2913ec77806f7d0fdae7247cca1c4b9be93a61f7c4f5e4ad101c912677",
+      "version": "1.1.1",
+      "fingerprint": "sha256:032e84de4ef737c148cce928a1ae37eeec0b4e2a9827e765c68f15fe37303afc",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-10-02",
+          "note": "iso_sha256_url: the cached rolling ISO is checked against the vendor's published SHA-256 and replaced when a new image is out"
+        },
         {
           "version": "1.1.0",
           "date": "2026-09-30",
