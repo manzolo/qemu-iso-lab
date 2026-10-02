@@ -39,10 +39,11 @@ main#panes.columns { grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); }
 main#panes.rows { grid-template-columns:minmax(0,1fr); }
 .pane { display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel); }
 .pane.live { border-color:#2f5a55; }
-.pane > header { display:flex; align-items:center; gap:8px; padding:6px 10px; background:#111a28; border-bottom:1px solid var(--line); font-size:12px; }
+/* The name keeps its room: in a narrow pane (three columns of a lab) the tools wrap under it. */
+.pane > header { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; padding:6px 10px; background:#111a28; border-bottom:1px solid var(--line); font-size:12px; }
 .pane > header .machine-icon { width:22px; height:22px; flex:0 0 22px; color:#92aecb; }
 .pane > header .machine-icon svg { width:100%; height:100%; }
-.pane > header h2 { margin:0; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.pane > header h2 { margin:0; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 1 auto; min-width:120px; }
 .chip { padding:2px 8px; border-radius:999px; border:1px solid #34465d; font-size:11px; color:var(--muted); white-space:nowrap; }
 .chip.ok { color:#9bf0da; border-color:#397d75; background:#183b3c; }
 .chip.busy { color:var(--warn); border-color:#6b5a32; background:#2b2416; }
@@ -129,20 +130,26 @@ function ask({title, message, command, button = "Run", option = null}) {
 // --- what the page shows: the hash carries the machines (#vms=a,b), start=1 starts the stopped ones once
 function readHash() {
   const h = new URLSearchParams(location.hash.replace(/^#/, ""));
-  return { vms: (h.get("vms") || "").split(",").map(decodeURIComponent).filter(Boolean), start: h.get("start") === "1" };
+  return { vms: (h.get("vms") || "").split(",").map(decodeURIComponent).filter(Boolean), start: h.get("start") === "1", lab: h.get("lab") || "" };
 }
 let panes = [...new Set(readHash().vms)];
 let startWanted = readHash().start;
+// Opened from a lab card (#lab=<group>): the page is that lab's, and shows its addresses.
+const labName = readHash().lab;
 let S = { vms: [] };                  // the dashboard snapshot (/api/state)
 const local = new Map();              // name -> "start" | "stop" | "link" submitted here, until the state shows it
 const frames = new Map();             // name -> pane element (iframes must survive re-renders)
 let busyNetwork = false, pollTimer = null;
 function writeHash() {
-  history.replaceState(null, "", "/multi#vms=" + panes.map(encodeURIComponent).join(","));
-  document.title = (panes.length ? panes.join(" · ") + " · " : "") + "Consoles · QEMU ISO Lab";
-  $("title").textContent = panes.length ? panes.join(" · ") : "Consoles";
+  history.replaceState(null, "", "/multi#vms=" + panes.map(encodeURIComponent).join(",") + (labName ? "&lab=" + encodeURIComponent(labName) : ""));
+  const heading = labName ? `${labName} · ${panes.join(" · ")}` : panes.join(" · ");
+  document.title = (panes.length ? heading + " · " : "") + "Consoles · QEMU ISO Lab";
+  $("title").textContent = panes.length ? heading : "Consoles";
 }
 const rowOf = (name) => S.vms.find(r => r.name === name);
+// The lab a machine belongs to (the page's own lab first), and its addresses on the lab's segment.
+const labOf = (name) => (S.labs || []).find(l => l.group === labName && (l.members || []).includes(name)) || (S.labs || []).find(l => (l.members || []).includes(name));
+const labAddresses = (name) => { const lab = labOf(name); return lab ? [].concat((lab.addresses || {})[name] || []).filter(Boolean) : []; };
 const busy = (r) => r && (r.job_status === "running" || local.has(r.name));
 function consoleUrl(vm, detached = true) {
   const url = new URL(location.origin + "/");
@@ -177,6 +184,13 @@ function renderNetwork() {
     status.innerHTML = `<span class="dot"></span>Linked on <span class="mono">${esc(seg)}</span>: ${esc(members.join(" · "))}`;
     status.title = members.join("\n");
     button.textContent = "Unlink network"; button.className = "warn";
+  } else if (panes.length && panes.every(n => labOf(n) && labOf(n).group === (labOf(panes[0]) || {}).group)) {
+    // A lab's stack: its members already share the lab's own segment, the addresses sit next to each name.
+    const lab = labOf(panes[0]);
+    status.className = "linked";
+    status.innerHTML = `<span class="dot"></span>Lab <span class="mono">${esc(lab.group)}</span>${lab.title ? ": " + esc(lab.title) : ""} · the members share its segment`;
+    status.title = panes.map(n => `${n} ${labAddresses(n).join(" ")}`).join("\n");
+    button.textContent = "Link network"; button.className = "";
   } else {
     status.innerHTML = `<span class="dot"></span>${linkedAny ? "Not all machines share a network" : panes.length < 2 ? "Add a second machine to link them" : "Not linked"}`;
     status.title = "A private network between the machines of this page: 192.168.100.x on the session segment, hot-plugged into running VMs, attached at the next start otherwise.";
@@ -247,7 +261,9 @@ function renderPane(name) {
   else [state, cls] = ["Stopped", ""];
   chip.textContent = state; chip.className = "chip " + cls;
   const link = (r?.links || []).find(l => commonSegments(panes).includes(l.segment)) || (r?.links || [])[0];
-  addr.textContent = link ? link.address : ""; addr.className = "address" + (link && !link.up ? " off" : ""); addr.title = link ? `${link.segment}${link.up ? "" : " · attached at the next start"}` : "";
+  const labAddr = link ? [] : labAddresses(name);
+  addr.textContent = link ? link.address : labAddr.join(" · "); addr.className = "address" + (link && !link.up ? " off" : "");
+  addr.title = link ? `${link.segment}${link.up ? "" : " · attached at the next start"}` : labAddr.length ? `on the segment of lab ${labOf(name).group}` : "";
   el.querySelector('[data-act="stop"]').hidden = !r?.running;
   el.querySelector('[data-act="stop"]').disabled = !r || stopping || r.job_status === "running";
   el.querySelector('[data-act="reload"]').hidden = !r?.running;

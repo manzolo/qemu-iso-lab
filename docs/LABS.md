@@ -75,7 +75,9 @@ script's output as it comes, counts its `[PASS]`/`[FAIL]` lines and ends with on
 and one for the lab; the exit status is 1 when a check failed. A script whose exit status is not
 its number of failed checks (SSH down, a bash error) is reported as an *error*, not as a failed
 check. `--json` prints the same as data (the web's *Run tests* button on the lab card runs it as
-a job). `check-vms` runs the tests too: when every member of a lab with tests was in the run and
+a job). The card's **Open consoles** opens every member of the lab side by side on `/multi`
+(like *Start in console* on a selection, stopped members started), with the page headed by the
+lab, its title in the network bar and each member's address on the lab's segment next to its name. `check-vms` runs the tests too: when every member of a lab with tests was in the run and
 passed, the members start on their fresh disks and a `lab-<name>` row records the outcome (SKIP
 when a member did not pass), like the `cluster-<name>` row of a Proxmox cluster.
 

@@ -1260,10 +1260,10 @@ $("selection-link").onclick = () => runSelectedNetwork();
 function consoleTargets(names = [...checkedVms]) {
   return S.vms.filter(r => names.includes(r.name) && (r.running || (r.installed && withVMJob(r).job_status !== "running")));
 }
-function openMultiConsole(names = consoleTargets().map(r => r.name)) {
+function openMultiConsole(names = consoleTargets().map(r => r.name), lab = "") {
   if (!names.length) return;
   const url = new URL(location.origin + "/multi"); url.searchParams.set("token", TOKEN);
-  url.hash = "vms=" + names.map(encodeURIComponent).join(",") + "&start=1";
+  url.hash = "vms=" + names.map(encodeURIComponent).join(",") + "&start=1" + (lab ? "&lab=" + encodeURIComponent(lab) : "");
   // Opened on the click itself: a window opened after an await is blocked by the browser.
   const tab = window.open(url.href, "_blank");
   if (!tab) { toast("Allow pop-up windows for this page, then try Start in console again.", true); return; }
@@ -1463,10 +1463,15 @@ function renderLabs() {
     const primary = installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab…",["group","install",lab.group],"primary");
     return `<section class="card lab" data-lab="${esc(lab.group)}"><div class="lab-head" tabindex="0" aria-label="${esc(lab.group)}. Right-click for stack actions."><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<h2>${esc(lab.group)}</h2></span><span class="lab-controls"><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span>${menuButton("lab",lab.group)}</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
       <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "Open profile →")}</span></span></button>${stateBadge(m)}${menuButton("member",m.name)}</div>`; }).join("")}</div>
-      <div class="buttons">${primary}${installed && up > 0 && up < members.length ? btn("Stop stack",["group","down",lab.group]) : ""}${btn("Status",["group","status",lab.group])}${installed && lab.tests ? btn("Run tests",["group","test",lab.group]) : ""}<button data-map="${esc(lab.group)}">Open map ↗</button></div>${lab.title ? `<p class="lab-order">${esc(lab.title)}</p>` : ""}
+      <div class="buttons">${primary}${installed && up > 0 && up < members.length ? btn("Stop stack",["group","down",lab.group]) : ""}${btn("Status",["group","status",lab.group])}${installed && lab.tests ? btn("Run tests",["group","test",lab.group]) : ""}${consoleTargets(names).length ? `<button data-lab-consoles="${esc(lab.group)}" title="Every member of the lab in one page of consoles, side by side, started if stopped">Open consoles ↗</button>` : ""}<button data-map="${esc(lab.group)}">Open map ↗</button></div>${lab.title ? `<p class="lab-order">${esc(lab.title)}</p>` : ""}
       <details class="lab-secondary"><summary>More lab actions</summary><p class="lab-order">Start order: ${esc(names.join(" → "))}</p><div class="buttons">${(lab.guides || []).length ? btn("Guide",["group","guide",lab.group]) : ""}${installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group])}${up && !installed ? btn("Stop stack",["group","down",lab.group]) : ""}${cluster ? btn("Form cluster",["group","cluster",lab.group]) : ""}${btn("Generate map",["group","map",lab.group])}${btn("Clean lab…",["group","clean",lab.group],"danger")}</div></details></section>`;
   }).join("") || '<p class="s-muted">No matching labs.</p>';
   bindStateLogs($("labs-view"));
+  // The lab's members side by side (/multi), like Start in console on a selection; the page knows the lab.
+  $("labs-view").querySelectorAll("[data-lab-consoles]").forEach(button => { button.onclick = () => {
+    const lab = (S.labs || []).find(l => l.group === button.dataset.labConsoles);
+    if (lab) openMultiConsole(consoleTargets(lab.start_order || lab.members).map(r => r.name), lab.group);
+  }; });
   $("labs-view").querySelectorAll("[data-lab-menu],[data-member-menu]").forEach(button => { button.onclick = () => {
     const rect = button.getBoundingClientRect();
     if (button.hasAttribute("data-lab-menu")) openLabContext(button.closest("[data-lab]"), rect.left, rect.bottom + 6);
