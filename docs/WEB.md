@@ -144,8 +144,8 @@ What the page offers:
 - **Multiple selection**: Ctrl/Cmd+click toggles machines, Shift+click selects a range. Clicking a distribution icon
   toggles it too (Enter/Space when focused). Selected rows have a teal edge and a check badge
   on the icon. Right-click a selected row for a menu scoped to the entire selection; right-click
-  outside it for single-machine actions. The selection toolbar offers **Start**, **Stop** and
-  **Link network**, with the eligible count for each action. Review the machine names before
+  outside it for single-machine actions. The selection toolbar offers **Start**, **Stop**,
+  **Start in console** and **Link network**, with the eligible count for each action. Review the machine names before
   submitting; busy or ineligible VMs are skipped. When all selected machines share a temporary
   network, the toolbar and context menu offer **Unlink** instead. If they share several networks,
   choose one before confirming; other members of that network remain connected. Dragging the
@@ -153,6 +153,17 @@ What the page offers:
   **Unlink**, scoped to those two machines. Search/filter changes clear the selection.
   With a selection, **F2** starts and **F8** stops the selected machines (same confirmation as
   the toolbar); the other function keys act on the machine shown in the details panel.
+- **Start in console** (selection toolbar and menu): the selected machines side by side on one
+  page, `/multi#vms=a,b`, opened in a new tab. Each pane is the detached console of one VM with
+  all its tools (keyboard, clipboard, files, SSH, screenshot, recording), so clicking a pane
+  gives that machine the keyboard; the page starts the stopped ones (headless, in the
+  background) and connects each pane as soon as its VM runs. The pane header shows the state,
+  **Start**/**Stop**, **Reload**, **Open alone** (that console in its own window) and **×**
+  (remove from the page); **Add a machine…** adds another pane, the layout buttons switch
+  between side by side, stacked and grid. **Link network** in the header runs `vmctl link` on
+  the machines of the page (**Unlink network** when they already share a segment): each pane
+  then shows the machine's address on the private segment (192.168.100.x; "at next start"
+  while the NIC is only recorded for a stopped VM). Closing the tab stops nothing.
 - **Link**: use the network button shown on hover, focus or the selected row: click it to choose
   another VM, or drag the network button onto another machine to connect them on a private
   segment (`vmctl link`, confirmed first): a running one gets a hot-plugged NIC, a stopped one
@@ -167,8 +178,12 @@ What the page offers:
   a running job alone does not mean an installation is taking place. Starting/stopping stays
   visible until a fresh VM state confirms completion; a delayed or disconnected refresh does
   not briefly re-enable the old controls. An unexpected state is reported explicitly.
-  **Force stop** skips guest shutdown, signals QEMU directly and escalates to SIGKILL after
-  2 seconds if necessary. **Clean** shows *Cleaning disk* and logs removed paths; its own
+  **Stop** asks the guest first (guest agent, then ACPI for the profile's grace, 60 s by default,
+  then a power-off over SSH when the guest accepts the connection) and signals QEMU only after
+  that: a guest sitting at a boot menu or inside an installer answers none of it, so its Stop
+  takes the whole ACPI grace before the SIGTERM. **Force stop** skips guest shutdown, signals
+  QEMU directly and escalates to SIGKILL after 2 seconds if necessary: the choice for a guest
+  that has no OS to ask. **Clean** shows *Cleaning disk* and logs removed paths; its own
   log, lock and completion status survive cleanup, along with checkpoints unless explicitly removed.
   The bottom bar shows the latest active job with **View job** and **Cancel job**. It remains
   during the final state check, disappears on completion, and leaves the log in Recent activity.

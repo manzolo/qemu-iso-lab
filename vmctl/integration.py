@@ -99,7 +99,7 @@ def connections(vm_name: str, console: Callable[[str], dict[str, Any]]) -> dict[
             checks["ssh"] = result("available", "SSH authentication succeeded.")
         else:
             kind = ssh.classify_ssh_failure(probe["stderr"])
-            hints = {"denied": "SSH key rejected. Check the guest authorized keys and the profile key.",
+            hints = {"denied": "SSH key rejected. Check the guest authorized keys and the profile key" + ssh.denied_user_hint(vm) + ".",
                      "negotiate": "Incompatible SSH algorithm. Check the profile legacy SSH options.",
                      "closed": "SSH port is closed. Check that the guest SSH service has started."}
             checks["ssh"] = result(kind or "unavailable", hints.get(kind, probe["stopped"] or probe["stderr"][:800] or "SSH failed."))

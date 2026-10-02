@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import cloud_init, flash, qemu, runtime, ui
+from vmctl import cloud_init, flash, qemu, runtime, ui, vmstate
 from vmctl.errors import VMError
 
 
@@ -113,6 +113,9 @@ def ssh_target(vm: dict[str, Any]) -> tuple[str, int, str]:
     port = int(cfg.get("ssh_host_port") or 0)
     if not user:
         raise VMError("SSH provisioning user is required")
+    # The disk's own user wins over the profile's: the identity of local.json can move after an
+    # install (vmstate.installed_user_for; the same during an install, which records it first).
+    user = vmstate.installed_user_for(vm) or user
     if port <= 0:
         raise VMError("SSH provisioning ssh_host_port is required")
     return ("127.0.0.1", port, user)
@@ -192,6 +195,20 @@ def classify_ssh_failure(stderr: str) -> str:
     return ""
 
 
+def denied_user_hint(vm: dict[str, Any]) -> str:
+    """When a disk has no recorded guest user, a refused key may simply be the wrong login: the
+    disk was installed before local.json named the current user (and before vmctl kept the user)."""
+    name = vmstate.vm_name_for(vm)
+    if not name or vmstate.installed_user(name):
+        return ""
+    try:
+        _, _, user = ssh_target(vm)
+    except VMError:  # no SSH section at all: nothing to hint about
+        return ""
+    return (f"; or the disk was installed as another user than {user!r}, before vmctl recorded it: "
+            f"`vmctl guest-user {name} <user>` tells vmctl who is on the disk (the catalog installs 'lab')")
+
+
 def wait_for_ssh(vm: dict[str, Any], timeout_sec: int, dry_run: bool = False, probe_command: str = "true") -> None:
     """Poll SSH until *probe_command* succeeds (``exit 0`` for guests whose login shell is cmd.exe).
 
@@ -232,7 +249,7 @@ def wait_for_ssh(vm: dict[str, Any], timeout_sec: int, dry_run: bool = False, pr
                 if time.monotonic() - denied_since >= SSH_DENIED_SEC:
                     raise VMError(f"SSH to {host}:{port} has refused the key for {int(SSH_DENIED_SEC)}s: {last_error} "
                                   "(the provisioning did not install the project key, or the sshd cannot use it: "
-                                  "key_type: rsa for an sshd older than OpenSSH 6.5)")
+                                  "key_type: rsa for an sshd older than OpenSSH 6.5" + denied_user_hint(vm) + ")")
             else:
                 denied_since = None
         except (OSError, subprocess.TimeoutExpired):

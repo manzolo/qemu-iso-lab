@@ -488,6 +488,21 @@ class ServerTests(BaseVmctlTestCase):
         self.assertEqual(status, 200)
         self.assertTrue(any(entry["name"] == "start" for entry in json.loads(body)))
 
+    def test_the_multi_console_page_is_served_and_embeds_the_detached_console(self):
+        status, body = self.get("/multi", token=None)
+        self.assertEqual(status, 200)
+        self.assertIn(b"QEMU ISO Lab", body)
+        page = body.decode()
+        # Every pane is the dashboard's own detached console in an iframe; the page never carries another VNC client.
+        self.assertIn('url.searchParams.set("detached", "1")', page)
+        self.assertNotIn("novnc", page.lower())
+        self.assertNotIn("<script src=\"http", page)
+        self.assertIn('["link", ...names]', page)
+        dashboard = (webui.WEB_DIR / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="selection-console"', dashboard)
+        self.assertIn('new URL(location.origin + "/multi")', dashboard)
+        self.assertIn("consoleEmbedded", dashboard)
+
     def test_file_endpoints_transfer_binary_and_require_authentication(self):
         from unittest import mock
 

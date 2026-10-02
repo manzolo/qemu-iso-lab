@@ -489,6 +489,53 @@ def default_nic_mac(vm: dict[str, Any], slot: int) -> str:
     return "52:54:00:" + ":".join(f"{b:02x}" for b in digest[:3])
 
 
+# The multicast of a segment stays on the host: QEMU sends and joins on the loopback interface
+# (localaddr), so the lab's frames never leave on the LAN NIC (they did, TTL 1, until 2026-10-02)
+# and a host firewall does not see them. ufw's default deny dropped the looped-back copy on
+# enp5s0f0 ([UFW BLOCK] SRC=<host> DST=239.63.58.241 DPT=40651): two linked VMs with their
+# addresses set and ARP failing both ways. Joining on lo works without the MULTICAST flag.
+MCAST_LOCALADDR = "127.0.0.1"
+
+
+def mcast_netdev(ident: str, endpoint: str) -> str:
+    """The ``-netdev socket`` of a segment: the multicast group plus the loopback as its interface."""
+    return f"socket,id={ident},mcast={endpoint},localaddr={MCAST_LOCALADDR}"
+
+
+def multicast_self_test(endpoint: str, timeout: float = 1.0) -> str | None:
+    """Does a multicast datagram to *endpoint* reach a socket joined on the loopback, the way
+    QEMU's netdevs are set up? None when it does, else what to tell the user (never raises)."""
+    import struct
+    host, _, port_text = endpoint.rpartition(":")
+    try:
+        port = int(port_text)
+        rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            rx.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            rx.bind((host, port))
+            rx.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(host) + socket.inet_aton(MCAST_LOCALADDR))
+            rx.settimeout(timeout)
+            tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                tx.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(MCAST_LOCALADDR))
+                tx.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+                token = struct.pack("!Q", os.getpid()) + b"vmctl-mcast"
+                tx.sendto(token, (host, port))
+            finally:
+                tx.close()
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                data, _ = rx.recvfrom(256)
+                if data == token:
+                    return None
+        finally:
+            rx.close()
+    except (OSError, ValueError) as exc:
+        return f"multicast on the loopback failed ({exc}): the VMs of a segment cannot see each other on this host"
+    return (f"no multicast loopback on this host for {endpoint}: a firewall drops it even on lo "
+            f"(check: journalctl -k | grep BLOCK), the VMs of a segment cannot see each other")
+
+
 def segment_endpoint(name: str, override: Any = None) -> str:
     """``group:port`` of the multicast socket that carries segment *name* between the VMs of this host."""
     if override:
@@ -534,7 +581,7 @@ def network_args(vm: dict[str, Any], phase: str = "runtime") -> list[str]:
             for fwd in spec["hostfwd"]:
                 netdev += f",hostfwd=tcp:127.0.0.1:{fwd['host_port']}-:{fwd['guest_port']}"
         else:
-            netdev = f"socket,id={spec['id']},mcast={segment_endpoint(str(spec['name']), spec['mcast'])}"
+            netdev = mcast_netdev(str(spec["id"]), segment_endpoint(str(spec["name"]), spec["mcast"]))
         device = f"{spec['device']},netdev={spec['id']}"
         if not spec["legacy"]:
             device += f",mac={spec['mac']}"

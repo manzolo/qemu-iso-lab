@@ -2243,6 +2243,33 @@ class GracefulStopTests(BaseVmctlTestCase):
         self.assertEqual(run.call_args.args[0][-3:], ["sudo", "systemctl", "poweroff"])
         kill.assert_not_called()
 
+    def test_stop_does_not_wait_the_ssh_grace_when_the_guest_refuses_the_connection(self):
+        # debian-12 booted with --boot-iso sat at the installer's GRUB menu: ACPI ignored, no sshd,
+        # and the stop still waited a second grace period before SIGTERM (2026-10-02).
+        import signal
+        sock_path = self.root / "qmp.sock"; sock_path.write_text("")
+        state = {"alive": True}
+        def ssh_run(*args, **kwargs):
+            return mock.Mock(returncode=255, stderr=b"ssh: connect to host 127.0.0.1 port 2297: Connection refused\n")
+        def signal_vm(pid, sig):
+            state["alive"] = False
+        clock = {"now": 1000.0}
+        def sleep(seconds):
+            clock["now"] += seconds
+        with mock.patch.object(vmctl.qemu, "qmp_command", return_value=True), \
+             mock.patch.object(vmctl.lifecycle, "process_cmdline", side_effect=lambda pid: "qemu" if state["alive"] else None), \
+             mock.patch.object(vmctl.lifecycle.subprocess, "run", side_effect=ssh_run) as run, \
+             mock.patch.object(vmctl.lifecycle.time, "monotonic", side_effect=lambda: clock["now"]), \
+             mock.patch.object(vmctl.lifecycle.time, "sleep", side_effect=sleep), \
+             mock.patch.object(vmctl.lifecycle.os, "kill", side_effect=signal_vm) as kill:
+            rc = vmctl.lifecycle.stop_qemu_process(4242, "Stop", "background VM", qmp_socket=sock_path, grace_sec=30,
+                                                  ssh_poweroff_cmd=["ssh", "guest", "sudo", "systemctl", "poweroff"])
+        self.assertEqual(rc, 0)
+        run.assert_called_once()
+        kill.assert_called_once_with(4242, signal.SIGTERM)
+        # One grace period (ACPI), not two: the SSH branch waited for nothing.
+        self.assertLess(clock["now"] - 1000.0, 45)
+
     def test_stop_without_socket_behaves_as_before(self):
         import signal
         with mock.patch.object(vmctl.qemu, "qmp_command") as qmp, \

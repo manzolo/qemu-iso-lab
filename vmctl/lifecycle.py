@@ -320,19 +320,29 @@ def stop_qemu_process(
             ui.print_status("warn", "QMP power-off request failed", ok=False)
 
         if ssh_poweroff_cmd:
-            # Second chance for provisioned guests: a plain `systemctl poweroff` over SSH.
+            # Second chance for provisioned guests: a plain `systemctl poweroff` over SSH. Waiting
+            # makes sense only when the guest took the request: a refused connection or key (a
+            # guest at the installer's boot menu, a disk without the project key) has nothing to
+            # wait for, and a second grace period only looked like a Stop that did nothing
+            # (debian-12 booted with --boot-iso, 2026-10-02).
             ui.print_note("Asking the guest to power off over SSH...")
+            refused = ""
             try:
-                subprocess.run(ssh_poweroff_cmd, check=False, timeout=20,
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                answer = subprocess.run(ssh_poweroff_cmd, check=False, timeout=20,
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                stderr = answer.stderr.decode("utf-8", "replace") if isinstance(answer.stderr, bytes) else str(answer.stderr or "")
+                refused = ssh.classify_ssh_failure(stderr) if answer.returncode != 0 else ""
             except (OSError, subprocess.TimeoutExpired):
                 pass
-            deadline = time.monotonic() + grace
-            while time.monotonic() < deadline:
-                if process_cmdline(pid) is None:
-                    return finalize_stop(f"Stopped {description} (guest powered off over SSH)")
-                time.sleep(1)
-            ui.print_status("warn", f"{description} still running after the SSH power-off request", ok=False)
+            if refused:
+                ui.print_note(f"No SSH session to ask ({refused}): the guest has no OS answering, nothing to wait for")
+            else:
+                deadline = time.monotonic() + grace
+                while time.monotonic() < deadline:
+                    if process_cmdline(pid) is None:
+                        return finalize_stop(f"Stopped {description} (guest powered off over SSH)")
+                    time.sleep(1)
+                ui.print_status("warn", f"{description} still running after the SSH power-off request", ok=False)
 
         ui.print_status("warn", "Sending SIGTERM (files written in the last seconds may be lost)", ok=False)
 
@@ -1377,6 +1387,37 @@ def cmd_protect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_guest_user(args: argparse.Namespace) -> int:
+    """``vmctl guest-user <vm> [user]``: the guest user on a VM's disk, the one SSH logs in as.
+    Recorded by every install since 2026-10-02; for an older disk (or one installed outside
+    vmctl) the name says who was created there when the profile's identity has moved since."""
+    cfg = config.load_config()
+    name = config.canonical_vm_name(args.vm)
+    vm = config.get_vm(cfg, name)
+    declared = config.resolve_vm_user(vm)[0]
+    if args.user:
+        if getattr(args, "dry_run", False):
+            print(f"  would record {args.user!r} as the guest user of {name} in {vmstate.state_path(name)}")
+            return 0
+        vmstate.set_installed_user(name, args.user)
+        ui.print_status("ok", f"{name}: SSH now logs in as {args.user}" + (f" (the profile names {declared})" if declared and declared != args.user else ""))
+        return 0
+    recorded = vmstate.installed_user(name)
+    out = {"vm": name, "guest_user": recorded, "profile_user": declared, "ssh_user": recorded or declared,
+           "has_data": vmstate.artifact_disk_has_data(name)}
+    if getattr(args, "json", False):
+        print(json.dumps(out, indent=2))
+        return 0
+    if not out["has_data"]:
+        print(f"{name}: no disk with data; the profile names {declared or '(no SSH user)'}")
+    elif recorded:
+        print(f"{name}: installed as {recorded}" + ("" if recorded == declared else f" (the profile names {declared} now; SSH logs in as {recorded})"))
+    else:
+        print(f"{name}: no guest user recorded for this disk (installed before vmctl kept it); SSH logs in as the profile's {declared or '(no SSH user)'}.\n"
+              f"  If the disk was installed with another identity (the catalog's 'lab' before local.json named yours): vmctl guest-user {name} <user>")
+    return 0
+
+
 def cmd_catalog(args: argparse.Namespace) -> int:
     """``vmctl catalog [list|add|remove|set|clear|hide|unhide] [vm...]``: My VMs, the personal
     selection, and the hidden profiles (the ones the dashboards leave out of their lists)."""
@@ -1452,7 +1493,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         disk, actual, virtual = disk_status(vm)
         runtime_str, runtime_note = vm_runtime_status(name, vm)
         runtime_cell = format_runtime_cell(runtime_str, runtime_note)
-        known = vmstate.summary(name, vm)
+        known = vmstate.summary(name, vm, profile_user=config.resolve_vm_user(vm)[0])
         rows.append((name, disk, iso_status(vm), nvram_status(vm), runtime_cell, actual, virtual, runtime_note, known))
 
     if getattr(args, "json", False):
@@ -1479,6 +1520,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "verify_at": known["verify_at"],
                 "profile_version": known["profile_version"],
                 "catalog_version": known["catalog_version"],
+                "guest_user": known["guest_user"],
+                "profile_user": known["profile_user"],
                 "origin": known["origin_kind"],
                 "runtime_note": runtime_note if runtime_note != "-" else None,
             }
@@ -3882,6 +3925,12 @@ def cmd_link(args: argparse.Namespace) -> int:
     if len(names) == 1 and not vmlink.load_record(segment)["members"]:
         raise VMError("vmctl link needs two VMs (or one to add to a segment that already has members)")
     results: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+    if not args.dry_run:
+        # The same multicast path the netdevs use: a host that drops it is told now, not found
+        # later through two guests whose ARP never answers (ufw on 2026-10-02).
+        problem = qemu.multicast_self_test(qemu.segment_endpoint(segment, args.mcast or vmlink.load_record(segment).get("mcast")))
+        if problem:
+            ui.print_status("warn", problem, ok=False)
     for name in names:
         vm = config.get_vm(cfg, name)
         pid = running_background_pid(name, vm)

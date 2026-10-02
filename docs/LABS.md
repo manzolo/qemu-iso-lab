@@ -70,6 +70,14 @@ its next start; only `vmctl link --off` (or *Unlink*) takes it off the segment. 
 2026-09-27: debian-server and almalinux-server linked while off, both at `enp0s6` after the boot,
 ping 0.6 ms; almalinux stopped and restarted rejoined by itself.
 
+The segment itself is a multicast group on the **loopback interface** (`localaddr=127.0.0.1`
+on every `-netdev socket,mcast=…`, since 2026-10-02): the lab's frames never leave the host and a
+host firewall does not see them. Before that they went out on the LAN NIC with TTL 1 and came
+back through its INPUT chain, where ufw's default deny dropped them (`[UFW BLOCK] … DST=239.x`
+in `journalctl -k`): two linked VMs had their addresses and ARP failed both ways. `vmctl link`
+now probes that path first and warns when a host still drops multicast on lo. VMs linked
+before the change keep talking only among themselves: unlink and link again.
+
 What happens on a running VM: the NIC is added to QEMU over QMP (`netdev_add` on the multicast
 socket the labs use, `device_add`) with a MAC that is stable per segment and VM; Linux,
 FreeBSD and Windows 10/11 guests with SSH get the address set by vmctl (the interface is found by

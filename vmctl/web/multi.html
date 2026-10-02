@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consoles · QEMU ISO Lab</title>
+<style>
+:root { color-scheme: dark; --bg:#0c111b; --panel:#141d2b; --panel2:#1b2738; --line:#2a374a; --text:#e6edf7; --muted:#9caec5; --accent:#7ddfc5; --ok:#7ddfc5; --warn:#efc582; --bad:#ff9aab; --btn:#223047; }
+* { box-sizing:border-box; }
+html,body { height:100%; }
+body { margin:0; display:flex; flex-direction:column; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; overflow:hidden; }
+.mono { font-family:ui-monospace,"Cascadia Code",monospace; }
+button,select { font:inherit; }
+button { background:var(--btn); color:var(--text); border:1px solid #34465d; border-radius:8px; padding:7px 11px; font-size:12px; cursor:pointer; white-space:nowrap; transition:background .15s,border-color .15s; }
+button:hover:not(:disabled) { background:#2b4059; border-color:#6a8ba8; }
+button:disabled { opacity:.45; cursor:default; }
+button.primary { background:var(--accent); color:#102c29; border-color:transparent; font-weight:650; }
+button.primary:hover:not(:disabled) { background:#9ff0dc; }
+button.warn { color:var(--warn); }
+button.active { background:#183b3c; border-color:#397d75; color:#9bf0da; }
+select { background:#101b2a; color:var(--text); border:1px solid #34465d; border-radius:8px; padding:7px 9px; font-size:12px; max-width:220px; }
+a { color:var(--accent); }
+header#top { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); background:linear-gradient(125deg,#182637,#121d2d 65%); }
+.brand { display:flex; flex-direction:column; min-width:0; }
+.brand .eyebrow { font-size:10px; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.brand h1 { margin:0; font-size:15px; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px; }
+#network { display:flex; align-items:center; gap:10px; padding:5px 6px 5px 12px; border:1px solid #304257; border-radius:12px; background:#0b142344; font-size:12px; }
+#network-status { color:var(--muted); max-width:520px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#network-status.linked { color:var(--accent); }
+#network-status .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--muted); margin-right:7px; vertical-align:middle; }
+#network-status.linked .dot { background:var(--accent); box-shadow:0 0 8px #7ddfc566; }
+#network-status.partial .dot { background:var(--warn); }
+.actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.segmented { display:flex; gap:2px; padding:3px; border:1px solid #304257; border-radius:10px; background:#0b142344; }
+.segmented button { border-color:transparent; background:transparent; padding:5px 9px; font-size:14px; line-height:1; }
+.segmented button.active { background:#183b3c; border-color:#397d75; }
+main#panes { flex:1; min-height:0; display:grid; gap:8px; padding:8px; }
+main#panes.columns { grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); }
+main#panes.rows { grid-template-columns:minmax(0,1fr); }
+.pane { display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel); }
+.pane.live { border-color:#2f5a55; }
+.pane > header { display:flex; align-items:center; gap:8px; padding:6px 10px; background:#111a28; border-bottom:1px solid var(--line); font-size:12px; }
+.pane > header .machine-icon { width:22px; height:22px; flex:0 0 22px; color:#92aecb; }
+.pane > header .machine-icon svg { width:100%; height:100%; }
+.pane > header h2 { margin:0; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.chip { padding:2px 8px; border-radius:999px; border:1px solid #34465d; font-size:11px; color:var(--muted); white-space:nowrap; }
+.chip.ok { color:#9bf0da; border-color:#397d75; background:#183b3c; }
+.chip.busy { color:var(--warn); border-color:#6b5a32; background:#2b2416; }
+.chip.bad { color:var(--bad); border-color:#6a3b48; }
+.address { color:var(--accent); font-size:11px; white-space:nowrap; }
+.address.off { color:var(--muted); }
+.pane-tools { display:flex; gap:4px; margin-left:auto; }
+.pane-tools button { padding:4px 8px; font-size:11px; background:transparent; }
+.pane-tools button.close:hover { background:#432b39; border-color:#754353; color:#ffb9c5; }
+.pane > .body { flex:1; min-height:0; position:relative; background:#0a0f18; }
+.pane iframe { position:absolute; inset:0; width:100%; height:100%; border:0; background:#0a0f18; }
+.placeholder { position:absolute; inset:0; display:grid; place-items:center; text-align:center; padding:24px; color:var(--muted); }
+.placeholder > div { max-width:360px; }
+.placeholder strong { display:block; color:var(--text); font-size:15px; margin-bottom:6px; }
+.placeholder p { margin:0 0 14px; font-size:13px; }
+.placeholder .spinner { width:28px; height:28px; margin:0 auto 14px; border:3px solid #2a374a; border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+#empty { display:grid; place-items:center; color:var(--muted); text-align:center; }
+dialog { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:14px; padding:22px 24px; width:460px; max-width:92vw; }
+dialog::backdrop { background:#0008; }
+dialog h2 { margin:0 0 8px; font-size:16px; }
+dialog p { margin:0 0 12px; color:var(--muted); font-size:13px; }
+dialog pre { margin:0 0 16px; padding:10px 12px; background:#0c1522; border:1px solid #33465e; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+dialog .buttons { display:flex; justify-content:flex-end; gap:8px; }
+#toast { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); margin:0; padding:10px 16px; border:1px solid var(--line); border-radius:10px; background:#1b2738; color:var(--text); font-size:13px; max-width:80vw; }
+#toast.bad { border-color:#6a3b48; color:var(--bad); }
+@media(max-width:720px) { .brand h1 { max-width:200px; } #network-status { max-width:180px; } main#panes.columns { grid-auto-flow:row; grid-auto-columns:auto; } }
+@media(prefers-reduced-motion:reduce) { .placeholder .spinner { animation:none; } }
+</style>
+</head>
+<body>
+<header id="top">
+  <div class="brand"><span class="eyebrow">QEMU ISO Lab · Consoles</span><h1 id="title">Consoles</h1></div>
+  <div id="network" aria-label="Private network between the machines"><span id="network-status"><span class="dot"></span>Not linked</span><button id="network-toggle" disabled>Link network</button></div>
+  <div class="actions">
+    <select id="add-vm" aria-label="Add a machine"><option value="">Add a machine…</option></select>
+    <div class="segmented" role="group" aria-label="Layout"><button data-layout="columns" title="Side by side">▥</button><button data-layout="rows" title="Stacked">▤</button><button data-layout="grid" title="Grid">▦</button></div>
+    <a href="/" id="dashboard">Dashboard</a>
+  </div>
+</header>
+<main id="panes" class="columns"></main>
+<dialog id="confirm"><h2 id="confirm-title"></h2><p id="confirm-message"></p><pre id="confirm-command" class="mono"></pre><div class="buttons"><button id="confirm-no">Cancel</button><button id="confirm-yes" class="primary">Run</button></div></dialog>
+<div id="toast" popover="manual" role="status"></div>
+<script src="/assets/icons.js"></script>
+<script>
+// Several consoles on one page: every pane is the dashboard's own detached console (index.html with
+// ?detached=1#console=<vm>) in an iframe, so keyboard, clipboard, files, SSH and recording are the
+// same code. This page only starts/stops the machines, follows their state and links them on a
+// private segment with `vmctl link` (the same job the dashboard's "Link network" runs).
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+const params = new URLSearchParams(location.search);
+if (params.get("token")) { sessionStorage.setItem("vmctl-token", params.get("token")); history.replaceState(null, "", "/multi" + location.hash); }
+const TOKEN = sessionStorage.getItem("vmctl-token") || "";
+async function api(path, body) {
+  const res = await fetch(path, { method: body ? "POST" : "GET", headers: { "X-Vmctl-Token": TOKEN, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({ error: res.statusText }));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+function toast(message, bad = false) {
+  const t = $("toast"); t.textContent = message; t.className = bad ? "bad" : "";
+  try { t.showPopover(); } catch (_) { t.style.display = "block"; }
+  clearTimeout(t._h); t._h = setTimeout(() => { try { t.hidePopover(); } catch (_) { t.style.display = "none"; } }, bad ? 7000 : 4000);
+}
+function ask({title, message, command, button = "Run"}) {
+  $("confirm-title").textContent = title; $("confirm-message").textContent = message || "";
+  $("confirm-command").textContent = command || ""; $("confirm-command").hidden = !command; $("confirm-yes").textContent = button;
+  return new Promise((resolve) => {
+    const d = $("confirm"); let answer = false;
+    $("confirm-yes").onclick = () => { answer = true; d.close(); };
+    $("confirm-no").onclick = () => d.close();
+    d.onclose = () => { d.onclose = null; resolve(answer); };
+    d.showModal(); $("confirm-no").focus();
+  });
+}
+
+// --- what the page shows: the hash carries the machines (#vms=a,b), start=1 starts the stopped ones once
+function readHash() {
+  const h = new URLSearchParams(location.hash.replace(/^#/, ""));
+  return { vms: (h.get("vms") || "").split(",").map(decodeURIComponent).filter(Boolean), start: h.get("start") === "1" };
+}
+let panes = [...new Set(readHash().vms)];
+let startWanted = readHash().start;
+let S = { vms: [] };                  // the dashboard snapshot (/api/state)
+const local = new Map();              // name -> "start" | "stop" | "link" submitted here, until the state shows it
+const frames = new Map();             // name -> pane element (iframes must survive re-renders)
+let busyNetwork = false, pollTimer = null;
+function writeHash() {
+  history.replaceState(null, "", "/multi#vms=" + panes.map(encodeURIComponent).join(","));
+  document.title = (panes.length ? panes.join(" · ") + " · " : "") + "Consoles · QEMU ISO Lab";
+  $("title").textContent = panes.length ? panes.join(" · ") : "Consoles";
+}
+const rowOf = (name) => S.vms.find(r => r.name === name);
+const busy = (r) => r && (r.job_status === "running" || local.has(r.name));
+function consoleUrl(vm, detached = true) {
+  const url = new URL(location.origin + "/");
+  url.searchParams.set("token", TOKEN); if (detached) url.searchParams.set("detached", "1");
+  url.hash = "console=" + encodeURIComponent(vm); return url.href;
+}
+
+// --- layout
+const LAYOUTS = ["columns", "rows", "grid"];
+let layout = (() => { try { return localStorage.getItem("vmctl-multi-layout"); } catch (_) { return null; } })();
+if (!LAYOUTS.includes(layout)) layout = "columns";
+function applyLayout() {
+  const main = $("panes"); main.className = layout;
+  main.style.gridTemplateColumns = layout === "grid" ? `repeat(${Math.max(1, Math.ceil(Math.sqrt(panes.length)))}, minmax(0,1fr))` : "";
+  for (const b of document.querySelectorAll("[data-layout]")) b.classList.toggle("active", b.dataset.layout === layout);
+}
+for (const b of document.querySelectorAll("[data-layout]")) b.onclick = () => { layout = b.dataset.layout; try { localStorage.setItem("vmctl-multi-layout", layout); } catch (_) {} applyLayout(); };
+
+// --- the network between the panes (vmctl link): the segment every pane is on, if any
+function commonSegments(names) {
+  const rows = names.map(rowOf);
+  if (!rows.length || rows.some(r => !r)) return [];
+  return [...new Set((rows[0].links || []).map(l => l.segment))].filter(seg => rows.every(r => (r.links || []).some(l => l.segment === seg))).sort();
+}
+function renderNetwork() {
+  const status = $("network-status"), button = $("network-toggle"), segments = commonSegments(panes);
+  const linkedAny = panes.some(n => (rowOf(n)?.links || []).length);
+  status.className = segments.length ? "linked" : linkedAny ? "partial" : "";
+  if (segments.length) {
+    const seg = segments[0];
+    const members = panes.map(n => { const l = (rowOf(n).links || []).find(l => l.segment === seg); return `${n} ${l.address}${l.up ? "" : " (at next start)"}`; });
+    status.innerHTML = `<span class="dot"></span>Linked on <span class="mono">${esc(seg)}</span>: ${esc(members.join(" · "))}`;
+    status.title = members.join("\n");
+    button.textContent = "Unlink network"; button.className = "warn";
+  } else {
+    status.innerHTML = `<span class="dot"></span>${linkedAny ? "Not all machines share a network" : panes.length < 2 ? "Add a second machine to link them" : "Not linked"}`;
+    status.title = "A private network between the machines of this page: 192.168.100.x on the session segment, hot-plugged into running VMs, attached at the next start otherwise.";
+    button.textContent = "Link network"; button.className = "";
+  }
+  button.disabled = busyNetwork || panes.length < 2 || panes.some(n => !rowOf(n));
+}
+$("network-toggle").onclick = async () => {
+  const segments = commonSegments(panes), names = panes.filter(rowOf);
+  if (names.length < 2) return;
+  const args = segments.length ? ["link", "--off", "--segment", segments[0], ...names] : ["link", ...names];
+  const ok = await ask(segments.length
+    ? { title: `Unlink ${names.length} machines?`, message: `Disconnect them from network "${segments[0]}". A NIC attached at boot stays until the VM stops; one hot-plugged live is removed now.`, command: "vmctl " + args.join(" "), button: "Unlink" }
+    : { title: `Link ${names.length} machines on a private network?`, message: "Running machines get a NIC hot-plugged and configured over SSH (192.168.100.x); stopped ones join at their next start. Only headless VMs started by vmctl can be plugged live.", command: "vmctl " + args.join(" "), button: "Link" });
+  if (!ok) return;
+  busyNetwork = true; renderNetwork();
+  try { await api("/api/run", { args }); toast(segments.length ? "Unlinking…" : "Linking… addresses appear when the guests are configured."); }
+  catch (e) { toast(e.message, true); }
+  finally { busyNetwork = false; schedulePoll(0); }
+};
+
+// --- panes
+function paneFor(name) {
+  if (frames.has(name)) return frames.get(name);
+  const el = document.createElement("section"); el.className = "pane"; el.dataset.vm = name;
+  el.innerHTML = `<header><span class="machine-icon"></span><h2 class="mono">${esc(name)}</h2><span class="chip"></span><span class="address"></span><span class="pane-tools"><button data-act="stop">Stop</button><button data-act="reload" title="Reconnect the display">Reload</button><button data-act="alone" title="This console alone in its own window">Open alone</button><button data-act="close" class="close" title="Remove from this page">×</button></span></header><div class="body"></div>`;
+  el.querySelector(".pane-tools").onclick = (e) => { const b = e.target.closest("button"); if (b) paneAction(name, b.dataset.act); };
+  frames.set(name, el); return el;
+}
+async function paneAction(name, act) {
+  const r = rowOf(name);
+  if (act === "close") { panes = panes.filter(n => n !== name); frames.get(name)?.remove(); frames.delete(name); if (!panes.length) { location.replace("/"); return; } writeHash(); render(); return; }
+  if (act === "alone") { if (!window.open(consoleUrl(name), "_blank", "popup,width=1280,height=900,resizable=yes,scrollbars=yes")) toast("Allow pop-up windows for this page, then try again.", true); return; }
+  if (act === "reload") { const f = frames.get(name)?.querySelector("iframe"); if (f) f.src = consoleUrl(name); return; }
+  if (act === "start") return startVm(name);
+  if (act === "stop" && r?.running) {
+    if (!await ask({ title: `Stop ${name}?`, message: "Request a normal shutdown of the guest (ACPI, then the guest agent or SSH).", command: `vmctl stop ${name}`, button: "Stop" })) return;
+    local.set(name, "stop"); render();
+    try { await api("/api/run", { args: ["stop", name] }); } catch (e) { local.delete(name); toast(e.message, true); }
+    schedulePoll(0);
+  }
+}
+async function startVm(name) {
+  const r = rowOf(name);
+  if (!r || r.running || busy(r) || !r.installed) return;
+  local.set(name, "start"); render();
+  try { await api("/api/run", { args: ["start", name, "--headless", "--background"] }); }
+  catch (e) { local.delete(name); toast(e.message, true); }
+  schedulePoll(0);
+}
+function renderPane(name) {
+  const el = paneFor(name), r = rowOf(name), body = el.querySelector(".body"), chip = el.querySelector(".chip"), addr = el.querySelector(".address");
+  const icon = el.querySelector(".machine-icon");
+  if (r && !icon.innerHTML) icon.innerHTML = catalogIcon(osIconKey(r));
+  // Clear a local verdict once the state agrees with it.
+  if (local.get(name) === "start" && r?.running) local.delete(name);
+  if (local.get(name) === "stop" && r && !r.running) local.delete(name);
+  const starting = local.get(name) === "start", stopping = local.get(name) === "stop";
+  let state, cls;
+  if (!r) [state, cls] = ["Unknown profile", "bad"];
+  else if (stopping) [state, cls] = ["Stopping…", "busy"];
+  else if (starting) [state, cls] = ["Starting…", "busy"];
+  else if (r.running) [state, cls] = [r.job_status === "running" ? "Running · job" : "Running", "ok"];
+  else if (r.job_status === "running") [state, cls] = ["Working…", "busy"];
+  else if (!r.installed) [state, cls] = [r.install_label || "no disk", "bad"];
+  else [state, cls] = ["Stopped", ""];
+  chip.textContent = state; chip.className = "chip " + cls;
+  const link = (r?.links || []).find(l => commonSegments(panes).includes(l.segment)) || (r?.links || [])[0];
+  addr.textContent = link ? link.address : ""; addr.className = "address" + (link && !link.up ? " off" : ""); addr.title = link ? `${link.segment}${link.up ? "" : " · attached at the next start"}` : "";
+  el.querySelector('[data-act="stop"]').hidden = !r?.running;
+  el.querySelector('[data-act="stop"]').disabled = !r || stopping || r.job_status === "running";
+  el.querySelector('[data-act="reload"]').hidden = !r?.running;
+  el.querySelector('[data-act="alone"]').hidden = !r?.running;
+  el.classList.toggle("live", !!r?.running);
+  const running = !!r?.running, frame = body.querySelector("iframe");
+  if (running && !frame) {
+    body.innerHTML = "";
+    const f = document.createElement("iframe"); f.title = "Console of " + name; f.allow = "fullscreen; clipboard-read; clipboard-write";
+    f.src = consoleUrl(name); body.appendChild(f);
+  } else if (!running) {
+    if (frame) frame.remove();
+    const hint = !r ? "This name is not in the catalog." : starting ? "The console opens here as soon as the VM runs." : stopping ? "Waiting for the guest to power off." : r.job_status === "running" ? "A job is running on this VM; the console opens when it is running headless." : !r.installed ? "Install it from the dashboard first." : "Start it to see its display.";
+    body.innerHTML = `<div class="placeholder"><div>${starting || stopping ? '<div class="spinner"></div>' : ""}<strong>${esc(name)} · ${esc(state)}</strong><p>${esc(hint)}</p>${r && !r.running && r.installed && !busy(r) ? '<button class="primary" data-start>Start</button>' : ""}</div></div>`;
+    const b = body.querySelector("[data-start]"); if (b) b.onclick = () => startVm(name);
+  }
+  return el;
+}
+function render() {
+  const main = $("panes");
+  if (!panes.length) { main.innerHTML = '<div id="empty"><div><strong>No machine on this page.</strong><p>Pick one from “Add a machine…”, or select several in the dashboard and use <em>Start in console</em>.</p></div></div>'; }
+  else {
+    const empty = main.querySelector("#empty"); if (empty) empty.remove();
+    panes.forEach((name, i) => { const el = renderPane(name); if (main.children[i] !== el) main.insertBefore(el, main.children[i] || null); });
+    for (const el of [...main.children]) if (el.dataset.vm && !panes.includes(el.dataset.vm)) el.remove();
+  }
+  applyLayout(); renderNetwork();
+  const add = $("add-vm"), current = add.value;
+  add.innerHTML = '<option value="">Add a machine…</option>' + S.vms.filter(r => !panes.includes(r.name) && (r.running || r.installed)).map(r => `<option value="${esc(r.name)}">${esc(r.name)}${r.running ? " · running" : ""}</option>`).join("");
+  add.value = current && [...add.options].some(o => o.value === current) ? current : "";
+}
+$("add-vm").onchange = () => { const name = $("add-vm").value; if (!name) return; $("add-vm").value = ""; if (!panes.includes(name)) { panes.push(name); writeHash(); render(); } };
+
+// --- state
+async function poll() {
+  pollTimer = null;
+  try {
+    S = await api("/api/state?fresh=1");
+    if (startWanted) {
+      startWanted = false; writeHash();
+      for (const name of panes) { const r = rowOf(name); if (r && !r.running && r.installed && !busy(r)) startVm(name); }
+    }
+    render();
+  } catch (e) { toast("Dashboard unreachable: " + e.message, true); }
+  schedulePoll(3000);
+}
+function schedulePoll(ms) { clearTimeout(pollTimer); pollTimer = setTimeout(poll, ms); }
+window.addEventListener("hashchange", () => { const wanted = [...new Set(readHash().vms)]; if (!wanted.length) { location.replace("/"); return; } if (wanted.join() !== panes.join()) { panes = wanted; render(); } });
+writeHash(); applyLayout();
+if (!TOKEN) { $("panes").innerHTML = '<div id="empty"><div><strong>Token required.</strong><p>Open this page from the dashboard, or with the URL that <code>vmctl web</code> printed.</p></div></div>'; }
+else if (!panes.length) { location.replace("/"); }  // no machine on the page: the dashboard is where to pick them
+else { render(); poll(); }
+</script>
+</body>
+</html>

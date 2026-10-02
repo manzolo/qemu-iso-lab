@@ -489,6 +489,7 @@ body.console-detached { overflow:hidden; }
 body.console-detached > :not(dialog):not(#toast):not(script) { display:none !important; }
 body.console-detached #vnc-dialog { position:fixed; inset:0; margin:0; width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border:0; border-radius:0; }
 body.console-detached #vnc-detach { display:none; }
+body.console-embedded #vnc-close,body.console-embedded #console-back { display:none; }
 @media(min-width:1251px) and (max-width:1450px) {
   #console-shell > header { grid-template-columns:minmax(0,1fr) auto; gap:12px; }
   #console-shell > header > .console-toolbar { grid-row:2; grid-column:1/-1; justify-content:flex-start; }
@@ -743,7 +744,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   <nav id="lab-navigation" class="lab-navigation hidden" aria-label="Lab navigation"><button id="back-to-labs">← Labs</button><span aria-hidden="true">/</span><span id="lab-origin" class="mono"></span><span aria-hidden="true">/</span><span id="lab-current-vm" class="mono" aria-current="page"></span></nav>
   <section class="card"><h2 id="list-title">Profiles</h2>
     <p id="selection-hint">Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
-    <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
+    <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-console" title="Start the selected machines and open their consoles side by side on one page">Start in console</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
   <section class="card" id="machine-panel" tabindex="-1" aria-label="Machine details"><div class="profile-heading"><h2>Machine</h2><button id="profile-protect" class="hidden" aria-label="Protect this disk">🔓</button><button id="profile-mine" class="hidden" aria-label="Add to My VMs">☆</button><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
@@ -1192,6 +1193,8 @@ function renderSelection() {
     button.classList.toggle("warn", operation === "unlink");
     button.disabled = bulkBusy || targets.length < (operation === "link" ? 2 : 1);
   }
+  $("selection-console").textContent = `Start in console (${consoleTargets().length})`;
+  $("selection-console").disabled = !consoleTargets().length;
   const [mineAction, mineNames] = selectionMine();
   $("selection-mine").textContent = `${mineAction === "add" ? "Add to" : "Remove from"} My VMs (${mineNames.length})`;
   $("selection-mine").disabled = !mineNames.length;
@@ -1233,6 +1236,21 @@ async function runSelection(action, segment = null, names = [...checkedVms]) {
 }
 for (const action of ["start","stop"]) $("selection-"+action).onclick = () => runSelection(action);
 $("selection-link").onclick = () => runSelectedNetwork();
+// "Start in console": the selected machines side by side on /multi (one detached console per pane,
+// the stopped ones started by that page), with a Link network button between them.
+function consoleTargets(names = [...checkedVms]) {
+  return S.vms.filter(r => names.includes(r.name) && (r.running || (r.installed && withVMJob(r).job_status !== "running")));
+}
+function openMultiConsole(names = consoleTargets().map(r => r.name)) {
+  if (!names.length) return;
+  const url = new URL(location.origin + "/multi"); url.searchParams.set("token", TOKEN);
+  url.hash = "vms=" + names.map(encodeURIComponent).join(",") + "&start=1";
+  // Opened on the click itself: a window opened after an await is blocked by the browser.
+  const tab = window.open(url.href, "_blank");
+  if (!tab) { toast("Allow pop-up windows for this page, then try Start in console again.", true); return; }
+  tab.opener = null;
+}
+$("selection-console").onclick = () => openMultiConsole();
 $("selection-mine").onclick = () => { const [action, names] = selectionMine(); if (names.length) setMine(action, names); };
 // Add while any selected machine is not chosen yet; remove when all of them are.
 function selectionMine() {
@@ -1371,7 +1389,7 @@ function renderDetails() {
   const more = buttons(a => a.form);
   const access = [
     ...((r.logins || []).length ? [["Login", r.logins.map(l => `<span class="mono">${esc(l.user)}</span> / ${l.password ? `<span class="mono">${esc(l.password)}</span>` : '<span class="s-muted">no password</span>'}${l.note ? ` <span class="s-muted">· ${esc(l.note)}</span>` : ""}`).join("<br>")]] : []),
-    ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options (F4)" aria-label="Open SSH console options">Options…</button></span>` : "Not configured"]
+    ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">${esc(r.ssh_user || "")}${r.ssh_user ? "@" : ""}127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options (F4)" aria-label="Open SSH console options">Options…</button></span>` + (r.installed_user && r.profile_user && r.installed_user !== r.profile_user ? `<br><span class="s-warn">installed as ${esc(r.installed_user)}; the profile names ${esc(r.profile_user)} now (reinstall to move the disk to it)</span>` : "") : "Not configured"]
   ];
   const config = [["Firmware", esc(r.firmware)],
     ...(r.profile_version ? [["Profile", `<span class="mono">${esc(r.profile_version)}</span>` + (r.installed_version && r.installed_version !== r.profile_version ? ` <span class="s-warn">on the disk: ${esc(r.installed_version)} · reinstall for the changes</span>` : r.installed_version ? ' <span class="s-muted">· on the disk</span>' : "")]] : []),
@@ -1870,6 +1888,11 @@ $("screen-img").onload = () => ($("screen-note").textContent = "A screenshot eve
 // --- console: noVNC in the page, bridged by the server to the VM's runtime/vnc.sock
 const consoleDetached = new URLSearchParams(location.search).get("detached") === "1";
 if (consoleDetached) document.body.classList.add("console-detached");
+// Embedded: this detached console is one pane of /multi (an iframe). That page owns the window,
+// starts and stops the VM and reloads the pane, so Close/Detach disappear and a stopped VM is a
+// status, never a return to the dashboard inside the frame.
+const consoleEmbedded = consoleDetached && window.self !== window.top;
+if (consoleEmbedded) document.body.classList.add("console-embedded");
 const consoleIconPaths = {
   files:'<path d="M3 7V4h6l2 3h10v13H3z"/><path d="M3 7h8"/>',
   detach:'<path d="M14 3h7v7m0-7L11 13M10 3H3v18h18v-7"/>',
@@ -2041,6 +2064,7 @@ async function retryConsole(generation, reason) {
   const restarting = current?.job_status === "running" && (current.job_command === "start" || installationJob(current));
   if (info?.running === false && !restarting) {
     const vm = consoleVm;
+    if (consoleEmbedded) { consoleStatus("Stopped", "s-muted", vm + " is stopped. The console comes back by itself when it runs again."); return; }
     closeConsole();
     if (consoleDetached) {
       window.close();
@@ -2105,7 +2129,7 @@ async function openConsole(vm, retry = false) {
     client.addEventListener("connect", () => {
       if (generation !== consoleGeneration) return;
       cancelConsoleRetry(); consoleRetryAttempt = 0;
-      consoleStatus("Connected", "s-ok", "Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave.");
+      consoleStatus("Connected", "s-ok", "Click the screen to use keyboard and mouse. Esc goes to the VM" + (consoleEmbedded ? "." : "; use Close to leave."));
       if (!terminalDocked && $("console-panel").hidden) client.focus();
     });
     client.addEventListener("clipboard", e => {
@@ -2913,6 +2937,7 @@ function selectionContextEntries() {
       group:"Selection actions", icon:({start:"play",stop:"stop",link:"network"})[action], warn:["stop","unlink"].includes(operation),
       disabled:bulkBusy || count < (operation === "link" ? 2 : 1), run:()=>action === "link" ? runSelectedNetwork() : runSelection(action)};
   });
+  entries.push({label:`Start selected in console (${consoleTargets().length})`, group:"Selection actions", icon:"console", disabled:!consoleTargets().length, run:()=>openMultiConsole()});
   const [mineAction, mineNames] = selectionMine();
   entries.push({label:`${mineAction === "add" ? "Add selected to" : "Remove selected from"} My VMs (${mineNames.length})`, group:"Selection actions", icon:"star", disabled:!mineNames.length, run:()=>$("selection-mine").click()});
   const hideRows = S.vms.filter(r => checkedVms.has(r.name)), toHide = hideRows.filter(r => !r.hidden).map(r => r.name);

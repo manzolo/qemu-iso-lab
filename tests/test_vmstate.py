@@ -303,3 +303,79 @@ class VmstateHookTests(BaseVmctlTestCase):
             with self.assertRaises(self.vmctl.VMError):
                 self.vmctl.run_post_install(self.vm_name, vm, 10)
         self.assertFalse(self.vmctl.vmstate.state_path(self.vm_name).exists())
+
+
+class GuestUserTests(BaseVmctlTestCase):
+    """The user on the disk, recorded at install: SSH logs in as that one when local.json's
+    identity moved the profile elsewhere since (debian-12 installed as lab on 2026-09-29, the
+    profile naming manzolo on 10-02)."""
+
+    def setUp(self):
+        super().setUp()
+        self.write_config_dir()
+        self.vm = dict(self.vmctl.get_vm(self.vmctl.load_config(), self.vm_name))
+        self.vm["ssh_provision"] = {"user": "manzolo", "ssh_host_port": 2297}
+
+    def write_disk(self, size: int = 32 * 1024 * 1024) -> None:
+        path = self.root / self.vm_config["disk"]["path"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"\x01" * size)
+
+    def test_begin_install_records_the_guest_user_and_ssh_logs_in_as_it(self):
+        self.write_disk()
+        self.vmctl.vmstate.begin_install(self.vm_name, "bootstrap-preseed", guest_user="lab")
+        self.assertEqual(self.vmctl.vmstate.installed_user(self.vm_name), "lab")
+        self.assertEqual(self.vmctl.vmstate.installed_user_for(self.vm), "lab")
+        self.assertEqual(self.vmctl.ssh.ssh_target(self.vm), ("127.0.0.1", 2297, "lab"))
+        self.assertIn("lab@127.0.0.1", self.vmctl.ssh.ssh_base_cmd(self.vm, dry_run=True))
+        # The record survives the completion and the verification of the same install.
+        self.vmctl.vmstate.complete_install(self.vm_name, "bootstrap-preseed", self.vm)
+        self.vmctl.vmstate.record_verified(self.vm_name, "post-install")
+        with mock.patch.object(shutil, "which", return_value=None):
+            known = self.vmctl.vmstate.summary(self.vm_name, self.vm, profile_user="manzolo")
+        self.assertEqual(known["guest_user"], "lab")
+        self.assertIn("installed as lab, the profile names manzolo now (SSH logs in as lab)", known["detail"])
+
+    def test_without_a_record_the_profile_user_stands_and_the_denied_hint_names_the_command(self):
+        self.write_disk()
+        self.assertIsNone(self.vmctl.vmstate.installed_user(self.vm_name))
+        self.assertEqual(self.vmctl.ssh.ssh_target(self.vm)[2], "manzolo")
+        self.assertIn(f"vmctl guest-user {self.vm_name} <user>", self.vmctl.ssh.denied_user_hint(self.vm))
+        self.vmctl.vmstate.set_installed_user(self.vm_name, "lab")
+        self.assertEqual(self.vmctl.ssh.denied_user_hint(self.vm), "")
+        self.assertEqual(self.vmctl.ssh.ssh_target(self.vm)[2], "lab")
+
+    def test_the_record_is_ignored_over_an_empty_disk_and_a_disk_kept_elsewhere(self):
+        self.write_disk()
+        self.vmctl.vmstate.set_installed_user(self.vm_name, "lab")
+        (self.root / self.vm_config["disk"]["path"]).write_bytes(b"")
+        self.assertIsNone(self.vmctl.vmstate.installed_user(self.vm_name))
+        self.assertEqual(self.vmctl.ssh.ssh_target(self.vm)[2], "manzolo")
+        elsewhere = dict(self.vm, disk={"path": "/srv/images/testvm.qcow2", "format": "qcow2"})
+        self.assertIsNone(self.vmctl.vmstate.vm_name_for(elsewhere))
+        self.assertIsNone(self.vmctl.vmstate.installed_user_for(elsewhere))
+
+    def test_set_installed_user_wants_a_login_name_and_a_disk_with_data(self):
+        with self.assertRaises(vmctl.errors.VMError):
+            self.vmctl.vmstate.set_installed_user(self.vm_name, "lab")
+        self.write_disk()
+        with self.assertRaises(vmctl.errors.VMError):
+            self.vmctl.vmstate.set_installed_user(self.vm_name, "Bad Name")
+        self.vmctl.vmstate.set_installed_user(self.vm_name, "lab", dry_run=True)
+        self.assertIsNone(self.vmctl.vmstate.installed_user(self.vm_name))
+
+    def test_the_command_shows_and_records(self):
+        import argparse
+        import io
+        from contextlib import redirect_stdout
+        self.write_disk()
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.vmctl.lifecycle.cmd_guest_user(argparse.Namespace(vm=self.vm_name, user=None, json=False, dry_run=False))
+        self.assertIn("no guest user recorded", out.getvalue())
+        with redirect_stdout(io.StringIO()):
+            self.vmctl.lifecycle.cmd_guest_user(argparse.Namespace(vm=self.vm_name, user="lab", json=False, dry_run=False))
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.vmctl.lifecycle.cmd_guest_user(argparse.Namespace(vm=self.vm_name, user=None, json=True, dry_run=False))
+        self.assertEqual(json.loads(out.getvalue())["ssh_user"], "lab")

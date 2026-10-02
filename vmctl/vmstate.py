@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -204,16 +205,81 @@ def artifact_disk_has_data(vm_name: str) -> bool:
     return False
 
 
-def begin_install(vm_name: str, flow: str, interactive: bool = False, dry_run: bool = False) -> None:
-    """A new installation starts on this disk: whatever the record said no longer holds."""
+def begin_install(vm_name: str, flow: str, interactive: bool = False, dry_run: bool = False,
+                  guest_user: str | None = None) -> None:
+    """A new installation starts on this disk: whatever the record said no longer holds.
+
+    The record also keeps the guest user this install creates (``guest``): the identity of
+    local.json can move later, and SSH must still log in as the user that exists on the disk."""
     if not dry_run and artifact_disk_has_data(vm_name):
         refuse_if_protected(vm_name, "install over its disk")
+    user = guest_user if guest_user is not None else declared_user(vm_name)
     record = {
         "origin": {"kind": "install", "flow": flow, "at": now()},
         "install": {"flow": flow, "started_at": now(), "completed_at": None,
                     "mode": FLOW_INTERACTIVE if interactive else "unattended", **_versions(vm_name)},
         "verify": None,
+        "guest": {"user": user, "recorded_by": "install", "at": now()} if user else None,
     }
+    save(vm_name, record, dry_run=dry_run)
+
+
+# --- the guest user on the disk -----------------------------------------------------------
+# Tracked profiles install `lab`; a local.json identity moves every profile to another user, also
+# the ones whose disk was installed before (debian-12 on 2026-10-02: installed as lab on 09-29,
+# the profile said manzolo, SSH, Files and link-settle knocked as a user the guest never had).
+# The record says who is on the disk; ssh_target logs in as that user when it differs.
+
+USER_NAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
+
+
+def declared_user(vm_name: str) -> str | None:
+    """The guest user the catalog declares for *vm_name* right now (local.json identity applied),
+    None when the catalog cannot be read here (a bare test root). config sits beside vmstate in
+    the import order, hence the lazy import."""
+    try:
+        from vmctl import config  # noqa: PLC0415 - same level of the import order, no module-level cycle
+        return config.resolve_vm_user(config.get_vm(config.load_config(), vm_name))[0]
+    except Exception:  # noqa: BLE001 - a record must never fail over the catalog's state
+        return None
+
+
+def installed_user(vm_name: str) -> str | None:
+    """The guest user recorded for the data on this disk: None without a record or a disk."""
+    if not artifact_disk_has_data(vm_name):
+        return None
+    guest = load(vm_name).get("guest")
+    user = guest.get("user") if isinstance(guest, dict) else None
+    return str(user).strip() or None if isinstance(user, str) else None
+
+
+def vm_name_for(vm: dict[str, Any]) -> str | None:
+    """The profile key of a resolved profile, read from its disk path: ``artifacts/<name>/disk.*``
+    is the only layout the record is kept in (a disk elsewhere has no record here)."""
+    try:
+        base = runtime.resolve_path(vm["disk"]["path"]).parent
+    except (KeyError, TypeError, AttributeError):
+        return None
+    if base.parent.resolve() != (state.ROOT / "artifacts").resolve():
+        return None
+    return base.name
+
+
+def installed_user_for(vm: dict[str, Any]) -> str | None:
+    """`installed_user` from a resolved profile (what ssh_target needs)."""
+    name = vm_name_for(vm)
+    return installed_user(name) if name else None
+
+
+def set_installed_user(vm_name: str, user: str, dry_run: bool = False) -> None:
+    """``vmctl guest-user <vm> <user>``: record the user of a disk installed before vmctl kept it
+    (or installed outside vmctl). The install ladder is untouched."""
+    if not USER_NAME_RE.match(user):
+        raise VMError(f"{user!r} is not a POSIX login name (lower-case letters, digits, '_' and '-')")
+    if not artifact_disk_has_data(vm_name):
+        raise VMError(f"{vm_name}: no disk with data under {runtime.vm_artifact_base(vm_name)}; install it first")
+    record = load(vm_name)
+    record["guest"] = {"user": user, "recorded_by": "vmctl guest-user", "at": now()}
     save(vm_name, record, dry_run=dry_run)
 
 
@@ -296,7 +362,7 @@ def image_facts(path: Path, fmt: str) -> dict[str, Any]:
     return facts
 
 
-def summary(vm_name: str, vm: dict[str, Any]) -> dict[str, Any]:
+def summary(vm_name: str, vm: dict[str, Any], profile_user: str | None = None) -> dict[str, Any]:
     """Everything the CLI and the TUI show about the disk, decided in one place.
 
     ``label`` is the compact ladder: ``no disk`` < ``empty`` < ``unverified`` (data, no
@@ -304,14 +370,17 @@ def summary(vm_name: str, vm: dict[str, Any]) -> dict[str, Any]:
     started and never sent its token) < ``installed`` (token arrived) < ``verified``
     (booted and checked). ``detail`` spells the same out in one sentence.
     """
-    return describe(load(vm_name), disk_facts(vm), catalog_version=(vm.get("meta") or {}).get("version"))
+    return describe(load(vm_name), disk_facts(vm), catalog_version=(vm.get("meta") or {}).get("version"),
+                    profile_user=profile_user)
 
 
-def describe(record: dict[str, Any], facts: dict[str, Any], catalog_version: str | None = None) -> dict[str, Any]:
+def describe(record: dict[str, Any], facts: dict[str, Any], catalog_version: str | None = None,
+             profile_user: str | None = None) -> dict[str, Any]:
     """`summary` for a record and image facts that do not belong to a live VM (a checkpoint)."""
     install = record.get("install") if isinstance(record.get("install"), dict) else None
     verify = record.get("verify") if isinstance(record.get("verify"), dict) else None
     origin = record.get("origin") if isinstance(record.get("origin"), dict) else None
+    guest = record.get("guest") if isinstance(record.get("guest"), dict) else None
 
     out: dict[str, Any] = {
         "disk_present": facts["present"],
@@ -332,6 +401,9 @@ def describe(record: dict[str, Any], facts: dict[str, Any], catalog_version: str
         "origin_at": origin.get("at") if origin else None,
         "stale": False,
         "profile_version": None, "vmctl_version": None, "catalog_version": catalog_version,
+        # The user on the disk (recorded at install or by vmctl guest-user) and the profile's today.
+        "guest_user": (str(guest.get("user") or "").strip() or None) if guest and facts["has_data"] else None,
+        "profile_user": profile_user,
     }
 
     if install:
@@ -384,6 +456,8 @@ def describe(record: dict[str, Any], facts: dict[str, Any], catalog_version: str
         if catalog_version and catalog_version != out["profile_version"]:
             out["detail"] += f", the catalog is at {catalog_version} now"
         out["detail"] += ")"
+    if out["guest_user"] and profile_user and profile_user != out["guest_user"]:
+        out["detail"] += f"; installed as {out['guest_user']}, the profile names {profile_user} now (SSH logs in as {out['guest_user']})"
     return out
 
 

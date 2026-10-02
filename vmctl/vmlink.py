@@ -166,7 +166,7 @@ def hotplug(vm: dict[str, Any], name: str, pid: int, segment: str, mac: str, mca
         if not free:
             raise VMError(f"{name} has no free hot-plug slot left ({len(qemu.HOTPLUG_PORTS)} per VM)")
         bus = free[0]
-    qemu.qmp_execute(sock, "netdev_add", arguments={"type": "socket", "id": ident,
+    qemu.qmp_execute(sock, "netdev_add", arguments={"type": "socket", "id": ident, "localaddr": qemu.MCAST_LOCALADDR,
                                                     "mcast": qemu.segment_endpoint(segment, mcast)})
     arguments: dict[str, Any] = {"driver": device, "netdev": ident, "id": f"{ident}-nic", "mac": mac}
     if bus:
@@ -327,7 +327,7 @@ def boot_args(name: str, vm: dict[str, Any]) -> list[str]:
             continue
         ident = netdev_id(str(record["segment"]))
         endpoint = qemu.segment_endpoint(str(record["segment"]), record.get("mcast"))
-        args += ["-netdev", f"socket,id={ident},mcast={endpoint}",
+        args += ["-netdev", qemu.mcast_netdev(ident, endpoint),
                  "-device", f"{device},netdev={ident},id={ident}-nic,mac={member.get('mac') or nic_mac(str(record['segment']), name)}"]
     return args
 

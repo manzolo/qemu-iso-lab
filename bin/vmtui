@@ -697,12 +697,12 @@ def facts(name, vm):
         disk, actual, virtual = "missing", "-", "-"
     prepared = disk == "ready"
     try:
-        known = vmstate.summary(name, vm)
+        known = vmstate.summary(name, vm, profile_user=config.resolve_vm_user(vm)[0])
     except Exception:
         known = {"has_data": False, "host_bytes": 0, "virtual_bytes": None, "label": vmstate.LABEL_NO_DISK,
                  "detail": "", "install_state": "none", "install_flow": None, "install_at": None,
                  "verified": False, "verify_kind": None, "verify_at": None,
-                 "profile_version": None, "catalog_version": None}
+                 "profile_version": None, "catalog_version": None, "guest_user": None, "profile_user": None}
     # "installed" keeps its historical meaning for the menu: the disk has data on it.
     installed = prepared and bool(known["has_data"])
     protected_by = "flag" if name in FLAGGED else "star" if name in MINE and installed else None
@@ -786,6 +786,10 @@ def facts(name, vm):
         "has_disk_image": bool(vm.get("disk_image")),
         "has_unattended_flow": bool(unattended_flow),
         "ssh_port": str(ssh_cfg.get("ssh_host_port") or ""),
+        # Who SSH logs in as: the user recorded for the disk, else the profile's (vmctl guest-user).
+        "ssh_user": str(known.get("guest_user") or ssh_cfg.get("user") or ""),
+        "installed_user": str(known.get("guest_user") or ""),
+        "profile_user": str(known.get("profile_user") or ssh_cfg.get("user") or ""),
         # Who logs in with what (meta.logins, or the profile's own user): shown in the web and the TUI.
         "logins": labs.logins(vm),
         # Segments this VM was hot-plugged on by `vmctl link` (temporary, gone when it stops).

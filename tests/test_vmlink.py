@@ -76,7 +76,7 @@ class RecordTests(BaseVmctlTestCase):
         self.assertEqual(vmlink.load_record("session")["mcast"], "239.1.2.3:4000")
         self.assertTrue(vmlink.link(vm, "off", None)["already"])
         self.assertEqual(vmlink.boot_args("off", vm), [
-            "-netdev", "socket,id=link-session,mcast=239.1.2.3:4000",
+            "-netdev", "socket,id=link-session,mcast=239.1.2.3:4000,localaddr=127.0.0.1",
             "-device", f"e1000,netdev=link-session,id=link-session-nic,mac={vmlink.nic_mac('session', 'off')}"])
         self.assertEqual(vmlink.boot_args("stranger", vm), [])
         with mock.patch.object(vmlink, "qemu_alive", return_value=True), \
@@ -247,7 +247,7 @@ class CommandTests(BaseVmctlTestCase):
             vmctl.lifecycle.cmd_start(argparse.Namespace(vm=self.vm_name, video=None, dry_run=False, headless=False,
                                                          background=False, spice_port=None, cloud_init=False))
         command = run.call_args.args[0]
-        self.assertIn("socket,id=link-session,mcast=" + vmctl.qemu.segment_endpoint("session"), command)
+        self.assertIn("socket,id=link-session,mcast=" + vmctl.qemu.segment_endpoint("session") + ",localaddr=127.0.0.1", command)
         settler.assert_called_once_with(self.vm_name, dry_run=False)
 
     def test_status_and_off_on_an_empty_segment_are_quiet(self):

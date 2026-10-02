@@ -579,6 +579,11 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             self._send(HTTPStatus.OK, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
             return
+        if path in ("/multi", "/multi.html"):
+            # Several consoles side by side (#vms=a,b): every pane is index.html's detached console in
+            # an iframe, the page itself only calls the API (token in the URL once, like the dashboard).
+            self._send(HTTPStatus.OK, (WEB_DIR / "multi.html").read_bytes(), "text/html; charset=utf-8")
+            return
         if path == "/assets/distro-icons.svg":
             self._send(HTTPStatus.OK, (WEB_DIR / "distro-icons.svg").read_bytes(), "image/svg+xml")
             return

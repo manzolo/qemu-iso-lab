@@ -122,6 +122,16 @@ Tracked profiles are generic on purpose:
   installing the tracked user, and the post-install waited for SSH as somebody the
   guest had never heard of until it timed out.
 
+**A disk keeps the user it was installed with.** Every install since 2026-10-02 records
+that user in `artifacts/<vm>/state.json` (`guest`), and SSH, the web console's Files and
+terminal, `vmctl link` and the post-install checks log in as *that* user even after the
+identity below moved the profile to another name; `vmctl status --json`, the TUI facts and
+the web details say "installed as lab; the profile names you now". For a disk installed
+before (or outside vmctl) nothing is recorded, so a refused key may just be the wrong
+login: `vmctl guest-user <vm>` shows who vmctl would use, `vmctl guest-user <vm> lab`
+records the user that is really there. Reinstalling (`vmctl clean <vm>`, then the
+bootstrap) is the way to get the new identity onto the disk.
+
 To use your own name everywhere, give `local.json` a top-level `identity`: it
 is applied to **every tracked profile**, the ones added tomorrow included, so a
 new profile of the catalog never installs as `lab` on your host:

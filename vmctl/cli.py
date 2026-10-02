@@ -22,7 +22,7 @@ COMMAND_HELP: dict[str, str] = {}
 # Every public subcommand must appear in exactly one group (enforced by tests).
 COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Discover", "what is configured, what exists on disk, what the host can run",
-     ["list", "status", "show", "catalog", "protect", "unprotect", "identity", "setup", "welcome"]),
+     ["list", "status", "show", "catalog", "protect", "unprotect", "identity", "guest-user", "setup", "welcome"]),
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
@@ -564,6 +564,18 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--open", action="store_true", help="open the page in the default browser")
     p.set_defaults(func=webui.cmd_web)
 
+    p = _add(subparsers, "guest-user", help="the guest user on a VM's disk, the one SSH logs in as (recorded at install; name one for a disk installed before)",
+             epilog="""examples:
+  vmctl guest-user debian-12            who is on the disk, and who the profile names today
+  vmctl guest-user debian-12 lab        the disk was installed as lab (before local.json named you): SSH, Files and link use lab from now on
+
+A disk installed with the catalog's identity keeps its user when local.json moves every profile
+to yours: the record in artifacts/<vm>/state.json says who is there, and a reinstall (vmctl clean
+<vm>, then the bootstrap) is the way to get the new identity on the disk.""")
+    p.add_argument("vm", help="profile name")
+    p.add_argument("user", nargs="?", help="record this user for the disk (none: show)")
+    p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    p.set_defaults(func=lifecycle.cmd_guest_user)
     p = _add(subparsers, "identity", help="the guest identity of local.json (user, password, real name) that every tracked profile takes; no option: show it")
     p.add_argument("--user", help="guest user name (a POSIX login name; the tracked catalog is 'lab')")
     p.add_argument("--password", help="guest password: hashed (SHA-512 crypt) and, unless --no-store-password, kept in clear for the installers that take only a plain one")
