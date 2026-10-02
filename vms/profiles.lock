@@ -557,6 +557,17 @@
         }
       ]
     },
+    "docker-lab-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:4dae634770039167ef271d129a1b6e068d7b661ff7cfbc5464f4f1049fb3bd3b",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-03",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "edubuntu-10.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:8ad3b14e3faffd3afd8f7db765d34f759a7e6458a045ef40ddbff9895fae90bc",
@@ -1160,6 +1171,17 @@
         {
           "version": "1.0.0",
           "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "lvm-lab-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d8f01e9dc2e2cdb1d3eb6460ed15df044f1ecc80d7288c3bdef760393b57b685",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-03",
           "note": "first versioned catalog"
         }
       ]

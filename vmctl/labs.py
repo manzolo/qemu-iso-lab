@@ -763,6 +763,122 @@ def _runbook_html(sections: list[dict[str, Any]]) -> str:
     return "\n".join(parts)
 
 
+# --- the guide as a page ----------------------------------------------------------------------
+
+_SAFE_URL = re.compile(r"^https?://[^\s\"'<>]+$")
+
+
+def _inline(text: str) -> str:
+    """Escaped first, then `code`, **bold**, *em* and [links](http...); a relative link (a path
+    inside the repository) has no meaning in the browser and stays its text."""
+    out: list[str] = []
+    for index, part in enumerate(text.split("`")):
+        if index % 2:
+            out.append(f"<code>{html.escape(part)}</code>")
+            continue
+        piece = html.escape(part, quote=False)
+        piece = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", piece)
+        piece = re.sub(r"(?<![*\w])\*(?!\s)(.+?)(?<!\s)\*(?![*\w])", r"<em>\1</em>", piece)
+
+        def link(match: re.Match[str]) -> str:
+            label, url = match.group(1), html.unescape(match.group(2))
+            if _SAFE_URL.match(url):
+                return f'<a href="{html.escape(url)}" target="_blank" rel="noopener">{label}</a>'
+            return label
+        out.append(re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", link, piece))
+    return "".join(out)
+
+
+def render_markdown(text: str) -> str:
+    """The subset the lab guides use: headings, paragraphs, fenced code, tables, lists, quotes.
+    Every piece of text is escaped; nothing in a guide is ever HTML."""
+    lines = text.splitlines()
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("```"):
+            body: list[str] = []
+            i += 1
+            while i < len(lines) and not lines[i].startswith("```"):
+                body.append(lines[i])
+                i += 1
+            out.append(f"<pre>{html.escape(chr(10).join(body))}</pre>")
+            i += 1
+            continue
+        heading = re.match(r"^(#{1,4})\s+(.*)$", line)
+        if heading:
+            level = len(heading.group(1))
+            out.append(f"<h{level}>{_inline(heading.group(2))}</h{level}>")
+            i += 1
+            continue
+        if line.startswith("|"):
+            rows: list[list[str]] = []
+            while i < len(lines) and lines[i].startswith("|"):
+                cells = [cell.strip() for cell in lines[i].strip().strip("|").split("|")]
+                if not all(re.fullmatch(r":?-{2,}:?", cell) for cell in cells):
+                    rows.append(cells)
+                i += 1
+            head, *body_rows = rows or [[]]
+            out.append("<div class=\"table-wrap\"><table><thead><tr>" + "".join(f"<th>{_inline(c)}</th>" for c in head)
+                       + "</tr></thead><tbody>" + "".join("<tr>" + "".join(f"<td>{_inline(c)}</td>" for c in row) + "</tr>" for row in body_rows)
+                       + "</tbody></table></div>")
+            continue
+        listed = re.match(r"^\s*([-*]|\d+\.)\s+(.*)$", line)
+        if listed:
+            tag = "ol" if listed.group(1)[0].isdigit() else "ul"
+            items: list[str] = []
+            while i < len(lines):
+                item = re.match(r"^\s*([-*]|\d+\.)\s+(.*)$", lines[i])
+                if item:
+                    items.append(item.group(2))
+                elif lines[i].startswith("  ") and lines[i].strip() and items:
+                    items[-1] += " " + lines[i].strip()  # a wrapped item
+                else:
+                    break
+                i += 1
+            out.append(f"<{tag}>" + "".join(f"<li>{_inline(item)}</li>" for item in items) + f"</{tag}>")
+            continue
+        if line.startswith(">"):
+            quoted: list[str] = []
+            while i < len(lines) and lines[i].startswith(">"):
+                quoted.append(lines[i].lstrip(">").strip())
+                i += 1
+            out.append(f"<blockquote>{_inline(' '.join(quoted))}</blockquote>")
+            continue
+        if not line.strip():
+            i += 1
+            continue
+        paragraph: list[str] = []
+        while i < len(lines) and lines[i].strip() and not re.match(r"^(```|#{1,4}\s|\||>|\s*([-*]|\d+\.)\s)", lines[i]):
+            paragraph.append(lines[i].strip())
+            i += 1
+        out.append(f"<p>{_inline(' '.join(paragraph))}</p>")
+    return "\n".join(out)
+
+
+def guide_page(content: dict[str, Any], lang: str, token: str = "") -> str:
+    """``vms/labs/<lab>/guide.<lang>.md`` as a self-contained page in the map's style, with a
+    link to the other language (the token travels so the link works in the web UI)."""
+    path = runtime.resolve_path(content["guides"][lang])
+    body = render_markdown(path.read_text(encoding="utf-8"))
+    group = html.escape(content["group"])
+    suffix = f"&amp;token={html.escape(token)}" if token else ""
+    langs = " · ".join(f"<b>{code.upper()}</b>" if code == lang else f'<a href="?lang={code}{suffix}">{code.upper()}</a>'
+                       for code in GUIDE_LANGS if code in content["guides"])
+    return f"""<!doctype html>
+<html lang="{html.escape(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{group} guide</title><style>{_CSS}
+main blockquote {{ margin:12px 0; padding:8px 14px; border-left:3px solid var(--accent); color:var(--muted); }}
+main pre {{ white-space:pre-wrap; }}
+</style></head>
+<body><main>
+<p class="sub">{group} · guide · {langs} · <code>{html.escape(content["guides"][lang])}</code></p>
+{body}
+</main></body></html>
+"""
+
+
 def map_path(group: str) -> Path:
     return runtime.resolve_path(f"artifacts/labs/{group}/network.html")
 

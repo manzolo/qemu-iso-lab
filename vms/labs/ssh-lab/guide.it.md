@@ -35,10 +35,12 @@ systemctl status ssh
 grep -vE '^#|^$' /etc/ssh/sshd_config      # Port, PermitRootLogin, PasswordAuthentication, PubkeyAuthentication
 ```
 
-Sul client, verifica che il segmento raggiunga sshd (una semplice apertura TCP sulla porta 22):
+Sul client, prova una semplice apertura TCP sulla porta 22 del server attraverso il segmento. Viene
+rifiutata: SSH dal segmento è filtrato dalla catena del port knock finché l'esercizio 5 non lo apre
+(vmctl entra dalla NAT):
 
 ```bash
-timeout 3 bash -c 'echo > /dev/tcp/172.20.2.1/22' && echo raggiungibile
+timeout 3 bash -c 'echo > /dev/tcp/172.20.2.1/22' || echo 'chiuso fino al knock'
 ```
 
 ## Esercizio 2: autenticazione a chiave

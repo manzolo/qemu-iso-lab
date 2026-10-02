@@ -211,3 +211,35 @@ class LabTestRunnerTests(BaseVmctlTestCase):
         results = [("pihole-lab", "passed", "ok")]
         lifecycle.run_lab_test_rows(cfg, ["pihole-lab"], results, args)
         self.assertEqual(len(results), 1)
+
+
+class GuidePageTests(BaseVmctlTestCase):
+    def test_markdown_is_escaped_and_only_http_links_are_links(self):
+        out = labs.render_markdown("# T <b>\n\nA <script>x</script> [ok](https://e.org) [rel](../x.md) **b** `<i>`\n\n"
+                                   "| a | b |\n|---|---|\n| 1 | `2` |\n\n- one\n- two\n\n```\n<x> & y\n```\n\n> note")
+        self.assertIn("<h1>T &lt;b&gt;</h1>", out)
+        self.assertIn("A &lt;script&gt;x&lt;/script&gt;", out)
+        self.assertIn('<a href="https://e.org" target="_blank" rel="noopener">ok</a>', out)
+        self.assertIn(" rel <b>b</b> <code>&lt;i&gt;</code>", out)
+        self.assertIn("<th>a</th><th>b</th></tr></thead><tbody><tr><td>1</td><td><code>2</code></td>", out)
+        self.assertIn("<ul><li>one</li><li>two</li></ul>", out)
+        self.assertIn("<pre>&lt;x&gt; &amp; y</pre>", out)
+        self.assertIn("<blockquote>note</blockquote>", out)
+        self.assertNotIn("javascript:", labs.render_markdown("[x](javascript:alert(1))"))
+
+    def test_every_tracked_guide_renders_and_the_page_links_the_other_language(self):
+        shutil.copytree(ROOT / "vms" / "labs", self.root / "vms" / "labs")
+        for group in labs.content_groups():
+            content = labs.load_content(group)
+            for lang in content["guides"]:
+                page = labs.guide_page(content, lang, "TOK")
+                with self.subTest(group=group, lang=lang):
+                    self.assertIn("<h1>", page)
+                    self.assertNotIn("```", page)
+                    other = "it" if lang == "en" else "en"
+                    self.assertIn(f'href="?lang={other}&amp;token=TOK"', page)
+        from vmctl import webui
+        self.assertIsNone(webui.lab_guide_page("../etc", "en"))
+        self.assertIsNone(webui.lab_guide_page("no-such-lab", "en"))
+        self.assertIn(b'<html lang="it">', webui.lab_guide_page("netlab", "it"))
+        self.assertIn(b'<html lang="en">', webui.lab_guide_page("netlab", "fr"))  # unknown language: English

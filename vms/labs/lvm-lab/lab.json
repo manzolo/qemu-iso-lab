@@ -1,0 +1,110 @@
+{
+  "title": "LVM lab: physical volumes, groups, logical volumes and snapshots",
+  "summary": "One server with three empty 2 GiB disks beside its system disk, there to be used up and wiped. The exercises turn the disks into physical volumes, pool them in a volume group, carve logical volumes with ext4 and xfs, grow a mounted one online, take a snapshot and roll a change back, then tear everything down. Never type the disk names: every block starts from DISKS, the 2G whole disks lsblk lists (today vda, vdb and vdc; the system disk is vdd, the last on the virtio bus). Ported from qlab's lvm-lab.",
+  "members": [
+    "lvm-lab-server"
+  ],
+  "exercises": [
+    {
+      "title": "LVM anatomy",
+      "text": "Three layers: physical volumes (disks or partitions labelled for LVM), a volume group that pools them, logical volumes cut from the pool. The system disk is not LVM here; the three lab disks are empty.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "lvm-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the three lab disks, never the system one",
+            "lsblk    # the 10G disk with partitions is the system (vdd); the three 2G ones are the lab's",
+            "sudo pvs; sudo vgs; sudo lvs    # nothing yet",
+            "sudo wipefs -n $DISKS    # no signature: empty disks"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Physical volumes and a volume group",
+      "text": "pvcreate writes the LVM label on each disk; vgcreate pools them. The group's size is the sum, minus a little metadata.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "lvm-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the three lab disks, never the system one",
+            "sudo pvcreate $DISKS",
+            "sudo pvs",
+            "sudo vgcreate labvg $DISKS",
+            "sudo vgs labvg    # about 6 GiB, 3 PVs"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Logical volumes with ext4 and xfs",
+      "text": "A logical volume is a block device like a partition, but it can span disks and change size.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "lvm-lab-server",
+          "commands": [
+            "sudo lvcreate -L 1G -n data labvg && sudo mkfs.ext4 /dev/labvg/data",
+            "sudo lvcreate -L 1G -n logs labvg && sudo mkfs.xfs /dev/labvg/logs",
+            "sudo mkdir -p /mnt/lab-data /mnt/lab-logs",
+            "sudo mount /dev/labvg/data /mnt/lab-data && sudo mount /dev/labvg/logs /mnt/lab-logs",
+            "df -h /mnt/lab-data /mnt/lab-logs; sudo lvs labvg"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Grow a volume while it is mounted",
+      "text": "lvextend --resizefs grows the logical volume and the file system on it in one step, online. ext4 and xfs both grow online; only ext4 can also shrink (offline).",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "lvm-lab-server",
+          "commands": [
+            "echo before-growth | sudo tee /mnt/lab-data/keep",
+            "sudo lvextend -L +1G --resizefs labvg/data",
+            "df -h /mnt/lab-data && cat /mnt/lab-data/keep    # 2 GiB, the data still there"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Snapshot and rollback",
+      "text": "A snapshot records the origin as it was; merging it back undoes every change made since. The merge completes when the origin is not in use.",
+      "blocks": [
+        {
+          "kind": "try",
+          "where": "lvm-lab-server",
+          "commands": [
+            "echo version-1 | sudo tee /mnt/lab-data/file",
+            "sudo lvcreate -s -L 256M -n data-snap labvg/data",
+            "echo version-2 | sudo tee /mnt/lab-data/file    # the change to undo",
+            "sudo umount /mnt/lab-data && sudo lvconvert --merge labvg/data-snap",
+            "sudo lvchange -an labvg/data && sudo lvchange -ay labvg/data && sudo mount /dev/labvg/data /mnt/lab-data",
+            "cat /mnt/lab-data/file    # version-1 again"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Tear it all down",
+      "text": "Back to three empty disks: unmount, remove the group (and its volumes), remove the PV labels, wipe what is left.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "lvm-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the three lab disks, never the system one",
+            "sudo umount /mnt/lab-data /mnt/lab-logs",
+            "sudo vgremove -y labvg",
+            "sudo pvremove $DISKS",
+            "sudo wipefs -a $DISKS",
+            "lsblk; sudo pvs"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -10,12 +10,15 @@ class LabsTests(BaseVmctlTestCase):
         for source in (ROOT / "vms/profiles").glob("*.json"):
             if source.name != "local.json":
                 shutil.copy(source, target / source.name)
+        # The lab content too: a one-machine lab (docker-lab, lvm-lab) is a lab because of it.
+        if not (self.root / "vms/labs").exists():
+            shutil.copytree(ROOT / "vms/labs", self.root / "vms/labs")
         with mock.patch.object(state, "CONFIG_DIR", target.parent):
             return config.load_config()
 
     def test_only_groups_whose_members_all_share_a_segment_are_labs(self):
         cfg = self.tracked_config()
-        self.assertEqual(labs.lab_groups(cfg), ["netlab", "proxmox-lab", "ssh-lab", "vpn-lab"])
+        self.assertEqual(labs.lab_groups(cfg), ["docker-lab", "lvm-lab", "netlab", "proxmox-lab", "ssh-lab", "vpn-lab"])
 
     def test_start_order_puts_infrastructure_then_services_first(self):
         cfg = self.tracked_config()
@@ -64,7 +67,7 @@ class LabsTests(BaseVmctlTestCase):
         self.assertLess(next(i for i, c in enumerate(drill["commands"]) if "zpool offline" in c),
                         next(i for i, c in enumerate(drill["commands"]) if "zpool online" in c))
         self.assertEqual([phase["title"] for phase in labs.model(cfg, "netlab")["runbook"]],
-                         ["Install", "Lab network", "Run the stack"])
+                         ["Install", "Lab network", "DNS and DHCP from Pi-hole", "Through the firewall", "Run the stack"])  # vms/labs/netlab/ exercises before the stack
 
     def test_login_shows_what_the_profile_knows_and_never_a_tracked_hint(self):
         cfg = self.tracked_config()

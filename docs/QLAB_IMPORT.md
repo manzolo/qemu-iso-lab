@@ -6,6 +6,45 @@ under each foundation). It plans how eight of the teaching labs built in
 repository each) become labs of this project: vpn, ssh, pxe, pam, mysql, lvm, docker, apache.
 The other ideas, which are new labs rather than ports, are in [LAB_IDEAS.md](LAB_IDEAS.md).
 
+## Where we are (2026-10-03) — the backlog
+
+Done, merged and verified live (vmctl 0.17.0 → 0.17.3, 2026-10-02/03):
+
+| step | what | live |
+|---|---|---|
+| F1 | `bootstrap-cloudimg`: vendor cloud image as a qcow2 overlay + cloud-init seed (`ubuntu-cloud-base`, `ubuntu-24.04-cloud`) | 49 s after the download |
+| F2 | `vmctl shell <vm> -- <command>` + `vms/labs/_common.sh` (`on`, `assert*`, `report_results`) | used by every test below |
+| F3 | lab content `vms/labs/<lab>/` (lab.json exercises in the map's runbook, guides EN/IT, tests), `vmctl group guide` | — |
+| F4 | `vmctl group test <lab>` + the `lab-<name>` row of `check-vms` | — |
+| netlab | content for the existing pfSense lab | 2/2, 9 checks |
+| vpn-lab | WireGuard + OpenVPN, two members on `vpn-lan` | 5/5, 34 checks |
+| ssh-lab | SSH hardening: sshd_config, fail2ban, port knocking, scanning | 6/6, 29 checks |
+| docker-lab | Docker Engine + Compose, images pre-pulled | 6/6, 25 checks |
+| lvm-lab | PVs, VG, ext4/xfs LVs, online growth, snapshot rollback | 7/7, 43 checks |
+| web | lab card: Run tests, Guide (page), Consoles (`/multi` headed by the lab, addresses per pane), restyled card | browser test |
+
+Next, in this order:
+
+1. **apache-lab** and **mysql-lab** (phase 2, one server each: content + tests on `ubuntu-cloud-base`).
+2. **F5 group checkpoints** (`vmctl group checkpoint create|restore`, *Reset lab* on the card; lvm-lab and
+   the hardening labs benefit most). Note: checkpoints refuse `extra_disks` today, so lvm-lab needs that
+   lifted (copy every disk) or a lab-specific reset.
+3. **pam-lab** (three VMs with OpenLDAP; never lock out the key-based sudo vmctl needs).
+4. **F6 network boot + pxe-lab** (the last foundation, the biggest).
+5. Then the other qlab plugins (dns, dhcp, firewall, nginx, postgres, raid, samba, systemd, git...):
+   most are one-server labs that fit the docker-lab/lvm-lab pattern unchanged.
+
+Open points found on the way: Debian's genericcloud image publishes SHA512SUMS only (needs an
+`iso_sha512` field before a Debian member); a guide's relative links (`../../docs/...`) render as
+text on the guide page; the matrix has not yet run the `lab-<name>` rows end to end (they run
+when every member of a lab is in a `check-vms` run).
+
+Lessons worth keeping (each cost a run): tests must not depend on the guest's locale (LVM printed
+`5,99g` under it_IT); never address extra disks by name (the system disk comes last on the PCI
+bus); a bootstrap handler under test needs `resolve_efi_firmware` mocked (CI has no OVMF, CI was
+red on 0.17.0-0.17.1 for it); OpenVPN 2.6 on OpenSSL 3 has no BF-CBC; a knock-gated port makes
+fail2ban blind unless the test knocks first.
+
 ## What qlab has, what we have
 
 A qlab plugin is a bash `run.sh` that downloads the Ubuntu 22.04 *minimal cloud image*, writes a
@@ -81,6 +120,9 @@ and a full lab would take longer than qlab's whole session. A profile gets a `cl
   single `ubuntu-24.04-cloud` profile, which is useful on its own as the fastest VM of the catalog.
 
 ### F2. Commands inside a member: `vmctl shell <vm> -- <command>`
+
+2026-10-03: one argument is a command line for the guest's shell, several are an argv quoted word by word
+(`shlex.join`): joined with plain spaces, `sh -c 'echo x > f'` lost its quotes (docker-lab).
 
 **Status (2026-10-02): done.** `lifecycle.cmd_shell` + `ssh.ssh_command_cmd` (BatchMode, LogLevel=ERROR,
 the command's exit status returned), `vms/labs/_common.sh` (`on`, `assert`, `assert_fail`,
@@ -218,13 +260,13 @@ rewrite, logs. Forwards 8083/8443 → 80/443 for the host browser. Tests: 6.
 backup and restore, security (bind-address, auth plugins, logging). Tests: 6. PostgreSQL
 (`qlab-plugin-postgres-lab`) is the same shape for a later lab.
 
-**docker-lab**: one server (2 GB, 2 vCPUs, disk 20 GB), `docker.io docker-compose-v2`, user in the
+**docker-lab** — **ported 2026-10-03, live 6/6 (25 checks)**: `vms/profiles/docker-lab.json`, `vms/labs/docker-lab/`; images pre-pulled by the post-install, exercises with `--pull never`. Plan: one server (2 GB, 2 vCPUs, disk 20 GB), `docker.io docker-compose-v2`, user in the
 `docker` group; exercises: anatomy, images and containers, exec/logs/attach, volumes and bind
 mounts, a Compose app in `~/compose-demo`, building a Dockerfile. Tests: 6. Images are pulled from
 Docker Hub during the tests: the matrix row needs network and is the lab most exposed to rate
 limits, so the post-install pre-pulls the few images the tests use.
 
-**lvm-lab**: one server (1 GB) with `extra_disks` (three 2 GB qcow2 disks, sacrificial by
+**lvm-lab** — **ported 2026-10-03, live 7/7 (43 checks)**: `vms/profiles/lvm-lab.json`, `vms/labs/lvm-lab/`; the disks found by size (the extra disks are vda-vdc, the system disk vdd), LVM numbers read with `LC_ALL=C`. Plan: one server (1 GB) with `extra_disks` (three 2 GB qcow2 disks, sacrificial by
 design); exercises: anatomy, PVs, VGs, LVs with ext4/xfs, online `lvextend --resizefs`,
 snapshot and rollback, cleanup. Tests: 7, the last one leaves the disks empty again. This is the
 lab where the group checkpoint (F5) matters most. `qlab-plugin-raid-lab` (mdadm on the same kind

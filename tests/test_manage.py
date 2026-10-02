@@ -81,6 +81,12 @@ class ManageTests(BaseVmctlTestCase):
             self.assertEqual(self.vmctl.cmd_shell(argparse.Namespace(vm=self.vm_name, dry_run=True, command=["true"])), 0)
         call.assert_not_called()
         self.assertEqual(run_cmd.call_args.args[0][-1], "true")
+        # Several words are an argv (each quoted); one word is a command line, passed as it is.
+        with mock.patch("subprocess.call", return_value=0) as call:
+            self.vmctl.cmd_shell(argparse.Namespace(vm=self.vm_name, dry_run=False, command=["--", "sh", "-c", "echo kept > /data/note"]))
+            self.assertEqual(call.call_args.args[0][-1], "sh -c 'echo kept > /data/note'")
+            self.vmctl.cmd_shell(argparse.Namespace(vm=self.vm_name, dry_run=False, command=["--", "echo a | wc -c"]))
+            self.assertEqual(call.call_args.args[0][-1], "echo a | wc -c")
 
     def test_cmd_shell_runs_with_ssh_provision(self):
         self.vm_config["ssh_provision"] = {

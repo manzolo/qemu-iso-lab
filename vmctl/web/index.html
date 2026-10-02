@@ -288,10 +288,25 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 #cmd-validation { flex:1; font-size:11px; color:var(--muted); }
 #cmd-warning { margin:0 0 10px; font-size:12px; color:var(--warn); }
 .labs { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); gap:16px; padding:0 24px 20px; }
-.lab { padding:0 16px 16px; }
+.lab { padding:0 18px 16px; display:flex; flex-direction:column; }
+/* The actions sit at the bottom of every card, so a row of cards lines them up. */
+.lab-footer { margin-top:auto; display:flex; flex-direction:column; gap:10px; padding-top:4px; }
+.lab-name { display:flex; flex-direction:column; gap:2px; min-width:0; }
+/* Name and subtitle take the room; the chip and Actions stay on the first line, top right. */
+.lab:not(.session) > .lab-head { flex-wrap:nowrap; align-items:flex-start; }
+.lab:not(.session) > .lab-head .lab-identity { flex:1 1 auto; align-items:flex-start; }
+.lab:not(.session) > .lab-head .lab-controls { flex:0 0 auto; padding-top:2px; }
+.lab-title { margin:0; color:var(--muted); font-size:12px; line-height:1.35; }
+.lab-facts { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 4px; }
+.lab-facts span { padding:2px 8px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:11px; }
+.lab-links { display:flex; flex-wrap:wrap; gap:4px 16px; border-top:1px solid var(--line); padding-top:10px; }
+.lab-links button { display:inline-flex; align-items:center; gap:6px; background:none; border:0; padding:2px 0; color:var(--accent); font-size:13px; }
+.lab-links button:hover { text-decoration:underline; }
+.lab-links button svg { width:15px; height:15px; }
 .lab .members { margin:8px 0 12px; font-size:13px; }
 .lab .members div { display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding:3px 0; }
 .lab .buttons { display:flex; flex-wrap:wrap; gap:6px; }
+.lab .lab-footer .buttons { padding-top:0; }
 #screen img { max-width:100%; border-radius:6px; display:block; margin:0 auto; background:#000; }
 #toast { margin:0; inset:76px 20px auto auto; position:fixed; color:var(--text); background:#1a2b33; border:1px solid #36564e; padding:13px 16px 13px 42px; border-radius:12px; box-shadow:0 12px 36px #0005; display:none; max-width:min(400px,calc(100vw - 32px)); white-space:pre-wrap; font-size:12px; z-index:20; }
 #toast::before { content:"✓"; position:absolute; left:16px; color:var(--ok); font-weight:700; }
@@ -315,7 +330,7 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .lab-controls { display:flex; align-items:center; gap:8px; margin-left:auto; }
 .lab-menu { padding:6px 9px; border:1px solid var(--line); background:transparent; font-size:12px; }
 .lab-head h2 { border:0; padding:0; color:var(--text); font-size:15px; text-transform:none; letter-spacing:0; }
-.lab-progress { height:4px; background:var(--btn); border-radius:4px; margin-bottom:16px; overflow:hidden; }
+.lab-progress { height:3px; background:var(--btn); border-radius:3px; margin-bottom:12px; overflow:hidden; }
 .lab-progress span { display:block; height:100%; background:var(--accent); }
 .lab .members div { padding:10px 0; align-items:center; gap:10px; }
 .lab .members button { background:none; padding:0; text-align:left; color:var(--text); }
@@ -326,7 +341,7 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .member-address { overflow-wrap:anywhere; }
 .member-address { display:block; font:11px ui-monospace,monospace; color:var(--muted); margin-top:3px; }
 .lab .buttons { padding-top:8px; }
-.lab-secondary { border-top:1px solid var(--line); margin-top:14px; padding-top:12px; }
+.lab-secondary { border-top:1px solid var(--line); margin-top:12px; padding-top:10px; }
 .lab-secondary summary { color:var(--muted); font-size:12px; cursor:pointer; }
 .lab-order { font-size:11px; color:var(--muted); margin:12px 0; overflow-wrap:anywhere; }
 #vnc-dialog { width:min(1500px,97vw); height:92dvh; max-height:94dvh; overflow:hidden; }
@@ -1461,10 +1476,15 @@ function renderLabs() {
     const cluster = members.some((m) => m.family === "proxmox");
     const btn = (label,args,cls="") => `<button class="${cls}" data-args='${esc(JSON.stringify(args))}'>${label}</button>`;
     const primary = installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab…",["group","install",lab.group],"primary");
-    return `<section class="card lab" data-lab="${esc(lab.group)}"><div class="lab-head" tabindex="0" aria-label="${esc(lab.group)}. Right-click for stack actions."><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<h2>${esc(lab.group)}</h2></span><span class="lab-controls"><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span>${menuButton("lab",lab.group)}</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
-      <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "Open profile →")}</span></span></button>${stateBadge(m)}${menuButton("member",m.name)}</div>`; }).join("")}</div>
-      <div class="buttons">${primary}${installed && up > 0 && up < members.length ? btn("Stop stack",["group","down",lab.group]) : ""}${btn("Status",["group","status",lab.group])}${installed && lab.tests ? btn("Run tests",["group","test",lab.group]) : ""}${consoleTargets(names).length ? `<button data-lab-consoles="${esc(lab.group)}" title="Every member of the lab in one page of consoles, side by side, started if stopped">Open consoles ↗</button>` : ""}<button data-map="${esc(lab.group)}">Open map ↗</button></div>${lab.title ? `<p class="lab-order">${esc(lab.title)}</p>` : ""}
-      <details class="lab-secondary"><summary>More lab actions</summary><p class="lab-order">Start order: ${esc(names.join(" → "))}</p><div class="buttons">${(lab.guides || []).length ? btn("Guide",["group","guide",lab.group]) : ""}${installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group])}${up && !installed ? btn("Stop stack",["group","down",lab.group]) : ""}${cluster ? btn("Form cluster",["group","cluster",lab.group]) : ""}${btn("Generate map",["group","map",lab.group])}${btn("Clean lab…",["group","clean",lab.group],"danger")}</div></details></section>`;
+    const subtitle = lab.title || (cluster ? `Proxmox VE: ${names.length - 1} nodes and a client on one segment` : `${names.length} machine${names.length === 1 ? "" : "s"} on a shared network`);
+    const facts = [`${names.length} machine${names.length === 1 ? "" : "s"}`, lab.tests ? `${lab.tests} test script${lab.tests === 1 ? "" : "s"}` : "", (lab.guides || []).length ? `guide ${lab.guides.map(g => g.toUpperCase()).join(" · ")}` : "", cluster ? "cluster" : ""].filter(Boolean);
+    const link = (attr, label, icon, title) => `<button ${attr} title="${esc(title)}">${consoleIcon(icon)}${label}</button>`;
+    return `<section class="card lab" data-lab="${esc(lab.group)}"><div class="lab-head" tabindex="0" aria-label="${esc(lab.group)}. Right-click for stack actions."><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<span class="lab-name"><h2>${esc(lab.group)}</h2><p class="lab-title">${esc(subtitle)}</p></span></span><span class="lab-controls"><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span>${menuButton("lab",lab.group)}</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
+      <div class="lab-facts">${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
+      <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc([].concat((lab.addresses || {})[m.name] || []).join(" · ") || "Open profile →")}</span></span></button>${stateBadge(m)}${menuButton("member",m.name)}</div>`; }).join("")}</div>
+      <div class="lab-footer"><div class="buttons">${primary}${installed && up > 0 && up < members.length ? btn("Stop stack",["group","down",lab.group]) : ""}${btn("Status",["group","status",lab.group])}${installed && lab.tests ? btn("Run tests",["group","test",lab.group]) : ""}</div>
+      <div class="lab-links">${consoleTargets(names).length ? link(`data-lab-consoles="${esc(lab.group)}"`, "Consoles", "detach", "Every member of the lab in one page of consoles, side by side, started if stopped") : ""}${link(`data-map="${esc(lab.group)}"`, "Map", "integration", "The network map, the access table and the runbook, in a new tab")}${(lab.guides || []).length ? link(`data-guide="${esc(lab.group)}"`, "Guide", "files", "The lab's walkthrough, in a new tab") : ""}</div></div>
+      <details class="lab-secondary"><summary>More lab actions</summary><p class="lab-order">Start order: ${esc(names.join(" → "))}</p><div class="buttons">${installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group])}${up && !installed ? btn("Stop stack",["group","down",lab.group]) : ""}${cluster ? btn("Form cluster",["group","cluster",lab.group]) : ""}${btn("Generate map",["group","map",lab.group])}${btn("Clean lab…",["group","clean",lab.group],"danger")}</div></details></section>`;
   }).join("") || '<p class="s-muted">No matching labs.</p>';
   bindStateLogs($("labs-view"));
   // The lab's members side by side (/multi), like Start in console on a selection; the page knows the lab.
@@ -1480,6 +1500,8 @@ function renderLabs() {
   }; });
   $("labs-view").querySelectorAll("[data-args]").forEach((b) => (b.onclick = () => run(JSON.parse(b.dataset.args))));
   $("labs-view").querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.map)}/map?token=${encodeURIComponent(TOKEN)}`, "_blank")));
+  // The guide in the language of the page's browser when the lab has it.
+  $("labs-view").querySelectorAll("[data-guide]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.guide)}/guide?lang=${(navigator.language || "en").slice(0,2)}&token=${encodeURIComponent(TOKEN)}`, "_blank")));
   $("labs-view").querySelectorAll("[data-member]").forEach((b) => (b.onclick = () => openLabProfile(b.closest("[data-lab]").dataset.lab, b.dataset.member)));
 }
 
@@ -1953,6 +1975,10 @@ const consoleIconPaths = {
   integration:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/><path d="M14 6h3a1 1 0 0 1 1 1v3M10 18H7a1 1 0 0 1-1-1v-3M10 10l4 4"/>',
   download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>'
 };
+// The same line icons outside the console (the lab cards' links).
+function consoleIcon(icon) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${consoleIconPaths[icon] || ""}</svg>`;
+}
 function consoleButton(id, label, icon) {
   $(id).innerHTML = `<span class="console-button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${consoleIconPaths[icon]}</svg></span><span class="console-button-label">${esc(label)}</span>`;
   $(id).setAttribute("aria-label", label);
@@ -3001,7 +3027,7 @@ function openSelectionContext(vm, x, y) {
 function openLabContext(card, x, y) {
   contextOrigin = card.querySelector(".lab-head");
   // Use the same buttons/commands as the stack card so the two entry points stay in sync.
-  const entries = [...card.querySelectorAll("[data-args],[data-map]")].map(button => {
+  const entries = [...card.querySelectorAll("[data-args],[data-map],[data-guide],[data-lab-consoles]")].map(button => {
     const args = button.dataset.args ? JSON.parse(button.dataset.args) : null, action = args?.[1];
     const danger = ["clean","install"].includes(action) && (action === "clean" || button.classList.contains("danger"));
     const group = danger ? "Danger zone" : ["up","down","install"].includes(action) ? "Power" : "Inspect & manage";

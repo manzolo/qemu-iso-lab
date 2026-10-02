@@ -1,0 +1,47 @@
+{
+  "vms": {
+    "lvm-lab-server": {
+      "name": "LVM lab server (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "lvm-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-03"
+      },
+      "notes": "The one machine of the lvm-lab (vms/labs/lvm-lab/): three empty 2 GB disks beside the system disk (extra_disks, sacrificial by design) for physical volumes, a volume group, logical volumes with ext4 and xfs, online growth and snapshots. The tests find the three disks by size, never by name, and leave them empty at the end. Ubuntu 24.04 minimal cloud image. Ported from qlab's lvm-lab.",
+      "extra_disks": [
+        {
+          "path": "artifacts/{{name}}/lvm1.qcow2",
+          "size": "2G"
+        },
+        {
+          "path": "artifacts/{{name}}/lvm2.qcow2",
+          "size": "2G"
+        },
+        {
+          "path": "artifacts/{{name}}/lvm3.qcow2",
+          "size": "2G"
+        }
+      ],
+      "cloudimg_config": {
+        "packages": [
+          "lvm2",
+          "xfsprogs"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2364,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "command -v pvcreate vgcreate lvcreate mkfs.xfs",
+          "test \"$(lsblk -dnbo SIZE,TYPE | awk '$1==2147483648 && $2==\"disk\"' | wc -l)\" -eq 3"
+        ]
+      }
+    }
+  }
+}

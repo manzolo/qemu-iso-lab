@@ -6,7 +6,9 @@
 #   out=$(on ssh-lab-client cat /etc/hostname); assert_contains "hostname" "$out" "ssh-lab-client"
 #   report_results "Exercise 1"
 #
-# `on <vm> <command...>` runs the command in the guest through `vmctl shell <vm> -- ...`: the
+# `on <vm> <command...>` runs the command in the guest through `vmctl shell <vm> -- ...`. One
+# argument is a command line for the guest's shell (`on vm "a | b && c"`); several are an argv,
+# each word kept whole (`on vm sh -c 'echo x > f'`), like running it locally. Then: the
 # profile's SSH port and key, the user the disk was installed with, BatchMode (a VM that cannot be
 # reached fails the check instead of asking for a password), the command's own exit status.
 # Every test is re-runnable: it ends with its own cleanup, because check-vms runs them in order.

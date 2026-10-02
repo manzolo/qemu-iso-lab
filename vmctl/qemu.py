@@ -126,9 +126,12 @@ def firmware_args(vm: dict[str, Any], dry_run: bool = False) -> list[str]:
 def extra_disks(vm: dict[str, Any]) -> list[dict[str, Any]]:
     """The profile's ``extra_disks``: further virtio disks beside ``disk``, e.g. the second half of a mirror.
 
-    Each entry is ``{"path", "size", "format"}``; they follow the main disk on the virtio bus (vdb,
-    vdc, ...), carry no boot index and live under the VM's artifact directory, so ``clean`` removes
-    them with it. Checkpoints, clones and the libvirt export handle one disk and refuse them.
+    Each entry is ``{"path", "size", "format"}``: explicit ``virtio-blk-pci`` devices with no boot
+    index, under the VM's artifact directory, so ``clean`` removes them with it. The guest names them
+    by PCI slot, and QEMU places an implicit ``-drive if=virtio`` main disk *after* the explicit
+    devices: without a boot index the extras are vda, vdb... and the system disk comes last
+    (lvm-lab, 2026-10-03; Proxmox's ZFS mirror never cared). Never address them by name in a guest.
+    Checkpoints, clones and the libvirt export handle one disk and refuse them.
     """
     raw = vm.get("extra_disks")
     if raw is None:

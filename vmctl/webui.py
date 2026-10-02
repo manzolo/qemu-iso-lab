@@ -363,6 +363,19 @@ def lab_map_page(group: str) -> bytes | None:
     return path.read_bytes()
 
 
+def lab_guide_page(group: str, lang: str | None, token: str = "") -> bytes | None:
+    """The lab's guide (vms/labs/<group>/guide.<lang>.md) rendered as a page; None without one."""
+    from vmctl import labs
+
+    if Path(group).name != group or not group:
+        return None
+    content = labs.load_content(group)
+    if not content or not content["guides"]:
+        return None
+    chosen: str = lang if lang and lang in content["guides"] else ("en" if "en" in content["guides"] else sorted(content["guides"])[0])
+    return labs.guide_page(content, chosen, token).encode("utf-8")
+
+
 def console_info(vm_name: str) -> dict[str, Any]:
     """Inspect the running process/channel, not just the next-boot profile."""
     from vmctl import lifecycle
@@ -640,6 +653,13 @@ class Handler(BaseHTTPRequestHandler):
                     self._error("No screen: the VM is not running headless with a QMP socket", HTTPStatus.NOT_FOUND)
                 else:
                     self._send(HTTPStatus.OK, image, "image/png")
+            elif path.startswith("/labs/") and path.endswith("/guide"):
+                group = unquote(path.split("/")[2])
+                page = lab_guide_page(group, (query.get("lang") or [""])[0] or None, (query.get("token") or [""])[0])
+                if page is None:
+                    self._error(f"No guide for {group}", HTTPStatus.NOT_FOUND)
+                else:
+                    self._send(HTTPStatus.OK, page, "text/html; charset=utf-8")
             elif path.startswith("/labs/") and path.endswith("/map"):
                 group = unquote(path.split("/")[2])
                 page = lab_map_page(group)

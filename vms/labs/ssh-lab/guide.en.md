@@ -34,10 +34,11 @@ systemctl status ssh
 grep -vE '^#|^$' /etc/ssh/sshd_config      # Port, PermitRootLogin, PasswordAuthentication, PubkeyAuthentication
 ```
 
-On the client, check the segment reaches the server's sshd (a plain TCP open to port 22):
+On the client, try a plain TCP open to the server's port 22 over the segment. It is refused: SSH
+from the segment is gated by the port-knock chain until exercise 5 opens it (vmctl gets in over NAT):
 
 ```bash
-timeout 3 bash -c 'echo > /dev/tcp/172.20.2.1/22' && echo reachable
+timeout 3 bash -c 'echo > /dev/tcp/172.20.2.1/22' || echo 'closed until a knock'
 ```
 
 ## Exercise 2: key-based authentication

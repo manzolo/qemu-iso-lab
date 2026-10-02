@@ -4313,7 +4313,11 @@ def cmd_shell(args: argparse.Namespace) -> int:
     if not words:
         runtime.run(ssh.ssh_shell_cmd(vm, dry_run=args.dry_run), dry_run=args.dry_run)
         return 0
-    cmd = ssh.ssh_command_cmd(vm, " ".join(words), dry_run=args.dry_run)
+    # One word is a command line for the guest's shell (pipes, &&, redirects); several words are an
+    # argv, quoted one by one: ssh joins them with spaces, and `sh -c 'echo x > f'` lost its quotes,
+    # so the redirect ran in the guest's shell outside the container (docker-lab, 2026-10-03).
+    line = words[0] if len(words) == 1 else shlex.join(words)
+    cmd = ssh.ssh_command_cmd(vm, line, dry_run=args.dry_run)
     if args.dry_run:
         runtime.run(cmd, dry_run=True)
         return 0

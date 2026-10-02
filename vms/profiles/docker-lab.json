@@ -1,0 +1,46 @@
+{
+  "vms": {
+    "docker-lab-server": {
+      "name": "Docker lab server (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "docker-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-03"
+      },
+      "notes": "The one machine of the docker-lab (vms/labs/docker-lab/): Docker Engine and the Compose plugin from Ubuntu's archive, the lab user in the docker group. The post-install pre-pulls the two small images the exercises and tests use (alpine:3.20, nginx:1.27-alpine), so a run is not exposed to Docker Hub's rate limit. Ubuntu 24.04 minimal cloud image. Ported from qlab's docker-lab.",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "disk": {
+        "size": "20G"
+      },
+      "cloudimg_config": {
+        "packages": [
+          "docker.io",
+          "docker-compose-v2",
+          "curl"
+        ],
+        "runcmd": [
+          "usermod -aG docker {{user}}",
+          "systemctl enable docker"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2363,
+        "post_install_run": [
+          "id {{user}} | grep -q '(docker)'",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "systemctl is-active docker",
+          "docker compose version",
+          "sudo docker pull -q alpine:3.20",
+          "sudo docker pull -q nginx:1.27-alpine",
+          "sudo docker image inspect alpine:3.20 nginx:1.27-alpine >/dev/null"
+        ]
+      }
+    }
+  }
+}
