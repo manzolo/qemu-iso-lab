@@ -144,7 +144,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_flavours_0929 |= {"haiku", "arch-2014", "slackware-15.0", "slackware-14.0", "slackware-14.1", "slackware-14.2", "slackware-13.37", "slackware-13.0"}
         verified_1001 = {"arch-omarchy-nvidia", "xubuntu-12.04", "edubuntu-12.04", "lubuntu-12.04", "kubuntu-12.04"}  # the desktop check on Omarchy, the stale precise Release on 12.04
         verified_1002 = {"windows-11",  # 26H2 (build 26300.9457) installed unattended and verified over SSH
-                         "ubuntu-24.04-cloud"}  # the first cloud-image profile: 49 s from the seed to the SSH checks
+                         "ubuntu-24.04-cloud",  # the first cloud-image profile: 49 s from the seed to the SSH checks
+                         "vpn-lab-server", "vpn-lab-client"}  # vpn-lab: group install + group test 5/5 live
         verified_0930 = {"fedora-server", "fedora-server-efi", "opensuse-tumbleweed-net", "opensuse-slowroll", "devuan-netinst", "centos-5", "centos-6", "centos-7", "centos-8", "fedora-xfce", "fedora-cinnamon", "fedora-workstation", "opensuse-tumbleweed-kde", "void-xfce", "opensuse-leap-16", "endeavouros", "popos-cosmic", "arch-2014", "ubuntu-niri"}  # the recipes written ahead, first live run  # PASS on 2026-09-29 (haiku after the identity fix; arch-2014 with the host cache, kept experimental)
         for name, vm in cfg["vms"].items():
             self.assertIn(vm["meta"]["status"], ("manual", "unattended", "experimental"))

@@ -254,7 +254,7 @@ class RepositoryGroupTests(unittest.TestCase):
         self.assertEqual(declared, ["arch-releases", "centos-releases", "debian-only", "debian-releases", "edubuntu-releases", "hobby-os", "kali", "kubuntu-releases",
                                     "lubuntu-releases", "netlab", "proxmox-lab", "slackware-releases", "smoke", "ubuntu", "ubuntu-budgie-releases",
                                     "ubuntu-cinnamon-releases", "ubuntu-flavors", "ubuntu-mate-releases", "ubuntu-releases",
-                                    "ubuntu-unity-releases", "windows-retro", "xubuntu-releases"])
+                                    "ubuntu-unity-releases", "vpn-lab", "windows-retro", "xubuntu-releases"])
         documentation = (ROOT / "docs" / "UNATTENDED.md").read_text(encoding="utf-8")
         for group in declared:
             self.assertIn(f"`{group}`", documentation, f"{group} is not documented")

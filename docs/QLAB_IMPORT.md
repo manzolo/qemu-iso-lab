@@ -178,6 +178,10 @@ Common choices for all eight, unless a lab says otherwise:
 
 **vpn-lab** (first: its network is the one qlab itself used as the model for every other plugin)
 
+**Status (2026-10-02): ported and live, `vmctl group test vpn-lab` 5/5 (34 checks).** `vms/profiles/vpn-lab.json` (two members on `ubuntu-cloud-base`, the base of
+`cloud.json`; the seed writes the segment's netplan by MAC, `cloudimg.segment_netplan`), `vms/labs/vpn-lab/`
+(four exercises, five tests, both guides). Addresses 172.20.1.1/.2, tunnels 10.10.0.0/24 and 10.20.0.0/24.
+
 - Members: `vpn-lab-server` 172.20.1.1, `vpn-lab-client` 172.20.1.2 (1 GB each). Packages:
   `wireguard wireguard-tools openvpn iptables tcpdump`.
 - Exercises: WireGuard (key pairs, `wg0.conf` both ends, tunnel 10.10.0.0/24), OpenVPN static key

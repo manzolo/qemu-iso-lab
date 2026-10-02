@@ -2182,6 +2182,28 @@
         }
       ]
     },
+    "vpn-lab-client": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:08bed70b07259d0e35c840dbea576fa9d7c6ccf24bb68e5d9a6fc33c1f4f95dc",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-02",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "vpn-lab-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:56d41e2d490fa502f9d2d676eff56b8b075052451abc7f30e4885aa07f1870c4",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-02",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "windows-10": {
       "version": "1.0.0",
       "fingerprint": "sha256:71ea52bd7ae835d7d9e2b92c73179e32f3befc3f9df9d5b0e26408115a9111c4",

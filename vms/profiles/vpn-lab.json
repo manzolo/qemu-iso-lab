@@ -1,0 +1,94 @@
+{
+  "vms": {
+    "vpn-lab-server": {
+      "name": "VPN lab server (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "vpn-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-02"
+      },
+      "notes": "The VPN endpoint of the vpn-lab (vms/labs/vpn-lab/): WireGuard and OpenVPN installed, nothing configured; the exercises build the tunnels by hand. Ubuntu 24.04 minimal cloud image, ready in about a minute. Ported from qlab's vpn-lab (labuser became the profile's user, the LAN moved from 192.168.100.0/24, which vmctl link uses, to 172.20.1.0/24).",
+      "cloudimg_config": {
+        "packages": [
+          "wireguard",
+          "wireguard-tools",
+          "openvpn",
+          "iptables"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2359,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "command -v wg wg-quick openvpn tcpdump iptables",
+          "test -f /etc/netplan/60-vmctl-vpn-lan.yaml"
+        ]
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "vpn-lan",
+          "phase": "runtime",
+          "address": "172.20.1.1/24"
+        }
+      ]
+    },
+    "vpn-lab-client": {
+      "name": "VPN lab client (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "client",
+        "status": "unattended",
+        "groups": [
+          "vpn-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-02"
+      },
+      "notes": "The client of the vpn-lab (vms/labs/vpn-lab/): connects to vpn-lab-server over the lab segment and through the tunnels the exercises build. Ubuntu 24.04 minimal cloud image.",
+      "cloudimg_config": {
+        "packages": [
+          "wireguard",
+          "wireguard-tools",
+          "openvpn",
+          "curl"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2360,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "command -v wg wg-quick openvpn tcpdump iptables",
+          "test -f /etc/netplan/60-vmctl-vpn-lan.yaml"
+        ]
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "vpn-lan",
+          "phase": "runtime",
+          "address": "172.20.1.2/24"
+        }
+      ]
+    }
+  }
+}

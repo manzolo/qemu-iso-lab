@@ -1,26 +1,17 @@
 {
-  "vms": {
-    "ubuntu-24.04-cloud": {
-      "name": "Ubuntu 24.04 Server (cloud image)",
+  "bases": {
+    "ubuntu-cloud-base": {
       "meta": {
         "slug": "ubuntu",
         "family": "debian",
-        "role": "server",
         "release_model": "lts",
-        "status": "unattended",
-        "groups": [
-          "ubuntu",
-          "smoke"
-        ],
-        "version": "1.0.0",
-        "verified": "2026-10-02"
+        "status": "unattended"
       },
-      "notes": "The fastest VM of the catalog: Ubuntu's minimal cloud image (about 270 MB, the vendor's SHA256SUMS pins the current release build) as a qcow2 overlay, configured at first boot by a cloud-init seed. No installer runs: the VM is ready in a few minutes. The base recipe of the lab members ported from qlab (docs/QLAB_IMPORT.md).",
       "iso": "isos/ubuntu-24.04-minimal-cloudimg-amd64.img",
       "iso_url": "https://cloud-images.ubuntu.com/minimal/releases/noble/release/ubuntu-24.04-minimal-cloudimg-amd64.img",
       "iso_sha256_url": "https://cloud-images.ubuntu.com/minimal/releases/noble/release/SHA256SUMS",
       "disk": {
-        "path": "artifacts/ubuntu-24.04-cloud/disk.qcow2",
+        "path": "artifacts/{{name}}/disk.qcow2",
         "size": "10G",
         "format": "qcow2",
         "interface": "virtio"
@@ -29,7 +20,7 @@
         "type": "efi",
         "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
         "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
-        "vars_path": "artifacts/ubuntu-24.04-cloud/OVMF_VARS.fd"
+        "vars_path": "artifacts/{{name}}/OVMF_VARS.fd"
       },
       "machine": "q35",
       "memory_mb": 1024,
@@ -59,7 +50,7 @@
         }
       },
       "cloudimg_config": {
-        "hostname": "ubuntu-24.04-cloud",
+        "hostname": "{{name}}",
         "username": "lab",
         "realname": "Lab User",
         "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
@@ -77,8 +68,26 @@
       },
       "ssh_provision": {
         "user": "lab",
+        "ssh_key": null
+      }
+    }
+  },
+  "vms": {
+    "ubuntu-24.04-cloud": {
+      "name": "Ubuntu 24.04 Server (cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "groups": [
+          "ubuntu",
+          "smoke"
+        ],
+        "verified": "2026-10-02",
+        "version": "1.0.0"
+      },
+      "notes": "The fastest VM of the catalog: Ubuntu's minimal cloud image (about 270 MB, the vendor's SHA256SUMS pins the current release build) as a qcow2 overlay, configured at first boot by a cloud-init seed. No installer runs: the VM is ready in a few minutes. The base recipe of the lab members ported from qlab (docs/QLAB_IMPORT.md).",
+      "ssh_provision": {
         "ssh_host_port": 2358,
-        "ssh_key": null,
         "post_install_run": [
           "id {{user}}",
           "test -f /etc/cloud/cloud-init.disabled",

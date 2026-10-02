@@ -70,6 +70,22 @@ class CloudImageSeedTests(unittest.TestCase):
 
 
 
+class SegmentNetplanTests(unittest.TestCase):
+    def test_a_runtime_segment_nic_with_an_address_gets_a_netplan_by_mac_in_the_seed(self):
+        vm = json.loads(json.dumps(config.load_tracked(ROOT / "vms" / "profiles")["vpn-lab-server"]))
+        files = cloudimg.segment_netplan(vm)
+        self.assertEqual([f["path"] for f in files], ["/etc/netplan/60-vmctl-vpn-lan.yaml"])
+        mac = cloudimg.qemu.network_specs(vm, "runtime")[1]["mac"]
+        self.assertIn(f'macaddress: "{mac}"', files[0]["content"])
+        self.assertIn("- 172.20.1.1/24", files[0]["content"])
+        self.assertIn("set-name: vpn-lan", files[0]["content"])
+        self.assertEqual(files[0]["permissions"], "0600")
+        payload = json.loads(cloudimg.render_user_data("vpn-lab-server", vm, [KEY]).split("\n", 1)[1])
+        self.assertEqual(payload["write_files"][0]["path"], "/etc/netplan/60-vmctl-vpn-lan.yaml")
+        self.assertEqual(cloudimg.segment_netplan(tracked_profile()), [])  # no networks: nothing to write
+        self.assertEqual(lifecycle.local_test_mode(vm)[0], "bootstrap-cloudimg")
+
+
 class CloudImageIdentityTests(BaseVmctlTestCase):
     def test_the_identity_of_local_json_moves_the_guest_user(self):
         profiles = self.config_dir / "profiles"

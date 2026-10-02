@@ -1,0 +1,79 @@
+{
+  "title": "VPN lab: WireGuard and OpenVPN between two machines",
+  "summary": "A server and a client on an isolated segment (172.20.1.0/24) with WireGuard and OpenVPN installed and nothing configured. The exercises build a WireGuard tunnel (10.10.0.0/24) and an OpenVPN static-key tunnel (10.20.0.0/24) by hand, watch the ciphertext on the segment and the plaintext inside the tunnel with tcpdump, and fence the server with iptables. Ported from qlab's vpn-lab.",
+  "members": ["vpn-lab-server", "vpn-lab-client"],
+  "exercises": [
+    {
+      "title": "WireGuard: keys, wg0.conf on both ends, the tunnel",
+      "text": "Each end generates a key pair and only the public halves travel. The server listens on 51820/udp on the segment; the client names it as Endpoint. 10.10.0.1 is the server inside the tunnel, 10.10.0.2 the client.",
+      "blocks": [
+        {"kind": "do", "where": "vpn-lab-server", "commands": [
+          "wg genkey | tee privatekey | wg pubkey > publickey && cat publickey    # the server's public key, for the client's [Peer]",
+          "sudo tee /etc/wireguard/wg0.conf >/dev/null <<EOF\n[Interface]\nAddress = 10.10.0.1/24\nListenPort = 51820\nPrivateKey = $(cat privatekey)\n\n[Peer]\nPublicKey = <CLIENT_PUBLIC_KEY>\nAllowedIPs = 10.10.0.2/32\nEOF",
+          "sudo wg-quick up wg0"
+        ]},
+        {"kind": "do", "where": "vpn-lab-client", "commands": [
+          "wg genkey | tee privatekey | wg pubkey > publickey && cat publickey    # the client's public key, for the server's [Peer]",
+          "sudo tee /etc/wireguard/wg0.conf >/dev/null <<EOF\n[Interface]\nAddress = 10.10.0.2/24\nPrivateKey = $(cat privatekey)\n\n[Peer]\nPublicKey = <SERVER_PUBLIC_KEY>\nEndpoint = 172.20.1.1:51820\nAllowedIPs = 10.10.0.1/32\nPersistentKeepalive = 25\nEOF",
+          "sudo wg-quick up wg0"
+        ]},
+        {"kind": "check", "where": "vpn-lab-client", "commands": [
+          "sudo wg show                        # latest handshake: a few seconds ago",
+          "ping -c3 10.10.0.1                  # the server, through the tunnel"
+        ]},
+        {"kind": "try", "where": "vpn-lab-client", "commands": [
+          "sudo wg-quick down wg0 && ping -c1 -W2 10.10.0.1; sudo wg-quick up wg0    # no tunnel, no answer; back up in a second"
+        ]}
+      ]
+    },
+    {
+      "title": "OpenVPN with a static key",
+      "text": "The simplest OpenVPN: one shared secret, a point-to-point tun. The server runs in the foreground so its log is visible; the client connects to the server's segment address on 1194/udp. Both ends name the cipher: OpenVPN 2.6 on OpenSSL 3 no longer has the static-key default BF-CBC ('Cipher BF-CBC not supported').",
+      "blocks": [
+        {"kind": "do", "where": "vpn-lab-server", "commands": [
+          "sudo openvpn --genkey secret /etc/openvpn/static.key && sudo cat /etc/openvpn/static.key    # copy it to the client as /etc/openvpn/static.key",
+          "sudo tee /etc/openvpn/server.conf >/dev/null <<EOF\ndev tun\nifconfig 10.20.0.1 10.20.0.2\nsecret /etc/openvpn/static.key\ncipher AES-256-CBC\nauth SHA256\nport 1194\nproto udp\nkeepalive 10 60\npersist-tun\npersist-key\nverb 3\nEOF",
+          "sudo openvpn --config /etc/openvpn/server.conf    # 'Initialization Sequence Completed' once the client is in"
+        ]},
+        {"kind": "do", "where": "vpn-lab-client", "commands": [
+          "sudo tee /etc/openvpn/client.ovpn >/dev/null <<EOF\ndev tun\nremote 172.20.1.1 1194 udp\nifconfig 10.20.0.2 10.20.0.1\nsecret /etc/openvpn/static.key\ncipher AES-256-CBC\nauth SHA256\npersist-tun\npersist-key\nverb 3\nEOF",
+          "sudo openvpn --config /etc/openvpn/client.ovpn --daemon"
+        ]},
+        {"kind": "check", "where": "vpn-lab-client", "commands": [
+          "ip -br addr show tun0",
+          "ping -c3 10.20.0.1"
+        ]}
+      ]
+    },
+    {
+      "title": "What the wire sees",
+      "text": "With a tunnel up, tcpdump on the server shows UDP ciphertext on the segment NIC and plaintext ICMP inside wg0 or tun0: the point of a VPN in two captures.",
+      "blocks": [
+        {"kind": "check", "where": "vpn-lab-server", "commands": [
+          "sudo timeout 10 tcpdump -ni vpn-lan udp port 51820    # WireGuard frames, while the client pings 10.10.0.1",
+          "sudo timeout 10 tcpdump -ni wg0                       # the same pings, in clear",
+          "sudo timeout 10 tcpdump -ni vpn-lan udp port 1194     # OpenVPN, while the client pings 10.20.0.1"
+        ]}
+      ]
+    },
+    {
+      "title": "Only the VPN and SSH get in",
+      "text": "iptables on the server: established traffic, SSH (never lock the lab out: vmctl's own SSH comes through the NAT NIC), the two VPN ports, then DROP. Flushing the rules puts everything back.",
+      "blocks": [
+        {"kind": "try", "where": "vpn-lab-server", "commands": [
+          "sudo iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT",
+          "sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT",
+          "sudo iptables -A INPUT -p udp --dport 51820 -j ACCEPT",
+          "sudo iptables -A INPUT -p udp --dport 1194 -j ACCEPT",
+          "sudo iptables -A INPUT -j DROP",
+          "sudo iptables -L INPUT -n -v",
+          "sudo iptables -F    # back to an open server"
+        ]},
+        {"kind": "check", "where": "vpn-lab-client", "commands": [
+          "ping -c1 -W2 172.20.1.1 || echo 'dropped by the server, as intended'    # while the rules are in",
+          "ping -c1 -W2 10.10.0.1    # the tunnel still works: 51820/udp is allowed"
+        ]}
+      ]
+    }
+  ]
+}

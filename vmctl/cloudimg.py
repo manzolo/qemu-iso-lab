@@ -20,12 +20,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 from pathlib import Path
 from typing import Any
 
-from vmctl import cloud_init, iso, runtime, state, ui
+from vmctl import cloud_init, iso, qemu, runtime, state, ui
 from vmctl.errors import VMError
 
 BOOTSTRAP_COMPLETE_TOKEN = "==> Cloud image provisioning complete!"
@@ -144,6 +145,24 @@ echo "{BOOTSTRAP_COMPLETE_TOKEN}" | tee /dev/ttyS0
 """
 
 
+def segment_netplan(vm: dict[str, Any]) -> list[dict[str, Any]]:
+    """One netplan file per runtime segment NIC that declares an ``address`` (``networks[]``),
+    matched by the NIC's MAC (the profile's, or vmctl's stable default): the lab segment is a
+    runtime NIC, absent during the first boot, so the file waits for the next one. What
+    netlab.provision_guest does over SSH for the autoinstall members, written by the seed here."""
+    raw = {str(entry.get("id") or ""): entry for entry in vm.get("networks") or [] if isinstance(entry, dict)}
+    files: list[dict[str, Any]] = []
+    for spec in qemu.network_specs(vm, "runtime") if vm.get("networks") else []:
+        address = str(raw.get(spec["id"], {}).get("address") or "").strip()
+        if spec["type"] != "segment" or not address:
+            continue
+        name = re.sub(r"[^a-z0-9]+", "-", str(spec["name"]).lower()).strip("-") or "segment"
+        content = (f"network:\n  version: 2\n  ethernets:\n    {name}:\n      match:\n        macaddress: \"{spec['mac']}\"\n"
+                   f"      set-name: {name}\n      addresses:\n        - {address}\n")
+        files.append({"path": f"/etc/netplan/60-vmctl-{name}.yaml", "permissions": "0600", "content": content})
+    return files
+
+
 def render_user_data(vm_name: str, vm: dict[str, Any], keys: list[str]) -> str:
     cfg = cloudimg_config(vm) or {}
     username = str(cfg["username"]).strip()
@@ -158,7 +177,7 @@ def render_user_data(vm_name: str, vm: dict[str, Any], keys: list[str]) -> str:
         "passwd": str(cfg["password_hash"]).strip(),
         "ssh_authorized_keys": [key.strip() for key in keys if key.strip()],
     }
-    write_files = [dict(entry) for entry in (cfg.get("write_files") or [])]
+    write_files = segment_netplan(vm) + [dict(entry) for entry in (cfg.get("write_files") or [])]
     write_files.append({"path": PROVISION_SCRIPT, "permissions": "0755", "content": render_provision_script(vm_name, vm)})
     payload: dict[str, Any] = {
         # A name with dots (ubuntu-24.04-cloud) is a host name here, not host + domain: without
