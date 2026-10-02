@@ -106,13 +106,13 @@
       "extends": "windows-base",
       "meta": {
         "slug": "windows-11",
-        "verified": "2026-09-26",
+        "verified": "2026-10-02",
         "version": "1.0.0"
       },
       "iso": "isos/windows11.iso",
       "memory_mb": 8192,
       "cpus": 4,
-      "notes": "Unattended Windows 11 via autounattend.xml (bootstrap-windows). Microsoft publishes no stable download URL: put the retail ISO at isos/windows11.iso (or point 'iso' at it in local.json). The ISO is rebuilt once as isos/windows11-noprompt.iso (UEFI efisys_noprompt.bin, no 'Press any key' wait); the answer file rides on a VMCTLSEED CD, the virtio-win ISO (downloaded from fedorapeople) supplies viostor/NetKVM in WinPE and the guest tools at first logon. TPM/Secure Boot/CPU/RAM checks are bypassed through the LabConfig registry keys (no swtpm needed). Edition/language must exist in the ISO ('Windows 11 Pro', en-US on the multi-edition English ISO; it-IT on the Italian one). Post-install runs over Windows OpenSSH with cmd.exe semantics.",
+      "notes": "Unattended Windows 11 via autounattend.xml (bootstrap-windows). Microsoft publishes no stable download URL: put the retail ISO at isos/windows11.iso (or point 'iso' at it in local.json). The ISO is rebuilt once as isos/windows11-noprompt.iso (UEFI efisys_noprompt.bin, no 'Press any key' wait); the answer file rides on a VMCTLSEED CD, the virtio-win ISO (downloaded from fedorapeople) supplies viostor/NetKVM in WinPE and the guest tools at first logon. TPM/Secure Boot/CPU/RAM checks are bypassed through the LabConfig registry keys (no swtpm needed). Edition/language must exist in the ISO ('Windows 11 Pro', en-US on the multi-edition English ISO; it-IT on the Italian one). Post-install runs over Windows OpenSSH with cmd.exe semantics. Verified live on 25H2 (build 26200) and on 26H2 (build 26300.9457, Italian ISO), 2026-10-02.",
       "windows_config": {
         "computer_name": "WIN11-LAB",
         "edition": "Windows 11 Pro",
