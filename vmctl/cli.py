@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
+     ["bootstrap-unattended", "bootstrap-cloudimg", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "agent", "attach", "link", "record"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -211,6 +211,11 @@ removes only files under isos/, never a medium set here.""")
     p.add_argument("--timeout", type=int, default=1800, help="seconds for the installer to finish, then for SSH after it (default: 1800, like the other bootstraps)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_omarchy)
 
+    p = _add(subparsers, "bootstrap-cloudimg", help="a vendor cloud image as a qcow2 overlay + cloud-init first boot + post-install (minutes, not an install)")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the first boot to complete (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_cloudimg)
+
     p = _add(subparsers, "bootstrap-preseed", help="fully automated Debian preseed install + post-install via serial console")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
@@ -335,12 +340,13 @@ removes only files under isos/, never a medium set here.""")
     p.add_argument("--libvirt", action="store_true", help="check: probe the LAN addresses (host on lab-lan) instead of the 127.0.0.1 forwards")
     p.set_defaults(func=lifecycle.cmd_lab)
 
-    p = _add(subparsers, "group", help="a declared group as one stack: list the groups (--labs: only those on a network segment), status, up (infrastructure first), down (reverse), map (HTML network map, --open), install (what is missing, cumulative), clean")
-    p.add_argument("action", choices=["list", "status", "up", "down", "map", "install", "clean", "cluster"], help="what to do with the group (install: what is missing, in start order, then up and the cluster; clean: stop and delete every member's disk; cluster: form the Proxmox cluster of a running stack)")
+    p = _add(subparsers, "group", help="a declared group as one stack: list the groups (--labs: only the labs: a segment or their own vms/labs/<group>/ content), status, up (infrastructure first), down (reverse), map (HTML network map with the lab's exercises, --open), guide (print vms/labs/<group>/guide.<lang>.md), test (the lab's tests/test_NN_*.sh against the running stack, started if needed; exit 1 on a failed check), install (what is missing, cumulative), clean")
+    p.add_argument("action", choices=["list", "status", "up", "down", "map", "guide", "test", "install", "clean", "cluster"], help="what to do with the group (install: what is missing, in start order, then up and the cluster; clean: stop and delete every member's disk; cluster: form the Proxmox cluster of a running stack)")
     p.add_argument("group", nargs="?", help="the group name (meta.groups), e.g. netlab or proxmox-lab")
     p.add_argument("--labs", action="store_true", help="list: only the labs (groups with a member on a segment)")
-    p.add_argument("--json", action="store_true", help="list/status: machine-readable output")
+    p.add_argument("--json", action="store_true", help="list/status/test: machine-readable output")
     p.add_argument("--open", action="store_true", help="map: open the page in the default browser")
+    p.add_argument("--lang", choices=["en", "it"], help="guide: the language of vms/labs/<group>/guide.<lang>.md to print (default: en)")
     p.add_argument("--output", help="map: write the page here instead of artifacts/labs/<group>/network.html")
     p.add_argument("--timeout", type=int, default=3600, help="install: seconds per member install (default: 3600)")
     p.add_argument("--yes", action="store_true", help="install/clean: do not ask before deleting disks")
@@ -433,8 +439,9 @@ drag it onto another machine) and from a multiple selection (Link network).""")
             p.add_argument("--autostart", action="store_true", help="enable libvirt autostart")
         p.set_defaults(func=handler)
 
-    p = _add(subparsers, "shell", help="SSH into a running VM")
+    p = _add(subparsers, "shell", help="SSH into a running VM, or run one command in it: vmctl shell <vm> -- <command> (its exit status is returned)")
     p.add_argument("vm", help=VM_HELP)
+    p.add_argument("command", nargs=argparse.REMAINDER, help="after --, a command to run in the guest instead of an interactive session")
     p.set_defaults(func=lifecycle.cmd_shell)
 
     p = _add(subparsers, "record", help="time-lapse of a VM's screen (also during a bootstrap) as a small GIF, and an MP4 on request: one screendump per second until the VM is gone",

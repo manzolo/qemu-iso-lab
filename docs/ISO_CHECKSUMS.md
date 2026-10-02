@@ -220,4 +220,5 @@ the architecture. With the current image (Snapshot20260930) `opensuse-tumbleweed
 | Profile | ISO | Vendor checksum |
 |---|---|---|
 | `opensuse-tumbleweed-autoyast`, `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net` | `openSUSE-Tumbleweed-NET-x86_64-Current.iso` | [.sha256](https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso.sha256) |
+| `ubuntu-24.04-cloud` | `ubuntu-24.04-minimal-cloudimg-amd64.img` (a cloud image, not an ISO: `bootstrap-cloudimg`; the `release/` build moves, and `SHA256SUMS` lists every file of the directory, so `published_sha256` takes the line naming this one) | [SHA256SUMS](https://cloud-images.ubuntu.com/minimal/releases/noble/release/SHA256SUMS) |
 | `opensuse-slowroll` | `openSUSE-Slowroll-DVD-x86_64-Media.iso` | [.sha256](https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso.sha256) |

@@ -1,6 +1,7 @@
 # Importing the qlab labs (plan)
 
-Written on 2026-09-27. Nothing here is started. It plans how eight of the teaching labs built in
+Written on 2026-09-27; F1 started on 2026-10-02 (branch `feature/qlab-import`, see the status
+under each foundation). It plans how eight of the teaching labs built in
 [qlab](https://github.com/manzolo/qlab) (`~/Workspaces/qemu/qlab`, one `qlab-plugin-<name>-lab`
 repository each) become labs of this project: vpn, ssh, pxe, pam, mysql, lvm, docker, apache.
 The other ideas, which are new labs rather than ports, are in [LAB_IDEAS.md](LAB_IDEAS.md).
@@ -23,8 +24,8 @@ This project already has most of the machinery a lab needs:
 | `qlab run <lab>` | `vmctl group install/up/down/status <group>` (start order by role) | done |
 | per-VM cloud-init | `cloud_init` seed + `ssh_provision` / `post_install_run` | done, but only after a full install |
 | the VM image | an unattended install from the ISO (8-15 min per member) | **gap: no cloud-image flow** |
-| `qlab shell <vm>` | `vmctl shell <vm>`, web SSH terminal | done (no command argument yet) |
-| `qlab test <lab>` | `vmctl group cluster` + the `cluster-<name>` row of `check-vms` | **gap: no per-lab tests** |
+| `qlab shell <vm>` | `vmctl shell <vm> [-- command]`, web SSH terminal | done (F2, 2026-10-02) |
+| `qlab test <lab>` | `vmctl group test <lab>` + the `lab-<name>` row of `check-vms` | done (F4, 2026-10-02) |
 | guide.md, walkthrough PDF | `vmctl group map` (map + do/check/try runbook), `make guides`, `profiledoc` | runbook is code in `labs.py`, not data |
 | extra disks (lvm) | `extra_disks` (`qemu.extra_disks`) | done (Proxmox ZFS mirror) |
 | a clean restart of an exercise | `vmctl checkpoint create/restore` per VM | done per VM, not per group |
@@ -38,6 +39,17 @@ foundations, one of which (network boot) only the pxe lab needs.
 Build these once, before the first lab, each with its unit tests and a live run.
 
 ### F1. A cloud-image flow (`bootstrap-cloudimg`)
+
+**Status (2026-10-02): done, live PASS** (49 s after the download), `vmctl/cloudimg.py` + `ubuntu-24.04-cloud` (`vms/profiles/cloud.json`),
+documented in [UNATTENDED.md](UNATTENDED.md#cloud-images-bootstrap-cloudimg). What changed from the
+plan below: the image is named with the ISO fields (`iso`, `iso_url`, `iso_sha256_url`) instead of
+a `cloud_image.url` block, so the download, the cache, the catalog site's "public download" and
+every ISO test work unchanged, and the flow's own section is `cloudimg_config` like the other
+flows; the base of the overlay is a hard link by content under `isos/.cloudimg/`, because
+`ensure_iso` deletes a cached file the vendor's SUMS no longer matches; later boots have no seed,
+so `provision.sh` disables cloud-init for them. Debian waits for a `sha512` field
+(`genericcloud` publishes `SHA512SUMS` only).
+
 
 The lab members are small Ubuntu/Debian servers; installing each from the ISO costs 8-15 minutes
 and a full lab would take longer than qlab's whole session. A profile gets a `cloud_image` block:
@@ -70,12 +82,23 @@ and a full lab would take longer than qlab's whole session. A profile gets a `cl
 
 ### F2. Commands inside a member: `vmctl shell <vm> -- <command>`
 
+**Status (2026-10-02): done.** `lifecycle.cmd_shell` + `ssh.ssh_command_cmd` (BatchMode, LogLevel=ERROR,
+the command's exit status returned), `vms/labs/_common.sh` (`on`, `assert`, `assert_fail`,
+`assert_contains`, `assert_not_contains`, `report_results`; `VMCTL` overrides the binary),
+`tests/test_lab_common.py` runs it against a stub.
+
 The tests and the runbooks run commands in the guests. `vmctl shell` gets an optional command
 (`ssh.ssh_shell_cmd` + the command, exit status passed through, `BatchMode=yes`, never a password
 prompt). qlab's `_common.sh` becomes `vms/labs/_common.sh` with `on <vm> <command>` built on it
 instead of `ssh_server` / `ssh_client` with hard-coded ports.
 
 ### F3. Lab content as data: `vms/labs/<lab>/`
+
+**Status (2026-10-02): done.** `labs.load_content`/`content_groups` (validated `lab.json`, guides, tests,
+provision), the exercises in `labs.runbook` before *Run the stack* and on the map page, `vmctl group
+guide`, `lab_groups` counting a group with content as a lab, `profile_versions.referenced_files`
+fingerprinting `vms/labs/` sources, `tests/test_lab_content.py`. First content: `vms/labs/netlab/`
+(two exercises, two tests, both guides). Docs: [LABS.md](LABS.md#lab-content-vmslabslab).
 
 Today the runbook of `vmctl group map` is Python in `labs.runbook()`, written for netlab and the
 Proxmox cluster. An imported lab brings its own content, in a directory next to the profiles
@@ -101,6 +124,11 @@ script is), and `tests/test_repo_profiles.py` checks that every lab directory na
 members and every member of a lab has its directory.
 
 ### F4. `vmctl group test <lab>` and a matrix row
+
+**Status (2026-10-02): done.** `labs.run_lab_tests`/`tests_summary`, `vmctl group test <lab> [--json]`
+(stack up + SSH wait first, exit 1 on a failed check, a script error told from a failed check),
+`lifecycle.run_lab_test_rows` after the cluster checks of `check-vms` (`lab-<name>` row, SKIP when a
+member did not pass), the web lab card's *Run tests* and *Guide* buttons; `tests/test_lab_content.py`.
 
 Runs `tests/test_*.sh` of the lab in order against the running stack (starting it if needed,
 like `group cluster`), prints `[PASS]/[FAIL]` per check and a summary, exits non-zero on any

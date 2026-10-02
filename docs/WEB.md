@@ -173,7 +173,10 @@ What the page offers:
   background) and connects each pane as soon as its VM runs. The pane header shows the state,
   **Start**/**Stop**, **Reload**, **Open alone** (that console in its own window) and **×**
   (remove from the page); **Add a machine…** adds another pane, the layout buttons switch
-  between side by side, stacked and grid. **Link network** in the header runs `vmctl link` on
+  between side by side, stacked and grid. The lab card's **Open consoles** opens the same page
+  for every member of a lab (`&lab=<group>` in the hash): the page is headed by the lab, the
+  network bar names it with its title, and each pane shows the member's address on the lab's
+  segment next to its name. **Link network** in the header runs `vmctl link` on
   the machines of the page (**Unlink network** when they already share a segment): each pane
   then shows the machine's address on the private segment (192.168.100.x; "at next start"
   while the NIC is only recorded for a stopped VM). Closing the tab stops nothing.

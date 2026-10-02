@@ -25,6 +25,7 @@ from vmctl.errors import VMError
 LOCK_FILE = Path("vms") / "profiles.lock"
 PROFILES_DIR = Path("vms") / "profiles"
 PROFILE_FILES_DIR = Path("vms") / "profile-files"
+LAB_FILES_DIR = Path("vms") / "labs"  # a lab's provision/ scripts, copied in by its members (labs.py)
 SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 PARTS = ("major", "minor", "patch")
 # Keys that describe or document a profile without changing what gets installed.
@@ -75,13 +76,14 @@ def children_of(base: str, root: Path | None = None) -> list[str]:
 
 
 def referenced_files(entry: dict[str, Any]) -> list[str]:
-    """The ``vms/profile-files/`` sources an entry copies into the guest (copy_from_host of the
-    SSH and cloud-init provisioning), sorted; anything outside that directory is the user's."""
+    """The ``vms/profile-files/`` and ``vms/labs/`` sources an entry copies into the guest
+    (copy_from_host of the SSH and cloud-init provisioning), sorted; anything outside those
+    directories is the user's."""
     sources: set[str] = set()
     for section in ("ssh_provision", "cloud_init"):
         for item in ((entry.get(section) or {}).get("copy_from_host") or []):
             source = str((item or {}).get("source") or "")
-            if source.startswith(str(PROFILE_FILES_DIR) + "/"):
+            if source.startswith((str(PROFILE_FILES_DIR) + "/", str(LAB_FILES_DIR) + "/")):
                 sources.add(source.rstrip("/"))
     return sorted(sources)
 

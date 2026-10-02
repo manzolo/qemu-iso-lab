@@ -420,6 +420,12 @@ def published_sha256(vm: dict[str, Any]) -> str | None:
     if match is None:
         ui.print_status("warn", f"No SHA-256 in {ui.pretty_url(str(url))}: the cached ISO is used without checking that it is current", ok=False)
         return None
+    # A SUMS file with several entries (cloud-images.ubuntu.com) names each file: take ours, not the first.
+    names = {Path(str(vm.get("iso") or "")).name, str(vm.get("iso_url") or "").rsplit("/", 1)[-1]} - {""}
+    for line in text.splitlines():
+        entry = re.match(r"\s*([0-9a-fA-F]{64})\s+\*?(\S.*?)\s*$", line)
+        if entry and Path(entry.group(2)).name in names:
+            return entry.group(1).lower()
     return match.group(0).lower()
 
 

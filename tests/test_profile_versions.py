@@ -35,6 +35,8 @@ class FingerprintTests(BaseVmctlTestCase):
         (self.files / "rc").write_text("two")
         self.assertNotEqual(profile_versions.fingerprint(with_file, self.root), one)
         self.assertEqual(profile_versions.referenced_files(with_file), ["vms/profile-files/testvm/rc"])
+        lab_file = {"ssh_provision": {"copy_from_host": [{"source": "vms/labs/x-lab/provision/setup.sh"}, {"source": "/home/me/own.sh"}]}}
+        self.assertEqual(profile_versions.referenced_files(lab_file), ["vms/labs/x-lab/provision/setup.sh"])
         # A user's own path is not part of the catalog.
         theirs = self.entry(cloud_init={"copy_from_host": [{"source": "~/.config/niri", "dest": "/home/{{user}}/.config/niri"}]})
         self.assertEqual(profile_versions.referenced_files(theirs), [])

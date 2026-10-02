@@ -439,6 +439,12 @@ try {
   await page.locator('#vm-context').getByRole('menuitem',{name:'SSH console…'}).click();
   assert.equal(await page.locator('#ssh-title').textContent(),'SSH · proxmox-ve-node2');
   await page.locator('#ssh-dialog [data-close]').click();
+  // Open consoles: the lab's members side by side on /multi, the page told which lab it is; not offered when nothing can show a console.
+  assert.equal(await page.locator('#labs-view [data-lab="proxmox-lab"] [data-lab-consoles]').count(),1);
+  assert.equal(await page.locator('#labs-view [data-lab="new-lab"] [data-lab-consoles]').count(),0);
+  const labConsoles=context.waitForEvent('page'); await page.locator('#labs-view [data-lab="proxmox-lab"] [data-lab-consoles]').click();
+  const labPage=await labConsoles; assert.equal(new URL(labPage.url()).hash,'#vms=proxmox-ve,proxmox-ve-node2&start=1&lab=proxmox-lab'); await labPage.close();
+  check('a lab card opens its members in one page of consoles');
   await page.locator('#labs-view [data-vm="proxmox-ve"] .state').click({button:'right'});
   assert.equal(await page.locator('#vm-context .context-title').textContent(),'proxmox-ve');
   await page.locator('#vm-context').getByRole('menuitem',{name:'More commands…',exact:true}).click();

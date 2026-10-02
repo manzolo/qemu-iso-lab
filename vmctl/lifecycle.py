@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, ubiquity, cloud_init, config, freebsd, guest_agent, opnsense, slackware, void, agama, popos, mediacheck, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
+from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, cloudimg, ubiquity, cloud_init, config, freebsd, guest_agent, opnsense, slackware, void, agama, popos, mediacheck, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 from vmctl import isofile
@@ -396,6 +396,12 @@ def ensure_vm_disk(vm: dict[str, Any], dry_run: bool = False, vm_name: str | Non
         if vm_name:
             vmstate.record_origin(vm_name, "image", ui.pretty_path(source), dry_run=dry_run)
         ui.print_status("ok", f"Created disk from the image: {ui.pretty_path(disk_path)}")
+    elif not disk_path.exists() and cloudimg.cloudimg_config(vm) is not None:
+        # A cloud image: the disk is a qcow2 overlay on the cached image, kept by content under isos/.cloudimg/.
+        source = iso.ensure_iso(vm, dry_run=dry_run)
+        backing = cloudimg.backing_image(vm, source, dry_run=dry_run)
+        cloudimg.create_overlay(vm, backing, dry_run=dry_run)
+        ui.print_status("ok", f"Created disk as an overlay on the image: {ui.pretty_path(disk_path)}")
     elif not disk_path.exists():
         runtime.ensure_parent(disk_path)
         cmd = ["qemu-img", "create", "-f", disk["format"]]
@@ -438,6 +444,10 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-omarchy", "Omarchy cidata install + post-install")
         return ("skip", "Omarchy cidata install without SSH post-install")
+    if cloudimg.cloudimg_config(vm) is not None:
+        if cloud_init.ssh_access_config(vm) is not None:
+            return ("bootstrap-cloudimg", "cloud image overlay + cloud-init seed + post-install")
+        return ("skip", "cloudimg_config without SSH post-install")
     if cloud_init.autoinstall_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-unattended", "autoinstall + post-install")
@@ -607,7 +617,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-cloudimg", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -812,8 +822,8 @@ def run_local_test_vm(
         if prep_note is not None:
             detail = f"{detail}; {prep_note}"
         return ("passed", detail)
-    if mode in {"bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox"}:
-        handler = {"bootstrap-freebsd": cmd_bootstrap_freebsd, "bootstrap-opnsense": cmd_bootstrap_opnsense, "bootstrap-slackware": cmd_bootstrap_slackware, "bootstrap-void": cmd_bootstrap_void, "bootstrap-agama": cmd_bootstrap_agama, "bootstrap-popos": cmd_bootstrap_popos,
+    if mode in {"bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-cloudimg"}:
+        handler = {"bootstrap-cloudimg": cmd_bootstrap_cloudimg, "bootstrap-freebsd": cmd_bootstrap_freebsd, "bootstrap-opnsense": cmd_bootstrap_opnsense, "bootstrap-slackware": cmd_bootstrap_slackware, "bootstrap-void": cmd_bootstrap_void, "bootstrap-agama": cmd_bootstrap_agama, "bootstrap-popos": cmd_bootstrap_popos,
                    "bootstrap-haiku": cmd_bootstrap_haiku, "bootstrap-proxmox": cmd_bootstrap_proxmox}[mode]
         try:
             handler(
@@ -2352,6 +2362,44 @@ def cmd_bootstrap_opnsense(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bootstrap_cloudimg(args: argparse.Namespace) -> int:
+    """A vendor cloud image: the disk is a qcow2 overlay on the cached image, the first boot
+    reads a NoCloud seed (user, key, packages, provision.sh ending in sync + the token) and
+    cloud-init powers the guest off (vmctl/cloudimg.py); then the usual SSH post-install."""
+    vm = resolved_vm(args, config.load_config())
+    cloudimg.check_profile(args.vm, vm)
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap cloud image (qcow2 overlay + cloud-init seed): {args.vm}")
+    disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+    if disk_exists and not args.dry_run:
+        vmstate.refuse_if_protected(args.vm, "reinstall the VM")
+        ui.print_status("warn", f"Replacing the existing disk: {ui.pretty_path(runtime.resolve_path(vm['disk']['path']))}", ok=False)
+        runtime.resolve_path(vm["disk"]["path"]).unlink()  # the overlay must start from the pristine image
+        disk_exists = False
+    ensure_vm_disk(vm, dry_run=args.dry_run)  # downloads the image and creates the overlay
+    vmstate.begin_install(args.vm, "bootstrap-cloudimg", dry_run=args.dry_run)
+    reset_vm_nvram(vm, dry_run=args.dry_run)
+    keys = cloudimg.resolve_ssh_pubkey(vm, dry_run=args.dry_run)
+    seed_iso = cloudimg.create_seed(args.vm, vm, keys, dry_run=args.dry_run)
+    command = qemu.common_args(vm, None, dry_run=args.dry_run, accel=automation_accel(vm), headless=True,
+                               serial_stdio=True, no_reboot=True, allow_missing_disk=args.dry_run and not disk_exists,
+                               enable_clipboard=False, network_phase="install")
+    command += cloudimg.seed_drive_args(seed_iso)
+    serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+    report.phase(args, "install")
+    try:
+        qemu.run_and_expect(command, expected_text=cloudimg.BOOTSTRAP_COMPLETE_TOKEN,
+                            timeout_sec=getattr(args, "timeout", 1800), dry_run=args.dry_run, log_path=serial_log,
+                            exit_grace_sec=cloudimg.SHUTDOWN_GRACE_SEC)
+    except VMError as exc:
+        raise explain_failed_bootstrap(exc, cloudimg.BOOTSTRAP_FAILED_TOKEN, "Cloud image", serial_log) from exc
+    vmstate.complete_install(args.vm, "bootstrap-cloudimg", vm, dry_run=args.dry_run)
+    start_installed_vm_headless(args.vm, vm, disk_exists, dry_run=args.dry_run)
+    report.phase(args, "post-install")
+    run_post_install(args.vm, vm, getattr(args, "timeout", 1800), dry_run=args.dry_run)
+    return 0
+
+
 def cmd_bootstrap_void(args: argparse.Namespace) -> int:
     """Void Linux from its live ISO: the host boots the ISO's kernel on the serial console, logs
     in as the live root, mounts the seed CD and runs install.sh (vmctl/void.py); then SSH checks."""
@@ -3014,8 +3062,14 @@ def cmd_group(args: argparse.Namespace) -> int:
                                      "start_order": labs.start_order(cfg, members)}
             if entry["lab"]:
                 # Addresses for the TUI's lab panel; live state stays with the dashboard's own rows.
+                lab = labs.model(cfg, group)
                 entry["addresses"] = {member["name"]: [nic["address"] for nic in member["nics"] if nic["type"] == "segment"]
-                                      for member in labs.model(cfg, group)["members"]}
+                                      for member in lab["members"]}
+                if lab.get("content"):
+                    entry["title"] = lab["content"]["title"]
+                    entry["content"] = lab["content"]["dir"]
+                    entry["guides"] = sorted(lab["content"]["guides"])
+                    entry["tests"] = len(lab["content"]["tests"])
             entries.append(entry)
         # Running VMs joined by `vmctl link` are a lab too, for as long as they run.
         entries += vmlink.session_labs()
@@ -3077,6 +3131,40 @@ def cmd_group(args: argparse.Namespace) -> int:
                 cmd_stop(argparse.Namespace(vm=member["name"], dry_run=args.dry_run))
             clean_vm(member["name"], vm, dry_run=args.dry_run)
         ui.print_status("ok", f"{args.group} cleaned; reinstall it with: vmctl group install {args.group}")
+        return 0
+    if action == "test":
+        content = lab.get("content") or {}
+        if not content.get("tests"):
+            raise VMError(f"{args.group} has no tests: vms/labs/{args.group}/tests/test_NN_*.sh would be them (docs/LABS.md)")
+        stopped = [m["name"] for m in lab["members"] if not m["running"]]
+        if stopped:
+            # Like group cluster: the stack comes up first, infrastructure first.
+            cmd_group(argparse.Namespace(**{**vars(args), "action": "up"}))
+        for member in lab["members"]:
+            vm = config.get_vm(cfg, member["name"])
+            if cloud_init.ssh_access_config(vm) is not None:
+                ssh.wait_for_ssh(vm, min(int(getattr(args, "timeout", 600) or 600), 600), dry_run=args.dry_run)
+        if not args.json:
+            ui.print_header(f"Test {args.group}: {', '.join(content['tests'])}")
+        results = labs.run_lab_tests(content, dry_run=args.dry_run, stream=not args.json)
+        status, detail = labs.tests_summary(results)
+        if args.json:
+            print(json.dumps({"group": args.group, "status": status, "detail": detail, "scripts": results}, indent=2))
+        elif args.dry_run:
+            ui.print_note(f"Dry run: nothing ran in {args.group}")
+        else:
+            for result in results:
+                ui.print_status("ok" if result["status"] == "passed" else "fail", f"{result['script']}: {result['status']} ({result['passed']} passed, {result['failed']} failed)", ok=result["status"] == "passed")
+            ui.print_status("ok" if status == "passed" else "fail", f"{args.group}: {detail}", ok=status == "passed")
+        return 0 if status == "passed" or args.dry_run else 1
+    if action == "guide":
+        content = lab.get("content") or {}
+        if not content.get("guides"):
+            raise VMError(f"{args.group} has no guide: vms/labs/{args.group}/guide.en.md (or guide.it.md) would be one")
+        lang = getattr(args, "lang", None) or ("en" if "en" in content["guides"] else sorted(content["guides"])[0])
+        if lang not in content["guides"]:
+            raise VMError(f"{args.group} has no guide in '{lang}' (available: {', '.join(sorted(content['guides']))})")
+        print(runtime.resolve_path(content["guides"][lang]).read_text(encoding="utf-8"), end="")
         return 0
     if action == "map":
         dest = Path(args.output).expanduser() if args.output else None
@@ -4214,10 +4302,22 @@ def cmd_unexport_libvirt(args: argparse.Namespace) -> int:
 
 
 def cmd_shell(args: argparse.Namespace) -> int:
+    """An interactive SSH session, or with ``-- <command>`` one command in the guest: output and
+    exit status are the command's own (ssh's 255 when the connection fails), which is what the
+    lab tests of vms/labs/ build on (``on <vm> <command>`` in _common.sh)."""
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
-    runtime.run(ssh.ssh_shell_cmd(vm, dry_run=args.dry_run), dry_run=args.dry_run)
-    return 0
+    words = list(getattr(args, "command", None) or [])
+    if words and words[0] == "--":
+        words = words[1:]
+    if not words:
+        runtime.run(ssh.ssh_shell_cmd(vm, dry_run=args.dry_run), dry_run=args.dry_run)
+        return 0
+    cmd = ssh.ssh_command_cmd(vm, " ".join(words), dry_run=args.dry_run)
+    if args.dry_run:
+        runtime.run(cmd, dry_run=True)
+        return 0
+    return subprocess.call(cmd)
 
 
 def cmd_boot_check(args: argparse.Namespace) -> int:
@@ -4466,6 +4566,62 @@ def resolve_group_selection(cfg: dict[str, Any], groups: list[str]) -> list[str]
 
 def cluster_row_id(cluster: str) -> str:
     return f"cluster-{cluster}"
+
+
+def lab_row_id(group: str) -> str:
+    return f"lab-{group}"
+
+
+def run_lab_test_rows(cfg: dict[str, Any], selected_names: list[str],
+                      results: list[tuple[str, str, str]], args: argparse.Namespace) -> None:
+    """The tests of every lab whose members were all in this run (vms/labs/<lab>/tests/, F4 of
+    docs/QLAB_IMPORT.md), like the cluster row: the members start on their fresh disks in start
+    order, SSH is waited for, the scripts run in order, one ``lab-<name>`` row records the
+    outcome; a member that did not pass makes the row a skip."""
+    outcomes = {name: status for name, status, _ in results}
+    selected = set(selected_names)
+    for group in labs.content_groups():
+        content = labs.load_content(group)
+        members = labs.group_members(cfg, group)
+        if content is None or not content["tests"] or not members or not selected.issuperset(members):
+            continue
+        row = lab_row_id(group)
+        order = labs.start_order(cfg, members)
+        primary = config.get_vm(cfg, order[0])
+        label = f"Lab {group}: {len(content['tests'])} test script(s) over {' + '.join(order)}"
+        ui.print_header(f"Test lab: {group}")
+        not_passed = [name for name in order if outcomes.get(name) != "passed"]
+        if not_passed:
+            detail = f"skipped: {', '.join(not_passed)} did not pass"
+            ui.print_status("skip", f"{row}: {detail}")
+            results.append((row, "skipped", detail))
+            report.record_group_row(row, label, primary, args, "skipped", detail, 0.0, "group test")
+            continue
+        started = time.monotonic()
+        try:
+            states = group_states(cfg, order)
+            for name in order:
+                if not states[name]["running"]:
+                    cmd_start(argparse.Namespace(vm=name, headless=True, background=True, video=None,
+                                                 cloud_init=False, spice_port=None, dry_run=args.dry_run))
+            for name in order:
+                vm = config.get_vm(cfg, name)
+                if cloud_init.ssh_access_config(vm) is not None:
+                    ssh.wait_for_ssh(vm, 600, dry_run=args.dry_run)
+            status, detail = labs.tests_summary(labs.run_lab_tests(content, dry_run=args.dry_run))
+            if args.dry_run:
+                status, detail = "skipped", "dry run"
+        except (VMError, subprocess.SubprocessError, OSError) as exc:
+            status, detail = "failed", str(exc)
+        finally:
+            for name in reversed(order):
+                try:
+                    cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run))
+                except VMError as exc:
+                    ui.print_status("warn", f"{name}: {exc}", ok=False)
+        ui.print_status("ok" if status == "passed" else "fail", f"{row}: {detail}", ok=status == "passed")
+        results.append((row, status, detail))
+        report.record_group_row(row, label, primary, args, status, detail, time.monotonic() - started, "group test")
 
 
 def run_cluster_checks(cfg: dict[str, Any], selected_names: list[str],
@@ -4864,6 +5020,7 @@ def cmd_test_local(args: argparse.Namespace) -> int:
             retry_failed_rows(results, cfg, args, cleanup, matrix_scheduler, parallel)
             # On the rows' own disks, before --restore puts the stashed ones back.
             run_cluster_checks(cfg, selected_names, results, args)
+            run_lab_test_rows(cfg, selected_names, results, args)
         finally:
             cleanup.finish()
 

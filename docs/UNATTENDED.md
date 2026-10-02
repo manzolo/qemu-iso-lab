@@ -1015,6 +1015,43 @@ places: `isos/freedos-1.3-x86boot.img` is `144m/x86BOOT.img` out of
 `3f7834ea…8925`), and `isos/dos/OAKCDROM.SYS` + `MSCDEX.EXE` are the files of
 the same name on a Windows 98 startup disk (`271741af…dfc5`, `6bc3f4c4…9217`).
 
+## Cloud images (`bootstrap-cloudimg`)
+
+Ubuntu and Debian publish *cloud images*: a system already installed, configured at first boot
+by cloud-init. For a small server (the lab members ported from qlab, [QLAB_IMPORT.md](QLAB_IMPORT.md))
+that replaces an 8-15 minute install with a boot of a couple of minutes. The profile carries
+`cloudimg_config` (`username`, `password_hash`, `realname`, `hostname`, `packages`, `write_files`,
+`runcmd`, `timezone`/`locale`/`keyboard`, optional `image_format`) and names the image with the
+ISO fields: `iso` is the cached file under `isos/`, `iso_url` the download, `iso_sha256_url` the
+vendor's `SHA256SUMS` (a `release/` image moves with every build; `iso.published_sha256` takes the
+line that names this file, see [ISO_CHECKSUMS.md](ISO_CHECKSUMS.md)). `vmctl/cloudimg.py`:
+
+- **The disk is a qcow2 overlay** on the image (`qemu-img create -b`, resized to `disk.size`;
+  cloud-init's growpart takes the room at first boot). The validated image is hard-linked by
+  content under `isos/.cloudimg/<sha256>.<format>` and the overlay points there, so a vendor
+  refresh that makes `ensure_iso` replace the cached copy never pulls the base out from under
+  a disk. `vmctl clean` removes the overlay only. A fresh overlay is a few hundred KB, so
+  `vmstate` reads the qcow2 header: an image with a backing file is a disk with data.
+  Checkpoints and clones `qemu-img convert` as always, which flattens the copy.
+- **The seed** is a NoCloud `cidata` CD (`cloud-localds`, else genisoimage/xorriso): the user
+  with the project key, the `$6$` hash and NOPASSWD sudo, `ssh_pwauth`, the packages, the
+  profile's `write_files` and, as the last `runcmd`, `/var/lib/vmctl/provision.sh`: the ttyS0
+  getty, the profile's `runcmd` lines, `touch /etc/cloud/cloud-init.disabled` (later boots carry
+  no seed, and cloud-init without a datasource would treat them as a new instance: default
+  user created again, host keys regenerated), then `sync` and the token on `/dev/ttyS0`.
+  cloud-init's own `power_state` powers the guest off afterwards (`SHUTDOWN_GRACE_SEC` 180),
+  the flush → token → natural power-off order of the rule below. A failed line prints the
+  FAILED token with its exit status.
+- **Then the usual SSH post-install** (`run_post_install`): the disk boots headless, the
+  profile's `post_install_run` lines run, `vmstate` records the install as verified.
+
+The identity and `locale` blocks of local.json reach `cloudimg_config` like every other
+section (`config.USER_IDENTITY_FIELDS`, `config.locale_values`). The first profile is
+`ubuntu-24.04-cloud` (Ubuntu 24.04 minimal, 1 GB, SSH 2358, in `smoke`). First live run
+2026-10-02: PASS, 49 s from the seed to the verified SSH post-install after a 266 MB download
+(cloud-init finished its final stage at 28 s of uptime and powered off by itself); Debian's `genericcloud` image publishes `SHA512SUMS` only, so it waits for a `sha512`
+field.
+
 ## The completion-token rule
 
 Every flow signals success by printing a token on the serial console, and every

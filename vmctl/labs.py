@@ -11,11 +11,16 @@ from __future__ import annotations
 import html
 import ipaddress
 import json
+import os
+import re
+import subprocess
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from vmctl import cloud_init, config, netlab, proxmox, pvecluster, qemu, runtime
+from vmctl import cloud_init, config, netlab, proxmox, pvecluster, qemu, runtime, state, ui
 from vmctl.errors import VMError
 
 # The tracked profiles' shared password ("lab"): a hash the map can recognise without cracking it.
@@ -90,11 +95,86 @@ def group_members(cfg: dict[str, Any], group: str) -> list[str]:
 
 
 def lab_groups(cfg: dict[str, Any]) -> list[str]:
-    """Declared groups whose members are all on a segment: the labs, in name order."""
+    """Declared groups whose members are all on a segment, or that bring their own content
+    (``vms/labs/<group>/lab.json``, a one-server lab has no segment): the labs, in name order."""
     groups = sorted({group for _, vm in config.sorted_vm_items(cfg) for group in config.declared_groups(vm)})
+    with_content = set(content_groups())
     # Every member: a category such as ``ubuntu`` holds one lab client and is still no lab.
     return [group for group in groups
-            if all(has_segment(config.get_vm(cfg, name)) for name in group_members(cfg, group))]
+            if group in with_content or all(has_segment(config.get_vm(cfg, name)) for name in group_members(cfg, group))]
+
+
+# --- lab content: vms/labs/<lab>/ ------------------------------------------------------------
+#
+# What a lab brings besides its profiles (docs/QLAB_IMPORT.md, F3): lab.json (title, summary,
+# members, exercises as do/check/try blocks in the runbook's own shape), guide.<lang>.md, the
+# provision/ files its members copy in (copy_from_host) and tests/test_NN_*.sh over _common.sh.
+
+LABS_DIR = Path("vms") / "labs"
+BLOCK_KINDS = ("do", "check", "try")
+GUIDE_LANGS = ("en", "it")
+
+
+def content_dir(group: str) -> Path:
+    return runtime.resolve_path(str(LABS_DIR / group))
+
+
+def content_groups() -> list[str]:
+    """The groups with a ``vms/labs/<group>/lab.json``."""
+    base = runtime.resolve_path(str(LABS_DIR))
+    if not base.is_dir():
+        return []
+    return sorted(entry.name for entry in base.iterdir() if entry.is_dir() and (entry / "lab.json").is_file())
+
+
+def load_content(group: str) -> dict[str, Any] | None:
+    """``vms/labs/<group>/lab.json`` validated, plus what sits next to it; None without the file."""
+    directory = content_dir(group)
+    path = directory / "lab.json"
+    if not path.is_file():
+        return None
+    what = ui.pretty_path(path)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise VMError(f"{what}: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise VMError(f"{what}: expected an object")
+    title = str(raw.get("title") or "").strip()
+    if not title:
+        raise VMError(f"{what}: 'title' is required")
+    members = raw.get("members")
+    if not isinstance(members, list) or not members or not all(isinstance(m, str) and m.strip() for m in members):
+        raise VMError(f"{what}: 'members' must be a non-empty list of profile names")
+    names = [str(m).strip() for m in members]
+    exercises: list[dict[str, Any]] = []
+    for index, item in enumerate(raw.get("exercises") or [], start=1):
+        label = f"{what}: exercises[{index}]"
+        if not isinstance(item, dict) or not str(item.get("title") or "").strip():
+            raise VMError(f"{label}: needs a title")
+        blocks: list[dict[str, Any]] = []
+        for b_index, block in enumerate(item.get("blocks") or [], start=1):
+            b_label = f"{label}.blocks[{b_index}]"
+            if not isinstance(block, dict):
+                raise VMError(f"{b_label}: expected an object")
+            kind = str(block.get("kind") or "do")
+            if kind not in BLOCK_KINDS:
+                raise VMError(f"{b_label}: 'kind' must be one of {', '.join(BLOCK_KINDS)}, not {kind!r}")
+            where = str(block.get("where") or "host")
+            if where != "host" and where not in names:
+                raise VMError(f"{b_label}: 'where' must be host or a member ({', '.join(names)}), not {where!r}")
+            commands = block.get("commands")
+            if not isinstance(commands, list) or not commands or not all(isinstance(c, str) for c in commands):
+                raise VMError(f"{b_label}: 'commands' must be a non-empty list of strings")
+            blocks.append(_block(kind, where, [str(c) for c in commands]))
+        exercises.append({"title": str(item["title"]).strip(), "text": str(item.get("text") or "").strip(), "blocks": blocks})
+    relative = (LABS_DIR / group).as_posix()
+    guides = {lang: f"{relative}/guide.{lang}.md" for lang in GUIDE_LANGS if (directory / f"guide.{lang}.md").is_file()}
+    tests_dir, provision_dir = directory / "tests", directory / "provision"
+    tests = sorted(p.name for p in tests_dir.glob("test_*.sh")) if tests_dir.is_dir() else []
+    provision = sorted(p.name for p in provision_dir.iterdir() if p.is_file()) if provision_dir.is_dir() else []
+    return {"group": group, "dir": relative, "title": title, "summary": str(raw.get("summary") or "").strip(),
+            "members": names, "exercises": exercises, "guides": guides, "tests": tests, "provision": provision}
 
 
 def start_order(cfg: dict[str, Any], names: list[str]) -> list[str]:
@@ -178,8 +258,13 @@ def model(cfg: dict[str, Any], group: str, states: dict[str, dict[str, Any]] | N
             # Guests of a hypervisor member (Proxmox containers) that the lab reaches on the segment.
             "services": [dict(entry) for entry in vm.get("lab_services") or [] if isinstance(entry, dict)],
         })
-    lab = {"group": group, "members": members, "segments": list(segments.values()),
-           "start_order": [member["name"] for member in members]}
+    lab: dict[str, Any] = {"group": group, "members": members, "segments": list(segments.values()),
+                           "start_order": [member["name"] for member in members]}
+    content = load_content(group)
+    if content is not None and set(content["members"]) != set(names):
+        raise VMError(f"{content['dir']}/lab.json lists {', '.join(content['members'])} but the profiles declaring "
+                      f"the group '{group}' are {', '.join(names)}: the two must agree")
+    lab["content"] = content
     lab["runbook"] = runbook(cfg, lab)
     return lab
 
@@ -330,6 +415,11 @@ def runbook(cfg: dict[str, Any], lab: dict[str, Any]) -> list[dict[str, Any]]:
                        "blocks": [_block("check", clients[0]["name"],
                                          [f'curl -ks -o /dev/null -w "%{{http_code}}  {url}\\n" {url}' for url in urls])]})
 
+    # The lab's own exercises (vms/labs/<lab>/lab.json), between what vmctl derives and the stack.
+    for exercise in (lab.get("content") or {}).get("exercises") or []:
+        phases.append({"title": exercise["title"], "text": exercise["text"],
+                       "blocks": [dict(block) for block in exercise["blocks"]]})
+
     phases.append({"title": "Run the stack", "text": "Infrastructure starts first and stops last.",
                    "blocks": [_block("do", "host", [f"vmctl group up {group}", f"vmctl group map {group} --open",
                                                     f"vmctl group down {group}",
@@ -339,6 +429,54 @@ def runbook(cfg: dict[str, Any], lab: dict[str, Any]) -> list[dict[str, Any]]:
         for block in phase["blocks"]:
             block["ssh"] = ssh_of.get(block["where"], "")
     return phases
+
+
+_CHECK_LINE = re.compile(r"^\s*(?:\x1b\[[0-9;]*m)*\s*\[(PASS|FAIL)\]")
+
+
+def run_lab_tests(content: dict[str, Any], dry_run: bool = False, stream: bool = True) -> list[dict[str, Any]]:
+    """``vms/labs/<lab>/tests/test_*.sh`` in order, each with bash from the checkout root and
+    ``VMCTL`` pointing at this checkout's vmctl, its output shown as it comes (and counted:
+    ``[PASS]``/``[FAIL]`` lines are _common.sh's). A script's exit status is its number of failed
+    checks; a status that is not that count is an error of the script itself (SSH down, bash
+    error), told apart from a failed check."""
+    results: list[dict[str, Any]] = []
+    env = {**os.environ, "VMCTL": str(state.ROOT / "bin" / "vmctl"), "NO_COLOR": "1"}
+    for script in content["tests"]:
+        path = runtime.resolve_path(f"{content['dir']}/tests/{script}")
+        if dry_run:
+            ui.print_note(f"Would run bash {ui.pretty_path(path)}")
+            results.append({"script": script, "status": "skipped", "passed": 0, "failed": 0, "exit": 0, "seconds": 0.0})
+            continue
+        started = time.monotonic()
+        passed = failed = 0
+        with subprocess.Popen(["bash", str(path)], cwd=str(state.ROOT), env=env, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, text=True, errors="replace") as process:
+            assert process.stdout is not None
+            for line in process.stdout:
+                mark = _CHECK_LINE.match(line)
+                if mark:
+                    passed += mark.group(1) == "PASS"
+                    failed += mark.group(1) == "FAIL"
+                if stream:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+            code = process.wait()
+        status = "passed" if code == 0 and failed == 0 else "failed" if code == failed and failed else "error"
+        results.append({"script": script, "status": status, "passed": passed, "failed": failed, "exit": code,
+                        "seconds": round(time.monotonic() - started, 3)})
+    return results
+
+
+def tests_summary(results: list[dict[str, Any]]) -> tuple[str, str]:
+    """(status, detail) over a lab's scripts: passed only when every script passed."""
+    ok = sum(r["status"] == "passed" for r in results)
+    checks = sum(r["passed"] for r in results), sum(r["failed"] for r in results)
+    errors = [r["script"] for r in results if r["status"] == "error"]
+    detail = f"{ok}/{len(results)} scripts passed, {checks[0]} checks passed, {checks[1]} failed"
+    if errors:
+        detail += f"; script error: {', '.join(errors)}"
+    return ("passed" if ok == len(results) and results else "failed", detail)
 
 
 # --- the map ---------------------------------------------------------------------------------
@@ -570,12 +708,23 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
                     f'<td>{"<br><br>".join(nics)}</td></tr>')
     group = esc(lab["group"])
     order = " → ".join(esc(name) for name in lab["start_order"])
+    content = lab.get("content") or {}
+    heading = esc(str(content.get("title") or lab["group"]))
+    intro = f'<p>{esc(content["summary"])}</p>' if content.get("summary") else ""
+    if content:
+        pieces = [f'content in <code>{esc(content["dir"])}/</code>']
+        if content.get("guides"):
+            pieces.append("guide " + ", ".join(f'<code>{esc(path)}</code>' for path in content["guides"].values()))
+        if content.get("tests"):
+            pieces.append(f'{len(content["tests"])} test script(s) under <code>tests/</code>')
+        intro += f'<p class="sub">{" · ".join(pieces)}</p>'
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{group} network map</title><style>{_CSS}</style></head>
 <body><main>
-<h1>{group}</h1>
-<p class="sub">{len(lab["members"])} VMs · {running} running · {len(lab["segments"])} segment(s) · generated {when} by <code>vmctl group map {group}</code></p>
+<h1>{heading}</h1>
+<p class="sub">{group} · {len(lab["members"])} VMs · {running} running · {len(lab["segments"])} segment(s) · generated {when} by <code>vmctl group map {group}</code></p>
+{intro}
 <div class="map">{_svg(lab)}</div>
 <p class="sub">Every NAT NIC is a private slirp {SLIRP_SUBNET} of its own VM: the guest reaches the Internet, the host reaches it only through the forwards on 127.0.0.1. The segments are shared between the VMs of this host only.</p>
 <h2>Access</h2>
