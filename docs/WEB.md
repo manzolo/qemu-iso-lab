@@ -12,6 +12,9 @@ What the page offers:
 
 - **Profiles**: every profile with its live state, search (`/`) and the filters of the dashboard
   (the workspace tabs My VMs, Catalog and Labs, then the machine filters All, Running, Stopped, To install, With disk and Hidden while there are hidden profiles). The × in the search box clears the text and keeps the current filter.
+  The **Sort** selector defaults to running machines first, then natural name order (Windows 7
+  before Windows 11), with name A–Z, name Z–A and installed first as alternatives. The browser remembers
+  your choice across reloads; changing it keeps the selected machine.
 - **My VMs**: the profiles you chose out of the catalog (plus whatever is running right now,
   so a running VM never hides). Its opposite is **Hide from the lists** (right-click a row, or a
   selection): a hidden profile leaves All and With disk, still shows while it runs or holds a
@@ -96,9 +99,10 @@ What the page offers:
   The browser shows upload progress followed by **Saving in VM** until SFTP confirms completion.
   If a connection fails, refresh the folder before retrying. A lost SSH connection may leave a
   hidden `.vmctl-upload-*.part` file when cleanup cannot reach the guest.
-  The header is four captioned groups: **Display** (fit, keyboard, clipboard), **Guest** (SSH,
-  files, integration), **Capture** (screenshot, record and its frame rate) and **Machine**
-  (stop), then the window actions Detach, Full screen and Close.
+  The header is three captioned groups: **Display** (fit, keyboard, clipboard), **Guest** (files,
+  integration, SSH) and **Capture** (screenshot, record and its frame rate), then **Stop** and the
+  window actions Detach, Full screen and Close. In a narrow console (a pane of `/multi`, a phone)
+  the actions become icons, named by their tooltips, and wrap instead of scrolling.
   **Stop** asks the guest to power off (`vmctl stop`, confirmed in the page's own dialog, with a
   **Force** checkbox that turns it into `vmctl stop --force` for a guest that answers nothing):
   the console shows the shutdown and closes by itself once the VM is off.

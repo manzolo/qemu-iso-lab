@@ -19,6 +19,7 @@ button.danger { color:var(--bad); border-color:#603846; background:#30212e; }
 button.link { background:none; color:var(--accent); padding:0; }
 :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 input[type=text],input[type=number],input:not([type]),select,textarea { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-width:0; }
+select option,select optgroup { background:var(--panel); color:var(--text); }
 input[type=checkbox] { accent-color:var(--accent); width:16px; height:16px; flex-shrink:0; }
 header { display:flex; align-items:center; gap:14px; padding:16px 24px; border-bottom:1px solid var(--line); }
 header h1 { font-size:17px; margin:0; font-weight:650; letter-spacing:-.025em; }
@@ -62,6 +63,10 @@ main > section:last-child { position:sticky; top:16px; }
 }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; box-shadow:0 8px 30px #00000012; }
 .card h2 { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:0; padding:17px 18px; border-bottom:1px solid var(--line); }
+.list-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 18px; border-bottom:1px solid var(--line); }
+.list-heading h2 { padding:0; border:0; }
+.list-sort { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:11px; }
+#vm-sort { padding:5px 8px; font-size:12px; background:transparent; }
 table { width:100%; border-collapse:collapse; }
 th { text-align:left; font-weight:500; color:var(--muted); font-size:11px; padding:10px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel); }
 td { padding:12px 16px; border-bottom:1px solid #253145; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:360px; }
@@ -384,17 +389,19 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 #console-shell .console-heading .eyebrow::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--muted); }
 #console-shell[data-connected="true"] .console-heading .eyebrow::before { background:var(--accent); box-shadow:0 0 9px #7ddfc566; }
 #console-shell .console-heading .machine-icon { box-shadow:0 4px 14px #0003; }
-#console-shell > header .console-toolbar { grid-row:2; grid-column:1/-1; justify-content:flex-start; flex-wrap:nowrap; gap:10px; }
-.console-action-group { display:flex; gap:4px; align-items:center; padding:4px; border:1px solid #304257; border-radius:12px; background:#0b142344; }
-/* Each group says what it is for: a small caption inside its pill (Display · Guest · Capture · Machine). */
-.console-action-group[data-group]::before { content:attr(data-group); padding:0 6px 0 8px; font-size:9px; font-weight:650; letter-spacing:.16em; text-transform:uppercase; color:#6f86a0; white-space:nowrap; }
-#console-shell > header .console-machine { margin-right:8px; }
+#console-shell > header .console-toolbar { grid-row:2; grid-column:1/-1; justify-content:flex-start; flex-wrap:nowrap; gap:10px; min-width:0; overflow-x:auto; }
+.console-action-group { position:relative; display:flex; gap:4px; align-items:center; padding:18px 0 0; }
+/* Quiet captions and separators leave the actions themselves easy to scan. */
+.console-action-group[data-group]::before { content:attr(data-group); position:absolute; top:0; left:8px; font-size:9px; font-weight:650; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); white-space:nowrap; }
+.console-toolbar > .console-action-group + .console-action-group { border-left:1px solid #304257; padding-left:12px; }
+.console-toolbar > .console-action-group + .console-action-group::before { left:20px; }
+#console-shell > header .console-machine { padding:0 10px 0 0; margin-right:2px; border-right:1px solid #304257; }
 #console-shell > header .console-window-actions .console-machine button { background:#2b2430; border-color:#5a3a46; color:#ffb9c5; }
 #console-shell > header .console-machine button:hover:not(:disabled) { background:#432b39; border-color:#754353; color:#ffd0d8; }
 .console-capture { flex-shrink:0; }
 .console-window-actions { grid-row:1; grid-column:2; display:flex; align-items:center; gap:6px; }
 #console-shell button,#console-shell select { transition:background .15s,border-color .15s,color .15s,box-shadow .15s; }
-#console-shell > header button,#console-shell > header select { min-height:36px; padding:8px 10px; border:1px solid #34465d; border-radius:8px; background:#203047; color:#c5d3e4; font-size:12px; white-space:nowrap; }
+#console-shell > header button,#console-shell > header select { min-height:36px; padding:8px 10px; border:1px solid transparent; border-radius:8px; background:transparent; color:#c5d3e4; font-size:12px; white-space:nowrap; }
 button .console-button-icon { display:inline-flex; flex:0 0 15px; width:15px; height:15px; color:#92aecb; }
 button:has(.console-button-icon) { display:inline-flex; align-items:center; justify-content:center; gap:7px; }
 button .console-button-icon svg { width:100%; height:100%; }
@@ -438,18 +445,19 @@ button .console-button-icon svg { width:100%; height:100%; }
   #console-shell > header > .console-window-actions { grid-row:1; grid-column:2; }
 }
 @media(max-width:1100px) {
-  #console-shell > header #vnc-fit .console-button-label,
-  #console-shell > header #vnc-keyboard .console-button-label,
-  #console-shell > header #vnc-clipboard .console-button-label,
-  #console-shell > header #vnc-screenshot .console-button-label { display:none; }
+  #console-shell > header #vnc-fit .console-button-label { display:none; }
+  #console-shell > header > .console-toolbar { gap:8px; }
+  #console-shell > header .console-toolbar button { padding:7px; font-size:11px; gap:5px; }
   #console-shell > header #vnc-record-fps { max-width:104px; }
 }
 @media(max-width:720px) {
   #console-shell > header { gap:10px; padding:10px 12px; }
-  #console-shell > header > .console-toolbar { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; padding-bottom:4px; width:100%; }
+  /* Narrow (a /multi pane, a phone): icon-only actions whose groups wrap, never a scrollbar. */
+  #console-shell > header > .console-toolbar { flex-wrap:wrap; overflow:visible; justify-content:flex-start; row-gap:6px; width:100%; }
   #console-shell > header button { flex:none; }
-  #console-shell > header .console-action-group { flex-shrink:0; }
-  .console-action-group[data-group]::before { display:none; }
+  #console-shell > header .console-action-group { flex-shrink:0; gap:2px; }
+  #console-shell > header .console-toolbar .console-button-label { display:none; }
+  #console-shell > header .console-toolbar button:has(.console-button-icon) { padding:7px 8px; }
   #console-shell .console-heading h1 { max-width:155px; font-size:13px; }
   #console-shell > header .console-window-actions button { padding:6px; }
   #console-shell > header .console-window-actions .console-button-label { display:none; }
@@ -751,7 +759,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <div id="recording-controls" class="hidden"><span id="recording-status" role="status"></span><button id="recording-stop">Stop recording</button><button id="recording-open" class="hidden">Download recording</button><button id="recording-dismiss" class="hidden" aria-label="Dismiss recording notice" title="Dismiss this notice; the recording stays available in the console">×</button></div>
 <main id="profiles-view">
   <nav id="lab-navigation" class="lab-navigation hidden" aria-label="Lab navigation"><button id="back-to-labs">← Labs</button><span aria-hidden="true">/</span><span id="lab-origin" class="mono"></span><span aria-hidden="true">/</span><span id="lab-current-vm" class="mono" aria-current="page"></span></nav>
-  <section class="card"><h2 id="list-title">Profiles</h2>
+  <section class="card"><div class="list-heading"><h2 id="list-title">Profiles</h2><label class="list-sort" for="vm-sort">Sort<select id="vm-sort"><option value="running">Running first</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="installed">Installed first</option></select></label></div>
     <p id="selection-hint">Double-click to open · Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
     <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-console" title="Start the selected machines and open their consoles side by side on one page">Start in console</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
@@ -783,12 +791,12 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
       <button id="vnc-clipboard" aria-expanded="false" aria-controls="console-panel">Clipboard</button>
       </div>
       <div class="console-action-group" data-group="Guest">
-      <button id="vnc-ssh" aria-expanded="false" aria-controls="console-ssh">SSH</button>
       <button id="vnc-files" aria-expanded="false" aria-controls="console-panel">Files</button>
       <button id="vnc-integration" aria-expanded="false" aria-controls="console-panel">Integration</button>
+      <button id="vnc-ssh" aria-expanded="false" aria-controls="console-ssh">SSH</button>
       </div>
       <div class="console-action-group console-capture" data-group="Capture"><button id="vnc-screenshot" disabled>Screenshot</button><button id="vnc-record" disabled>Record</button><select id="vnc-record-fps" aria-label="Recording frame rate" title="Capture frame rate for MP4; GIF exports at 1 fps"><option value="1">1 fps</option><option value="5">5 fps</option><option value="10" selected>10 fps</option><option value="15">15 fps</option></select></div>
-    </div><div class="console-window-actions"><div class="console-action-group console-machine" data-group="Machine"><button id="vnc-stop" title="Ask the guest to power off (vmctl stop), or force it">Stop</button></div><button id="vnc-detach" title="Open console in a separate window">Detach</button><button id="vnc-full" title="Toggle full screen">Full screen</button><button id="vnc-close" title="Close console">Close</button></div>
+    </div><div class="console-window-actions"><div class="console-action-group console-machine"><button id="vnc-stop" title="Ask the guest to power off (vmctl stop), or force it">Stop</button></div><button id="vnc-detach" title="Open console in a separate window">Detach</button><button id="vnc-full" title="Toggle full screen">Full screen</button><button id="vnc-close" title="Close console">Close</button></div>
   </header>
   <div id="console-workspace"><div id="console-desktop"><div id="console-stage"><div id="vnc-screen"></div>
     <div id="console-connection" hidden><div class="console-connection-card"><span class="console-connection-symbol" aria-hidden="true"></span><h2 id="console-connection-title" role="status">Connecting to VM</h2><p id="console-connection-note"></p><div class="console-connection-actions"><button id="console-retry" class="primary">Reconnect now</button><button id="console-back">Back to machines</button></div></div></div></div>
@@ -1300,8 +1308,13 @@ function matchesStatus(r, mode = statusFilter) {
 }
 function visible() {
   const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
+  const order = $("vm-sort").value;
   return scopeRows().filter(r => matchesStatus(r) && words.every(w => (r.name + " " + r.label + " " + r.family).toLowerCase().includes(w)))
-    .sort((x, y) => (y.running - x.running) || (y.installed - x.installed) || (y.prepared - x.prepared) || x.name.localeCompare(y.name, undefined, { numeric: true }));
+    .sort((x, y) => {
+      const priority = order === "running" ? Number(!!y.running) - Number(!!x.running)
+        : order === "installed" ? Number(!!y.installed) - Number(!!x.installed) : 0;
+      return priority || (order === "name-desc" ? -1 : 1) * x.name.localeCompare(y.name, "en", { numeric:true, sensitivity:"base" });
+    });
 }
 function updateProfileRows(html) {
   // Polling must not replace the button under a stationary pointer: doing so resets
@@ -1956,6 +1969,7 @@ try { dismissedRecording = sessionStorage.getItem("vmctl-recording-dismissed") |
 function renderRecording() {
   const rec = consoleRecording, active = rec?.status === "recording";
   consoleButton("vnc-record", active ? "Stop recording" : rec ? "Saved recording" : "Record", active ? "stop" : "record");
+  $("vnc-record").title = $("vnc-record").getAttribute("aria-label");
   $("vnc-record").classList.toggle("recording", !!active);
   $("vnc-record-fps").disabled = recordingBusy || !!rec;
   $("vnc-record").disabled = recordingBusy || (!rec && $("vnc-status").textContent !== "Connected");
@@ -3027,6 +3041,15 @@ window.addEventListener("resize",closeContext);
 document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
 document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { setFilter(b.dataset.filter); }));
 document.querySelectorAll("[data-status-filter]").forEach(b => b.onclick = () => setStatusFilter(b.dataset.statusFilter));
+try {
+  const saved = localStorage.getItem("vmctl-sort");
+  if ([...$("vm-sort").options].some(option => option.value === saved)) $("vm-sort").value = saved;
+} catch (_) { /* storage is optional */ }
+$("vm-sort").onchange = () => {
+  try { localStorage.setItem("vmctl-sort", $("vm-sort").value); } catch (_) { /* storage is optional */ }
+  selectionAnchor = "";
+  hideHoverShot(); render(); $("list").scrollTop = 0;
+};
 // Hovering the icon of a running machine shows its screen: a QMP screendump (or VNC for accelerated
 // displays), fetched after a short pause so sweeping the mouse across the list asks for nothing.
 // Only the icon, so reading the list shows nothing; a right-click (the context menu) hides it
@@ -3229,6 +3252,7 @@ document.addEventListener("keydown", (e) => {
   // Typing anywhere filters the list: the search box takes focus on the first letter.
   if (e.key.length === 1 && e.key !== " " && plain && !inField) { $("search").focus(); return; }
   if (/BUTTON|A|SUMMARY/.test(document.activeElement.tagName)) return;
+  if (inField && document.activeElement !== $("search")) return;
   if (document.activeElement === $("search") && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
   const rows = visible(), i = rows.findIndex((r) => r.name === selected);
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const r = rows[Math.max(0, Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (r) { selected = r.name; render(); document.querySelector("tr.sel")?.scrollIntoView({ block: "nearest" }); } }

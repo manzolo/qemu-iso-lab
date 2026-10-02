@@ -133,6 +133,29 @@ try {
   mkdirSync(root+'artifacts/webui-review',{recursive:true});
   await page.goto(`http://127.0.0.1:${server.address().port}/?token=fixture`);
   await page.locator('#rows [data-vm]').first().waitFor();
+  const rowNames = () => page.locator('#rows tr[data-vm]').evaluateAll(rows=>rows.map(row=>row.dataset.vm));
+  assert.equal(await page.locator('#vm-sort').inputValue(),'running');
+  assert.deepEqual(await rowNames(),['arch-noctalia','alpine-ci','debian-server','proxmox-ve','proxmox-ve-node2']);
+  await page.locator('#vm-sort').selectOption('name');
+  assert.deepEqual(await rowNames(),['alpine-ci','arch-noctalia','debian-server','proxmox-ve','proxmox-ve-node2']);
+  await page.locator('#rows [data-vm="arch-noctalia"] .profile-name').click();
+  await page.locator('#vm-sort').selectOption('name-desc');
+  assert.deepEqual(await rowNames(),['proxmox-ve-node2','proxmox-ve','debian-server','arch-noctalia','alpine-ci']);
+  assert.equal(await page.locator('#details .name').textContent(),'arch-noctalia');
+  await page.reload(); await page.locator('#rows [data-vm]').first().waitFor();
+  assert.equal(await page.locator('#vm-sort').inputValue(),'name-desc');
+  await page.locator('#vm-sort').selectOption('installed');
+  assert.deepEqual(await rowNames(),['arch-noctalia','debian-server','proxmox-ve','proxmox-ve-node2','alpine-ci']);
+  await page.locator('#vm-sort').selectOption('name');
+  await page.evaluate(()=>{
+    S.vms.push(...['windows-11','windows-7','ubuntu-26.04','ubuntu-8.04'].map(name=>({...S.vms[0],name,running:false})));
+    render();
+  });
+  assert.deepEqual((await rowNames()).filter(name=>/^(windows|ubuntu)-/.test(name)),['ubuntu-8.04','ubuntu-26.04','windows-7','windows-11']);
+  await page.evaluate(()=>refresh());
+  await page.locator('#vm-sort').selectOption('running');
+  assert.deepEqual(await rowNames(),['arch-noctalia','alpine-ci','debian-server','proxmox-ve','proxmox-ve-node2']);
+  check('natural name sorting, explicit status priorities, saved preference and stable selection');
   assert.equal(await page.locator('#running-count').textContent(),'1');
   assert.equal(await page.locator('#details .name').textContent(),'arch-noctalia');
   await shot('dashboard'); check('dashboard and profile');
@@ -527,6 +550,7 @@ try {
   await shot('commands');
   await page.locator('#cmd-dialog [data-close]').click();
   await page.locator('#details [data-action="0"]').click(); await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  assert.deepEqual(await page.locator('.console-action-group[data-group="Guest"] button').evaluateAll(buttons=>buttons.map(button=>button.id)),['vnc-files','vnc-integration','vnc-ssh']);
   await page.locator('#vnc-fit').click(); assert.equal(await page.locator('#vnc-fit').textContent(),'Actual size');
   await page.locator('#vnc-keyboard').click();
   await page.locator('#vnc-cad').click(); assert(await page.evaluate(()=>window.sentCAD));
@@ -565,10 +589,21 @@ try {
   await page.mouse.move(dividerBox.x+50,dividerBox.y+4); await page.mouse.down(); await page.mouse.move(dividerBox.x+50,dividerBox.y-40); await page.mouse.up();
   assert(Number(await page.locator('#console-divider').getAttribute('aria-valuenow'))>43);
   await shot('console-tools');
-  for (const width of [925,600,375]) {
+  for (const width of [925,768,600,375]) {
     await page.setViewportSize({width,height:909});
     const closeBox=await page.locator('#vnc-close').boundingBox(); assert(closeBox.x>=0 && closeBox.x+closeBox.width<=width);
     const heading=await page.locator('#vnc-title').boundingBox(); assert(heading.height<30);
+    if(width===925) {
+      const toolbar=await page.locator('#console-shell > header > .console-toolbar').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth}));
+      assert(toolbar.scroll<=toolbar.width,'console actions fit at laptop width');
+      for(const id of ['vnc-keyboard','vnc-clipboard','vnc-screenshot']) assert(await page.locator('#'+id+' .console-button-label').isVisible());
+    }
+    if(width<=600) {
+      const toolbar=await page.locator('#console-shell > header > .console-toolbar').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth}));
+      assert(toolbar.scroll<=toolbar.width,'narrow console actions wrap instead of scrolling');
+      assert(!(await page.locator('#vnc-keyboard .console-button-label').isVisible()),'narrow console actions are icons only');
+      if(width===600) await shot('console-narrow');
+    }
     await page.locator('#vnc-clipboard').click();
     const panel=await page.locator('#console-panel').boundingBox(); assert(panel.x>=0 && panel.x+panel.width<=width);
     if(width===925) await shot('console-laptop');
