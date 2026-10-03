@@ -4,6 +4,9 @@
     tools/build_catalog_site.py            # -> site/ (index.html, catalog.json, icons)
     tools/build_catalog_site.py --out DIR
 
+With docs/media/tour/tour.json (the intro clips, on the media branch like the install clips) the
+site also gets tour.html: a player, the playlist and the subtitles in English and Italian.
+
 One self-contained page: search, filters by family / kind of install / role / status, a card
 per profile (facts, version and its history, the last live PASS, the commands to run) and a
 basket that turns the profiles you tick into one `vmctl catalog add ...` line. catalog.json is
@@ -138,6 +141,7 @@ button.primary,.primary-link { background:var(--accent); color:#10251f; border:1
 .brand-label { margin-left:4px; padding-left:16px; border-left:1px solid var(--line); color:var(--muted); font-size:12px; }
 .brand nav { margin-left:auto; display:flex; align-items:center; gap:24px; font-size:12px; }
 .brand nav a { color:var(--muted); } .brand nav a:hover { color:var(--accent); }
+.brand nav a.tour { color:var(--accent); border:1px solid #8aead040; border-radius:7px; padding:3px 10px; background:#8aead010; }
 h1 { font-size:26px; line-height:1.2; letter-spacing:-.8px; margin:0 0 6px; }
 .start { margin:12px 0; max-width:680px; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
 .setup { margin:0 0 8px; }
@@ -243,13 +247,13 @@ footer { color:var(--muted); font-size:11px; padding:30px 0 0; }
 @media (min-width:1500px) { .site-header,main { max-width:1440px; } }
 @media (max-width:1050px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .search-row { gap:10px; } #kind { flex-shrink:0; } }
 @media (max-width:760px) { .site-header,main { padding-left:22px; padding-right:22px; } .brand nav { gap:14px; } .brand-label { display:none; } #kind { width:100%; } #kind button { flex:1; } .filter-label { display:none; } .filter-row { gap:8px; } }
-@media (max-width:520px) { .site-header,main { padding-left:16px; padding-right:16px; } .brand nav a:first-child { display:none; } h1 { font-size:23px; } .grid { grid-template-columns:1fr; } .catalog-heading { align-items:flex-start; gap:8px; } #count { padding-top:5px; font-size:10px; } .chips button { padding:6px 8px; font-size:10px; } #family { flex:1 1 100%; margin:0; } #basket { left:8px; right:8px; bottom:8px; padding:12px; gap:8px; } #basket .cmd { order:3; flex-basis:100%; } #basket small { order:4; } #basket-count { margin-right:auto; } .terminal-body { padding:18px 16px 8px; } }
+@media (max-width:520px) { .site-header,main { padding-left:16px; padding-right:16px; } .brand nav a.doc { display:none; } h1 { font-size:23px; } .grid { grid-template-columns:1fr; } .catalog-heading { align-items:flex-start; gap:8px; } #count { padding-top:5px; font-size:10px; } .chips button { padding:6px 8px; font-size:10px; } #family { flex:1 1 100%; margin:0; } #basket { left:8px; right:8px; bottom:8px; padding:12px; gap:8px; } #basket .cmd { order:3; flex-basis:100%; } #basket small { order:4; } #basket-count { margin-right:auto; } .terminal-body { padding:18px 16px 8px; } }
 @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .card { transition:none; } .card:hover { transform:none; } }
 </style>
 </head>
 <body>
 <header class="site-header">
-  <div class="brand"><a class="logo" href="__REPO__" aria-label="QEMU ISO Lab repository">&gt;_</a><a class="brand-name" href="__REPO__">QEMU <b>ISO Lab</b></a><span class="brand-label">THE VM CATALOG</span><nav aria-label="Main navigation"><a href="__REPO__#readme">Documentation</a><a href="__REPO__">GitHub ↗</a></nav></div>
+  <div class="brand"><a class="logo" href="__REPO__" aria-label="QEMU ISO Lab repository">&gt;_</a><a class="brand-name" href="__REPO__">QEMU <b>ISO Lab</b></a><span class="brand-label">THE VM CATALOG</span><nav aria-label="Main navigation">__TOUR_NAV__<a class="doc" href="__REPO__#readme">Documentation</a><a href="__REPO__">GitHub ↗</a></nav></div>
 </header>
 <main id="catalog">
   <div class="catalog-heading"><div><h1>Find your next machine</h1><div class="metrics"><span><strong id="m-profiles">—</strong> profiles</span><span><strong id="m-unattended">—</strong> automated</span><span><strong id="m-verified">—</strong> verified</span></div></div><span id="count" role="status" aria-live="polite"></span></div>
@@ -258,7 +262,7 @@ footer { color:var(--muted); font-size:11px; padding:30px 0 0; }
       <div class="terminal-step"><small>01 / Get the toolkit</small><code>git clone __REPO__.git</code><code>cd qemu-iso-lab</code></div>
       <div class="terminal-step"><small>02 / Set up your host</small><code>./setup.sh</code></div>
       <div class="terminal-step"><small>03 / Open your dashboard</small><code>vmctl web --open</code></div>
-    </div><div class="terminal-note"><span>Linux + KVM · Windows 11 + WSL2</span><button data-copy="git clone __REPO__.git &amp;&amp; cd qemu-iso-lab&#10;./setup.sh&#10;vmctl web --open">Copy setup</button></div></div>
+    </div>__TOUR_START__<div class="terminal-note"><span>Linux + KVM · Windows 11 + WSL2</span><button data-copy="git clone __REPO__.git &amp;&amp; cd qemu-iso-lab&#10;./setup.sh&#10;vmctl web --open">Copy setup</button></div></div>
   </details>
   <div id="toolbar">
     <div class="search-row"><div class="search-wrap"><input id="search" type="search" placeholder="Search profiles… e.g. ubuntu 26, fedora kde" autocomplete="off" aria-label="Search profiles"><kbd aria-hidden="true">/</kbd></div>
@@ -404,6 +408,142 @@ render();
 """
 
 
+TOUR_PAGE = r"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QEMU ISO Lab · tour</title>
+<meta name="description" content="Short clips, with English and Italian subtitles: the catalog, the setup, a first VM, the console in the browser and a lab of two machines.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%237ddfc5'/%3E%3Cpath d='M7 8l4 4-4 4M12 16h5' stroke='%230c111b' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root { color-scheme:dark; --bg:#0b1017; --panel:#131c27; --panel2:#192432; --line:#293646; --text:#edf3fa; --muted:#9aabbe; --accent:#8aead0; --btn:#202d3d; }
+* { box-sizing:border-box; }
+body { margin:0; background:radial-gradient(ellipse 70% 650px at 80% 0%,#19333765,transparent),var(--bg); color:var(--text); font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
+a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+button { font:inherit; cursor:pointer; background:var(--btn); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 12px; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.site-header,main { max-width:1320px; margin:auto; padding:0 36px; }
+.brand { display:flex; align-items:center; gap:12px; min-height:64px; border-bottom:1px solid var(--line); }
+.logo { width:36px; height:36px; border:1px solid #8aead050; border-radius:10px; display:grid; place-items:center; color:var(--accent); background:#8aead012; font:700 18px ui-monospace,monospace; }
+.brand-name { color:var(--text); font-size:17px; font-weight:700; letter-spacing:-.5px; } .brand-name b { color:var(--accent); }
+.brand-label { margin-left:4px; padding-left:16px; border-left:1px solid var(--line); color:var(--muted); font-size:12px; }
+.brand nav { margin-left:auto; display:flex; align-items:center; gap:20px; font-size:12px; } .brand nav a { color:var(--muted); }
+.head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; padding:26px 0 18px; flex-wrap:wrap; }
+h1 { font-size:30px; letter-spacing:-.8px; margin:0; line-height:1.2; }
+.head p { color:var(--muted); margin:6px 0 0; max-width:640px; }
+.lang { display:flex; gap:4px; background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:4px; }
+.lang button { border:0; background:transparent; color:var(--muted); padding:5px 12px; font-size:12px; }
+.lang button[aria-pressed=true] { background:#8aead018; color:var(--accent); }
+.layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:22px; align-items:start; padding-bottom:60px; }
+.player { background:#000; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+video { display:block; width:100%; aspect-ratio:16/9; background:#000; }
+.now { padding:14px 18px; background:var(--panel); border-top:1px solid var(--line); display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.now h2 { font-size:17px; margin:0; } .now span { color:var(--muted); font-size:12px; white-space:nowrap; }
+ol { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+ol button { width:100%; display:grid; grid-template-columns:120px 1fr; gap:12px; text-align:left; padding:8px; border-radius:11px; background:var(--panel); align-items:center; }
+ol button:hover { background:var(--panel2); }
+ol button[aria-current=true] { border-color:var(--accent); background:#8aead00d; }
+ol img { width:120px; aspect-ratio:16/9; object-fit:cover; border-radius:7px; display:block; background:#000; }
+ol b { display:block; font-size:13px; line-height:1.3; } ol small { color:var(--muted); font-size:11px; }
+.note { color:var(--muted); font-size:12px; margin-top:12px; }
+@media (max-width:980px) { .layout { grid-template-columns:1fr; } }
+@media (max-width:560px) { .site-header,main { padding:0 16px; } .brand-label { display:none; } h1 { font-size:24px; } ol button { grid-template-columns:96px 1fr; } ol img { width:96px; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="brand"><a class="logo" href="__REPO__" aria-label="QEMU ISO Lab repository">&gt;_</a><a class="brand-name" href="./">QEMU <b>ISO Lab</b></a><span class="brand-label">THE TOUR</span><nav aria-label="Main navigation"><a href="./">Catalog</a><a href="__REPO__">GitHub ↗</a></nav></div>
+</header>
+<main>
+  <div class="head"><div><h1 id="t-title"></h1><p id="t-lead"></p></div>
+    <div class="lang" role="group" aria-label="Language"><button data-lang="en">English</button><button data-lang="it">Italiano</button></div></div>
+  <div class="layout">
+    <section><div class="player"><video id="video" controls playsinline preload="metadata"></video>
+      <div class="now"><h2 id="now-title"></h2><span id="now-meta"></span></div></div>
+      <p class="note" id="t-note"></p></section>
+    <ol id="list" aria-label="Clips"></ol>
+  </div>
+</main>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const TOUR = JSON.parse(document.getElementById("data").textContent);
+const TEXT = {
+  en: { title: "Take the tour", lead: "Five short clips, from the catalog to a lab of two machines. Subtitles in English and Italian; each clip plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked.", clip: "Clip", of: "of" },
+  it: { title: "Il tour", lead: "Cinque clip brevi, dal catalogo a un lab di due macchine. Sottotitoli in italiano e in inglese; ogni clip prosegue nella successiva.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate.", clip: "Clip", of: "di" },
+};
+let lang = "en", current = 0;
+try { lang = localStorage.getItem("qil-tour-lang") || ((navigator.language || "en").startsWith("it") ? "it" : "en"); } catch { lang = (navigator.language || "en").startsWith("it") ? "it" : "en"; }
+const $ = (id) => document.getElementById(id);
+const video = $("video");
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
+function tracks() {
+  video.querySelectorAll("track").forEach((t) => t.remove());
+  const clip = TOUR.clips[current];
+  for (const code of ["en", "it"]) {
+    const t = document.createElement("track");
+    t.kind = "subtitles"; t.srclang = code; t.label = code === "en" ? "English" : "Italiano"; t.src = clip.subtitles[code];
+    video.appendChild(t);
+  }
+  showLang();
+}
+// One subtitle track on screen: the mode is set on each <track>'s own TextTrack.
+function showLang() { video.querySelectorAll("track").forEach((el) => { el.track.mode = el.srclang === lang ? "showing" : "disabled"; }); }
+function load(index, play) {
+  current = index;
+  const clip = TOUR.clips[index];
+  video.src = clip.video; video.poster = clip.poster;
+  tracks();
+  render();
+  history.replaceState(null, "", "#" + clip.id);
+  if (play) video.play().catch(() => {});
+}
+function render() {
+  const t = TEXT[lang], clip = TOUR.clips[current];
+  document.documentElement.lang = lang;
+  $("t-title").textContent = t.title; $("t-lead").textContent = t.lead; $("t-note").textContent = t.note;
+  $("now-title").textContent = clip.title[lang];
+  $("now-meta").textContent = `${t.clip} ${current + 1} ${t.of} ${TOUR.clips.length} · ${mmss(clip.duration)}`;
+  document.querySelectorAll(".lang button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  $("list").innerHTML = TOUR.clips.map((c, i) => `<li><button data-i="${i}" aria-current="${i === current}"><img src="${esc(c.poster)}" alt="" loading="lazy"><span><b>${esc(c.title[lang])}</b><small>${mmss(c.duration)}</small></span></button></li>`).join("");
+}
+$("list").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (b) load(Number(b.dataset.i), true); };
+document.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => {
+  lang = b.dataset.lang;
+  try { localStorage.setItem("qil-tour-lang", lang); } catch {}
+  showLang();
+  render();
+}));
+// Chromium's automatic track selection runs once the metadata arrives and can turn a second
+// track on: the choice is applied again then.
+video.addEventListener("loadedmetadata", showLang);
+video.onended = () => { if (current + 1 < TOUR.clips.length) load(current + 1, true); };
+const start = TOUR.clips.findIndex((c) => "#" + c.id === location.hash);
+load(start < 0 ? 0 : start, false);
+</script>
+</body>
+</html>
+"""
+
+
+def collect_tour(media: Path, out: Path) -> list[dict[str, Any]]:
+    """The tour (``<media>/tour/tour.json`` + its clips, posters and WebVTT subtitles, recorded by
+    hand in a lab VM): copied to ``<out>/tour/``; an empty list when there is none."""
+    index = media / "tour" / "tour.json"
+    if not index.is_file():
+        return []
+    clips = json.loads(index.read_text(encoding="utf-8"))["clips"]
+    target = out / "tour"
+    target.mkdir(parents=True, exist_ok=True)
+    for clip in clips:
+        for name in (clip["video"], clip["poster"], *clip["subtitles"].values()):
+            shutil.copy2(media / "tour" / name, target / name)
+        clip["video"], clip["poster"] = f"tour/{clip['video']}", f"tour/{clip['poster']}"
+        clip["subtitles"] = {lang: f"tour/{name}" for lang, name in clip["subtitles"].items()}
+    return clips
+
+
 def collect_media(root: Path, out: Path, media: Path | None, names: list[str]) -> dict[str, dict[str, str]]:
     """Per profile, the install clip files found under ``<media>/<vm>/`` (``vmctl record`` output:
     recording.mp4, recording.gif, poster.png), copied to ``<out>/media/<vm>/``; site-relative paths."""
@@ -454,7 +594,14 @@ def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "c
     shutil.copy2(web / "icons.js", out / "icons.js")
     # The sprite is inlined (hidden) so <use href="#arch"> works from file:// too, not only over HTTP.
     sprite = (web / "distro-icons.svg").read_text(encoding="utf-8").replace('<svg xmlns="http://www.w3.org/2000/svg">', '<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">', 1)
-    page = (PAGE.replace("__SPRITE__", sprite).replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
+    tour = collect_tour(media if media is not None else root / "docs" / "media", out)
+    if tour:
+        (out / "tour.html").write_text(TOUR_PAGE.replace("__REPO__", REPO_URL).replace(
+            "__DATA__", json.dumps({"clips": tour}, ensure_ascii=False).replace("</", "<\\/")), encoding="utf-8")
+    tour_nav = '<a class="tour" href="tour.html">▶ Tour</a>' if tour else ""
+    tour_start = ('<div class="terminal-note"><span>New to it? Five short clips show the whole road, '
+                  'with English and Italian subtitles.</span><a href="tour.html">▶ Take the tour</a></div>') if tour else ""
+    page = (PAGE.replace("__TOUR_NAV__", tour_nav).replace("__TOUR_START__", tour_start).replace("__SPRITE__", sprite).replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
             .replace("__VMCTL__", data["vmctl_version"]).replace("__GENERATED__", data["generated"])
             .replace("__COMMIT__", f" · {data['commit']}" if data["commit"] else "").replace("__REPO__", REPO_URL))
     (out / "index.html").write_text(page, encoding="utf-8")

@@ -59,6 +59,26 @@ class CatalogSiteTests(unittest.TestCase):
         self.assertIn('id="links-chip"', page)
         self.assertIsNone(self.data["links_checked"])  # without --links there is no badge at all
 
+    def test_the_tour_page_comes_with_its_clips_and_only_then(self):
+        media = Path(self.tempdir.name) / "media"
+        (media / "tour").mkdir(parents=True)
+        clip = {"id": "01-x", "title": {"en": "1 · X", "it": "1 · X it"}, "duration": 12.0, "video": "01-x.mp4",
+                "poster": "01-x.jpg", "subtitles": {"en": "01-x.en.vtt", "it": "01-x.it.vtt"}}
+        for name in ("01-x.mp4", "01-x.jpg", "01-x.en.vtt", "01-x.it.vtt"):
+            (media / "tour" / name).write_bytes(b"x")
+        (media / "tour" / "tour.json").write_text(json.dumps({"clips": [clip]}))
+        out = Path(self.tempdir.name) / "site-tour"
+        build_catalog_site.build(ROOT, out, media=media)
+        tour = (out / "tour.html").read_text(encoding="utf-8")
+        self.assertIn('"video": "tour/01-x.mp4"', tour)
+        self.assertIn('"it": "tour/01-x.it.vtt"', tour)
+        self.assertTrue((out / "tour" / "01-x.en.vtt").is_file())
+        self.assertIn('href="tour.html"', (out / "index.html").read_text(encoding="utf-8"))
+        bare = Path(self.tempdir.name) / "site-bare"
+        build_catalog_site.build(ROOT, bare, media=Path(self.tempdir.name) / "no-media")
+        self.assertFalse((bare / "tour.html").exists())
+        self.assertNotIn("tour.html", (bare / "index.html").read_text(encoding="utf-8"))
+
     def test_the_page_is_self_contained_and_ships_the_dashboard_icons(self):
         html = (self.out / "index.html").read_text(encoding="utf-8")
         for asset in ("icons.js", ".nojekyll", "catalog.json"):
