@@ -64,15 +64,18 @@ class CatalogSiteTests(unittest.TestCase):
         (media / "tour").mkdir(parents=True)
         clip = {"id": "01-x", "title": {"en": "1 · X", "it": "1 · X it"}, "duration": 12.0, "video": "01-x.mp4",
                 "poster": "01-x.jpg", "subtitles": {"en": "01-x.en.vtt", "it": "01-x.it.vtt"}}
-        for name in ("01-x.mp4", "01-x.jpg", "01-x.en.vtt", "01-x.it.vtt"):
+        voiced = {**clip, "id": "02-y", "video": {"it": "02-y.it.mp4", "en": "02-y.en.mp4"}}  # narrated: one file per language
+        for name in ("01-x.mp4", "01-x.jpg", "01-x.en.vtt", "01-x.it.vtt", "02-y.it.mp4", "02-y.en.mp4"):
             (media / "tour" / name).write_bytes(b"x")
-        (media / "tour" / "tour.json").write_text(json.dumps({"clips": [clip]}))
+        (media / "tour" / "tour.json").write_text(json.dumps({"clips": [clip, voiced]}))
         out = Path(self.tempdir.name) / "site-tour"
         build_catalog_site.build(ROOT, out, media=media)
         tour = (out / "tour.html").read_text(encoding="utf-8")
         self.assertIn('"video": "tour/01-x.mp4"', tour)
         self.assertIn('"it": "tour/01-x.it.vtt"', tour)
         self.assertTrue((out / "tour" / "01-x.en.vtt").is_file())
+        self.assertIn('"video": {"it": "tour/02-y.it.mp4", "en": "tour/02-y.en.mp4"}', tour)
+        self.assertTrue((out / "tour" / "02-y.en.mp4").is_file())
         self.assertIn('href="tour.html"', (out / "index.html").read_text(encoding="utf-8"))
         bare = Path(self.tempdir.name) / "site-bare"
         build_catalog_site.build(ROOT, bare, media=Path(self.tempdir.name) / "no-media")

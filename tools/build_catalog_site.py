@@ -469,8 +469,8 @@ ol b { display:block; font-size:13px; line-height:1.3; } ol small { color:var(--
 <script>
 const TOUR = JSON.parse(document.getElementById("data").textContent);
 const TEXT = {
-  en: { title: "Take the tour", lead: "Five short clips, from the catalog to a lab of two machines. Subtitles in English and Italian; each clip plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked.", clip: "Clip", of: "of" },
-  it: { title: "Il tour", lead: "Cinque clip brevi, dal catalogo a un lab di due macchine. Sottotitoli in italiano e in inglese; ogni clip prosegue nella successiva.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate.", clip: "Clip", of: "di" },
+  en: { title: "Take the tour", lead: "Five short clips, from the catalog to a lab of two machines. Spoken and subtitled in English and Italian; each clip plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked. The voice is synthetic (XTTS-v2).", clip: "Clip", of: "of" },
+  it: { title: "Il tour", lead: "Cinque clip brevi, dal catalogo a un lab di due macchine. Parlate e sottotitolate in italiano e in inglese; ogni clip prosegue nella successiva.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate. La voce è sintetica (XTTS-v2).", clip: "Clip", of: "di" },
 };
 let lang = "en", current = 0;
 try { lang = localStorage.getItem("qil-tour-lang") || ((navigator.language || "en").startsWith("it") ? "it" : "en"); } catch { lang = (navigator.language || "en").startsWith("it") ? "it" : "en"; }
@@ -493,12 +493,14 @@ function showLang() { video.querySelectorAll("track").forEach((el) => { el.track
 function load(index, play) {
   current = index;
   const clip = TOUR.clips[index];
-  video.src = clip.video; video.poster = clip.poster;
+  video.src = videoOf(clip); video.poster = clip.poster;
   tracks();
   render();
   history.replaceState(null, "", "#" + clip.id);
   if (play) video.play().catch(() => {});
 }
+// A narrated clip has one file per language: the voice follows the language switch.
+function videoOf(clip) { return typeof clip.video === "string" ? clip.video : (clip.video[lang] || Object.values(clip.video)[0]); }
 function render() {
   const t = TEXT[lang], clip = TOUR.clips[current];
   document.documentElement.lang = lang;
@@ -512,7 +514,12 @@ $("list").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (b
 document.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => {
   lang = b.dataset.lang;
   try { localStorage.setItem("qil-tour-lang", lang); } catch {}
-  showLang();
+  const clip = TOUR.clips[current], next = videoOf(clip);
+  if (!video.currentSrc.endsWith(next)) {
+    const at = video.currentTime, playing = !video.paused;
+    video.src = next; tracks();
+    video.addEventListener("loadedmetadata", () => { video.currentTime = at; if (playing) video.play().catch(() => {}); }, { once: true });
+  } else showLang();
   render();
 }));
 // Chromium's automatic track selection runs once the metadata arrives and can turn a second
@@ -537,9 +544,13 @@ def collect_tour(media: Path, out: Path) -> list[dict[str, Any]]:
     target = out / "tour"
     target.mkdir(parents=True, exist_ok=True)
     for clip in clips:
-        for name in (clip["video"], clip["poster"], *clip["subtitles"].values()):
+        # One video, or one per language when the clips are narrated (a browser cannot be trusted
+        # to switch the audio track of an MP4).
+        videos = clip["video"] if isinstance(clip["video"], dict) else {"": clip["video"]}
+        for name in (*videos.values(), clip["poster"], *clip["subtitles"].values()):
             shutil.copy2(media / "tour" / name, target / name)
-        clip["video"], clip["poster"] = f"tour/{clip['video']}", f"tour/{clip['poster']}"
+        clip["video"] = {lang: f"tour/{name}" for lang, name in videos.items()} if isinstance(clip["video"], dict) else f"tour/{clip['video']}"
+        clip["poster"] = f"tour/{clip['poster']}"
         clip["subtitles"] = {lang: f"tour/{name}" for lang, name in clip["subtitles"].items()}
     return clips
 
