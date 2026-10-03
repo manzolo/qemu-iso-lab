@@ -2376,8 +2376,11 @@ def cmd_bootstrap_cloudimg(args: argparse.Namespace) -> int:
         ui.print_status("warn", f"Replacing the existing disk: {ui.pretty_path(runtime.resolve_path(vm['disk']['path']))}", ok=False)
         runtime.resolve_path(vm["disk"]["path"]).unlink()  # the overlay must start from the pristine image
         disk_exists = False
-    ensure_vm_disk(vm, dry_run=args.dry_run)  # downloads the image and creates the overlay
+    # The record first: a fresh overlay already counts as a disk with data, so a profile starred
+    # before its first install (My VMs protects a disk with data) refused its own install when the
+    # overlay came first (2026-10-03, recording the intro clips). An existing disk was checked above.
     vmstate.begin_install(args.vm, "bootstrap-cloudimg", dry_run=args.dry_run)
+    ensure_vm_disk(vm, dry_run=args.dry_run)  # downloads the image and creates the overlay
     reset_vm_nvram(vm, dry_run=args.dry_run)
     keys = cloudimg.resolve_ssh_pubkey(vm, dry_run=args.dry_run)
     seed_iso = cloudimg.create_seed(args.vm, vm, keys, dry_run=args.dry_run)

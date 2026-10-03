@@ -180,6 +180,25 @@ class CloudImageDiskTests(BaseVmctlTestCase):
         self.assertEqual(len(seed), 1, cmd)
         self.assertIn("format=raw,if=virtio,readonly=on", seed[0])
 
+    def test_a_profile_starred_before_its_first_install_installs(self):
+        # 2026-10-03: the overlay came before begin_install, counted as a disk with data, and the
+        # star's protection refused the very install it was waiting for.
+        profiles = self.config_dir / "profiles"
+        profiles.mkdir(parents=True, exist_ok=True)
+        (profiles / "cloud.json").write_text((ROOT / "vms" / "profiles" / "cloud.json").read_text())
+        disk = runtime.vm_artifact_base("ubuntu-24.04-cloud") / "disk.qcow2"
+
+        class Reached(Exception):
+            pass
+
+        with mock.patch.object(vmstate, "starred_names", return_value={"ubuntu-24.04-cloud"}), \
+                mock.patch.object(lifecycle, "ensure_vm_disk", side_effect=lambda vm, **kw: self.fake_qcow2(disk, backing=True)), \
+                mock.patch.object(lifecycle, "reset_vm_nvram", side_effect=Reached):
+            import argparse
+            with self.assertRaises(Reached):
+                lifecycle.cmd_bootstrap_cloudimg(argparse.Namespace(vm="ubuntu-24.04-cloud", dry_run=False, timeout=600))
+            self.assertEqual(vmstate.protection_reason("ubuntu-24.04-cloud"), "star")  # and from now on it is protected
+
 
 class PublishedSumsTests(unittest.TestCase):
     def test_a_sums_file_with_several_entries_gives_the_hash_of_this_image(self):
