@@ -74,7 +74,9 @@ def _template(source: str, name: str, cfg: dict[str, Any], bases: dict[str, dict
         vm = profile_bases.resolve_extends({name: {"extends": source}}, bases)[name]
     else:
         source = config.canonical_vm_name(source, warn=False)
-        vm = copy.deepcopy(config.get_vm(cfg, source))
+        # A catalog recipe keeps {{user}} literal and excludes personal local overrides.
+        tracked = config.load_tracked()
+        vm = copy.deepcopy(tracked[source] if source in tracked else config.get_vm(cfg, source))
         vm = profile_bases.replace_placeholder(vm, f"artifacts/{source}/", f"artifacts/{name}/")
     vm.pop("extends", None)
     # The disk name is private even when the source uses an absolute/custom path.
@@ -115,11 +117,12 @@ def _template(source: str, name: str, cfg: dict[str, Any], bases: dict[str, dict
     return private_base, vm, private_base
 
 
-def _files(group: str, title: str, members: list[str], number: int, owned_bases: list[str]) -> dict[str, str]:
+def _files(group: str, title: str, members: list[str], number: int, owned_bases: list[str],
+           cloud_only: bool) -> dict[str, str]:
     peers = {name: f"172.20.{number}.{index}" for index, name in enumerate(members, 1)}
     checks = [f"vmctl shell {name} -- ping -c 2 {peers[peer]}"
               for name in members for peer in members if peer != name]
-    document = {"title": title, "summary": f"A private lab on 172.20.{number}.0/24.", "members": members,
+    document: dict[str, Any] = {"title": title, "summary": f"A private lab on 172.20.{number}.0/24.", "members": members,
                 "scaffold_bases": owned_bases,
                 "exercises": [{"title": "Reachability", "text": "Check every direction on the private segment.",
                                "blocks": [{"kind": "do", "where": "host", "commands": [f"vmctl group install {group}"]},
@@ -133,8 +136,21 @@ def _files(group: str, title: str, members: list[str], number: int, owned_bases:
                 # Windows ping uses -n, unlike Linux/BSD. The scaffold is reviewed before install.
                 script.append(f"assert {shlex.quote(name + ' reaches ' + peer)} on {name} ping -c 2 {peers[peer]}")
     script.append(f"report_results {shlex.quote(group + ' reachability')}")
-    files = {"lab.json": json.dumps(document, indent=2, ensure_ascii=False) + "\n",
-             "tests/test_01_reachability.sh": "\n".join(script) + "\n"}
+    files = {"tests/test_01_reachability.sh": "\n".join(script) + "\n"}
+    if cloud_only:
+        # Cloud-init guests already have Python; HTTPS also tests DNS without relying on
+        # ICMP forwarding through slirp or an extra curl package in the guest.
+        probe = 'import urllib.request; urllib.request.urlopen("https://example.org", timeout=10).close()'
+        command = f"python3 -c {shlex.quote(probe)}"
+        internet_script = script[:4] + [
+            f"assert {shlex.quote(name + ' reaches the Internet via NAT (HTTPS)')} on {name} {command}"
+            for name in members]
+        internet_script.append(f"report_results {shlex.quote(group + ' Internet access')}")
+        files["tests/test_02_internet.sh"] = "\n".join(internet_script) + "\n"
+        document["exercises"].append({"title": "Internet access", "text": "Check DNS and HTTPS through each member's NAT connection.",
+                                       "blocks": [{"kind": "check", "where": "host", "commands": [
+                                           f"vmctl shell {name} -- {command}" for name in members]}]})
+    files["lab.json"] = json.dumps(document, indent=2, ensure_ascii=False) + "\n"
     for lang in ("en", "it"):
         intro = ("Edit this guide and lab.json to add your exercises. Each VM has its own NAT connection and a private NIC; "
                  "a firewall role does not route the other members automatically. Cloud images configure the segment "
@@ -222,7 +238,8 @@ def create(group: str, specifications: list[str], title: str | None = None, dry_
         if "cloudimg_config" not in vm:
             ui.print_status("warn", f"{name}: configure the segment address inside the guest and adapt its ping check before running tests", ok=False)
     ui.print_note(f"Estimated total: {total_ram} MiB RAM, {total_cpu} vCPU, {total_disk} GiB virtual disk capacity (rounded up; excludes cached media)")
-    files = _files(group, (title or group).strip(), members, number, owned_bases)
+    files = _files(group, (title or group).strip(), members, number, owned_bases,
+                   all("cloudimg_config" in config.get_vm(candidate, name) for name in members))
     _check_revision(revision)
     if dry_run:
         ui.print_note(f"Would update local.json and create {ui.pretty_path(directory)}: {', '.join(files)}")

@@ -40,7 +40,7 @@ class UserLabsTests(BaseVmctlTestCase):
         self.assertEqual(content["dir"], "vms/labs.local/demo")
         self.assertEqual(content["title"], "My lab")
         self.assertEqual(set(content["guides"]), {"en", "it"})
-        self.assertEqual(content["tests"], ["test_01_reachability.sh"])
+        self.assertEqual(content["tests"], ["test_01_reachability.sh", "test_02_internet.sh"])
         self.assertEqual(set(content["members"]), {"demo-server", "demo-client"})
         model = labs.model(cfg, "demo")
         self.assertEqual(model["segments"][0]["subnet"], "172.20.3.0/24")
@@ -53,7 +53,7 @@ class UserLabsTests(BaseVmctlTestCase):
             self.assertEqual(lifecycle.cmd_group(args), 0)
         # This is the payload ClassicBridge sends to the web lab cards.
         card = next(entry for entry in json.loads(out.getvalue()) if entry["group"] == "demo")
-        self.assertEqual((card["title"], card["tests"]), ("My lab", 1))
+        self.assertEqual((card["title"], card["tests"]), ("My lab", 2))
         for index, name in enumerate(content["members"], 1):
             vm = cfg["vms"][name]
             self.assertEqual(vm["extends"], "ubuntu-cloud-base")
@@ -91,6 +91,33 @@ class UserLabsTests(BaseVmctlTestCase):
         self.assertFalse(self.directory.parent.exists())
         self.assertIn("Would update local.json", self.output.getvalue())
         self.assertEqual(sum(names.count("group") for _, _, names in cli.COMMAND_GROUPS), 1)
+
+    def test_cloud_internet_script_checks_each_member_and_reports_failures(self):
+        self.create()
+        binary = self.root / "bin/vmctl"
+        binary.parent.mkdir()
+        binary.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALLS"\nexit "${FAKE_EXIT:-0}"\n')
+        binary.chmod(0o755)
+        calls = self.root / "calls.txt"
+        env = {"PATH": os.defpath, "HOME": str(self.root), "LC_ALL": "C.UTF-8", "CALLS": str(calls)}
+        script = self.directory / "tests/test_02_internet.sh"
+        result = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.count("[PASS]"), 2)
+        for name in ("demo-server", "demo-client"):
+            self.assertIn(f"shell {name} -- python3 -c", calls.read_text())
+        self.assertIn('urlopen("https://example.org", timeout=10)', calls.read_text())
+        result = subprocess.run(["bash", str(script)], env={**env, "FAKE_EXIT": "1"}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout.count("[FAIL]"), 2)
+        self.assertIn("Internet access", [item["title"] for item in labs.load_content("demo")["exercises"]])
+
+    def test_mixed_lab_does_not_generate_cloud_internet_check(self):
+        self.members[0] = "server=debian-server"
+        self.create()
+        content = labs.load_content("demo")
+        self.assertEqual(content["tests"], ["test_01_reachability.sh"])
+        self.assertNotIn("Internet access", [item["title"] for item in content["exercises"]])
 
     def test_backup_and_unrelated_local_values_are_preserved(self):
         before = {"vms": {}, "catalog": {"selected": ["testvm"]}, "protected": ["testvm"], "note": "private"}
@@ -169,6 +196,37 @@ class UserLabsTests(BaseVmctlTestCase):
         self.assertIn("demo-server requires a user-supplied ISO", self.output.getvalue())
         self.assertIn("demo-router requires a user-supplied ISO", self.output.getvalue())
         self.assertFalse(self.local.exists())
+
+    def test_tracked_source_preserves_placeholders_without_personal_overrides(self):
+        path = self.config_dir / "profiles/debian.json"
+        fixture = json.loads(path.read_text())
+        fixture["vms"]["debian-server"]["ssh_provision"]["post_install_run"] = ["id {{user}}"]
+        path.write_text(json.dumps(fixture))
+        self.local.write_text(json.dumps({"identity": {"user": "fixtureuser", "password_hash": "fixture-hash"},
+                                          "vms": {"debian-server": {"memory_mb": 8192}}}))
+        self.assertEqual(config.load_config()["vms"]["debian-server"]["ssh_provision"]["user"], "fixtureuser")
+        self.members[0] = "server=debian-server"
+        self.create()
+        document = catalog.read_document()
+        snapshot = document["bases"]["demo-server-base"]
+        tracked = config.load_tracked()["debian-server"]
+        self.assertEqual(snapshot["memory_mb"], tracked["memory_mb"])
+        self.assertEqual(snapshot["preseed_config"]["password_hash"], tracked["preseed_config"]["password_hash"])
+        self.assertIn("{{user}}", json.dumps(snapshot))
+        self.assertNotIn("fixtureuser", json.dumps(snapshot))
+        self.assertNotIn("fixture-hash", json.dumps(snapshot))
+        document["vms"]["demo-server"].update(ssh_provision={"user": "anotherfixture", "ssh_host_port": 31000},
+                                               preseed_config={"username": "anotherfixture"})
+        effective = config.load_config(local_profiles=document)["vms"]["demo-server"]
+        self.assertEqual(effective["ssh_provision"]["post_install_run"], ["id anotherfixture"])
+        self.assertNotIn("{{user}}", json.dumps(effective))
+
+    def test_local_only_source_remains_supported(self):
+        self.local.write_text(json.dumps({"vms": {"personal": {"name": "Local source", "extends": "ubuntu-cloud-base",
+                                                               "memory_mb": 1536, "ssh_provision": {"ssh_host_port": 31000}}}}))
+        self.members[0] = "server=personal"
+        self.create()
+        self.assertEqual(config.load_config()["vms"]["demo-server"]["memory_mb"], 1536)
 
     def test_web_remove_requires_confirmation(self):
         with self.assertRaisesRegex(VMError, "confirm it first"):
