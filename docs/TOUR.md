@@ -146,5 +146,9 @@ catalog's "▶ Tour" link; without `tour/tour.json` the site has neither.
   profile starred before its first install refused it (fixed in 0.17.5).
 - The console clipboard needs a graphical guest with its agent: not on the text-mode server of
   the demo.
+- A cloned recording VM inherits the Chromium profile's lock from the original (hostname `lubuntu`,
+  the clone is `lubuntu-studio`): Chromium refuses to start ("profile in use by another Chromium
+  process on another computer", in `/tmp/chrome.log` in the VM) and `session.sh` waits in vain for
+  DevTools. With no Chromium running: `rm -f ~/snap/chromium/common/video-profile/Singleton*`.
 - `python3 -m http.server` does not serve byte ranges, so a local test cannot seek in a video;
   GitHub Pages does (206).
