@@ -146,9 +146,11 @@ class RowCleanupTests(BaseVmctlTestCase):
         (base / "disk.qcow2").write_bytes(b"TEST-INSTALL")
         return base
 
-    def cleanup(self, stashed=None, **flags):
+    def cleanup(self, stashed=None, lab_members=(), **flags):
         args = argparse.Namespace(dry_run=False, **flags)
-        with mock.patch.object(lifecycle.pvecluster, "clusters", return_value={"c": {"nodes": ["node1", "node2"]}}):
+        labs_found = [("lab", {"tests": ["test_01.sh"]}, list(lab_members))] if lab_members else []
+        with mock.patch.object(lifecycle.pvecluster, "clusters", return_value={"c": {"nodes": ["node1", "node2"]}}), \
+                mock.patch.object(lifecycle, "lab_test_groups", return_value=labs_found):
             return lifecycle.RowCleanup(stashed or {}, ["fresh", "stashed", "node1", "node2"], self.cfg,
                                         ["fresh", "stashed", "node1", "node2", "boot"], args)
 
@@ -225,6 +227,19 @@ class RowCleanupTests(BaseVmctlTestCase):
             with redirect_stdout(io.StringIO()):
                 cleanup.finish()
         self.assertFalse(node.exists())
+
+    def test_passing_lab_members_wait_for_the_lab_tests_and_failed_ones_go_at_once(self):
+        # 2026-10-03: the first matrix with lab rows cleaned the members first, every lab row failed.
+        cleanup = self.cleanup(lab_members=("fresh", "stashed"))
+        passed, failed = self.install("fresh"), self.install("stashed")
+        with mock.patch.object(lifecycle, "cmd_stop"), redirect_stdout(io.StringIO()):
+            cleanup.row_done("fresh", "passed")
+            cleanup.row_done("stashed", "failed")
+            self.assertTrue(passed.exists())  # the lab tests still need this disk
+            self.assertFalse(failed.exists())  # its lab row is a skip: no reason to hold it
+            self.assertNotIn("stashed", cleanup.deferred)  # and --retry-failed may run it again
+            cleanup.finish()
+        self.assertFalse(passed.exists())
 
     def test_an_interrupted_run_leaves_its_stash_and_the_next_run_puts_it_back(self):
         stash = lifecycle.restore_backup_base()

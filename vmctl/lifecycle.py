@@ -4576,6 +4576,18 @@ def lab_row_id(group: str) -> str:
     return f"lab-{group}"
 
 
+def lab_test_groups(cfg: dict[str, Any], selected_names: list[str]) -> list[tuple[str, dict[str, Any], list[str]]]:
+    """The labs check-vms tests after the rows: content with test scripts and every member in the run."""
+    selected = set(selected_names)
+    found = []
+    for group in labs.content_groups():
+        content = labs.load_content(group)
+        members = labs.group_members(cfg, group)
+        if content is not None and content["tests"] and members and selected.issuperset(members):
+            found.append((group, content, members))
+    return found
+
+
 def run_lab_test_rows(cfg: dict[str, Any], selected_names: list[str],
                       results: list[tuple[str, str, str]], args: argparse.Namespace) -> None:
     """The tests of every lab whose members were all in this run (vms/labs/<lab>/tests/, F4 of
@@ -4583,12 +4595,7 @@ def run_lab_test_rows(cfg: dict[str, Any], selected_names: list[str],
     order, SSH is waited for, the scripts run in order, one ``lab-<name>`` row records the
     outcome; a member that did not pass makes the row a skip."""
     outcomes = {name: status for name, status, _ in results}
-    selected = set(selected_names)
-    for group in labs.content_groups():
-        content = labs.load_content(group)
-        members = labs.group_members(cfg, group)
-        if content is None or not content["tests"] or not members or not selected.issuperset(members):
-            continue
+    for group, content, members in lab_test_groups(cfg, selected_names):
         row = lab_row_id(group)
         order = labs.start_order(cfg, members)
         primary = config.get_vm(cfg, order[0])
@@ -4692,6 +4699,11 @@ class RowCleanup:
         selected = set(selected_names)
         self.deferred = {node for entry in pvecluster.clusters(cfg, config.sorted_vm_names(cfg)).values()
                          if selected.issuperset(entry["nodes"]) for node in entry["nodes"]}
+        # The members of a lab whose tests run after the rows keep a passing install until then: the
+        # first matrix with lab rows (2026-10-03) cleaned them at the end of their rows and all five
+        # lab rows failed on "Disk image not found". A failed member is given back (and retried) at
+        # once: its lab row is a skip anyway, unless a retry passes and waits like the others.
+        self.lab_members = {name for _, _, members in lab_test_groups(cfg, selected_names) for name in members}
         self.waiting: dict[str, str] = {}
         self.lock = threading.Lock()
         self.restored: list[str] = []
@@ -4700,7 +4712,7 @@ class RowCleanup:
         self.kept_starred: list[str] = []
 
     def row_done(self, name: str, status: str) -> None:
-        if name in self.deferred:
+        if name in self.deferred or (name in self.lab_members and status == "passed"):
             with self.lock:
                 self.waiting[name] = status
             return
@@ -4763,7 +4775,7 @@ class RowCleanup:
                 ui.print_note(f"{name}: could not keep the logs ({exc})")
 
     def finish(self) -> None:
-        """The cluster nodes after their check, and any row an exception left behind."""
+        """The cluster nodes and lab members after their checks, and any row an exception left behind."""
         for name, status in list(self.waiting.items()):
             self._give_back(name, status)
         for name in list(self.stashed):
@@ -4979,7 +4991,8 @@ def cmd_test_local(args: argparse.Namespace) -> int:
         # stashed VM gets its own artifacts again, any other install row loses its test install
         # unless --keep (or --keep-passed on a PASS). Until 2026-09-29 everything waited for the end
         # of the matrix and a full run filled the disk. Nodes of a Proxmox cluster in the run wait
-        # for the cluster check, which runs on their disks after the rows.
+        # for the cluster check, and passing lab members for the lab tests, which run on their disks
+        # after the rows.
         cleanup = RowCleanup(stashed, candidates, cfg, selected_names, args)
 
         try:
