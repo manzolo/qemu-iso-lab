@@ -33,7 +33,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
      ["export-libvirt", "unexport-libvirt"]),
     ("Network lab", "pfSense router + Pi-hole DNS + clients on an isolated LAN segment",
      ["lab"]),
-    ("Groups", "a declared group (netlab, proxmox-lab...) as one stack: start, stop, network map",
+    ("Groups", "create/remove a local lab, or run a declared group as one stack: start, stop, network map",
      ["group"]),
     ("Verify", "smoke tests and the local validation matrix",
      ["boot-check", "media-check", "check-vms", "report-pdf"]),
@@ -341,8 +341,11 @@ removes only files under isos/, never a medium set here.""")
     p.set_defaults(func=lifecycle.cmd_lab)
 
     p = _add(subparsers, "group", help="a declared group as one stack: list the groups (--labs: only the labs: a segment or their own vms/labs/<group>/ content), status, up (infrastructure first), down (reverse), map (HTML network map with the lab's exercises, --open), guide (print vms/labs/<group>/guide.<lang>.md), test (the lab's tests/test_NN_*.sh against the running stack, started if needed; exit 1 on a failed check), install (what is missing, cumulative), clean")
-    p.add_argument("action", choices=["list", "status", "up", "down", "map", "guide", "test", "install", "clean", "cluster"], help="what to do with the group (install: what is missing, in start order, then up and the cluster; clean: stop and delete every member's disk; cluster: form the Proxmox cluster of a running stack)")
+    p.add_argument("action", choices=["list", "status", "up", "down", "map", "guide", "test", "install", "clean", "cluster", "new", "remove"], help="what to do with the group (new: scaffold a local lab; remove: delete a local lab with no disks; install: what is missing, then up; clean: delete disks; cluster: form the Proxmox cluster)")
     p.add_argument("group", nargs="?", help="the group name (meta.groups), e.g. netlab or proxmox-lab")
+    p.add_argument("--member", action="append", default=[], metavar="ROLE=BASE-OR-PROFILE", help="new: one member, repeat for each role (at least two)")
+    p.add_argument("--title", help="new: the lab title in its guide and map")
+    p.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS, help="preview without writing files or changing VMs")
     p.add_argument("--labs", action="store_true", help="list: only the labs (groups with a member on a segment)")
     p.add_argument("--json", action="store_true", help="list/status/test: machine-readable output")
     p.add_argument("--open", action="store_true", help="map: open the page in the default browser")

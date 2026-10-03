@@ -31,6 +31,7 @@ AGENTS.md
 # Local VM profile overrides
 vms/profiles/local.json
 vms/profiles/local.json.bak*
+vms/labs.local/
 vms/remotes.json
 # default host folder shared with guests (shared_dir.source: "shared")
 shared/

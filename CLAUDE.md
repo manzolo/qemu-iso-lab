@@ -59,6 +59,7 @@ vmctl report-pdf [report-dir] --lang en,it      # the same PDFs from an existing
 vmctl clean-reports [--keep N] [--older-than DAYS] [--dry-run]   # housekeeping: drop old report directories, never one being written
 vmctl checkpoint create|list|restore|delete <name> [cp]   # full copy of a stopped VM's disk + EFI vars under artifacts/<vm>/checkpoints/; survives clean
 vmctl clone <name> <new-name> [--identity regenerate]      # independent copy as a complete profile in local.json; guest identity is an explicit choice
+vmctl group new <lab> --member router=ubuntu-cloud-base --member client=ubuntu-cloud-base [--title ...] [--dry-run]; vmctl group remove <lab>  # private profiles in local.json + content in vms/labs.local; remove requires group clean first when disks exist (docs/LABS.md#your-own-lab)
 vmctl lab plan|install [--export]|up|down|status|check|clean   # the network lab (pfSense + Pi-hole + client) on plain QEMU
 vmctl lab export|unexport|libvirt-test         # the same lab handed to libvirt (lab-lan network) and back
 vmctl group list|status|up|down|map|guide|test|install|clean|cluster <group>   # a declared group as one stack; guide/test = the lab's vms/labs/<group>/ content (guide.<lang>.md; tests/test_NN_*.sh over the running stack, exit 1 on a failed check, also a lab-<name> row of check-vms); install is cumulative (keeps installed members, then down+up), map = HTML network map (--open), labs = groups on a segment (netlab, proxmox-lab); vmtui: Labs filter / F2

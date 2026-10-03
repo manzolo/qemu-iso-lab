@@ -111,20 +111,37 @@ def lab_groups(cfg: dict[str, Any]) -> list[str]:
 # provision/ files its members copy in (copy_from_host) and tests/test_NN_*.sh over _common.sh.
 
 LABS_DIR = Path("vms") / "labs"
+LOCAL_LABS_DIR = Path("vms") / "labs.local"
 BLOCK_KINDS = ("do", "check", "try")
 GUIDE_LANGS = ("en", "it")
 
 
 def content_dir(group: str) -> Path:
-    return runtime.resolve_path(str(LABS_DIR / group))
+    if not config.GROUP_RE.fullmatch(group):
+        raise VMError(f"Invalid lab name: {group!r}")
+    directories = _content_directories()
+    return directories.get(group, runtime.resolve_path(str(LABS_DIR / group)))
+
+
+def _content_directories() -> dict[str, Path]:
+    tracked = runtime.resolve_path(str(LABS_DIR))
+    local = runtime.resolve_path(str(LOCAL_LABS_DIR))
+    directories = {p.parent.name: p.parent for p in tracked.glob("*/lab.json")}
+    if config.tracked_only():
+        return directories
+    local_dirs = {p.parent.name: p.parent for p in local.glob("*/lab.json")}
+    if local_dirs:
+        # Also protect tracked labs with no content directory (e.g. proxmox-lab).
+        tracked_groups = {g for vm in config.load_tracked().values() for g in config.declared_groups(vm)}
+        collisions = set(local_dirs) & (set(directories) | tracked_groups)
+        if collisions:
+            raise VMError(f"Local lab '{sorted(collisions)[0]}' conflicts with a tracked lab/group; rename the local lab")
+    return {**directories, **local_dirs}
 
 
 def content_groups() -> list[str]:
-    """The groups with a ``vms/labs/<group>/lab.json``."""
-    base = runtime.resolve_path(str(LABS_DIR))
-    if not base.is_dir():
-        return []
-    return sorted(entry.name for entry in base.iterdir() if entry.is_dir() and (entry / "lab.json").is_file())
+    """Groups with tracked or local content; local labs respect --tracked-only."""
+    return sorted(_content_directories())
 
 
 def load_content(group: str) -> dict[str, Any] | None:
@@ -168,7 +185,7 @@ def load_content(group: str) -> dict[str, Any] | None:
                 raise VMError(f"{b_label}: 'commands' must be a non-empty list of strings")
             blocks.append(_block(kind, where, [str(c) for c in commands]))
         exercises.append({"title": str(item["title"]).strip(), "text": str(item.get("text") or "").strip(), "blocks": blocks})
-    relative = (LABS_DIR / group).as_posix()
+    relative = directory.relative_to(state.ROOT).as_posix()
     guides = {lang: f"{relative}/guide.{lang}.md" for lang in GUIDE_LANGS if (directory / f"guide.{lang}.md").is_file()}
     tests_dir, provision_dir = directory / "tests", directory / "provision"
     tests = sorted(p.name for p in tests_dir.glob("test_*.sh")) if tests_dir.is_dir() else []

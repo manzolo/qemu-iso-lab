@@ -30,6 +30,7 @@ import vmctl.kickstart  # noqa: E402
 import vmctl.checkpoint  # noqa: E402
 import vmctl.cloudimg  # noqa: E402
 import vmctl.clone  # noqa: E402
+import vmctl.user_labs  # noqa: E402
 import vmctl.cloud_init  # noqa: E402
 import vmctl.config  # noqa: E402
 import vmctl.profile_bases  # noqa: E402
@@ -96,7 +97,7 @@ class _VmctlFacade:
     _SEARCH_ORDER = (
         vmctl.lifecycle, vmctl.libvirt, vmctl.freebsd, vmctl.opnsense, vmctl.void, vmctl.cloudimg, vmctl.agama, vmctl.popos, vmctl.mediacheck, vmctl.slackware, vmctl.haiku, vmctl.proxmox, vmctl.nixos, vmctl.pearos, vmctl.pfsense, vmctl.reactos, vmctl.scheduler, vmctl.netlab, vmctl.report, vmctl.profiledoc, vmctl.ssh, vmctl.host_setup, vmctl.flash, vmctl.flash_allocated, vmctl.flash_progress, vmctl.tui_devices, vmctl.import_dev, vmctl.disk_inspect, vmctl.vmlink, vmctl.isofile,
         vmctl.iso, vmctl.alpine, vmctl.autoyast, vmctl.windows, vmctl.windowsnt4, vmctl.windowsxp, vmctl.archinstall, vmctl.omarchy, vmctl.preseed, vmctl.kickstart, vmctl.cloud_init, vmctl.qemu, vmctl.config, vmctl.profile_bases,
-        vmctl.clone, vmctl.checkpoint, vmctl.local_identity, vmctl.catalog, vmctl.vmstate, vmctl.runtime, vmctl.ui, vmctl.state, vmctl.errors,
+        vmctl.clone, vmctl.user_labs, vmctl.checkpoint, vmctl.local_identity, vmctl.catalog, vmctl.vmstate, vmctl.runtime, vmctl.ui, vmctl.state, vmctl.errors,
     )
 
     def __getattr__(self, name):

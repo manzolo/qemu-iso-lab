@@ -81,6 +81,79 @@ lab, its title in the network bar and each member's address on the lab's segment
 passed, the members start on their fresh disks and a `lab-<name>` row records the outcome (SKIP
 when a member did not pass), like the `cluster-<name>` row of a Proxmox cluster.
 
+## Your own lab
+
+Create a private lab without changing any tracked file. For example, three Ubuntu cloud
+images for Linux firewall exercises, a server and a client:
+
+```bash
+vmctl group new my-firewall --title "My Linux firewall lab" \
+  --member router=ubuntu-cloud-base --member server=ubuntu-cloud-base \
+  --member client=ubuntu-cloud-base --dry-run
+# Review the resource estimate, then repeat without --dry-run to save it.
+vmctl group new my-firewall --title "My Linux firewall lab" \
+  --member router=ubuntu-cloud-base --member server=ubuntu-cloud-base \
+  --member client=ubuntu-cloud-base
+vmctl group guide my-firewall --lang en
+vmctl group install my-firewall
+vmctl group test my-firewall
+vmctl group map my-firewall --open
+vmctl group down my-firewall
+```
+
+`new` accepts 2–254 distinct `--member role=base-or-profile` entries. Names use lowercase
+letters, digits and hyphens; each resulting `<lab>-<role>` name must fit in 64 characters.
+The profiles go into **`vms/profiles/local.json`**, and the teaching material goes into
+**`vms/labs.local/<lab>/`**; both are gitignored. The new directory contains `lab.json`
+(title, summary, members and do/check/try exercises), `guide.en.md`, `guide.it.md` and
+`tests/test_01_reachability.sh`. The test sources the tracked `vms/labs/_common.sh` and pings
+every peer from every member through `vmctl shell`.
+
+The scaffold chooses the first free `172.20.N.0/24`, with N from 1 through 255, considering
+tracked and local profiles, including overlapping networks. Members receive `.1`, `.2`, …
+in command-line order on a segment named `user-lab-N`. Existing networks are unchanged.
+SSH ports use clone's allocator from 2300 upwards, skipping configured ports. The preview
+reports total RAM, vCPUs and virtual disk capacity (including extra disks, excluding cached
+media), and warns about media you must supply yourself, using the same source detection as
+the rest of vmctl. Nothing is downloaded or started by `new`.
+
+Simple bases such as `ubuntu-cloud-base` remain an `extends` reference. An existing profile,
+or a base with its own topology, becomes a private snapshot base `<lab>-<role>-base` in
+`local.json`: this preserves provisioning while replacing inherited groups, NICs and mutable
+artifact paths. Its original group/cluster membership is discarded. Review inherited
+provisioning scripts before installation: embedded assumptions about the source lab are
+still yours to adapt. Local-only profiles inherit their recipe's login and locale; customize
+these in their local entries if needed (the top-level identity applies to tracked profiles).
+
+Cloud images configure the private NIC automatically during installation. Other guests
+need their own address configuration and may need adapted reachability commands (for example
+Windows ping syntax). Each member also has an independent NAT connection for SSH and internet
+access. The scaffold supplies a shared segment; making the router a firewall or gateway is an
+exercise you add, not an automatic change to the other guests' routes. Use `router` as the
+role when that VM should start first.
+
+Edit only `local.json` and `labs.local/<lab>/` to add packages, provisioning, guidance and
+exercises. Guides, the web card, the network map and `vmctl check-vms --group my-firewall`
+use the same content loading as tracked labs, including the `lab-my-firewall` test row when
+all members participate. `--tracked-only` excludes local profiles and local lab content.
+Local lab names must not collide with tracked labs/groups; duplicates are errors, never
+overrides. Member names in `lab.json` must match the profiles declaring that group.
+
+To remove a lab, first stop it and delete its disks explicitly:
+
+```bash
+vmctl group clean my-firewall
+vmctl group remove my-firewall --dry-run
+vmctl group remove my-firewall
+```
+
+`remove` refuses tracked profiles and any member with a primary or extra disk, including an
+empty prepared disk. It removes local member profiles, private scaffold bases and the local
+content directory; retained checkpoints and cached media stay on disk. It refuses removal if
+another profile still depends on a scaffold base. Both commands validate the whole candidate
+configuration before atomically replacing `local.json`, preserving other local settings and
+saving the previous document as `local.json.bak`. `--dry-run` writes nothing.
+
 ## Temporary links between VMs (`vmctl link`)
 
 A lab needs profiles that declare a segment. Two machines started on their own, each on its

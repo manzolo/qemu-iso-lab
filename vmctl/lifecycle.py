@@ -25,6 +25,7 @@ from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, 
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 from vmctl import isofile
+from vmctl import user_labs
 
 
 # --- background-VM tracking ----------------------------------------------------
@@ -3052,8 +3053,18 @@ def group_states(cfg: dict[str, Any], names: list[str]) -> dict[str, dict[str, A
 
 def cmd_group(args: argparse.Namespace) -> int:
     """``vmctl group list|status|up|down|map``: a declared group handled as one stack."""
-    cfg = config.load_config()
     action = args.action
+    if action in ("new", "remove"):
+        if not args.group:
+            raise VMError(f"vmctl group {action} needs a lab name")
+        if action == "new":
+            user_labs.create(args.group, args.member, args.title, args.dry_run)
+        else:
+            user_labs.remove(args.group, args.dry_run)
+        return 0
+    if getattr(args, "member", None) or getattr(args, "title", None) is not None:
+        raise VMError("--member and --title apply only to vmctl group new")
+    cfg = config.load_config()
     if action == "list":
         groups = labs.lab_groups(cfg) if args.labs else sorted(
             {group for _, vm in config.sorted_vm_items(cfg) for group in config.declared_groups(vm)})
