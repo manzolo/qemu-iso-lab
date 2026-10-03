@@ -1,0 +1,150 @@
+# The tour: recording, narrating and publishing the intro clips
+
+The catalog site's [tour](https://manzolo.github.io/qemu-iso-lab/tour.html) is five short clips (the
+catalog, the setup, a first VM, the console in the browser, a lab), spoken and subtitled in English
+and Italian. They are recorded on a real desktop, inside a VM, by a script that drives the browser
+and the terminal like a person would: the pointer moves, the commands are typed, the waits are sped
+up and marked. Everything that makes them lives in `tools/tour/`; this page is how to do it again.
+
+```
+tools/tour/
+├── session.sh       host: prepare the recording VM (--setup) and start a recording session
+├── rec.mjs          host: record one clip (Playwright over CDP + xdotool + ffmpeg in the VM)
+├── clips/*.mjs      the clips: their cues (en/it text) and what happens on screen
+├── build.py         host: subtitles (.srt), MP4 with both subtitle tracks, phone preview, review frames
+├── narrate.py       host: the voice (XTTS-v2), one MP4 with an Italian and an English track
+├── tts_cues.py      runs in the XTTS venv: one WAV per cue and language, cached by text
+├── publish.py       host: the narrated clips -> docs/media/tour/ (media branch) + tour.json
+├── setup-tts.sh     host: the XTTS venv under artifacts/tts/
+└── vm/              copied to ~/lab/video/ in the VM: setup.sh, chrome.sh, mv.py, demo.bashrc, open-in-cdp.sh
+```
+
+Outputs go to `artifacts/tour/out/<clip>/` (gitignored): `raw.mkv`, `cues.json`, the `.srt`, the MP4s,
+`voice/` (one WAV per sentence), `review/`.
+
+## 1. The recording VM
+
+Any X11 desktop VM works; the clips assume Lubuntu (LXQt, qterminal) at 1600x900 with autologin on
+`:0`, SSH with your key, and nested KVM (`/sys/module/kvm_intel/parameters/nested` = Y on the
+host, `host-passthrough` CPU) because the demo installs VMs inside it. Size: 8 vCPU, 16 GB RAM
+(two lab members and the desktop), a data disk of 100 GB or more for `~/lab/`.
+
+The maintainer's is the libvirt VM **`lubuntu22-studio`** (hostname `lubuntu-studio`), a clone of
+the `lubuntu22` lab VM kept for this, on libvirt's `default` network (NAT + DHCP: no lab router
+needed). Its address comes from the lease:
+
+```bash
+virsh start lubuntu22-studio
+virsh domifaddr lubuntu22-studio --source lease     # 192.168.122.x
+```
+
+A clone of a VM whose netplan matches its NIC by MAC gets no address at all (the clone has a new
+MAC): the studio's netplan matches `en*` with `dhcp4: true`; when SSH is out of reach, the QEMU
+guest agent (`virsh qemu-agent-command ... guest-exec`) still runs commands as root.
+
+Once, from the host (asks for the VM user's sudo password):
+
+```bash
+TOUR_VM=user@192.168.122.x tools/tour/session.sh --setup
+```
+
+`vm/setup.sh` installs ffmpeg, xdotool, qterminal and the **Chromium snap** (Chrome for Testing,
+what Playwright downloads, shows a "for automated testing" banner that no flag hides), copies the
+helpers to `~/lab/video/`, hides qterminal's menu and tab bar (font 17) and turns Chromium's password
+manager off (its "Save password?" bubble covered the Welcome form).
+
+## 2. A session
+
+```bash
+TOUR_VM=user@192.168.122.x tools/tour/session.sh
+```
+
+Every time: the screen goes to 1600x900 and stays there (`spice-vdagent` is stopped: an open
+virt-manager window resizes the guest to its own size, which broke a take at 1152x768), blanking
+off, the recorded Chromium started in kiosk mode at 125 % zoom with DevTools on `127.0.0.1:9222`,
+tunnelled to `127.0.0.1:19222` on the host.
+
+The demo lives in `~/lab/demo/qemu-iso-lab`, a fresh clone made by clip 2, with the guest user
+`demo` (password `demo`) chosen in its Welcome form: never a real name on screen. Clip 2 runs
+`./setup.sh`, which points `~/.local/bin/vmctl` at the demo clone.
+
+## 3. Recording a clip
+
+```bash
+export TOUR_VM=user@192.168.122.x
+export PLAYWRIGHT_MODULE=/path/to/node_modules/playwright/index.mjs   # Playwright 1.5x+
+node tools/tour/rec.mjs tools/tour/clips/01-catalog.mjs [--dry]
+python3 tools/tour/build.py artifacts/tour/out/01-catalog
+```
+
+A clip exports `title`, `cues` (`id`, `en`, `it`, optional `top: true` to put that subtitle at the
+top), an optional `setup(d)` (before the recording starts) and `run(d)`. The helpers of `d`:
+
+| | |
+|---|---|
+| `cue(id)` | the next subtitle starts now; the previous one stayed at least its reading time (the longer language, ~14 characters a second, 3.5 s minimum) |
+| `click(locator)`, `hover(locator)` | the real X pointer glides there (`mv.py`) and clicks: the video shows a pointer, CDP input would not |
+| `type(text)`, `key(keys)` | xdotool into whatever has the focus |
+| `scroll(dy, ms)` | a smooth page scroll |
+| `openTerminal()`, `run(cmd)`, `focusTerminal()`, `focusBrowser()` | qterminal with the demo shell; `run` waits for the next prompt |
+| `newestPage()` | the tab a link or `vmctl web --open` just opened |
+| `restartWeb()` | a fresh `vmctl web` of the demo checkout; returns its URL with the token |
+| `ff(factor)`, `ffEnd()` | from here to there the edit runs `factor` times faster, with a "▶▶ N×" badge |
+| `vm(cmd)` | a command in the VM over SSH (one ControlMaster connection) |
+
+Clips 3–5 start from the state the previous one left (a demo checkout with an identity, then an
+installed `ubuntu-24.04-cloud`): record them in order. Changing a sentence only needs the cue text
+edited and `build.py` again, as long as the timing still fits.
+
+Send the `*.it-burned.mp4` preview to a phone: soft subtitles rarely show there.
+
+## 4. The voice
+
+```bash
+tools/tour/setup-tts.sh                                          # once
+python3 tools/tour/narrate.py artifacts/tour/out/01-catalog      # --speaker "Claribel Dervla" is the default
+```
+
+XTTS-v2 (Coqui, run on the GPU; the model is under the Coqui Public Model License, non-commercial)
+reads every cue in both languages. A sentence starts with its subtitle; where it is longer than its
+cue, the last frame of the cue is held (both languages share one video, so the longer one wins).
+The WAVs are cached by text and voice: after a correction only the changed sentences are spoken again.
+
+What the subtitles write and the voice should say differently is the `SPOKEN` table in
+`narrate.py`: full stops are dropped (XTTS reads a sentence-ending "." aloud, "punto"), `qemu-iso-lab`
+becomes "QEMU ISO Lab", `VM` "V M", and in Italian `console` is written `consolle` so it is said
+the Italian way; the buttons' own names (Open console, Consoles) stay English.
+
+Another voice: `--speaker "<name>"` (XTTS's built-in speakers), or a recording of your own with
+`--speaker-wav file.wav` (15–25 s of plain speech, quiet room). On a PipeWire host:
+`pw-record --rate=22050 --channels=1 --sample-count=551250 my-voice.wav` (25 s); stopping
+`pw-record` with a signal (`timeout`) truncates the file to a couple of seconds.
+
+## 5. Publishing
+
+```bash
+python3 tools/tour/publish.py                                    # every narrated clip -> docs/media/tour/
+git -C docs/media add -A && git -C docs/media commit --amend --no-edit
+git -C docs/media push --force origin media
+gh workflow run pages.yml --ref main                             # a push to media alone does not rebuild
+```
+
+`docs/media/` is the worktree of the orphan `media` branch (one commit, replaced every time, like
+the install clips). Per clip: `<clip>.it.mp4` and `<clip>.en.mp4` (the same video with one voice
+each: a browser cannot be trusted to switch the audio track of one MP4), `<clip>.{en,it}.vtt`,
+`<clip>.jpg`, and `tour.json`. `tools/build_catalog_site.py` turns them into `tour.html` and the
+catalog's "▶ Tour" link; without `tour/tour.json` the site has neither.
+
+## Pitfalls met on the way (2026-10-03)
+
+- `pkill -f "<pattern>"` inside an `ssh host '...'` whose command line also contains the pattern's
+  text kills that very shell: write the pattern as `vmct[l] web`, or use two SSH calls.
+- `a && b || c && d` is not an if: a job-wait loop believed every job was done.
+- The welcome screen at the end of `./setup.sh` waits for "What now? [1-4]": the clip answers 1
+  (which opens the dashboard through `BROWSER`).
+- The first lab install used to be announced as destructive (fixed in 0.17.5); a cloud-image
+  profile starred before its first install refused it (fixed in 0.17.5).
+- The console clipboard needs a graphical guest with its agent: not on the text-mode server of
+  the demo.
+- `python3 -m http.server` does not serve byte ranges, so a local test cannot seek in a video;
+  GitHub Pages does (206).

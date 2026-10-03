@@ -360,6 +360,7 @@ Details: [docs/PROVISIONING.md](docs/PROVISIONING.md).
 | Page | Read it for |
 |------|-------------|
 | [Catalog site](https://manzolo.github.io/qemu-iso-lab/) | every profile, its version and history, what to run |
+| [Tour](https://manzolo.github.io/qemu-iso-lab/tour.html) ([how it is made](docs/TOUR.md)) | five short clips with English and Italian voice and subtitles |
 | [docs/README.md](docs/README.md) | the map of every page, in reading order |
 | [PROFILES](docs/PROFILES.md) | the profile model, versions, and how to add a VM |
 | [UNATTENDED](docs/UNATTENDED.md) | how each unattended install works, and the validation matrix |

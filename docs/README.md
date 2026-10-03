@@ -18,6 +18,7 @@ essential steps in Italian for the terminal-at-hand case.
 | [IMPORT_DISKS.md](IMPORT_DISKS.md) | you write a VM to a real disk, or read a real disk into a VM | `vmctl flash` (full or allocated-block copy, GPT repair, optional NTFS expansion) and `vmctl import-device` (full or allocated-block, resume) |
 | [WEB.md](WEB.md) | you prefer a browser | `vmctl web`: profiles and their actions, every command as a form, live job logs, VM screens, labs; safety and the JSON API |
 | [VMTUI.md](VMTUI.md) | you prefer menus to flags | The TUI: dashboard, filters, contextual menu, video profiles, remote SPICE |
+| [TOUR.md](TOUR.md) | you redo or add a clip of the tour | The intro clips: the recording VM, `tools/tour/` (record, subtitles, XTTS voice), publishing on the media branch |
 | [VENTOY.md](VENTOY.md) | you carry a guest disk on a Ventoy key | The two helper scripts off the `vmctl` path |
 
 ## 2. Printable guides (`guides/`)
