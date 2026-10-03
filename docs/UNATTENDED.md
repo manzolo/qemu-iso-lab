@@ -1144,6 +1144,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `vpn-lab` | The VPN lab (vms/labs/vpn-lab/): `vpn-lab-server`, `vpn-lab-client`, two cloud images on the `vpn-lan` segment |
 | `ssh-lab` | The SSH hardening lab (vms/labs/ssh-lab/): `ssh-lab-server`, `ssh-lab-client`, two cloud images on the `ssh-lan` segment |
 | `docker-lab` | The Docker lab (vms/labs/docker-lab/): `docker-lab-server`, one cloud image with Docker Engine and Compose |
+| `git-lab` | The Git lab (vms/labs/git-lab/): `git-lab-server`, one cloud image with git and git-flow and a repository prepared by the install (branches, a merge history, a resolved conflict, a bare remote) |
 | `lvm-lab` | The LVM lab (vms/labs/lvm-lab/): `lvm-lab-server`, one cloud image with three empty 2 GiB extra disks |
 | `proxmox-lab` | The Proxmox lab: `proxmox-ve` (ZFS mirror over two disks) and `proxmox-lab-client` (Xfce + Firefox), joined by the `pve-lan` segment |
 | `hobby-os` | Hobby operating systems to boot and explore, all manual live systems: `kolibrios`, `redox`, `menuetos`, and `serenityos` (a `disk_image` built from source). A `--group hobby-os` run records them as skipped (no unattended flow); boot one with `vmctl provision <name>` |
@@ -1714,7 +1715,7 @@ what went wrong first (all verified live on 2026-09-24):
 ## Groups as stacks and the lab map (`vmctl group`)
 
 A declared group (`meta.groups`) can be run as one stack. A **lab** is a group whose members are
-all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab`, `vpn-lab`, `ssh-lab`, `docker-lab` and `lvm-lab` (`vmctl group list --labs`).
+all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab`, `vpn-lab`, `ssh-lab`, `docker-lab`, `lvm-lab` and `git-lab` (`vmctl group list --labs`).
 
 ```bash
 vmctl group list [--labs] [--json]

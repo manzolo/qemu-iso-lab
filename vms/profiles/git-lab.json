@@ -1,0 +1,53 @@
+{
+  "vms": {
+    "git-lab-server": {
+      "name": "Git lab server (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "git-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-03"
+      },
+      "notes": "The one machine of the git-lab (vms/labs/git-lab/): git and git-flow, and a repository prepared by the post-install (vms/labs/git-lab/provision/setup-git-lab.sh) for the lab user: ~/workspace with real branches (feature/hello merged, feature/conflict with a resolved conflict, feature/stash rebased onto a hotfix, develop with a finished git-flow feature and the release 1.0 tagged v1.0) and a bare remote at /srv/git/lab.git. The exercises change history; ~/reset-git-lab.sh rebuilds everything. Ubuntu 24.04 minimal cloud image. Ported from qlab's git-lab.",
+      "memory_mb": 1024,
+      "cpus": 1,
+      "disk": {
+        "size": "10G"
+      },
+      "cloudimg_config": {
+        "packages": [
+          "git",
+          "git-flow",
+          "tree"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2365,
+        "copy_from_host": [
+          {
+            "source": "vms/labs/git-lab/provision/setup-git-lab.sh",
+            "dest": "/home/{{user}}/setup-git-lab.sh",
+            "dest_mode": "755"
+          },
+          {
+            "source": "vms/labs/git-lab/provision/reset-git-lab.sh",
+            "dest": "/home/{{user}}/reset-git-lab.sh",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "git --version && git flow version",
+          "bash ~/setup-git-lab.sh",
+          "test -d ~/workspace/.git && test -d /srv/git/lab.git",
+          "cd ~/workspace && git log --oneline main | wc -l | grep -qvE '^[0-5]$'",
+          "cd ~/workspace && git tag | grep -qx v1.0"
+        ]
+      }
+    }
+  }
+}

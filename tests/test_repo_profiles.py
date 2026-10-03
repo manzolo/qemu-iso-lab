@@ -143,7 +143,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_flavours_0929 = set("""arch-2019 arch-2022 arch-2026 kubuntu-20.04 lubuntu-20.04 edubuntu-8.04 edubuntu-10.04 edubuntu-14.04 edubuntu-26.04 kubuntu-8.04 kubuntu-10.04 kubuntu-14.04 kubuntu-16.04 kubuntu-18.04 kubuntu-22.04 kubuntu-26.04 lubuntu-14.04 lubuntu-16.04 lubuntu-18.04 lubuntu-22.04 lubuntu-26.04 ubuntu-budgie-18.04 ubuntu-budgie-20.04 ubuntu-budgie-22.04 ubuntu-budgie-26.04 ubuntu-cinnamon-26.04 ubuntu-mate-16.04 ubuntu-mate-18.04 ubuntu-mate-20.04 ubuntu-mate-22.04 ubuntu-mate-26.04 ubuntu-unity-26.04""".split())
         verified_flavours_0929 |= {"haiku", "arch-2014", "slackware-15.0", "slackware-14.0", "slackware-14.1", "slackware-14.2", "slackware-13.37", "slackware-13.0"}
         verified_1001 = {"arch-omarchy-nvidia", "xubuntu-12.04", "edubuntu-12.04", "lubuntu-12.04", "kubuntu-12.04"}  # the desktop check on Omarchy, the stale precise Release on 12.04
-        verified_1003 = {"docker-lab-server", "lvm-lab-server"}  # docker-lab 6/6 and lvm-lab 7/7 live
+        verified_1003 = {"docker-lab-server", "lvm-lab-server", "git-lab-server"}  # docker-lab 6/6, lvm-lab 7/7 and git-lab 9/9 live
         verified_1002 = {"windows-11",  # 26H2 (build 26300.9457) installed unattended and verified over SSH
                          "ubuntu-24.04-cloud",  # the first cloud-image profile: 49 s from the seed to the SSH checks
                          "vpn-lab-server", "vpn-lab-client",  # vpn-lab: group install + group test 5/5 live

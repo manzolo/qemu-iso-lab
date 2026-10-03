@@ -832,6 +832,17 @@
         }
       ]
     },
+    "git-lab-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c2f483e9d68f4028bc25f5a1b8724544b6b15deca8f4e008f7af7e929a0b8369",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-03",
+          "note": "git-lab: one cloud image with git and git-flow, the repository prepared by the post-install (ported from qlab)"
+        }
+      ]
+    },
     "haiku": {
       "version": "1.0.0",
       "fingerprint": "sha256:d54c8525d3c88aa88c15e7bc5d8eb925994cb91b9e3b55594739008c0eb219af",

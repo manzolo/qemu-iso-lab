@@ -1,0 +1,229 @@
+{
+  "title": "Git lab: commits, branches, merge, conflicts, stash, rebase and git flow",
+  "summary": "One server with a repository already made for you: ~/workspace with real branches, a merge history, a conflict already resolved, a stash demo, a rebased branch, a finished git-flow release tagged v1.0, and a bare remote at /srv/git/lab.git. The exercises read Git from underneath (commits as objects, branches as files holding one hash, the index) and then practise every operation; ~/reset-git-lab.sh rebuilds the repository when you have changed its history. Ported from qlab's git-lab.",
+  "members": [
+    "git-lab-server"
+  ],
+  "exercises": [
+    {
+      "title": "Git anatomy",
+      "text": "A repository is a .git/ directory: objects, refs, HEAD and config. The lab's working copy is ~/workspace, its remote the bare repository /srv/git/lab.git: the same files, with no working tree beside them.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/workspace && ls -a .git",
+            "git config --global --list    # who commits",
+            "git status; git branch",
+            "ls /srv/git/lab.git    # a bare repository: .git's contents, nothing checked out"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Commits are objects",
+      "text": "A commit holds a tree, its parents, an author and a message; the tree lists names and hashes; the blob is the file content and nothing else. A merge commit is simply one with two parents.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/workspace && git log --oneline --graph --all",
+            "git cat-file -p HEAD    # tree, parent(s), author, message",
+            "git cat-file -p HEAD^{tree}    # the directory listing",
+            "git cat-file -p HEAD:hello.txt    # the blob: bytes, no name"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "git-lab-server",
+          "commands": [
+            "echo 'My notes' > notes.txt && git add notes.txt && git commit -m 'Add notes.txt'",
+            "git commit --amend -m 'docs: add notes.txt'    # a new commit, a new hash",
+            "git reset --hard HEAD~1    # back as it was"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Branches are pointers",
+      "text": "A branch is a file with one hash in it; HEAD is a file naming the branch you are on. Creating or deleting one copies nothing.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/workspace && git branch -a",
+            "cat .git/HEAD; cat .git/refs/heads/main",
+            "git branch --merged main"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "git-lab-server",
+          "commands": [
+            "git switch -c feature/my-feature && git switch main",
+            "git branch -d feature/my-feature"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Merge: fast-forward or a merge commit",
+      "text": "When main has not moved, merging a branch just moves the pointer (fast-forward); when both sides moved, Git makes a merge commit with two parents. --no-ff forces one.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/workspace && git log --merges --oneline",
+            "git log --oneline --graph main~6..main",
+            "git show --stat HEAD~3    # a merge commit: 'Merge:' lists two parents"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "git-lab-server",
+          "commands": [
+            "git switch -c feature/test-merge && echo test > merge-test.txt && git add merge-test.txt && git commit -m 'test: add merge-test.txt'",
+            "git switch main && git merge --no-ff feature/test-merge -m 'Merge feature/test-merge'",
+            "git log --oneline --graph -4",
+            "git reset --hard origin/main && git branch -D feature/test-merge    # undo"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Conflicts",
+      "text": "Two branches changed the same lines: Git stops and marks the region with <<<<<<<, ======= and >>>>>>>. You choose the content, add it and commit; the merge commit records the resolution.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/workspace && cat conflict.txt",
+            "git log --oneline --grep=resolve",
+            "git diff feature/conflict...main -- conflict.txt"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "git-lab-server",
+          "commands": [
+            "git switch -c branch-a && echo 'Version A' > clash.txt && git add clash.txt && git commit -m 'branch-a: clash.txt'",
+            "git switch main && echo 'Version B' > clash.txt && git add clash.txt && git commit -m 'main: clash.txt'",
+            "git merge branch-a || cat clash.txt    # the markers",
+            "echo 'Resolved version' > clash.txt && git add clash.txt && git commit -m 'Merge: resolve clash.txt'",
+            "git reset --hard origin/main && git branch -D branch-a    # undo"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Stash",
+      "text": "git stash shelves uncommitted changes on a stack so you can switch context; pop puts the newest entry back. Stashes never travel to a remote.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/workspace && git switch feature/stash",
+            "echo 'More work in progress' >> wip.txt && git stash push -m 'WIP: my in-progress work'",
+            "git status --short; cat wip.txt    # clean: the change is on the stack",
+            "git stash list"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "git stash pop && cat wip.txt    # the change is back"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "git-lab-server",
+          "commands": [
+            "git checkout -- wip.txt && git switch main    # drop the change, leave the branch clean"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Remote",
+      "text": "origin is the bare repository. push uploads commits, fetch downloads the remote's refs into remotes/origin/* without touching your branches; origin/main is your last record of the remote, not the remote.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/workspace && git remote -v",
+            "git fetch origin && git log --oneline HEAD..origin/main    # on the remote, not here",
+            "git log --oneline origin/main..HEAD    # here, not pushed yet",
+            "git ls-remote origin"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "git-lab-server",
+          "commands": [
+            "echo pushed > pushed.txt && git add pushed.txt && git commit -m 'Add pushed.txt' && git push origin main",
+            "git log --oneline -1 origin/main    # moved with the push",
+            "git reset --hard HEAD~1 && git push --force origin main    # undo (your own remote: never force a shared one)"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Rebase",
+      "text": "rebase replays a branch's commits on top of another: a linear history with no merge commit. feature/stash was rebased onto main's hotfix. Never rebase commits others already have.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/workspace && git log --oneline feature/stash",
+            "git log --merges main..feature/stash --oneline    # none: linear",
+            "git log --oneline --graph main feature/stash"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "git-lab-server",
+          "commands": [
+            "git switch -c feature/rebase-demo main~2 && echo 'old base' > rebase-demo.txt && git add rebase-demo.txt && git commit -m 'demo commit'",
+            "git rebase main && git log --oneline -3",
+            "git switch main && git branch -D feature/rebase-demo"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Git flow",
+      "text": "A branching model with roles: main for releases, develop for integration, feature/* from develop, release/* merged into both and tagged, hotfix/* from main. The git-flow CLI does the branching, merging, tagging and cleanup.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/workspace && git flow version",
+            "git config --get-regexp gitflow    # stored in .git/config",
+            "git tag; git log --oneline --merges main",
+            "git log --oneline --graph develop -8"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "git-lab-server",
+          "commands": [
+            "git flow feature start try-me && echo try > try.txt && git add try.txt && git commit -m 'feature/try-me: try.txt'",
+            "GIT_MERGE_AUTOEDIT=no git flow feature finish try-me    # merged into develop, branch removed",
+            "git log --oneline -2 develop",
+            "bash ~/reset-git-lab.sh    # everything back as the lab hands it to you"
+          ]
+        }
+      ]
+    }
+  ]
+}
