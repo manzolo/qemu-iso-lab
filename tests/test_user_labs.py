@@ -149,7 +149,7 @@ class UserLabsTests(BaseVmctlTestCase):
 
     def test_allocations_skip_local_ports_and_networks(self):
         cfg = config.load_config()
-        expected = clone.allocate_ports(3, clone.used_host_ports(cfg))
+        expected = clone.allocate_ports(3, clone.used_host_ports(cfg), start=user_labs.USER_LAB_PORT_START)
         self.local.write_text(json.dumps({"vms": {"occupied": {
             "name": "Occupied", "extends": "ubuntu-cloud-base",
             "ssh_provision": {"ssh_host_port": expected[0]},
@@ -162,6 +162,12 @@ class UserLabsTests(BaseVmctlTestCase):
         user_labs.create("another", self.members)
         self.assertEqual(labs.model(config.load_config(), "another")["segments"][0]["subnet"], "172.20.5.0/24")
 
+    def test_local_lab_ports_stay_clear_of_the_catalog_numbering(self):
+        # 2026-10-03: a tracked profile added later took 2365, the port a scaffolded lab already held.
+        self.create()
+        ports = sorted(json.loads(self.local.read_text())["vms"][n]["ssh_provision"]["ssh_host_port"] for n in ("demo-server", "demo-client"))
+        self.assertEqual(ports, [user_labs.USER_LAB_PORT_START, user_labs.USER_LAB_PORT_START + 1])
+
     def test_subnet_allocator_handles_wider_prefix_and_exhaustion(self):
         cfg = {"vms": {"a": {"networks": [{"address": "172.20.1.1/23"}]}}}
         self.assertEqual(user_labs.allocate_subnet(cfg), 2)
@@ -171,7 +177,7 @@ class UserLabsTests(BaseVmctlTestCase):
 
     def test_ports_skip_host_forwards_in_both_phases(self):
         cfg = config.load_config()
-        expected = clone.allocate_ports(4, clone.used_host_ports(cfg))
+        expected = clone.allocate_ports(4, clone.used_host_ports(cfg), start=user_labs.USER_LAB_PORT_START)
         self.local.write_text(json.dumps({"vms": {"testvm": {"networks": [
             {"type": "user", "phase": "install", "hostfwd": [{"host_port": expected[0], "guest_port": 80}]},
             {"type": "user", "phase": "runtime", "hostfwd": [{"host_port": expected[1], "guest_port": 80}]}]}}}))

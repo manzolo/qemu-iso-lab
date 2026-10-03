@@ -33,6 +33,12 @@ def _name(name: str) -> str:
     return name
 
 
+# Local labs take their SSH ports from here up: the tracked catalog numbers its own from 2222 and had
+# reached 2364 by 2026-10-03, and a catalog update that lands on a port a local lab already holds makes
+# load_config refuse the whole configuration (git-lab-server at 2365 met a scaffolded lab's router).
+USER_LAB_PORT_START = 2400
+
+
 def allocate_subnet(cfg: dict[str, Any]) -> int:
     """First unused 172.20.N.0/24, N=1..255, including wider overlapping networks."""
     networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
@@ -220,7 +226,7 @@ def create(group: str, specifications: list[str], title: str | None = None, dry_
         for section in ("ssh_provision", "cloud_init"):
             if isinstance(vm.get(section), dict) and vm[section].get("ssh_host_port"):
                 taken.add(int(vm[section]["ssh_host_port"]))
-    ports = clone.allocate_ports(len(specifications), taken)
+    ports = clone.allocate_ports(len(specifications), taken, start=USER_LAB_PORT_START)
     members: list[str] = []
     owned_bases: list[str] = []
     for index, specification in enumerate(specifications, 1):

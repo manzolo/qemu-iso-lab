@@ -97,14 +97,14 @@ def used_host_ports(cfg: dict[str, Any]) -> set[int]:
     return ports
 
 
-def allocate_ports(count: int, taken: set[int], preferred: int | None = None) -> list[int]:
-    """`count` distinct free host ports: `preferred` first when given and free."""
+def allocate_ports(count: int, taken: set[int], preferred: int | None = None, start: int = CLONE_PORT_START) -> list[int]:
+    """`count` distinct free host ports from `start` up: `preferred` first when given and free."""
     chosen: list[int] = []
     if preferred is not None:
         if preferred in taken:
             raise VMError(f"Host port {preferred} is already forwarded by another profile")
         chosen.append(preferred)
-    candidate = CLONE_PORT_START
+    candidate = start
     while len(chosen) < count:
         if candidate > CLONE_PORT_END:
             raise VMError(f"No free host port left between {CLONE_PORT_START} and {CLONE_PORT_END}")

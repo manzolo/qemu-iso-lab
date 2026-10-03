@@ -105,7 +105,8 @@ Internet access through NAT. Edit these files to build your exercises; guides, w
 maps and `check-vms --group my-firewall` use them just like tracked labs.
 
 Choose a new lab name and 2–254 distinct roles. vmctl assigns the first free `172.20.N.0/24`
-(N=1…255), addresses `.1`, `.2`, … and free SSH ports from 2300. `--dry-run` writes nothing.
+(N=1…255), addresses `.1`, `.2`, … and free SSH ports from 2400 up, clear of the catalog's own
+numbering (which grows from 2222 as profiles are added). `--dry-run` writes nothing.
 A member can extend a base or start from an existing profile: tracked profiles use the
 catalog recipe, with `{{user}}` preserved and personal overrides excluded. Adjust each
 member's login in `local.json` if needed.
