@@ -374,7 +374,7 @@ try {
   assert.equal(await page.locator('[data-section=installation]').getAttribute('open'),''); check('polling preserves expanded profile');
   await page.locator('[data-filter=labs]').click();
   assert.equal(await page.locator('.lab').first().locator('.buttons button').first().textContent(),'Start stack');
-  assert.equal(await page.locator('.lab').nth(1).locator('.buttons button').first().textContent(),'Install lab…');
+  assert.equal(await page.locator('.lab').nth(1).locator('.buttons button').first().textContent(),'Install lab');
   await shot('labs'); check('installed and new labs have different primary actions');
   for (const width of [1440,912,390]) {
     await page.setViewportSize({width,height:909});

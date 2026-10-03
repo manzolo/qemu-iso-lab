@@ -1475,7 +1475,7 @@ function renderLabs() {
     const installed = names.length > 0 && names.every((n) => byName[n]?.installed);
     const cluster = members.some((m) => m.family === "proxmox");
     const btn = (label,args,cls="") => `<button class="${cls}" data-args='${esc(JSON.stringify(args))}'>${label}</button>`;
-    const primary = installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab…",["group","install",lab.group],"primary");
+    const primary = installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab",["group","install",lab.group],"primary");
     const subtitle = lab.title || (cluster ? `Proxmox VE: ${names.length - 1} nodes and a client on one segment` : `${names.length} machine${names.length === 1 ? "" : "s"} on a shared network`);
     const facts = [`${names.length} machine${names.length === 1 ? "" : "s"}`, lab.tests ? `${lab.tests} test script${lab.tests === 1 ? "" : "s"}` : "", (lab.guides || []).length ? `guide ${lab.guides.map(g => g.toUpperCase()).join(" · ")}` : "", cluster ? "cluster" : ""].filter(Boolean);
     const link = (attr, label, icon, title) => `<button ${attr} title="${esc(title)}">${consoleIcon(icon)}${label}</button>`;
@@ -1562,9 +1562,17 @@ function openStartedConsoles() {
     else openConsole(name);
   }
 }
+// vmctl group install deletes only the disks of members whose install never finished (the server's
+// lifecycle.group_install_overwrites): a first install asks nothing, a rerun over a broken disk does.
+function groupInstallOverwrites(args) {
+  if (args[0] !== "group" || args[1] !== "install") return [];
+  const lab = (S.labs || []).find(l => l.group === args[2]);
+  const names = lab ? (lab.start_order || lab.members || []).map(m => typeof m === "string" ? m : m.name) : [];
+  return names.filter(n => { const r = S.vms.find(v => v.name === n); return r && r.install_label !== "no disk" && !["installed", "verified"].includes(r.install_label); });
+}
 async function run(args, danger, afterStart = false) {
   const cmd = catalog.find((c) => c.name === args[0]);
-  const destructive = danger || (cmd && (cmd.destructive || cmd.destructive_actions.includes(args[1]))) || (args[0] === "check-vms" && args.includes("--clean-first"));
+  const destructive = danger || (cmd && (cmd.destructive || cmd.destructive_actions.includes(args[1]))) || groupInstallOverwrites(args).length > 0 || (args[0] === "check-vms" && args.includes("--clean-first"));
   const forceStop = args[0] === "stop" && args.includes("--force");
   if (destructive && !await askConfirm({ title: forceStop ? "Force stop this VM?" : "This deletes or overwrites data", message: forceStop ? "Power off the VM immediately. Unsaved guest changes may be lost; the disk and logs are kept." : "The command runs as a job and cannot be undone.", command: "vmctl " + args.join(" "), button: forceStop ? "Force stop" : "Run it" })) return;
   const vm = S.vms.find(r => r.name === args[1])?.name;
@@ -2768,7 +2776,7 @@ function buildArgs() {
 }
 function destructiveCommand(args) {
   const c = catalog.find((x) => x.name === args[0]);
-  return !!(c && (c.destructive || c.terminal_only || c.destructive_actions.includes(args[1]))) || (args[0] === "check-vms" && args.includes("--clean-first"));
+  return !!(c && (c.destructive || c.terminal_only || c.destructive_actions.includes(args[1]))) || groupInstallOverwrites(args).length > 0 || (args[0] === "check-vms" && args.includes("--clean-first"));
 }
 function preview() {
   if (!pal.cmd) return;

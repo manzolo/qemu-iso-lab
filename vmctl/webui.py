@@ -53,7 +53,9 @@ EXCLUDED_COMMANDS = {"web", "shell", "console", "flash", "import-device", "compl
 TERMINAL_COMMANDS = {"flash", "import-device"}
 # Delete or overwrite something: the browser asks first and the request must say it did.
 DESTRUCTIVE = {"clean", "delete-iso", "clean-reports", "clean-stale", "unexport-libvirt"}
-DESTRUCTIVE_ACTIONS = {"checkpoint": {"restore", "delete"}, "group": {"clean", "install"},
+# group install deletes only the disks of members whose install never finished, so it asks only
+# when there are some (lifecycle.group_install_overwrites); a first install is not destructive.
+DESTRUCTIVE_ACTIONS = {"checkpoint": {"restore", "delete"}, "group": {"clean"},
                        "lab": {"clean", "install"}}
 LOG_CHUNK = 65536
 
@@ -116,6 +118,12 @@ def is_destructive(args: list[str]) -> bool:
     actions = DESTRUCTIVE_ACTIONS.get(args[0], set())
     if any(arg in actions for arg in args[1:2]):
         return True
+    if args[:2] == ["group", "install"] and len(args) > 2:
+        from vmctl import lifecycle
+        try:
+            return bool(lifecycle.group_install_overwrites(args[2]))
+        except VMError:
+            return True  # an unknown group fails in the command itself; never skip the question on doubt
     return args[0] == "check-vms" and "--clean-first" in args
 
 

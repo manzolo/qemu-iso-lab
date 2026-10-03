@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import vmctl.state  # noqa: E402
-from vmctl import webui  # noqa: E402
+from vmctl import lifecycle, webui  # noqa: E402
 from vmctl.errors import VMError  # noqa: E402
 
 from tests._common import BaseVmctlTestCase  # noqa: E402
@@ -64,6 +64,20 @@ class CatalogTests(unittest.TestCase):
         self.assertTrue(webui.is_destructive(["check-vms", "a", "--clean-first"]))
         self.assertFalse(webui.is_destructive(["group", "up", "netlab"]))
         self.assertFalse(webui.is_destructive(["start", "vm"]))
+
+    def test_group_install_asks_only_when_it_would_delete_a_disk(self):
+        # 2026-10-03: a lab's first install was announced as "deletes or overwrites data".
+        with mock.patch.object(lifecycle, "group_install_overwrites", return_value=[]):
+            self.assertFalse(webui.is_destructive(["group", "install", "vpn-lab"]))
+        with mock.patch.object(lifecycle, "group_install_overwrites", return_value=["vpn-lab-client"]):
+            self.assertTrue(webui.is_destructive(["group", "install", "vpn-lab"]))
+        with mock.patch.object(lifecycle, "group_install_overwrites", side_effect=VMError("unknown group")):
+            self.assertTrue(webui.is_destructive(["group", "install", "nope"]))
+
+    def test_install_redo_names_only_unfinished_disks(self):
+        members = [{"name": "a", "install": "verified"}, {"name": "b", "install": "no disk"},
+                   {"name": "c", "install": "incomplete"}, {"name": "d", "install": "empty"}, {"name": "e", "install": "installed"}]
+        self.assertEqual(lifecycle.install_redo(members), ["c", "d"])
 
 
 class WebSocketTests(unittest.TestCase):

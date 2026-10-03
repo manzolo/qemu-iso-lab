@@ -3186,6 +3186,21 @@ def cmd_group(args: argparse.Namespace) -> int:
 INSTALLED_LABELS = ("installed", "verified")
 
 
+def install_redo(members: list[dict[str, Any]]) -> list[str]:
+    """The members ``group install`` deletes before installing them again: a disk left empty or by
+    an unfinished install. Nothing else is ever overwritten (installed members are kept)."""
+    return [m["name"] for m in members if m["install"] not in INSTALLED_LABELS and m["install"] != vmstate.LABEL_NO_DISK]
+
+
+def group_install_overwrites(group: str) -> list[str]:
+    """What ``vmctl group install <group>`` would delete right now: the web asks only then."""
+    cfg = config.load_config()
+    names = labs.group_members(cfg, group)
+    if not names:
+        return []
+    return install_redo(labs.model(cfg, group, group_states(cfg, names))["members"])
+
+
 def group_install(cfg: dict[str, Any], args: argparse.Namespace, lab: dict[str, Any]) -> int:
     """Install what the group lacks, in start order, with each member's own unattended flow; then
     bring the stack up in the runtime phase. Cumulative: installed members are kept, so a rerun after
@@ -3196,7 +3211,7 @@ def group_install(cfg: dict[str, Any], args: argparse.Namespace, lab: dict[str, 
     if not missing:
         ui.print_status("ok", f"Every member of {group} is installed")
     else:
-        redo = [m["name"] for m in lab["members"] if m["name"] in missing and m["install"] != "no disk"]
+        redo = install_redo(lab["members"])
         if redo:
             confirm_or_yes(args, f"Reinstall from scratch (their disks are deleted): {', '.join(redo)}?")
         ui.print_header(f"Install {group}: {' -> '.join(missing)}"
