@@ -73,7 +73,7 @@ export async function run(d) {
   await d.cue("inside");
   await d.guest("docker exec lab-web nginx -v", { read: 2000 });
   await d.guest("docker logs --tail 3 lab-web", { read: 3000 });
-  await d.guest("docker inspect -f '{{.NetworkSettings.IPAddress}} {{.State.Status}}' lab-web", { read: 3000 });
+  await d.guest("docker inspect -f '{{.State.Status}} {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' lab-web", { read: 3000 });
   await d.guest("docker rm -f lab-web", { read: 2000 });
 
   await d.cue("volumes");

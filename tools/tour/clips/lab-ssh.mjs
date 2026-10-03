@@ -92,12 +92,13 @@ export async function run(d) {
 
   await d.cue("noisy");
   await d.session(CLIENT);
-  await d.guest(`for i in 1 2 3 4; do sshpass -p nope ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no ${USER}@172.20.2.1 true 2>/dev/null; echo "attempt $i refused"; done`, { read: 2500, timeout: 90000 });
+  // ConnectTimeout: once fail2ban bans the client mid-loop, the remaining attempts would hang on a DROP.
+  await d.guest(`for i in 1 2 3 4; do sshpass -p nope ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no ${USER}@172.20.2.1 true 2>/dev/null; echo "attempt $i refused"; done`, { read: 2500, timeout: 90000 });
   await d.leave();
 
   await d.cue("banned");
   await d.session(SERVER);
-  await d.guest("sleep 3; sudo fail2ban-client status sshd | grep -A2 'Banned IP'", { read: 4500 });
+  await d.guest("sleep 3; sudo fail2ban-client status sshd | grep -A2 'Banned IP'", { read: 5500 });
   await d.guest("sudo fail2ban-client set sshd unbanip 172.20.2.2", { read: 2500 });
   await d.leave();
 

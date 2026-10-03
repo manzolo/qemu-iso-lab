@@ -52,7 +52,7 @@ curl -s localhost:8080 | grep '<title>'
 docker exec lab-web nginx -v            # un secondo processo nel container
 docker exec -it lab-web sh              # una shell dentro; exit per uscire
 docker logs --tail 5 lab-web            # quello che ha stampato il processo principale
-docker inspect -f '{{.State.Status}} {{.NetworkSettings.IPAddress}}' lab-web
+docker inspect -f '{{.State.Status}} {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' lab-web
 docker rm -f lab-web                    # ferma e rimuovi
 ```
 

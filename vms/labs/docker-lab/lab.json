@@ -39,7 +39,7 @@
           "docker exec lab-web nginx -v",
           "docker exec -it lab-web sh    # a shell inside: ls /usr/share/nginx/html, exit to leave",
           "docker logs --tail 5 lab-web",
-          "docker inspect -f '{{.NetworkSettings.IPAddress}} {{.State.Status}}' lab-web",
+          "docker inspect -f '{{.State.Status}} {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' lab-web",
           "docker rm -f lab-web    # stop and remove"
         ]}
       ]
