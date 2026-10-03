@@ -139,8 +139,12 @@ def _files(group: str, title: str, members: list[str], number: int, owned_bases:
     files = {"tests/test_01_reachability.sh": "\n".join(script) + "\n"}
     if cloud_only:
         # Cloud-init guests already have Python; HTTPS also tests DNS without relying on
-        # ICMP forwarding through slirp or an extra curl package in the guest.
-        probe = 'import urllib.request; urllib.request.urlopen("https://example.org", timeout=10).close()'
+        # ICMP forwarding through slirp or an extra curl package in the guest. Any HTTP answer
+        # proves DNS, TCP and TLS (example.org answers 403 to urllib's User-Agent, 2026-10-03);
+        # only a URLError (no name, no route, no handshake, timeout) fails.
+        probe = ('import urllib.request, urllib.error\n'
+                 'try: urllib.request.urlopen("https://example.org", timeout=10).close()\n'
+                 'except urllib.error.HTTPError: pass')
         command = f"python3 -c {shlex.quote(probe)}"
         internet_script = script[:4] + [
             f"assert {shlex.quote(name + ' reaches the Internet via NAT (HTTPS)')} on {name} {command}"
@@ -166,6 +170,31 @@ def _files(group: str, title: str, members: list[str], number: int, owned_bases:
                                     + ("Cleanup" if lang == "en" else "Pulizia")
                                     + f": `vmctl group clean {group}`, `vmctl group remove {group}`.\n")
     return files
+
+
+def _apply_identity(document: dict[str, Any], cfg: dict[str, Any], members: list[str]) -> None:
+    """The local identity, written into each member like ``clone`` does: the top-level identity
+    of local.json moves tracked profiles only (config.load_config), so a member built there from a
+    catalog base would otherwise install as the catalog's ``lab`` while every other VM is yours.
+    Explicit in the member's entry, so it is visible and editable; nothing is written without an identity."""
+    identity = document.get("identity")
+    if not isinstance(identity, dict) or not identity.get("user"):
+        return
+    for name in members:
+        resolved = config.get_vm(cfg, name)
+        sections = {section: copy.deepcopy(resolved[section]) for section, _ in config.USER_IDENTITY_FIELDS
+                    if isinstance(resolved.get(section), dict)}
+        before = copy.deepcopy(sections)
+        probe: dict[str, Any] = {**sections}
+        for key in ("haiku_config", "proxmox_config"):
+            if resolved.get(key) is not None:
+                probe[key] = resolved[key]
+        config.apply_identity(probe, identity, {})
+        entry = document["vms"][name]
+        for section, previous in before.items():
+            changed = {k: v for k, v in probe[section].items() if previous.get(k) != v}
+            if changed:
+                entry.setdefault(section, {}).update(changed)
 
 
 def create(group: str, specifications: list[str], title: str | None = None, dry_run: bool = False) -> None:
@@ -221,6 +250,8 @@ def create(group: str, specifications: list[str], title: str | None = None, dry_
                 profile.setdefault(section, {}).update(ssh_host_port=ports[index - 1], ssh_key=None)
         document["vms"][name] = profile
         members.append(name)
+    candidate = config.load_config(local_profiles=document)
+    _apply_identity(document, candidate, members)
     candidate = config.load_config(local_profiles=document)
     total_ram = total_cpu = total_disk = 0
     for name, port in zip(members, ports):

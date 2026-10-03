@@ -92,6 +92,25 @@ class UserLabsTests(BaseVmctlTestCase):
         self.assertIn("Would update local.json", self.output.getvalue())
         self.assertEqual(sum(names.count("group") for _, _, names in cli.COMMAND_GROUPS), 1)
 
+    def test_members_get_the_local_identity_explicitly(self):
+        # Without an identity the entries carry none; with one, each member installs as that user
+        # (the top-level identity moves tracked profiles only, a local-only member would stay "lab").
+        self.create()
+        self.assertNotIn("user", json.loads(self.local.read_text())["vms"]["demo-server"]["ssh_provision"])
+        user_labs.remove("demo")
+        document = catalog.read_document()
+        document["identity"] = {"user": "probeuser", "password_hash": "$6$probe$hash", "realname": "Probe"}
+        catalog.write_document(document)
+        self.create()
+        entry = json.loads(self.local.read_text())["vms"]["demo-server"]
+        self.assertEqual(entry["ssh_provision"]["user"], "probeuser")
+        self.assertEqual(entry["cloudimg_config"]["username"], "probeuser")
+        self.assertEqual(entry["cloudimg_config"]["password_hash"], "$6$probe$hash")
+        vm = config.load_config()["vms"]["demo-server"]
+        self.assertEqual(config.resolve_vm_user(vm), ("probeuser", None))
+        self.assertNotIn("{{user}}", json.dumps(vm))  # the base's placeholders follow the member's user
+        self.assertNotIn("lab", json.dumps(vm["cloudimg_config"].get("username")))
+
     def test_cloud_internet_script_checks_each_member_and_reports_failures(self):
         self.create()
         binary = self.root / "bin/vmctl"
@@ -107,6 +126,7 @@ class UserLabsTests(BaseVmctlTestCase):
         for name in ("demo-server", "demo-client"):
             self.assertIn(f"shell {name} -- python3 -c", calls.read_text())
         self.assertIn('urlopen("https://example.org", timeout=10)', calls.read_text())
+        self.assertIn("except urllib.error.HTTPError: pass", calls.read_text())  # an HTTP status is a reached server
         result = subprocess.run(["bash", str(script)], env={**env, "FAKE_EXIT": "1"}, capture_output=True, text=True)
         self.assertEqual(result.returncode, 2)
         self.assertEqual(result.stdout.count("[FAIL]"), 2)
