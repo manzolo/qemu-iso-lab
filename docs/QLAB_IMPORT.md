@@ -8,7 +8,7 @@ The other ideas, which are new labs rather than ports, are in [LAB_IDEAS.md](LAB
 
 ## Where we are (2026-10-03) — the backlog
 
-Done, merged and verified live (vmctl 0.17.0 → 0.17.3, 2026-10-02/03):
+Done, merged and verified live (vmctl 0.17.0 → 0.17.6, 2026-10-02/03; the tour of the catalog site shows vpn-lab):
 
 | step | what | live |
 |---|---|---|
@@ -36,8 +36,11 @@ Next, in this order:
 
 Open points found on the way: Debian's genericcloud image publishes SHA512SUMS only (needs an
 `iso_sha512` field before a Debian member); a guide's relative links (`../../docs/...`) render as
-text on the guide page; the matrix has not yet run the `lab-<name>` rows end to end (they run
-when every member of a lab is in a `check-vms` run).
+text on the guide page. The lab rows in the matrix: the first full run (2026-10-03, 171 PASS) had
+every member pass but all five `lab-<name>` rows fail on "Disk image not found", because the row
+cleanup removed each member's disk before the lab tests; fixed in 0.17.4 (a passing member waits
+for its lab's tests) and verified with vpn/ssh/docker/lvm (10/10), netlab's row still to see in
+the next full matrix. `cluster-pve-lab` passed (3 nodes, quorate).
 
 Lessons worth keeping (each cost a run): tests must not depend on the guest's locale (LVM printed
 `5,99g` under it_IT); never address extra disks by name (the system disk comes last on the PCI
