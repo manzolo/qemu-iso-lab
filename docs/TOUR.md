@@ -123,14 +123,25 @@ Another voice: `--speaker "<name>"` (XTTS's built-in speakers), or a recording o
 ## Lab lessons
 
 Besides the tour's chapters, a clip can be a **lesson on one lab**: `export const series = "labs"`
-and `export const lab = "<group>"` in the clip (`clips/lab-lvm.mjs` is the first, LVM from scratch
-on the LVM lab). The tour page lists the lessons in their own playlist after the tour, a lesson
+and `export const lab = "<group>"` in the clip. Five so far, one per lab with content:
+`lab-lvm` (LVM from scratch), `lab-vpn` (WireGuard by hand, the two captures, the iptables fence),
+`lab-ssh` (keys, port knocking, hardening, fail2ban, nmap), `lab-docker` (engine, images,
+run/exec/logs, volumes, Compose, a build) and `lab-netlab` (Pi-hole, the desktop, pfSense, the
+forwards and the map). The tour page lists the lessons in their own playlist after the tour, a lesson
 does not play on into the next clip, and the catalog's **Labs** section shows "▶ Watch the lesson"
 on that lab's card (`tour.json` carries `series` and `lab`, `tools/build_catalog_site.py` joins
-them). Lessons are terminal-driven: `vmctl shell <vm>` into the member, then the exercise commands
-typed slowly with a cue per concept; the last step runs `vmctl group test <lab>`, so the lab must
-be back in its initial state first (teardown with `;`, never `&&`: one failed `umount` left the
-volume group behind and the tests red in the first take).
+them). Lessons are terminal-driven, with the helpers of `rec.mjs`: `d.session(vm)` opens `vmctl shell`
+into a member and waits until the guest sees a pts, `d.guest(cmd)` types one command and waits for
+the guest's own prompt (a `PROMPT_COMMAND` stamp read through a second shell) before the next,
+`d.leave()` exits and waits for the host's prompt; a cue per concept, the output left on screen
+long enough to read. The last step runs `vmctl group test <lab>`, so the lab must be back in its
+initial state first. Lessons learned the hard way (five takes of the LVM lesson): a fixed delay
+is never enough (a `mkfs` or an `lvextend` overran it and the next command queued up); teardown
+with `;`, never `&&` (one failed `umount` left the volume group behind and the tests red); wait
+for a snapshot merge to finish before removing the group; `exit` closes the session, so its wait
+is on the host's prompt; a loop of failed SSH logins needs `ConnectTimeout`, or fail2ban's ban
+mid-loop hangs the rest on the DROP; Docker 29 moved a container's `IPAddress` under
+`.NetworkSettings.Networks` (the lesson found the lab's own exercise wrong).
 
 ## 5. Publishing
 
