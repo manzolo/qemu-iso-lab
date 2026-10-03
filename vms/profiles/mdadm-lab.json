@@ -1,0 +1,55 @@
+{
+  "vms": {
+    "mdadm-lab-server": {
+      "name": "mdadm lab server (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "mdadm-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-04"
+      },
+      "notes": "The one machine of the mdadm-lab (vms/labs/mdadm-lab/): four empty 2 GB disks beside the system disk (extra_disks, sacrificial by design) for Linux software RAID with mdadm: a RAID1 mirror, a failed and replaced disk, a RAID5 with a hot spare that rebuilds by itself, a RAID5 grown online by one disk, and the arrays stopped, assembled again and torn down. The tests find the four disks by size, never by name, and leave them empty at the end. Ubuntu 24.04 minimal cloud image. The RAID the name of qlab's raid-lab promised.",
+      "memory_mb": 1536,
+      "cpus": 2,
+      "disk": {
+        "size": "10G"
+      },
+      "extra_disks": [
+        {
+          "path": "artifacts/{{name}}/md1.qcow2",
+          "size": "2G"
+        },
+        {
+          "path": "artifacts/{{name}}/md2.qcow2",
+          "size": "2G"
+        },
+        {
+          "path": "artifacts/{{name}}/md3.qcow2",
+          "size": "2G"
+        },
+        {
+          "path": "artifacts/{{name}}/md4.qcow2",
+          "size": "2G"
+        }
+      ],
+      "cloudimg_config": {
+        "packages": [
+          "mdadm"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2367,
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "mdadm --version 2>&1 | grep -q mdadm",
+          "test \"$(lsblk -dnbo SIZE,TYPE | awk '$1==2147483648 && $2==\"disk\"' | wc -l)\" -eq 4",
+          "grep -q '^Personalities' /proc/mdstat"
+        ]
+      }
+    }
+  }
+}

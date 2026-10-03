@@ -1,0 +1,125 @@
+{
+  "title": "mdadm lab: Linux software RAID, a mirror, a failed disk, a hot spare and a grown RAID5",
+  "summary": "One server with four empty 2 GiB disks beside its system disk. mdadm is the Linux kernel's software RAID: the exercises build a RAID1 mirror and read it in /proc/mdstat, fail a disk and put a new one in while the data stays readable, build a RAID5 with a hot spare and watch the spare take over by itself, grow the RAID5 online by one disk, and stop, assemble again and tear the arrays down. The RAID the name of qlab's raid-lab promised.",
+  "members": [
+    "mdadm-lab-server"
+  ],
+  "exercises": [
+    {
+      "title": "RAID anatomy",
+      "text": "mdadm drives the kernel's md driver: arrays are /dev/mdN block devices made of member disks, and /proc/mdstat is the dashboard. The four lab disks are empty.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "mdadm-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "mdadm --version",
+            "cat /proc/mdstat    # Personalities, no arrays yet"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "A RAID1 mirror",
+      "text": "Two disks, every block written to both: one may fail. The first sync copies one disk onto the other (a few seconds here); the array is a block device you format and mount like any other.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "mdadm-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "sudo mdadm --create /dev/md0 --level=1 --raid-devices=2 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)",
+            "cat /proc/mdstat    # [UU] once the resync is over",
+            "sudo mdadm --detail /dev/md0",
+            "sudo mkfs.ext4 -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "A failed disk, replaced",
+      "text": "Mark a member faulty: the array is degraded, [U_], and the file is still there. Remove it, add a disk back, and the kernel rebuilds the mirror onto it.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "mdadm-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "sudo mdadm /dev/md0 --fail $(echo $DISKS | cut -d' ' -f1) && cat /proc/mdstat    # [U_], (F) on the failed member",
+            "cat /mnt/raid1/file    # still readable",
+            "sudo mdadm /dev/md0 --remove $(echo $DISKS | cut -d' ' -f1) && sudo mdadm /dev/md0 --add $(echo $DISKS | cut -d' ' -f1)",
+            "cat /proc/mdstat    # recovery, then [UU] again"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "A RAID5 with a hot spare",
+      "text": "RAID5 stripes data and parity over three disks: the space of two, any one may fail. A fourth disk declared as spare waits; fail a member and the rebuild onto the spare starts by itself.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "mdadm-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)",
+            "sudo mdadm --create /dev/md1 --level=5 --raid-devices=3 --spare-devices=1 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2) $(echo $DISKS | cut -d' ' -f3) $(echo $DISKS | cut -d' ' -f4)",
+            "cat /proc/mdstat; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State|spare'",
+            "sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "mdadm-lab-server",
+          "commands": [
+            "sudo mdadm /dev/md1 --fail $(echo $DISKS | cut -d' ' -f2) && cat /proc/mdstat    # the spare rebuilds without being asked",
+            "sudo mdadm --detail /dev/md1 | grep -E 'State|Active|Working|Failed|Spare'",
+            "cat /mnt/raid5/file"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Grow the RAID5 online",
+      "text": "Put the failed disk back as a new member and reshape the array from three devices to four: the data is redistributed while the file system stays mounted; then resize2fs takes the new space.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "mdadm-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "sudo mdadm /dev/md1 --remove $(echo $DISKS | cut -d' ' -f2) && sudo mdadm /dev/md1 --add $(echo $DISKS | cut -d' ' -f2)",
+            "sudo mdadm --grow /dev/md1 --raid-devices=4 && cat /proc/mdstat    # reshape",
+            "sudo mdadm --detail /dev/md1 | grep -E 'Raid Devices|Array Size'",
+            "sudo resize2fs /dev/md1 && df -h /mnt/raid5    # from 4 to 6 GiB, still mounted"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Scan, stop, assemble, tear down",
+      "text": "mdadm --detail --scan prints the line /etc/mdadm/mdadm.conf wants so the array comes back at boot. An array can be stopped and assembled again from the superblocks on its members; zeroing those superblocks is what ends it.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "mdadm-lab-server",
+          "commands": [
+            "sudo mdadm --detail --scan",
+            "sudo umount /mnt/raid5 && sudo mdadm --stop /dev/md1 && cat /proc/mdstat",
+            "sudo mdadm --assemble --scan && cat /proc/mdstat && sudo mount /dev/md1 /mnt/raid5 && cat /mnt/raid5/file"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "mdadm-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "sudo umount /mnt/raid5; sudo mdadm --stop /dev/md1",
+            "for d in $DISKS; do sudo mdadm --zero-superblock $d; sudo wipefs -a $d; done; cat /proc/mdstat; lsblk"
+          ]
+        }
+      ]
+    }
+  ]
+}

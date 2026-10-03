@@ -1197,6 +1197,17 @@
         }
       ]
     },
+    "mdadm-lab-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:38dc7e4696c88bec3f833170d5cd21abcb91f073d08426276de00834ed3f8f1f",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-04",
+          "note": "mdadm-lab: one cloud image with four empty disks for Linux software RAID"
+        }
+      ]
+    },
     "menuetos": {
       "version": "1.0.0",
       "fingerprint": "sha256:f6448ec3df8f06484d6fd21a61559f9dac2234e32525d10909a9829c953120b4",

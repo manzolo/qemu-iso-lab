@@ -23,6 +23,7 @@ Done, merged and verified live (vmctl 0.17.0 → 0.17.6, 2026-10-02/03; the tour
 | lvm-lab | PVs, VG, ext4/xfs LVs, online growth, snapshot rollback | 7/7, 43 checks |
 | git-lab | a prepared repository: objects, branches, merge, conflicts, stash, remote, rebase, git flow (one cloud image) | 9/9, 60 checks |
 | zfs-lab | the ZFS half of qlab's raid-lab, extended: RAIDZ, datasets, snapshots, offline/resilver, scrub, send/receive, mirrors (one cloud image, four disks) | 7/7, 46 checks |
+| mdadm-lab | Linux software RAID, the RAID qlab's raid-lab only named: a mirror, a failed disk, a RAID5 with a hot spare, a grow, stop/assemble (one cloud image, four disks) | 6/6, 42 checks |
 | web | lab card: Run tests, Guide (page), Consoles (`/multi` headed by the lab, addresses per pane), restyled card | browser test |
 
 Next, in this order:
