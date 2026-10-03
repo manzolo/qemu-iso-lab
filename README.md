@@ -4,15 +4,15 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)
 ![Profiles](https://img.shields.io/badge/profiles-100%2B-84c9e7)
 [![Catalog](https://img.shields.io/badge/catalog-browse%20online-7ddfc5)](https://manzolo.github.io/qemu-iso-lab/)
-[![Tour](https://img.shields.io/badge/tour-5%20clips%20·%20EN%2FIT-7ddfc5)](https://manzolo.github.io/qemu-iso-lab/tour.html)
+[![Tour](https://img.shields.io/badge/tour-6%20clips%20·%20EN%2FIT-7ddfc5)](https://manzolo.github.io/qemu-iso-lab/tour.html)
 
 **Linux, BSD and Windows virtual machines on QEMU/KVM, installed with zero clicks.**
 One JSON profile per VM describes the ISO (downloaded and checksummed), the disk, the
 firmware, the unattended install and the SSH provisioning. Pick the profiles you want out
 of the catalog and manage them from the **web dashboard** (`vmctl web`), the terminal
 dashboard (`vmtui`) or the CLI (`vmctl`), all sharing the same profiles, VM state and jobs.
-New here? **[The tour](https://manzolo.github.io/qemu-iso-lab/tour.html)** shows the whole road in five short clips,
-with English and Italian subtitles: the catalog, the setup, a first VM, the console in the browser, a lab.
+New here? **[The tour](https://manzolo.github.io/qemu-iso-lab/tour.html)** shows the whole road in six short clips,
+with English and Italian voice and subtitles: the catalog, the setup, a first VM, the console in the browser, a lab, your own lab.
 
 - **100+ profiles**, more than half of them fully unattended: every Ubuntu LTS since 8.04, Debian,
   Fedora, Arch, NixOS, openSUSE, FreeBSD, Haiku, ReactOS and Windows from 11 back to NT 4,
@@ -360,7 +360,7 @@ Details: [docs/PROVISIONING.md](docs/PROVISIONING.md).
 | Page | Read it for |
 |------|-------------|
 | [Catalog site](https://manzolo.github.io/qemu-iso-lab/) | every profile, its version and history, what to run |
-| [Tour](https://manzolo.github.io/qemu-iso-lab/tour.html) ([how it is made](docs/TOUR.md)) | five short clips with English and Italian voice and subtitles |
+| [Tour](https://manzolo.github.io/qemu-iso-lab/tour.html) ([how it is made](docs/TOUR.md)) | six short clips with English and Italian voice and subtitles |
 | [docs/README.md](docs/README.md) | the map of every page, in reading order |
 | [PROFILES](docs/PROFILES.md) | the profile model, versions, and how to add a VM |
 | [UNATTENDED](docs/UNATTENDED.md) | how each unattended install works, and the validation matrix |

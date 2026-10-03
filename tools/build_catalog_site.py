@@ -414,7 +414,7 @@ TOUR_PAGE = r"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QEMU ISO Lab · tour</title>
-<meta name="description" content="Short clips, with English and Italian subtitles: the catalog, the setup, a first VM, the console in the browser and a lab of two machines.">
+<meta name="description" content="Short clips, spoken and subtitled in English and Italian: the catalog, the setup, a first VM, the console in the browser, a lab, and a lab of your own.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%237ddfc5'/%3E%3Cpath d='M7 8l4 4-4 4M12 16h5' stroke='%230c111b' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root { color-scheme:dark; --bg:#0b1017; --panel:#131c27; --panel2:#192432; --line:#293646; --text:#edf3fa; --muted:#9aabbe; --accent:#8aead0; --btn:#202d3d; }
@@ -469,8 +469,8 @@ ol b { display:block; font-size:13px; line-height:1.3; } ol small { color:var(--
 <script>
 const TOUR = JSON.parse(document.getElementById("data").textContent);
 const TEXT = {
-  en: { title: "Take the tour", lead: "Five short clips, from the catalog to a lab of two machines. Spoken and subtitled in English and Italian; each clip plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked. The voice is synthetic (XTTS-v2).", clip: "Clip", of: "of" },
-  it: { title: "Il tour", lead: "Cinque clip brevi, dal catalogo a un lab di due macchine. Parlate e sottotitolate in italiano e in inglese; ogni clip prosegue nella successiva.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate. La voce è sintetica (XTTS-v2).", clip: "Clip", of: "di" },
+  en: { title: "Take the tour", lead: "Six short clips, from the catalog to a lab of your own. Spoken and subtitled in English and Italian; each clip plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked. The voice is synthetic (XTTS-v2).", clip: "Clip", of: "of" },
+  it: { title: "Il tour", lead: "Sei clip brevi, dal catalogo a un lab tutto tuo. Parlate e sottotitolate in italiano e in inglese; ogni clip prosegue nella successiva.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate. La voce è sintetica (XTTS-v2).", clip: "Clip", of: "di" },
 };
 let lang = "en", current = 0;
 try { lang = localStorage.getItem("qil-tour-lang") || ((navigator.language || "en").startsWith("it") ? "it" : "en"); } catch { lang = (navigator.language || "en").startsWith("it") ? "it" : "en"; }
@@ -610,8 +610,8 @@ def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "c
         (out / "tour.html").write_text(TOUR_PAGE.replace("__REPO__", REPO_URL).replace(
             "__DATA__", json.dumps({"clips": tour}, ensure_ascii=False).replace("</", "<\\/")), encoding="utf-8")
     tour_nav = '<a class="tour" href="tour.html">▶ Tour</a>' if tour else ""
-    tour_start = ('<div class="terminal-note"><span>New to it? Five short clips show the whole road, '
-                  'with English and Italian subtitles.</span><a href="tour.html">▶ Take the tour</a></div>') if tour else ""
+    tour_start = ('<div class="terminal-note"><span>New to it? Six short clips show the whole road, '
+                  'with English and Italian voice and subtitles.</span><a href="tour.html">▶ Take the tour</a></div>') if tour else ""
     page = (PAGE.replace("__TOUR_NAV__", tour_nav).replace("__TOUR_START__", tour_start).replace("__SPRITE__", sprite).replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
             .replace("__VMCTL__", data["vmctl_version"]).replace("__GENERATED__", data["generated"])
             .replace("__COMMIT__", f" · {data['commit']}" if data["commit"] else "").replace("__REPO__", REPO_URL))

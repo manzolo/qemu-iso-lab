@@ -1,7 +1,7 @@
 # The tour: recording, narrating and publishing the intro clips
 
-The catalog site's [tour](https://manzolo.github.io/qemu-iso-lab/tour.html) is five short clips (the
-catalog, the setup, a first VM, the console in the browser, a lab), spoken and subtitled in English
+The catalog site's [tour](https://manzolo.github.io/qemu-iso-lab/tour.html) is six short clips (the
+catalog, the setup, a first VM, the console in the browser, a lab, your own lab), spoken and subtitled in English
 and Italian. They are recorded on a real desktop, inside a VM, by a script that drives the browser
 and the terminal like a person would: the pointer moves, the commands are typed, the waits are sped
 up and marked. Everything that makes them lives in `tools/tour/`; this page is how to do it again.
