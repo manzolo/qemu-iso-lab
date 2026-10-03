@@ -144,6 +144,7 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_flavours_0929 |= {"haiku", "arch-2014", "slackware-15.0", "slackware-14.0", "slackware-14.1", "slackware-14.2", "slackware-13.37", "slackware-13.0"}
         verified_1001 = {"arch-omarchy-nvidia", "xubuntu-12.04", "edubuntu-12.04", "lubuntu-12.04", "kubuntu-12.04"}  # the desktop check on Omarchy, the stale precise Release on 12.04
         verified_1003 = {"docker-lab-server", "lvm-lab-server", "git-lab-server"}  # docker-lab 6/6, lvm-lab 7/7 and git-lab 9/9 live
+        verified_1004 = {"zfs-lab-server"}  # zfs-lab 7/7, 46 checks live
         verified_1002 = {"windows-11",  # 26H2 (build 26300.9457) installed unattended and verified over SSH
                          "ubuntu-24.04-cloud",  # the first cloud-image profile: 49 s from the seed to the SSH checks
                          "vpn-lab-server", "vpn-lab-client",  # vpn-lab: group install + group test 5/5 live
@@ -161,7 +162,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                     self.assertIn(twin["meta"]["status"], ("unattended", "experimental"), name)
             else:
                 self.assertNotIn("manual", vm["meta"], name)
-            expected_date = ("2026-10-03" if name in verified_1003
+            expected_date = ("2026-10-04" if name in verified_1004
+                             else "2026-10-03" if name in verified_1003
                              else "2026-10-02" if name in verified_1002
                              else "2026-10-01" if name in verified_1001
                              else "2026-09-30" if name in verified_0930

@@ -1,0 +1,59 @@
+{
+  "vms": {
+    "zfs-lab-server": {
+      "name": "ZFS lab server (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "zfs-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-04"
+      },
+      "notes": "The one machine of the zfs-lab (vms/labs/zfs-lab/): four empty 2 GB disks beside the system disk (extra_disks, sacrificial by design) for a RAIDZ pool, datasets with compression, snapshots and rollback, a disk taken offline and resilvered, a scrub, send/receive, and a pair of mirrors to compare with RAIDZ. zfsutils-linux from Ubuntu's archive; the zfs kernel module comes with linux-modules-extra when the cloud image's kernel does not carry it. The tests find the four disks by size, never by name, and leave them empty at the end. Ubuntu 24.04 minimal cloud image. The ZFS half of qlab's raid-lab, extended.",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "disk": {
+        "size": "10G"
+      },
+      "extra_disks": [
+        {
+          "path": "artifacts/{{name}}/zfs1.qcow2",
+          "size": "2G"
+        },
+        {
+          "path": "artifacts/{{name}}/zfs2.qcow2",
+          "size": "2G"
+        },
+        {
+          "path": "artifacts/{{name}}/zfs3.qcow2",
+          "size": "2G"
+        },
+        {
+          "path": "artifacts/{{name}}/zfs4.qcow2",
+          "size": "2G"
+        }
+      ],
+      "cloudimg_config": {
+        "packages": [
+          "zfsutils-linux"
+        ],
+        "runcmd": [
+          "modprobe zfs 2>/dev/null || { apt-get install -y linux-modules-extra-$(uname -r) && modprobe zfs; }",
+          "systemctl enable zfs-import-cache zfs-mount zfs.target 2>/dev/null || true"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2366,
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "sudo modprobe zfs && lsmod | grep -q '^zfs'",
+          "zfs version",
+          "test \"$(lsblk -dnbo SIZE,TYPE | awk '$1==2147483648 && $2==\"disk\"' | wc -l)\" -eq 4"
+        ]
+      }
+    }
+  }
+}

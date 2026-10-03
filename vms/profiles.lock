@@ -2512,6 +2512,17 @@
           "note": "first versioned catalog"
         }
       ]
+    },
+    "zfs-lab-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:f6ba7db50dd00eb624e325e5deac14d7fdca8a87b5bb7d2f3c6dd663dc3d1032",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-04",
+          "note": "zfs-lab: one cloud image with four empty disks for ZFS (the ZFS half of qlab's raid-lab, extended)"
+        }
+      ]
     }
   }
 }

@@ -1,0 +1,150 @@
+{
+  "title": "ZFS lab: a RAIDZ pool, datasets, snapshots, a failed disk and a scrub",
+  "summary": "One server with four empty 2 GiB disks beside its system disk, there to be pooled and wiped. ZFS is volume manager and file system in one: the exercises build a RAIDZ pool, carve datasets with compression, take snapshots and roll back, take a disk offline and watch the pool resilver, scrub it, copy a dataset with send and receive, and rebuild the pool as two mirrors to compare the space. The ZFS half of qlab's raid-lab, extended.",
+  "members": [
+    "zfs-lab-server"
+  ],
+  "exercises": [
+    {
+      "title": "ZFS anatomy",
+      "text": "ZFS replaces the partition, the volume manager and the file system with one stack: a pool of disks (vdevs), datasets mounted from it, checksums on every block. The module and the tools come with Ubuntu; the four lab disks are empty.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "zfs-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "lsmod | grep '^zfs'; zfs version",
+            "sudo zpool list    # no pools available yet"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "A RAIDZ pool",
+      "text": "zpool create takes whole disks and a layout. raidz (RAIDZ1) stripes data with one disk of parity across the four: any one disk may fail. The pool is mounted at /tank at once.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "zfs-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "sudo zpool create -f tank raidz $DISKS",
+            "sudo zpool status tank    # raidz1-0 over the four disks, ONLINE",
+            "sudo zpool list -o name,size,alloc,free,health tank",
+            "df -h /tank"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Datasets and compression",
+      "text": "A dataset is a file system cut from the pool with its own properties, and it takes only what it uses. compression=lz4 is free in practice: this text compresses several times over.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "zfs-lab-server",
+          "commands": [
+            "sudo zfs create tank/data && sudo zfs set compression=lz4 tank/data",
+            "yes 'the same line, again and again, compresses very well' | head -c 50M | sudo tee /tank/data/text.bin >/dev/null",
+            "sudo zfs get -H -o value compressratio tank/data    # well above 1.00x",
+            "sudo zfs list -o name,used,avail,refer,mountpoint"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Snapshots and rollback",
+      "text": "A snapshot is a read-only view of a dataset at an instant, free until the data diverges. zfs diff shows what changed since; rollback puts the dataset back as it was.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "zfs-lab-server",
+          "commands": [
+            "echo version-1 | sudo tee /tank/data/file",
+            "sudo zfs snapshot tank/data@v1",
+            "echo version-2 | sudo tee /tank/data/file",
+            "sudo zfs list -t snapshot; sudo zfs diff tank/data@v1"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "zfs-lab-server",
+          "commands": [
+            "sudo zfs rollback tank/data@v1 && cat /tank/data/file    # version-1 again"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "A failed disk, a resilver, a scrub",
+      "text": "Take one disk offline and the pool keeps serving, DEGRADED; bring it back and ZFS resilvers only the blocks it missed. A scrub reads every block against its checksum: the cheap insurance a cron job should run.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "zfs-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "sudo zpool offline tank $(echo $DISKS | cut -d' ' -f1) && sudo zpool status tank    # DEGRADED, still serving",
+            "echo written-while-degraded | sudo tee /tank/data/degraded",
+            "sudo zpool online tank $(echo $DISKS | cut -d' ' -f1) && sleep 2 && sudo zpool status tank    # resilvered"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "zfs-lab-server",
+          "commands": [
+            "sudo zpool scrub tank && sleep 3 && sudo zpool status tank    # scrub repaired 0B, No known data errors"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "send and receive",
+      "text": "zfs send turns a snapshot into a stream, zfs receive makes a dataset out of it: a backup, a copy to another pool or another machine over SSH, incremental with -i.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "zfs-lab-server",
+          "commands": [
+            "sudo zfs snapshot tank/data@backup",
+            "sudo zfs send tank/data@backup | sudo zfs receive tank/copy",
+            "sudo zfs list; cat /tank/copy/file"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "zfs-lab-server",
+          "commands": [
+            "sudo zfs destroy -r tank/copy"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Mirrors instead of RAIDZ, then tear it all down",
+      "text": "Two mirrored pairs striped together: half the space of the four disks, but any disk of each pair may fail and resilvers copy a whole disk at full speed. Compare AVAIL with the RAIDZ pool, then leave the disks empty.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "zfs-lab-server",
+          "commands": [
+            "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
+            "sudo zpool destroy tank",
+            "sudo zpool create -f tank mirror $(echo $DISKS | cut -d' ' -f1,2) mirror $(echo $DISKS | cut -d' ' -f3,4)",
+            "sudo zpool status tank; sudo zfs list tank    # mirror-0 and mirror-1; less AVAIL than raidz"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "zfs-lab-server",
+          "commands": [
+            "sudo zpool destroy tank",
+            "for d in $DISKS; do sudo zpool labelclear -f $d; sudo wipefs -a $d; done",
+            "lsblk    # four empty disks again"
+          ]
+        }
+      ]
+    }
+  ]
+}
