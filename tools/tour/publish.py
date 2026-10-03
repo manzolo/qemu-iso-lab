@@ -56,11 +56,16 @@ def main() -> None:
         length = duration(src)
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", str(min(args.poster_at, length / 2)), "-i", str(src),
                         "-frames:v", "1", "-vf", "scale=640:-1", "-q:v", "4", str(DEST / f"{name}.jpg")], check=True)
-        clips[name] = {"id": name, "title": meta["title"], "duration": round(length, 1),
+        steps_file = d / f"{name}.voice.steps.json"
+        steps = json.loads(steps_file.read_text(encoding="utf-8")) if steps_file.is_file() else []
+        clips[name] = {"id": name, "title": meta["title"], "duration": round(length, 1), "lab": meta.get("lab"), "series": meta.get("series") or "tour",
+                       "steps": [{"t": st["start"], "cmd": st["cmd"]} for st in steps],
                        "video": {lang: f"{name}.{lang}.mp4" for lang in LANGS}, "poster": f"{name}.jpg",
                        "subtitles": {lang: f"{name}.{lang}.vtt" for lang in ("en", "it")}}
         print(f"{name}: {length:.1f}s")
-    index.write_text(json.dumps({"clips": [clips[k] for k in sorted(clips)]}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # The tour's chapters first, in order, then the lab lessons.
+    ordered = sorted(clips, key=lambda k: (clips[k].get("series") != "tour", k))
+    index.write_text(json.dumps({"clips": [clips[k] for k in ordered]}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"{index}: {len(clips)} clips. Now publish the media branch and run the Pages workflow (see the docstring).")
 
 

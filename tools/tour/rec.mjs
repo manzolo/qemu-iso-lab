@@ -31,6 +31,7 @@ let page = ctx.pages()[0] || (await ctx.newPage());
 
 const log = [];
 const ff = [];
+const steps = [];  // the commands shown, with the moment they are typed: the player's "command at this moment"
 let t0 = 0, current = null;
 
 const d = {
@@ -38,6 +39,8 @@ const d = {
   set page(p) { page = p; },
   vm,
   sleep,
+  // A command the viewer may want to copy, typed now (run() records its own; guest sessions call it).
+  step(cmd) { steps.push({ start: (Date.now() - t0) / 1000, cmd }); },
   async cue(id) {
     const c = clip.cues.find((x) => x.id === id);
     if (!c) throw new Error(`no cue ${id}`);
@@ -90,8 +93,9 @@ const d = {
   async focusTerminal() { vm("DISPLAY=:0 sh -c 'xdotool windowactivate --sync $(xdotool search --class qterminal | tail -1)'"); await sleep(500); },
   async focusBrowser() { vm("DISPLAY=:0 sh -c 'xdotool windowactivate --sync $(xdotool search --class chromium | tail -1)'"); await sleep(500); },
   // Types a command, presses Enter and waits for the next prompt (or only `ms` when wait is false).
-  async run(cmd, { wait = true, timeout = 600000, delay = 70 } = {}) {
+  async run(cmd, { wait = true, timeout = 600000, delay = 70, record = true } = {}) {
     const before = vm("cat /tmp/demo-prompt 2>/dev/null || true");
+    if (record && cmd !== "clear") d.step(cmd);
     await d.type(cmd, delay);
     await sleep(350);
     await d.key("Return");
@@ -153,7 +157,7 @@ try {
     vm("pkill -INT -f 'x11gra[b]'; for i in $(seq 50); do pgrep -f 'x11gra[b]' >/dev/null || break; sleep 0.2; done");
     execFileSync("scp", [...SSH, "-q", `${VM}:lab/video/rec.mkv`, join(outDir, "raw.mkv")]);
   }
-  writeFileSync(join(outDir, "cues.json"), JSON.stringify({ clip: name, title: clip.title, cues: log, ff }, null, 2));
+  writeFileSync(join(outDir, "cues.json"), JSON.stringify({ clip: name, title: clip.title, lab: clip.lab || null, series: clip.series || "tour", cues: log, steps, ff }, null, 2));
   console.log(`-> ${outDir}`);
 }
 process.exit(0);

@@ -107,6 +107,12 @@ def main() -> None:
             labels.append(f"[{lang}{i}]")
         graph += f";{''.join(labels)}amix=inputs={len(labels)}:normalize=0:dropout_transition=0,volume=-3dB,alimiter=limit=0.8,apad,atrim=0:{new_total:.3f}[a{lang}]"
 
+    # A moment x of the cut timeline moves past every hold that ends before it.
+    def shifted(x: float) -> float:
+        return x + sum(extra[i] for i in range(len(cues)) if bounds[i] <= x)
+
+    steps = [{"start": round(shifted(st["start"]), 2), "cmd": st["cmd"]} for st in meta.get("steps") or []]
+    (d / f"{name}.voice.steps.json").write_text(json.dumps(steps, ensure_ascii=False, indent=1), encoding="utf-8")
     for i, c in enumerate(cues):
         c["start"] = new_start[i]
         c["end"] = (new_start[i + 1] if i + 1 < len(cues) else new_total) - 0.1

@@ -95,6 +95,27 @@ def profile_record(name: str, vm: dict[str, Any], lock: dict[str, Any]) -> dict[
     }
 
 
+def labs_data(cfg: dict[str, Any]) -> list[dict[str, Any]]:
+    """The tracked labs (vms/labs/<lab>/ content, or a group on a segment such as proxmox-lab):
+    title, summary, members with their roles, how many exercises and tests, the guides on GitHub,
+    the commands. The build adds ``clip`` when the tour has a lesson on the lab."""
+    from vmctl import labs
+    groups = sorted(set(labs.lab_groups(cfg)) | set(labs.content_groups()))
+    found = []
+    for group in groups:
+        model = labs.model(cfg, group)
+        content = model.get("content") or {}
+        members = [{"name": m["name"], "role": str(m.get("role") or ""), "label": str(m.get("label") or m["name"])} for m in model["members"]]
+        cluster = any(str((cfg["vms"][m["name"]].get("meta") or {}).get("family")) == "proxmox" for m in members)
+        title = content.get("title") or (f"Proxmox VE: {len(members) - 1} nodes and a client on one segment" if cluster
+                                         else f"{len(members)} machines on a shared network")
+        found.append({"group": group, "title": title, "summary": content.get("summary") or "", "members": members,
+                      "cluster": cluster, "exercises": len(content.get("exercises") or []), "tests": len(content.get("tests") or []),
+                      "guides": {lang: f"{REPO_URL}/blob/main/{path}" for lang, path in (content.get("guides") or {}).items()},
+                      "commands": [f"vmctl group install {group}", f"vmctl group test {group}", f"vmctl group map {group} --open"]})
+    return found
+
+
 def catalog_data(root: Path) -> dict[str, Any]:
     state.ROOT = root
     state.CONFIG_DIR = root / "vms"
@@ -110,7 +131,7 @@ def catalog_data(root: Path) -> dict[str, Any]:
             "site": SITE_URL, "repo": REPO_URL, "families": families,
             "counts": {"profiles": len(profiles), "unattended": sum(p["status"] == "unattended" for p in profiles),
                        "verified": sum(bool(p["verified"]) for p in profiles)},
-            "profiles": profiles}
+            "profiles": profiles, "labs": labs_data(cfg)}
 
 
 PAGE = r"""<!doctype html>
@@ -197,6 +218,14 @@ h2.family::after { content:""; height:1px; background:var(--line); flex:1; margi
 .pick { position:absolute; right:12px; top:12px; width:29px; height:29px; display:grid; place-items:center; border-radius:8px; font-size:19px; line-height:1; padding:0; background:#0b101766; border-color:#ffffff26; z-index:2; }
 .card.picked .pick { background:var(--accent); color:#10251f; border-color:var(--accent); }
 .card-body { padding:17px; display:flex; flex-direction:column; gap:13px; }
+.card.lab .desc { font-size:12px; color:var(--muted); line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.card.lab .members { list-style:none; margin:0; padding:0; display:grid; gap:4px; font-size:11px; }
+.card.lab .members li { display:flex; justify-content:space-between; gap:10px; } .card.lab .members span { color:var(--muted); }
+.lab-links { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; align-items:center; }
+.lab-links .lesson { font-weight:650; border:1px solid #8aead040; border-radius:7px; padding:4px 10px; background:#8aead010; }
+.lab-links .src { color:var(--muted); margin-left:auto; }
+.labs-lead { color:var(--muted); font-size:12px; margin:-4px 0 14px; }
+#labs[hidden] { display:none; }
 .card-head { min-width:0; min-height:48px; }
 .card-head .name { font-weight:650; font-size:15px; letter-spacing:-.25px; overflow-wrap:anywhere; line-height:1.4; }
 .card-head .desc { color:var(--muted); font-size:11px; margin-top:4px; overflow-wrap:anywhere; }
@@ -253,7 +282,7 @@ footer { color:var(--muted); font-size:11px; padding:30px 0 0; }
 </head>
 <body>
 <header class="site-header">
-  <div class="brand"><a class="logo" href="__REPO__" aria-label="QEMU ISO Lab repository">&gt;_</a><a class="brand-name" href="__REPO__">QEMU <b>ISO Lab</b></a><span class="brand-label">THE VM CATALOG</span><nav aria-label="Main navigation">__TOUR_NAV__<a class="doc" href="__REPO__#readme">Documentation</a><a href="__REPO__">GitHub ↗</a></nav></div>
+  <div class="brand"><a class="logo" href="__REPO__" aria-label="QEMU ISO Lab repository">&gt;_</a><a class="brand-name" href="__REPO__">QEMU <b>ISO Lab</b></a><span class="brand-label">THE VM CATALOG</span><nav aria-label="Main navigation">__TOUR_NAV__<a href="#labs">Labs</a><a class="doc" href="__REPO__#readme">Documentation</a><a href="__REPO__">GitHub ↗</a></nav></div>
 </header>
 <main id="catalog">
   <div class="catalog-heading"><div><h1>Find your next machine</h1><div class="metrics"><span><strong id="m-profiles">—</strong> profiles</span><span><strong id="m-unattended">—</strong> automated</span><span><strong id="m-verified">—</strong> verified</span></div></div><span id="count" role="status" aria-live="polite"></span></div>
@@ -270,6 +299,7 @@ footer { color:var(--muted); font-size:11px; padding:30px 0 0; }
     <div class="filter-row"><span class="filter-label">BUILT FOR</span><div class="chips" id="role" role="group" aria-label="Role"><button data-v="" class="active" aria-pressed="true">Any role</button><button data-v="desktop" aria-pressed="false">Desktop</button><button data-v="server" aria-pressed="false">Server</button><button data-v="other" aria-pressed="false">Other</button></div>
     <select id="family" aria-label="Family"><option value="">All OS families</option></select></div>
   </div>
+  <section id="labs" aria-label="Labs"></section>
   <div id="list"></div>
   <footer class="site-footer"><span>QEMU ISO Lab · vmctl __VMCTL__<br>Updated __GENERATED____COMMIT__</span><details><summary>About this catalog &amp; verification</summary><p>Generated from <a href="__REPO__/tree/main/vms/profiles">vms/profiles</a> and <a href="__REPO__/blob/main/vms/profiles.lock">profiles.lock</a>. Versions: a <i>patch</i> fixes the recipe, a <i>minor</i> adds something, a <i>major</i> means an installed VM is no longer comparable. “Verified live” is the last date the maintainer's validation matrix reinstalled the profile from scratch and it passed.</p></details><a href="catalog.json">Catalog JSON ↗</a></footer>
 </main>
@@ -366,7 +396,27 @@ function card(p) {
     ${clips}<div class="card-details">${history}${notes}${help}</div></div>
   </article>`;
 }
+// A lab: its members (each a link to its own card), exercises, tests, guides, and the tour's lesson on it.
+function labCard(l) {
+  const facts = [`<b>${l.members.length}</b> machine${l.members.length === 1 ? "" : "s"}`, l.exercises ? `<b>${l.exercises}</b> exercises` : "", l.tests ? `<b>${l.tests}</b> tests` : "", l.cluster ? "cluster" : ""].filter(Boolean);
+  const members = l.members.map(m => `<li><a href="#${esc(m.name)}" data-goto="${esc(m.name)}" class="mono">${esc(m.name)}</a>${m.role ? `<span>${esc(m.role)}</span>` : ""}</li>`).join("");
+  const guides = Object.entries(l.guides).map(([lang, url]) => `<a href="${esc(url)}">Guide ${lang.toUpperCase()}</a>`).join("") + (l.source ? `<a href="${esc(l.source)}" target="_blank" rel="noopener" class="src">Source ↗</a>` : "");
+  const lesson = l.clip ? `<a class="lesson" href="${esc(l.clip)}">▶ Watch the lesson</a>` : "";
+  return `<article class="card lab" id="lab-${esc(l.group)}" style="--tint:#8aead0">
+    <div class="cover"><span class="cover-top">${l.cluster ? "Cluster" : "Lab"}</span>${catalogIcon(l.cluster ? "cluster" : "network")}<span class="cover-label">${esc(l.group)}</span></div>
+    <div class="card-body"><div class="card-head"><div class="name">${esc(l.title)}</div>${l.summary ? `<div class="desc">${esc(l.summary)}</div>` : ""}</div>
+    <div class="facts">${facts.map(f => `<span>${f}</span>`).join("")}</div><ul class="members">${members}</ul>
+    <div class="cmds"><div class="cmd-bar"><span>RUN IN YOUR TERMINAL</span><button data-copy="${esc(l.commands.join("\n"))}" aria-label="Copy commands for ${esc(l.group)}">Copy ↗</button></div><pre>${l.commands.map(esc).join("\n")}</pre></div>
+    <div class="lab-links">${lesson}${guides}</div></div>
+  </article>`;
+}
+function renderLabs() {
+  const searching = !!$("search").value.trim();
+  $("labs").hidden = searching || !DATA.labs.length;
+  $("labs").innerHTML = searching ? "" : `<h2 class="family">Labs <span>${DATA.labs.length}</span></h2><p class="labs-lead">Several machines on a private network, installed and started as one stack, with a guide, exercises and tests. <a href="__REPO__/blob/main/docs/LABS.md">About labs ↗</a> · make your own with <code>vmctl group new</code>.</p><div class="grid">${DATA.labs.map(labCard).join("")}</div>`;
+}
 function render() {
+  renderLabs();
   const rows = visible(), byFamily = new Map();
   for (const p of rows) { if (!byFamily.has(p.family_label)) byFamily.set(p.family_label, []); byFamily.get(p.family_label).push(p); }
   $("count").textContent = `${rows.length} / ${DATA.profiles.length} profiles`;
@@ -446,7 +496,20 @@ ol button:hover { background:var(--panel2); }
 ol button[aria-current=true] { border-color:var(--accent); background:#8aead00d; }
 ol img { width:120px; aspect-ratio:16/9; object-fit:cover; border-radius:7px; display:block; background:#000; }
 ol b { display:block; font-size:13px; line-height:1.3; } ol small { color:var(--muted); font-size:11px; }
+ol li.series h3 { margin:10px 0 2px; font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); } ol li.series:first-child h3 { margin-top:0; }
 .note { color:var(--muted); font-size:12px; margin-top:12px; }
+.follow { margin:12px 0 0; font-size:13px; color:var(--muted); } .follow a { font-weight:650; border:1px solid #8aead040; border-radius:7px; padding:3px 10px; background:#8aead010; } .follow a.now-lang { background:#8aead025; }
+.follow[hidden] { display:none; }
+.steps { margin-top:14px; background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; } .steps[hidden] { display:none; }
+.steps-now { display:grid; grid-template-columns:auto 1fr auto; gap:10px 14px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--line); }
+.steps-now span { grid-column:1 / -1; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.steps-now code { font:12.5px/1.5 ui-monospace,"Cascadia Code",monospace; color:#dbe7ef; white-space:pre-wrap; overflow-wrap:anywhere; }
+.steps-now button { padding:4px 11px; font-size:12px; } .steps-now button:disabled { opacity:.5; cursor:default; }
+.steps ol { list-style:none; margin:0; padding:6px 0; max-height:168px; overflow:auto; display:block; }
+.steps ol button { display:grid; grid-template-columns:44px 1fr; gap:10px; width:100%; text-align:left; background:transparent; border:0; border-radius:0; padding:4px 14px; color:var(--muted); font-size:12px; }
+.steps ol button:hover { background:var(--panel2); } .steps ol button span { font:11px ui-monospace,monospace; color:var(--muted); }
+.steps ol button code { font:12px/1.45 ui-monospace,"Cascadia Code",monospace; color:#c8d4e0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.steps ol button[aria-current="true"] { background:#8aead012; } .steps ol button[aria-current="true"] code { color:var(--accent); }
 @media (max-width:980px) { .layout { grid-template-columns:1fr; } }
 @media (max-width:560px) { .site-header,main { padding:0 16px; } .brand-label { display:none; } h1 { font-size:24px; } ol button { grid-template-columns:96px 1fr; } ol img { width:96px; } }
 </style>
@@ -461,6 +524,8 @@ ol b { display:block; font-size:13px; line-height:1.3; } ol small { color:var(--
   <div class="layout">
     <section><div class="player"><video id="video" controls playsinline preload="metadata"></video>
       <div class="now"><h2 id="now-title"></h2><span id="now-meta"></span></div></div>
+      <p class="follow" id="t-follow" hidden></p>
+      <section class="steps" id="steps" hidden><div class="steps-now"><span id="steps-label"></span><code id="step-now"></code><button id="step-copy">Copy</button></div><ol id="step-list"></ol></section>
       <p class="note" id="t-note"></p></section>
     <ol id="list" aria-label="Clips"></ol>
   </div>
@@ -469,8 +534,8 @@ ol b { display:block; font-size:13px; line-height:1.3; } ol small { color:var(--
 <script>
 const TOUR = JSON.parse(document.getElementById("data").textContent);
 const TEXT = {
-  en: { title: "Take the tour", lead: "Six short clips, from the catalog to a lab of your own. Spoken and subtitled in English and Italian; each clip plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked. The voice is synthetic (XTTS-v2).", clip: "Clip", of: "of" },
-  it: { title: "Il tour", lead: "Sei clip brevi, dal catalogo a un lab tutto tuo. Parlate e sottotitolate in italiano e in inglese; ogni clip prosegue nella successiva.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate. La voce è sintetica (XTTS-v2).", clip: "Clip", of: "di" },
+  en: { steps: "Command at this moment", stepsNone: "Commands appear here as they are typed", copied: "Copied", follow: "Follow along with the guide:", series: { tour: "The tour", labs: "Lab lessons" }, title: "Take the tour", lead: "Six short clips, from the catalog to a lab of your own, then lessons on single labs. Spoken and subtitled in English and Italian; each clip plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked. The voice is synthetic (XTTS-v2).", clip: "Clip", of: "of" },
+  it: { steps: "Comando di questo momento", stepsNone: "I comandi compaiono qui man mano che vengono battuti", copied: "Copiato", follow: "Segui la guida passo passo:", series: { tour: "Il tour", labs: "Lezioni dei lab" }, title: "Il tour", lead: "Sei clip brevi, dal catalogo a un lab tutto tuo, poi le lezioni sui singoli lab. Parlate e sottotitolate in italiano e in inglese; ogni clip prosegue nella successiva.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate. La voce è sintetica (XTTS-v2).", clip: "Clip", of: "di" },
 };
 let lang = "en", current = 0;
 try { lang = localStorage.getItem("qil-tour-lang") || ((navigator.language || "en").startsWith("it") ? "it" : "en"); } catch { lang = (navigator.language || "en").startsWith("it") ? "it" : "en"; }
@@ -506,11 +571,47 @@ function render() {
   document.documentElement.lang = lang;
   $("t-title").textContent = t.title; $("t-lead").textContent = t.lead; $("t-note").textContent = t.note;
   $("now-title").textContent = clip.title[lang];
-  $("now-meta").textContent = `${t.clip} ${current + 1} ${t.of} ${TOUR.clips.length} · ${mmss(clip.duration)}`;
+  const steps = clip.steps || [];
+  $("steps").hidden = !steps.length;
+  $("steps-label").textContent = t.steps;
+  $("step-list").innerHTML = steps.map((st, i) => `<li><button data-t="${st.t}" data-i="${i}"><span>${mmss(st.t)}</span><code>${esc(st.cmd)}</code></button></li>`).join("");
+  currentStep(true);
+  const guides = clip.guides || {};
+  $("t-follow").hidden = !Object.keys(guides).length;
+  $("t-follow").innerHTML = Object.keys(guides).length ? `${esc(t.follow)} ${Object.entries(guides).map(([code, url]) => `<a href="${esc(url)}"${code === lang ? ' class="now-lang"' : ""}>${code.toUpperCase()}</a>`).join(" · ")}` : "";
+  const series = (c) => c.series || "tour", same = TOUR.clips.filter((c) => series(c) === series(clip));
+  $("now-meta").textContent = `${t.series[series(clip)] || series(clip)} · ${t.clip} ${same.indexOf(clip) + 1} ${t.of} ${same.length} · ${mmss(clip.duration)}`;
   document.querySelectorAll(".lang button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
-  $("list").innerHTML = TOUR.clips.map((c, i) => `<li><button data-i="${i}" aria-current="${i === current}"><img src="${esc(c.poster)}" alt="" loading="lazy"><span><b>${esc(c.title[lang])}</b><small>${mmss(c.duration)}</small></span></button></li>`).join("");
+  let last = null;
+  $("list").innerHTML = TOUR.clips.map((c, i) => {
+    const head = series(c) !== last ? `<li class="series"><h3>${esc(t.series[series(c)] || series(c))}</h3></li>` : "";
+    last = series(c);
+    return head + `<li><button data-i="${i}" aria-current="${i === current}"><img src="${esc(c.poster)}" alt="" loading="lazy"><span><b>${esc(c.title[lang])}</b><small>${mmss(c.duration)}</small></span></button></li>`;
+  }).join("");
 }
 $("list").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (b) load(Number(b.dataset.i), true); };
+// The command typed at (or just before) the playhead: shown with a Copy button, marked in the list.
+let shownStep = -1;
+function currentStep(force) {
+  const steps = TOUR.clips[current].steps || [];
+  let i = -1;
+  for (let k = 0; k < steps.length; k++) if (steps[k].t <= video.currentTime + 0.3) i = k;
+  if (i === shownStep && !force) return;
+  shownStep = i;
+  const t = TEXT[lang];
+  $("step-now").textContent = i >= 0 ? steps[i].cmd : t.stepsNone;
+  $("step-copy").disabled = i < 0;
+  $("step-list").querySelectorAll("button").forEach((b) => b.setAttribute("aria-current", String(Number(b.dataset.i) === i)));
+  const on = $("step-list").querySelector('button[aria-current="true"]');
+  if (on && !force) on.scrollIntoView({ block: "nearest" });
+}
+video.addEventListener("timeupdate", () => currentStep(false));
+$("step-list").onclick = (e) => { const b = e.target.closest("button[data-t]"); if (b) { video.currentTime = Number(b.dataset.t); video.play().catch(() => {}); } };
+$("step-copy").onclick = async () => {
+  const text = $("step-now").textContent;
+  try { await navigator.clipboard.writeText(text); } catch { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+  const b = $("step-copy"), was = b.textContent; b.textContent = TEXT[lang].copied; setTimeout(() => (b.textContent = was), 1200);
+};
 document.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => {
   lang = b.dataset.lang;
   try { localStorage.setItem("qil-tour-lang", lang); } catch {}
@@ -525,13 +626,91 @@ document.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => {
 // Chromium's automatic track selection runs once the metadata arrives and can turn a second
 // track on: the choice is applied again then.
 video.addEventListener("loadedmetadata", showLang);
-video.onended = () => { if (current + 1 < TOUR.clips.length) load(current + 1, true); };
+// A clip plays on into the next one of its own series; a lesson ends on its own.
+video.onended = () => { const n = current + 1; if (n < TOUR.clips.length && (TOUR.clips[n].series || "tour") === (TOUR.clips[current].series || "tour")) load(n, true); };
 const start = TOUR.clips.findIndex((c) => "#" + c.id === location.hash);
 load(start < 0 ? 0 : start, false);
 </script>
 </body>
 </html>
 """
+
+
+GUIDE_PAGE = r"""<!doctype html>
+<html lang="__LANG__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__GROUP__ · guide</title>
+<meta name="description" content="__DESCRIPTION__">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%237ddfc5'/%3E%3Cpath d='M7 8l4 4-4 4M12 16h5' stroke='%230c111b' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root { color-scheme:dark; --bg:#0b1017; --panel:#131c27; --panel2:#192432; --line:#293646; --text:#edf3fa; --muted:#9aabbe; --accent:#8aead0; --btn:#202d3d; }
+* { box-sizing:border-box; }
+body { margin:0; background:radial-gradient(ellipse 70% 650px at 80% 0%,#19333765,transparent),var(--bg); color:var(--text); font:15px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif; }
+a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+.site-header,main { max-width:900px; margin:auto; padding:0 36px; }
+.brand { display:flex; align-items:center; gap:12px; min-height:64px; border-bottom:1px solid var(--line); }
+.logo { width:36px; height:36px; border:1px solid #8aead050; border-radius:10px; display:grid; place-items:center; color:var(--accent); background:#8aead012; font:700 18px ui-monospace,monospace; }
+.brand-name { color:var(--text); font-size:17px; font-weight:700; letter-spacing:-.5px; } .brand-name b { color:var(--accent); }
+.brand-label { margin-left:4px; padding-left:16px; border-left:1px solid var(--line); color:var(--muted); font-size:12px; }
+.brand nav { margin-left:auto; display:flex; align-items:center; gap:20px; font-size:12px; } .brand nav a { color:var(--muted); }
+.head { padding:26px 0 8px; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; font-size:12px; color:var(--muted); }
+.head .group { font:600 12px ui-monospace,monospace; color:var(--text); background:var(--panel2); padding:3px 9px; border-radius:6px; }
+.head .lesson { color:var(--accent); border:1px solid #8aead040; border-radius:7px; padding:4px 10px; background:#8aead010; font-weight:650; }
+.head b { color:var(--text); }
+article { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:10px 34px 30px; margin:12px 0 60px; }
+article h1 { font-size:28px; letter-spacing:-.6px; line-height:1.2; margin:22px 0 10px; }
+article h2 { font-size:20px; letter-spacing:-.3px; margin:34px 0 8px; padding-top:18px; border-top:1px solid var(--line); }
+article h3 { font-size:15px; margin:22px 0 6px; }
+article p, article li { color:#d8e1ea; }
+article code { font-family:ui-monospace,"Cascadia Code",monospace; font-size:.92em; background:#0b111a; border:1px solid var(--line); border-radius:5px; padding:1px 5px; }
+article pre { background:#0b111a; border:1px solid var(--line); border-radius:9px; padding:14px 16px; overflow:auto; white-space:pre-wrap; font-size:12.5px; line-height:1.55; }
+article pre code { background:none; border:0; padding:0; font-size:inherit; }
+article table { border-collapse:collapse; width:100%; font-size:13px; margin:12px 0; } article th, article td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; } article th { color:var(--muted); font-weight:600; }
+article blockquote { margin:12px 0; padding:8px 14px; border-left:3px solid var(--accent); color:var(--muted); }
+article hr { border:0; border-top:1px solid var(--line); margin:24px 0; }
+@media (max-width:560px) { .site-header,main { padding:0 16px; } article { padding:6px 18px 22px; } .brand-label { display:none; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="brand"><a class="logo" href="__REPO__" aria-label="QEMU ISO Lab repository">&gt;_</a><a class="brand-name" href="../../">QEMU <b>ISO Lab</b></a><span class="brand-label">LAB GUIDE</span><nav aria-label="Main navigation"><a href="../../#labs">Labs</a><a href="../../tour.html">Tour</a><a href="__REPO__">GitHub ↗</a></nav></div>
+</header>
+<main>
+  <div class="head"><span class="group">__GROUP__</span><span>__LANGS__</span>__LESSON__<a href="../../#lab-__GROUP__">Lab in the catalog</a><a href="__SOURCE__" target="_blank" rel="noopener">Markdown source ↗</a></div>
+  <article class="guide">__BODY__</article>
+</main>
+</body>
+</html>
+"""
+
+
+def write_guides(root: Path, out: Path, labs: list[dict[str, Any]]) -> None:
+    """Every lab guide as a page of the site, ``labs/<lab>/guide.<lang>.html``, rendered from the
+    tracked markdown by the dashboard's own renderer (labs.render_markdown): the reader follows the
+    steps on their own machine, next to the lesson when the tour has one. The lab's ``guides`` then
+    point at these pages; ``source`` keeps the GitHub folder."""
+    import html as html_mod
+    from vmctl import labs as labs_mod
+    for lab in labs:
+        if not lab["guides"]:
+            continue
+        group = lab["group"]
+        target = out / "labs" / group
+        target.mkdir(parents=True, exist_ok=True)
+        pages = {lang: f"labs/{group}/guide.{lang}.html" for lang in lab["guides"]}
+        for lang in lab["guides"]:
+            source = root / "vms" / "labs" / group / f"guide.{lang}.md"
+            body = labs_mod.render_markdown(source.read_text(encoding="utf-8"))
+            langs = " · ".join(f"<b>{code.upper()}</b>" if code == lang else f'<a href="guide.{code}.html">{code.upper()}</a>' for code in pages)
+            lesson = f'<a class="lesson" href="../../{html_mod.escape(lab["clip"])}">▶ Watch the lesson</a>' if lab.get("clip") else ""
+            page = (GUIDE_PAGE.replace("__LANG__", lang).replace("__GROUP__", html_mod.escape(group)).replace("__LANGS__", langs)
+                    .replace("__LESSON__", lesson).replace("__SOURCE__", f"{REPO_URL}/blob/main/vms/labs/{group}/guide.{lang}.md")
+                    .replace("__DESCRIPTION__", html_mod.escape(lab["title"])).replace("__BODY__", body).replace("__REPO__", REPO_URL))
+            (target / f"guide.{lang}.html").write_text(page, encoding="utf-8")
+        lab["source"] = f"{REPO_URL}/tree/main/vms/labs/{group}"
+        lab["guides"] = pages
 
 
 def collect_tour(media: Path, out: Path) -> list[dict[str, Any]]:
@@ -600,15 +779,22 @@ def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "c
         profile["clip"] = clips.get(profile["name"])
         profile["link"] = status.get(profile["name"])
     data["clip_style"] = clip_style
-    (out / "catalog.json").write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     web = root / "vmctl" / "web"
     shutil.copy2(web / "icons.js", out / "icons.js")
     # The sprite is inlined (hidden) so <use href="#arch"> works from file:// too, not only over HTTP.
     sprite = (web / "distro-icons.svg").read_text(encoding="utf-8").replace('<svg xmlns="http://www.w3.org/2000/svg">', '<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">', 1)
     tour = collect_tour(media if media is not None else root / "docs" / "media", out)
+    lessons = {clip["lab"]: clip["id"] for clip in tour if clip.get("lab")}
+    for lab in data["labs"]:
+        lab["clip"] = f"tour.html#{lessons[lab['group']]}" if lab["group"] in lessons else None
+    write_guides(root, out, data["labs"])
+    guides = {lab["group"]: lab["guides"] for lab in data["labs"]}
+    for clip in tour:
+        clip["guides"] = guides.get(clip.get("lab") or "", {})
     if tour:
         (out / "tour.html").write_text(TOUR_PAGE.replace("__REPO__", REPO_URL).replace(
             "__DATA__", json.dumps({"clips": tour}, ensure_ascii=False).replace("</", "<\\/")), encoding="utf-8")
+    (out / "catalog.json").write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     tour_nav = '<a class="tour" href="tour.html">▶ Tour</a>' if tour else ""
     tour_start = ('<div class="terminal-note"><span>New to it? Six short clips show the whole road, '
                   'with English and Italian voice and subtitles.</span><a href="tour.html">▶ Take the tour</a></div>') if tour else ""

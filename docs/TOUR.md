@@ -120,6 +120,18 @@ Another voice: `--speaker "<name>"` (XTTS's built-in speakers), or a recording o
 `pw-record --rate=22050 --channels=1 --sample-count=551250 my-voice.wav` (25 s); stopping
 `pw-record` with a signal (`timeout`) truncates the file to a couple of seconds.
 
+## Lab lessons
+
+Besides the tour's chapters, a clip can be a **lesson on one lab**: `export const series = "labs"`
+and `export const lab = "<group>"` in the clip (`clips/lab-lvm.mjs` is the first, LVM from scratch
+on the LVM lab). The tour page lists the lessons in their own playlist after the tour, a lesson
+does not play on into the next clip, and the catalog's **Labs** section shows "▶ Watch the lesson"
+on that lab's card (`tour.json` carries `series` and `lab`, `tools/build_catalog_site.py` joins
+them). Lessons are terminal-driven: `vmctl shell <vm>` into the member, then the exercise commands
+typed slowly with a cue per concept; the last step runs `vmctl group test <lab>`, so the lab must
+be back in its initial state first (teardown with `;`, never `&&`: one failed `umount` left the
+volume group behind and the tests red in the first take).
+
 ## 5. Publishing
 
 ```bash

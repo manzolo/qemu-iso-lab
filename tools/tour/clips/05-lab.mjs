@@ -4,6 +4,8 @@ const LAB = "vpn-lab";
 const MEMBERS = ["vpn-lab-server", "vpn-lab-client"];
 const CHECKOUT = "~/lab/demo/qemu-iso-lab";
 
+export const lab = "vpn-lab";  // the catalog lab this clip explains: the site links it from the lab card
+
 export const cues = [
   { id: "labs", en: "Machines can also come as labs: here two VMs on their own private network, a VPN server and its client.",
     it: "Le macchine possono arrivare anche come lab: qui due VM sulla loro rete privata, un server VPN e il suo client." },

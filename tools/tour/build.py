@@ -62,6 +62,8 @@ def cut(d: Path, meta: dict) -> Path:
         c["start"] = mapped(c["start"])
         if c["end"] is not None:
             c["end"] = mapped(c["end"])
+    for step in meta.get("steps") or []:
+        step["start"] = mapped(step["start"])
     return out
 
 

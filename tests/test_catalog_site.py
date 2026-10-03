@@ -64,7 +64,7 @@ class CatalogSiteTests(unittest.TestCase):
         (media / "tour").mkdir(parents=True)
         clip = {"id": "01-x", "title": {"en": "1 · X", "it": "1 · X it"}, "duration": 12.0, "video": "01-x.mp4",
                 "poster": "01-x.jpg", "subtitles": {"en": "01-x.en.vtt", "it": "01-x.it.vtt"}}
-        voiced = {**clip, "id": "02-y", "video": {"it": "02-y.it.mp4", "en": "02-y.en.mp4"}}  # narrated: one file per language
+        voiced = {**clip, "id": "02-y", "video": {"it": "02-y.it.mp4", "en": "02-y.en.mp4"}, "series": "labs", "lab": "lvm-lab", "steps": [{"t": 3.5, "cmd": "sudo pvs"}]}  # narrated: one file per language; a lab lesson with its commands
         for name in ("01-x.mp4", "01-x.jpg", "01-x.en.vtt", "01-x.it.vtt", "02-y.it.mp4", "02-y.en.mp4"):
             (media / "tour" / name).write_bytes(b"x")
         (media / "tour" / "tour.json").write_text(json.dumps({"clips": [clip, voiced]}))
@@ -76,11 +76,39 @@ class CatalogSiteTests(unittest.TestCase):
         self.assertTrue((out / "tour" / "01-x.en.vtt").is_file())
         self.assertIn('"video": {"it": "tour/02-y.it.mp4", "en": "tour/02-y.en.mp4"}', tour)
         self.assertTrue((out / "tour" / "02-y.en.mp4").is_file())
+        # The lesson reaches the lab's card in the catalog, and only that lab's.
+        labs = {lab["group"]: lab for lab in json.loads((out / "catalog.json").read_text(encoding="utf-8"))["labs"]}
+        self.assertEqual(labs["lvm-lab"]["clip"], "tour.html#02-y")
+        self.assertIsNone(labs["vpn-lab"]["clip"])
+        self.assertIn("Watch the lesson", (out / "labs" / "lvm-lab" / "guide.en.html").read_text(encoding="utf-8"))
+        self.assertIn('"guides": {"en": "labs/lvm-lab/guide.en.html"', tour)  # the lesson links its guide
+        self.assertIn('"steps": [{"t": 3.5, "cmd": "sudo pvs"}]', tour)  # and its commands, for the player's panel
         self.assertIn('href="tour.html"', (out / "index.html").read_text(encoding="utf-8"))
         bare = Path(self.tempdir.name) / "site-bare"
         build_catalog_site.build(ROOT, bare, media=Path(self.tempdir.name) / "no-media")
         self.assertFalse((bare / "tour.html").exists())
         self.assertNotIn("tour.html", (bare / "index.html").read_text(encoding="utf-8"))
+
+    def test_the_labs_are_on_the_page_with_members_tests_and_guides(self):
+        labs = {lab["group"]: lab for lab in self.data["labs"]}
+        self.assertEqual(set(labs) >= {"netlab", "vpn-lab", "lvm-lab", "proxmox-lab"}, True)
+        lvm = labs["lvm-lab"]
+        self.assertEqual([m["name"] for m in lvm["members"]], ["lvm-lab-server"])
+        self.assertEqual(lvm["tests"], 7)
+        self.assertGreater(lvm["exercises"], 0)
+        self.assertEqual(set(lvm["guides"]), {"en", "it"})
+        # The guides are pages of the site, rendered from the tracked markdown, the source a link away.
+        self.assertEqual(lvm["guides"]["en"], "labs/lvm-lab/guide.en.html")
+        guide = (self.out / "labs" / "lvm-lab" / "guide.it.html").read_text(encoding="utf-8")
+        self.assertIn("<h1>", guide)
+        self.assertIn("lvcreate", guide)
+        self.assertIn('href="guide.en.html">EN</a>', guide)
+        self.assertTrue(lvm["source"].endswith("/tree/main/vms/labs/lvm-lab"))
+        self.assertTrue(labs["proxmox-lab"]["cluster"])
+        self.assertEqual(labs["proxmox-lab"]["tests"], 0)  # a lab by its segment, without content: no tests, no guides
+        page = (self.out / "index.html").read_text(encoding="utf-8")
+        self.assertIn('<section id="labs"', page)
+        self.assertIn("function labCard", page)
 
     def test_the_page_is_self_contained_and_ships_the_dashboard_icons(self):
         html = (self.out / "index.html").read_text(encoding="utf-8")
