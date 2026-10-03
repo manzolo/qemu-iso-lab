@@ -50,22 +50,7 @@ export async function setup(d) {
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
 }
 
-// Inside the guest session: the guest's own prompt writes a stamp (PROMPT_COMMAND), read from the
-// host through a second, non-interactive vmctl shell. A command is "done" when the stamp moves,
-// then the output stays on screen for `read` ms: nothing is typed over a command still running.
-const stamp = (d) => d.vm(`cd ${CHECKOUT} && ./bin/vmctl shell ${VM} -- cat /tmp/.p 2>/dev/null || true`).trim();
-async function guest(d, cmd, read = 3500, delay = 40) {
-  const before = stamp(d);
-  if (cmd !== "clear") d.step(cmd);
-  await d.type(cmd, delay);
-  await d.sleep(300);
-  await d.key("Return");
-  for (let i = 0; i < 180; i++) {
-    await d.sleep(600);
-    if (stamp(d) !== before) break;
-  }
-  await d.sleep(read);
-}
+const guest = (d, cmd, read = 3500) => d.guest(cmd, { read });
 
 export async function run(d) {
   await d.cue("intro");
@@ -82,16 +67,7 @@ export async function run(d) {
 
   await d.cue("shell");
   await d.run("clear");
-  await d.run(`vmctl shell ${VM}`, { wait: false });
-  // The interactive session is logged in when the guest sees a pts: only then is anything typed.
-  for (let i = 0; i < 60; i++) {
-    await d.sleep(1000);
-    if (d.vm(`cd ${CHECKOUT} && ./bin/vmctl shell ${VM} -- who 2>/dev/null | grep -c pts || true`).trim() !== "0") break;
-  }
-  await d.sleep(1500);
-  await d.type("PROMPT_COMMAND='date +%s%N >/tmp/.p'; clear", 30);
-  await d.key("Return");
-  await d.sleep(1500);
+  await d.session(VM);
   await d.cue("disks");
   await guest(d, "lsblk", 5000);
   await guest(d, DISKS, 3500);
@@ -132,9 +108,7 @@ export async function run(d) {
   await guest(d, "sudo umount /mnt/lab-data /mnt/lab-logs; sudo vgremove -fy labvg", 3500);
   await guest(d, "sudo pvremove -y $DISKS; sudo wipefs -a $DISKS", 3000);
   await guest(d, "lsblk", 4000);
-  // exit closes the session: the guest's prompt stamp stops moving, so wait for the host's prompt instead.
-  d.step("exit");
-  await d.run("exit", { record: false });
+  await d.leave();
 
   await d.cue("tests");
   await d.sleep(800);

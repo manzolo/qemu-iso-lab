@@ -20,6 +20,7 @@ const VM = process.env.TOUR_VM;
 if (!VM) throw new Error("TOUR_VM=user@host of the recording VM (docs/TOUR.md)");
 const SSH = ["-o", "BatchMode=yes", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/tour-ssh-%C", "-o", "ControlPersist=15m"];
 const vm = (cmd) => execFileSync("ssh", [...SSH, VM, cmd], { encoding: "utf8" });
+const vm_ = vm;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Reading time of a cue: the longer language, ~14 characters a second, never under 3.5 s.
@@ -113,6 +114,43 @@ const d = {
     vm("cd ~/lab/demo/qemu-iso-lab && setsid -f ./bin/vmctl web > /tmp/web.log 2>&1 < /dev/null; " +
        "for i in $(seq 40); do grep -q token= /tmp/web.log && break; sleep 0.25; done");
     return vm("grep -o 'http://127.0.0.1:8765/?token=[A-Za-z0-9_-]*' /tmp/web.log | tail -1").trim();
+  },
+  // --- Lessons: a session inside a guest, one command at a time, each waiting for the guest's own prompt.
+  // session(vm) types `vmctl shell <vm>` on the host terminal, waits until the guest sees a pts (the
+  // typed commands must never queue up on the host shell), then installs a PROMPT_COMMAND stamp;
+  // guest(cmd) types the command, waits for the stamp to move (read through a second, non-interactive
+  // vmctl shell) and leaves the output on screen for `read` ms; leave() exits and waits for the host prompt.
+  async session(vm, checkout = "~/lab/demo/qemu-iso-lab") {
+    d._guest = { vm, checkout };
+    await d.run(`vmctl shell ${vm}`, { wait: false });
+    for (let i = 0; i < 60; i++) {
+      await sleep(1000);
+      if (vm_(`cd ${checkout} && ./bin/vmctl shell ${vm} -- who 2>/dev/null | grep -c pts || true`).trim() !== "0") break;
+    }
+    await sleep(1500);
+    await d.type("PROMPT_COMMAND='date +%s%N >/tmp/.p'; clear", 30);
+    await d.key("Return");
+    await sleep(1500);
+  },
+  async guest(cmd, { read = 3500, delay = 40, timeout = 120000 } = {}) {
+    const { vm: g, checkout } = d._guest;
+    const stamp = () => vm_(`cd ${checkout} && ./bin/vmctl shell ${g} -- cat /tmp/.p 2>/dev/null || true`).trim();
+    const before = stamp();
+    if (cmd !== "clear") d.step(cmd);
+    await d.type(cmd, delay);
+    await sleep(300);
+    await d.key("Return");
+    const until = Date.now() + timeout;
+    while (Date.now() < until) {
+      await sleep(600);
+      if (stamp() !== before) break;
+    }
+    await sleep(read);
+  },
+  async leave() {
+    d.step("exit");
+    await d.run("exit", { record: false });  // the guest's stamp stops with the session: wait for the host's prompt
+    d._guest = null;
   },
   // The newest tab of the CDP browser (vmctl web --open makes one).
   async newestPage() {
