@@ -97,7 +97,9 @@ const d = {
   async run(cmd, { wait = true, timeout = 600000, delay = 70, record = true } = {}) {
     const before = vm("cat /tmp/demo-prompt 2>/dev/null || true");
     if (record && cmd !== "clear") d.step(cmd);
-    await d.type(cmd, delay);
+    // A leading space: the first character typed right after a focus change is sometimes lost
+    // (xdotool, "lear: command not found" in a take), and bash ignores the space.
+    await d.type(" " + cmd, delay);
     await sleep(350);
     await d.key("Return");
     if (!wait) return;
@@ -123,10 +125,16 @@ const d = {
   async session(vm, checkout = "~/lab/demo/qemu-iso-lab") {
     d._guest = { vm, checkout };
     await d.run(`vmctl shell ${vm}`, { wait: false });
-    for (let i = 0; i < 60; i++) {
+    // A login can take a minute (pam_motd on a server): past 4 s the wait is fast-forwarded in the edit.
+    const started = Date.now();
+    let fast = false;
+    for (let i = 0; i < 90; i++) {
       await sleep(1000);
-      if (vm_(`cd ${checkout} && ./bin/vmctl shell ${vm} -- who 2>/dev/null | grep -c pts || true`).trim() !== "0") break;
+      const probe = vm_(`cd ${checkout} && ./bin/vmctl shell ${vm} -- 'who; pgrep -af "sshd:.*@pts"' 2>/dev/null | grep -c pts || true`).trim();
+      if (probe !== "0" && probe !== "") break;
+      if (!fast && Date.now() - started > 4000) { d.ff(8); fast = true; }
     }
+    if (fast) d.ffEnd();
     await sleep(1500);
     await d.type("PROMPT_COMMAND='date +%s%N >/tmp/.p'; clear", 30);
     await d.key("Return");
@@ -137,7 +145,7 @@ const d = {
     const stamp = () => vm_(`cd ${checkout} && ./bin/vmctl shell ${g} -- cat /tmp/.p 2>/dev/null || true`).trim();
     const before = stamp();
     if (cmd !== "clear") d.step(cmd);
-    await d.type(cmd, delay);
+    await d.type(" " + cmd, delay);  // see run(): the first character after a focus change can be lost
     await sleep(300);
     await d.key("Return");
     const until = Date.now() + timeout;

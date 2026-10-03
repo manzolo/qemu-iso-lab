@@ -10,8 +10,8 @@ export const cues = [
     it: "Una piccola rete come quella di casa o di un ufficio: un router pfSense davanti, Pi-hole che fa DNS e DHCP sulla LAN, e un desktop Lubuntu come utente. Il lab di rete costruisce le tre macchine e le collega." },
   { id: "install", en: "This install is the long one: pfSense from its ISO, then Pi-hole and the desktop from Ubuntu's autoinstall. Half an hour, unattended.",
     it: "Questa è l'installazione lunga: pfSense dalla sua ISO, poi Pi-hole e il desktop con l'autoinstall di Ubuntu. Mezz'ora, senza domande." },
-  { id: "pihole", en: "On Pi-hole: blocking enabled, and it is the LAN's DHCP server, with fixed leases for the members. pfSense hands the clients to it and asks it for its own names.",
-    it: "Su Pi-hole: il blocco è attivo, ed è il server DHCP della LAN, con lease fissi per i membri. pfSense gli affida i client e gli chiede i propri nomi." },
+  { id: "pihole", en: "On Pi-hole: FTL answers DNS on port 53, blocking is enabled, and it is the LAN's DHCP server with its own address range. pfSense hands the clients to it and asks it for its own names.",
+    it: "Su Pi-hole: FTL risponde al DNS sulla porta 53, il blocco è attivo, ed è il server DHCP della LAN con il suo intervallo di indirizzi. pfSense gli affida i client e gli chiede i propri nomi." },
   { id: "client", en: "On the desktop: its DNS is Pi-hole, 192.168.0.10, in the domain qlan. pfsense.qlan resolves to the router, and a public name is answered by Pi-hole through pfSense.",
     it: "Sul desktop: il suo DNS è Pi-hole, 192.168.0.10, nel dominio qlan. pfsense.qlan risolve nel router, e un nome pubblico è risposto da Pi-hole attraverso pfSense." },
   { id: "route", en: "The client reaches the Internet only through the router: its default route is 192.168.0.1, and pfSense translates addresses on its WAN.",
@@ -53,8 +53,8 @@ export async function run(d) {
   await d.cue("pihole");
   await d.run("clear");
   await d.session("pihole-lab");
-  await d.guest("pihole status | head -3", { read: 3500 });
-  await d.guest("sudo pihole-FTL --config dhcp.active; sudo pihole-FTL --config dhcp.hosts", { read: 5000 });
+  await d.guest("sudo pihole status", { read: 4000 });
+  await d.guest("sudo pihole-FTL --config dhcp.active; sudo pihole-FTL --config dhcp.start; sudo pihole-FTL --config dhcp.end", { read: 5000 });
   await d.leave();
 
   await d.cue("client");

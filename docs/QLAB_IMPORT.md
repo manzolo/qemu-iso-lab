@@ -42,6 +42,11 @@ cleanup removed each member's disk before the lab tests; fixed in 0.17.4 (a pass
 for its lab's tests) and verified with vpn/ssh/docker/lvm (10/10), netlab's row still to see in
 the next full matrix. `cluster-pve-lab` passed (3 nodes, quorate).
 
+Found by the netlab lesson (2026-10-03): the exercise "DNS and DHCP from Pi-hole" promises the fixed
+leases of the members in `pihole-FTL --config dhcp.hosts`, but it prints `[]` on a fresh install
+(the members' addresses are static, netplan): either seed the leases in the provisioning or drop the
+claim; `pihole status` needs sudo to read pihole.toml without a warning.
+
 Lessons worth keeping (each cost a run): tests must not depend on the guest's locale (LVM printed
 `5,99g` under it_IT); never address extra disks by name (the system disk comes last on the PCI
 bus); a bootstrap handler under test needs `resolve_efi_firmware` mocked (CI has no OVMF, CI was
