@@ -131,7 +131,10 @@ export async function run(d) {
   await d.cue("teardown");
   await guest(d, "sudo umount /mnt/lab-data /mnt/lab-logs; sudo vgremove -fy labvg", 3500);
   await guest(d, "sudo pvremove -y $DISKS; sudo wipefs -a $DISKS", 3000);
-  await guest(d, "lsblk; exit", 3500);
+  await guest(d, "lsblk", 4000);
+  // exit closes the session: the guest's prompt stamp stops moving, so wait for the host's prompt instead.
+  d.step("exit");
+  await d.run("exit", { record: false });
 
   await d.cue("tests");
   await d.sleep(800);
