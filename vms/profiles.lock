@@ -866,9 +866,14 @@
       ]
     },
     "k8s-lab-main": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:9e1d092136cd4d0bb9c9c4114b6ae303df9eac9e227adabcc90561ecf2add729",
+      "version": "1.1.0",
+      "fingerprint": "sha256:a92d9be2123dfe1d98106d65e24612bb1592a3f97254d985846fa7c51e603b08",
       "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-04",
+          "note": "the manifests of exercises 5 and 6 in ~/k8s"
+        },
         {
           "version": "1.0.0",
           "date": "2026-10-04",

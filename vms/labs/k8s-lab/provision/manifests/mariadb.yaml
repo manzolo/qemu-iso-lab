@@ -1,0 +1,35 @@
+# k8s-lab, exercise 6: a claim on the default StorageClass and a MariaDB that keeps its data there.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: mariadb}
+  template:
+    metadata:
+      labels: {app: mariadb}
+    spec:
+      containers:
+      - name: mariadb
+        image: mariadb:11.4
+        env:
+        - name: MARIADB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef: {name: mariadb-root, key: password}
+        volumeMounts:
+        - {name: data, mountPath: /var/lib/mysql}
+      volumes:
+      - name: data
+        persistentVolumeClaim: {claimName: mariadb-data}

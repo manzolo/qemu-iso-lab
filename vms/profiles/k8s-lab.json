@@ -9,7 +9,7 @@
         "groups": [
           "k8s-lab"
         ],
-        "version": "1.0.0",
+        "version": "1.1.0",
         "verified": "2026-10-04"
       },
       "notes": "The control plane of the k8s-lab (vms/labs/k8s-lab/): MicroK8s 1.32 from the snap store, also a node that runs pods. At every boot on the lab segment /usr/local/sbin/k8s-lab-node pins the kubelet and the API server to 172.20.6.1 (every VM's NAT NIC is 10.0.2.15), points Calico at k8s-lan and publishes the fixed join token the workers use. NodePort 30080 is forwarded to http://127.0.0.1:8089 on the host. Ubuntu 24.04 minimal cloud image; the install downloads the snap (about 200 MB). Inspired by manzolo/multipass-microk8s-cluster-demo.",
@@ -69,6 +69,10 @@
             "source": "vms/labs/k8s-lab/provision/k8s-lab-node.sh",
             "dest": "/home/{{user}}/k8s-lab-node.sh",
             "dest_mode": "755"
+          },
+          {
+            "source": "vms/labs/k8s-lab/provision/manifests/",
+            "dest": "/home/{{user}}/k8s"
           }
         ],
         "post_install_run": [
@@ -78,7 +82,8 @@
           "sudo microk8s status --wait-ready --timeout 600 >/dev/null",
           "sudo microk8s kubectl get nodes | grep -q ' Ready '",
           "grep -q k8s-lab-node2 /etc/hosts",
-          "test -f /etc/netplan/60-vmctl-k8s-lan.yaml"
+          "test -f /etc/netplan/60-vmctl-k8s-lan.yaml",
+          "test -f ~/k8s/env-demo.yaml && test -f ~/k8s/mariadb.yaml"
         ]
       }
     },

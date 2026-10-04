@@ -160,7 +160,8 @@
           "commands": [
             "kubectl create configmap web-config --from-literal=GREETING=hello --from-literal=COLOR=blue",
             "kubectl create secret generic web-secret --from-literal=PASSWORD=labsecret",
-            "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: env-demo\nspec:\n  containers:\n  - name: show\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"echo GREETING=$GREETING COLOR=$COLOR PASSWORD=$PASSWORD; sleep 3600\"]\n    envFrom:\n    - configMapRef: {name: web-config}\n    - secretRef: {name: web-secret}\n    volumeMounts:\n    - {name: config, mountPath: /config}\n  volumes:\n  - name: config\n    configMap: {name: web-config}\nEOF",
+            "cat ~/k8s/env-demo.yaml                # envFrom: every key as a variable; a volume: every key as a file",
+            "kubectl apply -f ~/k8s/env-demo.yaml",
             "kubectl wait --for=condition=Ready pod/env-demo --timeout=120s"
           ]
         },
@@ -195,7 +196,8 @@
           "commands": [
             "microk8s enable hostpath-storage    # the default StorageClass: stays enabled",
             "kubectl create secret generic mariadb-root --from-literal=password=labroot",
-            "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: mariadb-data\nspec:\n  accessModes: [ReadWriteOnce]\n  resources:\n    requests: {storage: 1Gi}\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: mariadb\nspec:\n  replicas: 1\n  strategy: {type: Recreate}\n  selector:\n    matchLabels: {app: mariadb}\n  template:\n    metadata:\n      labels: {app: mariadb}\n    spec:\n      containers:\n      - name: mariadb\n        image: mariadb:11.4\n        env:\n        - name: MARIADB_ROOT_PASSWORD\n          valueFrom:\n            secretKeyRef: {name: mariadb-root, key: password}\n        volumeMounts:\n        - {name: data, mountPath: /var/lib/mysql}\n      volumes:\n      - name: data\n        persistentVolumeClaim: {claimName: mariadb-data}\nEOF",
+            "cat ~/k8s/mariadb.yaml                 # a PersistentVolumeClaim, and a Deployment that mounts it on /var/lib/mysql",
+            "kubectl apply -f ~/k8s/mariadb.yaml",
             "kubectl rollout status deployment/mariadb --timeout=300s && kubectl get pvc,pv"
           ]
         },

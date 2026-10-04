@@ -10,42 +10,8 @@ cleanup
 on "$M" microk8s enable hostpath-storage >/dev/null 2>&1 || true
 assert "a default StorageClass exists" on "$M" "kubectl get storageclass | grep -q '(default)'"
 k create secret generic mariadb-root --from-literal=password=labroot >/dev/null
-on "$M" kubectl apply -f - >/dev/null <<'YAML'
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mariadb-data
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests: {storage: 1Gi}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mariadb
-spec:
-  replicas: 1
-  strategy: {type: Recreate}
-  selector:
-    matchLabels: {app: mariadb}
-  template:
-    metadata:
-      labels: {app: mariadb}
-    spec:
-      containers:
-      - name: mariadb
-        image: mariadb:11.4
-        env:
-        - name: MARIADB_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef: {name: mariadb-root, key: password}
-        volumeMounts:
-        - {name: data, mountPath: /var/lib/mysql}
-      volumes:
-      - name: data
-        persistentVolumeClaim: {claimName: mariadb-data}
-YAML
+# The manifest the exercise applies, copied by the install into the guest's ~/k8s/.
+k apply -f k8s/mariadb.yaml >/dev/null
 assert "MariaDB comes up" on "$M" kubectl rollout status deployment/mariadb --timeout=300s
 assert_contains "the claim is Bound" "$(k get pvc mariadb-data -o 'jsonpath={.status.phase}')" "^Bound$"
 # mysqld answers a little after the container starts: retry the first statement.

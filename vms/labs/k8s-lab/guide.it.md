@@ -125,25 +125,8 @@ credenziali. Entrambi arrivano al pod come variabili d'ambiente o come file in u
 ```sh
 kubectl create configmap web-config --from-literal=GREETING=hello --from-literal=COLOR=blue
 kubectl create secret generic web-secret --from-literal=PASSWORD=labsecret
-kubectl apply -f - <<'EOF'
-apiVersion: v1
-kind: Pod
-metadata:
-  name: env-demo
-spec:
-  containers:
-  - name: show
-    image: busybox:1.36
-    command: ["sh", "-c", "echo GREETING=$GREETING COLOR=$COLOR PASSWORD=$PASSWORD; sleep 3600"]
-    envFrom:
-    - configMapRef: {name: web-config}
-    - secretRef: {name: web-secret}
-    volumeMounts:
-    - {name: config, mountPath: /config}
-  volumes:
-  - name: config
-    configMap: {name: web-config}
-EOF
+cat ~/k8s/env-demo.yaml                    # envFrom: ogni chiave come variabile; un volume: ogni chiave come file
+kubectl apply -f ~/k8s/env-demo.yaml
 kubectl wait --for=condition=Ready pod/env-demo --timeout=120s
 kubectl logs env-demo                      # GREETING=hello COLOR=blue PASSWORD=labsecret
 kubectl exec env-demo -- ls /config        # un file per chiave
@@ -171,42 +154,8 @@ password del database viaggia come Secret.
 ```sh
 microk8s enable hostpath-storage           # la StorageClass di default: resta abilitata
 kubectl create secret generic mariadb-root --from-literal=password=labroot
-kubectl apply -f - <<'EOF'
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mariadb-data
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests: {storage: 1Gi}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mariadb
-spec:
-  replicas: 1
-  strategy: {type: Recreate}
-  selector:
-    matchLabels: {app: mariadb}
-  template:
-    metadata:
-      labels: {app: mariadb}
-    spec:
-      containers:
-      - name: mariadb
-        image: mariadb:11.4
-        env:
-        - name: MARIADB_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef: {name: mariadb-root, key: password}
-        volumeMounts:
-        - {name: data, mountPath: /var/lib/mysql}
-      volumes:
-      - name: data
-        persistentVolumeClaim: {claimName: mariadb-data}
-EOF
+cat ~/k8s/mariadb.yaml                     # una PersistentVolumeClaim, e un Deployment che la monta su /var/lib/mysql
+kubectl apply -f ~/k8s/mariadb.yaml
 kubectl rollout status deployment/mariadb --timeout=300s && kubectl get pvc,pv
 sleep 15; kubectl exec deploy/mariadb -- mariadb -uroot -plabroot -e "CREATE DATABASE shop; CREATE TABLE shop.items (name VARCHAR(20)); INSERT INTO shop.items VALUES ('kept');"
 kubectl delete pod -l app=mariadb && kubectl rollout status deployment/mariadb

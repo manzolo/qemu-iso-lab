@@ -8,26 +8,8 @@ trap cleanup EXIT
 cleanup
 k create configmap web-config --from-literal=GREETING=hello --from-literal=COLOR=blue >/dev/null
 k create secret generic web-secret --from-literal=PASSWORD=labsecret >/dev/null
-# The pod's manifest on stdin, like the exercise's heredoc.
-on "$M" kubectl apply -f - >/dev/null <<'YAML'
-apiVersion: v1
-kind: Pod
-metadata:
-  name: env-demo
-spec:
-  containers:
-  - name: show
-    image: busybox:1.36
-    command: ["sh", "-c", "echo GREETING=$GREETING COLOR=$COLOR PASSWORD=$PASSWORD; sleep 3600"]
-    envFrom:
-    - configMapRef: {name: web-config}
-    - secretRef: {name: web-secret}
-    volumeMounts:
-    - {name: config, mountPath: /config}
-  volumes:
-  - name: config
-    configMap: {name: web-config}
-YAML
+# The manifest the exercise applies, copied by the install into the guest's ~/k8s/.
+k apply -f k8s/env-demo.yaml >/dev/null
 assert "the pod becomes Ready" on "$M" kubectl wait --for=condition=Ready pod/env-demo --timeout=180s
 assert_contains "ConfigMap and Secret arrive as environment" "$(k logs env-demo)" "^GREETING=hello COLOR=blue PASSWORD=labsecret$"
 assert_contains "one file per key in the volume" "$(k exec env-demo -- ls /config | tr '\n' ' ')" "^COLOR GREETING $"
