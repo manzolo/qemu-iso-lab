@@ -517,6 +517,7 @@ class ManageTests(BaseVmctlTestCase):
         policy = ("xorriso:\n  Installed: (none)\n  Candidate: 1.5.4-2\n  Version table:\n"
                   "swtpm:\n  Installed: (none)\n  Candidate: (none)\n")
         with mock.patch.object(shutil, "which", return_value="/usr/bin/apt-cache"), \
+             mock.patch.object(vmctl.host_setup, "apt_lists_complete", return_value=True), \
              mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=policy)):
             self.assertEqual(vmctl.host_setup.apt_available(["xorriso", "swtpm", "virtiofsd"]), {"xorriso"})
         with mock.patch.object(shutil, "which", return_value=None):
@@ -526,9 +527,26 @@ class ManageTests(BaseVmctlTestCase):
         # An Italian host prints "Candidato:": every package looked missing and none was installed.
         translated = "xorriso:\n  Installato: (nessuno)\n  Candidato: 1.5.4-2\n"
         with mock.patch.object(shutil, "which", return_value="/usr/bin/apt-cache"), \
+             mock.patch.object(vmctl.host_setup, "apt_lists_complete", return_value=True), \
              mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=translated)) as run:
             self.assertIsNone(vmctl.host_setup.apt_available(["xorriso"]))
         self.assertEqual(run.call_args.kwargs["env"]["LC_ALL"], "C")
+
+    def test_apt_available_cannot_tell_while_a_configured_list_is_missing(self):
+        # WSL's Ubuntu 24.04 enables universe and ships only main/restricted lists: before
+        # `apt update` fzf had no candidate and setup skipped it (2026-10-04).
+        lists = self.root / "lists"; lists.mkdir()
+        (lists / "noble_main_Packages").write_text("")
+        (lists / "noble_restricted_Packages.lz4").write_text("")
+        targets = f"{lists}/noble_main_Packages\n{lists}/noble_restricted_Packages\n"
+        with mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=targets)):
+            self.assertTrue(vmctl.host_setup.apt_lists_complete())
+        with mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=targets + f"{lists}/noble_universe_Packages\n")):
+            self.assertFalse(vmctl.host_setup.apt_lists_complete())
+            with mock.patch.object(shutil, "which", return_value="/usr/bin/apt-cache"):
+                self.assertIsNone(vmctl.host_setup.apt_available(["fzf"]))
+        with mock.patch.object(subprocess, "run", side_effect=OSError):
+            self.assertTrue(vmctl.host_setup.apt_lists_complete())
 
     def test_setup_install_without_names_installs_every_missing_tool_with_pacman(self):
         present = set(vmctl.host_setup.installable_names()) - {"sfdisk", "7z"}

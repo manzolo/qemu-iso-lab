@@ -13,7 +13,11 @@ nothing yet, `setup-windows.ps1` from WSL to the dashboard).
 - Independent of the lab: its disk is a **full copy** of `artifacts/windows-11/disk.qcow2` (the unattended
   `windows-11` profile) in `storage/hd/windows11-studio.qcow2`, EFI vars in
   `storage/hd/windows11-studio_VARS.fd`. `vmctl clean windows-11` does not touch it, and it does not touch
-  the lab. The XML is vmctl's own `export-libvirt` rendering with the name, paths, memory and CPUs changed.
+  the lab. The XML is vmctl's own `export-libvirt` rendering with the name, paths, memory and CPUs changed,
+  plus **`<hyperv mode='passthrough'/>`** in `<features>` and a `hypervclock` timer. Without the Hyper-V
+  enlightenments Windows resets on the spot (Kernel-Power 41, no dump, nothing in the host log) the moment
+  WSL starts its VM: Hyper-V runs fine as the L1 hypervisor until it launches an L2 guest. Reproduced twice
+  on 2026-10-04, gone with the enlightenments.
 - **Clean snapshot**: `storage/hd/windows11-studio.clean.qcow2` + `windows11-studio_VARS.clean.fd` =
   Windows with the studio tools and **no WSL**. To record the install again from zero:
   `virsh shutdown`, copy both `.clean` files over the live ones, `virsh start`.
@@ -62,3 +66,8 @@ so `$` is PowerShell's, not the host shell's (single quotes on the host side).
 Pitfalls met: `Type` is a PowerShell alias of `Get-Content` (aliases beat functions: the helper is
 `TypeIn`); a window title set with `$Host.UI.RawUI.WindowTitle` inside an `-ArgumentList` gets mangled,
 use the process id; a reboot ends a recording (record in segments, join them in the build).
+A check that looks for a command line containing `setup-windows.ps1` finds itself (like `pkill -f`).
+WSL's first start pre-fills the Unix user name with the Windows one (`demo`): Enter only, typing it
+again makes `demodemo`. A Ctrl+C at its password prompt left the WSL service hung (even `wsl --shutdown`):
+only a Windows reboot freed it. Backslash escapes do not survive `wsl.exe -- sh -c '...'` from PowerShell
+(`\n` arrives as `n`): write files with one `echo` per line.

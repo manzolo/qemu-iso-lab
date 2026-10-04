@@ -26,11 +26,14 @@ function TypeIn([string]$text, [int]$ms = 40) {
   foreach ($w in [regex]::Split($text, '(?<= )')) { if ($w) { [System.Windows.Forms.SendKeys]::SendWait((Esc $w)); Start-Sleep -Milliseconds ($ms * $w.Length / 2) } }
 }
 function Focus($target) {
-  # A process id, or a substring of a window title: Esc closes a Start menu left open, then Front().
-  [System.Windows.Forms.SendKeys]::SendWait('{ESC}'); Start-Sleep -Milliseconds 300
+  # A process id, or a substring of a window title. Esc only when the window is not already in front
+  # (it closes a Start menu left open after logon), never into a terminal that has the keyboard:
+  # a Linux program reads it as ^[ and the next answer arrives corrupted.
   $p = if ($target -is [int]) { Get-Process -Id $target } else { Get-Process | Where-Object { $_.MainWindowTitle -like "*$target*" } | Select-Object -First 1 }
   for ($i = 0; $i -lt 20 -and $p -and $p.MainWindowHandle -eq 0; $i++) { Start-Sleep -Milliseconds 250; $p.Refresh() }
   if (-not $p -or $p.MainWindowHandle -eq 0) { return "focus ${target}: no window" }
+  if ([Studio]::GetForegroundWindow() -eq $p.MainWindowHandle) { return "focus ${target}: already" }
+  [System.Windows.Forms.SendKeys]::SendWait('{ESC}'); Start-Sleep -Milliseconds 300
   $ok = [Studio]::Front($p.MainWindowHandle); Start-Sleep -Milliseconds 300; "focus ${target}: $ok"
 }
 function Key([string]$spec) { [System.Windows.Forms.SendKeys]::SendWait($spec) }

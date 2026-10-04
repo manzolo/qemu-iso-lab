@@ -255,11 +255,34 @@ def missing_tools() -> list[str]:
     return [name for name in installable_names() if not tool_present(name)]
 
 
+def apt_lists_complete() -> bool:
+    """Whether every package list the sources configure is on disk. The Ubuntu 24.04 image of WSL
+    enables universe but ships the lists of main and restricted only: before the first `apt update`
+    fzf, dialog, partclone... have no candidate, and setup skipped them as "no apt package on this
+    release" (fresh Windows 11 + WSL, 2026-10-04). Asking apt is the only answer that does not
+    depend on how the sources are written (one-line or deb822); a question it cannot answer
+    counts as complete, the behaviour before this check."""
+    try:
+        result = subprocess.run(["apt-get", "indextargets", "--format", "$(FILENAME)", "Created-By: Packages"],
+                                capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return True
+    if result.returncode:
+        return True
+    for name in result.stdout.split():
+        # apt may keep a list compressed (Acquire::GzipIndexes, lz4): the FILENAME is the plain name.
+        if not Path(name).exists() and not list(Path(name).parent.glob(Path(name).name + ".*")):
+            return False
+    return True
+
+
 def apt_available(packages: list[str]) -> set[str] | None:
     """The packages apt can install on this release (``apt-cache policy`` shows a candidate), or
     None when that cannot be asked. Ubuntu 22.04 has no ``virtiofsd`` package (the daemon ships in
     qemu-system-common), and one unknown name makes ``apt install`` refuse the whole list."""
     if not packages or shutil.which("apt-cache") is None:
+        return None
+    if not apt_lists_complete():
         return None
     try:
         # LC_ALL=C: the labels are translated ("Candidato:" on an Italian host, which made every
