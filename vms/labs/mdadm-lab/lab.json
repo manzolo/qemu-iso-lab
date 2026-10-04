@@ -66,7 +66,7 @@
             "sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)",
             "sudo mdadm --create /dev/md1 --size=256M --run --level=5 --raid-devices=3 --spare-devices=1 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2) $(echo $DISKS | cut -d' ' -f3) $(echo $DISKS | cut -d' ' -f4)",
             "cat /proc/mdstat; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State|spare'",
-            "sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file"
+            "sudo mkfs.ext4 -F -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file"
           ]
         },
         {

@@ -88,7 +88,7 @@ export async function run(d) {
   await d.guest(`clear; sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock ${D(1)} ${D(2)}`, { read: 2000 });
   await d.guest("sudo mdadm --create /dev/md1 --size=256M --run --level=5 --raid-devices=3 --spare-devices=1 $DISKS", { read: 2500 });
   await d.guest(`${WAIT}; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State :|Active|Spare'`, { read: 5500, timeout: 300000 });
-  await d.guest("sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file", { read: 3000 });
+  await d.guest("sudo mkfs.ext4 -F -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file", { read: 3000 });
 
   await d.cue("spare");
   await d.guest(`clear; sudo mdadm /dev/md1 --fail ${D(2)} && sleep 2 && cat /proc/mdstat    # the spare rebuilds, unasked`, { read: 5000 });

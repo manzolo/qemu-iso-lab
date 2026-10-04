@@ -11,7 +11,7 @@ assert_contains "the level is raid5" "$detail" "Raid Level : raid5"
 assert_contains "one spare device" "$detail" "Spare Devices : 1"
 size=$(on mdadm-lab-server lsblk -bdno SIZE /dev/md1 2>/dev/null || echo 0)
 assert "the array holds the space of two members (2 x 256 MiB)" test "$size" -gt 500000000 -a "$size" -le 536870912
-on mdadm-lab-server "sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file >/dev/null" >/dev/null
+on mdadm-lab-server "sudo mkfs.ext4 -F -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file >/dev/null" >/dev/null
 assert "a member fails" on mdadm-lab-server sudo mdadm /dev/md1 --fail "$DISK2"
 sleep 2
 md_settle

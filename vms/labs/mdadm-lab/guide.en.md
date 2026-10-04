@@ -66,13 +66,15 @@ cat /proc/mdstat
 
 RAID5 stripes data and parity across three disks: the space of two, any one may fail. The fourth disk,
 declared as a spare, waits. Fail a member and the rebuild onto the spare starts by itself: that is the
-whole point of a hot spare, nobody has to be awake.
+whole point of a hot spare, nobody has to be awake. `--zero-superblock` erases only md's metadata:
+the mirror's ext4 is still on the first two disks, so `mkfs.ext4` would ask "Proceed anyway?" and `-F`
+says yes.
 
 ```sh
 sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)
 sudo mdadm --create /dev/md1 --size=256M --run --level=5 --raid-devices=3 --spare-devices=1 $DISKS
 cat /proc/mdstat; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State|spare'
-sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file
+sudo mkfs.ext4 -F -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file
 sudo mdadm /dev/md1 --fail $(echo $DISKS | cut -d' ' -f2) && cat /proc/mdstat
 sudo mdadm --detail /dev/md1 | grep -E 'State|Active|Working|Failed|Spare'
 cat /mnt/raid5/file

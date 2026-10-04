@@ -69,13 +69,15 @@ cat /proc/mdstat
 
 Il RAID5 distribuisce dati e parità su tre dischi: lo spazio di due, uno qualsiasi può guastarsi. Il
 quarto disco, dichiarato spare, aspetta. Fai fallire un membro e la ricostruzione sullo spare parte da
-sola: è tutto il senso di uno spare a caldo, nessuno deve essere sveglio.
+sola: è tutto il senso di uno spare a caldo, nessuno deve essere sveglio. `--zero-superblock` cancella
+solo i metadati di md: l'ext4 del mirror è ancora sui primi due dischi, quindi `mkfs.ext4` chiederebbe
+"Proceed anyway?" e `-F` risponde sì.
 
 ```sh
 sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)
 sudo mdadm --create /dev/md1 --size=256M --run --level=5 --raid-devices=3 --spare-devices=1 $DISKS
 cat /proc/mdstat; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State|spare'
-sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file
+sudo mkfs.ext4 -F -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file
 sudo mdadm /dev/md1 --fail $(echo $DISKS | cut -d' ' -f2) && cat /proc/mdstat
 sudo mdadm --detail /dev/md1 | grep -E 'State|Active|Working|Failed|Spare'
 cat /mnt/raid5/file
