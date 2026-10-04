@@ -1,0 +1,19 @@
+#!/bin/bash
+# wq '<powershell>': run it inside demo's desktop session through the studio agent (agent.ps1), print its output.
+# The agent's helpers are in scope: TypeIn "text" [ms], Key "{ENTER}", Glide x y [sec], Focus "title",
+# RecStart C:\studio\x.mkv, RecStop, RecTime, [Studio]::Resolution(w,h). WQ_WAIT = seconds to wait (600).
+here=$(cd "$(dirname "$0")" && pwd); n=$(date +%s%N); f=$(mktemp --suffix=.ps1)
+printf '%s\r\n' "$1" > "$f"
+"$here/w" "powershell -NoProfile -Command \"\$null\"" >/dev/null 2>&1 || { echo "wq: windows11-studio unreachable" >&2; exit 2; }
+ROOT=$(cd "$here/../../.." && pwd)
+WIN_HOST=${WIN_HOST:-$(virsh --connect qemu:///system domifaddr windows11-studio --source lease 2>/dev/null | awk '/ipv4/{split($4,a,"/");print a[1]; exit}')}
+WIN_USER=${WIN_USER:-$("$ROOT/bin/vmctl" show windows-11 --json 2>/dev/null | python3 -c 'import json,sys;print(json.load(sys.stdin)["ssh_provision"]["user"])')}
+scp -q -i "${WIN_KEY:-$ROOT/artifacts/windows-11/ssh/id_ed25519}" -o BatchMode=yes -o UserKnownHostsFile="$ROOT/artifacts/tour/win-known_hosts" -o LogLevel=ERROR \
+  "$f" "$WIN_USER@$WIN_HOST:C:/studio/q/$n.ps1" || exit 2
+rm -f "$f"
+for _ in $(seq 1 "${WQ_WAIT:-600}"); do
+  out=$("$here/w" "if exist C:\\studio\\done\\$n.log (type C:\\studio\\done\\$n.log & del C:\\studio\\done\\$n.log & echo __done__)" 2>/dev/null)
+  case "$out" in *__done__*) printf '%s\n' "${out%__done__*}" | tr -d '\r'; exit 0;; esac
+  sleep 1
+done
+echo "wq: timeout" >&2; exit 1

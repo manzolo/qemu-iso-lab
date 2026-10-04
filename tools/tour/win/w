@@ -1,0 +1,9 @@
+#!/bin/sh
+# w <cmd>: run a command in windows11-studio over SSH as the profile user (cmd.exe; use powershell -Command for PS).
+# WIN_HOST defaults to the DHCP lease of the libvirt domain; WIN_KEY to the windows-11 profile's key.
+ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
+WIN_HOST=${WIN_HOST:-$(virsh --connect qemu:///system domifaddr windows11-studio --source lease 2>/dev/null | awk '/ipv4/{split($4,a,"/");print a[1]; exit}')}
+WIN_USER=${WIN_USER:-$("$ROOT/bin/vmctl" show windows-11 --json 2>/dev/null | python3 -c 'import json,sys;print(json.load(sys.stdin)["ssh_provision"]["user"])')}
+exec ssh -i "${WIN_KEY:-$ROOT/artifacts/windows-11/ssh/id_ed25519}" -o BatchMode=yes -o ConnectTimeout=10 \
+  -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$ROOT/artifacts/tour/win-known_hosts" -o LogLevel=ERROR \
+  "$WIN_USER@$WIN_HOST" "$@"
