@@ -1,5 +1,9 @@
 # Common guide: host, vmctl and daily use
 
+> **Disclaimer.** QEMU ISO Lab is provided **as is**, without warranty of any kind (MIT License):
+> you use it on your machine and your data at your own risk. `vmctl flash` overwrites a physical
+> disk and its previous content **cannot be recovered**: check the target device twice.
+
 Everything that applies to every VM of the lab, to read once. The per-distro guides point
 here for the repeated steps.
 

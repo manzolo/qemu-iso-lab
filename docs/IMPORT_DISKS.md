@@ -1,5 +1,13 @@
 # Physical Disks: Flash and Import
 
+> [!CAUTION]
+> **`vmctl flash` erases the target disk completely and irreversibly.** Partitions, files and
+> operating systems on it are overwritten; no command of this project (or any other) brings them
+> back. Choose the device by size, model and serial (the dashboard and `vmtui` show them), never
+> by its `/dev/sdX` name alone: those names change between boots and when a USB disk is plugged in.
+> Unplug every disk you are not flashing if you can. The software is provided **as is**, without
+> warranty ([MIT License](../LICENSE)): the responsibility for what is written where is yours.
+
 Two destructive, sudo-only commands move a VM between an image and a real disk:
 `vmctl flash` writes a VM image to a whole block device, `vmctl import-device`
 reads a whole block device into a VM image. Both take the device twice

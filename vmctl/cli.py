@@ -556,7 +556,7 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--record", action="store_true", help=argparse.SUPPRESS)
     p.set_defaults(func=lifecycle.cmd_check_vm)
 
-    p = _add(subparsers, "flash", help="copy a VM disk, repair GPT and offer optional NTFS expansion (DESTRUCTIVE; requires sudo)")
+    p = _add(subparsers, "flash", help="write a VM disk to a physical device, repair GPT, offer NTFS expansion (ERASES the target disk, unrecoverable; requires sudo)")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--device", required=True, help="target block device, e.g. /dev/sdb")
     p.add_argument("--confirm-device", required=True, help="repeat --device exactly to confirm")

@@ -28,11 +28,19 @@ with English and Italian voice and subtitles: the catalog, the setup, a first VM
   validation matrix; the last full run (2026-09-27) passed 60 of 61 rows, the one failure a
   vmctl bug on a disk-image profile (SerenityOS), fixed the next morning.
 
+> [!WARNING]
+> **Use at your own risk.** QEMU ISO Lab is provided **as is**, without warranty of any kind
+> ([MIT License](LICENSE)): you run it on your machine, with your data, under your responsibility.
+> **`vmctl flash` and `vmctl import-device` write directly to physical disks.** `flash` overwrites
+> the whole target device: everything on it is **erased and cannot be recovered**. Pick the device by
+> its size, model and serial, check it twice, and keep a backup of anything you care about.
+> Installs, `clean`, checkpoint restores and lab installs also delete or replace VM disks.
+
 ![The web dashboard: My VMs, two of them running, the selected one with its actions and facts](docs/screenshots/web-dashboard.png)
 
 **Contents:** [Quick start](#quick-start) · [From zero to a running VM](#from-zero-to-a-running-vm) · [The catalog](#the-catalog-pick-what-you-want) ·
 [In the browser](#in-the-browser) · [Terminal dashboard](#the-terminal-dashboard) · [Labs](#labs) · [Everyday commands](#everyday-commands) ·
-[Make it yours](#make-it-yours) · [Documentation](#documentation) · [Development](#development)
+[Make it yours](#make-it-yours) · [Documentation](#documentation) · [Development](#development) · [License](#license)
 
 ## Quick start
 
@@ -385,3 +393,10 @@ subcommand. Tests never touch the host, and CI runs them on Python 3.10 to 3.14.
 After editing a tracked profile's recipe, `tools/bump_profile.py <vm> patch|minor|major -m "..."`
 records the new version (a test fails otherwise).
 More in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## License
+
+[MIT](LICENSE). The software is provided "as is", without warranty of any kind; the authors are not
+liable for any damage or data loss arising from its use. Read the warning at the top before using
+`vmctl flash` or `vmctl import-device`.
+

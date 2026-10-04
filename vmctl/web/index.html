@@ -2916,7 +2916,7 @@ function preview() {
   $("cmd-validation").textContent = missing.length ? "Required: " + missing.map((a) => a.flag || a.dest).join(", ") : mismatch ? "Device paths must match exactly." : c.terminal_only ? "Opens a terminal window on the host · sudo asks there" : "Ready · Ctrl / ⌘ + Enter to run";
   const danger = destructiveCommand(args);
   $("cmd-warning").classList.toggle("hidden", !danger);
-  $("cmd-warning").textContent = danger ? (c.terminal_only ? "This command overwrites the target disk. You confirm here, then again in the terminal before it starts." : "This command deletes or overwrites data. Confirmation is required before running.") : "";
+  $("cmd-warning").textContent = danger ? (c.terminal_only ? "This command erases the target disk: what is on it cannot be recovered. You confirm here, then again in the terminal before it starts." : "This command deletes or overwrites data. Confirmation is required before running.") : "";
   $("cmd-run").classList.toggle("danger", danger); $("cmd-run").classList.toggle("primary", !danger);
   $("cmd-run").textContent = c.terminal_only ? (commandBusy ? "Opening…" : "Review & open in a terminal ↗") : commandBusy ? "Starting…" : danger ? "Review & run…" : "Run command";
   const active = c.args.filter((a, i) => a.flag && (a.kind === "flag" ? $("arg" + i).checked : $("arg" + i).value.trim())).length;
@@ -2931,7 +2931,7 @@ async function submitCommand() {
     if (c.terminal_only) {
       const args = buildArgs(), device = args[args.indexOf("--device") + 1], disk = (deviceCache || []).find((d) => d.path === device);
       const facts = disk ? [["Disk", disk.path], ["Size", fmtBytes(disk.size)], ["Model", disk.model || "unknown"], ["Partitions", String((disk.children || []).length)], ...(disk.serial ? [["Serial", disk.serial]] : [])] : [["Device", device || "?"]];
-      if (!await askConfirm({ eyebrow: "Physical disk", title: `Overwrite ${device || "the target disk"}?`, message: "Everything on it is lost. A terminal window opens on the host and waits for Enter before the command starts; sudo may ask for your password there.", command: "vmctl " + args.join(" "), facts, button: "Open the terminal" })) return;
+      if (!await askConfirm({ eyebrow: "Physical disk", title: `Overwrite ${device || "the target disk"}?`, message: "Everything on it is erased and cannot be recovered. A terminal window opens on the host and waits for Enter before the command starts; sudo may ask for your password there.", command: "vmctl " + args.join(" "), facts, button: "Open the terminal" })) return;
       const res = await api("/api/terminal", { args }); toast(`Opened in ${res.terminal}: press Enter there to start (sudo may ask for your password).`);
     }
     else await run(buildArgs());
