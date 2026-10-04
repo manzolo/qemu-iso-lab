@@ -4326,8 +4326,7 @@ def cmd_export_libvirt(args: argparse.Namespace) -> int:
 
 
 def cmd_unexport_libvirt(args: argparse.Namespace) -> int:
-    config.get_vm(config.load_config(), args.vm)
-    return libvirt.unexport(args)
+    return libvirt.unexport(args, config.get_vm(config.load_config(), args.vm))
 
 
 def cmd_shell(args: argparse.Namespace) -> int:

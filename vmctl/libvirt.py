@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import shlex
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -18,7 +20,37 @@ def domain_name(name: str) -> str:
     return name
 
 
-def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
+# The enlightenments of qemu.hyperv_cpu_flags, spelled out for libvirt. Not mode='passthrough':
+# that makes the domain unmigratable, so virt-manager refuses a snapshot of the running VM. Not
+# reenlightenment: the live snapshot is taken but its revert fails restoring that MSR (-22). Both
+# found on windows11-studio, 2026-10-04, where this list runs Windows with WSL2 inside and reverts
+# its running snapshots in ~20 s.
+HYPERV_FEATURES = ("relaxed", "vapic", "spinlocks", "vpindex", "runtime", "synic", "stimer",
+                   "reset", "frequencies", "tlbflush", "ipi")
+
+
+def host_is_intel() -> bool:
+    """evmcs (the enlightened VMCS nested Hyper-V uses) exists on Intel VMX only."""
+    try:
+        with open("/proc/cpuinfo", encoding="utf-8", errors="replace") as cpuinfo:
+            return any(line.startswith("vendor_id") and "GenuineIntel" in line for line in cpuinfo)
+    except OSError:
+        return False
+
+
+def hyperv_features(features: ET.Element) -> None:
+    hyperv = ET.SubElement(features, "hyperv", mode="custom")
+    for name in HYPERV_FEATURES:
+        node = ET.SubElement(hyperv, name, state="on")
+        if name == "spinlocks":
+            node.set("retries", "8191")
+        if name == "stimer":
+            ET.SubElement(node, "direct", state="on")
+    if host_is_intel():
+        ET.SubElement(hyperv, "evmcs", state="on")
+
+
+def render_domain_xml(name: str, vm: dict[str, Any], firmware: tuple[Path, Path] | None = None) -> str:
     domain = ET.Element("domain", type="kvm")
     ET.SubElement(domain, "name").text = domain_name(name)
     ET.SubElement(domain, "memory", unit="MiB").text = str(vm["memory_mb"])
@@ -30,9 +62,15 @@ def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
     ET.SubElement(os, "type", arch="x86_64", machine=machine).text = "hvm"
     fw = vm["firmware"]
     if fw["type"] == "efi":
-        code, _, nvram = qemu.resolve_efi_firmware(fw)
-        ET.SubElement(os, "loader", readonly="yes", type="pflash").text = str(code.resolve())
-        ET.SubElement(os, "nvram").text = str(nvram.resolve())
+        if firmware is not None:
+            # qcow2 copies (export_firmware): libvirt takes internal snapshots of a pflash VM only
+            # with its variables in qcow2, and wants the loader in the same format.
+            ET.SubElement(os, "loader", readonly="yes", type="pflash", format="qcow2").text = str(firmware[0].resolve())
+            ET.SubElement(os, "nvram", format="qcow2").text = str(firmware[1].resolve())
+        else:
+            code, _, nvram = qemu.resolve_efi_firmware(fw)
+            ET.SubElement(os, "loader", readonly="yes", type="pflash").text = str(code.resolve())
+            ET.SubElement(os, "nvram").text = str(nvram.resolve())
     ET.SubElement(os, "boot", dev="hd")
     features = ET.SubElement(domain, "features")
     ET.SubElement(features, "acpi")
@@ -40,9 +78,7 @@ def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
     if vm.get("vmport") is False:
         ET.SubElement(features, "vmport", state="off")
     if vm.get("hyperv") is True and not vm.get("cpu_model"):
-        # The libvirt spelling of qemu.hyperv_cpu_flags: every enlightenment the host supports,
-        # plus the Hyper-V reference clock.
-        ET.SubElement(features, "hyperv", mode="passthrough")
+        hyperv_features(features)
     ET.SubElement(domain, "cpu", mode="host-passthrough")
     if vm.get("hyperv") is True and not vm.get("cpu_model"):
         clock = ET.SubElement(domain, "clock", offset="utc")
@@ -94,6 +130,41 @@ def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
     return ET.tostring(domain, encoding="unicode") + "\n"
 
 
+FIRMWARE_CODE = "OVMF_CODE.qcow2"
+FIRMWARE_VARS = "OVMF_VARS.qcow2"
+
+
+def export_firmware(vm_name: str, vm: dict[str, Any], dry_run: bool) -> tuple[Path, Path] | None:
+    """The EFI firmware of an exported VM as qcow2 copies under artifacts/<vm>/libvirt/: with the
+    raw vars vmctl uses, virt-manager's snapshots are refused ("internal snapshots of a VM with
+    pflash based firmware require QCOW2 nvram format", libvirt 12, 2026-10-04). The variables are
+    converted from vmctl's own file at every export and converted back by unexport."""
+    if vm["firmware"].get("type") != "efi":
+        return None
+    code, template, nvram = qemu.resolve_efi_firmware(vm["firmware"])
+    base = runtime.vm_artifact_base(vm_name) / "libvirt"
+    code_copy, vars_copy = base / FIRMWARE_CODE, base / FIRMWARE_VARS
+    if not dry_run:
+        base.mkdir(parents=True, exist_ok=True)
+    source_vars = nvram if dry_run or nvram.is_file() else template
+    runtime.run(["qemu-img", "convert", "-f", "raw", "-O", "qcow2", str(code), str(code_copy)], dry_run=dry_run)
+    runtime.run(["qemu-img", "convert", "-f", "raw", "-O", "qcow2", str(source_vars), str(vars_copy)], dry_run=dry_run)
+    return code_copy, vars_copy
+
+
+def import_firmware(vm_name: str, vm: dict[str, Any], exported_nvram: Path | None, dry_run: bool) -> None:
+    """Back from libvirt: the qcow2 variables (what the guest changed while there) become vmctl's
+    raw file again, and the copies go."""
+    if exported_nvram is None or exported_nvram.name != FIRMWARE_VARS or vm["firmware"].get("type") != "efi":
+        return
+    _, _, nvram = qemu.resolve_efi_firmware(vm["firmware"])
+    if exported_nvram.is_file() or dry_run:
+        runtime.run(["qemu-img", "convert", "-f", "qcow2", "-O", "raw", str(exported_nvram), str(nvram)], dry_run=dry_run)
+    if not dry_run:
+        exported_nvram.unlink(missing_ok=True)
+        (exported_nvram.parent / FIRMWARE_CODE).unlink(missing_ok=True)
+
+
 def segment_names(vm: dict[str, Any]) -> list[str]:
     return [str(spec["name"]) for spec in qemu.network_specs(vm, "runtime") if spec["type"] == "segment"]
 
@@ -142,7 +213,9 @@ def virsh_output(uri: str, *args: str) -> str:
 
 def undefine(uri: str, name: str, dry_run: bool) -> None:
     """--nvram deletes the vars file: preserve guest firmware state in place."""
-    command = ["virsh", "--connect", uri, "undefine", name, "--nvram"]
+    # --snapshots-metadata: libvirt refuses to undefine a domain with snapshots; the snapshots
+    # themselves stay inside the qcow2 images.
+    command = ["virsh", "--connect", uri, "undefine", name, "--nvram", "--snapshots-metadata"]
     if dry_run:
         runtime.run(command, dry_run=True)
         return
@@ -166,7 +239,8 @@ def export(args: argparse.Namespace, vm: dict[str, Any]) -> int:
     disk = runtime.resolve_path(vm["disk"]["path"])
     if not disk.is_file():
         raise VMError(f"Installed disk missing: {disk}. Install the VM with vmctl first")
-    xml = render_domain_xml(name, vm)
+    firmware = export_firmware(args.vm, vm, args.dry_run)
+    xml = render_domain_xml(name, vm, firmware)
     destination = runtime.vm_artifact_base(args.vm) / "libvirt" / f"{name}.xml"
     replace_existing = False
     if not args.no_define and not args.dry_run:
@@ -197,10 +271,32 @@ def export(args: argparse.Namespace, vm: dict[str, Any]) -> int:
     return 0
 
 
-def unexport(args: argparse.Namespace) -> int:
+def warn_foreign_owner(vm: dict[str, Any]) -> None:
+    """libvirt chowns a domain's images to libvirt-qemu while it runs and normally gives them back
+    at shutdown, but a snapshot revert can lose the remembered owner: the disk of windows-11 stayed
+    libvirt-qemu:kvm 0644 after an export, a revert and an unexport (2026-10-04), and the next
+    `vmctl start` died on "Permission denied". vmctl cannot chown without root and does not assume sudo exists: it names the command."""
+    paths = [runtime.resolve_path(vm["disk"]["path"])]
+    if vm["firmware"].get("type") == "efi":
+        paths.append(qemu.resolve_efi_firmware(vm["firmware"])[2])
+    foreign = [path for path in paths if path.exists() and path.stat().st_uid != os.getuid()]
+    if foreign:
+        ui.print_status("warn", "libvirt left these files to another owner; vmctl cannot open them until, as root "
+                        "(sudo, doas or su -c):", ok=False)
+        print(f"    chown {os.getuid()}:{os.getgid()} " + " ".join(shlex.quote(str(path)) for path in foreign))
+
+
+def unexport(args: argparse.Namespace, vm: dict[str, Any]) -> int:
+    name = domain_name(args.name or args.vm)
+    exported_nvram: Path | None = None
     if not args.dry_run:
         runtime.require_command("virsh")
-    undefine(args.connect, domain_name(args.name or args.vm), args.dry_run)
+        nvram_text = ET.fromstring(virsh_output(args.connect, "dumpxml", name) or "<domain/>").findtext("os/nvram")
+        exported_nvram = Path(nvram_text) if nvram_text else None
+    undefine(args.connect, name, args.dry_run)
+    import_firmware(args.vm, vm, exported_nvram, args.dry_run)
+    if not args.dry_run:
+        warn_foreign_owner(vm)
     ui.print_note("Would remove libvirt definition; disk and firmware vars preserved." if args.dry_run else
                   "Libvirt definition removed; disk and firmware vars preserved in artifacts.")
     return 0

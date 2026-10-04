@@ -47,6 +47,23 @@ NVRAM bytes because libvirt otherwise deletes that file. Replacement uses the
 same preservation procedure. No command uses `--remove-all-storage`.
 The generated XML remains as a reference; it is not a VM snapshot or backup.
 
+### Snapshots in virt-manager
+
+An EFI profile is exported with its firmware as **qcow2 copies** under `artifacts/<vm>/libvirt/`
+(`OVMF_CODE.qcow2`, `OVMF_VARS.qcow2`, converted from vmctl's raw files at every export): libvirt
+takes internal snapshots of a pflash VM only with qcow2 variables and a loader in the same format.
+With them virt-manager's snapshots work, with the VM running too (memory included, a revert in
+seconds). Unexport converts the variables back into vmctl's raw file (whatever the guest changed in
+libvirt is kept), removes the copies and undefines with `--snapshots-metadata`: the snapshots stay
+inside the disk's qcow2 (`qemu-img snapshot -l`), vmctl boots the disk as it is, and
+`qemu-img snapshot -d` removes one. A Windows profile (`hyperv: true`) gets the Hyper-V
+enlightenments as an explicit list, not `mode='passthrough'`, which libvirt refuses to snapshot
+running; `evmcs` only on Intel hosts.
+
+After a snapshot revert libvirt may not give the disk back to its owner: unexport checks and, if the
+disk or the variables belong to another user (libvirt-qemu), prints the `chown` to run as root
+before `vmctl start` (which otherwise fails on "Permission denied").
+
 ## Profile translation
 
 Memory/vCPUs, machine, EFI loader and existing NVRAM, disk bus/format, audio,
