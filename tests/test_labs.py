@@ -111,6 +111,26 @@ class LabsTests(BaseVmctlTestCase):
         self.assertIn('href="https://127.0.0.1:8006/"', page)
         self.assertIn("segment pve-lan", page)
 
+    def test_maps_render_for_all_tracked_labs_including_legacy_nat(self):
+        cfg = self.tracked_config()
+        for group in labs.lab_groups(cfg):
+            with self.subTest(group=group):
+                lab = labs.model(cfg, group)
+                page = labs.render_html(lab)
+                self.assertIn("<svg", page)
+                for member in lab["members"]:
+                    self.assertIn(member["name"], page)
+                if group == "mdadm-lab":
+                    self.assertIsNone(lab["members"][0]["nics"][0]["mac"])
+                    self.assertIn("MAC not specified", page)
+
+    def test_map_handles_unspecified_segment_mac_in_table_and_diagram(self):
+        lab = labs.model(self.tracked_config(), "proxmox-lab")
+        lab["members"][0]["nics"][1]["mac"] = None
+        page = labs.render_html(lab)
+        self.assertIn("MAC not specified</text>", page)
+        self.assertIn("<code>MAC not specified</code>", page)
+
     def test_group_up_skips_members_without_a_disk_and_starts_in_order(self):
         cfg = self.tracked_config()
         states = {name: {"running": False, "install": "verified"} for name in labs.group_members(cfg, "proxmox-lab")}

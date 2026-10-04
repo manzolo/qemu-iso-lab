@@ -589,7 +589,7 @@ def _svg(lab: dict[str, Any]) -> str:
             out.append(f'<line class="seg-l" x1="{cx}" y1="{box_y + box_h}" x2="{cx}" y2="{y}"/>')
             out.append(f'<circle class="port" cx="{cx}" cy="{y}" r="5"/>')
             out.append(f'<text class="addr" x="{cx + 8}" y="{box_y + box_h + 22}">{esc(nic["address"] or "address not declared")}</text>')
-            out.append(f'<text class="small" x="{cx + 8}" y="{box_y + box_h + 38}">{esc(nic["mac"])}</text>')
+            out.append(f'<text class="small" x="{cx + 8}" y="{box_y + box_h + 38}">{esc(nic["mac"] or "MAC not specified")}</text>')
     for seg in lab["segments"]:
         y = seg_y[seg["name"]]
         out.append(f'<line class="bus" x1="{_MARGIN}" y1="{y}" x2="{width - _MARGIN}" y2="{y}"/>')
@@ -711,9 +711,9 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
         for nic in member["nics"]:
             if nic["type"] == "user":
                 fwd = "<br>".join(_forward_html(f) for f in nic["forwards"]) or "no forwards"
-                nics.append(f'<b>NAT</b> <code>{esc(nic["mac"])}</code><br>{fwd}')
+                nics.append(f'<b>NAT</b> <code>{esc(nic["mac"] or "MAC not specified")}</code><br>{fwd}')
             else:
-                nics.append(f'<b>{esc(nic["segment"])}</b> <code>{esc(nic["mac"])}</code><br>{esc(nic["address"] or "—")}')
+                nics.append(f'<b>{esc(nic["segment"])}</b> <code>{esc(nic["mac"] or "MAC not specified")}</code><br>{esc(nic["address"] or "—")}')
         for service in member["services"]:
             url = str(service.get("url") or "")
             link = f'<a href="{esc(url)}">{esc(url)}</a>' if url else esc(str(service.get("address") or ""))
