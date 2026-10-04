@@ -97,6 +97,23 @@ What the page offers:
   Existing names get a numbered copy; uploads are staged privately and renamed only on success.
   Symlinks and special files are shown but cannot be downloaded. Zip folders before uploading.
   The browser shows upload progress followed by **Saving in VM** until SFTP confirms completion.
+  Drop onto any part of a console, including a pane in `/multi`. An overlay identifies the
+  destination VM and folder before release. Files go to the folder open in **Files**, or the
+  SSH user's home if no folder is open. Dropping while that first folder is loading queues
+  the files without requiring another drop. The location on the guest desktop does not
+  select a destination directory.
+  To copy between guests, drag a regular file from one console's **Files** list onto another
+  console, or choose **Copy to VM…** next to the file and select a running VM and destination
+  folder. The host reads the source into a private temporary file, copies it to the destination
+  over SFTP, and removes the temporary file. The guests do not need a network connection to
+  each other, and the source is kept. Dragging an icon directly out of the remote desktop is
+  not supported by the VNC connection.
+  **Transfers** shows queued files, the current phase, progress, final paths and errors.
+  **Cancel** removes a queued file or requests cancellation of an active copy; cancellation
+  during SFTP waits is acknowledged after the current bounded operation returns. A copy that
+  already completed remains completed. Video reconnects do not restart transfers. Keep the
+  page open for files still queued in the browser; copies already accepted by the server can
+  finish after the console closes. Restarting `vmctl web` cancels its active transfers.
   If a connection fails, refresh the folder before retrying. A lost SSH connection may leave a
   hidden `.vmctl-upload-*.part` file when cleanup cannot reach the guest.
   The header is three captioned groups: **Display** (fit, keyboard, clipboard), **Guest** (files,
@@ -277,6 +294,10 @@ The page can delete disks and start anything `vmctl` can, so:
 | GET | `/api/vm/<vm>/file?path=…` | download a regular guest file, staged before HTTP headers are sent |
 | POST | `/api/vm/<vm>/files-upload?path=…&name=…` | raw file body, at most 256 MiB; returns the saved name/path/size without replacing existing files |
 | POST | `/api/vm/<vm>/files-session` / `files-session-close` | open (and close) one SFTP session that several sequential uploads share (`?session=` on `files-upload`); 8 sessions at most, idle ones expire after 60 s |
+| POST | `/api/transfers` | queue a host upload (`vm`, `path`, `name`, `size`) or start a guest copy (`vm`, `path`, `source_vm`, `source_path`); at most 8 active transfers |
+| POST | `/api/transfers/<id>/data` | raw host file body; size must match the queued file, at most 256 MiB |
+| GET | `/api/transfers/<id>` | phase, byte progress, result or error; latest 100 transfers retained in memory |
+| POST | `/api/transfers/<id>/cancel` | request cancellation, preserving completed files and cleaning partial copies when reachable |
 | GET / POST | `/api/identity` | the guest identity of local.json: `{exists, path, identity: {user, realname, has_password, has_hash}, defaults}`; save `{"user", "password" (empty keeps the current one), "realname", "store_password"}`: creates the file on a fresh checkout, keeps every other key afterwards |
 | POST | `/api/catalog` | `{"action": add|remove|set|clear|hide|unhide, "names": [...]}`: My VMs and the hidden profiles (`vmctl catalog`), saved in local.json |
 | POST | `/api/protect` | `{"action": "add"|"remove", "names": [...]}`: `vmctl protect`/`unprotect`, saved in local.json; the 🔒 of the details panel. A VM in *My VMs* whose disk holds data is protected as well (`protected_by: star` in the rows): the star, not this call, unlocks it |

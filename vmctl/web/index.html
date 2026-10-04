@@ -357,7 +357,7 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .console-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 18px; background:#111a28; border-top:1px solid var(--line); flex-shrink:0; }
 #vnc-note { margin:0; font-size:12px; color:var(--muted); }
 #vnc-status { white-space:nowrap; }
-#console-shell { display:flex; flex-direction:column; flex:1; min-height:0; background:var(--panel); }
+#console-shell { position:relative; display:flex; flex-direction:column; flex:1; min-height:0; background:var(--panel); }
 #console-shell:fullscreen { width:100vw; height:100dvh; max-height:100dvh; border:0; border-radius:0; }
 #console-shell:fullscreen > header { position:absolute; top:0; left:0; right:0; z-index:5; transform:translateY(-100%); transition:transform .15s; }
 #console-shell:fullscreen > .console-footer { display:none; }
@@ -520,6 +520,20 @@ button .console-button-icon svg { width:100%; height:100%; }
 .file-entry .file-name { flex:1; min-width:0; overflow-wrap:anywhere; color:#c4d8e9; }
 .file-entry .file-size { font-size:10px; color:#8ba6bd; white-space:nowrap; }
 .file-entry .file-kind { font:15px ui-monospace,monospace; color:#83d2be; }
+.file-entry-row { display:flex; align-items:center; gap:4px; }
+.file-entry-row .file-entry { min-width:0; flex:1; }
+#console-panel .file-copy { flex:none; padding:5px; font-size:10px; }
+.file-entry[draggable=true] { cursor:grab; }
+#console-file-overlay { position:absolute; inset:8px; z-index:20; pointer-events:none; border:2px dashed var(--accent); border-radius:12px; background:#102e35d9; display:grid; place-content:center; text-align:center; padding:20px; overflow-wrap:anywhere; }
+#console-file-overlay[hidden] { display:none; }
+#console-file-overlay strong { font-size:20px; }
+#console-file-overlay span { margin-top:12px; }
+#console-transfers { margin-top:14px; border-top:1px solid #304257; }
+.file-transfer { padding:10px 0; border-bottom:1px solid #304257; overflow-wrap:anywhere; font-size:11px; }
+.file-transfer p { margin:5px 0; }
+.file-transfer progress { width:100%; height:6px; accent-color:var(--accent); }
+#console-file-copy { margin:10px 0; padding:10px; border:1px solid #304257; border-radius:8px; }
+#console-file-copy select,#console-file-copy input { width:100%; margin-bottom:8px; }
 body.console-detached { overflow:hidden; }
 body.console-detached > :not(dialog):not(#toast):not(script) { display:none !important; }
 body.console-detached #vnc-dialog { position:fixed; inset:0; margin:0; width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border:0; border-radius:0; }
@@ -801,6 +815,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <dialog id="screen-dialog"><header><h1 id="screen-title">Screen</h1><button data-close>Close</button></header>
   <div class="body" id="screen"><img id="screen-img" alt="VM screen"><p class="s-muted" id="screen-note">Loading the screen…</p></div></dialog>
 <dialog id="vnc-dialog" aria-labelledby="vnc-title"><div id="console-shell"><button id="console-tools" aria-label="Show console controls">Controls ▾</button>
+  <div id="console-file-overlay" hidden><strong id="console-file-drop-title"></strong><span id="console-file-drop-path"></span></div>
   <header><div class="console-heading"><span id="console-icon" aria-hidden="true"></span><div><div class="eyebrow">Live console</div><h1 id="vnc-title">Console</h1></div></div>
     <div class="console-toolbar">
       <div class="console-action-group" data-group="Display">
@@ -862,9 +877,11 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
       <button id="console-files-drop" class="file-drop" disabled><span class="file-drop-symbol" aria-hidden="true">⇧</span><strong>Drop files here</strong><span>or click to choose · up to 256 MiB each</span></button>
       <input id="console-files-input" type="file" multiple hidden>
       <p id="console-files-status" class="help" role="status">Loading files…</p>
+      <div id="console-transfers" aria-label="File transfers"></div>
       <label class="file-hidden-toggle"><input id="console-files-hidden" type="checkbox">Show hidden files</label>
       <div id="console-files-list" aria-label="Files in the VM"></div>
-      <p class="help">Uploads go into this folder. Existing files are kept; duplicate names are numbered.</p>
+      <p class="help">Drop host files on the console. Drag a file from this list onto another VM, or use Copy to VM. Existing files are kept; duplicate names are numbered. Zip folders first.</p>
+      <div id="console-file-copy" hidden><strong id="console-file-copy-name"></strong><label for="console-file-copy-vm">Destination VM</label><select id="console-file-copy-vm"></select><label for="console-file-copy-path">Destination folder (. = home)</label><input id="console-file-copy-path" value="."><button id="console-file-copy-send">Copy file</button><button id="console-file-copy-close">Cancel</button></div>
     </section>
   </aside></div>
   <div class="console-footer"><span id="vnc-status" class="state s-warn" role="status">Connecting</span><p id="vnc-note">Click the screen to use keyboard and mouse. Esc goes to the VM; use Close to leave.</p><label class="console-auto"><input id="vnc-auto" type="checkbox" checked>Auto reconnect</label><button id="vnc-reconnect">Reconnect</button></div>
@@ -2180,6 +2197,7 @@ async function openConsole(vm, retry = false) {
   }
   resetConsoleClipboard();
   consoleVm = vm;
+  renderFileTransfers();
   if (rfb) { rfb.disconnect(); rfb = null; }
   const row = S.vms.find(r => r.name === vm);
   $("vnc-files").disabled = $("vnc-ssh").disabled = !row?.ssh_port;
@@ -2410,15 +2428,17 @@ $("integration-run").onclick = async () => {
 };
 // Files use an independent session so display reconnects never restart a transfer.
 let consoleFilesListing = null, consoleFilesBusy = false, consoleFilesGeneration = 0;
-let consoleFilesController = null, consoleFilesUpload = null;
+let consoleFilesController = null;
 function resetConsoleFiles() {
   ++consoleFilesGeneration;
-  consoleFilesController?.abort(); consoleFilesUpload?.abort();
-  consoleFilesController = consoleFilesUpload = null;
+  consoleFilesController?.abort();
+  consoleFilesController = null;
   consoleFilesListing = null; consoleFilesBusy = false;
   $("console-files-list").innerHTML = ""; $("console-files-path").textContent = "Home folder";
   $("console-files-status").textContent = "Open Files to browse the VM.";
   $("console-files-input").value = "";
+  $("console-file-overlay").hidden = true;
+  $("console-file-copy").hidden = true;
   renderConsoleFiles();
 }
 function fileStatus(text, error = false) {
@@ -2431,15 +2451,21 @@ function fileSize(bytes) {
 function renderConsoleFiles() {
   for (const id of ["console-files-home", "console-files-up", "console-files-refresh"]) $(id).disabled = consoleFilesBusy;
   $("console-files-up").disabled ||= !consoleFilesListing || consoleFilesListing.path === consoleFilesListing.parent;
-  $("console-files-drop").disabled = consoleFilesBusy || !consoleFilesListing;
+  $("console-files-drop").disabled = false;
   const entries = (consoleFilesListing?.entries || []).filter(entry => $("console-files-hidden").checked || !entry.name.startsWith("."));
-  $("console-files-list").innerHTML = entries.map((entry, index) => `<button class="file-entry" data-file-index="${index}" ${consoleFilesBusy || entry.kind === "other" ? "disabled" : ""} title="${esc(entry.kind === "directory" ? "Open folder" : entry.kind === "file" ? "Download file" : "Not a regular file")}"><span class="file-kind" aria-hidden="true">${entry.kind === "directory" ? "▸" : "↓"}</span><span class="file-name">${esc(entry.name)}</span><span class="file-size">${entry.kind === "directory" ? "Folder" : entry.kind === "file" ? fileSize(entry.size) : "Special"}</span></button>`).join("") || (consoleFilesListing ? '<p class="help">No files to show in this folder.</p>' : "");
+  $("console-files-list").innerHTML = entries.map((entry, index) => `<div class="file-entry-row"><button class="file-entry" data-file-index="${index}" draggable="${entry.kind === "file" && !consoleFilesBusy}" ${consoleFilesBusy || entry.kind === "other" ? "disabled" : ""} title="${esc(entry.kind === "directory" ? "Open folder" : entry.kind === "file" ? "Download file; drag to another VM to copy" : "Not a regular file")}"><span class="file-kind" aria-hidden="true">${entry.kind === "directory" ? "▸" : "↓"}</span><span class="file-name">${esc(entry.name)}</span><span class="file-size">${entry.kind === "directory" ? "Folder" : entry.kind === "file" ? fileSize(entry.size) : "Special"}</span></button>${entry.kind === "file" ? `<button class="file-copy" data-copy-index="${index}" aria-label="Copy ${esc(entry.name)} to another VM" ${consoleFilesBusy ? "disabled" : ""}>Copy to VM…</button>` : ""}</div>`).join("") || (consoleFilesListing ? '<p class="help">No files to show in this folder.</p>' : "");
+  const sourceFile = index => ({vm:consoleVm, path:consoleFilesListing.path.replace(/\/$/, "") + "/" + entries[index].name, name:entries[index].name, size:entries[index].size});
   $("console-files-list").querySelectorAll('[data-file-index]').forEach(button => button.onclick = () => {
     const entry = entries[Number(button.dataset.fileIndex)];
     const path = consoleFilesListing.path.replace(/\/$/, "") + "/" + entry.name;
     if (entry.kind === "directory") loadConsoleFiles(path);
     else downloadConsoleFile(path, entry.name, entry.size);
   });
+  $("console-files-list").querySelectorAll('[draggable="true"]').forEach(button => button.ondragstart = e => {
+    e.dataTransfer.setData(GUEST_FILE_TYPE, JSON.stringify(sourceFile(Number(button.dataset.fileIndex))));
+    e.dataTransfer.effectAllowed = "copy";
+  });
+  $("console-files-list").querySelectorAll('[data-copy-index]').forEach(button => button.onclick = () => chooseFileTarget(sourceFile(Number(button.dataset.copyIndex))));
 }
 async function loadConsoleFiles(path = ".", note = "") {
   if (consoleFilesBusy) return;
@@ -2452,58 +2478,135 @@ async function loadConsoleFiles(path = ".", note = "") {
     if (!response.ok) throw new Error(data.error || (response.status === 404 ? "Restart vmctl web to enable file exchange, then open its new URL." : "Cannot list guest files."));
     if (generation !== consoleFilesGeneration) return;
     consoleFilesListing = data; $("console-files-path").textContent = data.path;
+    try { localStorage.setItem("vmctl-file-folder:" + vm, data.path); } catch (_) { /* optional */ }
     fileStatus(note || (data.truncated ? "Showing the first 2,000 entries. Open a subfolder to see more." : "Click a folder to open it, or a file to download."));
   } catch (e) { if (generation === consoleFilesGeneration) fileStatus(e.message, true); }
   finally { if (generation === consoleFilesGeneration) { consoleFilesBusy = false; consoleFilesController = null; renderConsoleFiles(); } }
 }
-function uploadConsoleFile(file, path, generation, position, total, vm, session) {
+const GUEST_FILE_TYPE = "application/x-vmctl-guest-file";
+const fileTransfers = [];
+let fileTransferRunning = false, fileCopySource = null;
+const transferFinished = item => ["completed", "cancelled", "failed"].includes(item.status);
+function rememberedFileFolder(vm) {
+  try { return localStorage.getItem("vmctl-file-folder:" + vm) || "."; } catch (_) { return "."; }
+}
+function consoleFileDestination() { return consoleFilesListing?.path || "."; }
+function renderFileTransfers() {
+  const items = fileTransfers.filter(item => item.vm === consoleVm || item.source_vm === consoleVm);
+  $("console-transfers").innerHTML = items.length ? '<strong>Transfers</strong>' + items.map(item => {
+    const labels = {queued:"Queued",waiting:"Waiting for file",receiving:"Sending to host",connecting:"Connecting to guest",downloading:"Reading source VM",copying:"Saving in VM",cancelling:"Cancelling…",completed:"Completed",cancelled:"Cancelled",failed:"Failed"};
+    return `<div class="file-transfer" data-transfer-key="${item.key}"><strong>${esc(item.name)}</strong><p>${esc(item.source_vm || "Host")} → ${esc(item.vm)} · ${esc(item.path === "." ? "Home folder" : item.path)}</p><p role="status">${esc(labels[item.status] || item.status)}${item.error ? " · " + esc(item.error) : ""}${item.result ? " · " + esc(item.result.path) : ""}</p>${!transferFinished(item) ? `<progress max="${item.size || 1}" value="${item.bytes || 0}" aria-label="Transfer progress"></progress><button data-cancel-transfer="${item.key}" ${item.cancelRequested ? "disabled" : ""}>Cancel</button>` : ""}</div>`;
+  }).join("") : "";
+  $("console-transfers").querySelectorAll('[data-cancel-transfer]').forEach(button => button.onclick = () => cancelFileTransfer(fileTransfers.find(item => item.key === button.dataset.cancelTransfer)));
+}
+async function cancelFileTransfer(item) {
+  if (!item || transferFinished(item)) return;
+  item.cancelRequested = true;
+  if (!item.id && item.status === "queued") { item.status = "cancelled"; item.file = null; }
+  else {
+    item.status = "cancelling";
+    if (item.id) {
+      try { Object.assign(item, await api(`/api/transfers/${item.id}/cancel`, {})); item.request?.abort(); }
+      catch (e) { item.error = "Cancellation not confirmed: " + e.message; item.cancelRequested = false; }
+    }
+  }
+  renderFileTransfers();
+}
+function sendTransferData(item) {
   return new Promise((resolve, reject) => {
-    const request = new XMLHttpRequest(); consoleFilesUpload = request;
-    request.open("POST", `/api/vm/${encodeURIComponent(vm)}/files-upload?path=${encodeURIComponent(path)}&name=${encodeURIComponent(file.name)}&session=${encodeURIComponent(session)}`);
+    const request = new XMLHttpRequest(); item.request = request;
+    request.open("POST", `/api/transfers/${item.id}/data`);
     request.setRequestHeader("X-Vmctl-Token", TOKEN); request.setRequestHeader("Content-Type", "application/octet-stream");
     request.timeout = 240000;
-    request.upload.onprogress = e => {
-      if (generation !== consoleFilesGeneration) return;
-      const percent = e.lengthComputable ? Math.round(e.loaded / e.total * 100) : 0;
-      fileStatus(`${position}/${total} · ${file.name} · ${percent < 100 ? `Sending ${percent}%` : "Saving in VM…"}`);
-    };
+    request.upload.onprogress = e => { if (!item.cancelRequested) { item.status = "receiving"; item.bytes = e.loaded; renderFileTransfers(); } };
     request.onload = () => {
-      let result;
-      try { result = JSON.parse(request.responseText); } catch (_) { reject(new Error("Invalid file transfer response. Restart vmctl web if it was updated.")); return; }
-      if (request.status >= 200 && request.status < 300) resolve(result);
-      else reject(new Error(result.error || "Upload failed"));
+      let data;
+      try { data = JSON.parse(request.responseText); } catch (_) { reject(new Error("Invalid transfer response")); return; }
+      if (request.status >= 200 && request.status < 300) { Object.assign(item, data); resolve(); }
+      else reject(new Error(data.error || "Upload failed"));
     };
-    request.onerror = () => reject(new Error("File transfer connection lost. Refresh the folder to check the result."));
-    request.ontimeout = () => reject(new Error("File transfer timed out. Refresh the folder before retrying."));
-    request.onabort = () => reject(new Error("File transfer view closed."));
-    request.send(file);
+    request.onerror = () => reject(new Error("Upload connection lost"));
+    request.ontimeout = () => reject(new Error("Upload timed out"));
+    request.onabort = () => reject(new Error("Upload cancelled"));
+    request.send(item.file);
   });
 }
-async function uploadConsoleFiles(files) {
-  if (consoleFilesBusy || !consoleFilesListing || !files.length) return;
-  const limit = consoleFilesListing.max_file_size || 256 * 1024 * 1024;
-  if (files.some(file => file.size > limit)) { fileStatus("Choose files no larger than 256 MiB each.", true); return; }
-  const path = consoleFilesListing.path, generation = ++consoleFilesGeneration, vm = consoleVm;
-  consoleFilesBusy = true; renderConsoleFiles();
-  const saved = [];
-  let session = null;
+async function runFileTransfers() {
+  if (fileTransferRunning) return;
+  fileTransferRunning = true;
   try {
-    session = (await api(`/api/vm/${encodeURIComponent(vm)}/files-session`, {})).session;
-    if (generation !== consoleFilesGeneration) return;
-    for (const [index, file] of files.entries()) {
-      fileStatus(`${index + 1}/${files.length} · Sending ${file.name}…`);
-      const result = await uploadConsoleFile(file, path, generation, index + 1, files.length, vm, session);
-      if (generation !== consoleFilesGeneration) return;
-      saved.push(result.name);
+    for (const item of fileTransfers) {
+      if (item.status !== "queued") continue;
+      item.status = "connecting"; renderFileTransfers();
+      try {
+        const body = {vm:item.vm, path:item.path, ...(item.file ? {name:item.name,size:item.size} : {source_vm:item.source_vm,source_path:item.source_path})};
+        Object.assign(item, await api("/api/transfers", body));
+        if (item.cancelRequested) await cancelFileTransfer(item);
+        if (item.file && !item.cancelRequested) {
+          try { await sendTransferData(item); }
+          catch (e) {
+            // Ask the server: the final response may have been lost after it accepted the file.
+            const current = await api(`/api/transfers/${item.id}`);
+            Object.assign(item, current);
+            if (["waiting", "receiving"].includes(current.status)) {
+              await api(`/api/transfers/${item.id}/cancel`, {});
+              if (!item.cancelRequested) item.error = e.message;
+            }
+          }
+        }
+        item.file = null; item.request = null;
+        while (!transferFinished(item)) {
+          renderFileTransfers();
+          await new Promise(resolve => setTimeout(resolve, 500));
+          try { Object.assign(item, await api(`/api/transfers/${item.id}`)); }
+          catch (e) {
+            if (e.message.includes("not found")) throw new Error("Transfer no longer available. Check the destination before retrying.");
+            item.error = "Connection lost; checking transfer status…";
+          }
+        }
+        if (item.vm === consoleVm && $("vnc-dialog").open) {
+          const note = item.status === "completed" ? `Saved in VM: ${item.result.name}` : item.error || "Transfer cancelled";
+          if (!consoleFilesBusy && (!consoleFilesListing || item.path === consoleFilesListing.path || item.path === ".")) await loadConsoleFiles(item.result ? item.result.path.slice(0, item.result.path.lastIndexOf("/")) || "/" : item.path, note);
+          else fileStatus(note, item.status === "failed");
+        }
+      } catch (e) { item.status = "failed"; item.error = e.message; }
+      finally { item.file = null; item.request = null; renderFileTransfers(); }
     }
-    consoleFilesBusy = false; consoleFilesUpload = null;
-    await loadConsoleFiles(path, `Saved in VM: ${saved.join(", ")}`);
-  } catch (e) { if (generation === consoleFilesGeneration) fileStatus(`${saved.length ? `${saved.length} file(s) saved. ` : ""}${e.message}`, true); }
-  finally {
-    if (session) api(`/api/vm/${encodeURIComponent(vm)}/files-session-close`, {session}).catch(() => {});
-    if (generation === consoleFilesGeneration) { consoleFilesBusy = false; consoleFilesUpload = null; renderConsoleFiles(); }
-  }
+  } finally { fileTransferRunning = false; }
 }
+function queueFileTransfers(files, vm = consoleVm, path = consoleFileDestination(), source = null) {
+  const target = S.vms.find(row => row.name === vm);
+  if (!target?.ssh_port || !target.running) { fileStatus("File exchange requires a running VM with SSH/SFTP access.", true); toast("File exchange requires a running VM with SSH/SFTP access.", true); return; }
+  const entries = source ? [source] : files;
+  if (!entries.length) return;
+  if (source && (typeof source.vm !== "string" || typeof source.path !== "string" || typeof source.name !== "string" || source.vm === vm)) { fileStatus("Choose a file from a different VM.", true); return; }
+  if (entries.some(file => !Number.isSafeInteger(file.size) || file.size < 0 || file.size > 256 * 1024 * 1024)) { fileStatus("Choose files no larger than 256 MiB each.", true); return; }
+  if (fileTransfers.filter(item => !transferFinished(item)).length + entries.length > 100) { fileStatus("The transfer queue is full. Wait for files to finish.", true); return; }
+  // Keep bounded history; queued File objects are released as soon as they are sent.
+  while (!fileTransferRunning && fileTransfers.length && transferFinished(fileTransfers[0]) && fileTransfers.length > 50) fileTransfers.shift();
+  for (const file of entries) fileTransfers.push({key:crypto.randomUUID(), vm, path, name:file.name, size:file.size, bytes:0, status:"queued", ...(source ? {source_vm:source.vm,source_path:source.path} : {file})});
+  renderFileTransfers(); runFileTransfers();
+}
+function uploadConsoleFiles(files) { queueFileTransfers(files); }
+function chooseFileTarget(source) {
+  fileCopySource = source;
+  const targets = S.vms.filter(row => row.name !== source.vm && row.running && row.ssh_port);
+  $("console-file-copy").hidden = false;
+  $("console-file-copy-name").textContent = source.name;
+  $("console-file-copy-vm").innerHTML = targets.map(row => `<option value="${esc(row.name)}">${esc(row.name)}</option>`).join("");
+  $("console-file-copy-send").disabled = !targets.length;
+  $("console-file-copy-path").value = targets.length ? rememberedFileFolder(targets[0].name) : ".";
+  if (!targets.length) fileStatus("No other running VM has SSH file access.", true);
+  $("console-file-copy-vm").focus();
+  $("console-file-copy").scrollIntoView({block:"nearest"});
+}
+$("console-file-copy-vm").onchange = () => { $("console-file-copy-path").value = rememberedFileFolder($("console-file-copy-vm").value); };
+$("console-file-copy-close").onclick = () => { $("console-file-copy").hidden = true; };
+$("console-file-copy-send").onclick = () => {
+  if (!fileCopySource) return;
+  queueFileTransfers([], $("console-file-copy-vm").value, $("console-file-copy-path").value.trim() || ".", fileCopySource);
+  $("console-file-copy").hidden = true;
+};
 async function downloadConsoleFile(path, name, size) {
   if (consoleFilesBusy) return;
   if (size > (consoleFilesListing?.max_file_size || 256 * 1024 * 1024)) { fileStatus("Choose a file no larger than 256 MiB.", true); return; }
@@ -2526,21 +2629,41 @@ $("console-files-refresh").onclick = () => loadConsoleFiles(consoleFilesListing?
 $("console-files-hidden").onchange = renderConsoleFiles;
 $("console-files-drop").onclick = () => $("console-files-input").click();
 $("console-files-input").onchange = e => { const files = Array.from(e.target.files); e.target.value = ""; uploadConsoleFiles(files); };
-$("console-shell").addEventListener("dragover", e => {
-  if (!Array.from(e.dataTransfer.types).includes("Files")) return;
-  e.preventDefault(); e.dataTransfer.dropEffect = $("vnc-files").disabled ? "none" : "copy";
-  if ($("vnc-files").disabled) return;
+function isConsoleFileDrag(data) {
+  return Array.from(data?.types || []).some(type => type === "Files" || type === GUEST_FILE_TYPE);
+}
+function showConsoleFileDrop() {
+  const supported = !$("vnc-files").disabled;
+  $("console-file-drop-title").textContent = supported ? `Copy files to ${consoleVm}` : "SSH/SFTP is not configured for this VM";
+  $("console-file-drop-path").textContent = supported ? (consoleFileDestination() === "." ? "Home folder of the SSH user" : consoleFileDestination()) : "Enable SSH file access to transfer files.";
+  $("console-file-overlay").hidden = false;
+  return supported;
+}
+function hideConsoleFileDrop() { $("console-file-overlay").hidden = true; }
+function acceptConsoleFileDrop(payload) {
+  hideConsoleFileDrop();
+  if ($("vnc-files").disabled) { toast("SSH/SFTP is not configured for this VM.", true); return; }
+  // Capture the destination before opening Files starts its asynchronous directory listing.
+  const path = consoleFileDestination();
   if ($("vnc-files").getAttribute("aria-expanded") !== "true") toggleConsolePanel("files");
-  $("console-files-drop").classList.add("drag-over");
+  if (payload.directory) { fileStatus("Choose files, or zip a folder before uploading it.", true); return; }
+  if (payload.guest) {
+    try { queueFileTransfers([], consoleVm, path, JSON.parse(payload.guest)); }
+    catch (_) { fileStatus("Invalid guest file. Drag a file from the Files panel.", true); }
+  } else queueFileTransfers(payload.files || [], consoleVm, path);
+}
+$("console-shell").addEventListener("dragover", e => {
+  if (!isConsoleFileDrag(e.dataTransfer)) return;
+  e.preventDefault(); e.stopPropagation();
+  e.dataTransfer.dropEffect = showConsoleFileDrop() ? "copy" : "none";
 });
-$("console-shell").addEventListener("dragleave", e => { if (!e.currentTarget.contains(e.relatedTarget)) $("console-files-drop").classList.remove("drag-over"); });
+$("console-shell").addEventListener("dragleave", e => { if (!e.currentTarget.contains(e.relatedTarget)) hideConsoleFileDrop(); });
 $("console-shell").addEventListener("drop", e => {
-  if (!Array.from(e.dataTransfer.types).includes("Files")) return;
-  e.preventDefault(); $("console-files-drop").classList.remove("drag-over");
-  if (Array.from(e.dataTransfer.items).some(item => item.webkitGetAsEntry?.()?.isDirectory)) { fileStatus("Choose files, or zip a folder before uploading it.", true); return; }
-  if (consoleFilesBusy || !consoleFilesListing) { fileStatus("Wait for the folder to load, then drop the files again.", true); return; }
-  uploadConsoleFiles(Array.from(e.dataTransfer.files));
+  if (!isConsoleFileDrag(e.dataTransfer)) return;
+  e.preventDefault(); e.stopPropagation();
+  acceptConsoleFileDrop({files:Array.from(e.dataTransfer.files), guest:e.dataTransfer.getData(GUEST_FILE_TYPE), directory:Array.from(e.dataTransfer.items).some(item => item.webkitGetAsEntry?.()?.isDirectory)});
 });
+window.addEventListener("dragend", hideConsoleFileDrop);
 $("vnc-screenshot").onclick = () => {
   if (!consoleConnected || !rfb) return;
   const vm = consoleVm;

@@ -18,14 +18,37 @@ let hideJobs = false, recording = null, recordingExports = [], failExport = fals
 let clipboardChannel = true, consoleRunning = true, failConsoleInfo = false, failFiles = false;
 let connectionChecks = 0, guestCommands = [], uploadSessions = 0, uploadSessionIds = [];
 const guestFiles = new Map([['hello.txt',Buffer.from('hello from guest')],['.hidden',Buffer.from('hidden')]]);
+const vmFiles = new Map([['arch-noctalia',guestFiles]]);
+const filesFor = vm => { if (!vmFiles.has(vm)) vmFiles.set(vm,new Map([['hello.txt',Buffer.from('hello from guest')]])); return vmFiles.get(vm); };
+const transfers = new Map(), transferRequests = [];
+let holdTransfers = false, fileListingDelay = 0;
 let screenDelay = 700;
 let screenRequests = 0, failScreen = false, holdState = false, stateWaiters = [], dynamicVmJobs = false;
 const profileBase = {name:'Arch Linux + Noctalia',memory_mb:8192,cpus:4,post_install:{commands:Array.from({length:35},(_,i)=>'echo catalog step '+i)}};
 const server = createServer(async (req,res) => {
+  if (req.url === '/multi' || req.url.startsWith('/multi?')) { res.setHeader('Content-Type','text/html'); return res.end(readFileSync(root+'vmctl/web/multi.html')); }
   if (req.url === '/' || req.url.startsWith('/?')) { res.setHeader('Content-Type','text/html'); return res.end(html); }
   if (req.url === '/assets/distro-icons.svg') { res.setHeader('Content-Type','image/svg+xml'); return res.end(readFileSync(root+'vmctl/web/distro-icons.svg')); }
   if (req.url === '/assets/icons.js') { res.setHeader('Content-Type','text/javascript'); return res.end(readFileSync(root+'vmctl/web/icons.js')); }
   res.setHeader('Content-Type','application/json');
+  if (req.url === '/api/transfers') {
+    let body=''; for await (const chunk of req) body+=chunk;
+    const data=JSON.parse(body); transferRequests.push(data);
+    const entry={...data,id:String(transfers.size+1),status:data.source_vm?'downloading':'waiting',bytes:0,error:''};
+    transfers.set(entry.id,entry); return res.end(JSON.stringify(entry));
+  }
+  if (req.url.startsWith('/api/transfers/')) {
+    const [, , , id, action]=req.url.split('/'), entry=transfers.get(id);
+    if (!entry) {res.statusCode=400;return res.end(JSON.stringify({error:'File transfer not found'}));}
+    if (action==='cancel') {entry.status='cancelled';return res.end(JSON.stringify(entry));}
+    if (action==='data') {const chunks=[];for await(const chunk of req)chunks.push(chunk);entry.payload=Buffer.concat(chunks);entry.status='copying';}
+    if (!action && !holdTransfers && ['copying','downloading'].includes(entry.status)) {
+      const files=filesFor(entry.vm), payload=entry.source_vm ? filesFor(entry.source_vm).get(entry.source_path.split('/').at(-1)) : entry.payload;
+      const name=files.has(entry.name || entry.source_path?.split('/').at(-1)) ? 'copy-'+(entry.name || entry.source_path.split('/').at(-1)) : entry.name || entry.source_path.split('/').at(-1);
+      files.set(name,payload);entry.status='completed';entry.result={name,path:(entry.path==='.'?'/home/lab':entry.path)+'/'+name,size:payload.length};
+    }
+    return res.end(JSON.stringify({...entry,payload:undefined}));
+  }
   if (req.url.includes('/screen.png?')) {
     screenRequests++;
     if (screenDelay) await new Promise(resolve=>setTimeout(resolve,screenDelay));
@@ -34,9 +57,11 @@ const server = createServer(async (req,res) => {
     return res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768"><rect width="1024" height="768" fill="#111827"/><rect width="1024" height="38" fill="#263449"/><g fill="#bceedd" font-family="monospace" font-size="22"><text x="24" y="94">Arch Linux · console</text><text x="24" y="145">guest@arch-noctalia:~$ uptime</text><text x="24" y="186">Screen frame ${screenRequests}</text></g></svg>`);
   }
   if (req.url.includes('/files?')) {
+    if (fileListingDelay) await new Promise(resolve=>setTimeout(resolve,fileListingDelay));
     if(failFiles) {res.statusCode=400;return res.end(JSON.stringify({error:'SSH key unavailable'}));}
     const path=new URL(req.url,'http://fixture').searchParams.get('path');
-    return res.end(JSON.stringify({path:path==='.'?'/home/lab':path,home:'/home/lab',parent:'/home/lab',max_file_size:256*1024*1024,entries:[{name:'Documents',kind:'directory',size:0},...Array.from(guestFiles,([name,data])=>({name,kind:'file',size:data.length}))]}));
+    const files=filesFor(decodeURIComponent(req.url.split('/')[3]));
+    return res.end(JSON.stringify({path:path==='.'?'/home/lab':path,home:'/home/lab',parent:'/home/lab',max_file_size:256*1024*1024,entries:[{name:'Documents',kind:'directory',size:0},...Array.from(files,([name,data])=>({name,kind:'file',size:data.length}))]}));
   }
   if (req.url.includes('/files-upload?')) {
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
@@ -753,10 +778,11 @@ try {
   await page.locator('#console-files-input').setInputFiles([{name:'uploaded.bin',mimeType:'application/octet-stream',buffer:Buffer.from([0,255,17])}]);
   await page.waitForFunction(()=>document.getElementById('console-files-status').textContent.includes('Saved in VM: uploaded.bin'));
   assert.deepEqual(guestFiles.get('uploaded.bin'),Buffer.from([0,255,17]));
-  const beforeBatch=uploadSessions;
+  const beforeBatch=transferRequests.length;
   await page.locator('#console-files-input').setInputFiles([{name:'batch-a.txt',mimeType:'text/plain',buffer:Buffer.from('a')},{name:'batch-b.txt',mimeType:'text/plain',buffer:Buffer.from('b')}]);
-  await page.waitForFunction(()=>document.getElementById('console-files-status').textContent.includes('Saved in VM: batch-a.txt, batch-b.txt'));
-  assert.equal(uploadSessions,beforeBatch+1);assert.equal(uploadSessionIds.at(-1),uploadSessionIds.at(-2));
+  await page.waitForFunction(()=>!fileTransferRunning);
+  assert.equal(transferRequests.length,beforeBatch+2);
+  assert.equal(guestFiles.get('batch-a.txt').toString(),'a');assert.equal(guestFiles.get('batch-b.txt').toString(),'b');
   await page.locator('#console-files-drop').evaluate(el=>{const transfer=new DataTransfer();transfer.items.add(new File(['drop bytes'],'dropped.txt',{type:'text/plain'}));el.dispatchEvent(new DragEvent('drop',{dataTransfer:transfer,bubbles:true,cancelable:true}));});
   await page.waitForFunction(()=>document.getElementById('console-files-status').textContent.includes('Saved in VM: dropped.txt'));
   assert.equal(guestFiles.get('dropped.txt').toString(),'drop bytes');
@@ -767,6 +793,84 @@ try {
   failFiles=false;await page.locator('#console-files-refresh').click();await page.waitForFunction(()=>!consoleFilesBusy);
   await page.locator('#console-panel-close').click();
   check('file browser navigates folders, uploads binary files and drops, downloads original bytes and recovers from SSH errors');
+  // A drop is retained even while the first directory listing is still connecting.
+  await page.evaluate(()=>resetConsoleFiles()); fileListingDelay=900;
+  await page.locator('#vnc-screen').evaluate(el=>{
+    const data=new DataTransfer();data.items.add(new File(['cold drop'],'cold.txt'));
+    el.dispatchEvent(new DragEvent('dragover',{dataTransfer:data,bubbles:true,cancelable:true}));
+  });
+  assert(await page.locator('#console-file-overlay').isVisible());
+  assert((await page.locator('#console-file-drop-title').textContent()).includes('arch-noctalia'));
+  assert((await page.locator('#console-file-drop-path').textContent()).includes('Home folder'));
+  await page.locator('#vnc-screen').evaluate(el=>{
+    const data=new DataTransfer();data.items.add(new File(['cold drop'],'cold.txt'));
+    el.dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}));
+  });
+  await page.waitForFunction(()=>!fileTransferRunning && !consoleFilesBusy);fileListingDelay=0;
+  assert.equal(guestFiles.get('cold.txt').toString(),'cold drop');
+  assert.equal(transferRequests.at(-1).path,'.');
+  assert(!(await page.locator('#console-file-overlay').isVisible()));
+  // Queued cancellation never reaches the server; active cancellation is acknowledged there.
+  holdTransfers=true; const beforeTransferCancel=transferRequests.length;
+  await page.locator('#console-files-input').setInputFiles([{name:'cancel-active',buffer:Buffer.from('one'),mimeType:'text/plain'},{name:'cancel-queued',buffer:Buffer.from('two'),mimeType:'text/plain'}]);
+  await page.waitForFunction(()=>fileTransfers.some(item=>item.name==='cancel-active' && item.status==='copying'));
+  await page.locator('.file-transfer').filter({hasText:'cancel-queued'}).getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.locator('.file-transfer').filter({hasText:'cancel-active'}).getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.waitForFunction(()=>!fileTransferRunning);
+  assert.equal(transferRequests.length,beforeTransferCancel+1);
+  assert(!guestFiles.has('cancel-active'));assert(!guestFiles.has('cancel-queued'));
+  // Video reconnects leave the independently owned transfer alive.
+  await page.locator('#console-files-input').setInputFiles([{name:'reconnect.txt',buffer:Buffer.from('survives'),mimeType:'text/plain'}]);
+  await page.waitForFunction(()=>fileTransfers.some(item=>item.name==='reconnect.txt' && item.status==='copying'));
+  await page.locator('#vnc-reconnect').click();await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  holdTransfers=false;await page.waitForFunction(()=>!fileTransferRunning);
+  assert.equal(guestFiles.get('reconnect.txt').toString(),'survives');
+  state.vms.find(vm=>vm.name==='debian-server').running=true;await page.evaluate(()=>refresh(true));
+  if (!(await page.locator('#console-files-panel').isVisible())) await page.locator('#vnc-files').click();
+  await page.getByRole('button',{name:'Copy hello.txt to another VM',exact:true}).click();
+  await page.locator('#console-file-copy-vm').selectOption('debian-server');
+  await page.locator('#console-file-copy-path').fill('/home/lab/Documents');
+  await page.locator('#console-file-copy-send').click();await page.waitForFunction(()=>!fileTransferRunning);
+  assert.equal(transferRequests.at(-1).source_vm,'arch-noctalia');
+  assert.equal(transferRequests.at(-1).vm,'debian-server');
+  assert.equal(transferRequests.at(-1).path,'/home/lab/Documents');
+  assert.equal(filesFor('debian-server').get('copy-hello.txt').toString(),'hello from guest');
+  await shot('console-file-transfers');
+  check('cold console drops, active/queued cancellation, reconnects and Copy to VM preserve data and select the correct destination');
+  const multi=await context.newPage();multi.on('pageerror',e=>errors.push(e.message));
+  await multi.goto(`http://127.0.0.1:${server.address().port}/multi?token=fixture#vms=arch-noctalia,debian-server`);
+  const left=multi.frameLocator('[data-vm="arch-noctalia"] iframe'), right=multi.frameLocator('[data-vm="debian-server"] iframe');
+  await left.locator('#vnc-status').filter({hasText:'Connected'}).waitFor();
+  await right.locator('#vnc-status').filter({hasText:'Connected'}).waitFor();
+  await right.locator('#vnc-screen').evaluate(el=>{
+    const data=new DataTransfer();data.items.add(new File(['multi bytes'],'multi.txt'));
+    el.dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}));
+  });
+  await right.locator('.file-transfer').filter({hasText:'multi.txt'}).getByRole('status').filter({hasText:'Completed'}).waitFor();
+  assert.equal(filesFor('debian-server').get('multi.txt').toString(),'multi bytes');assert(!guestFiles.has('multi.txt'));
+  await left.locator('#vnc-files').click();await left.locator('.file-entry').filter({hasText:'hello.txt'}).waitFor();
+  const source=left.locator('.file-entry').filter({hasText:'hello.txt'});
+  await source.scrollIntoViewIfNeeded();
+  const sourceBox=await source.boundingBox(), targetBox=await right.locator('#vnc-screen').boundingBox();
+  const beforeDrag=transferRequests.length;
+  await multi.mouse.move(sourceBox.x+sourceBox.width/2,sourceBox.y+sourceBox.height/2);await multi.mouse.down();
+  await multi.mouse.move(sourceBox.x+sourceBox.width/2+15,sourceBox.y+sourceBox.height/2,{steps:5});
+  await multi.mouse.move(targetBox.x+targetBox.width/2,targetBox.y+targetBox.height/2,{steps:15});
+  await multi.mouse.move(targetBox.x+targetBox.width/2+2,targetBox.y+targetBox.height/2+2);
+  await multi.mouse.up();
+  await right.locator('.file-transfer').filter({hasText:'hello.txt'}).getByRole('status').filter({hasText:'Completed'}).waitFor();
+  assert.equal(transferRequests.length,beforeDrag+1);assert.equal(transferRequests.at(-1).source_vm,'arch-noctalia');assert.equal(transferRequests.at(-1).vm,'debian-server');
+  await multi.screenshot({path:root+'artifacts/webui-review/multi-file-transfer.png'});
+  // The outer pane header routes a host drop to exactly its own iframe too.
+  await multi.locator('[data-vm="debian-server"] > header').evaluate(el=>{
+    const data=new DataTransfer();data.items.add(new File(['header bytes'],'header.txt'));
+    el.dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}));
+  });
+  await right.locator('.file-transfer').filter({hasText:'header.txt'}).getByRole('status').filter({hasText:'Completed'}).waitFor();
+  assert(!guestFiles.has('header.txt'));assert(filesFor('debian-server').has('header.txt'));
+  await multi.close();state.vms.find(vm=>vm.name==='debian-server').running=false;
+  await page.evaluate(()=>refresh(true));await page.locator('#console-panel-close').click();
+  check('multi-console host drops and native guest-file drag between iframes target only the receiving VM');
   const popupEvent=context.waitForEvent('page');await page.locator('#vnc-detach').click();const popup=await popupEvent;
   popup.on('pageerror',e=>errors.push(e.message));
   await popup.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');

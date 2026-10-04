@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from types import TracebackType
 from typing import Any, BinaryIO, TypedDict
 
@@ -341,7 +341,7 @@ class SFTP:
         return {"path": directory, "home": home, "parent": posixpath.dirname(directory.rstrip("/")) or "/",
                 "entries": entries, "truncated": truncated, "max_file_size": MAX_FILE_SIZE}
 
-    def download(self, path: str, target: BinaryIO) -> int:
+    def download(self, path: str, target: BinaryIO, progress: Callable[[int], None] | None = None) -> int:
         validate_path(path)
         attrs = self.attributes(path)
         if not stat.S_ISREG(attrs.get("mode", 0)):
@@ -349,6 +349,8 @@ class SFTP:
         if attrs.get("size", 0) > MAX_FILE_SIZE:
             raise VMError("Files must be no larger than 256 MiB")
         offset = 0
+        if progress:
+            progress(offset)
         with self.handle(3, string(path) + uint(1) + uint(0)) as handle:
             # Recheck the opened object as well as its directory entry.
             opened = self.request(8, string(handle), 105).attrs()
@@ -367,9 +369,12 @@ class SFTP:
                 if offset > MAX_FILE_SIZE:
                     raise VMError("File grew beyond the 256 MiB transfer limit")
                 target.write(data)
+                if progress:
+                    progress(offset)
         return offset
 
-    def upload(self, directory: str, name: str, source: BinaryIO, size: int) -> dict[str, Any]:
+    def upload(self, directory: str, name: str, source: BinaryIO, size: int,
+               progress: Callable[[int], None] | None = None) -> dict[str, Any]:
         validate_name(name)
         if not 0 <= size <= MAX_FILE_SIZE:
             raise VMError("Files must be no larger than 256 MiB")
@@ -377,6 +382,8 @@ class SFTP:
         staged = posixpath.join(directory, ".vmctl-upload-" + secrets.token_hex(12) + ".part")
         created = False
         try:
+            if progress:
+                progress(0)
             # WRITE|CREAT|EXCL; private permissions, no existing file is truncated.
             with self.handle(3, string(staged) + uint(2 | 8 | 32) + uint(4) + uint(0o600)) as handle:
                 created = True
@@ -387,6 +394,8 @@ class SFTP:
                         raise VMError("Upload was interrupted before the file was complete")
                     self.request(6, string(handle) + struct.pack(">Q", offset) + string(chunk))
                     offset += len(chunk)
+                    if progress:
+                        progress(offset)
             stem, extension = posixpath.splitext(name)
             for attempt in range(100):
                 saved = name if attempt == 0 else f"{stem} ({attempt + 1}){extension}"
@@ -398,6 +407,8 @@ class SFTP:
                     if exc.code != 2:  # No such file
                         raise
                 try:
+                    if progress:
+                        progress(size)
                     # Baseline v3 RENAME refuses an existing destination, even if
                     # another upload raced the check. Do not use posix-rename.
                     self.request(18, string(staged) + string(path))

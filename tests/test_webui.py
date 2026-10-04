@@ -561,6 +561,41 @@ class ServerTests(BaseVmctlTestCase):
                 conn.close()
             sftp.assert_not_called()
 
+    def test_transfer_api_auth_upload_progress_cancel_and_invalid_size(self):
+        self.write_config_dir()
+
+        def post(path, body, token="secret-token", raw=False):
+            conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+            self.addCleanup(conn.close)
+            conn.request("POST", path, body if raw else json.dumps(body),
+                         {"X-Vmctl-Token": token, "Content-Type": "application/octet-stream" if raw else "application/json"})
+            response = conn.getresponse()
+            return response.status, json.loads(response.read())
+
+        self.assertEqual(post("/api/transfers", {}, token="")[0], 401)
+        self.assertEqual(self.get("/api/transfers/unknown", token=None)[0], 401)
+        with mock.patch.object(webui.web_files, "SFTP") as sftp:
+            client = sftp.return_value.__enter__.return_value
+            def upload(path, name, source, size, progress):
+                self.assertEqual(source.read(), b"\0\xffx")
+                progress(size)
+                return {"name": name, "path": "/home/lab/" + name, "size": size}
+            client.upload.side_effect = upload
+            body = {"vm": "testvm", "path": ".", "name": "test.bin", "size": 3}
+            status, entry = post("/api/transfers", body)
+            self.assertEqual(status, 200)
+            url = "/api/transfers/" + entry["id"]
+            self.assertEqual(post(url + "/data", b"\0\xffx", raw=True)[0], 200)
+            transfer = self.server.RequestHandlerClass.transfers.get(entry["id"])
+            transfer.thread.join(2)
+            self.assertEqual(json.loads(self.get(url)[1])["status"], "completed")
+            self.assertEqual(post(url + "/data", b"\0\xffx", raw=True)[0], 400)
+            status, entry = post("/api/transfers", body)
+            url = "/api/transfers/" + entry["id"]
+            self.assertEqual(post(url + "/cancel", {})[1]["status"], "cancelled")
+            self.assertEqual(post(url + "/data", b"\0\xffx", raw=True)[0], 400)
+            self.assertEqual(post("/api/transfers", body | {"size": -1})[0], 400)
+
     def test_console_info_requires_token_and_decodes_vm_name(self):
         from unittest import mock
 

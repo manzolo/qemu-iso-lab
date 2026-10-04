@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import catalog, config, integration, isofile, local_identity, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording
+from vmctl import catalog, config, integration, isofile, local_identity, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording, web_transfers
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
@@ -559,6 +559,7 @@ class Handler(BaseHTTPRequestHandler):
     recordings = web_recording.Recordings()
     connections = integration.ConnectionCache()
     uploads = web_files.UploadSessions()
+    transfers = web_transfers.Transfers()
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - BaseHTTPRequestHandler API
         return
@@ -632,6 +633,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(profile_overrides.read_override(path[len("/api/vm/"):-len("/override")]))
             elif path == "/api/jobs":
                 self._json(list_jobs())
+            elif path.startswith("/api/transfers/"):
+                self._json(self.transfers.get(path[len("/api/transfers/"):]).info())
             elif path.startswith("/api/recordings/"):
                 self._json(self.recordings.get(path[len("/api/recordings/"):]).info())
             elif path.startswith("/api/jobs/") and path.endswith("/log"):
@@ -778,6 +781,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         path = unquote(urlparse(self.path).path)
         try:
+            if path.startswith("/api/transfers/") and path.endswith("/data"):
+                self.close_connection = True
+                transfer = self.transfers.get(path[len("/api/transfers/"):-len("/data")])
+                length = int(self.headers.get("Content-Length") or 0)
+                self.connection.settimeout(30)
+                transfer.receive(self.rfile, length)
+                self._json(transfer.info())
+                return
             if path.startswith("/api/vm/") and path.endswith("/files-upload"):
                 # Raw file bodies have their own bounded, disk-backed reader.
                 self.close_connection = True
@@ -790,7 +801,11 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
             if not isinstance(body, dict):
                 raise VMError("Request body must be a JSON object")
-            if path.startswith("/api/vm/") and path.endswith("/diagnostics"):
+            if path == "/api/transfers":
+                self._json(self.transfers.create(body, config.load_config()))
+            elif path.startswith("/api/transfers/") and path.endswith("/cancel"):
+                self._json(self.transfers.get(path[len("/api/transfers/"):-len("/cancel")]).cancel())
+            elif path.startswith("/api/vm/") and path.endswith("/diagnostics"):
                 if body:
                     raise VMError("Diagnostics accepts no commands or options")
                 name = path[len("/api/vm/"):-len("/diagnostics")]
@@ -912,14 +927,17 @@ def _version() -> str:
 
 def make_server(port: int, token: str) -> ThreadingHTTPServer:
     uploads = web_files.UploadSessions()
+    transfers = web_transfers.Transfers()
     class WebServer(ThreadingHTTPServer):
         def server_close(self) -> None:
             uploads.close_all()
+            transfers.close_all()
             super().server_close()
 
     handler: type[Handler] = type("BoundHandler", (Handler,), {"token": token, "port": port, "snapshot": Snapshot(),
                                                               "recordings": web_recording.Recordings(),
-                                                              "connections": integration.ConnectionCache(), "uploads": uploads})
+                                                              "connections": integration.ConnectionCache(), "uploads": uploads,
+                                                              "transfers": transfers})
     server = WebServer(("127.0.0.1", port), handler)
     server.daemon_threads = True
     handler.port = server.server_address[1]  # --port 0: the Host check needs the port actually bound

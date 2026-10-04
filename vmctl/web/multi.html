@@ -139,6 +139,28 @@ const labName = readHash().lab;
 let S = { vms: [] };                  // the dashboard snapshot (/api/state)
 const local = new Map();              // name -> "start" | "stop" | "link" submitted here, until the state shows it
 const frames = new Map();             // name -> pane element (iframes must survive re-renders)
+// Drops inside a console are handled by that iframe. Forward drops on its outer
+// title bar to the same handler, without ever broadcasting files to other panes.
+const guestFileType = "application/x-vmctl-guest-file";
+const fileDrag = data => Array.from(data?.types || []).some(type => type === "Files" || type === guestFileType);
+$("panes").addEventListener("dragover", e => {
+  if (!fileDrag(e.dataTransfer)) return;
+  e.preventDefault();
+  const console = e.target.closest(".pane")?.querySelector("iframe")?.contentWindow;
+  e.dataTransfer.dropEffect = console?.showConsoleFileDrop?.() ? "copy" : "none";
+});
+$("panes").addEventListener("dragleave", e => {
+  const pane = e.target.closest(".pane");
+  if (pane && !pane.contains(e.relatedTarget)) pane.querySelector("iframe")?.contentWindow?.hideConsoleFileDrop?.();
+});
+$("panes").addEventListener("drop", e => {
+  if (!fileDrag(e.dataTransfer)) return;
+  e.preventDefault();
+  const console = e.target.closest(".pane")?.querySelector("iframe")?.contentWindow;
+  if (!console?.acceptConsoleFileDrop) { toast("Wait for the VM console to open before dropping files.", true); return; }
+  console.acceptConsoleFileDrop({files:Array.from(e.dataTransfer.files), guest:e.dataTransfer.getData(guestFileType), directory:Array.from(e.dataTransfer.items).some(item => item.webkitGetAsEntry?.()?.isDirectory)});
+});
+window.addEventListener("dragend", () => { for (const pane of frames.values()) pane.querySelector("iframe")?.contentWindow?.hideConsoleFileDrop?.(); });
 let busyNetwork = false, pollTimer = null;
 function writeHash() {
   history.replaceState(null, "", "/multi#vms=" + panes.map(encodeURIComponent).join(",") + (labName ? "&lab=" + encodeURIComponent(labName) : ""));
