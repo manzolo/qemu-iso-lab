@@ -5444,7 +5444,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> int:
                           replace=bool(getattr(args, "replace", False)), dry_run=args.dry_run)
         return 0
     if action == "restore":
-        vmstate.refuse_if_protected(args.vm, "replace its disk with a checkpoint")
+        vmstate.refuse_if_protected(args.vm, "replace its disk with a checkpoint", allow_starred=True)
         ensure_vm_quiescent(args.vm, vm, "restore a checkpoint into")
         if checkpoint.load_manifest(checkpoint.checkpoint_dir(args.vm, name)) is None:
             raise VMError(f"Checkpoint '{name}' of '{args.vm}' does not exist (vmctl checkpoint list {args.vm})")

@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from unittest import mock
 
+import vmctl.catalog
 import vmctl.checkpoint
 import vmctl.lifecycle
 import vmctl.runtime
@@ -310,6 +311,72 @@ class RestoreDeleteTests(CheckpointTestCase):
         self.assertIn("incomplete", str(ctx.exception))
         (target / "manifest.json").unlink()
         self.assertEqual(self.vmctl.checkpoint.list_checkpoints(self.vm_name), [])
+
+
+class StarredRestoreTests(CheckpointTestCase):
+    def setUp(self):
+        super().setUp()
+        self.cfg = self.vmctl.load_config()
+        vmctl.catalog.update("add", [self.vm_name], self.cfg)
+        self.checkpoint()
+        self.disk.write_bytes(b"\x02" * (32 * 1024 * 1024))
+
+    def test_restore_with_yes_or_interactive_consent_keeps_the_star_and_protection(self):
+        for yes in (True, False):
+            with self.subTest(yes=yes):
+                self.disk.write_bytes(b"\x02" * (32 * 1024 * 1024))
+                with mock.patch("sys.stdin.isatty", return_value=True), \
+                     mock.patch("builtins.input", return_value="y") as prompt:
+                    self.assertEqual(self.vmctl.cmd_checkpoint(self.args("restore", "clean-install", yes=yes)), 0)
+                if yes:
+                    prompt.assert_not_called()
+                else:
+                    prompt.assert_called_once()
+                    self.assertIn("The current state is lost", prompt.call_args.args[0])
+                self.assertEqual(self.disk.read_bytes()[:1], b"\x01")
+                self.assertIn(self.vm_name, vmctl.catalog.selected())
+                self.assertEqual(vmctl.vmstate.protection_reason(self.vm_name), "star")
+                with self.assertRaisesRegex(self.vmctl.VMError, "vmctl catalog remove"):
+                    self.vmctl.clean_vm(self.vm_name, self.vm)
+                with self.assertRaisesRegex(self.vmctl.VMError, "vmctl catalog remove"):
+                    vmctl.vmstate.begin_install(self.vm_name, "bootstrap-alpine")
+
+    def test_restore_without_consent_keeps_current_disk_and_star(self):
+        for tty, answer in ((True, "n"), (True, ""), (False, "y")):
+            with self.subTest(tty=tty, answer=answer):
+                with mock.patch("sys.stdin.isatty", return_value=tty), \
+                     mock.patch("builtins.input", return_value=answer) as prompt:
+                    with self.assertRaisesRegex(self.vmctl.VMError, "Not confirmed"):
+                        self.vmctl.cmd_checkpoint(self.args("restore", "clean-install", yes=False))
+                if not tty:
+                    prompt.assert_not_called()
+                self.assertEqual(self.disk.read_bytes()[:1], b"\x02")
+                self.assertIn(self.vm_name, vmctl.catalog.selected())
+
+    def test_explicit_protection_blocks_restore_until_unprotected_even_with_star_and_yes(self):
+        vmctl.catalog.update_protected("add", [self.vm_name], self.cfg)
+        with mock.patch.object(vmctl.checkpoint, "restore") as restore:
+            with self.assertRaisesRegex(self.vmctl.VMError, "vmctl unprotect"):
+                self.vmctl.cmd_checkpoint(self.args("restore", "clean-install"))
+            restore.assert_not_called()
+        self.assertEqual(self.disk.read_bytes()[:1], b"\x02")
+        vmctl.catalog.update_protected("remove", [self.vm_name], self.cfg)
+        self.assertEqual(self.vmctl.cmd_checkpoint(self.args("restore", "clean-install")), 0)
+        self.assertEqual(self.disk.read_bytes()[:1], b"\x01")
+        self.assertIn(self.vm_name, vmctl.catalog.selected())
+
+    def test_star_does_not_bypass_running_installation_or_libvirt_guards(self):
+        guards = (
+            mock.patch.object(vmctl.lifecycle, "vm_runtime_status", return_value=("tracked:4242", "-")),
+            mock.patch.object(vmctl.lifecycle.tui_jobs, "status", return_value="running"),
+            mock.patch.object(vmctl.lifecycle, "libvirt_domain_defined", return_value=True),
+        )
+        for guard in guards:
+            with guard, mock.patch.object(vmctl.checkpoint, "restore") as restore:
+                with self.assertRaises(self.vmctl.VMError):
+                    self.vmctl.cmd_checkpoint(self.args("restore", "clean-install"))
+                restore.assert_not_called()
+            self.assertEqual(self.disk.read_bytes()[:1], b"\x02")
 
 
 class CheckpointCliTests(CheckpointTestCase):

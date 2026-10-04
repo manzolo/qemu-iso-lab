@@ -54,6 +54,14 @@ Create and restore work on a powered-off VM. They refuse:
 `restore` and `delete` ask for confirmation on a terminal; without one (a pipe, a script)
 they stop unless `--yes` is given, so nothing is destroyed by a missing answer.
 
+The **My VMs star** allows a confirmed restore and stays on the VM. It still guards the
+disk against clean and reinstall. The separate **`vmctl protect` flag** blocks restore,
+even with `--yes`: remove that flag with `vmctl unprotect <vm>` first. If both protections
+are present, removing the explicit flag is enough; the star can stay.
+
+Restore discards changes made since the checkpoint. To keep the current state too, create
+another checkpoint before restoring, for example `vmctl checkpoint create <vm> before-restore`.
+
 ## How the files are protected
 
 - **Create** assembles the copy in a hidden staging directory next to the checkpoints and

@@ -138,7 +138,8 @@ def _versions(vm_name: str) -> dict[str, Any]:
 # the explicit flag of ``vmctl protect`` ("protected": {"vms": [...]}, written by
 # catalog.update_protected) and My VMs ("catalog": {"selected": [...]}): a starred VM whose disk
 # holds data is protected as long as the star is on it (decision of 2026-09-29: the machines one
-# keeps are the ones one would not want a stray clean to take).
+# keeps are the ones one would not want a stray clean to take). Checkpoint restore allows
+# the star through its own confirmation; the explicit protection flag still blocks it.
 PROTECTED_KEY = "protected"
 CATALOG_KEY = "catalog"
 
@@ -183,12 +184,13 @@ def is_protected(vm_name: str) -> bool:
     return protection_reason(vm_name) is not None
 
 
-def refuse_if_protected(vm_name: str, action: str) -> None:
+def refuse_if_protected(vm_name: str, action: str, *, allow_starred: bool = False) -> None:
+    """Guard destructive actions; confirmed checkpoint restore may allow My VMs through."""
     reason = protection_reason(vm_name)
     if reason == "flag":
         raise VMError(f"'{vm_name}' is protected: refusing to {action}. "
                       f"vmctl unprotect {vm_name} first if that is really what you want.")
-    if reason == "star":
+    if reason == "star" and not allow_starred:
         raise VMError(f"'{vm_name}' is in My VMs and its disk holds data, so it is protected: refusing to {action}. "
                       f"vmctl catalog remove {vm_name} first if that is really what you want.")
 

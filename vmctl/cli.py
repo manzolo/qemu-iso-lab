@@ -128,7 +128,10 @@ the star away. Only the view changes: vmctl list, check-vms and the groups still
 refuses it (clean --all skips it), a new installation over a disk with data refuses, a
 checkpoint restore refuses, and check-vms moves its artifacts aside and gives them back
 instead of cleaning them. Saved in vms/profiles/local.json under "protected". It is not a
-filesystem permission: a manual rm still deletes the files."""
+filesystem permission: a manual rm still deletes the files.
+The My VMs star also protects disks with data against clean and reinstall, but permits a
+confirmed checkpoint restore without removing the star. An explicit protect flag still
+blocks restore, even with --yes; use vmctl unprotect <vm> to remove that flag."""
     p = _add(subparsers, "protect", help="guard VMs' disks against clean, reinstall and checkpoint restore (no names: list them)",
              epilog="""examples:
   vmctl protect ubuntu-26.04 windows-11    guard two disks
@@ -628,7 +631,9 @@ to yours: the record in artifacts/<vm>/state.json says who is there, and a reins
 The VM must be stopped, not installing and not defined in libvirt. A checkpoint is a full copy
 under artifacts/<vm>/checkpoints/<name>/ (disk in the VM's format, nvram.fd for EFI profiles,
 the state.json record, manifest.json): it needs no other file and stays valid whatever happens
-to the current disk. Restore converts into a staging directory first and swaps with renames,
+to the current disk. My VMs (the star) permits a confirmed restore and keeps the star;
+explicit vmctl protect blocks restore even with --yes until vmctl unprotect <vm>.
+Restore converts into a staging directory first and swaps with renames,
 so a failure leaves the current disk in place. TPM state is not handled (profiles declaring
 tpm are refused). See docs/CHECKPOINTS.md.""")
     p.add_argument("action", choices=["create", "list", "restore", "delete"], help="what to do")
