@@ -147,6 +147,19 @@ is on the host's prompt; a loop of failed SSH logins needs `ConnectTimeout`, or 
 mid-loop hangs the rest on the DROP; Docker 29 moved a container's `IPAddress` under
 `.NetworkSettings.Networks` (the lesson found the lab's own exercise wrong).
 
+## The Windows chapter
+
+`02w-windows` (after `02-setup`, "On Windows: WSL2 from nothing to the dashboard") is recorded on
+the Windows 11 studio, `tools/tour/win/README.md`: a libvirt copy of the `windows-11` disk with the
+Hyper-V enlightenments WSL needs, a `demo` desktop and an agent that types and records inside it.
+No `.mjs` drives it: it is two segments (`segA` up to `Restart-Computer`, `segB` after the reboot)
+recorded step by step through `tools/tour/win/wq` from the clean snapshot, joined with ffmpeg's
+concat demuxer into `raw.mkv`; `tools/tour/win/02w-windows.cues.json` is the cues, steps and
+fast-forwards written from the timings the agent printed (`RecTime`), then `build.py` and
+`narrate.py` as for every clip. Retaking it: restore `windows11-studio.clean.*`, follow the cues'
+order, answer each question only after a screenshot shows it (WSL's user prompt is pre-filled,
+setup.sh asks `[y/N]` and twice for sudo, the welcome screen waits for Enter).
+
 ## 5. Publishing
 
 ```bash

@@ -21,4 +21,8 @@ Set-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Syste
 New-Item -Force 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization' | Out-Null
 Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization' NoLockScreen 1
 powercfg /change monitor-timeout-ac 0; powercfg /change standby-timeout-ac 0
+# Edge opens the dashboard: no first-run pages (four of them, sign-in, Google import, consent).
+New-Item -Force 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' | Out-Null
+Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' HideFirstRunExperience 1
+Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' TranslateEnabled 0
 "studio ready"
