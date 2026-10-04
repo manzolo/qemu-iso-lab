@@ -4,7 +4,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../_common.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/_mdadm.sh"
 echo ""; echo "${BOLD}Exercise 5 — grow the RAID5 online${RESET}"; echo ""
 md_teardown; trap md_teardown EXIT
-on mdadm-lab-server "sudo mdadm --create /dev/md1 --run --level=5 --raid-devices=3 $DISK1 $DISK2 $DISK3" >/dev/null 2>&1
+on mdadm-lab-server "sudo mdadm --create /dev/md1 --size=256M --run --level=5 --raid-devices=3 $DISK1 $DISK2 $DISK3" >/dev/null 2>&1
 md_settle
 on mdadm-lab-server "sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file >/dev/null" >/dev/null
 before=$(on mdadm-lab-server lsblk -bdno SIZE /dev/md1 2>/dev/null || echo 0)

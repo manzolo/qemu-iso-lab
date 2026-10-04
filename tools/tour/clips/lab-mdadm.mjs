@@ -13,8 +13,8 @@ export const cues = [
     it: "Il RAID tiene i tuoi dati quando un disco muore. mdadm è il RAID software del kernel Linux, senza controller. Il lab mdadm è un server con quattro dischi vuoti: costruiamo array, li rompiamo e li guardiamo guarire." },
   { id: "install", en: "One cloud image plus four 2-gigabyte disks.",
     it: "Una cloud image più quattro dischi da 2 gigabyte." },
-  { id: "anatomy", en: "The four lab disks, picked by size. /proc/mdstat is the dashboard: the RAID levels the kernel can run, and no array yet. On virtual disks we let the sync run at full speed.",
-    it: "I quattro dischi del lab, scelti per dimensione. /proc/mdstat è il cruscotto: i livelli RAID che il kernel sa gestire, e ancora nessun array. Sui dischi virtuali lasciamo correre la sincronizzazione a piena velocità." },
+  { id: "anatomy", en: "The four lab disks, picked by size. /proc/mdstat is the dashboard: the RAID levels the kernel can run, and no array yet. Our arrays use only 256 megabytes of each disk, so every sync takes seconds.",
+    it: "I quattro dischi del lab, scelti per dimensione. /proc/mdstat è il cruscotto: i livelli RAID che il kernel sa gestire, e ancora nessun array. I nostri array usano solo 256 megabyte di ogni disco, così ogni sincronizzazione dura pochi secondi." },
   { id: "raid1", en: "A mirror: two disks, every block written to both. The first sync copies one disk onto the other; U U means both members are up. The array is a block device like any other.",
     it: "Un mirror: due dischi, ogni blocco scritto su entrambi. La prima sincronizzazione copia un disco sull'altro; U U vuol dire che i membri sono su entrambi. L'array è un dispositivo a blocchi come un altro." },
   { id: "mount", en: "Format it, mount it, write a file.",
@@ -69,10 +69,9 @@ export async function run(d) {
   await d.session(VM);
   await d.guest(DISKS, { read: 3000 });
   await d.guest("cat /proc/mdstat", { read: 4000 });
-  await d.guest("sudo sysctl -w dev.raid.speed_limit_min=200000    # no throttling on a lab's disks", { read: 3000 });
 
   await d.cue("raid1");
-  await d.guest(`sudo mdadm --create /dev/md0 --level=1 --raid-devices=2 ${D(1)} ${D(2)}`, { read: 2500 });
+  await d.guest(`sudo mdadm --create /dev/md0 --size=256M --level=1 --raid-devices=2 ${D(1)} ${D(2)}`, { read: 2500 });
   await d.guest(`${WAIT}; cat /proc/mdstat`, { read: 5000, timeout: 180000 });
   await d.guest("sudo mdadm --detail /dev/md0 | grep -E 'Raid Level|Array Size|State :|Active|Working'", { read: 4500 });
   await d.cue("mount");
@@ -87,7 +86,7 @@ export async function run(d) {
 
   await d.cue("raid5");
   await d.guest(`clear; sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock ${D(1)} ${D(2)}`, { read: 2000 });
-  await d.guest("sudo mdadm --create /dev/md1 --level=5 --raid-devices=3 --spare-devices=1 $DISKS", { read: 2500 });
+  await d.guest("sudo mdadm --create /dev/md1 --size=256M --level=5 --raid-devices=3 --spare-devices=1 $DISKS", { read: 2500 });
   await d.guest(`${WAIT}; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State :|Active|Spare'`, { read: 5500, timeout: 300000 });
   await d.guest("sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file", { read: 3000 });
 
@@ -98,7 +97,7 @@ export async function run(d) {
   await d.cue("grow");
   await d.guest(`clear; sudo mdadm /dev/md1 --remove ${D(2)} && sudo mdadm /dev/md1 --add ${D(2)} && sudo mdadm --grow /dev/md1 --raid-devices=4 && cat /proc/mdstat    # reshape`, { read: 5000 });
   await d.guest(`${WAIT}; sudo mdadm --detail /dev/md1 | grep -E 'Raid Devices|Array Size'`, { read: 4000, timeout: 600000 });
-  await d.guest("sudo resize2fs /dev/md1 2>/dev/null; df -h /mnt/raid5    # from 4 to 6 GiB, still mounted", { read: 5000 });
+  await d.guest("sudo resize2fs /dev/md1 2>/dev/null; df -h /mnt/raid5    # from 512 to 768 MiB, still mounted", { read: 5000 });
 
   await d.cue("assemble");
   await d.guest("clear; sudo mdadm --detail --scan", { read: 3500 });
