@@ -171,7 +171,7 @@
           "commands": [
             "kubectl logs env-demo                  # GREETING=hello COLOR=blue PASSWORD=labsecret",
             "kubectl exec env-demo -- ls /config    # one file per key",
-            "kubectl exec env-demo -- cat /config/COLOR",
+            "kubectl exec env-demo -- cat /config/COLOR; echo    # a ConfigMap value has no newline",
             "kubectl get secret web-secret -o jsonpath='{.data.PASSWORD}' | base64 -d; echo    # base64, not encryption"
           ]
         },
@@ -180,7 +180,7 @@
           "where": "k8s-lab-main",
           "commands": [
             "kubectl create configmap web-config --from-literal=GREETING=hello --from-literal=COLOR=red -o yaml --dry-run=client | kubectl apply -f -",
-            "sleep 70; kubectl exec env-demo -- cat /config/COLOR    # red: the volume follows the ConfigMap; the environment does not",
+            "sleep 70; kubectl exec env-demo -- cat /config/COLOR; echo    # red: the volume follows the ConfigMap; the environment does not",
             "kubectl delete pod env-demo && kubectl delete configmap web-config && kubectl delete secret web-secret"
           ]
         }

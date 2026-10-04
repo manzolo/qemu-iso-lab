@@ -129,7 +129,7 @@ export async function run(d) {
   await guest(d, "kubectl apply -f ~/k8s/env-demo.yaml", 500);
   await slow(d, "kubectl wait --for=condition=Ready pod/env-demo --timeout=180s", 1000);
   await guest(d, "clear; kubectl logs env-demo", 3000);
-  await guest(d, "kubectl exec env-demo -- ls /config; kubectl exec env-demo -- cat /config/COLOR", 3000);
+  await guest(d, "kubectl exec env-demo -- ls /config; kubectl exec env-demo -- cat /config/COLOR; echo", 3000);
   await guest(d, "kubectl get secret web-secret -o jsonpath='{.data.PASSWORD}'; echo", 2500);
   await guest(d, "kubectl get secret web-secret -o jsonpath='{.data.PASSWORD}' | base64 -d; echo", 3500);
   await guest(d, "kubectl delete pod env-demo --grace-period=1 >/dev/null; kubectl delete configmap web-config; kubectl delete secret web-secret", 1000);
@@ -140,7 +140,7 @@ export async function run(d) {
   await guest(d, "clear; grep -E 'kind|storage:|claimName|mountPath|secretKeyRef' ~/k8s/mariadb.yaml", 5000);
   await guest(d, "kubectl apply -f ~/k8s/mariadb.yaml", 500);
   await slow(d, "kubectl rollout status deployment/mariadb --timeout=600s && sleep 20", 1000, 8);
-  await guest(d, "clear; kubectl get pvc", 3500);
+  await guest(d, "clear; kubectl get pvc -o custom-columns=CLAIM:.metadata.name,STATUS:.status.phase,SIZE:.status.capacity.storage,CLASS:.spec.storageClassName", 3500);
   await guest(d, "kubectl exec deploy/mariadb -- mariadb -uroot -plabroot -e \"CREATE DATABASE shop; CREATE TABLE shop.items (name VARCHAR(20)); INSERT INTO shop.items VALUES ('kept');\"", 1500);
   await slow(d, "kubectl delete pod -l app=mariadb && kubectl rollout status deployment/mariadb && sleep 20", 1000, 6);
   await guest(d, PODS("-l app=mariadb") + "    # a new pod", 3500);

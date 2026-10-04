@@ -128,7 +128,7 @@ kubectl apply -f ~/k8s/env-demo.yaml
 kubectl wait --for=condition=Ready pod/env-demo --timeout=120s
 kubectl logs env-demo                      # GREETING=hello COLOR=blue PASSWORD=labsecret
 kubectl exec env-demo -- ls /config        # one file per key
-kubectl exec env-demo -- cat /config/COLOR
+kubectl exec env-demo -- cat /config/COLOR; echo    # a ConfigMap value has no newline
 kubectl get secret web-secret -o jsonpath='{.data.PASSWORD}' | base64 -d; echo    # base64, not encryption
 ```
 
@@ -139,7 +139,7 @@ keeps the value the pod started with.
 
 ```sh
 kubectl create configmap web-config --from-literal=GREETING=hello --from-literal=COLOR=red -o yaml --dry-run=client | kubectl apply -f -
-sleep 70; kubectl exec env-demo -- cat /config/COLOR    # red
+sleep 70; kubectl exec env-demo -- cat /config/COLOR; echo    # red
 kubectl delete pod env-demo && kubectl delete configmap web-config && kubectl delete secret web-secret
 ```
 
