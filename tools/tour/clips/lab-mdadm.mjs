@@ -71,7 +71,7 @@ export async function run(d) {
   await d.guest("cat /proc/mdstat", { read: 4000 });
 
   await d.cue("raid1");
-  await d.guest(`sudo mdadm --create /dev/md0 --size=256M --level=1 --raid-devices=2 ${D(1)} ${D(2)}`, { read: 2500 });
+  await d.guest(`sudo mdadm --create /dev/md0 --size=256M --run --level=1 --raid-devices=2 ${D(1)} ${D(2)}`, { read: 2500 });
   await d.guest(`${WAIT}; cat /proc/mdstat`, { read: 5000, timeout: 180000 });
   await d.guest("sudo mdadm --detail /dev/md0 | grep -E 'Raid Level|Array Size|State :|Active|Working'", { read: 4500 });
   await d.cue("mount");
@@ -86,7 +86,7 @@ export async function run(d) {
 
   await d.cue("raid5");
   await d.guest(`clear; sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock ${D(1)} ${D(2)}`, { read: 2000 });
-  await d.guest("sudo mdadm --create /dev/md1 --size=256M --level=5 --raid-devices=3 --spare-devices=1 $DISKS", { read: 2500 });
+  await d.guest("sudo mdadm --create /dev/md1 --size=256M --run --level=5 --raid-devices=3 --spare-devices=1 $DISKS", { read: 2500 });
   await d.guest(`${WAIT}; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State :|Active|Spare'`, { read: 5500, timeout: 300000 });
   await d.guest("sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file", { read: 3000 });
 

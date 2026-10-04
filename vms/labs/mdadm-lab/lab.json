@@ -29,7 +29,7 @@
           "where": "mdadm-lab-server",
           "commands": [
             "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
-            "sudo mdadm --create /dev/md0 --size=256M --level=1 --raid-devices=2 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)",
+            "sudo mdadm --create /dev/md0 --size=256M --run --level=1 --raid-devices=2 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)",
             "cat /proc/mdstat    # [UU] once the resync is over",
             "sudo mdadm --detail /dev/md0",
             "sudo mkfs.ext4 -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file"
@@ -64,7 +64,7 @@
           "commands": [
             "DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2==\"2G\" && $3==\"disk\" {print $1}' | xargs); echo $DISKS    # the four lab disks, never the system one",
             "sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)",
-            "sudo mdadm --create /dev/md1 --size=256M --level=5 --raid-devices=3 --spare-devices=1 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2) $(echo $DISKS | cut -d' ' -f3) $(echo $DISKS | cut -d' ' -f4)",
+            "sudo mdadm --create /dev/md1 --size=256M --run --level=5 --raid-devices=3 --spare-devices=1 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2) $(echo $DISKS | cut -d' ' -f3) $(echo $DISKS | cut -d' ' -f4)",
             "cat /proc/mdstat; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State|spare'",
             "sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file"
           ]

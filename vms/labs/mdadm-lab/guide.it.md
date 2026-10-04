@@ -32,10 +32,12 @@ cat /proc/mdstat
 
 `Personalities` elenca i livelli RAID che il kernel sa gestire; nessun array ancora.
 
-Ogni array di questo lab si crea con `--size=256M`: usa solo i primi 256 MiB di ogni membro. Una
-sincronizzazione, una ricostruzione o un reshape copiano il membro intero, e sui dischi virtuali di un
-lab (annidato soprattutto) 2 GiB richiedono minuti mentre 256 MiB pochi secondi. Su un server vero
-`--size` si omette: l'array prende tutto il disco.
+Ogni array di questo lab si crea con `--size=256M --run`. `--size` usa solo i primi 256 MiB di ogni
+membro, così una sincronizzazione, una ricostruzione o un reshape durano pochi secondi anche su dischi
+virtuali lenti; su un server vero si omette e l'array prende tutto il disco. `--run` risponde alla
+domanda su cui `--create` altrimenti si ferma, "Continue creating array? (y/n)": mdadm la fa perché
+gran parte di ogni disco resta inutilizzata e perché i metadati stanno all'inizio dei membri (va bene
+per i dati, non per `/boot`).
 
 ## Esercizio 2: un mirror RAID1
 
@@ -45,7 +47,7 @@ sincronizzazione (un disco copiato sull'altro: secondi qui, ore su dischi veri);
 formatta, si monta.
 
 ```sh
-sudo mdadm --create /dev/md0 --size=256M --level=1 --raid-devices=2 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)
+sudo mdadm --create /dev/md0 --size=256M --run --level=1 --raid-devices=2 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)
 cat /proc/mdstat
 sudo mdadm --detail /dev/md0
 sudo mkfs.ext4 -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file
@@ -71,7 +73,7 @@ sola: è tutto il senso di uno spare a caldo, nessuno deve essere sveglio.
 
 ```sh
 sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)
-sudo mdadm --create /dev/md1 --size=256M --level=5 --raid-devices=3 --spare-devices=1 $DISKS
+sudo mdadm --create /dev/md1 --size=256M --run --level=5 --raid-devices=3 --spare-devices=1 $DISKS
 cat /proc/mdstat; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State|spare'
 sudo mkfs.ext4 -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file
 sudo mdadm /dev/md1 --fail $(echo $DISKS | cut -d' ' -f2) && cat /proc/mdstat
