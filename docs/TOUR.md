@@ -160,6 +160,28 @@ fast-forwards written from the timings the agent printed (`RecTime`), then `buil
 order, answer each question only after a screenshot shows it (WSL's user prompt is pre-filled,
 setup.sh asks `[y/N]` and twice for sudo, the welcome screen waits for Enter).
 
+## Before a take (2026-10-04)
+
+The mysql-lab lesson took four takes, each lost to something a rehearsal would have shown. The order
+now, for every lesson:
+
+1. **Restore the studio's snapshot** `pronta-per-registrare` (virt-manager, or `virsh snapshot-revert
+   lubuntu22-studio pronta-per-registrare`), start it, `git pull` in `~/lab/demo/qemu-iso-lab`,
+   `tools/tour/session.sh`. Taken with the VM off: its virtiofs share forbids a running snapshot.
+   Do not open a viewer on the studio while recording: it resizes the screen.
+2. **The lab works in the studio**, not only on the host: `vmctl group install <lab>` and `vmctl group
+   test <lab>` from a stopped VM there. The host's tests are not interactive and find the VM running;
+   the studio's interactive shell and cold start are what the lesson meets.
+3. **`tools/tour/lint_commands.py`** (also part of `make check`): no `!` inside double quotes (bash's
+   history expansion broke `Reader123!`), no command that stops to ask (`mdadm --create` without
+   `--run`, `apt` without `-y`, `mkfs` without `-F`/`-f`, `adduser`, `passwd`).
+4. **The rehearsal**: `node tools/tour/rec.mjs tools/tour/clips/<clip>.mjs --dry`. The whole clip runs
+   in the studio, nothing recorded, the reading pauses cut; one screenshot per cue in
+   `artifacts/tour/out/<clip>.rehearsal/`. Read them: the right terminal (the guest's prompt, not the
+   studio's), no error on screen, the browser where it should be.
+5. **The take.** The recorder checks on its own that the screen is 1600x900, that ffmpeg is recording
+   and that the guest session opened, and stops at once otherwise.
+
 ## Background music
 
 `narrate.py --music FILE` lays a track under the voice: looped to the clip's length, faded in (3 s)
