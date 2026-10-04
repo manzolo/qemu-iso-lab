@@ -1,0 +1,47 @@
+{
+  "title": "Kubernetes lab: a three-node MicroK8s cluster",
+  "summary": "A control plane and two workers on an isolated segment (172.20.6.0/24), MicroK8s 1.32 on Ubuntu 24.04 cloud images. The workers join the control plane by themselves at their first boot on the segment. The exercises read the cluster's anatomy, then run a Deployment of three nginx replicas spread over the nodes and reach it through a NodePort Service, from every node and from the host. Inspired by manzolo/multipass-microk8s-cluster-demo.",
+  "members": ["k8s-lab-main", "k8s-lab-node1", "k8s-lab-node2"],
+  "exercises": [
+    {
+      "title": "The cluster's anatomy",
+      "text": "Three nodes, each with its address on the lab segment: the control plane runs the API server and is a node itself, the workers only run pods. kube-system holds the cluster's own pods: Calico (one per node, the pod network), CoreDNS, the metrics of nothing yet.",
+      "blocks": [
+        {"kind": "check", "where": "k8s-lab-main", "commands": [
+          "kubectl get nodes -o wide          # three nodes Ready, INTERNAL-IP on 172.20.6.0/24",
+          "kubectl cluster-info",
+          "kubectl get pods -n kube-system -o wide    # calico-node on every node",
+          "microk8s status | head -8"
+        ]},
+        {"kind": "check", "where": "k8s-lab-node1", "commands": [
+          "microk8s status                    # acting as a node in a cluster: no control plane here"
+        ]}
+      ]
+    },
+    {
+      "title": "A Deployment and a NodePort Service",
+      "text": "A Deployment keeps a number of identical pods running and the scheduler spreads them over the nodes. A Service gives them one address; a NodePort Service also opens the same port on every node, whichever node the pods run on. The control plane's 30080 is forwarded to the host's 8089.",
+      "blocks": [
+        {"kind": "do", "where": "k8s-lab-main", "commands": [
+          "kubectl create deployment web --image=nginx:1.27-alpine --replicas=3",
+          "kubectl rollout status deployment/web",
+          "kubectl create service nodeport web --tcp=80:80 --node-port=30080"
+        ]},
+        {"kind": "check", "where": "k8s-lab-main", "commands": [
+          "kubectl get pods -o wide           # NODE: the replicas spread over the nodes",
+          "kubectl get service web            # 80:30080/TCP",
+          "for ip in $(kubectl get pods -l app=web -o jsonpath='{.items[*].status.podIP}'); do curl -s -o /dev/null -w \"$ip %{http_code}\\n\" http://$ip; done    # every pod from here, whatever its node: the pod network spans the cluster",
+          "for ip in 172.20.6.1 172.20.6.11 172.20.6.12; do curl -s http://$ip:30080 | grep -o '<title>.*</title>'; done    # every node answers"
+        ]},
+        {"kind": "check", "where": "host", "commands": [
+          "curl -s http://127.0.0.1:8089 | grep -o '<title>.*</title>'    # the same page, from the host"
+        ]},
+        {"kind": "try", "where": "k8s-lab-main", "commands": [
+          "kubectl delete pod $(kubectl get pods -l app=web -o name | head -n1 | cut -d/ -f2) && kubectl get pods -l app=web    # a new pod replaces it",
+          "kubectl scale deployment web --replicas=6 && kubectl get pods -o wide",
+          "kubectl delete service web && kubectl delete deployment web    # back to an empty default namespace"
+        ]}
+      ]
+    }
+  ]
+}

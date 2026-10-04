@@ -1148,6 +1148,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `zfs-lab` | The ZFS lab (vms/labs/zfs-lab/): `zfs-lab-server`, one cloud image with four empty 2 GB disks for a RAIDZ pool, datasets, snapshots, a resilver, a scrub, send/receive and mirrors |
 | `mdadm-lab` | The mdadm lab (vms/labs/mdadm-lab/): `mdadm-lab-server`, one cloud image with four empty 2 GB disks for Linux software RAID: a mirror, a failed disk, a RAID5 with a hot spare, a grow, stop/assemble |
 | `mysql-lab` | The MySQL lab (vms/labs/mysql-lab/): `mysql-lab-server`, one cloud image with MySQL 8, a sample shop database (users, orders, a foreign key) and phpMyAdmin on http://127.0.0.1:8088/phpmyadmin: queries, joins, transactions, privileges, indexes, mysqldump, configuration |
+| `k8s-lab` | The Kubernetes lab (vms/labs/k8s-lab/): `k8s-lab-main`, `k8s-lab-node1`, `k8s-lab-node2`, three cloud images with MicroK8s 1.32 on the `k8s-lan` segment; the workers join by themselves at their first boot there (`k8s-lab-node.service`); NodePort 30080 on http://127.0.0.1:8089 |
 | `lvm-lab` | The LVM lab (vms/labs/lvm-lab/): `lvm-lab-server`, one cloud image with three empty 2 GiB extra disks |
 | `proxmox-lab` | The Proxmox lab: `proxmox-ve` (ZFS mirror over two disks) and `proxmox-lab-client` (Xfce + Firefox), joined by the `pve-lan` segment |
 | `hobby-os` | Hobby operating systems to boot and explore, all manual live systems: `kolibrios`, `redox`, `menuetos`, and `serenityos` (a `disk_image` built from source). A `--group hobby-os` run records them as skipped (no unattended flow); boot one with `vmctl provision <name>` |
@@ -1718,7 +1719,7 @@ what went wrong first (all verified live on 2026-09-24):
 ## Groups as stacks and the lab map (`vmctl group`)
 
 A declared group (`meta.groups`) can be run as one stack. A **lab** is a group whose members are
-all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab`, `vpn-lab`, `ssh-lab`, `docker-lab`, `lvm-lab`, `git-lab`, `zfs-lab`, `mdadm-lab` and `mysql-lab` (`vmctl group list --labs`).
+all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab`, `vpn-lab`, `ssh-lab`, `docker-lab`, `lvm-lab`, `git-lab`, `zfs-lab`, `mdadm-lab`, `mysql-lab` and `k8s-lab` (`vmctl group list --labs`).
 
 ```bash
 vmctl group list [--labs] [--json]

@@ -865,6 +865,39 @@
         }
       ]
     },
+    "k8s-lab-main": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:9e1d092136cd4d0bb9c9c4114b6ae303df9eac9e227adabcc90561ecf2add729",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-04",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "k8s-lab-node1": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d31f01539a212f209a5ff6b3249d793c5058e14ec9c7858efca617bb0295afc8",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-04",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "k8s-lab-node2": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:d2b5b9844c19bf81ca3bc401598f854cd9b055d2bbd80d58d2abd625fb74a42c",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-04",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "kali": {
       "version": "1.0.0",
       "fingerprint": "sha256:0f5e65ceebac5369900be4986b4944401c3d4e7c7ddc5499c9458311d1721311",

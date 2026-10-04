@@ -1,0 +1,238 @@
+{
+  "vms": {
+    "k8s-lab-main": {
+      "name": "Kubernetes lab control plane (Ubuntu 24.04 cloud image, MicroK8s 1.32)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "k8s-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-04"
+      },
+      "notes": "The control plane of the k8s-lab (vms/labs/k8s-lab/): MicroK8s 1.32 from the snap store, also a node that runs pods. At every boot on the lab segment /usr/local/sbin/k8s-lab-node pins the kubelet and the API server to 172.20.6.1 (every VM's NAT NIC is 10.0.2.15), points Calico at k8s-lan and publishes the fixed join token the workers use. NodePort 30080 is forwarded to http://127.0.0.1:8089 on the host. Ubuntu 24.04 minimal cloud image; the install downloads the snap (about 200 MB). Inspired by manzolo/multipass-microk8s-cluster-demo.",
+      "memory_mb": 4096,
+      "cpus": 2,
+      "disk": {
+        "size": "20G"
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true,
+          "hostfwd": [
+            {
+              "host_port": 8089,
+              "guest_port": 30080
+            }
+          ]
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "k8s-lan",
+          "phase": "runtime",
+          "address": "172.20.6.1/24"
+        }
+      ],
+      "cloudimg_config": {
+        "packages": [
+          "snapd",
+          "curl"
+        ],
+        "write_files": [
+          {
+            "path": "/etc/systemd/system/k8s-lab-node.service",
+            "permissions": "0644",
+            "content": "[Unit]\nDescription=k8s-lab: this node's place in the cluster on k8s-lan\nAfter=network-online.target snapd.service snap.microk8s.daemon-kubelite.service\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nTimeoutStartSec=0\nExecStart=/usr/local/sbin/k8s-lab-node\n\n[Install]\nWantedBy=multi-user.target\n"
+          },
+          {
+            "path": "/etc/hosts.k8s-lab",
+            "permissions": "0644",
+            "content": "172.20.6.1 k8s-lab-main\n172.20.6.11 k8s-lab-node1\n172.20.6.12 k8s-lab-node2\n"
+          }
+        ],
+        "runcmd": [
+          "cat /etc/hosts.k8s-lab >> /etc/hosts",
+          "snap install microk8s --classic --channel=1.32/stable",
+          "snap alias microk8s.kubectl kubectl",
+          "usermod -a -G microk8s {{user}}"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2369,
+        "copy_from_host": [
+          {
+            "source": "vms/labs/k8s-lab/provision/k8s-lab-node.sh",
+            "dest": "/home/{{user}}/k8s-lab-node.sh",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "sudo install -m 755 ~/k8s-lab-node.sh /usr/local/sbin/k8s-lab-node && rm ~/k8s-lab-node.sh",
+          "sudo systemctl enable k8s-lab-node.service    # after the script exists: the install boot has nothing to run",
+          "sudo microk8s status --wait-ready --timeout 600 >/dev/null",
+          "sudo microk8s kubectl get nodes | grep -q ' Ready '",
+          "grep -q k8s-lab-node2 /etc/hosts",
+          "test -f /etc/netplan/60-vmctl-k8s-lan.yaml"
+        ]
+      }
+    },
+    "k8s-lab-node1": {
+      "name": "Kubernetes lab worker (Ubuntu 24.04 cloud image, MicroK8s 1.32)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "node",
+        "status": "unattended",
+        "groups": [
+          "k8s-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-04"
+      },
+      "notes": "A worker of the k8s-lab (vms/labs/k8s-lab/): MicroK8s 1.32 that joins k8s-lab-main (172.20.6.1) with --worker at its first boot on the lab segment and stays joined. Ubuntu 24.04 minimal cloud image.",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "disk": {
+        "size": "20G"
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "k8s-lan",
+          "phase": "runtime",
+          "address": "172.20.6.11/24"
+        }
+      ],
+      "cloudimg_config": {
+        "packages": [
+          "snapd",
+          "curl"
+        ],
+        "write_files": [
+          {
+            "path": "/etc/systemd/system/k8s-lab-node.service",
+            "permissions": "0644",
+            "content": "[Unit]\nDescription=k8s-lab: this node's place in the cluster on k8s-lan\nAfter=network-online.target snapd.service snap.microk8s.daemon-kubelite.service\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nTimeoutStartSec=0\nExecStart=/usr/local/sbin/k8s-lab-node\n\n[Install]\nWantedBy=multi-user.target\n"
+          },
+          {
+            "path": "/etc/hosts.k8s-lab",
+            "permissions": "0644",
+            "content": "172.20.6.1 k8s-lab-main\n172.20.6.11 k8s-lab-node1\n172.20.6.12 k8s-lab-node2\n"
+          }
+        ],
+        "runcmd": [
+          "cat /etc/hosts.k8s-lab >> /etc/hosts",
+          "snap install microk8s --classic --channel=1.32/stable",
+          "snap alias microk8s.kubectl kubectl",
+          "usermod -a -G microk8s {{user}}"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2370,
+        "copy_from_host": [
+          {
+            "source": "vms/labs/k8s-lab/provision/k8s-lab-node.sh",
+            "dest": "/home/{{user}}/k8s-lab-node.sh",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "sudo install -m 755 ~/k8s-lab-node.sh /usr/local/sbin/k8s-lab-node && rm ~/k8s-lab-node.sh",
+          "sudo systemctl enable k8s-lab-node.service    # after the script exists: the install boot has nothing to run",
+          "sudo microk8s status --wait-ready --timeout 600 >/dev/null",
+          "sudo microk8s kubectl get nodes | grep -q ' Ready '",
+          "grep -q k8s-lab-node2 /etc/hosts",
+          "test -f /etc/netplan/60-vmctl-k8s-lan.yaml"
+        ]
+      }
+    },
+    "k8s-lab-node2": {
+      "name": "Kubernetes lab worker (Ubuntu 24.04 cloud image, MicroK8s 1.32)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "node",
+        "status": "unattended",
+        "groups": [
+          "k8s-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-04"
+      },
+      "notes": "A worker of the k8s-lab (vms/labs/k8s-lab/): MicroK8s 1.32 that joins k8s-lab-main (172.20.6.1) with --worker at its first boot on the lab segment and stays joined. Ubuntu 24.04 minimal cloud image.",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "disk": {
+        "size": "20G"
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "k8s-lan",
+          "phase": "runtime",
+          "address": "172.20.6.12/24"
+        }
+      ],
+      "cloudimg_config": {
+        "packages": [
+          "snapd",
+          "curl"
+        ],
+        "write_files": [
+          {
+            "path": "/etc/systemd/system/k8s-lab-node.service",
+            "permissions": "0644",
+            "content": "[Unit]\nDescription=k8s-lab: this node's place in the cluster on k8s-lan\nAfter=network-online.target snapd.service snap.microk8s.daemon-kubelite.service\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nTimeoutStartSec=0\nExecStart=/usr/local/sbin/k8s-lab-node\n\n[Install]\nWantedBy=multi-user.target\n"
+          },
+          {
+            "path": "/etc/hosts.k8s-lab",
+            "permissions": "0644",
+            "content": "172.20.6.1 k8s-lab-main\n172.20.6.11 k8s-lab-node1\n172.20.6.12 k8s-lab-node2\n"
+          }
+        ],
+        "runcmd": [
+          "cat /etc/hosts.k8s-lab >> /etc/hosts",
+          "snap install microk8s --classic --channel=1.32/stable",
+          "snap alias microk8s.kubectl kubectl",
+          "usermod -a -G microk8s {{user}}"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2371,
+        "copy_from_host": [
+          {
+            "source": "vms/labs/k8s-lab/provision/k8s-lab-node.sh",
+            "dest": "/home/{{user}}/k8s-lab-node.sh",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "sudo install -m 755 ~/k8s-lab-node.sh /usr/local/sbin/k8s-lab-node && rm ~/k8s-lab-node.sh",
+          "sudo systemctl enable k8s-lab-node.service    # after the script exists: the install boot has nothing to run",
+          "sudo microk8s status --wait-ready --timeout 600 >/dev/null",
+          "sudo microk8s kubectl get nodes | grep -q ' Ready '",
+          "grep -q k8s-lab-node2 /etc/hosts",
+          "test -f /etc/netplan/60-vmctl-k8s-lan.yaml"
+        ]
+      }
+    }
+  }
+}
