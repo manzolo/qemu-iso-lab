@@ -24,11 +24,12 @@ Done, merged and verified live (vmctl 0.17.0 → 0.17.6, 2026-10-02/03; the tour
 | git-lab | a prepared repository: objects, branches, merge, conflicts, stash, remote, rebase, git flow (one cloud image) | 9/9, 60 checks |
 | zfs-lab | the ZFS half of qlab's raid-lab, extended: RAIDZ, datasets, snapshots, offline/resilver, scrub, send/receive, mirrors (one cloud image, four disks) | 7/7, 46 checks |
 | mdadm-lab | Linux software RAID, the RAID qlab's raid-lab only named: a mirror, a failed disk, a RAID5 with a hot spare, a grow, stop/assemble (one cloud image, four disks) | 6/6, 42 checks |
+| mysql-lab | MySQL 8 with a sample shop database (users, orders, a foreign key), phpMyAdmin forwarded to 8088: queries, joins, transactions, privileges, indexes and EXPLAIN, mysqldump/restore, configuration (one cloud image) | 6/6, 39 checks |
 | web | lab card: Run tests, Guide (page), Consoles (`/multi` headed by the lab, addresses per pane), restyled card | browser test |
 
 Next, in this order:
 
-1. **apache-lab** and **mysql-lab** (phase 2, one server each: content + tests on `ubuntu-cloud-base`).
+1. **apache-lab** (phase 2, one server: content + tests on `ubuntu-cloud-base`; mysql-lab done).
 2. **F5 group checkpoints** (`vmctl group checkpoint create|restore`, *Reset lab* on the card; lvm-lab and
    the hardening labs benefit most). Note: checkpoints refuse `extra_disks` today, so lvm-lab needs that
    lifted (copy every disk) or a lab-specific reset.

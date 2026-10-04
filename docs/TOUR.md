@@ -160,6 +160,18 @@ fast-forwards written from the timings the agent printed (`RecTime`), then `buil
 order, answer each question only after a screenshot shows it (WSL's user prompt is pre-filled,
 setup.sh asks `[y/N]` and twice for sudo, the welcome screen waits for Enter).
 
+## Background music
+
+`narrate.py --music FILE` lays a track under the voice: looped to the clip's length, faded in (3 s)
+and out (4 s), mixed in mono like the voices (a stereo bed made the mono voice 3 dB quieter in the
+mix), and ducked by a `sidechaincompress` keyed on the voice, so it drops while she speaks and comes
+back in the pauses and the fast-forwards. `--music-db` (default -8) sets the bed: the default puts the
+piano about 17 dB under the voice in the pauses. The voice's own chain is unchanged, so a clip with
+music speaks exactly as one without. Only public-domain or CC0 tracks, kept outside the repository in
+`artifacts/tour/music/` with `CREDITS.md` (source, performer, license); the first is Satie's
+Gymnopédie No. 1 played by Robin Alciatore for Musopen, public domain on Wikimedia Commons. FreePD,
+the obvious CC0 source, closed in 2026.
+
 ## 5. Publishing
 
 ```bash

@@ -52,6 +52,9 @@ def main() -> None:
     ap.add_argument("clip")
     ap.add_argument("--speaker", default="Claribel Dervla")
     ap.add_argument("--speaker-wav", default=None, help="clone this voice instead of a built-in speaker")
+    ap.add_argument("--music", default=None, help="a background track (public domain or CC0: see artifacts/tour/music/CREDITS.md), "
+                    "looped under the whole clip, faded in and out, ducked under the voice")
+    ap.add_argument("--music-db", type=float, default=-8.0, help="gain on the track before ducking (default -8 dB: the public-domain piano of CREDITS.md sits about 17 dB under the voice in the pauses)")
     args = ap.parse_args()
     d = Path(args.clip)
     meta = json.loads((d / "cues.json").read_text())
@@ -105,7 +108,26 @@ def main() -> None:
             ms = int(round(new_start[i] * 1000))
             graph += f";[{idx}:a]aresample=48000,adelay={ms}|{ms}[{lang}{i}]"
             labels.append(f"[{lang}{i}]")
-        graph += f";{''.join(labels)}amix=inputs={len(labels)}:normalize=0:dropout_transition=0,volume=-3dB,alimiter=limit=0.8,apad,atrim=0:{new_total:.3f}[a{lang}]"
+        mixed = f"amix=inputs={len(labels)}:normalize=0:dropout_transition=0,volume=-3dB,apad,atrim=0:{new_total:.3f}"
+        # The voice's chain is the same with or without music (alimiter also auto-levels: the
+        # voice must come out of it exactly as in the clips without a bed).
+        if args.music:
+            graph += f";{''.join(labels)}{mixed},alimiter=limit=0.8,asplit=2[v{lang}][sc{lang}]"
+        else:
+            graph += f";{''.join(labels)}{mixed},alimiter=limit=0.8[a{lang}]"
+    music_inputs: list[str] = []
+    if args.music:
+        # The bed: looped to the clip's length, quiet, faded in and out, then pressed down further
+        # whenever the voice speaks (the voice is the sidechain) and let back up in the pauses.
+        music_idx = 1 + len(inputs) // 2
+        music_inputs = ["-stream_loop", "-1", "-i", str(Path(args.music).resolve())]
+        fade_out = max(0.0, new_total - 4)
+        graph += (f";[{music_idx}:a]aresample=48000,aformat=channel_layouts=mono,atrim=0:{new_total:.3f},"
+                  f"volume={args.music_db}dB,afade=t=in:d=3,afade=t=out:st={fade_out:.3f}:d=4,asplit={len(LANGS)}"
+                  + "".join(f"[m{lang}]" for lang in LANGS))
+        for lang in LANGS:
+            graph += (f";[m{lang}][sc{lang}]sidechaincompress=threshold=0.02:ratio=6:attack=30:release=600[d{lang}]"
+                      f";[v{lang}][d{lang}]amix=inputs=2:normalize=0:dropout_transition=0,alimiter=limit=0.95:level=false[a{lang}]")
 
     # A moment x of the cut timeline moves past every hold that ends before it.
     def shifted(x: float) -> float:
@@ -123,8 +145,8 @@ def main() -> None:
             lines += [str(i), f"{build.ts(c['start'])} --> {build.ts(c['end'])}", text, ""]
         (d / f"{name}.voice.{lang}.srt").write_text("\n".join(lines), encoding="utf-8")
     sub_inputs = ["-i", str(d / f"{name}.voice.it.srt"), "-i", str(d / f"{name}.voice.en.srt")]
-    n_audio_inputs = 1 + len(inputs) // 2
-    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(src), *inputs, *sub_inputs,
+    n_audio_inputs = 1 + len(inputs) // 2 + (1 if args.music else 0)
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(src), *inputs, *music_inputs, *sub_inputs,
                     "-filter_complex", graph, "-map", "[vout]", "-map", "[ait]", "-map", "[aen]",
                     "-map", f"{n_audio_inputs}", "-map", f"{n_audio_inputs + 1}",
                     "-c:v", "libx264", "-preset", "slow", "-crf", "20", "-pix_fmt", "yuv420p",

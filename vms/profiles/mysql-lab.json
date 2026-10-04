@@ -1,0 +1,70 @@
+{
+  "vms": {
+    "mysql-lab-server": {
+      "name": "MySQL lab server (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "mysql-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-04"
+      },
+      "notes": "The one machine of the mysql-lab (vms/labs/mysql-lab/): MySQL 8 with the lab database testdb (users and orders, a foreign key between them) and the account labuser / labpass, plus phpMyAdmin on Apache. From the host: phpMyAdmin at http://127.0.0.1:8088/phpmyadmin, MySQL at 127.0.0.1:3307 (bind-address 0.0.0.0 in the guest, reached through QEMU's NAT). ~/setup-mysql-lab.sh is also the reset: it drops testdb and loads the sample data again. Ubuntu 24.04 minimal cloud image. Ported from qlab's mysql-lab.",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "disk": {
+        "size": "10G"
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true,
+          "hostfwd": [
+            {
+              "host_port": 8088,
+              "guest_port": 80
+            },
+            {
+              "host_port": 3307,
+              "guest_port": 3306
+            }
+          ]
+        }
+      ],
+      "cloudimg_config": {
+        "packages": [
+          "mysql-server",
+          "mysql-client",
+          "apache2",
+          "php",
+          "php-mysql",
+          "php-mbstring",
+          "php-zip",
+          "php-gd",
+          "php-curl"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2368,
+        "copy_from_host": [
+          {
+            "source": "vms/labs/mysql-lab/provision/setup-mysql-lab.sh",
+            "dest": "/home/{{user}}/setup-mysql-lab.sh",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "systemctl is-active mysql apache2",
+          "bash ~/setup-mysql-lab.sh",
+          "mysql testdb -N -e 'SELECT COUNT(*) FROM users' | grep -qx 4",
+          "curl -fs http://127.0.0.1/phpmyadmin/ | grep -qi phpmyadmin"
+        ]
+      }
+    }
+  }
+}

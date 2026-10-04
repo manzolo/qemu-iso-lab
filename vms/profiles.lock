@@ -1230,6 +1230,17 @@
         }
       ]
     },
+    "mysql-lab-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:b2f9ab162f1eb0761ded829889f946f7dcb9eb114669192e73c91ef586ca2a65",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-04",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "nixos-gnome": {
       "version": "1.0.0",
       "fingerprint": "sha256:7cac8cc4899f25a20ac6a8bbddb80f0f245ed42e6225c1c0e68af733465734e8",

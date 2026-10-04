@@ -146,7 +146,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_1003 = {"docker-lab-server", "lvm-lab-server", "git-lab-server"}  # docker-lab 6/6, lvm-lab 7/7 and git-lab 9/9 live
         verified_1004 = {"zfs-lab-server",  # zfs-lab 7/7, 46 checks live
                          "mdadm-lab-server",  # mdadm-lab 6/6, 42 checks live
-                         "windows-11"}  # reinstalled with the Hyper-V enlightenments (1.0.1), then WSL2 + Ubuntu ran inside
+                         "windows-11",  # reinstalled with the Hyper-V enlightenments (1.0.1), then WSL2 + Ubuntu ran inside
+                         "mysql-lab-server"}  # mysql-lab 6/6, 39 checks live
         verified_1002 = {"ubuntu-24.04-cloud",  # the first cloud-image profile: 49 s from the seed to the SSH checks
                          "vpn-lab-server", "vpn-lab-client",  # vpn-lab: group install + group test 5/5 live
                          "ssh-lab-server", "ssh-lab-client"}  # ssh-lab: group install + group test 6/6 live

@@ -1,0 +1,122 @@
+{
+  "title": "MySQL lab: tables, queries, transactions, users, backups and phpMyAdmin",
+  "summary": "One server with MySQL 8 and a small shop database already loaded: testdb with users and orders, a foreign key between them, and one user who never ordered. The exercises read the server, query it (filters, sorting, joins, aggregates), change data inside transactions, give and take privileges, administer a second database (indexes, a backup and its restore) and look at what makes the server reachable. phpMyAdmin shows the same data in the browser. ~/setup-mysql-lab.sh puts the database back as it was. Ported from qlab's mysql-lab.",
+  "members": [
+    "mysql-lab-server"
+  ],
+  "exercises": [
+    {
+      "title": "MySQL anatomy",
+      "text": "A running service, a data directory, databases made of tables. root logs in through the Unix socket with no password (auth_socket); the lab account labuser has a password, kept in ~/.my.cnf so that `mysql testdb` just works.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "mysql-lab-server",
+          "commands": [
+            "systemctl status mysql --no-pager | head -5",
+            "mysql --version",
+            "sudo mysql -e 'SHOW DATABASES;'    # root, over the socket",
+            "sudo ls /var/lib/mysql | head    # one directory per database",
+            "mysql testdb -e 'SHOW TABLES; DESCRIBE users;'    # labuser, from ~/.my.cnf"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "SQL queries",
+      "text": "SELECT reads, WHERE filters, ORDER BY sorts, JOIN matches rows of two tables on a key; LEFT JOIN keeps the rows with no match (Dana never ordered), GROUP BY folds rows into totals.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "mysql-lab-server",
+          "commands": [
+            "mysql testdb -e 'SELECT * FROM users;'",
+            "mysql testdb -e \"SELECT name, email FROM users WHERE name LIKE 'A%';\"",
+            "mysql testdb -e 'SELECT product, amount FROM orders ORDER BY amount DESC;'",
+            "mysql testdb -e 'SELECT u.name, o.product, o.amount FROM users u JOIN orders o ON o.user_id = u.id;'",
+            "mysql testdb -e 'SELECT u.name, o.product FROM users u LEFT JOIN orders o ON o.user_id = u.id;'    # Dana: NULL",
+            "mysql testdb -e 'SELECT u.name, COUNT(o.id) AS orders, SUM(o.amount) AS total FROM users u LEFT JOIN orders o ON o.user_id = u.id GROUP BY u.id;'"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Changing data, in transactions",
+      "text": "INSERT, UPDATE and DELETE change rows. Inside a transaction nothing is final until COMMIT, and ROLLBACK takes it all back. The foreign key refuses to delete a user who still has orders.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "mysql-lab-server",
+          "commands": [
+            "mysql testdb -e \"INSERT INTO users (name, email) VALUES ('Eve', 'eve@example.com'); SELECT * FROM users;\"",
+            "mysql testdb -e \"UPDATE users SET email = 'eve@lab.local' WHERE name = 'Eve'; DELETE FROM users WHERE name = 'Eve';\"",
+            "mysql testdb -e \"START TRANSACTION; INSERT INTO users (name) VALUES ('Ghost'); SELECT COUNT(*) FROM users; ROLLBACK; SELECT COUNT(*) FROM users;\"",
+            "mysql testdb -e \"START TRANSACTION; INSERT INTO users (name) VALUES ('Frank'); COMMIT;\"",
+            "mysql testdb -e \"DELETE FROM users WHERE name = 'Alice';\"    # refused: Alice has orders"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Users and privileges",
+      "text": "An account is a name plus the host it connects from. GRANT gives exactly what is needed (here SELECT on one database), SHOW GRANTS says what an account may do, REVOKE and DROP USER take it away.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "mysql-lab-server",
+          "commands": [
+            "sudo mysql -e \"CREATE USER 'reader'@'localhost' IDENTIFIED BY 'Reader123!'; GRANT SELECT ON testdb.* TO 'reader'@'localhost';\"",
+            "sudo mysql -e \"SHOW GRANTS FOR 'reader'@'localhost';\"",
+            "mysql -u reader -p'Reader123!' testdb -e 'SELECT COUNT(*) FROM users;'    # allowed",
+            "mysql -u reader -p'Reader123!' testdb -e \"INSERT INTO users (name) VALUES ('x');\"    # denied",
+            "sudo mysql -e \"REVOKE SELECT ON testdb.* FROM 'reader'@'localhost'; DROP USER 'reader'@'localhost';\""
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Administration: indexes, backup, restore",
+      "text": "A second database to break freely. EXPLAIN shows how a query is executed: a full scan before the index, an index lookup after. mysqldump writes the database as SQL; reading that file back restores it.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "mysql-lab-server",
+          "commands": [
+            "sudo mysql -e \"CREATE DATABASE testlab; GRANT ALL ON testlab.* TO 'labuser'@'localhost';\"",
+            "mysql testlab -e \"CREATE TABLE students (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100), grade INT); INSERT INTO students (name, grade) VALUES ('Ann', 28), ('Ben', 24), ('Cleo', 30);\"",
+            "mysql testlab -e \"ALTER TABLE students ADD COLUMN email VARCHAR(100); EXPLAIN SELECT * FROM students WHERE grade = 30;\"",
+            "mysql testlab -e \"CREATE INDEX idx_grade ON students (grade); EXPLAIN SELECT * FROM students WHERE grade = 30;\"",
+            "mysqldump --no-tablespaces testlab > ~/testlab.sql && grep -c INSERT ~/testlab.sql",
+            "mysql testlab -e 'DROP TABLE students;' && mysql testlab < ~/testlab.sql && mysql testlab -e 'SELECT * FROM students;'"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Security and configuration",
+      "text": "Where the configuration lives, what address the server listens on and who is connected. bind-address 0.0.0.0 is what lets the host reach it through QEMU's NAT: phpMyAdmin at http://127.0.0.1:8088/phpmyadmin, MySQL at 127.0.0.1:3307, as labuser / labpass. ~/setup-mysql-lab.sh puts testdb back as it was.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "mysql-lab-server",
+          "commands": [
+            "ls /etc/mysql/mysql.conf.d/ && grep -E '^bind-address' /etc/mysql/mysql.conf.d/mysqld.cnf",
+            "ss -ltn | grep -E ':(3306|80) '",
+            "sudo mysql -e \"SELECT user, host, plugin FROM mysql.user WHERE user IN ('root','labuser');\"    # auth_socket vs password",
+            "sudo mysql -e 'SHOW PROCESSLIST;'",
+            "sudo mysql -e \"SHOW VARIABLES LIKE 'log_error';\"",
+            "bash ~/setup-mysql-lab.sh    # the reset"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "host",
+          "commands": [
+            "xdg-open http://127.0.0.1:8088/phpmyadmin    # labuser / labpass",
+            "mysql -h 127.0.0.1 -P 3307 -u labuser -plabpass testdb -e 'SELECT * FROM orders;'    # needs a mysql client on the host"
+          ]
+        }
+      ]
+    }
+  ]
+}
