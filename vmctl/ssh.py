@@ -428,13 +428,19 @@ def post_install_copy(
                     else:
                         path.unlink(missing_ok=True)
             remote_target = f"{user}@{host}:{dest_raw}"
-            runtime.run(
-                scp_base_cmd(vm, dry_run=dry_run) + ["-r", f"{staged_source}/.", remote_target],
-                dry_run=dry_run,
-                stdout_log=stdout_log,
-                stderr_log=stderr_log,
-                append=True,
-            )
+            # The directory's entries one by one, never `dir/.`: the classic scp protocol, still the
+            # default of OpenSSH 8.x clients (Ubuntu 22.04), sends "." as a file name and the guest's
+            # scp refuses it ("unexpected filename: .", k8s-lab's manifests from a 22.04 host,
+            # 2026-10-04); OpenSSH 9's SFTP mode accepted it.
+            entries = sorted(str(path) for path in staged_source.iterdir()) if staged_source.is_dir() else []
+            if entries or dry_run:
+                runtime.run(
+                    scp_base_cmd(vm, dry_run=dry_run) + ["-r", *(entries or [f"{staged_source}/*"]), remote_target],
+                    dry_run=dry_run,
+                    stdout_log=stdout_log,
+                    stderr_log=stderr_log,
+                    append=True,
+                )
             if dest_mode:
                 runtime.run(
                     remote_chmod(vm, f"chmod -R {shlex.quote(dest_mode)} {shlex.quote(dest_raw)}", dry_run=dry_run),

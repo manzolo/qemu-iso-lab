@@ -184,7 +184,7 @@ class PostInstallTests(BaseVmctlTestCase):
         )
         self.assertEqual(executed[1][0], "scp")
         self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/niri")
-        self.assertTrue(executed[1][-2].endswith("/host-niri/."))
+        self.assertTrue(executed[1][-2].endswith("/host-niri/config.kdl"))  # the entries, never "dir/."
         self.assertEqual(
             executed[2][-1],
             "sh -lc 'sudo apt update'",
@@ -295,7 +295,9 @@ class PostInstallTests(BaseVmctlTestCase):
         executed = [call.args[0] for call in run_cmd.call_args_list]
         self.assertEqual(executed[0][-1], "sh -lc 'mkdir -p /home/tester/.config/geany && chmod -R u+w /home/tester/.config/geany'")
         self.assertEqual(executed[1][0], "scp")
-        self.assertTrue(executed[1][-2].endswith("/."))
+        # The entries one by one, never "dir/.", which OpenSSH 8.x's scp protocol sends as a refused name.
+        self.assertEqual([Path(a).name for a in executed[1][-3:-1]], ["geany.conf", "runtime-link"])
+        self.assertFalse(any(a.endswith("/.") for a in executed[1]))
         self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/geany")
 
     def test_cmd_post_install_recursive_copy_skips_dangling_symlink(self):
