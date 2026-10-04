@@ -145,9 +145,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_1001 = {"arch-omarchy-nvidia", "xubuntu-12.04", "edubuntu-12.04", "lubuntu-12.04", "kubuntu-12.04"}  # the desktop check on Omarchy, the stale precise Release on 12.04
         verified_1003 = {"docker-lab-server", "lvm-lab-server", "git-lab-server"}  # docker-lab 6/6, lvm-lab 7/7 and git-lab 9/9 live
         verified_1004 = {"zfs-lab-server",  # zfs-lab 7/7, 46 checks live
-                         "mdadm-lab-server"}  # mdadm-lab 6/6, 42 checks live
-        verified_1002 = {"windows-11",  # 26H2 (build 26300.9457) installed unattended and verified over SSH
-                         "ubuntu-24.04-cloud",  # the first cloud-image profile: 49 s from the seed to the SSH checks
+                         "mdadm-lab-server",  # mdadm-lab 6/6, 42 checks live
+                         "windows-11"}  # reinstalled with the Hyper-V enlightenments (1.0.1), then WSL2 + Ubuntu ran inside
+        verified_1002 = {"ubuntu-24.04-cloud",  # the first cloud-image profile: 49 s from the seed to the SSH checks
                          "vpn-lab-server", "vpn-lab-client",  # vpn-lab: group install + group test 5/5 live
                          "ssh-lab-server", "ssh-lab-client"}  # ssh-lab: group install + group test 6/6 live
         verified_0930 = {"fedora-server", "fedora-server-efi", "opensuse-tumbleweed-net", "opensuse-slowroll", "devuan-netinst", "centos-5", "centos-6", "centos-7", "centos-8", "fedora-xfce", "fedora-cinnamon", "fedora-workstation", "opensuse-tumbleweed-kde", "void-xfce", "opensuse-leap-16", "endeavouros", "popos-cosmic", "arch-2014", "ubuntu-niri"}  # the recipes written ahead, first live run  # PASS on 2026-09-29 (haiku after the identity fix; arch-2014 with the host cache, kept experimental)

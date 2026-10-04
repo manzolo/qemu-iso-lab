@@ -107,7 +107,7 @@
       "extends": "windows-base",
       "meta": {
         "slug": "windows-11",
-        "verified": "2026-10-02",
+        "verified": "2026-10-04",
         "version": "1.0.1"
       },
       "iso": "isos/windows11.iso",
