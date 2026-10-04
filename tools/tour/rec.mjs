@@ -191,8 +191,16 @@ const d = {
 
 if (clip.setup) await clip.setup(d);
 if (!dry) {
+  // The screen must be 1600x900 when the capture starts: a viewer opened on the VM (virt-manager)
+  // can resize it, and x11grab then refuses the area and records nothing while the clip plays on
+  // (mysql lesson, 2026-10-04: seven minutes lost at 1152x768).
+  vm("pkill -x spice-vdagent; DISPLAY=:0 xrandr --output Virtual-1 --mode 1600x900; true");
+  const size = vm("DISPLAY=:0 xdpyinfo | awk '/dimensions:/{print $2}'").trim();
+  if (size !== "1600x900") throw new Error(`the recording VM's screen is ${size}, not 1600x900`);
   vm("rm -f ~/lab/video/rec.mkv; setsid -f ffmpeg -loglevel error -y -f x11grab -framerate 30 -video_size 1600x900 -i :0 -c:v libx264 -preset ultrafast -crf 16 ~/lab/video/rec.mkv </dev/null >/tmp/ff.log 2>&1");
-  await sleep(800);
+  await sleep(1500);
+  if (!vm("pgrep -f 'x11gra[b]' >/dev/null && test -s ~/lab/video/rec.mkv && echo rec || true").includes("rec"))
+    throw new Error(`ffmpeg is not recording: ${vm("cat /tmp/ff.log").trim()}`);
 }
 t0 = Date.now();
 try {
