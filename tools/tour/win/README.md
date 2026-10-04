@@ -8,50 +8,56 @@ nothing yet, `setup-windows.ps1` from WSL to the dashboard).
 
 - libvirt domain **`windows11-studio`** (`qemu:///system`, network `default`, DHCP: the address is
   `virsh --connect qemu:///system domifaddr windows11-studio --source lease`). 12 GiB, 6 vCPU,
-  `host-passthrough` CPU (nested virtualization reaches Windows: WSL2 gets `/dev/kvm`), q35/OVMF, TPM
-  emulator, QXL at 1600x900.
-- Independent of the lab: its disk is a **full copy** of `artifacts/windows-11/disk.qcow2` (the unattended
-  `windows-11` profile) in `storage/hd/windows11-studio.qcow2`, EFI vars in
-  `storage/hd/windows11-studio_VARS.fd`. `vmctl clean windows-11` does not touch it, and it does not touch
-  the lab. The XML is vmctl's own `export-libvirt` rendering with the name, paths, memory and CPUs changed,
-  plus **`<hyperv mode='passthrough'/>`** in `<features>` and a `hypervclock` timer. Without the Hyper-V
-  enlightenments Windows resets on the spot (Kernel-Power 41, no dump, nothing in the host log) the moment
-  WSL starts its VM: Hyper-V runs fine as the L1 hypervisor until it launches an L2 guest. Reproduced twice
-  on 2026-10-04, gone with the enlightenments.
-- **Clean snapshot**: `storage/hd/windows11-studio.clean.qcow2` + `windows11-studio_VARS.clean.fd` =
-  Windows with the studio tools and **no WSL**. To record the install again from zero:
-  `virsh shutdown`, copy both `.clean` files over the live ones, `virsh start`.
-- **WSL snapshot**: `windows11-studio.wsl.qcow2` + `windows11-studio_VARS.wsl.fd` = the same after
-  `wsl --install` and its reboot, with Ubuntu 24.04 initialised (Linux user `demo`): the point to
-  restart from for the part after WSL (clone, `./setup.sh`, the dashboard) without reinstalling it.
-- **Ready snapshot**: `windows11-studio.ready.qcow2` + `windows11-studio_VARS.ready.fd` = qemu-iso-lab
-  installed in WSL (`~/qemu-iso-lab`, `setup.sh` done, `demo` in the kvm group) and `ubuntu-24.04-cloud`
-  installed inside it (6 min 50 s three levels deep, 49 s on the host): for clips that start from a working
-  lab on Windows. The VM serves other recordings too: the snapshots are its known states, not its purpose.
-- The domain's XML is saved beside the disks as `storage/hd/windows11-studio.xml` (host paths, so not in
-  the repository): `virsh define` it to rebuild the VM on this host.
-- Delete it like every libvirt VM here: `virsh undefine windows11-studio --nvram` and remove the files by
-  hand. Never `--remove-all-storage` (it deletes the ISOs of the pools).
+  `host-passthrough` CPU (nested virtualization reaches Windows: WSL2 gets `/dev/kvm`), q35, TPM
+  emulator, QXL at 1600x900. **It lives in libvirt**: vmctl only installed it (`windows-11`, profile
+  1.0.1, 2026-10-04); its disk was copied out once and nothing in the project touches it since.
+- Files, all in `storage/hd/`: `windows11-studio.qcow2` (the disk), `windows11-studio_CODE.qcow2` and
+  `windows11-studio_VARS.qcow2` (OVMF code and EFI variables **converted to qcow2**: internal snapshots
+  need every writable image in qcow2, and libvirt wants the loader and the variables in the same format;
+  the `<os>` has no `firmware='efi'` autoselection, the system ships no qcow2 build), and
+  `windows11-studio.xml` (the domain, host paths: not in the repository).
+- **Hyper-V enlightenments, as an explicit list** (`<hyperv mode='custom'>`: relaxed, vapic, spinlocks,
+  vpindex, runtime, synic, stimer+direct, reset, frequencies, tlbflush, ipi, evmcs). Without them Windows
+  resets on the spot (Kernel-Power 41, no dump) the moment WSL starts its VM. Not `mode='passthrough'`:
+  it makes the VM unmigratable, so a snapshot with the VM running is refused. Not `reenlightenment`
+  either: a live snapshot is taken, but restoring it fails (`cpu/msr_hyperv_reenlightenment ... -22`);
+  it only matters for migrations between hosts with different TSC frequencies.
+- **Snapshots are libvirt's**, internal, taken with the VM running (memory included: a revert resumes
+  where it was, in about 20 s), managed from virt-manager (*View → Snapshots*) or `virsh snapshot-*`:
+
+  | Snapshot | State |
+  |---|---|
+  | `1-windows-installato` | Windows as vmctl installed it + the studio (demo, agent, ffmpeg, Edge policies), no WSL |
+  | `2-wsl` | + WSL 3.0.1 and Ubuntu 24.04 (Linux user `demo`, password `demo`), from `setup-windows.ps1`'s first two runs |
+  | `3-qemu-iso-lab-pronto` | + qemu-iso-lab in WSL (third run: clone, `setup.sh`, kvm group) and `ubuntu-24.04-cloud` installed inside (3 min 5 s three levels deep), stopped |
+
+  The agent inside a snapshot is the one of its day: after a revert, copy the current `agent.ps1` if it
+  changed and restart the `StudioAgent` task.
+- Delete it like every libvirt VM here: `virsh snapshot-delete` each snapshot (or `undefine
+  --snapshots-metadata`), `virsh undefine windows11-studio --nvram`, then the files by hand. Never
+  `--remove-all-storage` (it deletes the ISOs of the pools).
 
 ## Rebuilding it from scratch
 
-1. **The source disk**: a `windows-11` installed by vmctl, `vmctl bootstrap-windows windows-11` (OpenSSH,
-   the project key and the guest agent come with it). With that VM stopped, copy it, never move it:
+1. **Install** with vmctl: `vmctl bootstrap-windows windows-11` (OpenSSH, the project key, the guest
+   agent, the Hyper-V enlightenments of `hyperv: true`), then `vmctl stop windows-11`.
+2. **Copy it out**, never move it:
    ```sh
-   qemu-img convert -p -O qcow2 artifacts/windows-11/disk.qcow2 ../storage/hd/windows11-studio.qcow2
-   cp artifacts/windows-11/OVMF_VARS.fd ../storage/hd/windows11-studio_VARS.fd
+   H=../storage/hd
+   qemu-img convert -p -O qcow2 artifacts/windows-11/disk.qcow2 $H/windows11-studio.qcow2
+   qemu-img convert -f raw -O qcow2 /usr/share/OVMF/OVMF_CODE_4M.fd $H/windows11-studio_CODE.qcow2
+   qemu-img convert -f raw -O qcow2 artifacts/windows-11/OVMF_VARS.fd $H/windows11-studio_VARS.qcow2
    ```
-2. **The domain**: start from `vmctl --dry-run export-libvirt windows-11`, change the name, the disk and
-   VARS paths, memory (12 GiB) and vCPUs (6), add `<hyperv mode='passthrough'/>` in `<features>` and
-   `<clock offset='localtime'><timer name='hypervclock' present='yes'/></clock>`; `virsh define`,
-   `virsh start`, the address from `domifaddr --source lease`. (Once the `hyperv` profile field is in vmctl,
-   the export renders both blocks itself.) Or `virsh define storage/hd/windows11-studio.xml`.
-3. **Inside Windows**, over SSH as the profile user: `setup-studio.ps1` (as administrator), then
-   `agent.ps1` into `C:\studio\` and `install-agent.ps1`; reboot (demo logs on, the agent starts), then
-   `wq '[Studio]::Resolution(1600,900)'`.
-4. **Snapshots**: with the VM shut down, `cp --sparse=always` the disk and the VARS to `.clean`, `.wsl`,
-   `.ready`; restore by copying them back over the live files. **After a restore**, copy the current
-   `agent.ps1` again and restart the `StudioAgent` task: a snapshot keeps the agent of its day.
+3. **Define** it from `storage/hd/windows11-studio.xml` (or from `vmctl --dry-run export-libvirt
+   windows-11`: name, paths, 12 GiB/6 vCPU, the qcow2 `<loader format='qcow2'>`/`<nvram format='qcow2'>`,
+   the explicit `<hyperv mode='custom'>` list above and the `hypervclock` timer), `virsh start`.
+4. **The studio**, over SSH as the profile user: `setup-studio.ps1`, `agent.ps1` into `C:\studio\`,
+   `install-agent.ps1`, reboot, `wq '[Studio]::Resolution(1600,900)'`, close the Start menu the first
+   logon leaves open; snapshot 1.
+5. **WSL** from demo's desktop with `setup-windows.ps1` (through `wq`, as a user would): first run,
+   reboot, second run, Enter on the pre-filled user, the password twice, `exit`; `wsl --shutdown`;
+   snapshot 2. Third run: `y`, the sudo password, Enter on the welcome, the sudo password again; a first
+   VM inside WSL to prove it; `wsl --shutdown`; snapshot 3.
 
 ## Inside Windows (`setup-studio.ps1` + `install-agent.ps1`, already applied)
 
@@ -96,6 +102,9 @@ so `$` is PowerShell's, not the host shell's (single quotes on the host side).
 | Pitfall | What to do |
 |---|---|
 | Windows resets on the spot (Kernel-Power 41, no dump, nothing on the host) when WSL starts its VM | the Hyper-V enlightenments in the XML (see *The VM*) |
+| `<hyperv mode='passthrough'/>`: "'hv-passthrough' CPU flag prevents migration", no snapshot with the VM running | the explicit `mode='custom'` list |
+| `reenlightenment` in that list: the live snapshot is taken, its revert fails (`msr_hyperv_reenlightenment`, -22) | leave it out |
+| Internal snapshots refused while the EFI variables are a raw file; `firmware='efi'` finds no qcow2 build | OVMF code and variables converted to qcow2, explicit `<loader>`/`<nvram format='qcow2'>`, no autoselection |
 | SSH lands in session 0: nothing typed or recorded reaches the desktop | the agent in demo's session |
 | `Type` is a PowerShell alias of `Get-Content`, and aliases beat functions | the helper is `TypeIn` |
 | `AppActivate` from a background process does not take the focus | `Focus` (Alt + `SetForegroundWindow`) |
@@ -110,5 +119,5 @@ so `$` is PowerShell's, not the host shell's (single quotes on the host side).
 | The reboot `wsl --install` asks for ends the recording | record in segments, join them with ffmpeg's concat demuxer |
 | Edge's first start shows four pages | the Edge policies of `setup-studio.ps1` |
 | Localized words: `virsh domstate` says *terminato*, Windows answers in Italian | checks accept the localized words (or compare `LastBootUpTime`, a number) |
-| A snapshot keeps the agent of its day | copy `agent.ps1` again after every restore |
+| A snapshot keeps the agent of its day | copy `agent.ps1` again after a revert if it changed |
 | A fresh WSL Ubuntu has the `universe` lists missing until `apt update`: setup.sh skipped fzf, dialog, partclone... | fixed in vmctl: `host_setup.apt_lists_complete` (lists the native `Packages` files the suites' Release declares non-empty; while one is missing nothing is filtered) |
