@@ -11,7 +11,13 @@ assert "the three replicas become available" on "$M" kubectl rollout status depl
 k create service nodeport web --tcp=80:80 --node-port=30080 >/dev/null
 spread=$(k get pods -l app=web -o 'jsonpath={range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | grep -c . || true)
 assert_contains "the replicas run on more than one node" "$spread" "^[23]$"
-codes=$(on "$M" "for ip in \$(kubectl get pods -l app=web -o jsonpath='{.items[*].status.podIP}'); do curl -s -o /dev/null -w '%{http_code} ' --max-time 3 http://\$ip; done" 2>&1 || true)
+# Right after a boot the first packet to another node's pod can take longer than curl waits (seen
+# once after `group up`, 2026-10-04): retry for half a minute, as for the NodePort below.
+for _ in $(seq 1 10); do
+    codes=$(on "$M" "for ip in \$(kubectl get pods -l app=web -o jsonpath='{.items[*].status.podIP}'); do curl -s -o /dev/null -w '%{http_code} ' --max-time 3 http://\$ip; done" 2>&1 || true)
+    [ "$codes" = "200 200 200 " ] && break
+    sleep 3
+done
 assert_contains "every pod answers from main, whatever its node" "$codes" "^200 200 200 $"
 for ip in 172.20.6.1 172.20.6.11 172.20.6.12; do
     page=""

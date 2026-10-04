@@ -75,6 +75,148 @@ kubectl scale deployment web --replicas=6 && kubectl get pods -o wide
 kubectl delete service web && kubectl delete deployment web    # il namespace default torna vuoto
 ```
 
+## Esercizio 3: scale, rolling update, rollback
+
+Scalare cambia solo il numero di pod. Cambiare l'immagine avvia un rolling update: i pod nuovi salgono
+mentre i vecchi se ne vanno, pochi alla volta, così il Service non smette mai di rispondere. Ogni modifica
+del template dei pod è una revisione, e `rollout undo` torna alla precedente.
+
+```sh
+kubectl create deployment web --image=nginx:1.27-alpine --replicas=3 && kubectl rollout status deployment/web
+kubectl scale deployment web --replicas=5 && kubectl get pods -l app=web -o wide
+kubectl set image deployment/web nginx=nginx:1.28-alpine && kubectl rollout status deployment/web    # escono i vecchi, entrano i nuovi
+kubectl rollout history deployment/web     # due revisioni
+kubectl get deployment web -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'    # nginx:1.28-alpine
+kubectl rollout undo deployment/web && kubectl rollout status deployment/web
+kubectl get deployment web -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'    # di nuovo nginx:1.27-alpine
+kubectl delete deployment web
+```
+
+Prova: un'immagine che non esiste. I pod nuovi restano in `ErrImagePull` e i vecchi continuano a servire:
+un rolling update non toglie mai più di quanto ha già sostituito.
+
+```sh
+kubectl create deployment web --image=nginx:1.27-alpine --replicas=3 && kubectl set image deployment/web nginx=nginx:no-such-tag && sleep 20 && kubectl get pods -l app=web
+kubectl rollout undo deployment/web && kubectl rollout status deployment/web && kubectl delete deployment web
+```
+
+## Esercizio 4: drain di un nodo
+
+Prima di una manutenzione si fa il drain del nodo: viene messo in cordon (niente pod nuovi) e i suoi pod
+vengono sfrattati, così i loro Deployment li ricreano sugli altri nodi. I pod dei DaemonSet come
+`calico-node` restano, uno per nodo per definizione. `uncordon` restituisce il nodo allo scheduler; i pod
+già spostati restano dove sono.
+
+```sh
+kubectl create deployment web --image=nginx:1.27-alpine --replicas=6 && kubectl rollout status deployment/web
+kubectl get pods -l app=web -o wide        # alcuni su k8s-lab-node2
+kubectl drain k8s-lab-node2 --ignore-daemonsets --delete-emptydir-data
+kubectl get nodes                          # k8s-lab-node2 Ready,SchedulingDisabled
+kubectl get pods -l app=web -o wide        # tutti e sei su main e node1
+kubectl uncordon k8s-lab-node2 && kubectl get nodes
+kubectl delete deployment web
+```
+
+## Esercizio 5: ConfigMap e Secret
+
+La configurazione sta fuori dall'immagine: una ConfigMap contiene impostazioni in chiaro, un Secret le
+credenziali. Entrambi arrivano al pod come variabili d'ambiente o come file in un volume.
+
+```sh
+kubectl create configmap web-config --from-literal=GREETING=hello --from-literal=COLOR=blue
+kubectl create secret generic web-secret --from-literal=PASSWORD=labsecret
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: env-demo
+spec:
+  containers:
+  - name: show
+    image: busybox:1.36
+    command: ["sh", "-c", "echo GREETING=$GREETING COLOR=$COLOR PASSWORD=$PASSWORD; sleep 3600"]
+    envFrom:
+    - configMapRef: {name: web-config}
+    - secretRef: {name: web-secret}
+    volumeMounts:
+    - {name: config, mountPath: /config}
+  volumes:
+  - name: config
+    configMap: {name: web-config}
+EOF
+kubectl wait --for=condition=Ready pod/env-demo --timeout=120s
+kubectl logs env-demo                      # GREETING=hello COLOR=blue PASSWORD=labsecret
+kubectl exec env-demo -- ls /config        # un file per chiave
+kubectl exec env-demo -- cat /config/COLOR
+kubectl get secret web-secret -o jsonpath='{.data.PASSWORD}' | base64 -d; echo    # base64, non cifratura
+```
+
+Un Secret è solo codificato in base64: chi può leggere i Secret del namespace legge la password.
+
+Prova: cambia la ConfigMap. Il file nel volume si aggiorna entro un minuto; la variabile d'ambiente resta
+quella con cui il pod è partito.
+
+```sh
+kubectl create configmap web-config --from-literal=GREETING=hello --from-literal=COLOR=red -o yaml --dry-run=client | kubectl apply -f -
+sleep 70; kubectl exec env-demo -- cat /config/COLOR    # red
+kubectl delete pod env-demo && kubectl delete configmap web-config && kubectl delete secret web-secret
+```
+
+## Esercizio 6: un volume persistente, MariaDB che sopravvive al suo pod
+
+I file di un pod muoiono con lui. Una PersistentVolumeClaim chiede uno spazio che sopravvive al pod;
+l'addon `hostpath-storage` di MicroK8s la soddisfa con una directory sul nodo che esegue il pod. La
+password del database viaggia come Secret.
+
+```sh
+microk8s enable hostpath-storage           # la StorageClass di default: resta abilitata
+kubectl create secret generic mariadb-root --from-literal=password=labroot
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: mariadb}
+  template:
+    metadata:
+      labels: {app: mariadb}
+    spec:
+      containers:
+      - name: mariadb
+        image: mariadb:11.4
+        env:
+        - name: MARIADB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef: {name: mariadb-root, key: password}
+        volumeMounts:
+        - {name: data, mountPath: /var/lib/mysql}
+      volumes:
+      - name: data
+        persistentVolumeClaim: {claimName: mariadb-data}
+EOF
+kubectl rollout status deployment/mariadb --timeout=300s && kubectl get pvc,pv
+sleep 15; kubectl exec deploy/mariadb -- mariadb -uroot -plabroot -e "CREATE DATABASE shop; CREATE TABLE shop.items (name VARCHAR(20)); INSERT INTO shop.items VALUES ('kept');"
+kubectl delete pod -l app=mariadb && kubectl rollout status deployment/mariadb
+sleep 15; kubectl exec deploy/mariadb -- mariadb -uroot -plabroot -e 'SELECT * FROM shop.items;'    # kept: un pod nuovo, gli stessi dati
+kubectl get pv -o wide                     # il volume e dove sta
+kubectl delete deployment mariadb && kubectl delete pvc mariadb-data && kubectl delete secret mariadb-root
+```
+
+Cancellare la claim cancella anche il volume (reclaim policy `Delete`).
+
 ## Test
 
 ```sh

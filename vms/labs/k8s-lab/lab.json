@@ -1,46 +1,227 @@
 {
   "title": "Kubernetes lab: a three-node MicroK8s cluster",
-  "summary": "A control plane and two workers on an isolated segment (172.20.6.0/24), MicroK8s 1.32 on Ubuntu 24.04 cloud images. The workers join the control plane by themselves at their first boot on the segment. The exercises read the cluster's anatomy, then run a Deployment of three nginx replicas spread over the nodes and reach it through a NodePort Service, from every node and from the host. Inspired by manzolo/multipass-microk8s-cluster-demo.",
-  "members": ["k8s-lab-main", "k8s-lab-node1", "k8s-lab-node2"],
+  "summary": "A control plane and two workers on an isolated segment (172.20.6.0/24), MicroK8s 1.32 on Ubuntu 24.04 cloud images. The workers join the control plane by themselves at their first boot on the segment. The exercises read the cluster's anatomy, run a Deployment behind a NodePort Service, scale it, roll an update forward and back, drain a node, feed pods a ConfigMap and a Secret, and keep a MariaDB's data on a persistent volume across its pod's death. Inspired by manzolo/multipass-microk8s-cluster-demo.",
+  "members": [
+    "k8s-lab-main",
+    "k8s-lab-node1",
+    "k8s-lab-node2"
+  ],
   "exercises": [
     {
       "title": "The cluster's anatomy",
       "text": "Three nodes, each with its address on the lab segment: the control plane runs the API server and is a node itself, the workers only run pods. kube-system holds the cluster's own pods: Calico (one per node, the pod network), CoreDNS, the metrics of nothing yet.",
       "blocks": [
-        {"kind": "check", "where": "k8s-lab-main", "commands": [
-          "kubectl get nodes -o wide          # three nodes Ready, INTERNAL-IP on 172.20.6.0/24",
-          "kubectl cluster-info",
-          "kubectl get pods -n kube-system -o wide    # calico-node on every node",
-          "microk8s status | head -8"
-        ]},
-        {"kind": "check", "where": "k8s-lab-node1", "commands": [
-          "microk8s status                    # acting as a node in a cluster: no control plane here"
-        ]}
+        {
+          "kind": "check",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl get nodes -o wide          # three nodes Ready, INTERNAL-IP on 172.20.6.0/24",
+            "kubectl cluster-info",
+            "kubectl get pods -n kube-system -o wide    # calico-node on every node",
+            "microk8s status | head -8"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "k8s-lab-node1",
+          "commands": [
+            "microk8s status                    # acting as a node in a cluster: no control plane here"
+          ]
+        }
       ]
     },
     {
       "title": "A Deployment and a NodePort Service",
       "text": "A Deployment keeps a number of identical pods running and the scheduler spreads them over the nodes. A Service gives them one address; a NodePort Service also opens the same port on every node, whichever node the pods run on. The control plane's 30080 is forwarded to the host's 8089.",
       "blocks": [
-        {"kind": "do", "where": "k8s-lab-main", "commands": [
-          "kubectl create deployment web --image=nginx:1.27-alpine --replicas=3",
-          "kubectl rollout status deployment/web",
-          "kubectl create service nodeport web --tcp=80:80 --node-port=30080"
-        ]},
-        {"kind": "check", "where": "k8s-lab-main", "commands": [
-          "kubectl get pods -o wide           # NODE: the replicas spread over the nodes",
-          "kubectl get service web            # 80:30080/TCP",
-          "for ip in $(kubectl get pods -l app=web -o jsonpath='{.items[*].status.podIP}'); do curl -s -o /dev/null -w \"$ip %{http_code}\\n\" http://$ip; done    # every pod from here, whatever its node: the pod network spans the cluster",
-          "for ip in 172.20.6.1 172.20.6.11 172.20.6.12; do curl -s http://$ip:30080 | grep -o '<title>.*</title>'; done    # every node answers"
-        ]},
-        {"kind": "check", "where": "host", "commands": [
-          "curl -s http://127.0.0.1:8089 | grep -o '<title>.*</title>'    # the same page, from the host"
-        ]},
-        {"kind": "try", "where": "k8s-lab-main", "commands": [
-          "kubectl delete pod $(kubectl get pods -l app=web -o name | head -n1 | cut -d/ -f2) && kubectl get pods -l app=web    # a new pod replaces it",
-          "kubectl scale deployment web --replicas=6 && kubectl get pods -o wide",
-          "kubectl delete service web && kubectl delete deployment web    # back to an empty default namespace"
-        ]}
+        {
+          "kind": "do",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl create deployment web --image=nginx:1.27-alpine --replicas=3",
+            "kubectl rollout status deployment/web",
+            "kubectl create service nodeport web --tcp=80:80 --node-port=30080"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl get pods -o wide           # NODE: the replicas spread over the nodes",
+            "kubectl get service web            # 80:30080/TCP",
+            "for ip in $(kubectl get pods -l app=web -o jsonpath='{.items[*].status.podIP}'); do curl -s -o /dev/null -w \"$ip %{http_code}\\n\" http://$ip; done    # every pod from here, whatever its node: the pod network spans the cluster",
+            "for ip in 172.20.6.1 172.20.6.11 172.20.6.12; do curl -s http://$ip:30080 | grep -o '<title>.*</title>'; done    # every node answers"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "host",
+          "commands": [
+            "curl -s http://127.0.0.1:8089 | grep -o '<title>.*</title>'    # the same page, from the host"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl delete pod $(kubectl get pods -l app=web -o name | head -n1 | cut -d/ -f2) && kubectl get pods -l app=web    # a new pod replaces it",
+            "kubectl scale deployment web --replicas=6 && kubectl get pods -o wide",
+            "kubectl delete service web && kubectl delete deployment web    # back to an empty default namespace"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Scale, rolling update, rollback",
+      "text": "Scaling changes only the number of pods. Changing the image starts a rolling update: new pods come up while the old ones go away, a few at a time, so the Service never stops answering. Every change of the pod template is a revision, and rollout undo goes back to the previous one.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl create deployment web --image=nginx:1.27-alpine --replicas=3 && kubectl rollout status deployment/web",
+            "kubectl scale deployment web --replicas=5 && kubectl get pods -l app=web -o wide",
+            "kubectl set image deployment/web nginx=nginx:1.28-alpine && kubectl rollout status deployment/web    # old pods out, new pods in"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl rollout history deployment/web    # two revisions",
+            "kubectl get deployment web -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'    # nginx:1.28-alpine"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl rollout undo deployment/web && kubectl rollout status deployment/web",
+            "kubectl get deployment web -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}'    # nginx:1.27-alpine again",
+            "kubectl delete deployment web"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl create deployment web --image=nginx:1.27-alpine --replicas=3 && kubectl set image deployment/web nginx=nginx:no-such-tag && sleep 20 && kubectl get pods -l app=web    # ErrImagePull: the old pods keep serving",
+            "kubectl rollout undo deployment/web && kubectl rollout status deployment/web && kubectl delete deployment web"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Drain a node",
+      "text": "Before maintenance a node is drained: it is cordoned (no new pods) and its pods are evicted, so their Deployments recreate them on the other nodes. DaemonSet pods such as calico-node stay, one per node by definition. uncordon gives the node back to the scheduler; the pods already moved stay where they are.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl create deployment web --image=nginx:1.27-alpine --replicas=6 && kubectl rollout status deployment/web",
+            "kubectl get pods -l app=web -o wide    # some on k8s-lab-node2",
+            "kubectl drain k8s-lab-node2 --ignore-daemonsets --delete-emptydir-data"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl get nodes                       # k8s-lab-node2 Ready,SchedulingDisabled",
+            "kubectl get pods -l app=web -o wide    # all six on main and node1"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl uncordon k8s-lab-node2 && kubectl get nodes",
+            "kubectl delete deployment web"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl cordon k8s-lab-node1 && kubectl create deployment web --image=nginx:1.27-alpine --replicas=4 && kubectl rollout status deployment/web && kubectl get pods -l app=web -o wide    # cordoned: no new pod on node1, the old ones would stay",
+            "kubectl uncordon k8s-lab-node1 && kubectl delete deployment web"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ConfigMap and Secret",
+      "text": "Configuration lives outside the image: a ConfigMap holds plain settings, a Secret holds credentials. Both reach a pod as environment variables or as files in a volume. A Secret is only base64-encoded, not encrypted: who may read Secrets in the namespace reads the password.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl create configmap web-config --from-literal=GREETING=hello --from-literal=COLOR=blue",
+            "kubectl create secret generic web-secret --from-literal=PASSWORD=labsecret",
+            "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: env-demo\nspec:\n  containers:\n  - name: show\n    image: busybox:1.36\n    command: [\"sh\", \"-c\", \"echo GREETING=$GREETING COLOR=$COLOR PASSWORD=$PASSWORD; sleep 3600\"]\n    envFrom:\n    - configMapRef: {name: web-config}\n    - secretRef: {name: web-secret}\n    volumeMounts:\n    - {name: config, mountPath: /config}\n  volumes:\n  - name: config\n    configMap: {name: web-config}\nEOF",
+            "kubectl wait --for=condition=Ready pod/env-demo --timeout=120s"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl logs env-demo                  # GREETING=hello COLOR=blue PASSWORD=labsecret",
+            "kubectl exec env-demo -- ls /config    # one file per key",
+            "kubectl exec env-demo -- cat /config/COLOR",
+            "kubectl get secret web-secret -o jsonpath='{.data.PASSWORD}' | base64 -d; echo    # base64, not encryption"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl create configmap web-config --from-literal=GREETING=hello --from-literal=COLOR=red -o yaml --dry-run=client | kubectl apply -f -",
+            "sleep 70; kubectl exec env-demo -- cat /config/COLOR    # red: the volume follows the ConfigMap; the environment does not",
+            "kubectl delete pod env-demo && kubectl delete configmap web-config && kubectl delete secret web-secret"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "A persistent volume: MariaDB that survives its pod",
+      "text": "A pod's own files die with it. A PersistentVolumeClaim asks for storage that outlives the pod; MicroK8s' hostpath-storage addon answers it with a directory on the node that runs the pod. The database password travels as a Secret. Delete the pod: the Deployment starts a new one on the same volume and the data is still there.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "k8s-lab-main",
+          "commands": [
+            "microk8s enable hostpath-storage    # the default StorageClass: stays enabled",
+            "kubectl create secret generic mariadb-root --from-literal=password=labroot",
+            "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: mariadb-data\nspec:\n  accessModes: [ReadWriteOnce]\n  resources:\n    requests: {storage: 1Gi}\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: mariadb\nspec:\n  replicas: 1\n  strategy: {type: Recreate}\n  selector:\n    matchLabels: {app: mariadb}\n  template:\n    metadata:\n      labels: {app: mariadb}\n    spec:\n      containers:\n      - name: mariadb\n        image: mariadb:11.4\n        env:\n        - name: MARIADB_ROOT_PASSWORD\n          valueFrom:\n            secretKeyRef: {name: mariadb-root, key: password}\n        volumeMounts:\n        - {name: data, mountPath: /var/lib/mysql}\n      volumes:\n      - name: data\n        persistentVolumeClaim: {claimName: mariadb-data}\nEOF",
+            "kubectl rollout status deployment/mariadb --timeout=300s && kubectl get pvc,pv"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "k8s-lab-main",
+          "commands": [
+            "sleep 15; kubectl exec deploy/mariadb -- mariadb -uroot -plabroot -e \"CREATE DATABASE shop; CREATE TABLE shop.items (name VARCHAR(20)); INSERT INTO shop.items VALUES ('kept');\"",
+            "kubectl delete pod -l app=mariadb && kubectl rollout status deployment/mariadb"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "k8s-lab-main",
+          "commands": [
+            "sleep 15; kubectl exec deploy/mariadb -- mariadb -uroot -plabroot -e 'SELECT * FROM shop.items;'    # kept: a new pod, the same data",
+            "kubectl get pv -o wide                 # the volume and where it lives"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "k8s-lab-main",
+          "commands": [
+            "kubectl delete deployment mariadb && kubectl delete pvc mariadb-data && kubectl delete secret mariadb-root    # the claim gone, the volume goes too (reclaim policy Delete)"
+          ]
+        }
       ]
     }
   ]
