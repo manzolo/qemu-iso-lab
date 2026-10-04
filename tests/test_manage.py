@@ -532,19 +532,30 @@ class ManageTests(BaseVmctlTestCase):
             self.assertIsNone(vmctl.host_setup.apt_available(["xorriso"]))
         self.assertEqual(run.call_args.kwargs["env"]["LC_ALL"], "C")
 
-    def test_apt_available_cannot_tell_while_a_configured_list_is_missing(self):
+    def test_apt_available_cannot_tell_while_a_published_list_is_missing(self):
         # WSL's Ubuntu 24.04 enables universe and ships only main/restricted lists: before
         # `apt update` fzf had no candidate and setup skipped it (2026-10-04).
         lists = self.root / "lists"; lists.mkdir()
-        (lists / "noble_main_Packages").write_text("")
-        (lists / "noble_restricted_Packages.lz4").write_text("")
-        targets = f"{lists}/noble_main_Packages\n{lists}/noble_restricted_Packages\n"
-        with mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=targets)):
-            self.assertTrue(vmctl.host_setup.apt_lists_complete())
-        with mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=targets + f"{lists}/noble_universe_Packages\n")):
+        (lists / "u_dists_noble_main_binary-amd64_Packages").write_text("")
+        (lists / "u_dists_noble_restricted_binary-amd64_Packages.lz4").write_text("")
+        (lists / "u_dists_noble_InRelease").write_text(
+            "SHA256:\n abc 1234 main/binary-amd64/Packages\n abc 99 restricted/binary-amd64/Packages\n"
+            " abc 5678 universe/binary-amd64/Packages\n abc 0 backports-empty/binary-amd64/Packages\n"
+            " abc 20 backports-empty/binary-amd64/Packages.gz\n")   # an empty list, compressed: still empty
+        def targets(*rows: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess([], 0, stdout="".join(f"{lists}/u_dists_noble_{c}_binary-{a}_Packages|{c}|{a}\n" for c, a in (r.split(":") for r in rows)))
+        def answer(listing: subprocess.CompletedProcess[str]):
+            return lambda argv, **_: subprocess.CompletedProcess(argv, 0, stdout="amd64\n") if argv[0] == "dpkg" else listing
+        present = ["main:amd64", "restricted:amd64", "main:all", "main:i386", "backports-empty:amd64"]
+        with mock.patch.object(subprocess, "run", side_effect=answer(targets(*present))):
+            self.assertTrue(vmctl.host_setup.apt_lists_complete())   # binary-all, i386, empty components: fine
+        with mock.patch.object(subprocess, "run", side_effect=answer(targets(*present, "universe:amd64"))):
             self.assertFalse(vmctl.host_setup.apt_lists_complete())
             with mock.patch.object(shutil, "which", return_value="/usr/bin/apt-cache"):
                 self.assertIsNone(vmctl.host_setup.apt_available(["fzf"]))
+        (lists / "u_dists_noble_InRelease").unlink()                   # a suite never fetched
+        with mock.patch.object(subprocess, "run", side_effect=answer(targets("universe:amd64"))):
+            self.assertFalse(vmctl.host_setup.apt_lists_complete())
         with mock.patch.object(subprocess, "run", side_effect=OSError):
             self.assertTrue(vmctl.host_setup.apt_lists_complete())
 

@@ -256,23 +256,43 @@ def missing_tools() -> list[str]:
 
 
 def apt_lists_complete() -> bool:
-    """Whether every package list the sources configure is on disk. The Ubuntu 24.04 image of WSL
-    enables universe but ships the lists of main and restricted only: before the first `apt update`
-    fzf, dialog, partclone... have no candidate, and setup skipped them as "no apt package on this
-    release" (fresh Windows 11 + WSL, 2026-10-04). Asking apt is the only answer that does not
-    depend on how the sources are written (one-line or deb822); a question it cannot answer
-    counts as complete, the behaviour before this check."""
+    """Whether every package list the sources configure and their repositories publish is on disk.
+    The Ubuntu 24.04 image of WSL enables universe but ships the lists of main and restricted only:
+    before the first `apt update` fzf, dialog, partclone... have no candidate, and setup skipped
+    them as "no apt package on this release" (fresh Windows 11 + WSL, 2026-10-04). A list counts
+    as expected when it is for the native architecture and its suite's (In)Release declares it
+    with a size: `binary-all`/`i386` lists and empty components (backports) are never downloaded
+    and are no sign of anything. A suite whose Release was never fetched is incomplete too. A
+    question apt cannot answer counts as complete, the behaviour before this check."""
     try:
-        result = subprocess.run(["apt-get", "indextargets", "--format", "$(FILENAME)", "Created-By: Packages"],
+        native = subprocess.run(["dpkg", "--print-architecture"], capture_output=True, text=True,
+                                stdin=subprocess.DEVNULL, timeout=30, check=False).stdout.strip()
+        result = subprocess.run(["apt-get", "indextargets", "--no-release-info", "--format",
+                                 "$(FILENAME)|$(COMPONENT)|$(ARCHITECTURE)", "Created-By: Packages"],
                                 capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60, check=False)
     except (OSError, subprocess.TimeoutExpired):
         return True
-    if result.returncode:
+    if result.returncode or not native:
         return True
-    for name in result.stdout.split():
+    for line in result.stdout.splitlines():
+        name, _, rest = line.partition("|")
+        component, _, arch = rest.partition("|")
+        suffix = f"_{component}_binary-{arch}_Packages"
+        if arch != native or not name.endswith(suffix):
+            continue
+        listed = Path(name)
         # apt may keep a list compressed (Acquire::GzipIndexes, lz4): the FILENAME is the plain name.
-        if not Path(name).exists() and not list(Path(name).parent.glob(Path(name).name + ".*")):
+        if listed.exists() or list(listed.parent.glob(listed.name + ".*")):
+            continue
+        prefix = name[: -len(suffix)]
+        release = next((Path(prefix + tail) for tail in ("_InRelease", "_Release") if Path(prefix + tail).exists()), None)
+        if release is None:
             return False
+        wanted = f"{component}/binary-{arch}/Packages"
+        for entry in release.read_text(errors="replace").splitlines():
+            fields = entry.split()
+            if len(fields) == 3 and fields[2] == wanted and fields[1] != "0":
+                return False
     return True
 
 
