@@ -32,6 +32,14 @@ cat /proc/mdstat
 
 `Personalities` elenca i livelli RAID che il kernel sa gestire; nessun array ancora.
 
+md rallenta una sincronizzazione fino a `speed_limit_min` (1000 KB/s) appena vede altro I/O sui membri,
+per tenere reattivo un server in produzione. Sui dischi virtuali di un lab, annidato soprattutto,
+quella stima trasforma secondi in mezz'ora; alza la soglia per questa sessione (sparisce al prossimo boot):
+
+```sh
+sudo sysctl -w dev.raid.speed_limit_min=200000
+```
+
 ## Esercizio 2: un mirror RAID1
 
 Due dischi, ogni blocco scritto su entrambi: uno può guastarsi. `--create` avvia subito la prima

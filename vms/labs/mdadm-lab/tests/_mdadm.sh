@@ -4,6 +4,10 @@ LAB_DISKS=$(on mdadm-lab-server lsblk -dnbo NAME,SIZE,TYPE | awk '$2==2147483648
 LAB_DISKS=${LAB_DISKS% }
 read -r DISK1 DISK2 DISK3 DISK4 <<<"$LAB_DISKS"
 
+# md throttles a sync to speed_limit_min (1000 KB/s) when it sees other I/O: on nested virtual disks
+# that made a 2 GiB mirror take half an hour (guide, exercise 1). Lifted for the running guest only.
+on mdadm-lab-server sudo sysctl -qw dev.raid.speed_limit_min=200000 >/dev/null 2>&1 || true
+
 # Unmount, stop every array, zero the superblocks and wipe: the disks end as the install left them.
 md_teardown() {
     on mdadm-lab-server "sudo umount -q /mnt/raid1 /mnt/raid5 2>/dev/null; for m in \$(ls /dev/md[0-9]* 2>/dev/null); do sudo mdadm --stop \$m >/dev/null 2>&1; done; for d in $LAB_DISKS; do sudo mdadm --zero-superblock \$d >/dev/null 2>&1; sudo wipefs -aq \$d; done; sudo rmdir /mnt/raid1 /mnt/raid5 2>/dev/null; true" >/dev/null 2>&1 || true

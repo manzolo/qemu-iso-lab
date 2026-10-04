@@ -123,12 +123,15 @@ Another voice: `--speaker "<name>"` (XTTS's built-in speakers), or a recording o
 ## Lab lessons
 
 Besides the tour's chapters, a clip can be a **lesson on one lab**: `export const series = "labs"`
-and `export const lab = "<group>"` in the clip. Six so far, one per lab with content:
+and `export const lab = "<group>"` in the clip. Eight so far, one per lab with content:
 `lab-lvm` (LVM from scratch), `lab-vpn` (WireGuard by hand, the two captures, the iptables fence),
 `lab-ssh` (keys, port knocking, hardening, fail2ban, nmap), `lab-docker` (engine, images,
 run/exec/logs, volumes, Compose, a build), `lab-netlab` (Pi-hole, the desktop, pfSense, the
-forwards and the map) and `lab-git` (Git from underneath: objects, refs, a conflict made and
-resolved, stash, remote, rebase, git flow, the reset). The tour page lists the lessons in their own playlist after the tour, a lesson
+forwards and the map), `lab-git` (Git from underneath: objects, refs, a conflict made and
+resolved, stash, remote, rebase, git flow, the reset), `lab-zfs` (a RAIDZ pool, a compressed
+dataset, snapshots and rollback, a disk offline and its resilver, a scrub, send/receive, mirrors)
+and `lab-mdadm` (a RAID1 mirror, a failed and replaced disk, a RAID5 whose hot spare rebuilds by
+itself, an online grow, stop and assemble: every read of /proc/mdstat waits for the sync in the guest). The tour page lists the lessons in their own playlist after the tour, a lesson
 does not play on into the next clip, and the catalog's **Labs** section shows "▶ Watch the lesson"
 on that lab's card (`tour.json` carries `series` and `lab`, `tools/build_catalog_site.py` joins
 them). Lessons are terminal-driven, with the helpers of `rec.mjs`: `d.session(vm)` opens `vmctl shell`
