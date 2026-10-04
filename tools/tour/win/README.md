@@ -24,6 +24,10 @@ nothing yet, `setup-windows.ps1` from WSL to the dashboard).
 - **WSL snapshot**: `windows11-studio.wsl.qcow2` + `windows11-studio_VARS.wsl.fd` = the same after
   `wsl --install` and its reboot, with Ubuntu 24.04 initialised (Linux user `demo`): the point to
   restart from for the part after WSL (clone, `./setup.sh`, the dashboard) without reinstalling it.
+- **Ready snapshot**: `windows11-studio.ready.qcow2` + `windows11-studio_VARS.ready.fd` = qemu-iso-lab
+  installed in WSL (`~/qemu-iso-lab`, `setup.sh` done, `demo` in the kvm group) and `ubuntu-24.04-cloud`
+  installed inside it (6 min 50 s three levels deep, 49 s on the host): for clips that start from a working
+  lab on Windows. The VM serves other recordings too: the snapshots are its known states, not its purpose.
 - Delete it like every libvirt VM here: `virsh undefine windows11-studio --nvram` and remove the files by
   hand. Never `--remove-all-storage` (it deletes the ISOs of the pools).
 
