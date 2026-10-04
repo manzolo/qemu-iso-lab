@@ -198,8 +198,9 @@ if (!dry) {
   const size = vm("DISPLAY=:0 xdpyinfo | awk '/dimensions:/{print $2}'").trim();
   if (size !== "1600x900") throw new Error(`the recording VM's screen is ${size}, not 1600x900`);
   vm("rm -f ~/lab/video/rec.mkv; setsid -f ffmpeg -loglevel error -y -f x11grab -framerate 30 -video_size 1600x900 -i :0 -c:v libx264 -preset ultrafast -crf 16 ~/lab/video/rec.mkv </dev/null >/tmp/ff.log 2>&1");
-  await sleep(1500);
-  if (!vm("pgrep -f 'x11gra[b]' >/dev/null && test -s ~/lab/video/rec.mkv && echo rec || true").includes("rec"))
+  await sleep(2000);
+  // Alive and silent is enough: the file stays empty for a few seconds while x264 fills its buffers.
+  if (!vm("pgrep -f 'x11gra[b]' >/dev/null && ! test -s /tmp/ff.log && echo rec || true").includes("rec"))
     throw new Error(`ffmpeg is not recording: ${vm("cat /tmp/ff.log").trim()}`);
 }
 t0 = Date.now();
