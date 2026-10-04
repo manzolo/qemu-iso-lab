@@ -13,7 +13,10 @@ const dry = process.argv.includes("--dry");
 const clip = await import(pathToFileURL(clipPath).href);
 const name = basename(clipPath, ".mjs");
 const ROOT = join(dirname(new URL(import.meta.url).pathname), "..", "..");
-const outDir = join(ROOT, "artifacts", "tour", "out", name);
+// --dry is the dress rehearsal: the whole clip in the studio, nothing recorded, waits cut to a
+// quarter (only the viewer's reading time: subtitles and read: pauses; polling loops keep theirs), a screenshot at the end of every cue in <clip>.rehearsal/ to read what the terminal and
+// the browser showed. Run it before every real take (docs/TOUR.md, "Before a take").
+const outDir = join(ROOT, "artifacts", "tour", "out", dry ? `${name}.rehearsal` : name);
 mkdirSync(outDir, { recursive: true });
 
 const VM = process.env.TOUR_VM;
@@ -24,7 +27,7 @@ const vm_ = vm;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Reading time of a cue: the longer language, ~14 characters a second, never under 3.5 s.
-const readMs = (c) => Math.max(3500, (Math.max(c.en.length, c.it.length) / 14) * 1000 + 800);
+const readMs = (c) => (dry ? 0 : Math.max(3500, (Math.max(c.en.length, c.it.length) / 14) * 1000 + 800));
 
 const browser = await chromium.connectOverCDP("http://127.0.0.1:19222");
 const ctx = browser.contexts()[0];
@@ -49,6 +52,7 @@ const d = {
       const held = Date.now() - current.startMs;
       if (held < current.minMs) await sleep(current.minMs - held);
       current.entry.end = (Date.now() - t0) / 1000;
+      if (dry) shot(current.entry.id);
     }
     const entry = { id, start: (Date.now() - t0) / 1000, end: null, en: c.en, it: c.it, top: !!c.top };
     log.push(entry);
@@ -158,7 +162,7 @@ const d = {
       await sleep(600);
       if (stamp() !== before) break;
     }
-    await sleep(read);
+    await sleep(dry ? read / 4 : read);
   },
   async leave() {
     d.step("exit");
@@ -189,6 +193,14 @@ const d = {
   },
 };
 
+// The rehearsal's evidence: the VM's whole screen when a cue ends, NN-<cue>.png.
+let shots = 0;
+function shot(id) {
+  const file = `${String(++shots).padStart(2, "0")}-${id}.png`;
+  vm(`DISPLAY=:0 import -window root /tmp/rehearsal.png`);
+  execFileSync("scp", [...SSH, "-q", `${VM}:/tmp/rehearsal.png`, join(outDir, file)]);
+}
+
 if (clip.setup) await clip.setup(d);
 if (!dry) {
   // The screen must be 1600x900 when the capture starts: a viewer opened on the VM (virt-manager)
@@ -210,6 +222,7 @@ try {
     const held = Date.now() - current.startMs;
     if (held < current.minMs) await sleep(current.minMs - held);
     current.entry.end = (Date.now() - t0) / 1000;
+    if (dry) shot(current.entry.id);
   }
   await sleep(1200);
 } finally {
@@ -218,6 +231,6 @@ try {
     execFileSync("scp", [...SSH, "-q", `${VM}:lab/video/rec.mkv`, join(outDir, "raw.mkv")]);
   }
   writeFileSync(join(outDir, "cues.json"), JSON.stringify({ clip: name, title: clip.title, lab: clip.lab || null, series: clip.series || "tour", cues: log, steps, ff }, null, 2));
-  console.log(`-> ${outDir}`);
+  console.log(dry ? `-> ${outDir}: rehearsal, ${shots} screenshots (one per cue) to read before the take` : `-> ${outDir}`);
 }
 process.exit(0);

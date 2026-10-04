@@ -86,7 +86,7 @@ export async function run(d) {
   await guest(d, "sudo lvcreate -L 1G -n logs labvg", 2500);
   await guest(d, "sudo lvs labvg", 3000);
   await d.cue("mount");
-  await guest(d, "sudo mkfs.ext4 -q /dev/labvg/data && sudo mkfs.xfs -q /dev/labvg/logs", 4000);
+  await guest(d, "sudo mkfs.ext4 -F -q /dev/labvg/data && sudo mkfs.xfs -f -q /dev/labvg/logs", 4000);
   await guest(d, "sudo mkdir -p /mnt/lab-data /mnt/lab-logs && sudo mount /dev/labvg/data /mnt/lab-data && sudo mount /dev/labvg/logs /mnt/lab-logs", 2500);
   await guest(d, "df -h /mnt/lab-data /mnt/lab-logs; sudo vgs labvg", 5000);
 

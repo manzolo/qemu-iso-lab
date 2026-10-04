@@ -50,7 +50,7 @@ formatta, si monta.
 sudo mdadm --create /dev/md0 --size=256M --run --level=1 --raid-devices=2 $(echo $DISKS | cut -d' ' -f1) $(echo $DISKS | cut -d' ' -f2)
 cat /proc/mdstat
 sudo mdadm --detail /dev/md0
-sudo mkfs.ext4 -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file
+sudo mkfs.ext4 -F -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file
 ```
 
 ## Esercizio 3: un disco guasto, sostituito

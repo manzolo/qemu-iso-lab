@@ -75,7 +75,7 @@ export async function run(d) {
   await d.guest(`${WAIT}; cat /proc/mdstat`, { read: 5000, timeout: 180000 });
   await d.guest("sudo mdadm --detail /dev/md0 | grep -E 'Raid Level|Array Size|State :|Active|Working'", { read: 4500 });
   await d.cue("mount");
-  await d.guest("sudo mkfs.ext4 -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file", { read: 3500 });
+  await d.guest("sudo mkfs.ext4 -F -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file", { read: 3500 });
 
   await d.cue("fail");
   await d.guest(`clear; sudo mdadm /dev/md0 --fail ${D(1)} && cat /proc/mdstat`, { read: 5000 });

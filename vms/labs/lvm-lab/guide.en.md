@@ -55,8 +55,8 @@ sudo vgs labvg            # about 6 GiB over 3 PVs
 A logical volume is a block device like a partition, but it can span disks and change size.
 
 ```bash
-sudo lvcreate -L 1G -n data labvg && sudo mkfs.ext4 /dev/labvg/data
-sudo lvcreate -L 1G -n logs labvg && sudo mkfs.xfs /dev/labvg/logs
+sudo lvcreate -L 1G -n data labvg && sudo mkfs.ext4 -F /dev/labvg/data
+sudo lvcreate -L 1G -n logs labvg && sudo mkfs.xfs -f /dev/labvg/logs
 sudo mkdir -p /mnt/lab-data /mnt/lab-logs
 sudo mount /dev/labvg/data /mnt/lab-data
 sudo mount /dev/labvg/logs /mnt/lab-logs
