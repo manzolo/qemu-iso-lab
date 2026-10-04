@@ -60,7 +60,15 @@ def resolve_path(path_str: str) -> Path:
 
 
 def expand_host_path(path_str: str) -> Path:
-    return Path(path_str).expanduser()
+    """A host path from a profile: ``~`` expanded, a relative path taken from the checkout.
+
+    Relative paths in profiles (``vms/profile-files/...``, ``vms/labs/<lab>/provision/...``) name
+    files of the repository. Resolved against the working directory they were found only when
+    vmctl ran from the checkout: from anywhere else (vmctl on the PATH) copy_from_host skipped
+    them with a warning and the post-install failed on the missing file (k8s-lab, 2026-10-04).
+    """
+    path = Path(path_str).expanduser()
+    return path if path.is_absolute() else state.ROOT / path
 
 
 def require_command(name: str) -> None:

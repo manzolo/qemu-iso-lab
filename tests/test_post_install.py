@@ -300,6 +300,23 @@ class PostInstallTests(BaseVmctlTestCase):
         self.assertFalse(any(a.endswith("/.") for a in executed[1]))
         self.assertEqual(executed[1][-1], "tester@127.0.0.1:/home/tester/.config/geany")
 
+    def test_relative_copy_source_is_taken_from_the_checkout_not_the_working_directory(self):
+        # vmctl on the PATH, run from another directory: vms/... still names the repository's file
+        # (k8s-lab's node script was skipped and its post-install failed, 2026-10-04).
+        source = self.root / "vms" / "labs" / "demo" / "provision" / "node.sh"
+        source.parent.mkdir(parents=True)
+        source.write_text("#!/bin/sh\n", encoding="utf-8")
+        elsewhere = self.root / "elsewhere"
+        elsewhere.mkdir()
+        previous = os.getcwd()
+        os.chdir(elsewhere)
+        try:
+            self.assertEqual(vmctl.runtime.expand_host_path("vms/labs/demo/provision/node.sh"), source)
+            self.assertEqual(vmctl.runtime.expand_host_path(str(source)), source)
+            self.assertEqual(vmctl.runtime.expand_host_path("~/x"), pathlib.Path.home() / "x")
+        finally:
+            os.chdir(previous)
+
     def test_cmd_post_install_recursive_copy_skips_dangling_symlink(self):
         source_dir = self.root / "host-geany-dangling"
         source_dir.mkdir()
