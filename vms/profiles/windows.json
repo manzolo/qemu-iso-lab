@@ -1,6 +1,7 @@
 {
   "bases": {
     "windows-base": {
+      "hyperv": true,
       "meta": {
         "family": "windows",
         "role": "desktop",
@@ -83,7 +84,7 @@
       "meta": {
         "slug": "windows-10",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/windows10.iso",
       "memory_mb": 4096,
@@ -107,7 +108,7 @@
       "meta": {
         "slug": "windows-11",
         "verified": "2026-10-02",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/windows11.iso",
       "memory_mb": 8192,

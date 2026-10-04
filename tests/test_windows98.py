@@ -176,6 +176,17 @@ class Windows98Tests(BaseVmctlTestCase):
         self.assertEqual(args[args.index("-cpu") + 1], "pentium3",
                          "Windows 98 does not survive the feature set of a modern host CPU")
 
+    def test_hyperv_enlightenments_only_on_kvm_with_the_host_cpu(self):
+        import shutil
+        import vmctl.qemu
+        cpu = lambda **kw: (lambda a: a[a.index("-cpu") + 1])(vmctl.qemu.common_args(  # noqa: E731
+            dict(self.vm_config, **kw.pop("vm", {})), None, dry_run=True, headless=True, allow_missing_disk=True, **kw))
+        with mock.patch.object(shutil, "which", return_value="/usr/bin/qemu-system-x86_64"):
+            self.assertEqual(cpu(accel="kvm", vm={"hyperv": True}), "host,hv-passthrough")
+            self.assertEqual(cpu(accel="kvm"), "host")
+            self.assertEqual(cpu(accel="tcg", vm={"hyperv": True}), "max")
+            self.assertEqual(cpu(accel="kvm", vm={"hyperv": True, "cpu_model": "pentium3"}), "pentium3")
+
     def test_command_is_registered(self):
         args = cli.build_parser().parse_args(["bootstrap-windows98", "testvm"])
         self.assertIs(args.func, vmctl.lifecycle.cmd_bootstrap_windows98)

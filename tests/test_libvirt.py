@@ -64,6 +64,18 @@ class LibvirtTests(BaseVmctlTestCase):
         self.assertEqual(xml.find("devices/channel/target").get("name"), "org.qemu.guest_agent.0")
         self.assertIsNotNone(xml.find("devices/sound"))
         self.assertIsNotNone(xml.find("devices/input"))
+        self.assertIsNone(xml.find("features/hyperv"), "only hyperv: true asks for the enlightenments")
+
+    def test_hyperv_profiles_get_the_enlightenments_and_the_reference_clock(self):
+        # Without them Windows 11 reset the moment WSL started its VM (windows11-studio, 2026-10-04).
+        self.vm_config["hyperv"] = True
+        xml = ET.fromstring(libvirt.render_domain_xml("windows", self.vm_config))
+        self.assertEqual(xml.find("features/hyperv").get("mode"), "passthrough")
+        self.assertEqual(xml.find("clock/timer").get("name"), "hypervclock")
+        self.vm_config["cpu_model"] = "pentium3"
+        xml = ET.fromstring(libvirt.render_domain_xml("windows", self.vm_config))
+        self.assertIsNone(xml.find("features/hyperv"))
+        self.assertIsNone(xml.find("clock"))
 
     def test_missing_disk(self):
         with self.assertRaisesRegex(VMError, "Installed disk missing"):

@@ -895,6 +895,19 @@ def hotplug_port_args(vm: dict[str, Any]) -> list[str]:
     return args
 
 
+def hyperv_cpu_flags(vm: dict[str, Any], cpu_model: str, accel: str | None) -> str:
+    """`hyperv: true` (the windows-base profiles): the Hyper-V enlightenments KVM supports, as
+    `hv-passthrough`. Windows runs faster on them (clock, interrupts, spinlocks), and once it is a
+    hypervisor itself (WSL2, Windows Sandbox, virtualization-based security) they are what keeps it
+    alive: without them a Windows 11 guest reset on the spot, no dump, the moment WSL started its
+    VM (windows11-studio, 2026-10-04). Passthrough instead of a list because the list depends on
+    the host (hv-evmcs exists on Intel only). KVM with the host CPU only: TCG has no Hyper-V and a
+    named cpu_model (Windows 98's pentium3) is the point of its profile."""
+    if vm.get("hyperv") is not True or accel != "kvm" or cpu_model != "host":
+        return ""
+    return ",hv-passthrough"
+
+
 def common_args(
     vm: dict[str, Any], variant: str | None, dry_run: bool = False, accel: str | None = "kvm",
     headless: bool = False, serial_stdio: bool = False, no_reboot: bool = False,
@@ -907,6 +920,7 @@ def common_args(
     # cpu_model means it: Windows 98 does not survive the feature set of a 2020s processor, and the
     # model it was written for is the point of the profile.
     cpu_model = str(vm.get("cpu_model") or ("host" if accel == "kvm" else "max"))
+    cpu_model += hyperv_cpu_flags(vm, cpu_model, accel)
     machine_extra, memory_objects, shared_device = shared_dir_args(vm)
     args = ["qemu-system-x86_64", "-m", str(vm["memory_mb"]), "-cpu", cpu_model, "-smp", str(vm["cpus"]),
             "-machine", machine_arg(vm, accel=accel) + machine_extra, "-boot", "menu=on"]

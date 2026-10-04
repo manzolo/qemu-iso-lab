@@ -39,7 +39,14 @@ def render_domain_xml(name: str, vm: dict[str, Any]) -> str:
     ET.SubElement(features, "apic")
     if vm.get("vmport") is False:
         ET.SubElement(features, "vmport", state="off")
+    if vm.get("hyperv") is True and not vm.get("cpu_model"):
+        # The libvirt spelling of qemu.hyperv_cpu_flags: every enlightenment the host supports,
+        # plus the Hyper-V reference clock.
+        ET.SubElement(features, "hyperv", mode="passthrough")
     ET.SubElement(domain, "cpu", mode="host-passthrough")
+    if vm.get("hyperv") is True and not vm.get("cpu_model"):
+        clock = ET.SubElement(domain, "clock", offset="utc")
+        ET.SubElement(clock, "timer", name="hypervclock", present="yes")
     shared = qemu.shared_dir_config(vm)
     if shared:
         backing = ET.SubElement(domain, "memoryBacking")

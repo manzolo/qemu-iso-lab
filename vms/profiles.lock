@@ -2281,9 +2281,14 @@
       ]
     },
     "windows-10": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:71ea52bd7ae835d7d9e2b92c73179e32f3befc3f9df9d5b0e26408115a9111c4",
+      "version": "1.0.1",
+      "fingerprint": "sha256:27b6e4241016554ae70a8068608a0281aa50591d779c8eed04fefc26247acda8",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-04",
+          "note": "hyperv: true, the Hyper-V enlightenments (hv-passthrough; libvirt <hyperv mode='passthrough'/> + hypervclock): faster Windows, and WSL2/VBS inside no longer resets the guest"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2303,9 +2308,14 @@
       ]
     },
     "windows-11": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:1487e2c80b2b643ef1c3d39566cea45612bad324dbe03c6eeb111437bd0764ea",
+      "version": "1.0.1",
+      "fingerprint": "sha256:711f0aad01c9518497c0304c2d4c4d3c2acbc3a2032589c6d64447faac35db71",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-04",
+          "note": "hyperv: true, the Hyper-V enlightenments (hv-passthrough; libvirt <hyperv mode='passthrough'/> + hypervclock): faster Windows, and WSL2/VBS inside no longer resets the guest"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
