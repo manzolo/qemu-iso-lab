@@ -75,9 +75,9 @@ export async function run(d) {
   await d.guest("mysql testdb -e \"DELETE FROM users WHERE name = 'Alice';\"    # refused: Alice has orders", { read: 4500 });
 
   await d.cue("privileges");
-  await d.guest("clear; sudo mysql -e \"CREATE USER 'reader'@'localhost' IDENTIFIED BY 'Reader123!'; GRANT SELECT ON testdb.* TO 'reader'@'localhost'; SHOW GRANTS FOR 'reader'@'localhost';\"", { read: 4000 });
-  await d.guest("mysql -u reader -p'Reader123!' testdb -e 'SELECT COUNT(*) FROM users;'    # allowed", { read: 3000 });
-  await d.guest("mysql -u reader -p'Reader123!' testdb -e \"INSERT INTO users (name) VALUES ('x');\"    # denied", { read: 3500 });
+  await d.guest("clear; sudo mysql -e \"CREATE USER 'reader'@'localhost' IDENTIFIED BY 'readerpass'; GRANT SELECT ON testdb.* TO 'reader'@'localhost'; SHOW GRANTS FOR 'reader'@'localhost';\"", { read: 4000 });
+  await d.guest("mysql -u reader -p'readerpass' testdb -e 'SELECT COUNT(*) FROM users;'    # allowed", { read: 3000 });
+  await d.guest("mysql -u reader -p'readerpass' testdb -e \"INSERT INTO users (name) VALUES ('x');\"    # denied", { read: 3500 });
   await d.guest("sudo mysql -e \"DROP USER 'reader'@'localhost';\"", { read: 1500 });
 
   await d.cue("admin");

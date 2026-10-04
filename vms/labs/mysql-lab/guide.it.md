@@ -64,10 +64,10 @@ annulla. L'ultimo comando fallisce apposta: la chiave esterna non lascia un ordi
 ## Esercizio 4: utenti e privilegi
 
 ```sh
-sudo mysql -e "CREATE USER 'reader'@'localhost' IDENTIFIED BY 'Reader123!'; GRANT SELECT ON testdb.* TO 'reader'@'localhost';"
+sudo mysql -e "CREATE USER 'reader'@'localhost' IDENTIFIED BY 'readerpass'; GRANT SELECT ON testdb.* TO 'reader'@'localhost';"
 sudo mysql -e "SHOW GRANTS FOR 'reader'@'localhost';"
-mysql -u reader -p'Reader123!' testdb -e 'SELECT COUNT(*) FROM users;'           # permesso
-mysql -u reader -p'Reader123!' testdb -e "INSERT INTO users (name) VALUES ('x');" # negato
+mysql -u reader -p'readerpass' testdb -e 'SELECT COUNT(*) FROM users;'           # permesso
+mysql -u reader -p'readerpass' testdb -e "INSERT INTO users (name) VALUES ('x');" # negato
 sudo mysql -e "REVOKE SELECT ON testdb.* FROM 'reader'@'localhost'; DROP USER 'reader'@'localhost';"
 ```
 

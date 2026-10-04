@@ -128,13 +128,18 @@ const d = {
     // A login can take a minute (pam_motd on a server): past 4 s the wait is fast-forwarded in the edit.
     const started = Date.now();
     let fast = false;
+    let inside = false;
     for (let i = 0; i < 90; i++) {
       await sleep(1000);
       const probe = vm_(`cd ${checkout} && ./bin/vmctl shell ${vm} -- 'who; pgrep -af "sshd:.*@pts"' 2>/dev/null | grep -c pts || true`).trim();
-      if (probe !== "0" && probe !== "") break;
+      if (probe !== "0" && probe !== "") { inside = true; break; }
       if (!fast && Date.now() - started > 4000) { d.ff(8); fast = true; }
     }
     if (fast) d.ffEnd();
+    // Never go on without the session: the clip's guest commands would be typed into the studio's
+    // own terminal (mysql-lab, 2026-10-04: a lab VM that failed its install, `sudo mysql` asking the
+    // studio's password).
+    if (!inside) throw new Error(`no SSH session in ${vm} after 90 s: is it running? (vmctl status, its post-install log)`);
     await sleep(1500);
     await d.type("PROMPT_COMMAND='date +%s%N >/tmp/.p'; clear", 30);
     await d.key("Return");

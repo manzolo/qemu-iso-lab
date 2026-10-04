@@ -7,8 +7,8 @@ cleanup() { rootsql "DROP USER IF EXISTS 'reader'@'localhost';" >/dev/null; }
 trap cleanup EXIT
 cleanup
 # reader's statements, on stdin as well; the password is the exercise's own.
-reader() { printf '%s\n' "$1" | on "$V" mysql -u reader -pReader123! -N -B testdb 2>&1 || true; }
-rootsql "CREATE USER 'reader'@'localhost' IDENTIFIED BY 'Reader123!'; GRANT SELECT ON testdb.* TO 'reader'@'localhost';" >/dev/null
+reader() { printf '%s\n' "$1" | on "$V" mysql -u reader -preaderpass -N -B testdb 2>&1 || true; }
+rootsql "CREATE USER 'reader'@'localhost' IDENTIFIED BY 'readerpass'; GRANT SELECT ON testdb.* TO 'reader'@'localhost';" >/dev/null
 assert_contains "SHOW GRANTS lists SELECT on testdb" "$(rootsql "SHOW GRANTS FOR 'reader'@'localhost';")" "GRANT SELECT ON .testdb"
 assert_contains "reader may SELECT" "$(reader 'SELECT COUNT(*) FROM users;')" "^4$"
 assert_contains "reader may not INSERT" "$(reader "INSERT INTO users (name) VALUES ('x');")" "denied"
