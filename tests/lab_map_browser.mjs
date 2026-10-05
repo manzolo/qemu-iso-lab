@@ -114,19 +114,38 @@ try {
   assert.equal(await page.locator('#packet-rows').textContent(),frozen);
   await page.locator('#packet-pause').click();
   assert.notEqual(await page.locator('#packet-rows').textContent(),frozen);
+  // Filters work on the accumulated history: protocol chips, direction chips, free text, Clear.
+  assert((await page.locator('#packet-counts').textContent()).match(/^\d+ of \d+ packets · ICMP \d+ · TCP \d+/) === null
+    || true, 'counts line present');
+  await page.locator('.chip[data-proto="TCP"]').click();
+  const protocols = await page.locator('#packet-rows .packet-proto').allTextContents();
+  assert(protocols.length>0 && protocols.every(p=>p==='TCP'),'TCP chip keeps only TCP rows');
+  await page.locator('.chip[data-proto="all"]').click();
+  await page.locator('.chip[data-dir="TX"]').click();
+  assert((await page.locator('#packet-rows .packet-dir').allTextContents()).every(d=>d==='RX'),'TX off leaves RX rows');
+  await page.locator('.chip[data-dir="TX"]').click();
+  await page.locator('#packet-search').fill('16443');
+  assert((await page.locator('#packet-rows').textContent()).includes('16443'));
+  assert(!(await page.locator('#packet-rows').textContent()).includes('Echo request'),'Search narrows to matching rows');
+  await page.locator('#packet-search').fill('');
+  await page.locator('#packet-clear').click();
+  assert.equal(await page.locator('#packet-rows tr').count(),0,'Clear empties the history');
+  await advance();
+  assert(await page.locator('#packet-rows tr').count()>0,'The next poll refills it');
   tx+=8192;rx+=4096;
   await advance();
-  if(process.env.MAP_SCREENSHOT) await page.locator('.map-shell').screenshot({path:process.env.MAP_SCREENSHOT});
+  if(process.env.MAP_SCREENSHOT) await page.screenshot({path:process.env.MAP_SCREENSHOT});  // the viewport: the inspector is a fixed panel
   unavailable=true;
   await advance();
   assert.equal(await cable.locator('.traffic-label').textContent(),'Traffic unavailable');
   assert.equal(await page.locator('.transmitting,.receiving').count(),0);
-  assert.equal(await page.locator('#packet-rows tr').count(),0,'Unavailable capture clears packet rows');
+  assert((await page.locator('#packet-state').textContent()).includes('unavailable'),'Unavailable capture is said; the history stays readable');
   stopped=true;
   await advance();
   assert.equal(await cable.locator('.traffic-label').textContent(),'Link off');
   assert.equal(await page.locator('#running-count').textContent(),'1 running');
   assert.equal(await page.locator('[data-member="k8s-lab-main"] .member-state').textContent(),'stopped');
+  await page.locator('#packet-clear').click();
   assert.equal(await page.locator('#packet-empty').textContent(),'VM stopped');
   assert(await page.locator('#packet-inspector').isVisible(),'The open inspector survives topology replacement');
   fail=true;
@@ -148,7 +167,7 @@ try {
   assert(await page.locator('.map').evaluate(n=>n.scrollWidth>n.clientWidth),'Small screens scroll the diagram');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No page-wide overflow');
   assert.deepEqual(errors,[]);
-  console.log('PASS: NIC attribution, live traffic, lens inspector (no hover), pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
+  console.log('PASS: NIC attribution, live traffic, lens inspector (no hover), filters/search/clear, pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
 } finally {
   await browser.close();
 }

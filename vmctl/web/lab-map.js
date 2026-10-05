@@ -10,16 +10,43 @@
   const status = document.getElementById('map-live');
   const inspector = document.getElementById('packet-inspector');
   const pauseButton = document.getElementById('packet-pause');
+  const searchBox = document.getElementById('packet-search');
   // The inspector opens only from a cable's lens button and stays until closed: nothing pops
-  // up while the pointer crosses the map (2026-10-05).
+  // up while the pointer crosses the map (2026-10-05). It accumulates what the polls bring
+  // (the server hands the last 24 headers per NIC each time) up to HISTORY rows, so the
+  // filters have something to work on.
+  const HISTORY = 500;
   let samples = new Map(), selected = null, paused = false, fresh = false, restoringFocus = false;
-  let anchor = {x:24, y:24};
+  let history = new Map();  // packet id -> packet, for the selected NIC
+  let clearedBelow = 0;     // Clear drops what the current sample still carries, until newer ids arrive
+  const filters = {proto: 'all', dirs: new Set(['TX', 'RX']), text: ''};
+  let anchor = {x:24, y:24}, dragged = null;
   const keyOf = node => JSON.stringify([node.dataset.vm, node.dataset.nic]);
   const buttonOf = key => [...map.querySelectorAll('.nic')].find(node => keyOf(node) === key)?.querySelector('.inspect-btn');
   const positionInspector = () => {
     const width = inspector.offsetWidth, height = inspector.offsetHeight;
-    inspector.style.left = `${Math.max(12, Math.min(anchor.x + 16, innerWidth - width - 12))}px`;
-    inspector.style.top = `${Math.max(12, Math.min(anchor.y + 16, innerHeight - height - 12))}px`;
+    const at = dragged || {x: anchor.x + 16, y: anchor.y + 16};
+    inspector.style.left = `${Math.max(12, Math.min(at.x, innerWidth - width - 12))}px`;
+    inspector.style.top = `${Math.max(12, Math.min(at.y, innerHeight - height - 12))}px`;
+  };
+  const protoClass = packet => ['TCP', 'UDP', 'ARP'].includes(packet.protocol) ? packet.protocol
+    : packet.protocol.startsWith('ICMP') ? 'ICMP' : 'other';
+  const endpointText = (address, port) => port === undefined ? address : `${address.includes(':') ? `[${address}]` : address}:${port}`;
+  const matches = packet => {
+    if (filters.proto !== 'all' && protoClass(packet) !== filters.proto) return false;
+    if (!filters.dirs.has(packet.direction)) return false;
+    if (!filters.text) return true;
+    const hay = `${packet.protocol} ${endpointText(packet.source, packet.source_port)} ${endpointText(packet.destination, packet.destination_port)} ${packet.info} ${packet.source_mac} ${packet.destination_mac}`.toLowerCase();
+    return hay.includes(filters.text);
+  };
+  const absorb = () => {
+    const sample = samples.get(selected);
+    if (!sample?.packets_available) return;
+    for (const packet of sample.packets || []) if (packet.id > clearedBelow) history.set(packet.id, packet);
+    if (history.size > HISTORY) {
+      const ids = [...history.keys()].sort((a, b) => a - b);
+      for (const id of ids.slice(0, history.size - HISTORY)) history.delete(id);
+    }
   };
   function renderInspector() {
     map.querySelectorAll('.nic').forEach(node => {
@@ -36,12 +63,14 @@
     const sample = samples.get(selected);
     const state = document.getElementById('packet-state');
     state.textContent = !fresh ? 'Updates unavailable or paused · last observed headers' : paused
-      ? 'Paused · displayed packet list frozen' : sample?.packets_available ? 'Live · newest packets first' : 'Packet capture unavailable';
+      ? 'Paused · the list is frozen, capture goes on' : sample?.packets_available ? 'Live · newest packets first' : 'Packet capture unavailable';
     if (!paused) {
+      absorb();
+      const all = [...history.values()].sort((a, b) => b.id - a.id);
+      const shown = all.filter(matches);
       const rows = document.getElementById('packet-rows');
       const fragment = document.createDocumentFragment();
-      const packets = sample?.packets_available ? sample.packets || [] : [];
-      for (const packet of packets) {
+      for (const packet of shown) {
         const row = document.createElement('tr');
         const cell = (text, className = '') => {
           const td = document.createElement('td');
@@ -53,7 +82,6 @@
         cell(new Date(packet.time * 1000).toLocaleTimeString('en-GB'), 'packet-time');
         cell(packet.direction, `packet-dir ${packet.direction === 'TX' ? 'packet-tx' : 'packet-rx'}`);
         cell(packet.protocol, 'packet-proto');
-        const endpointText = (address, port) => port === undefined ? address : `${address.includes(':') ? `[${address}]` : address}:${port}`;
         const route = cell(`${endpointText(packet.source, packet.source_port)} → ${endpointText(packet.destination, packet.destination_port)}`, 'packet-route');
         const detail = document.createElement('div');
         detail.className = 'packet-detail';
@@ -65,8 +93,12 @@
       }
       rows.replaceChildren(fragment);
       const empty = document.getElementById('packet-empty');
-      empty.hidden = packets.length > 0;
-      empty.textContent = sample?.packets_available ? 'No recent packets. Try a ping between lab VMs.' : sample?.packet_reason || 'Waiting for capture information…';
+      empty.hidden = shown.length > 0;
+      empty.textContent = !sample?.packets_available && !all.length ? (sample?.packet_reason || 'Waiting for capture information…')
+        : all.length && !shown.length ? 'No packet matches the filters.' : 'No recent packets. Try a ping between lab VMs.';
+      const counts = ['TCP', 'UDP', 'ICMP', 'ARP', 'other'].map(kind => [kind, all.filter(packet => protoClass(packet) === kind).length])
+        .filter(([, n]) => n).map(([kind, n]) => `${kind} ${n}`).join(' · ');
+      document.getElementById('packet-counts').textContent = all.length ? `${shown.length} of ${all.length} packets${counts ? ' · ' + counts : ''}` : '';
     }
     positionInspector();
   }
@@ -74,7 +106,7 @@
     const node = button.closest('.nic');
     const key = keyOf(node);
     if (selected === key && !event?.type?.startsWith('key')) { closeInspector(false); return; }  // the lens toggles
-    if (selected !== key) paused = false;
+    if (selected !== key) { paused = false; history = new Map(); clearedBelow = 0; dragged = null; }
     selected = key;
     const rect = button.getBoundingClientRect();
     anchor = {x:rect.right, y:rect.bottom};
@@ -82,7 +114,7 @@
   }
   const closeInspector = (restoreFocus = false) => {
     const trigger = selected ? buttonOf(selected) : null;
-    selected = null; paused = false;
+    selected = null; paused = false; history = new Map(); clearedBelow = 0; dragged = null;
     renderInspector();
     if (restoreFocus && trigger) {
       restoringFocus = true;
@@ -101,7 +133,35 @@
     }
   });
   pauseButton.addEventListener('click', () => { paused = !paused; renderInspector(); });
+  document.getElementById('packet-clear').addEventListener('click', () => {
+    clearedBelow = Math.max(0, ...[...history.keys()], ...((samples.get(selected)?.packets || []).map(p => p.id)));
+    history = new Map(); renderInspector();
+  });
   document.getElementById('packet-close').addEventListener('click', () => closeInspector(true));
+  inspector.querySelectorAll('.chip[data-proto]').forEach(chip => chip.addEventListener('click', () => {
+    filters.proto = chip.dataset.proto;
+    inspector.querySelectorAll('.chip[data-proto]').forEach(other => other.setAttribute('aria-pressed', String(other === chip)));
+    renderInspector();
+  }));
+  inspector.querySelectorAll('.chip[data-dir]').forEach(chip => chip.addEventListener('click', () => {
+    const dir = chip.dataset.dir;
+    if (filters.dirs.has(dir)) { if (filters.dirs.size > 1) filters.dirs.delete(dir); } else filters.dirs.add(dir);
+    inspector.querySelectorAll('.chip[data-dir]').forEach(other => other.setAttribute('aria-pressed', String(filters.dirs.has(other.dataset.dir))));
+    renderInspector();
+  }));
+  searchBox.addEventListener('input', () => { filters.text = searchBox.value.trim().toLowerCase(); renderInspector(); });
+  // Drag by the header; the resize handle is the browser's own (CSS resize).
+  const head = document.getElementById('packet-drag');
+  head.addEventListener('pointerdown', event => {
+    if (event.target.closest('button')) return;
+    const rect = inspector.getBoundingClientRect();
+    const offset = {x: event.clientX - rect.left, y: event.clientY - rect.top};
+    const move = e => { dragged = {x: e.clientX - offset.x, y: e.clientY - offset.y}; positionInspector(); };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    event.preventDefault();
+  });
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && selected) closeInspector(true); });
   window.addEventListener('resize', positionInspector);
   const prepareCables = () => {

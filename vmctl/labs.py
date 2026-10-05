@@ -744,29 +744,36 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .map svg .inspect-btn:focus { outline:none; }
 .map svg .nic.inspected .inspect-btn .bg { fill:#245369; stroke:#6fcfe3; }
 .map svg .nic.offline .inspect-btn { opacity:.45; }
-.packet-inspector { position:fixed; z-index:20; width:min(640px, calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto;
-  box-sizing:border-box; background:#0c1929; color:#e0ebf7; border:1px solid #42657f; border-radius:14px; box-shadow:0 20px 65px #0009; font-size:12px; }
+.packet-inspector { position:fixed; z-index:20; width:min(820px, calc(100vw - 24px)); height:min(560px, calc(100dvh - 24px)); min-width:320px; min-height:240px;
+  resize:both; overflow:hidden; display:flex; flex-direction:column; background:#101c2a; color:#dce9f5; border:1px solid #3c5c74; border-radius:12px; box-shadow:0 18px 48px rgba(0,0,0,.55); }
 .packet-inspector[hidden] { display:none; }
-.packet-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px 10px; }
-.packet-head strong { color:#7edced; font-size:11px; letter-spacing:.12em; }
-.packet-actions { display:flex; gap:6px; }
+.packet-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid #263b50; cursor:move; user-select:none; }
+.packet-head > div:first-child { display:flex; align-items:baseline; gap:12px; min-width:0; }
+.packet-head strong { font-size:12px; letter-spacing:.12em; color:#8fd3ea; }
+.packet-head #packet-link { font:600 14px/1.3 system-ui, sans-serif; color:#e8f2fb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.packet-actions { display:flex; gap:6px; flex-shrink:0; }
 .packet-inspector button { background:#182f43; color:#cce5f7; border:1px solid #3c5c74; padding:5px 9px; border-radius:6px; font:inherit; cursor:pointer; }
 .packet-inspector button[aria-pressed="true"] { background:#245369; border-color:#6fcfe3; color:#fff; }
-.packet-inspector button:focus-visible { outline:2px solid #a3ecff; outline-offset:2px; }
-#packet-link { margin:0 16px; font-weight:650; font-size:14px; overflow-wrap:anywhere; }
-#packet-state { margin:5px 16px 12px; color:#92b6cf; }
-.packet-scroll { overflow:auto; max-height:270px; border-top:1px solid #2a4055; border-bottom:1px solid #2a4055; }
-.packet-inspector table { border:0; border-radius:0; background:transparent; table-layout:fixed; }
+.packet-inspector button:focus-visible, .packet-inspector input:focus-visible { outline:2px solid #a3ecff; outline-offset:2px; }
+.packet-filters { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; padding:10px 16px; border-bottom:1px solid #263b50; background:#0d1823; }
+.packet-chips { display:inline-flex; gap:4px; }
+.packet-inspector .chip { padding:3px 9px; border-radius:999px; font-size:11px; font-family:ui-monospace, monospace; }
+.packet-inspector .chip-tx[aria-pressed="true"] { color:#78dff7; } .packet-inspector .chip-rx[aria-pressed="true"] { color:#c2adff; }
+.packet-inspector #packet-search { flex:1 1 160px; min-width:120px; background:#0b1420; color:#dce9f5; border:1px solid #3c5c74; border-radius:6px; padding:4px 8px; font:12px ui-monospace, monospace; }
+.packet-inspector #packet-state { margin:0; padding:6px 16px; font-size:11px; color:#9bb7cf; }
+.packet-scroll { flex:1 1 auto; overflow:auto; }
+.packet-inspector table { border:0; border-radius:0; background:transparent; table-layout:fixed; width:100%; margin:0; }
 .packet-inspector th, .packet-inspector td { border-color:#263b50; padding:8px; font-size:11px; }
 .packet-inspector th { position:sticky; top:0; background:#142639; color:#9bb7cf; font-size:10px; }
 .packet-inspector td { font-family:ui-monospace,monospace; }
 .packet-inspector .packet-time { width:64px; } .packet-inspector .packet-dir { width:28px; }
 .packet-inspector .packet-proto { width:53px; } .packet-inspector .packet-size { width:40px; text-align:right; }
-.packet-route { overflow-wrap:anywhere; } .packet-detail { color:#9bb2c8; margin-top:3px; font-size:10px; }
+.packet-inspector .packet-detail { color:#9bb7cf; font-size:10px; }
 .packet-inspector .packet-tx { color:#78dff7; } .packet-inspector .packet-rx { color:#c2adff; }
-#packet-empty { padding:20px 16px; margin:0; color:#9bb2c8; }
-.packet-foot { margin:0; padding:10px 16px; color:#829bb4; font-size:11px; }
-@media (max-width:480px) { .packet-inspector .packet-time { display:none; } .packet-head { flex-wrap:wrap; } }
+.packet-inspector #packet-empty { margin:0; padding:18px 16px; color:#9bb7cf; font-size:12px; }
+.packet-foot { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0; padding:8px 16px; border-top:1px solid #263b50; font-size:10px; color:#7f98b0; }
+.packet-foot #packet-counts { font-family:ui-monospace, monospace; color:#9bd8ee; }
+@media (max-width:480px) { .packet-inspector .packet-time { display:none; } .packet-head { flex-wrap:wrap; } .packet-inspector { resize:none; height:min(70dvh, calc(100dvh - 24px)); } }
 @media (prefers-reduced-motion: reduce) {
   .map svg .nic.transmitting .signal.tx, .map svg .nic.receiving .signal.rx { animation:none; }
 }
@@ -890,13 +897,19 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
 <div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>The lens on a LAN cable opens its packet inspector</span></div>
 </section>
 <aside id="packet-inspector" class="packet-inspector" aria-label="Packet inspector" hidden>
-<div class="packet-head"><strong>PACKET INSPECTOR</strong><div class="packet-actions">
+<div class="packet-head" id="packet-drag" title="Drag to move"><div><strong>PACKET INSPECTOR</strong><span id="packet-link"></span></div><div class="packet-actions">
 <button id="packet-pause" type="button" aria-pressed="false">Pause</button>
+<button id="packet-clear" type="button">Clear</button>
 <button id="packet-close" type="button" aria-label="Close packet inspector">Close</button></div></div>
-<p id="packet-link"></p><p id="packet-state"></p>
+<div class="packet-filters" role="group" aria-label="Packet filters">
+<span class="packet-chips" data-filter="proto"><button type="button" class="chip" data-proto="all" aria-pressed="true">All</button><button type="button" class="chip" data-proto="TCP" aria-pressed="false">TCP</button><button type="button" class="chip" data-proto="UDP" aria-pressed="false">UDP</button><button type="button" class="chip" data-proto="ICMP" aria-pressed="false">ICMP</button><button type="button" class="chip" data-proto="ARP" aria-pressed="false">ARP</button><button type="button" class="chip" data-proto="other" aria-pressed="false">Other</button></span>
+<span class="packet-chips" data-filter="dir"><button type="button" class="chip chip-tx" data-dir="TX" aria-pressed="true">TX</button><button type="button" class="chip chip-rx" data-dir="RX" aria-pressed="true">RX</button></span>
+<input id="packet-search" type="search" placeholder="IP, port, text…" aria-label="Filter packets by text" autocomplete="off">
+</div>
+<p id="packet-state"></p>
 <div class="packet-scroll"><table aria-label="Recent packets"><thead><tr><th class="packet-time">Time</th><th class="packet-dir">Dir</th><th class="packet-proto">Protocol</th><th>Source → destination / detail</th><th class="packet-size">Bytes</th></tr></thead><tbody id="packet-rows"></tbody></table>
 <p id="packet-empty">Click the lens on a LAN cable to inspect its packets.</p></div>
-<p class="packet-foot">Recent headers · last 30s, up to 24 entries · sampled up to 100 packets/s per segment · no payload stored</p>
+<p class="packet-foot"><span id="packet-counts"></span><span>headers only · sampled up to 100 packets/s per segment · no payload stored</span></p>
 </aside>
 <p class="sub">Every NAT NIC is a private slirp {SLIRP_SUBNET} of its own VM: the guest reaches the Internet, the host reaches it only through the forwards on 127.0.0.1. The segments are shared between the VMs of this host only.</p>
 <h2>Access</h2>

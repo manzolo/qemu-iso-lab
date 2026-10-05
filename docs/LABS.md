@@ -64,8 +64,11 @@ the cable glow, moving pulses and TX/RX byte rates summarize activity during the
 interval rather than tracing individual packets or proving that the guest received them.
 
 Click the small lens on a LAN cable (or focus it and press Enter) to open the **Packet inspector**;
-it stays open until **Close** or Escape (nothing opens on hover). **Pause** freezes the displayed
-list, **Resume** follows new packets again. The panel shows recent TX/RX packet headers:
+it stays open until **Close** or Escape (nothing opens on hover), can be dragged by its title bar
+and resized from its corner. The list accumulates what the polls bring (up to 500 headers);
+the chips filter by protocol (TCP, UDP, ICMP, ARP, other) and direction (TX, RX), the box filters
+by any text (an IP, a port, a flag), the footer counts what is shown out of what was seen;
+**Pause** freezes the list while the capture goes on, **Clear** starts it afresh. The panel shows recent TX/RX packet headers:
 source/destination IPs and ports, ICMP echo request/reply with sequence number, TCP flags,
 UDP, ARP and IPv6. Unsupported or truncated headers are labelled rather than guessed.
 The list is a bounded sample: up to 24 recent entries per NIC from the last 30 seconds,
