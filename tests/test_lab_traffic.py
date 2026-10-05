@@ -99,6 +99,23 @@ class TrafficTests(unittest.TestCase):
                 lab_traffic.SegmentListener("239.1.2.3:34567")
             factory.return_value.close.assert_called_once()
 
+    def test_segment_packets_are_available_even_when_agent_supplies_counters(self):
+        entries, _, segment = self.sample(agent=True, reply=[
+            {"hardware-address": B, "statistics": {"rx-bytes": 12, "tx-bytes": 34}},
+        ])
+        segment.assert_called_once()
+        self.assertEqual((entries[1]["source"], entries[1]["rx"]), ("guest agent", 12))
+        self.assertTrue(entries[1]["packets_available"])
+        self.assertFalse(entries[0]["packets_available"])
+
+    def test_capture_failure_preserves_agent_counters_but_reports_sniffer_failure(self):
+        entries, _, _ = self.sample(agent=True, reply=[
+            {"hardware-address": B, "statistics": {"rx-bytes": 12, "tx-bytes": 34}},
+        ], segment_error=OSError("capture failed"))
+        self.assertTrue(entries[1]["available"])
+        self.assertFalse(entries[1]["packets_available"])
+        self.assertIn("capture failed", entries[1]["packet_reason"])
+
 
 if __name__ == "__main__":
     unittest.main()

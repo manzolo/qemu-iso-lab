@@ -37,6 +37,9 @@ def main():
             time.sleep(.02)
         expected = {macs[0]: {"rx": 0, "tx": 98}, macs[1]: {"rx": 98, "tx": 0}}
         assert observed["counters"] == received["counters"] == expected
+        assert observed["packets"][macs[0]][0]["direction"] == "TX"
+        assert observed["packets"][macs[1]][0]["direction"] == "RX"
+        assert observed["packets"][macs[1]][0]["bytes"] == len(packet)
         assert observed["epoch"] == first["epoch"]
         # Closing the map releases the socket after its idle lease even with no requests.
         listener = monitor.listeners[endpoint]
@@ -44,6 +47,7 @@ def main():
             listener.last_used = time.monotonic() - lab_traffic.IDLE_SECONDS - 1
         listener.thread.join(timeout=2)
         assert listener.stop.is_set() and listener.sock.fileno() == -1
+        assert not listener.history.records
         restarted = monitor.segment(endpoint, macs)
         assert restarted["epoch"] != first["epoch"]
         assert all(values == {"rx": 0, "tx": 0} for values in restarted["counters"].values())

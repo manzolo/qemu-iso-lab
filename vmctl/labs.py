@@ -539,7 +539,7 @@ def _device_icon(role: str, x: float, y: float) -> str:
 def _link(x1: float, y1: float, x2: float, y2: float, active: bool, kind: str) -> str:
     power = "online" if active else "offline"
     coords = f'x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}"'
-    return (f'<g class="link {kind} {power}"><line class="cable" {coords}/>'
+    return (f'<g class="link {kind} {power}"><line class="cable-hit" {coords}/><line class="cable-halo" {coords}/><line class="cable" {coords}/>'
             f'<line class="signal tx" {coords}/><line class="signal rx" {coords}/>'
             f'<circle class="socket" cx="{x1}" cy="{y1}" r="4"/>'
             f'<circle class="socket" cx="{x2}" cy="{y2}" r="4"/></g>')
@@ -592,7 +592,8 @@ def _svg(lab: dict[str, Any]) -> str:
     for seg in lab["segments"]:
         y = seg_y[seg["name"]]
         active = any(m["running"] and m["name"] in seg["members"] for m in members)
-        out.append(_link(_MARGIN, y, width - _MARGIN, y, active, "segment-bus"))
+        out.append(f'<g class="segment-track" data-segment="{esc(seg["name"])}">'
+                   + _link(_MARGIN, y, width - _MARGIN, y, active, "segment-bus") + '</g>')
         subnet = f' · {seg["subnet"]}' if seg["subnet"] else ""
         out.append(f'<text class="bus-t" x="{_MARGIN}" y="{y + 29}">segment {esc(seg["name"])}{esc(subnet)}</text>')
         out.append(f'<text class="network-caption" x="{width - _MARGIN}" y="{y + 29}" text-anchor="end">ISOLATED LAN</text>')
@@ -645,7 +646,7 @@ def _svg(lab: dict[str, Any]) -> str:
             # Separate ports and labels for guests attached to more than one segment.
             port_x = x + 24 + index * 18
             attrs = f'data-vm="{esc(member["name"])}" data-nic="{esc(nic["id"])}"'
-            out.append(f'<g class="nic lan-nic {power}" {attrs}><title>{esc(nic["segment"])} · {esc(member["name"])} · {badge}</title>')
+            out.append(f'<g class="nic lan-nic {power}" data-segment="{esc(nic["segment"])}" {attrs}><title>{esc(nic["segment"])} · {esc(member["name"])} · {badge}</title>')
             out.append(_link(port_x, box_y + box_h, port_x, y, member["running"], "seg-l"))
             label_x = x + 32 + len(lans) * 18
             out.append(f'<text class="addr" x="{label_x}" y="{y - 58}">{esc(nic["address"] or "address not declared")}</text>')
@@ -695,15 +696,19 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .map svg .link.segment-bus, .map svg .link.seg-l { --cable:#a997ff; }
 .map svg .cable { stroke:#34475c; stroke-width:2; fill:none; }
 .map svg .offline .cable { stroke-dasharray:5 6; }
-.map svg .online .cable { stroke:var(--cable); stroke-opacity:.65; filter:drop-shadow(0 0 4px var(--cable)); }
+.map svg .online .cable { stroke:var(--cable); stroke-opacity:.25; }
+.map svg .cable-halo { stroke:var(--cable); stroke-width:9; opacity:0; pointer-events:none; }
+.map svg .link.active .cable { stroke-opacity:var(--traffic-strength, .8); stroke-width:3; filter:drop-shadow(0 0 5px var(--cable)); }
+.map svg .link.active .cable-halo { opacity:var(--traffic-halo, .18); filter:blur(4px); }
 .map svg .segment-bus .cable, .map svg .nat-bus .cable { stroke-width:3; }
 .map svg .socket { fill:#132337; stroke:#536b82; stroke-width:1.5; }
-.map svg .online .socket { fill:var(--cable); stroke:#cfedff; filter:drop-shadow(0 0 4px var(--cable)); }
+.map svg .online .socket { fill:#254052; stroke:#698694; }
+.map svg .link.active .socket { fill:var(--cable); stroke:#d5f5ff; filter:drop-shadow(0 0 5px var(--cable)); }
 .map svg .signal { stroke:#c9f6ff; stroke-width:3; stroke-dasharray:3 24; stroke-linecap:round; opacity:0; pointer-events:none; }
 .map svg .signal.tx { transform:translateX(-2px); }
 .map svg .signal.rx { transform:translateX(2px); stroke:#c4b5ff; }
-.map svg .nic.transmitting .signal.tx { opacity:1; animation:packet-flow .75s linear infinite; filter:drop-shadow(0 0 5px #72e7ff); }
-.map svg .nic.receiving .signal.rx { opacity:1; animation:packet-flow .75s linear infinite reverse; }
+.map svg .nic.transmitting .signal.tx { opacity:1; animation:packet-flow var(--traffic-speed, 1.5s) linear infinite; filter:drop-shadow(0 0 5px #72e7ff); }
+.map svg .nic.receiving .signal.rx { opacity:1; animation:packet-flow var(--traffic-speed, 1.5s) linear infinite reverse; }
 @keyframes packet-flow { to { stroke-dashoffset:-54; } }
 .map svg .pill { fill:#102236; stroke:#36506a; stroke-width:1; }
 .map svg .online .pill { stroke:#43869b; }
@@ -723,6 +728,34 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .map svg .addr { font:12px ui-monospace, monospace; fill:#c8daf0; }
 .map svg .traffic-label { fill:#77def3; font:10px ui-monospace, monospace; }
 .map svg .nic.offline .traffic-label { fill:#778b9f; }
+.map svg .cable-hit { stroke:transparent; stroke-width:18; pointer-events:none; }
+.map svg .nic .cable-hit { pointer-events:stroke; }
+.map svg .nic { cursor:pointer; }
+.map svg .nic:focus { outline:none; }
+.map svg .nic:focus .cable, .map svg .nic.inspected .cable { stroke:#eefaff; stroke-width:3; }
+.packet-inspector { position:fixed; z-index:20; width:min(640px, calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto;
+  box-sizing:border-box; background:#0c1929; color:#e0ebf7; border:1px solid #42657f; border-radius:14px; box-shadow:0 20px 65px #0009; font-size:12px; }
+.packet-inspector[hidden] { display:none; }
+.packet-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px 10px; }
+.packet-head strong { color:#7edced; font-size:11px; letter-spacing:.12em; }
+.packet-actions { display:flex; gap:6px; }
+.packet-inspector button { background:#182f43; color:#cce5f7; border:1px solid #3c5c74; padding:5px 9px; border-radius:6px; font:inherit; cursor:pointer; }
+.packet-inspector button[aria-pressed="true"] { background:#245369; border-color:#6fcfe3; color:#fff; }
+.packet-inspector button:focus-visible { outline:2px solid #a3ecff; outline-offset:2px; }
+#packet-link { margin:0 16px; font-weight:650; font-size:14px; overflow-wrap:anywhere; }
+#packet-state { margin:5px 16px 12px; color:#92b6cf; }
+.packet-scroll { overflow:auto; max-height:270px; border-top:1px solid #2a4055; border-bottom:1px solid #2a4055; }
+.packet-inspector table { border:0; border-radius:0; background:transparent; table-layout:fixed; }
+.packet-inspector th, .packet-inspector td { border-color:#263b50; padding:8px; font-size:11px; }
+.packet-inspector th { position:sticky; top:0; background:#142639; color:#9bb7cf; font-size:10px; }
+.packet-inspector td { font-family:ui-monospace,monospace; }
+.packet-inspector .packet-time { width:64px; } .packet-inspector .packet-dir { width:28px; }
+.packet-inspector .packet-proto { width:53px; } .packet-inspector .packet-size { width:40px; text-align:right; }
+.packet-route { overflow-wrap:anywhere; } .packet-detail { color:#9bb2c8; margin-top:3px; font-size:10px; }
+.packet-inspector .packet-tx { color:#78dff7; } .packet-inspector .packet-rx { color:#c2adff; }
+#packet-empty { padding:20px 16px; margin:0; color:#9bb2c8; }
+.packet-foot { margin:0; padding:10px 16px; color:#829bb4; font-size:11px; }
+@media (max-width:480px) { .packet-inspector .packet-time { display:none; } .packet-head { flex-wrap:wrap; } }
 @media (prefers-reduced-motion: reduce) {
   .map svg .nic.transmitting .signal.tx, .map svg .nic.receiving .signal.rx { animation:none; }
 }
@@ -843,8 +876,18 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
 <section class="map-shell" aria-label="Lab topology">
 <div class="map-toolbar"><span class="map-title">NETWORK TOPOLOGY</span><div class="map-legend"><span><i class="on"></i>VM on</span><span><i></i>VM off</span><span><i class="flow"></i>Measured traffic</span></div></div>
 <div class="map" id="lab-topology">{_svg(lab)}</div>
-<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>Lights = VM power · pulses = observed TX / RX · hover a cable for details</span></div>
+<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>Hover a cable to inspect packets · click to pin</span></div>
 </section>
+<aside id="packet-inspector" class="packet-inspector" aria-label="Packet inspector" hidden>
+<div class="packet-head"><strong>PACKET INSPECTOR</strong><div class="packet-actions">
+<button id="packet-pin" type="button" aria-pressed="false">Pin</button>
+<button id="packet-pause" type="button" aria-pressed="false">Pause</button>
+<button id="packet-close" type="button" aria-label="Close packet inspector">Close</button></div></div>
+<p id="packet-link"></p><p id="packet-state"></p>
+<div class="packet-scroll"><table aria-label="Recent packets"><thead><tr><th class="packet-time">Time</th><th class="packet-dir">Dir</th><th class="packet-proto">Protocol</th><th>Source → destination / detail</th><th class="packet-size">Bytes</th></tr></thead><tbody id="packet-rows"></tbody></table>
+<p id="packet-empty">Hover a LAN cable to inspect packets.</p></div>
+<p class="packet-foot">Recent headers · last 30s, up to 24 entries · sampled up to 100 packets/s per segment · no payload stored</p>
+</aside>
 <p class="sub">Every NAT NIC is a private slirp {SLIRP_SUBNET} of its own VM: the guest reaches the Internet, the host reaches it only through the forwards on 127.0.0.1. The segments are shared between the VMs of this host only.</p>
 <h2>Access</h2>
 {_access_html(lab)}

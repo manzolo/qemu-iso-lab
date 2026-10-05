@@ -9,13 +9,50 @@ from __future__ import annotations
 import socket
 import threading
 import time
+from collections import deque
 from typing import Any
 
-from vmctl import config, guest_agent, qemu
+from vmctl import config, guest_agent, packet_summary, qemu
 from vmctl.errors import VMError
 
 
 IDLE_SECONDS = 15
+PACKET_HISTORY = 128
+PACKET_SECONDS = 30
+PACKETS_PER_SECOND = 100
+PACKETS_PER_NIC = 24
+
+
+class PacketHistory:
+    """A short, bounded sample of headers; byte counters remain unsampled."""
+    def __init__(self) -> None:
+        self.records: deque[dict[str, Any]] = deque(maxlen=PACKET_HISTORY)
+        self.window = 0.0
+        self.recorded = 0
+        self.sequence = 0
+
+    def add(self, frame: bytes, now: float) -> None:
+        if now - self.window >= 1:
+            self.window, self.recorded = now, 0
+        if self.recorded >= PACKETS_PER_SECOND:
+            return
+        self.recorded += 1
+        summary = packet_summary.summarize(frame)
+        if summary is not None:
+            self.sequence += 1
+            self.records.append({**summary, "id": self.sequence, "time": time.time(), "observed": now})
+
+    def for_mac(self, mac: str, now: float) -> list[dict[str, Any]]:
+        while self.records and self.records[0]["observed"] < now - PACKET_SECONDS:
+            self.records.popleft()
+        found = []
+        for record in reversed(self.records):
+            direction = "TX" if record["source_mac"] == mac else "RX" if record["destination_mac"] == mac or record["multicast"] else ""
+            if direction:
+                found.append({key: value for key, value in record.items() if key != "observed"} | {"direction": direction})
+            if len(found) >= PACKETS_PER_NIC:
+                break
+        return found
 
 
 def count_frame(frame: bytes, counters: dict[str, dict[str, int]]) -> None:
@@ -37,6 +74,7 @@ class SegmentListener:
     def __init__(self, endpoint: str):
         self.lock = threading.Lock()
         self.counters: dict[str, dict[str, int]] = {}
+        self.history = PacketHistory()
         self.last_used = time.monotonic()
         self.epoch = self.last_used
         self.error = ""
@@ -67,11 +105,14 @@ class SegmentListener:
                     continue
                 with self.lock:
                     count_frame(frame, self.counters)
+                    self.history.add(frame, time.monotonic())
         except OSError as exc:
             self.error = str(exc)
         finally:
             self.stop.set()
             self.sock.close()
+            with self.lock:
+                self.history.records.clear()
 
     def sample(self, macs: list[str]) -> dict[str, Any]:
         with self.lock:
@@ -79,6 +120,7 @@ class SegmentListener:
             for mac in macs:
                 self.counters.setdefault(mac, {"rx": 0, "tx": 0})
             return {"time": self.last_used, "epoch": self.epoch,
+                    "packets": {mac: self.history.for_mac(mac, self.last_used) for mac in macs},
                     "counters": {mac: dict(self.counters[mac]) for mac in macs}}
 
     def close(self) -> None:
@@ -123,6 +165,8 @@ class TrafficMonitor:
                     pass
             for nic in qemu.network_specs(vm):
                 entry = {"vm": member["name"], "nic": nic["id"], "mac": nic["mac"],
+                         "packets_available": False, "packets": [],
+                         "packet_reason": "VM stopped" if not member["running"] else "Packet inspection is available on LAN links; NAT has no packet capture.",
                          "available": False, "reason": "VM stopped" if not member["running"] else "Traffic unavailable"}
                 entries.append(entry)
                 if not member["running"]:
@@ -131,20 +175,24 @@ class TrafficMonitor:
                 if isinstance(stats, dict) and all(type(stats.get(key)) is int and stats[key] >= 0 for key in ("rx-bytes", "tx-bytes")):
                     entry.update(available=True, source="guest agent", rx=stats["rx-bytes"], tx=stats["tx-bytes"],
                                  time=time.monotonic(), epoch="qga")
-                elif nic["type"] == "segment":
+                if nic["type"] == "segment":
                     endpoint = qemu.segment_endpoint(str(nic["name"]), nic["mcast"])
                     segments.setdefault(endpoint, []).append(entry)
-                else:
+                elif not entry["available"]:
                     entry["reason"] = "NAT traffic needs guest-agent counters"
         for endpoint, members in segments.items():
             try:
                 sample = self.segment(endpoint, [m["mac"] for m in members])
                 for entry in members:
-                    entry.update(available=True, source="segment frames", time=sample["time"], epoch=sample["epoch"],
-                                 **sample["counters"][entry["mac"]])
+                    if not entry["available"]:
+                        entry.update(available=True, source="segment frames", time=sample["time"], epoch=sample["epoch"],
+                                     **sample["counters"][entry["mac"]])
+                    entry.update(packets_available=True, packet_reason="", packets=sample.get("packets", {}).get(entry["mac"], []))
             except (OSError, ValueError, VMError) as exc:
                 for entry in members:
-                    entry["reason"] = f"Segment capture unavailable: {exc}"
+                    entry["packet_reason"] = f"Segment capture unavailable: {exc}"
+                    if not entry["available"]:
+                        entry["reason"] = entry["packet_reason"]
         return entries
 
     def close(self) -> None:
