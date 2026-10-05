@@ -28,7 +28,10 @@ try {
   const target = fixture.nics.find(n=>n.vm==='k8s-lab-main' && n.nic!==fixture.nics[0].nic);
   const packet = () => ({id:tick,time:1720000000+tick,source:'172.20.6.1',destination:'172.20.6.11',
     source_mac:'52:54:00:00:00:01',destination_mac:'52:54:00:00:00:02',direction:'TX',protocol:'ICMP',
-    info:`Echo request · id=42 seq=${tick}`,bytes:98});
+    info:`Echo request · id=42 seq=${tick}`,bytes:98,
+    layers:[{name:'Ethernet',fields:[['Destination','52:54:00:00:00:02'],['Source','52:54:00:00:00:01'],['Type','IPv4 (0x0800)']]},
+      {name:'IPv4',fields:[['TTL','64'],['Protocol','ICMP (1)']]},{name:'ICMP',fields:[['Type',`Echo request (8)`],['Sequence number',String(tick)]]}],
+    header_hex:'525400000002525400000001080045000054000140004001f00dac140601ac14060b0800f7ff002a0007'});
   assert(target);
   await page.route('http://lab.test/**', async route => {
     const url = new URL(route.request().url());
@@ -128,6 +131,17 @@ try {
   assert((await page.locator('#packet-rows').textContent()).includes('16443'));
   assert(!(await page.locator('#packet-rows').textContent()).includes('Echo request'),'Search narrows to matching rows');
   await page.locator('#packet-search').fill('');
+  // A row opens its detail: the decoded layers and the header bytes, never a payload.
+  await page.locator('tr.packet-row').first().click();
+  assert.equal(await page.locator('tr.packet-detail-row').count(),1,'One detail row under the clicked packet');
+  const detail = await page.locator('tr.packet-detail-row').textContent();
+  assert(detail.includes('IPv4') && detail.includes('TTL') && detail.includes('Header bytes'),'Layers and hex are shown');
+  assert(detail.includes('0000  52 54 00 00 00 02 52 54'),'Hex dump starts with the Ethernet header');
+  await advance();
+  assert.equal(await page.locator('tr.packet-detail-row').count(),1,'The open detail survives a refresh');
+  if(process.env.MAP_SCREENSHOT) await page.screenshot({path:process.env.MAP_SCREENSHOT.replace('.png','-detail.png')});
+  await page.locator('tr.packet-row.open').click();
+  assert.equal(await page.locator('tr.packet-detail-row').count(),0,'A second click closes it');
   await page.locator('#packet-clear').click();
   assert.equal(await page.locator('#packet-rows tr').count(),0,'Clear empties the history');
   await advance();
@@ -167,7 +181,7 @@ try {
   assert(await page.locator('.map').evaluate(n=>n.scrollWidth>n.clientWidth),'Small screens scroll the diagram');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No page-wide overflow');
   assert.deepEqual(errors,[]);
-  console.log('PASS: NIC attribution, live traffic, lens inspector (no hover), filters/search/clear, pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
+  console.log('PASS: NIC attribution, live traffic, lens inspector (no hover), filters/search/clear, packet detail, pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
 } finally {
   await browser.close();
 }

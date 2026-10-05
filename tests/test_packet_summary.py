@@ -108,3 +108,46 @@ class PacketSummaryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PacketDetailTests(unittest.TestCase):
+    """The detail view of a row: decoded layers and the header bytes, never the payload."""
+
+    def test_layers_and_header_hex_stop_at_the_transport_header(self):
+        tcp = struct.pack("!HHIIBBHHH", 45000, 443, 7, 9, 0x60, 0x18, 1024, 0, 0) + bytes([1, 1, 1, 1]) + b"SECRET-PAYLOAD"
+        raw = ethernet(ipv4(tcp, 6))
+        result = packet_summary.summarize(raw)
+        self.assertEqual([layer["name"] for layer in result["layers"]], ["Ethernet", "IPv4", "TCP"])
+        fields = {name: value for layer in result["layers"] for name, value in layer["fields"]}
+        self.assertEqual(fields["Type"], "IPv4 (0x0800)")
+        self.assertEqual(fields["TTL"], "64")
+        self.assertEqual(fields["Protocol"], "TCP (6)")
+        self.assertEqual(fields["Sequence number"], "7")
+        self.assertEqual(fields["Header length"], "24 bytes (4 bytes of options)")
+        self.assertEqual(fields["Flags"], "ACK PSH (0x18)")
+        self.assertEqual(fields["Payload"], "14 bytes (not captured)")
+        header = bytes.fromhex(result["header_hex"])
+        self.assertEqual(len(header), 14 + 20 + 24)
+        self.assertNotIn(b"SECRET", header)
+        self.assertNotIn("SECRET", json.dumps(result))
+
+    def test_every_kind_of_frame_has_layers_and_bounded_hex(self):
+        arp = struct.pack("!HHBBH6s4s6s4s", 1, 0x0800, 6, 4, 2, bytes.fromhex("525400000001"),
+                          ipaddress.IPv4Address("172.20.6.1").packed, bytes(6), ipaddress.IPv4Address("172.20.6.11").packed)
+        frames = {
+            "ARP": ethernet(arp, 0x0806), "ICMP": ethernet(ipv4(echo() + b"x" * 56)),
+            "UDP": ethernet(ipv4(struct.pack("!HHHH", 50000, 53, 20, 0) + b"q" * 12, 17)),
+            "ICMPv6": ethernet(ipv6(echo(128) + b"y" * 8), 0x86dd), "Ethernet": ethernet(b"\x00" * 40, 0x1234),
+        }
+        for name, raw in frames.items():
+            result = packet_summary.summarize(raw)
+            self.assertEqual(result["protocol"], name)
+            self.assertTrue(result["layers"], name)
+            header = bytes.fromhex(result["header_hex"])
+            self.assertTrue(14 <= len(header) <= len(raw), name)
+            self.assertNotIn(b"x" * 8, header)
+            self.assertNotIn(b"q" * 8, header)
+        # A frame too short for its headers still describes what it has, with the hex of what was read.
+        result = packet_summary.summarize(ethernet(b"\x00" * 10))
+        self.assertIn("truncated", result["info"].lower())
+        self.assertGreaterEqual(len(result["header_hex"]), 28)

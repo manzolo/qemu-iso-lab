@@ -19,6 +19,7 @@
   let samples = new Map(), selected = null, paused = false, fresh = false, restoringFocus = false;
   let history = new Map();  // packet id -> packet, for the selected NIC
   let clearedBelow = 0;     // Clear drops what the current sample still carries, until newer ids arrive
+  let expanded = new Set(), lastShown = [];  // opened rows (by packet id) and the list on screen
   const filters = {proto: 'all', dirs: new Set(['TX', 'RX']), text: ''};
   let anchor = {x:24, y:24}, dragged = null;
   const keyOf = node => JSON.stringify([node.dataset.vm, node.dataset.nic]);
@@ -64,14 +65,18 @@
     const state = document.getElementById('packet-state');
     state.textContent = !fresh ? 'Updates unavailable or paused · last observed headers' : paused
       ? 'Paused · the list is frozen, capture goes on' : sample?.packets_available ? 'Live · newest packets first' : 'Packet capture unavailable';
-    if (!paused) {
-      absorb();
+    {
+      if (!paused) absorb();
       const all = [...history.values()].sort((a, b) => b.id - a.id);
-      const shown = all.filter(matches);
+      const shown = paused ? lastShown : (lastShown = all.filter(matches));
       const rows = document.getElementById('packet-rows');
       const fragment = document.createDocumentFragment();
       for (const packet of shown) {
         const row = document.createElement('tr');
+        row.className = 'packet-row' + (expanded.has(packet.id) ? ' open' : '');
+        row.dataset.id = packet.id;
+        row.tabIndex = 0;
+        row.setAttribute('aria-expanded', String(expanded.has(packet.id)));
         const cell = (text, className = '') => {
           const td = document.createElement('td');
           td.textContent = text;
@@ -90,6 +95,7 @@
         route.title = `${packet.source_mac} → ${packet.destination_mac}`;
         cell(packet.bytes, 'packet-size');
         fragment.append(row);
+        if (expanded.has(packet.id)) fragment.append(detailRow(packet));
       }
       rows.replaceChildren(fragment);
       const empty = document.getElementById('packet-empty');
@@ -102,11 +108,73 @@
     }
     positionInspector();
   }
+  // The detail of one packet: every decoded header with its fields, then the header bytes
+  // (Ethernet through the transport header: the server never keeps the payload).
+  function detailRow(packet) {
+    const tr = document.createElement('tr');
+    tr.className = 'packet-detail-row';
+    const td = document.createElement('td');
+    td.colSpan = 5;
+    const box = document.createElement('div');
+    box.className = 'packet-layers';
+    for (const layer of packet.layers || []) {
+      const section = document.createElement('section');
+      const h = document.createElement('h4');
+      h.textContent = layer.name;
+      const dl = document.createElement('dl');
+      for (const [name, value] of layer.fields || []) {
+        const dt = document.createElement('dt'); dt.textContent = name;
+        const dd = document.createElement('dd'); dd.textContent = value;
+        dl.append(dt, dd);
+      }
+      section.append(h, dl);
+      box.append(section);
+    }
+    if (!packet.layers?.length) {
+      const note = document.createElement('p');
+      note.textContent = 'No decoded headers for this packet (captured before the detail view existed).';
+      box.append(note);
+    }
+    if (packet.header_hex) {
+      const hex = document.createElement('section');
+      hex.className = 'packet-hex';
+      const h = document.createElement('h4');
+      const bytes = packet.header_hex.length / 2;
+      h.textContent = `Header bytes · ${bytes} of ${packet.bytes} on the wire · payload not captured`;
+      const pre = document.createElement('pre');
+      const lines = [];
+      for (let i = 0; i < packet.header_hex.length; i += 32) {
+        const chunk = packet.header_hex.slice(i, i + 32).match(/../g);
+        const ascii = chunk.map(b => { const c = parseInt(b, 16); return c >= 32 && c < 127 ? String.fromCharCode(c) : '.'; }).join('');
+        lines.push(`${(i / 2).toString(16).padStart(4, '0')}  ${chunk.slice(0, 8).join(' ').padEnd(23)}  ${chunk.slice(8).join(' ').padEnd(23)}  ${ascii}`);
+      }
+      pre.textContent = lines.join('\n');
+      hex.append(h, pre);
+      box.append(hex);
+    }
+    td.append(box);
+    tr.append(td);
+    return tr;
+  }
+  const toggleRow = row => {
+    const id = Number(row.dataset.id);
+    if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+    renderInspector();
+    inspector.querySelector(`tr.packet-row[data-id="${id}"]`)?.focus({preventScroll:true});
+  };
+  document.getElementById('packet-rows').addEventListener('click', event => {
+    const row = event.target.closest('tr.packet-row');
+    if (row && !window.getSelection()?.toString()) toggleRow(row);
+  });
+  document.getElementById('packet-rows').addEventListener('keydown', event => {
+    const row = event.target.closest('tr.packet-row');
+    if (row && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleRow(row); }
+  });
   function openInspector(button, event) {
     const node = button.closest('.nic');
     const key = keyOf(node);
     if (selected === key && !event?.type?.startsWith('key')) { closeInspector(false); return; }  // the lens toggles
-    if (selected !== key) { paused = false; history = new Map(); clearedBelow = 0; dragged = null; }
+    if (selected !== key) { paused = false; history = new Map(); clearedBelow = 0; expanded = new Set(); lastShown = []; dragged = null; }
     selected = key;
     const rect = button.getBoundingClientRect();
     anchor = {x:rect.right, y:rect.bottom};
@@ -114,7 +182,7 @@
   }
   const closeInspector = (restoreFocus = false) => {
     const trigger = selected ? buttonOf(selected) : null;
-    selected = null; paused = false; history = new Map(); clearedBelow = 0; dragged = null;
+    selected = null; paused = false; history = new Map(); clearedBelow = 0; expanded = new Set(); lastShown = []; dragged = null;
     renderInspector();
     if (restoreFocus && trigger) {
       restoringFocus = true;
@@ -135,7 +203,7 @@
   pauseButton.addEventListener('click', () => { paused = !paused; renderInspector(); });
   document.getElementById('packet-clear').addEventListener('click', () => {
     clearedBelow = Math.max(0, ...[...history.keys()], ...((samples.get(selected)?.packets || []).map(p => p.id)));
-    history = new Map(); renderInspector();
+    history = new Map(); expanded = new Set(); lastShown = []; renderInspector();
   });
   document.getElementById('packet-close').addEventListener('click', () => closeInspector(true));
   inspector.querySelectorAll('.chip[data-proto]').forEach(chip => chip.addEventListener('click', () => {

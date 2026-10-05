@@ -770,6 +770,21 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .packet-inspector .packet-proto { width:53px; } .packet-inspector .packet-size { width:40px; text-align:right; }
 .packet-inspector .packet-detail { color:#9bb7cf; font-size:10px; }
 .packet-inspector .packet-tx { color:#78dff7; } .packet-inspector .packet-rx { color:#c2adff; }
+.packet-inspector tr.packet-row { cursor:pointer; }
+.packet-inspector tr.packet-row:hover td, .packet-inspector tr.packet-row:focus-visible td { background:#152737; }
+.packet-inspector tr.packet-row:focus-visible { outline:none; }
+.packet-inspector tr.packet-row.open td { background:#17304a; border-bottom-color:transparent; }
+.packet-inspector tr.packet-row td:first-child::before { content:"▸"; color:#6fa9c4; margin-right:6px; }
+.packet-inspector tr.packet-row.open td:first-child::before { content:"▾"; }
+.packet-inspector .packet-detail-row td { background:#0d1823; padding:10px 16px 14px; }
+.packet-layers { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px 20px; }
+.packet-layers section { min-width:0; }
+.packet-layers h4 { margin:0 0 6px; font:600 11px/1.3 system-ui, sans-serif; letter-spacing:.08em; color:#8fd3ea; text-transform:uppercase; }
+.packet-layers dl { margin:0; display:grid; grid-template-columns:minmax(90px, auto) 1fr; gap:2px 10px; font-size:11px; }
+.packet-layers dt { color:#8aa3bb; } .packet-layers dd { margin:0; color:#e3eef8; word-break:break-all; }
+.packet-layers .packet-hex { grid-column:1 / -1; }
+.packet-layers pre { margin:0; padding:8px 10px; background:#0a1420; border:1px solid #263b50; border-radius:6px; font:11px/1.5 ui-monospace, monospace; color:#cfe3f3; overflow:auto; }
+@media (max-width:480px) { .packet-inspector tr.packet-row td:first-child::before { content:""; margin:0; } }
 .packet-inspector #packet-empty { margin:0; padding:18px 16px; color:#9bb7cf; font-size:12px; }
 .packet-foot { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0; padding:8px 16px; border-top:1px solid #263b50; font-size:10px; color:#7f98b0; }
 .packet-foot #packet-counts { font-family:ui-monospace, monospace; color:#9bd8ee; }

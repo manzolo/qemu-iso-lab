@@ -68,7 +68,11 @@ it stays open until **Close** or Escape (nothing opens on hover), can be dragged
 and resized from its corner. The list accumulates what the polls bring (up to 500 headers);
 the chips filter by protocol (TCP, UDP, ICMP, ARP, other) and direction (TX, RX), the box filters
 by any text (an IP, a port, a flag), the footer counts what is shown out of what was seen;
-**Pause** freezes the list while the capture goes on, **Clear** starts it afresh. The panel shows recent TX/RX packet headers:
+**Pause** freezes the list while the capture goes on, **Clear** starts it afresh. A click on a row opens the packet itself: every decoded header with its fields (Ethernet,
+VLAN, ARP, IPv4/IPv6 with TTL, identification, flags and fragment offset, TCP with sequence,
+acknowledgment, flags, window and options, UDP, ICMP with id and sequence) and a hex dump of
+those header bytes with offsets; the payload is never captured, and the detail says how many
+bytes of it were on the wire. The panel shows recent TX/RX packet headers:
 source/destination IPs and ports, ICMP echo request/reply with sequence number, TCP flags,
 UDP, ARP and IPv6. Unsupported or truncated headers are labelled rather than guessed.
 The list is a bounded sample: up to 24 recent entries per NIC from the last 30 seconds,
