@@ -1,223 +1,169 @@
 {
  "clip": "02w-windows",
  "title": {
-  "en": "On Windows: WSL2 from nothing to the dashboard",
-  "it": "Su Windows: da zero a WSL2 e alla dashboard"
+  "en": "On Windows: from nothing to the dashboard",
+  "it": "Su Windows: da zero alla dashboard"
  },
  "series": "tour",
  "cues": [
   {
    "id": "intro",
-   "start": 0,
-   "end": 24,
-   "en": "vmctl needs Linux: KVM, /proc, Unix sockets. On Windows 11 it lives in WSL2, a real Linux kernel beside Windows. This is a Windows with nothing installed yet: one PowerShell script takes it to the dashboard.",
-   "it": "vmctl ha bisogno di Linux: KVM, /proc, i socket Unix. Su Windows 11 vive in WSL2, un vero kernel Linux accanto a Windows. Questo è un Windows su cui non c'è ancora niente: uno script PowerShell lo porta fino alla dashboard.",
+   "en": "vmctl needs Linux: KVM, /proc, Unix sockets. On Windows 11 it lives in WSL2, a real Linux kernel next to Windows. This is a Windows with nothing on it yet.",
+   "it": "vmctl ha bisogno di Linux: KVM, /proc, i socket Unix. Su Windows 11 vive in WSL2, un vero kernel Linux accanto a Windows. Questo è un Windows su cui non c'è ancora niente.",
+   "start": 0.0,
+   "end": 12.0,
    "top": false
   },
   {
-   "id": "download",
-   "start": 24,
-   "end": 44.5,
-   "en": "Open PowerShell and download setup-windows.ps1 from the repository.",
-   "it": "Apri PowerShell e scarica setup-windows.ps1 dal repository.",
+   "id": "site",
+   "en": "From the catalog site, download the Windows installer.",
+   "it": "Dal sito del catalogo si scarica l'installer per Windows.",
+   "start": 12.0,
+   "end": 22.0,
    "top": false
   },
   {
-   "id": "run",
-   "start": 44.5,
-   "end": 51.1,
-   "en": "Run it. The first time it finds no WSL, so it installs WSL together with Ubuntu 24.04.",
-   "it": "Lancialo. La prima volta non trova WSL, quindi installa WSL insieme a Ubuntu 24.04.",
+   "id": "keep",
+   "en": "Edge warns: it is a script, nobody signed it. Keep it, then open it.",
+   "it": "Edge avverte: è uno script, non è firmato. Conservalo e aprilo.",
+   "start": 22.0,
+   "end": 48.0,
    "top": false
   },
   {
-   "id": "wslinstall",
-   "start": 51.1,
-   "end": 172.2,
-   "en": "This is wsl --install: the Windows Subsystem for Linux and the Virtual Machine Platform. Windows may ask for administrator rights: say yes.",
-   "it": "Questo è wsl --install: il Sottosistema Windows per Linux e la Piattaforma macchina virtuale. Windows può chiedere i diritti di amministratore: rispondi sì.",
+   "id": "warn",
+   "en": "Windows asks once more. Choose Run: the default button is Cancel.",
+   "it": "Windows chiede conferma: Esegui. Attenzione, il pulsante predefinito è Annulla.",
+   "start": 48.0,
+   "end": 86.0,
+   "top": false
+  },
+  {
+   "id": "wsl",
+   "en": "First run: it installs WSL. Windows asks for administrator rights, then wants a restart.",
+   "it": "Primo giro: installa WSL. Windows chiede i diritti di amministratore, poi vuole un riavvio.",
+   "start": 86.0,
+   "end": 163.0,
    "top": false
   },
   {
    "id": "reboot",
-   "start": 172.2,
-   "end": 212.12,
-   "en": "Windows wants a restart to turn the new features on. Restart, then run the same script again.",
-   "it": "Windows vuole un riavvio per attivare le nuove funzionalità. Riavvia, poi lancia di nuovo lo stesso script.",
+   "en": "Restart, and run the same installer again.",
+   "it": "Riavvia e rilancia lo stesso installer.",
+   "start": 163.0,
+   "end": 221.0,
    "top": false
   },
   {
-   "id": "again",
-   "start": 212.12,
-   "end": 341.12,
-   "en": "After the restart the script finds WSL and installs Ubuntu: download, unpack, and the first start of the distribution.",
-   "it": "Dopo il riavvio lo script trova WSL e installa Ubuntu: download, estrazione e il primo avvio della distribuzione.",
+   "id": "ubuntu",
+   "en": "Second run: it downloads and installs Ubuntu 24.04.",
+   "it": "Secondo giro: scarica e installa Ubuntu 24.04.",
+   "start": 221.0,
+   "end": 489.0,
    "top": false
   },
   {
    "id": "user",
-   "start": 341.12,
-   "end": 367.62,
-   "en": "At its first start Ubuntu asks for a Linux user. It proposes your Windows name: Enter accepts it.",
-   "it": "Al primo avvio Ubuntu chiede un utente Linux. Propone il tuo nome di Windows: Invio lo accetta.",
-   "top": false
-  },
-  {
-   "id": "password",
-   "start": 367.62,
-   "end": 419.72,
-   "en": "Then a password, twice. Remember it: sudo will ask for it in a minute.",
-   "it": "Poi una password, due volte. Ricordala: tra un minuto la chiederà sudo.",
-   "top": false
-  },
-  {
-   "id": "linux",
-   "start": 419.72,
-   "end": 435.52,
-   "en": "And you are in Linux, inside Windows. /dev/kvm is already there: the virtualization reaches Ubuntu.",
-   "it": "E sei in Linux, dentro Windows. /dev/kvm c'è già: la virtualizzazione arriva fino a Ubuntu.",
+   "en": "At its first start Ubuntu asks for a Linux user: it proposes your Windows name, Enter accepts it. Then a password, twice: sudo will ask for it in a minute.",
+   "it": "Al primo avvio Ubuntu chiede un utente Linux: propone il nome di Windows, Invio lo accetta. Poi una password, due volte: tra poco la chiederà sudo.",
+   "start": 489.0,
+   "end": 517.0,
    "top": false
   },
   {
    "id": "third",
-   "start": 435.52,
-   "end": 518.42,
-   "en": "Leave Ubuntu and run the script a third time. Now it turns nested virtualization on in .wslconfig, clones the repository inside Ubuntu and runs setup.sh, the same as on any Linux.",
-   "it": "Esci da Ubuntu e lancia lo script una terza volta. Ora attiva la virtualizzazione annidata in .wslconfig, clona il repository dentro Ubuntu ed esegue setup.sh, come su qualsiasi Linux.",
+   "en": "Exit, and run it a third time: now it clones the project inside Ubuntu and runs setup.sh, as on any Linux.",
+   "it": "Esci e rilancia una terza volta: ora clona il progetto dentro Ubuntu e lancia setup.sh, come su qualsiasi Linux.",
+   "start": 517.0,
+   "end": 637.0,
    "top": false
   },
   {
    "id": "confirm",
-   "start": 518.42,
-   "end": 531.92,
    "en": "setup.sh lists what it would install and asks first: y, then the Linux password for sudo.",
-   "it": "setup.sh elenca cosa installerebbe e chiede prima: y, poi la password Linux per sudo.",
+   "it": "setup.sh elenca cosa installerebbe e chiede prima: y, poi la password per sudo.",
+   "start": 637.0,
+   "end": 693.0,
    "top": false
   },
   {
    "id": "apt",
-   "start": 531.92,
-   "end": 807.02,
-   "en": "QEMU, the firmware, the tools and the terminal dashboard. A few minutes, unattended.",
-   "it": "QEMU, il firmware, gli strumenti e la dashboard da terminale. Qualche minuto, senza domande.",
+   "en": "QEMU, the firmware, the tools. A few minutes, no questions.",
+   "it": "QEMU, il firmware, gli strumenti. Qualche minuto, senza domande.",
+   "start": 693.0,
+   "end": 867.0,
    "top": false
   },
   {
    "id": "welcome",
-   "start": 807.02,
-   "end": 821.12,
-   "en": "Setup check passed: the welcome screen lists what to do next. Enter for nothing, the script is not done yet.",
-   "it": "Controllo superato: la schermata di benvenuto elenca cosa fare dopo. Invio per niente, lo script non ha ancora finito.",
+   "en": "The welcome screen: Enter, the installer has not finished yet.",
+   "it": "La schermata di benvenuto: Invio, l'installer non ha ancora finito.",
+   "start": 867.0,
+   "end": 889.0,
    "top": false
   },
   {
    "id": "kvm",
-   "start": 821.12,
-   "end": 835.62,
-   "en": "Last step: your Linux user joins the kvm group, so the machines run accelerated. sudo once more.",
-   "it": "Ultimo passo: il tuo utente Linux entra nel gruppo kvm, così le macchine girano accelerate. Ancora una volta sudo.",
+   "en": "Last step: your Linux user joins the kvm group, and QEMU ISO Lab lands on the desktop and in the Start menu.",
+   "it": "Ultimo passo: il tuo utente Linux entra nel gruppo kvm, e QEMU ISO Lab arriva sul desktop e nel menu Start.",
+   "start": 889.0,
+   "end": 923.0,
    "top": false
   },
   {
-   "id": "done",
-   "start": 835.62,
-   "end": 854.92,
-   "en": "Done. Every later start is one command.",
-   "it": "Fatto. Da qui in poi basta un comando.",
-   "top": false
-  },
-  {
-   "id": "web",
-   "start": 854.92,
-   "end": 889.12,
-   "en": "setup-windows.ps1 -Web starts the dashboard inside Ubuntu and opens it in the Windows browser: WSL forwards localhost.",
-   "it": "setup-windows.ps1 -Web avvia la dashboard dentro Ubuntu e la apre nel browser di Windows: WSL inoltra localhost.",
+   "id": "icon",
+   "en": "From here on, one double-click.",
+   "it": "Da qui in poi basta un doppio clic.",
+   "start": 923.0,
+   "end": 968.0,
    "top": false
   },
   {
    "id": "identity",
-   "start": 889.12,
-   "end": 937.12,
-   "en": "The first time, the dashboard asks for the guest user: it becomes the user of every machine you install.",
-   "it": "La prima volta la dashboard chiede l'utente ospite: diventa l'utente di ogni macchina che installi.",
+   "en": "The first time the dashboard asks for the guest user of your machines.",
+   "it": "La prima volta la dashboard chiede l'utente ospite delle macchine.",
+   "start": 968.0,
+   "end": 988.0,
    "top": false
   },
   {
    "id": "catalog",
-   "start": 937.12,
-   "end": 952.82,
    "en": "And here is the whole catalog, from Windows: the same lab as on Linux.",
    "it": "Ed ecco tutto il catalogo, da Windows: lo stesso lab che su Linux.",
+   "start": 988.0,
+   "end": 996.0,
    "top": false
   },
   {
    "id": "end",
-   "start": 952.82,
-   "end": 960.68,
-   "en": "The steps are in the README, under On Windows.",
-   "it": "I passi sono nel README, alla voce On Windows.",
-   "top": true
+   "en": "Three runs, then an icon. The details are in the README.",
+   "it": "Tre giri, poi un'icona. I dettagli sono nel README.",
+   "start": 996.0,
+   "end": 1003,
+   "top": false
   }
  ],
- "steps": [
-  {
-   "start": 28.2,
-   "cmd": "irm https://raw.githubusercontent.com/manzolo/qemu-iso-lab/main/setup-windows.ps1 -OutFile setup-windows.ps1"
-  },
-  {
-   "start": 39,
-   "cmd": "Get-Item .\\setup-windows.ps1"
-  },
-  {
-   "start": 44.5,
-   "cmd": "powershell -ExecutionPolicy Bypass -File .\\setup-windows.ps1"
-  },
-  {
-   "start": 201.7,
-   "cmd": "Restart-Computer"
-  },
-  {
-   "start": 214.12,
-   "cmd": "powershell -ExecutionPolicy Bypass -File .\\setup-windows.ps1"
-  },
-  {
-   "start": 419.72,
-   "cmd": "uname -sr; ls -l /dev/kvm"
-  },
-  {
-   "start": 435.52,
-   "cmd": "powershell -ExecutionPolicy Bypass -File .\\setup-windows.ps1"
-  },
-  {
-   "start": 854.92,
-   "cmd": ".\\setup-windows.ps1 -Web"
-  }
- ],
+ "steps": [],
  "ff": [
   {
-   "start": 58,
-   "end": 168,
+   "start": 100.0,
+   "end": 148.0,
    "factor": 8
   },
   {
-   "start": 227.12,
-   "end": 337.12,
+   "start": 239.0,
+   "end": 469.0,
    "factor": 8
   },
   {
-   "start": 443.12,
-   "end": 509.12,
-   "factor": 4
+   "start": 560.0,
+   "end": 630.0,
+   "factor": 6
   },
   {
-   "start": 535.12,
-   "end": 803.12,
+   "start": 695.0,
+   "end": 855.0,
    "factor": 12
-  },
-  {
-   "start": 859.12,
-   "end": 877.12,
-   "factor": 3
   }
  ]
 }

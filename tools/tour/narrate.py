@@ -30,7 +30,10 @@ SPOKEN = {
     # buttons' own names (Open console, Consoles), which are English on the screen too.
     "it": [(r"(?<!Open )\bconsole\b", "consolle"), (r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Canc", "Control Alt Canc"),
            (r"…", ","), (r"\bVM\b", "V M"), (r"\bMy VMs\b", "My V Ms"),
-           (r"(?i)\bmicrok8s\b", "micro k8s")],  # then the mixed-token rule spells k8s
+           (r"(?i)\bmicrok8s\b", "micro k8s"),  # then the mixed-token rule spells k8s
+           # English loanwords read letter by letter in Italian: "file" came out as "fi-le" (Manzolo, 2026-10-05).
+           (r"\bfiles?\b", "fail"),
+           (r"/proc\b", "proc"), (r"\by\b", "ipsilon"), (r"\bkvm\b", "KVM")],
 }
 
 

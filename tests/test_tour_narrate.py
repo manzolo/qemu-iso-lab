@@ -34,7 +34,10 @@ class SpokenTests(unittest.TestCase):
         self.assertEqual(narrate.spoken('Dice "pronto." (davvero.)', "it"), 'Dice "pronto," (davvero,),')
         self.assertEqual(narrate.spoken("Apri la console. Poi Open console.", "it"), "Apri la consolle, Poi Open console,")
         self.assertEqual(narrate.spoken("Ed ecco il lab: tutto il catalogo!", "it"), "Ed ecco il lab: tutto il catalogo!")
-        self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un file privato,")
+        self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un fail privato,")
+        self.assertEqual(narrate.spoken("I file del profilo.", "it"), "I fail del profilo,")
+        self.assertEqual(narrate.spoken("KVM, /proc, i socket Unix: y, poi il gruppo kvm.", "it"),
+                         "KVM, proc, i socket Unix: ipsilon, poi il gruppo KVM,")
         self.assertEqual(narrate.spoken("Prossimo passo:", "it"), "Prossimo passo:")
         for cue in ("Prima VM in 24.04.", "Tre nodi, 8 vCPU, porta 2222."):
             text = narrate.spoken(cue, "it")
