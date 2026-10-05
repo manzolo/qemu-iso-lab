@@ -12,6 +12,7 @@ python -m pytest tests/test_archinstall.py -v  # single test file
 python -m pytest tests/ -k "test_render"       # filter by name
 make ci                                        # python -m unittest discover -s tests -v (what GitHub Actions runs)
 make lint                                      # python -m mypy vmctl/ --strict (enforced)
+vmctl update [--check] [--yes]                 # updater.py (2026-10-05): git fetch + `pull --ff-only` of the current branch, refuses local edits to tracked files or local commits, then setup.sh's leftovers a release can need again (relink ~/.local/bin where links exist, refresh the .desktop, install newly missing tools, asks first); excluded from the web (a pull under the running server); tests/test_updater.py runs it against real temp git repos
 make install-cli                               # symlink vmctl + vmtui + qemu-iso-lab (bin/qemu-iso-lab = `vmctl web --open`, what the app-menu entry runs) into ~/.local/bin
 sh -c "$(curl -fsSL https://manzolo.github.io/qemu-iso-lab/install.sh)"   # the README's one-line install (install.sh: git+python3 via apt/pacman/dnf/zypper, clone into ~/qemu-iso-lab or $VMCTL_INSTALL_DIR, ./setup.sh; a rerun reuses the checkout, never pulls); Windows: install-windows.cmd (double-click, three runs: WSL → restart → Ubuntu → clone+setup+shortcuts) downloads setup-windows.ps1 as install.ps1; both published by tools/build_catalog_site.py next to the catalog; tests/test_installer.py runs install.sh against stub tools, tested live on both studio VMs 2026-10-05
 make web                                       # vmctl web --open: the lab in a browser on 127.0.0.1 (token in the URL), every command as a job
@@ -83,7 +84,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ```
 errors ← {state, profile_bases} ← {ui, runtime, profile_versions} ← {config, vmstate, iso, cloud_init, qemu, archinstall, disk_inspect} ← {checkpoint, catalog} ← clone
-      ← {alpine, autoyast, cloudimg, preseed, ubiquity, kickstart, haiku, nixos, omarchy, pearos, proxmox, slackware, void, agama, popos, windows} (archinstall ← arch_archive ← {state, ui, errors}) ← {flash, flash_progress, tui_devices, import_dev, ssh, host_setup, report, isofile} ← {netlab, pvecluster} ← labs ← {pfsense, freebsd, libvirt} ← opnsense ← mediacheck ← lifecycle ← {profile_overrides, web_terminal, web_recording, web_files, integration} ← webui ← cli
+      ← {alpine, autoyast, cloudimg, preseed, ubiquity, kickstart, haiku, nixos, omarchy, pearos, proxmox, slackware, void, agama, popos, windows} (archinstall ← arch_archive ← {state, ui, errors}) ← {flash, flash_progress, tui_devices, import_dev, ssh, host_setup, updater, report, isofile} ← {netlab, pvecluster} ← labs ← {pfsense, freebsd, libvirt} ← opnsense ← mediacheck ← lifecycle ← {profile_overrides, web_terminal, web_recording, web_files, integration} ← webui ← cli
 ```
 
 Mutable globals (`ROOT`, `CONFIG_DIR`, etc.) live in `state.py` and are always accessed as `state.ROOT`, never imported directly — a direct import captures a stale binding and breaks tests.

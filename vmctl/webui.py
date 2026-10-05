@@ -47,7 +47,7 @@ from vmctl.errors import VMError
 DEFAULT_PORT = 8765
 WEB_DIR = Path(__file__).resolve().parent / "web"
 # Need an interactive terminal or sudo: excluded from the detached job endpoint.
-EXCLUDED_COMMANDS = {"web", "shell", "console", "flash", "import-device", "completion", "identity"}  # identity: its own panel, no password in a job log
+EXCLUDED_COMMANDS = {"web", "shell", "console", "flash", "import-device", "completion", "identity", "update"}  # identity: its own panel, no password in a job log; update: a git pull under the running server
 # Discoverable in the command center and opened in a terminal window on the host (sudo and the
 # CLI's own questions happen there), never as a detached job.
 TERMINAL_COMMANDS = {"flash", "import-device"}

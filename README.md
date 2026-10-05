@@ -79,7 +79,15 @@ is not on your PATH).
 
 Running the installer again is safe: on Linux it reuses the checkout without pulling or touching
 local changes (`VMCTL_INSTALL_DIR=/other/path` installs elsewhere); on Windows it continues
-where it stopped.
+where it stopped. **Updating** is one command, on Linux and inside the Windows Ubuntu alike:
+
+```sh
+vmctl update          # fetch the latest release, fast-forward, relink, install what a new release needs (asks first)
+vmctl update --check  # only list what is new
+```
+
+It refuses to run over local edits to tracked files (your `local.json` is not one), so nothing is
+lost; a dashboard already open keeps the previous code until you start it again.
 
 <details>
 <summary><b>Manual installation / already cloned the repository</b></summary>

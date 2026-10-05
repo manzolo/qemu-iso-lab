@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import vmctl
-from vmctl import clone, config, disk_inspect, flash, import_dev, lifecycle, local_identity, ui, webui
+from vmctl import clone, config, disk_inspect, flash, import_dev, lifecycle, local_identity, ui, updater, webui
 from vmctl.errors import VMError
 
 
@@ -22,7 +22,7 @@ COMMAND_HELP: dict[str, str] = {}
 # Every public subcommand must appear in exactly one group (enforced by tests).
 COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Discover", "what is configured, what exists on disk, what the host can run",
-     ["list", "status", "show", "catalog", "protect", "unprotect", "identity", "guest-user", "setup", "welcome"]),
+     ["list", "status", "show", "catalog", "protect", "unprotect", "identity", "guest-user", "setup", "update", "welcome"]),
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
@@ -614,6 +614,11 @@ to yours: the record in artifacts/<vm>/state.json says who is there, and a reins
     p.add_argument("--yes", action="store_true", help="with --install: do not ask before running the install commands")
     p.add_argument("--verbose", "-v", action="store_true", help="one line per tool, with what it is for, instead of one per group")
     p.set_defaults(func=lifecycle.cmd_setup)
+
+    p = _add(subparsers, "update", help="bring this checkout to the latest release (git fetch + fast-forward), then relink ~/.local/bin, refresh the menu entry and install the tools a new release needs (asks first); --check only says what is new")
+    p.add_argument("--check", action="store_true", help="fetch and list the new commits, change nothing")
+    p.add_argument("--yes", action="store_true", help="do not ask before installing newly required host tools")
+    p.set_defaults(func=updater.cmd_update)
 
     p = _add(subparsers, "clean", help="force-stop and remove artifacts for one VM (or all VMs); checkpoints are kept unless --checkpoints")
     p.add_argument("vm", nargs="?", help=VM_HELP)

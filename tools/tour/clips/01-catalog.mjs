@@ -24,6 +24,11 @@ export const cues = [
 ];
 
 export async function setup(d) {
+  // Recorded after another clip, the dashboard tab that one left open would stay in front
+  // (2026-10-05: a take filmed the local dashboard while the site loaded behind it).
+  for (const p of d.page.context().pages()) if (p !== d.page) await p.close();
+  await d.page.bringToFront();
+  await d.focusBrowser();
   await d.page.goto("https://manzolo.github.io/qemu-iso-lab/");
   await d.page.evaluate(() => { localStorage.clear(); window.scrollTo(0, 0); });
   await d.page.reload();
