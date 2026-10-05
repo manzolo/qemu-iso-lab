@@ -1,4 +1,4 @@
-"""`vmctl web`: the lab in a browser, on 127.0.0.1 only.
+"""`vmctl web`: the lab in a browser, on 127.0.0.1 only (`--lan`: your network too, an explicit choice).
 
 A small JSON API over what the TUI already uses, so the browser drives the same backend:
 
@@ -26,9 +26,11 @@ import json
 import os
 import secrets
 import shlex
+import re
 import shutil
 import signal
 import socket
+import ssl
 import struct
 import subprocess
 import sys
@@ -597,9 +599,11 @@ class Handler(BaseHTTPRequestHandler):
     def _error(self, message: str, status: int = HTTPStatus.BAD_REQUEST) -> None:
         self._json({"error": message}, status)
 
+    hosts: frozenset[str] = frozenset()  # the Host values accepted, set by make_server (127.0.0.1 and localhost; --lan adds the host's addresses)
+
     def _allowed(self) -> bool:
         host = self.headers.get("Host", "")
-        if host not in (f"127.0.0.1:{self.port}", f"localhost:{self.port}"):
+        if host not in self.hosts:
             self._error("Host not allowed", HTTPStatus.FORBIDDEN)
             return False
         query = parse_qs(urlparse(self.path).query)
@@ -949,7 +953,88 @@ def _version() -> str:
     return str(vmctl.__version__)
 
 
-def make_server(port: int, token: str) -> ThreadingHTTPServer:
+VIRTUAL_INTERFACES = re.compile(r"^(lo|br-|docker|virbr|mpqemu|tun|tap|veth|wg|vmnet|lxc|lxd|cni|flannel|zt)")
+
+
+def interface_addresses() -> list[tuple[str, str]]:
+    """(interface, IPv4 address) for every address of this host, loopback excluded."""
+    found: list[tuple[str, str]] = []
+    tool = shutil.which("ip")
+    if tool:
+        try:
+            out = subprocess.run([tool, "-4", "-o", "addr", "show", "scope", "global"], capture_output=True, text=True,
+                                 timeout=5, check=False).stdout
+        except (OSError, subprocess.SubprocessError):
+            out = ""
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) > 3 and "inet" in parts:
+                found.append((parts[1], parts[parts.index("inet") + 1].split("/")[0]))
+    if not found:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+                probe.connect(("192.0.2.1", 9))  # no packet is sent: the kernel only picks the route
+                found.append(("default", str(probe.getsockname()[0])))
+        except OSError:
+            pass
+    return [(name, address) for name, address in found if not address.startswith("127.")]
+
+
+def lan_addresses(physical_only: bool = False) -> list[str]:
+    """The host's IPv4 addresses: all of them for the Host check (a VM on a libvirt bridge may open
+    the page too); with *physical_only* the ones a phone on the LAN can reach (ethernet, Wi-Fi), for
+    the URLs printed: a host with Docker, libvirt and a VPN has twenty addresses nobody wants listed."""
+    pairs = interface_addresses()
+    if physical_only:
+        kept = [address for name, address in pairs if not VIRTUAL_INTERFACES.match(name)]
+        if kept:
+            return kept
+    return [address for _, address in pairs]
+
+
+def allowed_hosts(port: int, lan: bool = False) -> frozenset[str]:
+    """The Host header values the server answers: loopback, and with --lan the host's own
+    addresses and names on that port. Anything else is a page served to the wrong name (DNS
+    rebinding) and gets 403."""
+    names = ["127.0.0.1", "localhost"]
+    if lan:
+        hostname = socket.gethostname()
+        names += lan_addresses() + [hostname, f"{hostname}.local", hostname.lower(), f"{hostname.lower()}.local"]
+    return frozenset(f"{name}:{port}" for name in names)
+
+
+TLS_DIR = ("artifacts", ".web-tls")  # the self-signed certificate of --lan, made once with openssl
+
+
+def tls_context(lan_addresses_now: list[str] | None = None) -> ssl.SSLContext:
+    """The TLS context of `--lan`: a self-signed certificate under artifacts/.web-tls/, generated
+    with openssl the first time (CN = the host name, the host's addresses as SANs). Browsers warn
+    once and remember it; the point is a *secure context*, which noVNC and the clipboard API need
+    and which plain HTTP has only on 127.0.0.1 (a phone on the LAN got a black console, 2026-10-05)."""
+    directory = state.ROOT.joinpath(*TLS_DIR)
+    cert, key = directory / "cert.pem", directory / "key.pem"
+    if not (cert.is_file() and key.is_file()):
+        openssl = shutil.which("openssl")
+        if not openssl:
+            raise VMError("vmctl web --lan needs HTTPS and `openssl` is not installed (apt install openssl)")
+        directory.mkdir(parents=True, exist_ok=True)
+        hostname = socket.gethostname()
+        sans = ["DNS:localhost", "IP:127.0.0.1", f"DNS:{hostname}", f"DNS:{hostname}.local"]
+        sans += [f"IP:{address}" for address in (lan_addresses_now if lan_addresses_now is not None else lan_addresses())]
+        subprocess.run([openssl, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "3650", "-subj", f"/CN={hostname}",
+                        "-addext", "subjectAltName=" + ",".join(sans), "-keyout", str(key), "-out", str(cert)],
+                       check=True, capture_output=True)
+        key.chmod(0o600)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.load_cert_chain(str(cert), str(key))
+    return context
+
+
+def make_server(port: int, token: str, lan: bool = False) -> ThreadingHTTPServer:
+    """The server on 127.0.0.1 over plain HTTP, or with *lan* on every interface over HTTPS (a
+    self-signed certificate: the browser warns once): the same token, the Host check widened to the
+    host's own addresses, nothing else. An explicit choice for a network the user trusts."""
     uploads = web_files.UploadSessions()
     transfers = web_transfers.Transfers()
     class WebServer(ThreadingHTTPServer):
@@ -965,9 +1050,12 @@ def make_server(port: int, token: str) -> ThreadingHTTPServer:
                                                               "recordings": web_recording.Recordings(),
                                                               "connections": integration.ConnectionCache(), "uploads": uploads,
                                                               "transfers": transfers})
-    server = WebServer(("127.0.0.1", port), handler)
+    server = WebServer(("0.0.0.0" if lan else "127.0.0.1", port), handler)
     server.daemon_threads = True
+    if lan:
+        server.socket = tls_context().wrap_socket(server.socket, server_side=True)
     handler.port = server.server_address[1]  # --port 0: the Host check needs the port actually bound
+    handler.hosts = allowed_hosts(handler.port, lan)
     return server
 
 
@@ -1003,13 +1091,27 @@ def open_browser(url: str) -> bool:
 
 def cmd_web(args: argparse.Namespace) -> int:
     token = secrets.token_urlsafe(18)
+    lan = bool(getattr(args, "lan", False))
     try:
-        server = make_server(args.port, token)
+        server = make_server(args.port, token, lan=lan)
     except OSError as exc:
-        raise VMError(f"Cannot listen on 127.0.0.1:{args.port}: {exc} (choose another with --port)") from exc
-    url = f"http://127.0.0.1:{server.server_address[1]}/?token={token}"
-    ui.print_header("vmctl web: the lab in your browser (127.0.0.1 only)")
+        where = "every interface" if lan else "127.0.0.1"
+        raise VMError(f"Cannot listen on {where}:{args.port}: {exc} (choose another with --port)") from exc
+    port = server.server_address[1]
+    scheme = "https" if lan else "http"
+    url = f"{scheme}://127.0.0.1:{port}/?token={token}"
+    ui.print_header("vmctl web: the lab in your browser" + (" (this computer and your LAN, HTTPS)" if lan else " (127.0.0.1 only)"))
     ui.print_kv("open", url)
+    if lan:
+        # The same page from a phone or another computer on the network: the token is the whole
+        # access control, so the URL is as secret as a password; TLS is self-signed (the browser
+        # warns once), there because a secure context is what the console and the clipboard need.
+        for address in lan_addresses(physical_only=True):
+            ui.print_kv("on the LAN", f"https://{address}:{port}/?token={token}")
+        ui.print_note("Self-signed certificate (artifacts/.web-tls/): accept the browser's warning once per device. "
+                      "A firewall on this computer (ufw) may still block the port for the others: allow it from your network only.")
+        ui.print_status("warn", "LAN mode: whoever has this URL controls the lab. "
+                        "Use it on a network you trust, stop it with Ctrl-C when done.", ok=False)
     ui.print_note("Jobs started here keep running after Ctrl-C; the TUI shows them too.")
     sys.stdout.flush()  # the URL carries the token: it must reach a log even without a terminal
     if getattr(args, "open", False) and not open_browser(url):

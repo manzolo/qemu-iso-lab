@@ -2,6 +2,7 @@
 
 ```bash
 make web            # or: vmctl web --open   (PORT=9000 make web / --port 9000; --port 0 picks a free one)
+vmctl web --lan     # also from a phone or another PC on your network: prints https://<your LAN address>:8765/?token=... (HTTPS with a self-signed certificate under artifacts/.web-tls/, accepted once per device: noVNC and the clipboard need a secure context, which plain HTTP has only on 127.0.0.1; the URL is the key: a trusted network only; without --lan an SSH tunnel does the same: ssh -N -L 8765:127.0.0.1:8765 user@host)
 ```
 
 `vmctl web` serves the lab in a browser on **127.0.0.1 only** and prints a URL with a random

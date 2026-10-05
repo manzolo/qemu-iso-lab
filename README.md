@@ -253,6 +253,7 @@ what to get and where to put it.
 
 ```bash
 vmctl web --open          # open the dashboard on 127.0.0.1:8765
+vmctl web --lan           # the same page from a phone or another PC on your network (HTTPS, self-signed: accept it once; the URL is the key)
 vmctl web --port 9000     # a different port (no browser; the URL with the token is printed)
 make web [PORT=9000]      # the same, for those who have make
 ```

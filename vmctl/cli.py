@@ -577,6 +577,9 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p = _add(subparsers, "web", help="serve the lab in a browser on 127.0.0.1: dashboard, labs, every vmctl command as a job with its live log")
     p.add_argument("--port", type=int, default=webui.DEFAULT_PORT, help=f"port on 127.0.0.1 (default: {webui.DEFAULT_PORT}; 0 picks a free one)")
     p.add_argument("--open", action="store_true", help="open the page in the default browser")
+    p.add_argument("--lan", action="store_true", help="also answer on this computer's network addresses (a phone or another PC on your LAN), over HTTPS with a "
+                   "self-signed certificate made once (accept it in the browser): same token, the printed URL is the key to the lab; "
+                   "use only on a network you trust")
     p.set_defaults(func=webui.cmd_web)
 
     p = _add(subparsers, "guest-user", help="the guest user on a VM's disk, the one SSH logs in as (recorded at install; name one for a disk installed before)",

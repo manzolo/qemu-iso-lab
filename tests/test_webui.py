@@ -7,6 +7,7 @@ import sys
 import threading
 from unittest import mock
 import time
+import shutil
 import unittest
 from pathlib import Path
 
@@ -641,3 +642,52 @@ class ServerTests(BaseVmctlTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LanModeTests(unittest.TestCase):
+    """`vmctl web --lan`: the Host check widens to the host's own addresses and names, loopback stays."""
+
+    def test_allowed_hosts_on_loopback_and_on_the_lan(self):
+        with mock.patch.object(webui, "lan_addresses", return_value=["192.168.1.50", "10.0.0.7"]), \
+                mock.patch.object(webui.socket, "gethostname", return_value="Studio"):
+            self.assertEqual(webui.allowed_hosts(8765), frozenset({"127.0.0.1:8765", "localhost:8765"}))
+            lan = webui.allowed_hosts(8765, lan=True)
+        for host in ("127.0.0.1:8765", "localhost:8765", "192.168.1.50:8765", "10.0.0.7:8765", "Studio:8765", "studio.local:8765"):
+            self.assertIn(host, lan)
+        self.assertNotIn("192.168.1.50:80", lan)
+        self.assertNotIn("evil.example:8765", lan)
+
+    def test_lan_addresses_never_include_loopback(self):
+        with mock.patch.object(webui.shutil, "which", return_value="/usr/bin/ip"), \
+                mock.patch.object(webui.subprocess, "run", return_value=mock.Mock(stdout=(
+                    "1: lo    inet 127.0.0.1/8 scope host lo\n2: enp5s0    inet 192.168.0.42/24 brd 192.168.0.255 scope global enp5s0\n"
+                    "3: virbr0    inet 192.168.122.1/24 brd 192.168.122.255 scope global virbr0\n"))):
+            self.assertEqual(webui.lan_addresses(), ["192.168.0.42", "192.168.122.1"])
+            self.assertEqual(webui.lan_addresses(physical_only=True), ["192.168.0.42"])  # virbr0 is not where a phone lives
+
+    def test_server_binds_every_interface_over_tls_only_with_lan(self):
+        import ssl
+        import tempfile
+        from pathlib import Path
+
+        with mock.patch.object(webui, "lan_addresses", return_value=["192.168.1.50"]):
+            local = webui.make_server(0, "t")
+            try:
+                self.assertEqual(local.server_address[0], "127.0.0.1")
+                self.assertNotIsInstance(local.socket, ssl.SSLSocket)
+                self.assertEqual(local.RequestHandlerClass.hosts, frozenset({f"127.0.0.1:{local.server_address[1]}", f"localhost:{local.server_address[1]}"}))
+            finally:
+                local.server_close()
+            if not shutil.which("openssl"):
+                self.skipTest("openssl missing")
+            with tempfile.TemporaryDirectory() as tmp, mock.patch.object(webui.state, "ROOT", Path(tmp)):
+                wide = webui.make_server(0, "t", lan=True)
+                try:
+                    self.assertEqual(wide.server_address[0], "0.0.0.0")
+                    self.assertIsInstance(wide.socket, ssl.SSLSocket)  # a secure context: noVNC refuses plain HTTP off localhost
+                    self.assertIn(f"192.168.1.50:{wide.server_address[1]}", wide.RequestHandlerClass.hosts)
+                    self.assertTrue((Path(tmp) / "artifacts" / ".web-tls" / "cert.pem").is_file())
+                    again = webui.make_server(0, "t", lan=True)  # the certificate is made once
+                    again.server_close()
+                finally:
+                    wide.server_close()
