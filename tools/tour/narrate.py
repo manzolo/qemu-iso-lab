@@ -32,7 +32,7 @@ SPOKEN = {
            (r"…", ","), (r"\bVM\b", "V M"), (r"\bMy VMs\b", "My V Ms"),
            (r"(?i)\bmicrok8s\b", "micro k8s"),  # then the mixed-token rule spells k8s
            # English loanwords read letter by letter in Italian: "file" came out as "fi-le" (Manzolo, 2026-10-05).
-           (r"\bfiles?\b", "fail"),
+           (r"\bfiles?\b", "fail"), (r"\b[Cc]lients?\b", "claient"),  # read as Italian letters otherwise (2026-10-05)
            (r"/proc\b", "proc"), (r"\by\b", "ipsilon"), (r"\bkvm\b", "KVM"),
            (r"\bv(\d+(?:\.\d+)*)\b", r"vu \1"),  # a tag v1.0: "vu uno punto zero" (the version rule takes the rest)
            # Enclitic imperatives get the stress wrong ("aprìlo"): say them in two words (Manzolo, 2026-10-05).

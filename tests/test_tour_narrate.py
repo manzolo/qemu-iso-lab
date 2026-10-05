@@ -36,6 +36,7 @@ class SpokenTests(unittest.TestCase):
         self.assertEqual(narrate.spoken("Ed ecco il lab: tutto il catalogo!", "it"), "Ed ecco il lab: tutto il catalogo!")
         self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un fail privato,")
         self.assertEqual(narrate.spoken("I file del profilo.", "it"), "I fail del profilo,")
+        self.assertEqual(narrate.spoken("Il client e i client.", "it"), "Il claient e i claient,")
         self.assertEqual(narrate.spoken("Conservalo e aprilo. Ad aprile.", "it"), "Conservalo e apri il fail, Ad aprile,")
         self.assertEqual(narrate.spoken("KVM, /proc, i socket Unix: y, poi il gruppo kvm.", "it"),
                          "KVM, proc, i socket Unix: ipsilon, poi il gruppo KVM,")
@@ -57,7 +58,7 @@ class SpokenTests(unittest.TestCase):
                          "micro kappa otto esse su kappa otto esse-lab-main, disco vda uno in ext quattro,")
         self.assertEqual(narrate.spoken("lo snap di microk8s", "it"), "lo snap di micro kappa otto esse,")
         self.assertEqual(narrate.spoken("Il wg0.conf del client, taggato v1.0, con fail2ban e resize2fs.", "it"),
-                         "Il doppia vu gi zero punto conf del client, taggato vu uno punto zero, con fail due ban e resize due effe esse,")
+                         "Il doppia vu gi zero punto conf del claient, taggato vu uno punto zero, con fail due ban e resize due effe esse,")
 
     def test_english_keeps_its_own_table(self):
         self.assertEqual(narrate.spoken("Ubuntu 24.04 with vmctl and 2 VMs.", "en"), "Ubuntu 24.04 with vm control and 2 V Ms,")
