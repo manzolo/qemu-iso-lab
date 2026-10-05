@@ -32,11 +32,11 @@ SPOKEN = {
            (r"…", ","), (r"\bVM\b", "V M"), (r"\bMy VMs\b", "My V Ms"),
            (r"(?i)\bmicrok8s\b", "micro k8s"),  # then the mixed-token rule spells k8s
            # English loanwords read letter by letter in Italian: "file" came out as "fi-le" (Manzolo, 2026-10-05).
-           (r"\bfiles?\b", "fail"), (r"\b[Cc]lients?\b", "claient"),  # read as Italian letters otherwise (2026-10-05)
+           (r"\bfiles?\b", "fàil"), (r"\b[Cc]lients?\b", "claient"),  # read as Italian letters otherwise (2026-10-05)
            (r"/proc\b", "proc"), (r"\by\b", "ipsilon"), (r"\bkvm\b", "KVM"),
            (r"\bv(\d+(?:\.\d+)*)\b", r"vu \1"),  # a tag v1.0: "vu uno punto zero" (the version rule takes the rest)
            # Enclitic imperatives get the stress wrong ("aprìlo"): say them in two words (Manzolo, 2026-10-05).
-           (r"\baprilo\b", "apri il fail"), (r"\bchiudilo\b", "chiudi il fail")],
+           (r"\baprilo\b", "apri il fàil"), (r"\bchiudilo\b", "chiudi il fàil")],
 }
 
 
@@ -77,8 +77,16 @@ def number_it(digits: str) -> str:
 
 
 _LETTERS_IT = {"a": "a", "b": "bi", "c": "ci", "d": "di", "e": "e", "f": "effe", "g": "gi", "h": "acca", "i": "i", "j": "i lunga",
-               "k": "kappa", "l": "elle", "m": "emme", "n": "enne", "o": "o", "p": "pi", "q": "cu", "r": "erre", "s": "esse",
+               "k": "cappa", "l": "elle", "m": "emme", "n": "enne", "o": "o", "p": "pi", "q": "cu", "r": "erre", "s": "esse",
                "t": "ti", "u": "u", "v": "vu", "w": "doppia vu", "x": "ics", "y": "ipsilon", "z": "zeta"}
+
+
+CONSONANT_ACRONYM = re.compile(r"\b[B-DF-HJ-NP-TV-Z]{2,5}\b")  # KVM, WSL, SSH, TCP, DNS, VPN, ZFS, LVM, DHCP, HTTP...
+
+
+def spell_it(letters: str) -> str:
+    """Letter names, the Italian way."""
+    return " ".join(_LETTERS_IT[c] for c in letters.lower())
 
 
 def mixed_token_it(token: str) -> str:
@@ -91,10 +99,10 @@ def mixed_token_it(token: str) -> str:
     for run in re.findall(r"[A-Z]?[a-z]+|[A-Z]+|\d+", token):
         if run.isdigit():
             parts.append(number_it(run))
-        elif len(run) >= 3:
+        elif len(run) >= 3 and not CONSONANT_ACRONYM.fullmatch(run):
             parts.append(run)
         else:
-            parts.append(" ".join(_LETTERS_IT[c] for c in run.lower()))
+            parts.append(spell_it(run))  # WSL2 -> vu esse elle due
     return " ".join(parts)
 
 
@@ -110,6 +118,9 @@ def spoken(text: str, lang: str) -> str:
     if lang == "it":
         text = re.sub(r"\b(\w+)\.(" + "|".join(EXTENSIONS_IT) + r")\b",
                       lambda m: f"{m.group(1)} punto {EXTENSIONS_IT[m.group(2)]}", text)
+        # An upper-case acronym without a vowel cannot be read as a word: KVM, WSL, SSH, TCP, DNS, VPN
+        # ("KVM" and "WSL" came out unintelligible, Manzolo 2026-10-05); QEMU, ISO, NAT stay words.
+        text = CONSONANT_ACRONYM.sub(lambda m: spell_it(m.group(0)), text)
         # Letters and digits in one word: microk8s, k8s, ext4, x86_64, ttyS0, md0.
         text = re.sub(r"\b(?=[A-Za-z0-9_]*\d)(?=[A-Za-z0-9_]*[A-Za-z])[A-Za-z0-9_]+\b",
                       lambda m: mixed_token_it(m.group(0)), text)

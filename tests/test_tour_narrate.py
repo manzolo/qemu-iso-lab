@@ -28,18 +28,20 @@ class SpokenTests(unittest.TestCase):
         self.assertEqual(narrate.spoken("Ubuntu 24.04 in 3 minuti.", "it"),
                          "Ubuntu ventiquattro punto zero quattro in tre minuti,")
         self.assertEqual(narrate.spoken("WSL 3.0.1 e setup.sh, poi local.json.", "it"),
-                         "WSL tre punto zero punto uno e setup punto esse acca, poi local punto jason,")
+                         "doppia vu esse elle tre punto zero punto uno e setup punto esse acca, poi local punto jason,")
         self.assertEqual(narrate.spoken("Si clona il repository… e si lancia vmctl.", "it"),
                          "Si clona il repository, e si lancia vm control,")
         self.assertEqual(narrate.spoken('Dice "pronto." (davvero.)', "it"), 'Dice "pronto," (davvero,),')
         self.assertEqual(narrate.spoken("Apri la console. Poi Open console.", "it"), "Apri la consolle, Poi Open console,")
         self.assertEqual(narrate.spoken("Ed ecco il lab: tutto il catalogo!", "it"), "Ed ecco il lab: tutto il catalogo!")
-        self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un fail privato,")
-        self.assertEqual(narrate.spoken("I file del profilo.", "it"), "I fail del profilo,")
+        self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un fàil privato,")
+        self.assertEqual(narrate.spoken("I file del profilo.", "it"), "I fàil del profilo,")
         self.assertEqual(narrate.spoken("Il client e i client.", "it"), "Il claient e i claient,")
-        self.assertEqual(narrate.spoken("Conservalo e aprilo. Ad aprile.", "it"), "Conservalo e apri il fail, Ad aprile,")
+        self.assertEqual(narrate.spoken("Conservalo e aprilo. Ad aprile.", "it"), "Conservalo e apri il fàil, Ad aprile,")
         self.assertEqual(narrate.spoken("KVM, /proc, i socket Unix: y, poi il gruppo kvm.", "it"),
-                         "KVM, proc, i socket Unix: ipsilon, poi il gruppo KVM,")
+                         "cappa vu emme, proc, i socket Unix: ipsilon, poi il gruppo cappa vu emme,")
+        self.assertEqual(narrate.spoken("Su Windows vive in WSL2; SSH, TCP e DNS; QEMU, ISO e NAT restano parole.", "it"),
+                         "Su Windows vive in doppia vu esse elle due; esse esse acca, ti ci pi e di enne esse; QEMU, ISO e NAT restano parole,")
         self.assertEqual(narrate.spoken("Prossimo passo:", "it"), "Prossimo passo:")
         for cue in ("Prima VM in 24.04.", "Tre nodi, 8 vCPU, porta 2222."):
             text = narrate.spoken(cue, "it")
@@ -47,16 +49,16 @@ class SpokenTests(unittest.TestCase):
             self.assertNotIn(".", text)
 
     def test_words_with_digits_inside(self):
-        self.assertEqual(narrate.mixed_token_it("MicroK8s"), "Micro kappa otto esse")
-        self.assertEqual(narrate.mixed_token_it("k8s"), "kappa otto esse")
+        self.assertEqual(narrate.mixed_token_it("MicroK8s"), "Micro cappa otto esse")
+        self.assertEqual(narrate.mixed_token_it("k8s"), "cappa otto esse")
         self.assertEqual(narrate.mixed_token_it("ext4"), "ext quattro")
         self.assertEqual(narrate.mixed_token_it("x86_64"), "ics ottantasei sessantaquattro")
         self.assertEqual(narrate.mixed_token_it("ttyS0"), "tty esse zero")
         self.assertEqual(narrate.mixed_token_it("md0"), "emme di zero")
-        self.assertEqual(narrate.mixed_token_it("WSL2"), "WSL due")
+        self.assertEqual(narrate.mixed_token_it("WSL2"), "doppia vu esse elle due")
         self.assertEqual(narrate.spoken("MicroK8s su k8s-lab-main, disco vda1 in ext4.", "it"),
-                         "micro kappa otto esse su kappa otto esse-lab-main, disco vda uno in ext quattro,")
-        self.assertEqual(narrate.spoken("lo snap di microk8s", "it"), "lo snap di micro kappa otto esse,")
+                         "micro cappa otto esse su cappa otto esse-lab-main, disco vda uno in ext quattro,")
+        self.assertEqual(narrate.spoken("lo snap di microk8s", "it"), "lo snap di micro cappa otto esse,")
         self.assertEqual(narrate.spoken("Il wg0.conf del client, taggato v1.0, con fail2ban e resize2fs.", "it"),
                          "Il doppia vu gi zero punto conf del claient, taggato vu uno punto zero, con fail due ban e resize due effe esse,")
 
