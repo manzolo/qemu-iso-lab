@@ -31,8 +31,23 @@ vmctl group map proxmox-lab --open      # the network map below, with the Access
 vmctl group guide netlab --lang it      # the lab's walkthrough (vms/labs/netlab/guide.it.md)
 vmctl group test netlab                 # the lab's tests/test_NN_*.sh over the running stack (started if needed); exit 1 on a failed check
 vmctl group down proxmox-lab            # stop every member, in reverse start order
+vmctl group reset k8s-lab               # every member back to its reset point (lab-start), then up again
+vmctl group checkpoint k8s-lab          # take the current disks as the new reset point (--name N: another one)
 vmctl group clean proxmox-lab           # delete the members' disks (asks first; ISOs are kept)
 ```
+
+### Reset lab
+
+`vmctl group install` ends every member it installs with a **reset point**: a checkpoint named
+`lab-start` (docs/CHECKPOINTS.md), the member exactly as the install left it, before the lab's first
+runtime boot. `vmctl group reset <lab>` (the card's **Reset lab…**) stops the stack, puts every
+member back to it and starts the stack again: the exercises can be done again from scratch in
+minutes instead of a reinstall. All members or none: a member without the checkpoint stops the
+reset before anything is touched. `vmctl group checkpoint <lab>` (**Save as reset point…** under
+*More lab actions*) makes the current state the reset point instead, for instance after preparing
+something the exercises should always start from; `--name` keeps several. A cloud-image member's
+reset point is an overlay on its base image, so it costs only what the install changed; extra disks
+(lvm, zfs, mdadm, the Proxmox mirror) are part of it.
 
 ## The network map
 

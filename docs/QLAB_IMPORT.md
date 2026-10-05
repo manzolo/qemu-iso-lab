@@ -30,9 +30,9 @@ Done, merged and verified live (vmctl 0.17.0 → 0.17.6, 2026-10-02/03; the tour
 Next, in this order:
 
 1. **apache-lab** (phase 2, one server: content + tests on `ubuntu-cloud-base`; mysql-lab done).
-2. **F5 group checkpoints** (`vmctl group checkpoint create|restore`, *Reset lab* on the card; lvm-lab and
-   the hardening labs benefit most). Note: checkpoints refuse `extra_disks` today, so lvm-lab needs that
-   lifted (copy every disk) or a lab-specific reset.
+2. ~~**F5 group checkpoints**~~ done 2026-10-05: `vmctl group checkpoint|reset <lab>`, a `lab-start` reset point
+   written by `group install`, *Reset lab…* on the card; checkpoints now carry `extra_disks` and keep
+   cloud-image overlays as overlays (docs/LABS.md#reset-lab).
 3. **pam-lab** (three VMs with OpenLDAP; never lock out the key-based sudo vmctl needs).
 4. **F6 network boot + pxe-lab** (the last foundation, the biggest).
 5. Then the other qlab plugins (dns, dhcp, firewall, nginx, postgres, raid, samba, systemd, git...):

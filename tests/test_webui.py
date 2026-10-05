@@ -61,6 +61,8 @@ class CatalogTests(unittest.TestCase):
     def test_destructive_detection(self):
         self.assertTrue(webui.is_destructive(["clean", "vm"]))
         self.assertTrue(webui.is_destructive(["group", "clean", "netlab"]))
+        self.assertTrue(webui.is_destructive(["group", "reset", "k8s-lab"]))  # Reset lab replaces every disk
+        self.assertTrue(webui.is_destructive(["group", "checkpoint", "k8s-lab"]))  # replaces the reset point
         self.assertTrue(webui.is_destructive(["check-vms", "a", "--clean-first"]))
         self.assertFalse(webui.is_destructive(["group", "up", "netlab"]))
         self.assertFalse(webui.is_destructive(["start", "vm"]))

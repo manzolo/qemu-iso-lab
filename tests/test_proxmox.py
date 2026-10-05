@@ -91,8 +91,10 @@ class ProxmoxTests(BaseVmctlTestCase):
 
     def test_single_disk_operations_refuse_extra_disks(self):
         vm = self.profile()
-        with self.assertRaises(VMError):
-            checkpoint.check_profile('proxmox-ve', vm)
+        # Checkpoints carry the mirror's second disk with the first (group reset, 2026-10-05) ...
+        checkpoint.check_profile('proxmox-ve', vm)
+        self.assertEqual([d['role'] for d in checkpoint.disks_of(vm)], ['disk', 'extra0'])
+        # ... the libvirt export still handles one disk.
         with self.assertRaises(VMError):
             libvirt.export(argparse.Namespace(vm='proxmox-ve', name=None), vm)
 

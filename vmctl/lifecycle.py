@@ -3129,6 +3129,10 @@ def cmd_group(args: argparse.Namespace) -> int:
         return 0
     if action == "install":
         return group_install(cfg, args, lab)
+    if action == "checkpoint":
+        return group_checkpoint(cfg, args, lab)
+    if action == "reset":
+        return group_reset(cfg, args, lab)
     if action == "cluster":
         # The cross-VM step of install alone, on a running stack (idempotent).
         pvecluster.form(cfg, order, args.timeout, dry_run=args.dry_run)
@@ -3240,6 +3244,9 @@ def group_install(cfg: dict[str, Any], args: argparse.Namespace, lab: dict[str, 
             if outcome != "passed":
                 raise VMError(f"{name} was not installed ({detail}); fix it and rerun vmctl group install {group}")
             ui.print_status("ok", f"{name} installed ({detail})")
+            # The reset point: the member as the install left it, before the lab's first runtime boot.
+            # A member kept from an earlier install is not checkpointed here: its disk may hold work.
+            make_reset_point(name, vm, f"vmctl group install {group}", args.dry_run)
     # The installs ran with the install-phase NICs: restart everything in the runtime phase.
     for member in reversed(labs.model(cfg, group, group_states(cfg, lab["start_order"]))["members"]):
         if member["running"]:
@@ -3248,6 +3255,72 @@ def group_install(cfg: dict[str, Any], args: argparse.Namespace, lab: dict[str, 
     # Cross-VM steps need the runtime NICs, so they come last: a Proxmox cluster over the segment.
     pvecluster.form(cfg, lab["start_order"], args.timeout, dry_run=args.dry_run)
     return code
+
+
+RESET_POINT = "lab-start"
+
+
+def make_reset_point(name: str, vm: dict[str, Any], why: str, dry_run: bool) -> None:
+    """The ``lab-start`` checkpoint of one member; a failure is a warning (the install did succeed)."""
+    try:
+        checkpoint.check_profile(name, vm)
+        checkpoint.create(name, vm, RESET_POINT, note=f"reset point: {why}", replace=True, dry_run=dry_run)
+    except VMError as exc:
+        ui.print_status("warn", f"{name}: no reset point ({exc}); vmctl group reset will not cover it", ok=False)
+
+
+def group_checkpoint_name(args: argparse.Namespace) -> str:
+    return checkpoint.validate_name(getattr(args, "name", None) or RESET_POINT)
+
+
+def group_checkpoint(cfg: dict[str, Any], args: argparse.Namespace, lab: dict[str, Any]) -> int:
+    """``vmctl group checkpoint <lab> [--name N]``: the whole stack's current disks as one named
+    checkpoint per member (``lab-start`` by default: what ``group reset`` returns to). The stack is
+    stopped first, a checkpoint needs quiet disks; it is not started again."""
+    group, name = lab["group"], group_checkpoint_name(args)
+    present = [m for m in lab["members"] if m["install"] != vmstate.LABEL_NO_DISK]
+    missing = [m["name"] for m in lab["members"] if m["install"] == vmstate.LABEL_NO_DISK]
+    if missing:
+        raise VMError(f"{', '.join(missing)} of {group} have no disk: vmctl group install {group} first")
+    existing = [m["name"] for m in present if checkpoint.checkpoint_dir(m["name"], name).is_dir()]
+    if existing:
+        confirm_or_yes(args, f"Replace checkpoint '{name}' of {', '.join(existing)} with the current disks?")
+    for member in reversed(lab["members"]):
+        if member["running"]:
+            cmd_stop(argparse.Namespace(vm=member["name"], dry_run=args.dry_run))
+    for member in lab["members"]:
+        vm = config.get_vm(cfg, member["name"])
+        ensure_vm_quiescent(member["name"], vm, "checkpoint")
+        checkpoint.create(member["name"], vm, name, note=f"vmctl group checkpoint {group}", replace=True, dry_run=args.dry_run)
+    ui.print_status("ok", f"{group}: checkpoint '{name}' of {len(lab['members'])} members"
+                    + (" (the reset point of vmctl group reset)" if name == RESET_POINT else f"; back to it: vmctl group reset {group} --name {name}"))
+    return 0
+
+
+def group_reset(cfg: dict[str, Any], args: argparse.Namespace, lab: dict[str, Any]) -> int:
+    """``vmctl group reset <lab> [--name N]``: every member back to its checkpoint (``lab-start``,
+    written by group install), then the stack up again. All members or none: a lab whose server is
+    reset under a client that is not would be neither state."""
+    group, name = lab["group"], group_checkpoint_name(args)
+    lacking = [m["name"] for m in lab["members"] if checkpoint.load_manifest(checkpoint.checkpoint_dir(m["name"], name)) is None]
+    if lacking:
+        hint = (f"group install writes it for the members it installs; vmctl group checkpoint {group} takes the current state"
+                if name == RESET_POINT else f"vmctl group checkpoint {group} --name {name} writes it")
+        raise VMError(f"No checkpoint '{name}' for {', '.join(lacking)}: nothing was reset ({hint})")
+    for member in lab["members"]:
+        vmstate.refuse_if_protected(member["name"], "replace its disk with a checkpoint", allow_starred=True)
+    confirm_or_yes(args, f"Reset {group} to '{name}'? Every change made in {', '.join(m['name'] for m in lab['members'])} since then is lost.")
+    for member in reversed(lab["members"]):
+        if member["running"]:
+            cmd_stop(argparse.Namespace(vm=member["name"], dry_run=args.dry_run))
+    for member in lab["members"]:
+        vm = config.get_vm(cfg, member["name"])
+        ensure_vm_quiescent(member["name"], vm, "restore a checkpoint into")
+        checkpoint.restore(member["name"], vm, name, dry_run=args.dry_run)
+    ui.print_status("ok", f"{group} reset to '{name}'")
+    if getattr(args, "no_up", False):
+        return 0
+    return cmd_group(argparse.Namespace(**{**vars(args), "action": "up"}))
 
 
 def lab_in_libvirt(uri: str, names: list[str], dry_run: bool) -> bool:

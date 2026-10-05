@@ -389,3 +389,130 @@ class CheckpointCliTests(CheckpointTestCase):
         self.assertEqual((args.action, args.vm, args.name, args.note, args.compress), ("create", "testvm", "clean-install", "x", True))
         args = parser.parse_args(["clean", "testvm", "--checkpoints"])
         self.assertTrue(args.checkpoints)
+
+
+def qcow2_overlay_header(backing: str, fmt: str | None = "qcow2", version: int = 3) -> bytes:
+    """A qcow2 header naming a backing file (and its format in the header extension), as
+    qemu-img create -b ... -F ... writes it; enough for checkpoint.qcow2_backing."""
+    header_len = 104 if version >= 3 else 72
+    header = bytearray(header_len)
+    header[:4] = b"QFI\xfb"
+    header[4:8] = version.to_bytes(4, "big")
+    ext = b""
+    if fmt:
+        data = fmt.encode()
+        ext = (0xE2792ACA).to_bytes(4, "big") + len(data).to_bytes(4, "big") + data + b"\0" * (-len(data) % 8)
+    ext += b"\0" * 8  # end of the extensions
+    name_offset = header_len + len(ext)
+    header[8:16] = name_offset.to_bytes(8, "big")
+    header[16:20] = len(backing.encode()).to_bytes(4, "big")
+    if version >= 3:
+        header[100:104] = header_len.to_bytes(4, "big")
+    return bytes(header) + ext + backing.encode() + b"\0" * 64
+
+
+class OverlayAndExtraDiskTests(CheckpointTestCase):
+    """Group reset (2026-10-05): a cloud-image overlay is kept an overlay on its base, and the
+    profile's extra_disks travel with the main disk, all or none."""
+
+    def overlay_vm(self, extras: int = 0):
+        base = self.root / "isos" / ".cloudimg" / "base.qcow2"
+        base.parent.mkdir(parents=True, exist_ok=True)
+        base.write_bytes(b"BASE")
+        self.disk.write_bytes(qcow2_overlay_header(str(base)))
+        self.vm_config["extra_disks"] = [{"path": f"artifacts/testvm/extra{i}.qcow2", "size": "2G"} for i in range(extras)]
+        for i in range(extras):
+            (self.root / f"artifacts/testvm/extra{i}.qcow2").write_bytes(f"EXTRA{i}-v1".encode())
+        self.write_config_dir()
+        self.vm = self.vmctl.get_vm(self.vmctl.load_config(), self.vm_name)
+        return base
+
+    def converts(self):
+        return [c.args[0] for c in vmctl.runtime.run.call_args_list if c.args and c.args[0][:2] == ["qemu-img", "convert"]]
+
+    def test_header_parsing(self):
+        base = self.root / "b.img"
+        path = self.root / "o.qcow2"
+        path.write_bytes(qcow2_overlay_header(str(base)))
+        self.assertEqual(vmctl.checkpoint.qcow2_backing(path), (base, "qcow2"))
+        path.write_bytes(qcow2_overlay_header("b.img", fmt="raw", version=2))
+        self.assertEqual(vmctl.checkpoint.qcow2_backing(path), (self.root / "b.img", "raw"))  # relative to the overlay
+        path.write_bytes(b"\x01" * 4096)
+        self.assertIsNone(vmctl.checkpoint.qcow2_backing(path))
+        path.write_bytes(qcow2_overlay_header(str(base), fmt=None))
+        with self.assertRaisesRegex(self.vmctl.VMError, "no backing format"):
+            vmctl.checkpoint.qcow2_backing(path)
+
+    def test_overlay_is_copied_and_restored_as_an_overlay(self):
+        base = self.overlay_vm()
+        self.checkpoint("lab-start")
+        self.vmctl.cmd_checkpoint(self.args("restore", "lab-start"))
+        create, restore = self.converts()
+        for cmd in (create, restore):
+            self.assertEqual(cmd[cmd.index("-B") + 1:cmd.index("-B") + 4], [str(base), "-F", "qcow2"])
+        manifest = json.loads((vmctl.checkpoint.checkpoint_dir(self.vm_name, "lab-start") / "manifest.json").read_text())
+        self.assertEqual(manifest["version"], 2)
+        self.assertEqual(manifest["disk"]["backing"], str(base))
+
+    def test_restore_refuses_when_the_base_is_gone(self):
+        base = self.overlay_vm()
+        self.checkpoint("lab-start")
+        base.unlink()
+        with self.assertRaisesRegex(self.vmctl.VMError, "which is missing"):
+            self.vmctl.cmd_checkpoint(self.args("restore", "lab-start"))
+
+    def test_extra_disks_travel_with_the_main_disk(self):
+        self.overlay_vm(extras=2)
+        self.checkpoint("lab-start")
+        target = vmctl.checkpoint.checkpoint_dir(self.vm_name, "lab-start")
+        self.assertEqual((target / "extra1.qcow2").read_bytes(), b"EXTRA1-v1")
+        for i in range(2):
+            (self.root / f"artifacts/testvm/extra{i}.qcow2").write_bytes(b"CHANGED")
+        self.vmctl.cmd_checkpoint(self.args("restore", "lab-start"))
+        for i in range(2):
+            self.assertEqual((self.root / f"artifacts/testvm/extra{i}.qcow2").read_bytes(), f"EXTRA{i}-v1".encode())
+        rows = vmctl.checkpoint.list_checkpoints(self.vm_name)
+        self.assertEqual((rows[0]["extra_disks"], rows[0]["overlay"]), (2, True))
+
+    def test_a_main_disk_only_checkpoint_never_restores_into_a_vm_with_extra_disks(self):
+        self.checkpoint("old")  # no extra disks yet: a version-1-like checkpoint of one disk
+        self.overlay_vm(extras=1)
+        with self.assertRaisesRegex(self.vmctl.VMError, "holds 1 disk"):
+            self.vmctl.cmd_checkpoint(self.args("restore", "old"))
+        self.assertEqual((self.root / "artifacts/testvm/extra0.qcow2").read_bytes(), b"EXTRA0-v1")
+
+
+class GroupResetTests(CheckpointTestCase):
+    def group_args(self, action, **extra):
+        base = {"action": action, "group": "duo", "dry_run": False, "yes": True, "name": None, "no_up": True,
+                "json": False, "member": [], "title": None, "timeout": 60}
+        base.update(extra)
+        return argparse.Namespace(**base)
+
+    def setUp(self):
+        super().setUp()
+        second = json.loads(json.dumps(self.vm_config))
+        second["disk"]["path"] = "artifacts/testvm2/disk.qcow2"
+        second["firmware"]["vars_path"] = "artifacts/testvm2/OVMF_VARS.fd"
+        self.vm_config.setdefault("meta", {})["groups"] = ["duo"]
+        second.setdefault("meta", {})["groups"] = ["duo"]
+        self.write_config_dir()
+        self.write_extra_profile("second.json", {"vms": {"testvm2": second}})
+        self.disk2 = self.root / "artifacts/testvm2/disk.qcow2"
+        self.disk2.parent.mkdir(parents=True, exist_ok=True)
+        self.disk2.write_bytes(b"\x02" * 4096)
+
+    def test_reset_refuses_until_every_member_has_the_reset_point(self):
+        self.vmctl.cmd_checkpoint(self.args("create", "lab-start"))  # testvm only
+        self.disk.write_bytes(b"WORK")
+        with self.assertRaisesRegex(self.vmctl.VMError, "No checkpoint 'lab-start' for testvm2: nothing was reset"):
+            self.vmctl.cmd_group(self.group_args("reset"))
+        self.assertEqual(self.disk.read_bytes(), b"WORK")
+
+    def test_group_checkpoint_then_reset_puts_every_member_back(self):
+        self.assertEqual(self.vmctl.cmd_group(self.group_args("checkpoint")), 0)
+        self.disk.write_bytes(b"WORK1")
+        self.disk2.write_bytes(b"WORK2")
+        self.assertEqual(self.vmctl.cmd_group(self.group_args("reset")), 0)
+        self.assertEqual(self.disk.read_bytes(), b"\x01" * (32 * 1024 * 1024))
+        self.assertEqual(self.disk2.read_bytes(), b"\x02" * 4096)

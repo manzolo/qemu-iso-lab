@@ -10,6 +10,15 @@ NT 4, vpc for the VHD template): qcow2 internal snapshots would have excluded tw
 and would have lived inside the very file ``clean`` deletes. The price is space, and
 ``--compress`` (qcow2 only) buys some of it back.
 
+Two exceptions to "depends on nothing", both because the disk itself already depends on the
+same thing: a qcow2 *overlay* (a cloud-image VM, its base hard-linked under isos/.cloudimg/)
+is copied as an overlay on the same base (``qemu-img convert -B``), a few hundred MB instead
+of the whole flattened system, and restored the same way; and the profile's ``extra_disks``
+(lvm-lab, zfs-lab, mdadm-lab, the Proxmox mirror) travel with the main disk, all or none, so
+a restored pool or array never meets a disk from another moment (manifest version 2; a
+version 1 checkpoint holds the main disk only and restores only into a profile without
+extra disks).
+
 Nothing here is a VM-running snapshot: create and restore work on a powered-off VM, and
 the caller (``lifecycle.ensure_vm_quiescent``) refuses a running VM, an installation in
 progress and a VM handed to libvirt. TPM state does not exist on plain QEMU (the Windows
@@ -32,12 +41,14 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from vmctl import runtime, ui, vmstate
+from vmctl import qemu, runtime, ui, vmstate
 from vmctl.errors import VMError
 
 CHECKPOINTS_DIR = "checkpoints"
 MANIFEST_FILE = "manifest.json"
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
+# The qcow2 header extension that names the backing file's format.
+QCOW2_EXT_BACKING_FORMAT = 0xE2792ACA
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 # Formats ``qemu-img convert`` writes back losslessly for our purposes.
 SUPPORTED_FORMATS = ("qcow2", "raw", "vpc", "vdi", "vmdk")
@@ -91,13 +102,64 @@ def check_profile(vm_name: str, vm: dict[str, Any]) -> None:
             f"VM '{vm_name}' declares TPM state: checkpoints carry the disk and the EFI vars only, "
             "and a TPM whose state is not saved would not match the restored disk. Not supported."
         )
-    if vm.get("extra_disks"):
-        raise VMError(f"VM '{vm_name}' has extra_disks: checkpoints and clones copy the main disk only, "
-                      "and a restored mirror half would not match its partner. Not supported.")
+    for disk in disks_of(vm):
+        if disk["format"] not in SUPPORTED_FORMATS:
+            raise VMError(f"VM '{vm_name}' uses disk format '{disk['format']}' ({disk['role']}), which checkpoints "
+                          f"do not handle (supported: {', '.join(SUPPORTED_FORMATS)})")
+
+
+def disks_of(vm: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every disk a checkpoint carries: the main one, then the profile's extra_disks in order.
+    ``file`` is the name inside the checkpoint directory."""
     fmt = disk_format(vm)
-    if fmt not in SUPPORTED_FORMATS:
-        raise VMError(f"VM '{vm_name}' uses disk format '{fmt}', which checkpoints do not handle "
-                      f"(supported: {', '.join(SUPPORTED_FORMATS)})")
+    rows = [{"role": "disk", "path": runtime.resolve_path(str(vm["disk"]["path"])), "format": fmt, "file": disk_file_name(fmt)}]
+    for index, extra in enumerate(qemu.extra_disks(vm)):
+        efmt = str(extra["format"])
+        rows.append({"role": f"extra{index}", "path": runtime.resolve_path(str(extra["path"])), "format": efmt,
+                     "file": f"extra{index}.{DISK_EXTENSIONS.get(efmt, efmt)}"})
+    return rows
+
+
+def qcow2_backing(path: Path) -> tuple[Path, str] | None:
+    """The backing file of a qcow2 overlay and its format, read from the header (no qemu-img:
+    tests and dry runs see it too); None for an image without one. A relative name is relative
+    to the overlay's directory, as QEMU reads it."""
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(112)
+            if len(header) < 72 or header[:4] != b"QFI\xfb":
+                return None
+            version = int.from_bytes(header[4:8], "big")
+            offset = int.from_bytes(header[8:16], "big")
+            size = int.from_bytes(header[16:20], "big")
+            if offset == 0 or size == 0:
+                return None
+            handle.seek(offset)
+            name = handle.read(size).decode("utf-8", errors="replace")
+            fmt = ""
+            position = int.from_bytes(header[100:104], "big") if version >= 3 and len(header) >= 104 else 72
+            for _ in range(64):
+                handle.seek(position)
+                head = handle.read(8)
+                if len(head) < 8:
+                    break
+                ext_type, ext_len = int.from_bytes(head[:4], "big"), int.from_bytes(head[4:8], "big")
+                if ext_type == 0:
+                    break
+                data = handle.read(ext_len)
+                if ext_type == QCOW2_EXT_BACKING_FORMAT:
+                    fmt = data.decode("ascii", errors="replace")
+                    break
+                position += 8 + ((ext_len + 7) // 8) * 8
+    except OSError:
+        return None
+    backing = Path(name)
+    if not backing.is_absolute():
+        backing = path.parent / backing
+    if not fmt:
+        raise VMError(f"{path} is an overlay on {backing} but its header names no backing format: "
+                      "checkpoints cannot copy it as an overlay (qemu-img rebase -F <format> fixes the header)")
+    return backing, fmt
 
 
 # --- reading ----------------------------------------------------------------------------
@@ -126,6 +188,9 @@ def list_checkpoints(vm_name: str) -> list[dict[str, Any]]:
         disk = manifest.get("disk") or {}
         disk_path = directory / str(disk.get("file", ""))
         facts = vmstate.image_facts(disk_path, str(disk.get("format", "")))
+        extras = [e for e in (manifest.get("extra_disks") or []) if isinstance(e, dict)]
+        host_bytes = int(facts["host_bytes"] or 0) + sum(
+            int(vmstate.image_facts(directory / str(e.get("file", "")), str(e.get("format", "")))["host_bytes"] or 0) for e in extras)
         record: dict[str, Any] = {}
         state_file = manifest.get("state_file")
         if state_file:
@@ -143,7 +208,9 @@ def list_checkpoints(vm_name: str) -> list[dict[str, Any]]:
             "format": disk.get("format"),
             "compressed": bool(manifest.get("compressed")),
             "virtual_bytes": disk.get("virtual_bytes") or facts["virtual_bytes"],
-            "host_bytes": facts["host_bytes"],
+            "host_bytes": host_bytes,
+            "extra_disks": len(extras),
+            "overlay": bool(disk.get("backing")),
             "nvram": bool(manifest.get("nvram_file")),
             "label": known["label"],
             "detail": known["detail"],
@@ -156,13 +223,19 @@ def list_checkpoints(vm_name: str) -> list[dict[str, Any]]:
 
 # --- create -----------------------------------------------------------------------------
 
-def convert_image(src: Path, src_format: str, dst: Path, dst_format: str, compress: bool, dry_run: bool) -> None:
-    """One full copy through ``qemu-img convert``: format-aware, zero-detecting, sparse on the
-    way out. ``-p`` prints its own progress line; the whole output stays on the terminal."""
+def convert_image(src: Path, src_format: str, dst: Path, dst_format: str, compress: bool, dry_run: bool,
+                  backing: tuple[Path, str] | None = None) -> None:
+    """One copy through ``qemu-img convert``: format-aware, zero-detecting, sparse on the way
+    out. With *backing* (qcow2 output only) the copy is an overlay on that file holding only
+    what differs from it. ``-p`` prints its own progress line; the output stays on the terminal."""
     runtime.require_command("qemu-img")
     cmd = ["qemu-img", "convert", "-p", "-f", src_format, "-O", dst_format]
     if compress and dst_format == "qcow2":
         cmd.append("-c")
+    if backing is not None:
+        if dst_format != "qcow2":
+            raise VMError(f"an overlay copy needs qcow2 output, not {dst_format}")
+        cmd += ["-B", str(backing[0]), "-F", backing[1]]
     cmd += [str(src), str(dst)]
     runtime.run(cmd, dry_run=dry_run)
     if not dry_run and not dst.is_file():
@@ -171,24 +244,32 @@ def convert_image(src: Path, src_format: str, dst: Path, dst_format: str, compre
 
 def create(vm_name: str, vm: dict[str, Any], name: str, note: str | None = None,
            compress: bool = False, replace: bool = False, dry_run: bool = False) -> Path:
-    """Copy the current disk (and EFI vars, and state record) into a new checkpoint."""
+    """Copy the current disks (and EFI vars, and state record) into a new checkpoint."""
     check_profile(vm_name, vm)
     final = checkpoint_dir(vm_name, name)
-    fmt = disk_format(vm)
-    disk_path = runtime.resolve_path(str(vm["disk"]["path"]))
-    if not disk_path.is_file():
-        raise VMError(f"VM '{vm_name}' has no disk image to checkpoint: {disk_path}")
-    facts = vmstate.image_facts(disk_path, fmt)
+    disks = disks_of(vm)
+    main = disks[0]
+    for disk in disks:
+        if not disk["path"].is_file():
+            what = "no disk image to checkpoint" if disk["role"] == "disk" else f"no {disk['role']} image (an extra disk)"
+            raise VMError(f"VM '{vm_name}' has {what}: {disk['path']}")
+        disk["backing"] = qcow2_backing(disk["path"]) if disk["format"] == "qcow2" else None
+        if disk["backing"] is not None and not disk["backing"][0].is_file():
+            raise VMError(f"{disk['path']} is an overlay on {disk['backing'][0]}, which is missing: the disk itself cannot boot")
+        disk["facts"] = vmstate.image_facts(disk["path"], disk["format"])
     if final.exists() and not replace:
         raise VMError(f"Checkpoint '{name}' of '{vm_name}' already exists; pick another name or pass --replace")
-    if compress and fmt != "qcow2":
-        ui.print_status("warn", f"--compress applies to qcow2 only; the {fmt} copy is written uncompressed", ok=False)
+    if compress and main["format"] != "qcow2":
+        ui.print_status("warn", f"--compress applies to qcow2 only; the {main['format']} copy is written uncompressed", ok=False)
         compress = False
 
     vars_path = firmware_vars_path(vm)
     staging = final.parent / f".{final.name}.tmp-{os.getpid()}"
     ui.print_header(f"Checkpoint '{name}' of {vm_name}")
-    ui.print_kv("disk", f"{ui.pretty_path(disk_path)} ({fmt}, {runtime.format_bytes(facts['host_bytes'])} on the host)")
+    for disk in disks:
+        label = "disk" if disk["role"] == "disk" else disk["role"]
+        overlay = f", overlay on {ui.pretty_path(disk['backing'][0])}: only what differs is copied" if disk["backing"] else ""
+        ui.print_kv(label, f"{ui.pretty_path(disk['path'])} ({disk['format']}, {runtime.format_bytes(disk['facts']['host_bytes'])} on the host{overlay})")
     if vars_path is not None:
         ui.print_kv("EFI vars", ui.pretty_path(vars_path) if vars_path.is_file() else f"{ui.pretty_path(vars_path)} (not created yet: none saved)")
     ui.print_kv("into", ui.pretty_path(final))
@@ -202,8 +283,14 @@ def create(vm_name: str, vm: dict[str, Any], name: str, note: str | None = None,
     if not dry_run:
         staging.mkdir(parents=True)
     try:
-        disk_file = disk_file_name(fmt)
-        convert_image(disk_path, fmt, staging / disk_file, fmt, compress, dry_run)
+        entries: list[dict[str, Any]] = []
+        for disk in disks:
+            convert_image(disk["path"], disk["format"], staging / disk["file"], disk["format"],
+                          compress and disk["format"] == "qcow2", dry_run, backing=disk["backing"])
+            entries.append({"format": disk["format"], "file": disk["file"], "virtual_bytes": disk["facts"]["virtual_bytes"],
+                            "source_host_bytes": disk["facts"]["host_bytes"],
+                            "backing": str(disk["backing"][0]) if disk["backing"] else None,
+                            "backing_format": disk["backing"][1] if disk["backing"] else None})
         nvram_file: str | None = None
         if vars_path is not None and vars_path.is_file():
             nvram_file = "nvram.fd"
@@ -222,8 +309,8 @@ def create(vm_name: str, vm: dict[str, Any], name: str, note: str | None = None,
             "created_at": vmstate.now(),
             "note": note or None,
             "firmware": str((vm.get("firmware") or {}).get("type", "bios")),
-            "disk": {"format": fmt, "file": disk_file, "virtual_bytes": facts["virtual_bytes"],
-                     "source_host_bytes": facts["host_bytes"]},
+            "disk": entries[0],
+            "extra_disks": entries[1:],
             "compressed": compress,
             "nvram_file": nvram_file,
             "state_file": state_file,
@@ -247,11 +334,21 @@ def create(vm_name: str, vm: dict[str, Any], name: str, note: str | None = None,
 
 # --- restore ----------------------------------------------------------------------------
 
-def restore(vm_name: str, vm: dict[str, Any], name: str, dry_run: bool = False) -> None:
-    """Put the checkpoint's disk, EFI vars and record back in place of the current ones.
+def _saved_backing(entry: dict[str, Any], name: str) -> tuple[Path, str] | None:
+    if not entry.get("backing"):
+        return None
+    backing = Path(str(entry["backing"]))
+    if not backing.is_file():
+        raise VMError(f"Checkpoint '{name}' is an overlay on {backing}, which is missing: it cannot be restored "
+                      "(the cloud image under isos/.cloudimg/ was removed)")
+    return backing, str(entry.get("backing_format") or "qcow2")
 
-    The expensive and fallible step (the conversion) runs into a staging directory while the
-    current disk is untouched; the swap is renames only, and a failed rename puts back what
+
+def restore(vm_name: str, vm: dict[str, Any], name: str, dry_run: bool = False) -> None:
+    """Put the checkpoint's disks, EFI vars and record back in place of the current ones.
+
+    The expensive and fallible step (the conversions) runs into a staging directory while the
+    current disks are untouched; the swap is renames only, and a failed rename puts back what
     was already moved. The previous files are removed with the staging directory at the end.
     """
     check_profile(vm_name, vm)
@@ -259,14 +356,22 @@ def restore(vm_name: str, vm: dict[str, Any], name: str, dry_run: bool = False) 
     manifest = load_manifest(source)
     if manifest is None:
         raise VMError(f"Checkpoint '{name}' of '{vm_name}' does not exist (vmctl checkpoint list {vm_name})")
-    disk_meta = manifest.get("disk") or {}
-    src_disk = source / str(disk_meta.get("file", ""))
-    src_format = str(disk_meta.get("format", "qcow2"))
-    if not src_disk.is_file():
-        raise VMError(f"Checkpoint '{name}' is incomplete: {src_disk} is missing")
+    targets = disks_of(vm)
+    saved = [manifest.get("disk") or {}] + [e for e in (manifest.get("extra_disks") or []) if isinstance(e, dict)]
+    if len(saved) != len(targets):
+        raise VMError(f"Checkpoint '{name}' holds {len(saved)} disk(s) but '{vm_name}' has {len(targets)} now "
+                      f"(main disk plus extra_disks): restoring part of them would mix two moments, refused")
+    pairs: list[tuple[dict[str, Any], Path, str, tuple[Path, str] | None]] = []
+    for target, entry in zip(targets, saved):
+        src = source / str(entry.get("file", ""))
+        if not src.is_file():
+            raise VMError(f"Checkpoint '{name}' is incomplete: {src} is missing")
+        backing = _saved_backing(entry, name)
+        if backing is not None and target["format"] != "qcow2":
+            raise VMError(f"Checkpoint '{name}' holds a qcow2 overlay but the profile's {target['role']} is {target['format']} now")
+        pairs.append((target, src, str(entry.get("format", "qcow2")), backing))
 
-    fmt = disk_format(vm)
-    disk_path = runtime.resolve_path(str(vm["disk"]["path"]))
+    disk_path = targets[0]["path"]
     vars_path = firmware_vars_path(vm)
     nvram_src = source / str(manifest["nvram_file"]) if manifest.get("nvram_file") else None
     state_src = source / str(manifest["state_file"]) if manifest.get("state_file") else None
@@ -275,37 +380,45 @@ def restore(vm_name: str, vm: dict[str, Any], name: str, dry_run: bool = False) 
     ui.print_header(f"Restore checkpoint '{name}' into {vm_name}")
     ui.print_kv("from", ui.pretty_path(source))
     ui.print_kv("created", str(manifest.get("created_at") or "?") + (f"  ({manifest['note']})" if manifest.get("note") else ""))
-    ui.print_kv("disk", f"{ui.pretty_path(disk_path)} <- {src_disk.name} ({src_format} -> {fmt})")
+    for target, src, src_format, _backing in pairs:
+        ui.print_kv("disk" if target["role"] == "disk" else target["role"],
+                    f"{ui.pretty_path(target['path'])} <- {src.name} ({src_format} -> {target['format']})")
     if vars_path is not None:
         ui.print_kv("EFI vars", f"{ui.pretty_path(vars_path)} <- {nvram_src.name if nvram_src else 'none saved: the store is reset'}")
 
     staging = disk_path.parent / f".restore-{name}-{os.getpid()}"
     previous = staging / "previous"
+
+    def staged_name(target: dict[str, Any]) -> str:
+        return f"{target['role']}-{target['path'].name}"
+
     if dry_run:
         ui.print_note(f"Would convert into {ui.pretty_path(staging)} and swap the files with renames")
-        convert_image(src_disk, src_format, staging / disk_path.name, fmt, False, True)
+        for target, src, src_format, backing in pairs:
+            convert_image(src, src_format, staging / staged_name(target), target["format"], False, True, backing=backing)
         return
 
     if staging.exists():
         shutil.rmtree(staging)
     previous.mkdir(parents=True)
     try:
-        convert_image(src_disk, src_format, staging / disk_path.name, fmt, False, False)
+        for target, src, src_format, backing in pairs:
+            convert_image(src, src_format, staging / staged_name(target), target["format"], False, False, backing=backing)
         if nvram_src is not None and vars_path is not None:
             shutil.copy2(nvram_src, staging / vars_path.name)
         if state_src is not None:
             shutil.copy2(state_src, staging / record_path.name)
 
-        # (current, staged or None): None means the current file is removed, not replaced.
-        swaps: list[tuple[Path, Path | None]] = [(disk_path, staging / disk_path.name)]
+        # (current, staged or None, parked name): None means the current file is removed, not replaced.
+        swaps: list[tuple[Path, Path | None, str]] = [(t["path"], staging / staged_name(t), staged_name(t)) for t, _s, _f, _b in pairs]
         if vars_path is not None:
-            swaps.append((vars_path, staging / vars_path.name if nvram_src is not None else None))
-        swaps.append((record_path, staging / record_path.name if state_src is not None else None))
+            swaps.append((vars_path, staging / vars_path.name if nvram_src is not None else None, "vars-" + vars_path.name))
+        swaps.append((record_path, staging / record_path.name if state_src is not None else None, "state-" + record_path.name))
         moved: list[tuple[Path, Path]] = []
         try:
-            for current, staged in swaps:
+            for current, staged, parked_name in swaps:
                 if current.exists():
-                    parked = previous / current.name
+                    parked = previous / parked_name
                     os.rename(current, parked)
                     moved.append((current, parked))
                 if staged is not None and staged.exists():
@@ -322,7 +435,7 @@ def restore(vm_name: str, vm: dict[str, Any], name: str, dry_run: bool = False) 
             raise VMError(f"Restore of '{name}' into '{vm_name}' failed while swapping files: {exc}; "
                           f"the previous files were put back (leftovers, if any, under {staging})") from exc
     except BaseException:
-        # The conversion or a copy failed: nothing has been swapped yet.
+        # A conversion or a copy failed: nothing has been swapped yet.
         if previous.exists() and not any(previous.iterdir()):
             shutil.rmtree(staging, ignore_errors=True)
         raise

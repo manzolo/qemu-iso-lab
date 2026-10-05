@@ -131,7 +131,7 @@ def extra_disks(vm: dict[str, Any]) -> list[dict[str, Any]]:
     by PCI slot, and QEMU places an implicit ``-drive if=virtio`` main disk *after* the explicit
     devices: without a boot index the extras are vda, vdb... and the system disk comes last
     (lvm-lab, 2026-10-03; Proxmox's ZFS mirror never cared). Never address them by name in a guest.
-    Checkpoints, clones and the libvirt export handle one disk and refuse them.
+    Checkpoints carry them with the main disk; clones and the libvirt export handle one disk and refuse them.
     """
     raw = vm.get("extra_disks")
     if raw is None:

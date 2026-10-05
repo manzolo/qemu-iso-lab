@@ -121,6 +121,9 @@ def check_source(src: str, vm: dict[str, Any]) -> None:
     disk_path = runtime.resolve_path(str(vm["disk"]["path"]))
     if not disk_path.is_file():
         raise VMError(f"'{src}' has no disk image to clone: {disk_path}")
+    if vm.get("extra_disks"):
+        raise VMError(f"'{src}' has extra_disks: a clone copies the main disk only, and a pool or mirror half "
+                      "without its partners would not match. Not supported.")
     checkpoint.check_profile(src, vm)
 
 

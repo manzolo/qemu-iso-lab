@@ -55,7 +55,7 @@ TERMINAL_COMMANDS = {"flash", "import-device"}
 DESTRUCTIVE = {"clean", "delete-iso", "clean-reports", "clean-stale", "unexport-libvirt"}
 # group install deletes only the disks of members whose install never finished, so it asks only
 # when there are some (lifecycle.group_install_overwrites); a first install is not destructive.
-DESTRUCTIVE_ACTIONS = {"checkpoint": {"restore", "delete"}, "group": {"clean", "remove"},
+DESTRUCTIVE_ACTIONS = {"checkpoint": {"restore", "delete"}, "group": {"clean", "remove", "reset", "checkpoint"},
                        "lab": {"clean", "install"}}
 LOG_CHUNK = 65536
 

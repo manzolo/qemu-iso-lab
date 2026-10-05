@@ -25,7 +25,8 @@ disk), *Create checkpoint*, and *Restore* / *Delete* behind a confirmation.
 | `disk.qcow2` (`.img` for raw, `.vhd` for vpc) | a **full copy** of the disk written by `qemu-img convert` in the VM's own format (zero-detecting, sparse; `--compress` for a compressed qcow2) |
 | `nvram.fd` | the EFI variable store (`OVMF_VARS.fd`) of an EFI profile, when it existed |
 | `state.json` | the [record of what was known about the disk](PROFILES.md#what-is-known-about-the-disk-statejson-vmctl-status-the-tui) at that moment |
-| `manifest.json` | name, VM, creation time, note, format, sizes, which of the files above are present |
+| `extra0.qcow2`, `extra1.qcow2`… | the profile's `extra_disks` (lvm-lab, zfs-lab, mdadm-lab, the Proxmox mirror), copied with the main disk |
+| `manifest.json` | name, VM, creation time, note, format, sizes, which of the files above are present (version 2: `extra_disks`, `backing`) |
 
 The strategy is the full copy, for every format the profiles use (qcow2, raw for Windows
 NT 4, vpc for the VHD import template). qcow2 internal snapshots would have excluded two
@@ -35,6 +36,16 @@ valid however the current disk changes afterwards, it can be restored onto a VM 
 no longer exists, and it costs disk space, which `--compress` reduces for qcow2 at the
 price of a slower write and restore. Checkpoints are listed in `vmctl status`'s
 `ON HOST` figure of the VM only indirectly: `vmctl checkpoint list` shows their own size.
+
+Two cases where the copy shares something with the disk, because the disk already does:
+
+- a **cloud-image VM** (`bootstrap-cloudimg`) is a qcow2 overlay on the vendor image hard-linked
+  under `isos/.cloudimg/`. Its checkpoint is an overlay on the same base (`qemu-img convert -B`):
+  only what the VM changed, a few hundred MB instead of the whole system, and restored the same
+  way. A restore refuses if that base was removed, as the disk itself would no longer boot.
+- the **`extra_disks`** of a profile travel with the main disk, all or none: a restored pool or
+  array never meets a disk from another moment. A checkpoint holding fewer disks than the profile
+  has now (one written before the profile grew a disk) is refused rather than restored halfway.
 
 TPM state is not part of a checkpoint because there is none on plain QEMU (the Windows
 profiles bypass the TPM check with `LabConfig`; swtpm exists only in the libvirt export).
