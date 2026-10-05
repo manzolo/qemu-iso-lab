@@ -34,6 +34,7 @@ class SpokenTests(unittest.TestCase):
         self.assertEqual(narrate.spoken('Dice "pronto." (davvero.)', "it"), 'Dice "pronto," (davvero,),')
         self.assertEqual(narrate.spoken("Apri la console. Poi Open console.", "it"), "Apri la consolle, Poi Open console,")
         self.assertEqual(narrate.spoken("Ed ecco il lab: tutto il catalogo!", "it"), "Ed ecco il lab: tutto il catalogo!")
+        self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un file privato,")
         self.assertEqual(narrate.spoken("Prossimo passo:", "it"), "Prossimo passo:")
         for cue in ("Prima VM in 24.04.", "Tre nodi, 8 vCPU, porta 2222."):
             text = narrate.spoken(cue, "it")

@@ -113,7 +113,7 @@ def spoken(text: str, lang: str) -> str:
     # if it has none), the convention of manzolo/poetry-voice's ensure_soft_punctuation.
     text = re.sub(r"\.(?=[\s\"”»')\]]|$)", ",", text)
     text = re.sub(r"\s+,", ",", text).strip()
-    text = text.rstrip(",").rstrip()
+    text = text.strip(",").strip()  # a cue that continues the previous one starts with "…"
     return text if text.endswith((";", ":", "!", "?")) else text + ","
 
 
