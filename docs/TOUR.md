@@ -217,9 +217,10 @@ gh workflow run pages.yml --ref main                             # a push to med
 ```
 
 `docs/media/` is the worktree of the orphan `media` branch (one commit, replaced every time, like
-the install clips). Per clip: `<clip>.it.mp4` and `<clip>.en.mp4` (the same video with one voice
-each: a browser cannot be trusted to switch the audio track of one MP4), `<clip>.{en,it}.vtt`,
-`<clip>.jpg`, and `tour.json`. `tools/build_catalog_site.py` turns them into `tour.html` and the
+the install clips). Per clip: one `<clip>.mp4` (the video with the Italian voice; until 2026-10-05
+there was one file per language, the same video twice, and the branch weighed double),
+`<clip>.{en,it}.vtt`, `<clip>.jpg`, and `tour.json`, whose `video` entries for both languages
+name that one file. `tools/build_catalog_site.py` turns them into `tour.html` and the
 catalog's "▶ Tour" link; without `tour/tour.json` the site has neither.
 
 ## Pitfalls met on the way (2026-10-03)

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The narrated clips -> docs/media/tour/ (the media branch's worktree), what the catalog site's
-tour.html plays: per clip one MP4 per language (video + that voice), WebVTT subtitles, a poster,
-and tour.json. Then publish the media branch and rebuild the site (docs/TOUR.md):
+tour.html plays: per clip one MP4 (the video with the Italian voice: the voice is Italian only
+since 2026-10-05, and two files with the same video doubled the media branch), WebVTT subtitles per
+language, a poster, and tour.json. Then publish the media branch and rebuild the site (docs/TOUR.md):
 
     tools/tour/publish.py [clip ...]          # default: every artifacts/tour/out/<clip> with a .voice.mp4
     git -C docs/media add -A && git -C docs/media commit --amend --no-edit && git -C docs/media push --force origin media
@@ -49,9 +50,11 @@ def main() -> None:
         d = OUT / name
         meta = json.loads((d / "cues.json").read_text())
         src = d / f"{name}.voice.mp4"
-        for i, lang in enumerate(LANGS):
-            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(src), "-map", "0:v", "-map", f"0:a:{i}",
-                            "-c", "copy", "-movflags", "+faststart", str(DEST / f"{name}.{lang}.mp4")], check=True)
+        # One file, the first audio track (Italian); both languages of tour.json play it.
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(src), "-map", "0:v", "-map", "0:a:0",
+                        "-c", "copy", "-movflags", "+faststart", str(DEST / f"{name}.mp4")], check=True)
+        for lang in LANGS:
+            (DEST / f"{name}.{lang}.mp4").unlink(missing_ok=True)  # the per-language files of before
             (DEST / f"{name}.{lang}.vtt").write_text(vtt((d / f"{name}.voice.{lang}.srt").read_text(encoding="utf-8")), encoding="utf-8")
         length = duration(src)
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", str(min(args.poster_at, length / 2)), "-i", str(src),
@@ -60,7 +63,7 @@ def main() -> None:
         steps = json.loads(steps_file.read_text(encoding="utf-8")) if steps_file.is_file() else []
         clips[name] = {"id": name, "title": meta["title"], "duration": round(length, 1), "lab": meta.get("lab"), "series": meta.get("series") or "tour",
                        "steps": [{"t": st["start"], "cmd": st["cmd"]} for st in steps],
-                       "video": {lang: f"{name}.{lang}.mp4" for lang in LANGS}, "poster": f"{name}.jpg",
+                       "video": f"{name}.mp4", "poster": f"{name}.jpg",
                        "subtitles": {lang: f"{name}.{lang}.vtt" for lang in ("en", "it")}}
         print(f"{name}: {length:.1f}s")
     # The tour's chapters first, in order, then the lab lessons.
