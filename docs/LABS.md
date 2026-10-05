@@ -63,9 +63,9 @@ automatically, roughly every two seconds. LEDs show VM power, not a connectivity
 the cable glow, moving pulses and TX/RX byte rates summarize activity during the sample
 interval rather than tracing individual packets or proving that the guest received them.
 
-Hover a cable or focus it with the keyboard to open the **Packet inspector**. Click the cable
-(or press Enter) to pin it; **Pause** freezes the displayed list, **Resume** follows new
-packets, and **Close** or Escape dismisses it. The panel shows recent TX/RX packet headers:
+Click the small lens on a LAN cable (or focus it and press Enter) to open the **Packet inspector**;
+it stays open until **Close** or Escape (nothing opens on hover). **Pause** freezes the displayed
+list, **Resume** follows new packets again. The panel shows recent TX/RX packet headers:
 source/destination IPs and ports, ICMP echo request/reply with sequence number, TCP flags,
 UDP, ARP and IPv6. Unsupported or truncated headers are labelled rather than guessed.
 The list is a bounded sample: up to 24 recent entries per NIC from the last 30 seconds,

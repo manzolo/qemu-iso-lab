@@ -92,25 +92,28 @@ try {
   assert.equal(await cable.locator('.signal.tx').evaluate(n=>getComputedStyle(n).animationName),'none');
   await page.emulateMedia({reducedMotion:'no-preference'});
   assert.equal(await cable.locator('.signal.tx').evaluate(n=>getComputedStyle(n).animationName),'packet-flow');
-  // The wide transparent hit target makes the thin cable usable with a mouse.
+  // Nothing opens on hover: the inspector comes from the lens button of a LAN cable only.
   await cable.scrollIntoViewIfNeeded();
   const hit = await cable.locator('.cable-hit').boundingBox();
   await page.mouse.move(hit.x+hit.width/2,hit.y+hit.height/2);
+  await page.clock.runFor(400);
+  assert(await page.locator('#packet-inspector').isHidden(),'Hovering a cable opens nothing');
+  const lens = cable.locator('.inspect-btn');
+  await lens.click();
   await page.waitForFunction(()=>!document.getElementById('packet-inspector').hidden);
   assert((await page.locator('#packet-link').textContent()).includes(target.vm));
   assert((await page.locator('#packet-rows').textContent()).includes('Echo request'));
   assert((await page.locator('#packet-rows').textContent()).includes('172.20.6.11'));
-  await page.locator('#packet-pin').click();
+  assert.equal(await lens.getAttribute('aria-pressed'),'true');
   await page.mouse.move(5,5);
   await page.clock.runFor(400);
-  assert(await page.locator('#packet-inspector').isVisible(),'Pinned inspector survives pointer leave');
+  assert(await page.locator('#packet-inspector').isVisible(),'The inspector stays open when the pointer leaves');
   await page.locator('#packet-pause').click();
   const frozen = await page.locator('#packet-rows').textContent();
   await advance();
   assert.equal(await page.locator('#packet-rows').textContent(),frozen);
   await page.locator('#packet-pause').click();
   assert.notEqual(await page.locator('#packet-rows').textContent(),frozen);
-  assert.equal(await page.locator('#packet-pin').getAttribute('aria-pressed'),'true');
   tx+=8192;rx+=4096;
   await advance();
   if(process.env.MAP_SCREENSHOT) await page.locator('.map-shell').screenshot({path:process.env.MAP_SCREENSHOT});
@@ -125,7 +128,7 @@ try {
   assert.equal(await page.locator('#running-count').textContent(),'1 running');
   assert.equal(await page.locator('[data-member="k8s-lab-main"] .member-state').textContent(),'stopped');
   assert.equal(await page.locator('#packet-empty').textContent(),'VM stopped');
-  assert(await page.locator('#packet-inspector').isVisible(),'Pinned inspector survives topology replacement');
+  assert(await page.locator('#packet-inspector').isVisible(),'The open inspector survives topology replacement');
   fail=true;
   await page.clock.runFor(2100);
   await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Updates unavailable'));
@@ -133,12 +136,11 @@ try {
   assert((await page.locator('#packet-state').textContent()).includes('Updates unavailable'));
   await page.keyboard.press('Escape');
   assert(await page.locator('#packet-inspector').isHidden());
-  assert(await cable.evaluate(n=>document.activeElement===n),'Dismissal returns focus to the cable');
-  const nat = page.locator('.nat-nic').first();
-  await nat.focus();
-  await nat.press('Enter');
-  assert.equal(await page.locator('#packet-pin').getAttribute('aria-pressed'),'true');
-  assert((await page.locator('#packet-empty').textContent()).includes('NAT'));
+  assert(await lens.evaluate(n=>document.activeElement===n),'Dismissal returns focus to the lens');
+  assert.equal(await page.locator('.nat-nic .inspect-btn').count(),0,'NAT links have no lens: the host cannot capture there');
+  await lens.focus();
+  await lens.press('Enter');
+  assert(await page.locator('#packet-inspector').isVisible(),'Enter on the lens opens the inspector');
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
   const panelBounds = await page.locator('#packet-inspector').boundingBox();
@@ -146,7 +148,7 @@ try {
   assert(await page.locator('.map').evaluate(n=>n.scrollWidth>n.clientWidth),'Small screens scroll the diagram');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No page-wide overflow');
   assert.deepEqual(errors,[]);
-  console.log('PASS: NIC attribution, live traffic, hover inspector, pin/pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
+  console.log('PASS: NIC attribution, live traffic, lens inspector (no hover), pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
 } finally {
   await browser.close();
 }

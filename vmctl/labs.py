@@ -651,7 +651,14 @@ def _svg(lab: dict[str, Any]) -> str:
             label_x = x + 32 + len(lans) * 18
             out.append(f'<text class="addr" x="{label_x}" y="{y - 58}">{esc(nic["address"] or "address not declared")}</text>')
             out.append(f'<text class="small mac" x="{label_x}" y="{y - 39}">{esc(nic["mac"] or "MAC not specified")}</text>')
-            out.append(f'<text class="traffic-label" x="{label_x}" y="{y - 17}"></text></g>')
+            out.append(f'<text class="traffic-label" x="{label_x}" y="{y - 17}"></text>')
+            # The packet inspector opens from this small lens, never from hovering the cable
+            # (Manzolo, 2026-10-05: windows popping up while moving the pointer were a nuisance).
+            bx, by = label_x + 150, y - 43
+            out.append(f'<g class="inspect-btn" role="button" tabindex="0" aria-controls="packet-inspector" aria-pressed="false" '
+                       f'aria-label="Inspect packets: {esc(member["name"])} / {esc(nic["id"])}">'
+                       f'<circle class="bg" cx="{bx}" cy="{by}" r="11"/><circle class="lens" cx="{bx - 1.5}" cy="{by - 1.5}" r="4"/>'
+                       f'<line class="lens" x1="{bx + 1.5}" y1="{by + 1.5}" x2="{bx + 5}" y2="{by + 5}"/></g></g>')
     out.append('</svg>')
     return "\n".join(out)
 
@@ -729,10 +736,14 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .map svg .traffic-label { fill:#77def3; font:10px ui-monospace, monospace; }
 .map svg .nic.offline .traffic-label { fill:#778b9f; }
 .map svg .cable-hit { stroke:transparent; stroke-width:18; pointer-events:none; }
-.map svg .nic .cable-hit { pointer-events:stroke; }
-.map svg .nic { cursor:pointer; }
-.map svg .nic:focus { outline:none; }
-.map svg .nic:focus .cable, .map svg .nic.inspected .cable { stroke:#eefaff; stroke-width:3; }
+.map svg .nic.inspected .cable { stroke:#eefaff; stroke-width:3; }
+.map svg .inspect-btn { cursor:pointer; }
+.map svg .inspect-btn .bg { fill:#182f43; stroke:#3c5c74; stroke-width:1.5; }
+.map svg .inspect-btn .lens { fill:none; stroke:#9bd8ee; stroke-width:1.8; stroke-linecap:round; }
+.map svg .inspect-btn:hover .bg, .map svg .inspect-btn:focus .bg { stroke:#a3ecff; fill:#1f3d55; }
+.map svg .inspect-btn:focus { outline:none; }
+.map svg .nic.inspected .inspect-btn .bg { fill:#245369; stroke:#6fcfe3; }
+.map svg .nic.offline .inspect-btn { opacity:.45; }
 .packet-inspector { position:fixed; z-index:20; width:min(640px, calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto;
   box-sizing:border-box; background:#0c1929; color:#e0ebf7; border:1px solid #42657f; border-radius:14px; box-shadow:0 20px 65px #0009; font-size:12px; }
 .packet-inspector[hidden] { display:none; }
@@ -876,16 +887,15 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
 <section class="map-shell" aria-label="Lab topology">
 <div class="map-toolbar"><span class="map-title">NETWORK TOPOLOGY</span><div class="map-legend"><span><i class="on"></i>VM on</span><span><i></i>VM off</span><span><i class="flow"></i>Measured traffic</span></div></div>
 <div class="map" id="lab-topology">{_svg(lab)}</div>
-<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>Hover a cable to inspect packets · click to pin</span></div>
+<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>The lens on a LAN cable opens its packet inspector</span></div>
 </section>
 <aside id="packet-inspector" class="packet-inspector" aria-label="Packet inspector" hidden>
 <div class="packet-head"><strong>PACKET INSPECTOR</strong><div class="packet-actions">
-<button id="packet-pin" type="button" aria-pressed="false">Pin</button>
 <button id="packet-pause" type="button" aria-pressed="false">Pause</button>
 <button id="packet-close" type="button" aria-label="Close packet inspector">Close</button></div></div>
 <p id="packet-link"></p><p id="packet-state"></p>
 <div class="packet-scroll"><table aria-label="Recent packets"><thead><tr><th class="packet-time">Time</th><th class="packet-dir">Dir</th><th class="packet-proto">Protocol</th><th>Source → destination / detail</th><th class="packet-size">Bytes</th></tr></thead><tbody id="packet-rows"></tbody></table>
-<p id="packet-empty">Hover a LAN cable to inspect packets.</p></div>
+<p id="packet-empty">Click the lens on a LAN cable to inspect its packets.</p></div>
 <p class="packet-foot">Recent headers · last 30s, up to 24 entries · sampled up to 100 packets/s per segment · no payload stored</p>
 </aside>
 <p class="sub">Every NAT NIC is a private slirp {SLIRP_SUBNET} of its own VM: the guest reaches the Internet, the host reaches it only through the forwards on 127.0.0.1. The segments are shared between the VMs of this host only.</p>

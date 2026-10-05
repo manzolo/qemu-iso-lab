@@ -9,11 +9,13 @@
   const map = document.getElementById('lab-topology');
   const status = document.getElementById('map-live');
   const inspector = document.getElementById('packet-inspector');
-  const pinButton = document.getElementById('packet-pin');
   const pauseButton = document.getElementById('packet-pause');
-  let samples = new Map(), selected = null, pinned = false, paused = false, fresh = false, hideTimer, restoringFocus = false;
+  // The inspector opens only from a cable's lens button and stays until closed: nothing pops
+  // up while the pointer crosses the map (2026-10-05).
+  let samples = new Map(), selected = null, paused = false, fresh = false, restoringFocus = false;
   let anchor = {x:24, y:24};
   const keyOf = node => JSON.stringify([node.dataset.vm, node.dataset.nic]);
+  const buttonOf = key => [...map.querySelectorAll('.nic')].find(node => keyOf(node) === key)?.querySelector('.inspect-btn');
   const positionInspector = () => {
     const width = inspector.offsetWidth, height = inspector.offsetHeight;
     inspector.style.left = `${Math.max(12, Math.min(anchor.x + 16, innerWidth - width - 12))}px`;
@@ -21,13 +23,12 @@
   };
   function renderInspector() {
     map.querySelectorAll('.nic').forEach(node => {
-      node.classList.toggle('inspected', keyOf(node) === selected);
-      node.setAttribute('aria-pressed', String(pinned && keyOf(node) === selected));
+      const open = keyOf(node) === selected;
+      node.classList.toggle('inspected', open);
+      node.querySelector('.inspect-btn')?.setAttribute('aria-pressed', String(open));
     });
     if (!selected) { inspector.hidden = true; return; }
     inspector.hidden = false;
-    pinButton.textContent = pinned ? 'Pinned' : 'Pin';
-    pinButton.setAttribute('aria-pressed', String(pinned));
     pauseButton.textContent = paused ? 'Resume' : 'Pause';
     pauseButton.setAttribute('aria-pressed', String(paused));
     const [vm, nic] = JSON.parse(selected);
@@ -69,22 +70,19 @@
     }
     positionInspector();
   }
-  function selectCable(node, event, pin = false) {
-    if (pinned && !pin) return;
-    clearTimeout(hideTimer);
+  function openInspector(button, event) {
+    const node = button.closest('.nic');
     const key = keyOf(node);
+    if (selected === key && !event?.type?.startsWith('key')) { closeInspector(false); return; }  // the lens toggles
     if (selected !== key) paused = false;
     selected = key;
-    pinned = pin;
-    const rect = node.getBoundingClientRect();
-    anchor = event && event.type !== 'keydown' && event.type !== 'focusin'
-      ? {x:event.clientX, y:event.clientY} : {x:rect.left, y:rect.top + Math.min(rect.height, 80)};
+    const rect = button.getBoundingClientRect();
+    anchor = {x:rect.right, y:rect.bottom};
     renderInspector();
   }
   const closeInspector = (restoreFocus = false) => {
-    const trigger = [...map.querySelectorAll('.nic')].find(node => keyOf(node) === selected);
-    clearTimeout(hideTimer);
-    selected = null; pinned = false; paused = false;
+    const trigger = selected ? buttonOf(selected) : null;
+    selected = null; paused = false;
     renderInspector();
     if (restoreFocus && trigger) {
       restoringFocus = true;
@@ -92,54 +90,23 @@
       restoringFocus = false;
     }
   };
-  const scheduleHide = () => {
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => {
-      const focusedCable = document.activeElement?.closest('.nic');
-      if (!pinned && !inspector.matches(':hover') && !inspector.contains(document.activeElement)
-          && (!focusedCable || keyOf(focusedCable) !== selected)) closeInspector();
-    }, 250);
-  };
-  map.addEventListener('pointerover', event => {
-    const node = event.target.closest('.nic');
-    if (node && !node.contains(event.relatedTarget)) selectCable(node, event);
-  });
-  map.addEventListener('pointerout', event => {
-    const node = event.target.closest('.nic');
-    if (node && !node.contains(event.relatedTarget)) scheduleHide();
-  });
   map.addEventListener('click', event => {
-    const node = event.target.closest('.nic');
-    if (node) selectCable(node, event, true);
+    const button = event.target.closest('.inspect-btn');
+    if (button) openInspector(button, event);
   });
-  map.addEventListener('focusin', event => {
-    const node = event.target.closest('.nic');
-    if (node && !restoringFocus) selectCable(node, event);
-  });
-  map.addEventListener('focusout', scheduleHide);
   map.addEventListener('keydown', event => {
-    const node = event.target.closest('.nic');
-    if (node && (event.key === 'Enter' || event.key === ' ')) {
-      event.preventDefault(); selectCable(node, event, true); pinButton.focus();
+    const button = event.target.closest('.inspect-btn');
+    if (button && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault(); openInspector(button, event); pauseButton.focus();
     }
   });
-  inspector.addEventListener('pointerenter', () => clearTimeout(hideTimer));
-  inspector.addEventListener('pointerleave', scheduleHide);
-  inspector.addEventListener('focusout', scheduleHide);
-  pinButton.addEventListener('click', () => { pinned = !pinned; renderInspector(); });
   pauseButton.addEventListener('click', () => { paused = !paused; renderInspector(); });
   document.getElementById('packet-close').addEventListener('click', () => closeInspector(true));
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && selected) closeInspector(true); });
   window.addEventListener('resize', positionInspector);
   const prepareCables = () => {
     map.querySelector('svg')?.setAttribute('role', 'group');
-    map.querySelectorAll('.nic').forEach(node => {
-      node.setAttribute('tabindex', '0');
-      node.setAttribute('role', 'button');
-      node.setAttribute('aria-controls', 'packet-inspector');
-      node.setAttribute('aria-label', `Inspect packets: ${node.dataset.vm} / ${node.dataset.nic}`);
-      node.querySelector('title')?.remove();
-    });
+    map.querySelectorAll('.nic title').forEach(title => title.remove());
   };
   const illuminate = (link, bytes) => {
     if (!link) return;
@@ -182,7 +149,11 @@
       const data = await response.json();
       if (typeof data.svg !== 'string' || !data.states || !Array.isArray(data.traffic)) throw new Error('Invalid snapshot');
       if (document.hidden) { clearTraffic(); return; }
-      if (data.svg !== lastSvg) { map.innerHTML = data.svg; lastSvg = data.svg; prepareCables(); }
+      if (data.svg !== lastSvg) {
+        const hadFocus = document.activeElement?.closest?.('.inspect-btn') ? keyOf(document.activeElement.closest('.nic')) : null;
+        map.innerHTML = data.svg; lastSvg = data.svg; prepareCables();
+        if (hadFocus) buttonOf(hadFocus)?.focus({preventScroll:true});
+      }
       samples = new Map(data.traffic.map(entry => [JSON.stringify([entry.vm, entry.nic]), entry]));
       const next = new Map();
       const segmentRates = new Map();
