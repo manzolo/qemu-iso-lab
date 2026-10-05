@@ -11,8 +11,9 @@ One JSON profile per VM describes the ISO (downloaded and checksummed), the disk
 firmware, the unattended install and the SSH provisioning. Pick the profiles you want out
 of the catalog and manage them from the **web dashboard** (`vmctl web`), the terminal
 dashboard (`vmtui`) or the CLI (`vmctl`), all sharing the same profiles, VM state and jobs.
-New here? **[The tour](https://manzolo.github.io/qemu-iso-lab/tour.html)** shows the whole road in six short clips,
-with English and Italian voice and subtitles: the catalog, the setup, a first VM, the console in the browser, a lab, your own lab.
+New here? **[The tour](https://manzolo.github.io/qemu-iso-lab/tour.html)** shows the whole road in short clips
+(Italian voice, English and Italian subtitles): the catalog, the setup on Linux and on Windows, a first VM, the console in
+the browser, a lab, your own lab, the network map with its packet inspector; then one lesson per lab.
 
 - **100+ profiles**, more than half of them fully unattended: every Ubuntu LTS since 8.04, Debian,
   Fedora, Arch, NixOS, openSUSE, FreeBSD, Haiku, ReactOS and Windows from 11 back to NT 4,
@@ -38,7 +39,7 @@ with English and Italian voice and subtitles: the catalog, the setup, a first VM
 
 ![The web dashboard: My VMs, two of them running, the selected one with its actions and facts](docs/screenshots/web-dashboard.png)
 
-**Contents:** [Quick start](#quick-start) · [From zero to a running VM](#from-zero-to-a-running-vm) · [The catalog](#the-catalog-pick-what-you-want) ·
+**Contents:** [Quick start](#quick-start) · [Gallery](#gallery) · [From zero to a running VM](#from-zero-to-a-running-vm) · [The catalog](#the-catalog-pick-what-you-want) ·
 [In the browser](#in-the-browser) · [Terminal dashboard](#the-terminal-dashboard) · [Labs](#labs) · [Everyday commands](#everyday-commands) ·
 [Make it yours](#make-it-yours) · [Documentation](#documentation) · [Development](#development) · [License](#license)
 
@@ -165,6 +166,21 @@ Flashing or importing a physical disk needs the disk attached to WSL first (`wsl
 from an administrator PowerShell). This setup has not been through the validation matrix yet:
 reports are welcome.
 </details>
+
+## Gallery
+
+Frames from the tour's own recordings (the pictures link to the full 1600×900 captures; the files
+live on the `media` branch, not in the repository's history):
+
+<p align="center"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/gallery.gif" alt="Slideshow of the lab: catalog, dashboard, install job, console, labs, map, packet inspector, Windows, TUI" width="800"></p>
+
+<table>
+<tr><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/catalog.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/catalog.png" alt="The catalog site: every profile a card, with how it installs and the commands to run" width="100%"></a><br><sub>The catalog site: every profile a card, with how it installs and the commands to run</sub></td><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/dashboard.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/dashboard.png" alt="The web dashboard, straight after the one-line install" width="100%"></a><br><sub>The web dashboard, straight after the one-line install</sub></td><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/app-menu.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/app-menu.png" alt="QEMU ISO Lab in the applications menu" width="100%"></a><br><sub>QEMU ISO Lab in the applications menu</sub></td></tr>
+<tr><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/install-job.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/install-job.png" alt="A zero-click install as a job, with its live log" width="100%"></a><br><sub>A zero-click install as a job, with its live log</sub></td><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/console-ssh.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/console-ssh.png" alt="The VM's screen in the browser, an SSH terminal docked under it" width="100%"></a><br><sub>The VM's screen in the browser, an SSH terminal docked under it</sub></td><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/console-files.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/console-files.png" alt="Files: browse the guest, drag files in, click to download" width="100%"></a><br><sub>Files: browse the guest, drag files in, click to download</sub></td></tr>
+<tr><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/multi-console.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/multi-console.png" alt="Two consoles side by side, the lab's members" width="100%"></a><br><sub>Two consoles side by side, the lab's members</sub></td><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/labs.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/labs.png" alt="Labs: declared groups of VMs on their own segment, one card each" width="100%"></a><br><sub>Labs: declared groups of VMs on their own segment, one card each</sub></td><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/lab-tests.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/lab-tests.png" alt="Run tests: the lab's own checks, inside the machines" width="100%"></a><br><sub>Run tests: the lab's own checks, inside the machines</sub></td></tr>
+<tr><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/lab-map.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/lab-map.png" alt="The network map, drawn live: host, forwards, machines, segment" width="100%"></a><br><sub>The network map, drawn live: host, forwards, machines, segment</sub></td><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/packet-inspector.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/packet-inspector.png" alt="The packet inspector: a frame opened layer by layer, header bytes only" width="100%"></a><br><sub>The packet inspector: a frame opened layer by layer, header bytes only</sub></td><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/windows.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/windows.png" alt="The same dashboard on Windows 11, in Edge, from WSL2" width="100%"></a><br><sub>The same dashboard on Windows 11, in Edge, from WSL2</sub></td></tr>
+<tr><td align="center" width="33%"><a href="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/tui.png"><img src="https://raw.githubusercontent.com/manzolo/qemu-iso-lab/media/gallery/thumbs/tui.png" alt="The terminal dashboard, vmtui" width="100%"></a><br><sub>The terminal dashboard, vmtui</sub></td></tr>
+</table>
 
 ## From zero to a running VM
 
@@ -419,7 +435,7 @@ Details: [docs/PROVISIONING.md](docs/PROVISIONING.md).
 | Page | Read it for |
 |------|-------------|
 | [Catalog site](https://manzolo.github.io/qemu-iso-lab/) | every profile, its version and history, what to run |
-| [Tour](https://manzolo.github.io/qemu-iso-lab/tour.html) ([how it is made](docs/TOUR.md)) | six short clips with English and Italian voice and subtitles |
+| [Tour](https://manzolo.github.io/qemu-iso-lab/tour.html) ([how it is made](docs/TOUR.md)) | eight short chapters and the lab lessons, Italian voice, English and Italian subtitles |
 | [docs/README.md](docs/README.md) | the map of every page, in reading order |
 | [PROFILES](docs/PROFILES.md) | the profile model, versions, and how to add a VM |
 | [UNATTENDED](docs/UNATTENDED.md) | how each unattended install works, and the validation matrix |

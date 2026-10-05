@@ -804,8 +804,8 @@ def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "c
             "__DATA__", json.dumps({"clips": tour}, ensure_ascii=False).replace("</", "<\\/")), encoding="utf-8")
     (out / "catalog.json").write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     tour_nav = '<a class="tour" href="tour.html">▶ Tour</a>' if tour else ""
-    tour_start = ('<div class="terminal-note"><span>New to it? Six short clips show the whole road, '
-                  'with English and Italian voice and subtitles.</span><a href="tour.html">▶ Take the tour</a></div>') if tour else ""
+    tour_start = ('<div class="terminal-note"><span>New to it? Short clips show the whole road, '
+                  'Italian voice with English and Italian subtitles.</span><a href="tour.html">▶ Take the tour</a></div>') if tour else ""
     page = (PAGE.replace("__TOUR_NAV__", tour_nav).replace("__TOUR_START__", tour_start).replace("__SPRITE__", sprite).replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
             .replace("__VMCTL__", data["vmctl_version"]).replace("__GENERATED__", data["generated"])
             .replace("__COMMIT__", f" · {data['commit']}" if data["commit"] else "").replace("__REPO__", REPO_URL)
