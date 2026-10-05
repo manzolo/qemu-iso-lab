@@ -359,7 +359,8 @@ def lab_map_page(group: str) -> bytes | None:
     """The lab's network map, rendered now from the profiles and the live states.
 
     Serving only the file `group map` left behind answered 404 until someone ran it, and a
-    map written earlier showed the states of that moment; the file is refreshed on the way.
+    map written earlier showed the states of that moment. Render the interactive page
+    directly; exported files remain self-contained snapshots without web controls.
     """
     from vmctl import labs, lifecycle
 
@@ -369,8 +370,8 @@ def lab_map_page(group: str) -> bytes | None:
     names = labs.group_members(cfg, group)
     if not names:
         return None
-    path = labs.write_map(labs.model(cfg, group, lifecycle.group_states(cfg, names)))
-    return path.read_bytes()
+    lab = labs.model(cfg, group, lifecycle.group_states(cfg, names))
+    return labs.render_html(lab, interactive=True).encode("utf-8")
 
 
 def lab_map_state(group: str) -> dict[str, Any] | None:
@@ -385,7 +386,7 @@ def lab_map_state(group: str) -> dict[str, Any] | None:
         return None
     states = lifecycle.group_states(cfg, names)
     lab = labs.model(cfg, group, states)
-    return {"svg": labs._svg(lab), "states": states, "traffic": lab_traffic.monitor.sample(cfg, lab)}
+    return {"svg": labs._svg(lab, interactive=True), "states": states, "traffic": lab_traffic.monitor.sample(cfg, lab)}
 
 
 def lab_guide_page(group: str, lang: str | None, token: str = "") -> bytes | None:

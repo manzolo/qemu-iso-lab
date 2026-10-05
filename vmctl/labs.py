@@ -618,10 +618,10 @@ def _internet_node(x: float, y: float) -> list[str]:
             f'<text class="node-t" x="{x + 100}" y="{y + 40}" text-anchor="middle">Internet</text></g>']
 
 
-def _svg(lab: dict[str, Any]) -> str:
+def _svg(lab: dict[str, Any], interactive: bool = False) -> str:
     members = lab["members"]
     count = max(1, len(members))
-    box_h = _BOX_H + 22 * max((len(m["services"]) for m in members), default=0)
+    box_h = _BOX_H + 22 * max((len(m["services"]) for m in members), default=0) + (40 if interactive else 0)
     width = max(860, 2 * _MARGIN + count * _BOX_W + (count - 1) * _GAP)
     pills = max((len(n["forwards"]) for m in members for n in m["nics"] if n["type"] == "user"), default=0)
     box_y = _NAT_Y + 48 + pills * (_PILL_H + _PILL_GAP)
@@ -695,6 +695,20 @@ def _svg(lab: dict[str, Any]) -> str:
             where = str(service.get("address") or "").split("/")[0]
             label = f'CT {service.get("container", "?")} {service.get("name", "")} · {where}'
             out.append(f'<text class="svc" x="{x + 18}" y="{box_y + _BOX_H + 6 + 22 * index}">{esc(label)}</text>')
+        if interactive:
+            actions = [("ssh", "SSH", bool(member["running"] and member["ssh"])),
+                       ("console", "Console", bool(member["running"])), ("vm", "Manage", True)]
+            for index, (action, label, enabled) in enumerate(actions):
+                ax, ay = x + 18 + index * 84, box_y + box_h - 44
+                reason = "" if enabled else " · Start the VM first"
+                if action == "ssh" and not member["ssh"]:
+                    reason = " · SSH is not configured"
+                out.append(f'<g class="vm-action" role="button" data-vm="{esc(member["name"])}" data-action="{action}" '
+                           f'aria-disabled="{str(not enabled).lower()}" aria-label="{label}: {esc(member["name"])}{reason}" '
+                           f'tabindex="{-1 if not enabled else 0}">'
+                           f'<title>{label}{reason or " · Opens in a dialog on this page"}</title>'
+                           f'<rect x="{ax}" y="{ay}" width="78" height="30" rx="6"/>'
+                           f'<text x="{ax + 39}" y="{ay + 20}" text-anchor="middle">{label}</text></g>')
         out.append('</g>')
         lans = [nic for nic in member["nics"] if nic["type"] == "segment"]
         for index, nic in enumerate(lans):
@@ -787,6 +801,24 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .map svg .badge.running { fill:#62e3bc; } .map svg .badge.absent { fill:#e7b768; }
 .map svg .divider { stroke:#293e53; stroke-width:1; }
 .map svg .svc { fill:#bcb0fa; font-size:12px; }
+.map svg .vm-action { cursor:pointer; }
+.map svg .vm-action rect { fill:#142b3e; stroke:#38566d; }
+.map svg .vm-action text { fill:#a9d9eb; font-size:12px; font-weight:550; }
+.map svg .vm-action:hover rect, .map svg .vm-action:focus-visible rect { fill:#204258; stroke:#91dbef; }
+.map svg .vm-action:focus-visible { outline:none; }
+.map svg .vm-action[aria-disabled="true"] { opacity:.4; cursor:default; }
+.map svg .vm-action[aria-disabled="true"] rect { fill:#142333; stroke:#385066; }
+.vm-dialog { width:min(1280px, calc(100vw - 32px)); height:min(900px, calc(100dvh - 32px)); max-width:none; max-height:none; padding:0; border:1px solid #2f4a62; border-radius:14px; background:#0b1520; color:#e3edf7; display:none; flex-direction:column; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.6); }
+.vm-dialog[open] { display:flex; }
+.vm-dialog::backdrop { background:rgba(3,9,16,.72); backdrop-filter:blur(2px); }
+.vm-dialog header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid #22384c; background:#0f1d2b; }
+.vm-dialog h2 { margin:0; font-size:1.05rem; font-family:ui-monospace, monospace; }
+.vm-dialog-eyebrow { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#7fb4c9; }
+.vm-dialog-tools { display:flex; gap:8px; align-items:center; }
+.vm-dialog-tools a, .vm-dialog-tools button { font:inherit; font-size:13px; color:#cfe3f1; background:#15293b; border:1px solid #38566d; border-radius:8px; padding:6px 12px; text-decoration:none; cursor:pointer; }
+.vm-dialog-tools a:hover, .vm-dialog-tools button:hover { background:#204258; border-color:#91dbef; }
+.vm-dialog iframe { flex:1; width:100%; border:0; background:#0b111b; }
+@media (max-width:600px) { .vm-dialog { width:100vw; height:100dvh; border-radius:0; border:0; } }
 .map svg .bus-t { fill:#b6aafa; font:12px ui-monospace, monospace; }
 .map svg .addr { font:12px ui-monospace, monospace; fill:#c8daf0; }
 .map svg .traffic-label { fill:#77def3; font:10px ui-monospace, monospace; }
@@ -921,7 +953,7 @@ def _forward_html(fwd: dict[str, Any]) -> str:
     return f'{html.escape(target)}{what}'
 
 
-def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
+def render_html(lab: dict[str, Any], generated: datetime | None = None, *, interactive: bool = False) -> str:
     esc = html.escape
     when = (generated or datetime.now()).strftime("%Y-%m-%d %H:%M")
     running = sum(member["running"] for member in lab["members"])
@@ -965,9 +997,14 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
 {intro}
 <section class="map-shell" aria-label="Lab topology">
 <div class="map-toolbar"><span class="map-title">NETWORK TOPOLOGY</span><div class="map-legend"><span><i class="on"></i>VM on</span><span><i></i>VM off</span><span><i class="flow"></i>Measured traffic</span></div></div>
-<div class="map" id="lab-topology">{_svg(lab)}</div>
-<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>The lens on a LAN cable opens its packet inspector</span></div>
+<div class="map" id="lab-topology">{_svg(lab, interactive=interactive)}</div>
+<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>The lens on a LAN cable opens its packet inspector{" · SSH, Console and Manage open in a dialog" if interactive else ""}</span></div>
 </section>
+<dialog id="vm-dialog" class="vm-dialog" aria-labelledby="vm-dialog-title">
+<header><div><div class="vm-dialog-eyebrow" id="vm-dialog-kind">Console</div><h2 id="vm-dialog-title">VM</h2></div>
+<div class="vm-dialog-tools"><a id="vm-dialog-tab" href="#" target="_blank" rel="noopener noreferrer">Open in a tab ↗</a><button type="button" id="vm-dialog-close">Close</button></div></header>
+<iframe id="vm-dialog-frame" title="VM" src="about:blank"></iframe>
+</dialog>
 <aside id="packet-inspector" class="packet-inspector" aria-label="Packet inspector" hidden>
 <div class="packet-head" id="packet-drag" title="Drag to move"><div><strong>PACKET INSPECTOR</strong><span id="packet-link"></span></div><div class="packet-actions">
 <button id="packet-pause" type="button" aria-pressed="false">Pause</button>

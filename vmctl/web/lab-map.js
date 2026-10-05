@@ -238,6 +238,70 @@
     map.querySelector('svg')?.setAttribute('role', 'group');
     map.querySelectorAll('.nic title').forEach(title => title.remove());
   };
+  // SSH, Console and Manage under a machine open the dashboard's own view of it in a dialog on
+  // this page (Manzolo wanted dialogs, not new tabs, 2026-10-05): the embedded detached console,
+  // the browser SSH terminal, or the Machine panel alone (`panel=1`). "Open in a tab" keeps the
+  // old behaviour at hand. Closing the dialog unloads the frame, so SSH and VNC disconnect.
+  const vmDialog = document.getElementById('vm-dialog');
+  const vmFrame = document.getElementById('vm-dialog-frame');
+  const vmTab = document.getElementById('vm-dialog-tab');
+  const ACTIONS = {ssh: 'SSH terminal', console: 'Console', vm: 'Manage'};
+  const actionUrl = (action, vm, embedded) => {
+    const url = new URL('/', location.href);
+    url.searchParams.set('token', endpoint.searchParams.get('token') || '');
+    if (action === 'console' || action === 'ssh') url.searchParams.set('detached', '1');
+    else if (embedded) url.searchParams.set('panel', '1');
+    url.hash = `${action}=${encodeURIComponent(vm)}`;
+    return url;
+  };
+  let dialogOpener = null;
+  const openVmDialog = (action, vm, opener) => {
+    if (!vmDialog || !ACTIONS[action]) return;
+    dialogOpener = opener || null;
+    document.getElementById('vm-dialog-kind').textContent = ACTIONS[action];
+    document.getElementById('vm-dialog-title').textContent = vm;
+    vmFrame.title = `${ACTIONS[action]} · ${vm}`;
+    vmTab.href = actionUrl(action, vm, false).href;
+    vmFrame.src = actionUrl(action, vm, true).href;
+    vmDialog.dataset.vm = vm; vmDialog.dataset.action = action;
+    if (!vmDialog.open) vmDialog.showModal();
+    vmFrame.focus();
+  };
+  // The `close` event arrives a task later than close(): unload the frame right away, and again
+  // on the event for an Escape (the dialog's own cancel), which never comes through here.
+  const releaseVmDialog = () => {
+    if (vmFrame.getAttribute('src') !== 'about:blank') vmFrame.src = 'about:blank';
+    delete vmDialog.dataset.vm; delete vmDialog.dataset.action;
+    const key = dialogOpener; dialogOpener = null;
+    if (key) [...map.querySelectorAll('.vm-action')].find(n => n.dataset.vm === key.vm && n.dataset.action === key.action)?.focus({preventScroll:true});
+  };
+  const closeVmDialog = () => {
+    if (!vmDialog?.open) return;
+    vmDialog.close(); releaseVmDialog();
+  };
+  vmDialog?.addEventListener('close', releaseVmDialog);
+  document.getElementById('vm-dialog-close')?.addEventListener('click', closeVmDialog);
+  window.addEventListener('message', event => {
+    if (event.origin !== location.origin || event.source !== vmFrame?.contentWindow) return;
+    if (event.data && event.data.type === 'vmctl-close') closeVmDialog();
+  });
+  const actionOf = event => {
+    const node = event.target.closest?.('.vm-action');
+    return node && node.getAttribute('aria-disabled') !== 'true' ? node : null;
+  };
+  map.addEventListener('click', event => {
+    const node = actionOf(event);
+    if (!node) return;
+    event.preventDefault();
+    openVmDialog(node.dataset.action, node.dataset.vm, {vm: node.dataset.vm, action: node.dataset.action});
+  });
+  map.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const node = actionOf(event);
+    if (!node) return;
+    event.preventDefault();
+    openVmDialog(node.dataset.action, node.dataset.vm, {vm: node.dataset.vm, action: node.dataset.action});
+  });
   const illuminate = (link, bytes) => {
     if (!link) return;
     link.classList.toggle('active', bytes > 0);
@@ -281,8 +345,15 @@
       if (document.hidden) { clearTraffic(); return; }
       if (data.svg !== lastSvg) {
         const hadFocus = document.activeElement?.closest?.('.inspect-btn') ? keyOf(document.activeElement.closest('.nic')) : null;
+        const actionFocus = document.activeElement?.closest?.('.vm-action')?.dataset;
         map.innerHTML = data.svg; lastSvg = data.svg; prepareCables();
         if (hadFocus) buttonOf(hadFocus)?.focus({preventScroll:true});
+        if (actionFocus) {
+          const links = [...map.querySelectorAll('.vm-action')].filter(link => link.dataset.vm === actionFocus.vm);
+          const target = links.find(link => link.dataset.action === actionFocus.action && link.getAttribute('aria-disabled') !== 'true')
+            || links.find(link => link.dataset.action === 'vm');
+          target?.focus({preventScroll:true});
+        }
       }
       samples = new Map(data.traffic.map(entry => [JSON.stringify([entry.vm, entry.nic]), entry]));
       const next = new Map();

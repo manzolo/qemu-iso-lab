@@ -12,11 +12,11 @@ cfg=config.load_config()
 names=labs.group_members(cfg,'k8s-lab')
 states={name:{'running':i<2,'install':'verified'} for i,name in enumerate(names)}
 lab=labs.model(cfg,'k8s-lab',states)
-result={'html':labs.render_html(lab),'svg':labs._svg(lab),'states':states,'nics':[
+result={'html':labs.render_html(lab,interactive=True),'svg':labs._svg(lab,interactive=True),'states':states,'nics':[
 {'vm':m['name'],'nic':n['id'],'available':m['running'],'source':'segment frames', 'rx':0,'tx':0,'time':1,'epoch':1}
 for m in lab['members'] for n in m['nics']]}
 lab['members'][0]['running']=False
-result['stopped_svg']=labs._svg(lab)
+result['stopped_svg']=labs._svg(lab,interactive=True)
 print(json.dumps(result))
 `], {cwd:root}));
 const browser = await chromium.launch({headless:true, executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined});
@@ -35,6 +35,7 @@ try {
   assert(target);
   await page.route('http://lab.test/**', async route => {
     const url = new URL(route.request().url());
+    if(url.pathname==='/') return route.fulfill({contentType:'text/html',body:'<title>VM action target</title>'});
     if(url.pathname.endsWith('/map')) return route.fulfill({contentType:'text/html',body:fixture.html});
     assert(url.pathname.endsWith('/map-state'));
     assert.equal(url.searchParams.get('token'),'fixture-token');
@@ -53,6 +54,39 @@ try {
   await page.clock.install();
   await page.goto('http://lab.test/labs/k8s-lab/map?token=fixture-token');
   await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Live'));
+  const action = (kind, vm='k8s-lab-main') => page.locator(`.vm-action[data-vm="${vm}"][data-action="${kind}"]`);
+  const dialog = page.locator('#vm-dialog'), frame = page.locator('#vm-dialog-frame');
+  // The three buttons under a machine open a dialog on this page, never a tab: the embedded
+  // detached console, the SSH terminal alone, or the Machine panel alone.
+  for (const kind of ['ssh','console','vm']) {
+    assert.equal(await action(kind).getAttribute('href'),null,'No link: a dialog opens');
+    await action(kind).click();
+    assert(await dialog.evaluate(n=>n.open),`${kind} opens the dialog`);
+    const url=new URL(await frame.getAttribute('src'));
+    assert.equal(url.origin,'http://lab.test');
+    assert.equal(url.searchParams.get('token'),'fixture-token');
+    assert.equal(url.hash,`#${kind}=k8s-lab-main`);
+    assert.equal(url.searchParams.get('detached'),kind==='vm'?null:'1');
+    assert.equal(url.searchParams.get('panel'),kind==='vm'?'1':null);
+    const tab=new URL(await page.locator('#vm-dialog-tab').getAttribute('href'));
+    assert.equal(tab.hash,`#${kind}=k8s-lab-main`); assert.equal(tab.searchParams.get('panel'),null,'The tab gets the whole dashboard');
+    assert.equal(await page.locator('#vm-dialog-title').textContent(),'k8s-lab-main');
+    await page.locator('#vm-dialog-close').click();
+    assert(!await dialog.evaluate(n=>n.open));
+    assert.equal(await frame.getAttribute('src'),'about:blank','Closing unloads the frame (SSH and VNC disconnect)');
+  }
+  assert(await action('vm').evaluate(n=>document.activeElement===n),'Closing gives the focus back to the button that opened it');
+  await action('ssh','k8s-lab-node2').click({force:true});
+  assert(!await dialog.evaluate(n=>n.open),'A disabled button opens nothing');
+  assert.equal(await action('console','k8s-lab-node2').getAttribute('tabindex'),'-1');
+  assert.equal(await action('vm','k8s-lab-node2').getAttribute('aria-disabled'),'false','Stopped VMs can still be managed');
+  await action('ssh').focus(); await page.keyboard.press('Enter');
+  assert(await dialog.evaluate(n=>n.open),'Enter opens the dialog too');
+  const embedded = page.frames().find(f=>f.url().startsWith('http://lab.test/?'));
+  assert(embedded);
+  await embedded.evaluate(()=>window.parent.postMessage({type:'vmctl-close'}, location.origin));
+  await page.waitForFunction(()=>!document.getElementById('vm-dialog').open);
+  assert(page.url().includes('/labs/k8s-lab/map'),'The map stays where it is');
   const cable = page.locator(`.nic[data-vm="${target.vm}"][data-nic="${target.nic}"]`);
   const advance = async () => {
     const before=requests;
@@ -154,8 +188,12 @@ try {
   assert.equal(await cable.locator('.traffic-label').textContent(),'Traffic unavailable');
   assert.equal(await page.locator('.transmitting,.receiving').count(),0);
   assert((await page.locator('#packet-state').textContent()).includes('unavailable'),'Unavailable capture is said; the history stays readable');
+  await action('ssh').focus();
   stopped=true;
   await advance();
+  assert.equal(await action('ssh').getAttribute('aria-disabled'),'true','Stopping disables SSH');
+  assert.equal(await action('console').getAttribute('aria-disabled'),'true','Stopping disables the console');
+  assert(await action('vm').evaluate(n=>document.activeElement===n),'Focus moves to Manage when SSH becomes disabled');
   assert.equal(await cable.locator('.traffic-label').textContent(),'Link off');
   assert.equal(await page.locator('#running-count').textContent(),'1 running');
   assert.equal(await page.locator('[data-member="k8s-lab-main"] .member-state').textContent(),'stopped');
@@ -181,7 +219,7 @@ try {
   assert(await page.locator('.map').evaluate(n=>n.scrollWidth>n.clientWidth),'Small screens scroll the diagram');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No page-wide overflow');
   assert.deepEqual(errors,[]);
-  console.log('PASS: NIC attribution, live traffic, lens inspector (no hover), filters/search/clear, packet detail, pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
+  console.log('PASS: VM action dialogs, NIC attribution, live traffic, lens inspector (no hover), filters/search/clear, packet detail, pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
 } finally {
   await browser.close();
 }

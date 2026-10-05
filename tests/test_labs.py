@@ -148,6 +148,35 @@ class LabsTests(BaseVmctlTestCase):
             link = next(node for node in cable if node.attrib.get("class", "").startswith("link "))
             self.assertIn(expected, link.attrib["class"].split())
 
+    def test_web_map_actions_follow_power_and_ssh_configuration(self):
+        from xml.etree import ElementTree as ET
+
+        lab = labs.model(self.tracked_config(), "k8s-lab", {
+            "k8s-lab-main": {"running": True, "install": "verified"},
+        })
+        lab["members"][0]["name"] = 'host<&"'
+        def actions():
+            tree = ET.fromstring(labs._svg(lab, interactive=True))
+            return {(node.attrib["data-vm"], node.attrib["data-action"]): node.attrib
+                    for node in tree.iter() if "data-action" in node.attrib}
+        buttons = actions()
+        for member in lab["members"]:
+            for action in ("ssh", "console", "vm"):
+                self.assertEqual(buttons[member["name"], action]["aria-disabled"],
+                                 str(not (member["running"] or action == "vm")).lower())
+        lab["members"][0]["ssh"] = ""
+        self.assertEqual(actions()['host<&"', "ssh"]["aria-disabled"], "true")
+        self.assertEqual(actions()['host<&"', "console"]["aria-disabled"], "false")
+        for attrs in buttons.values():
+            self.assertEqual(attrs["role"], "button")
+            self.assertNotIn("href", attrs)
+            self.assertNotIn("target", attrs)
+        snapshot, page = labs.render_html(lab), labs.render_html(lab, interactive=True)
+        self.assertNotIn('class="vm-action"', snapshot)
+        self.assertIn('class="vm-action"', page)
+        self.assertIn('id="vm-dialog"', page)
+        self.assertIn("open in a dialog", page)
+
     def test_group_up_skips_members_without_a_disk_and_starts_in_order(self):
         cfg = self.tracked_config()
         states = {name: {"running": False, "install": "verified"} for name in labs.group_members(cfg, "proxmox-lab")}
