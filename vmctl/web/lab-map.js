@@ -20,6 +20,7 @@
   let history = new Map();  // packet id -> packet, for the selected NIC
   let clearedBelow = 0;     // Clear drops what the current sample still carries, until newer ids arrive
   let expanded = new Set(), lastShown = [];  // opened rows (by packet id) and the list on screen
+  let lastSignature = '';  // the rows are rebuilt only when the list or the opened rows change (a detail under the pointer must not vanish)
   const filters = {proto: 'all', dirs: new Set(['TX', 'RX']), text: ''};
   let anchor = {x:24, y:24}, dragged = null;
   const keyOf = node => JSON.stringify([node.dataset.vm, node.dataset.nic]);
@@ -70,8 +71,9 @@
       const all = [...history.values()].sort((a, b) => b.id - a.id);
       const shown = paused ? lastShown : (lastShown = all.filter(matches));
       const rows = document.getElementById('packet-rows');
+      const signature = JSON.stringify([shown.map(packet => packet.id), [...expanded]]);
       const fragment = document.createDocumentFragment();
-      for (const packet of shown) {
+      for (const packet of signature === lastSignature ? [] : shown) {
         const row = document.createElement('tr');
         row.className = 'packet-row' + (expanded.has(packet.id) ? ' open' : '');
         row.dataset.id = packet.id;
@@ -97,7 +99,7 @@
         fragment.append(row);
         if (expanded.has(packet.id)) fragment.append(detailRow(packet));
       }
-      rows.replaceChildren(fragment);
+      if (signature !== lastSignature) { rows.replaceChildren(fragment); lastSignature = signature; }
       const empty = document.getElementById('packet-empty');
       empty.hidden = shown.length > 0;
       empty.textContent = !sample?.packets_available && !all.length ? (sample?.packet_reason || 'Waiting for capture information…')
@@ -174,7 +176,7 @@
     const node = button.closest('.nic');
     const key = keyOf(node);
     if (selected === key && !event?.type?.startsWith('key')) { closeInspector(false); return; }  // the lens toggles
-    if (selected !== key) { paused = false; history = new Map(); clearedBelow = 0; expanded = new Set(); lastShown = []; dragged = null; }
+    if (selected !== key) { paused = false; history = new Map(); clearedBelow = 0; expanded = new Set(); lastShown = []; lastSignature = ''; dragged = null; }
     selected = key;
     const rect = button.getBoundingClientRect();
     anchor = {x:rect.right, y:rect.bottom};
@@ -203,7 +205,7 @@
   pauseButton.addEventListener('click', () => { paused = !paused; renderInspector(); });
   document.getElementById('packet-clear').addEventListener('click', () => {
     clearedBelow = Math.max(0, ...[...history.keys()], ...((samples.get(selected)?.packets || []).map(p => p.id)));
-    history = new Map(); expanded = new Set(); lastShown = []; renderInspector();
+    history = new Map(); expanded = new Set(); lastShown = []; lastSignature = ''; renderInspector();
   });
   document.getElementById('packet-close').addEventListener('click', () => closeInspector(true));
   inspector.querySelectorAll('.chip[data-proto]').forEach(chip => chip.addEventListener('click', () => {
