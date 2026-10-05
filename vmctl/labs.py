@@ -818,7 +818,11 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .vm-dialog-tools a, .vm-dialog-tools button { font:inherit; font-size:13px; color:#cfe3f1; background:#15293b; border:1px solid #38566d; border-radius:8px; padding:6px 12px; text-decoration:none; cursor:pointer; }
 .vm-dialog-tools a:hover, .vm-dialog-tools button:hover { background:#204258; border-color:#91dbef; }
 .vm-dialog iframe { flex:1; width:100%; border:0; background:#0b111b; }
-@media (max-width:600px) { .vm-dialog { width:100vw; height:100dvh; border-radius:0; border:0; } }
+.vm-dialog.floating { position:fixed; margin:0; inset:auto; width:min(760px, calc(100vw - 24px)); height:min(480px, calc(100dvh - 24px)); min-width:360px; min-height:220px; resize:both; z-index:25; }
+.vm-dialog.floating header { cursor:grab; user-select:none; }
+.vm-dialog.dragging header { cursor:grabbing; }
+.vm-dialog.dragging iframe { pointer-events:none; }
+@media (max-width:600px) { .vm-dialog { width:100vw; height:100dvh; border-radius:0; border:0; } .vm-dialog.floating { resize:none; width:calc(100vw - 16px); height:min(60dvh, calc(100dvh - 16px)); } }
 .map svg .bus-t { fill:#b6aafa; font:12px ui-monospace, monospace; }
 .map svg .addr { font:12px ui-monospace, monospace; fill:#c8daf0; }
 .map svg .traffic-label { fill:#77def3; font:10px ui-monospace, monospace; }
@@ -998,10 +1002,10 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None, *, inter
 <section class="map-shell" aria-label="Lab topology">
 <div class="map-toolbar"><span class="map-title">NETWORK TOPOLOGY</span><div class="map-legend"><span><i class="on"></i>VM on</span><span><i></i>VM off</span><span><i class="flow"></i>Measured traffic</span></div></div>
 <div class="map" id="lab-topology">{_svg(lab, interactive=interactive)}</div>
-<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>The lens on a LAN cable opens its packet inspector{" · SSH, Console and Manage open in a dialog" if interactive else ""}</span></div>
+<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>The lens on a LAN cable opens its packet inspector{" · SSH opens a small window you can move and resize, Console and Manage a dialog" if interactive else ""}</span></div>
 </section>
 <dialog id="vm-dialog" class="vm-dialog" aria-labelledby="vm-dialog-title">
-<header><div><div class="vm-dialog-eyebrow" id="vm-dialog-kind">Console</div><h2 id="vm-dialog-title">VM</h2></div>
+<header id="vm-dialog-drag"><div><div class="vm-dialog-eyebrow" id="vm-dialog-kind">Console</div><h2 id="vm-dialog-title">VM</h2></div>
 <div class="vm-dialog-tools"><a id="vm-dialog-tab" href="#" target="_blank" rel="noopener noreferrer">Open in a tab ↗</a><button type="button" id="vm-dialog-close">Close</button></div></header>
 <iframe id="vm-dialog-frame" title="VM" src="about:blank"></iframe>
 </dialog>

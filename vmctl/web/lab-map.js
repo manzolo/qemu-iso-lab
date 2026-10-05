@@ -254,9 +254,21 @@
     url.hash = `${action}=${encodeURIComponent(vm)}`;
     return url;
   };
-  let dialogOpener = null;
+  // SSH is a small window that floats over the map (non-modal, dragged by its header, resized by
+  // the browser's handle): a shell on one machine next to the packet inspector is how the
+  // analyser gets tested (Manzolo, 2026-10-05). Console and Manage stay modal dialogs.
+  const FLOATING = new Set(['ssh']);
+  let dialogOpener = null, floatAt = null;
+  const placeFloating = () => {
+    const width = vmDialog.offsetWidth, height = vmDialog.offsetHeight;
+    const at = floatAt || {x: innerWidth - width - 16, y: 16};
+    vmDialog.style.left = `${Math.max(8, Math.min(at.x, innerWidth - width - 8))}px`;
+    vmDialog.style.top = `${Math.max(8, Math.min(at.y, innerHeight - height - 8))}px`;
+  };
   const openVmDialog = (action, vm, opener) => {
     if (!vmDialog || !ACTIONS[action]) return;
+    const floating = FLOATING.has(action);
+    if (vmDialog.open && vmDialog.classList.contains('floating') !== floating) closeVmDialog();
     dialogOpener = opener || null;
     document.getElementById('vm-dialog-kind').textContent = ACTIONS[action];
     document.getElementById('vm-dialog-title').textContent = vm;
@@ -264,14 +276,30 @@
     vmTab.href = actionUrl(action, vm, false).href;
     vmFrame.src = actionUrl(action, vm, true).href;
     vmDialog.dataset.vm = vm; vmDialog.dataset.action = action;
-    if (!vmDialog.open) vmDialog.showModal();
+    vmDialog.classList.toggle('floating', floating);
+    if (!floating) { vmDialog.style.left = vmDialog.style.top = ''; }
+    if (!vmDialog.open) { if (floating) vmDialog.show(); else vmDialog.showModal(); }
+    if (floating) placeFloating();
     vmFrame.focus();
   };
+  document.getElementById('vm-dialog-drag')?.addEventListener('pointerdown', event => {
+    if (!vmDialog.classList.contains('floating') || event.target.closest('button, a')) return;
+    const rect = vmDialog.getBoundingClientRect();
+    const offset = {x: event.clientX - rect.left, y: event.clientY - rect.top};
+    vmDialog.classList.add('dragging');
+    const move = e => { floatAt = {x: e.clientX - offset.x, y: e.clientY - offset.y}; placeFloating(); };
+    const up = () => { vmDialog.classList.remove('dragging'); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    event.preventDefault();
+  });
+  window.addEventListener('resize', () => { if (vmDialog?.open && vmDialog.classList.contains('floating')) placeFloating(); });
   // The `close` event arrives a task later than close(): unload the frame right away, and again
   // on the event for an Escape (the dialog's own cancel), which never comes through here.
   const releaseVmDialog = () => {
     if (vmFrame.getAttribute('src') !== 'about:blank') vmFrame.src = 'about:blank';
     delete vmDialog.dataset.vm; delete vmDialog.dataset.action;
+    vmDialog.classList.remove('floating', 'dragging');
     const key = dialogOpener; dialogOpener = null;
     if (key) [...map.querySelectorAll('.vm-action')].find(n => n.dataset.vm === key.vm && n.dataset.action === key.action)?.focus({preventScroll:true});
   };

@@ -71,6 +71,21 @@ try {
     const tab=new URL(await page.locator('#vm-dialog-tab').getAttribute('href'));
     assert.equal(tab.hash,`#${kind}=k8s-lab-main`); assert.equal(tab.searchParams.get('panel'),null,'The tab gets the whole dashboard');
     assert.equal(await page.locator('#vm-dialog-title').textContent(),'k8s-lab-main');
+    assert.equal(await dialog.evaluate(n=>n.matches(':modal')),kind!=='ssh',`${kind}: SSH floats, the others are modal`);
+    assert.equal(await dialog.evaluate(n=>n.classList.contains('floating')),kind==='ssh');
+    if (kind==='ssh') {
+      // A floating window: dragged by its header, the map (and its lens) still usable underneath.
+      const before=await dialog.boundingBox(), head=await page.locator('#vm-dialog-drag').boundingBox();
+      await page.mouse.move(head.x+head.width/2,head.y+head.height/2); await page.mouse.down();
+      await page.mouse.move(head.x+head.width/2-200,head.y+head.height/2+120,{steps:4}); await page.mouse.up();
+      const after=await dialog.boundingBox();
+      assert(Math.abs(after.x-(before.x-200))<2 && Math.abs(after.y-(before.y+120))<2,`Dragged by the header: ${JSON.stringify([before,after])}`);
+      assert.equal(await dialog.evaluate(n=>n.classList.contains('dragging')),false);
+      await page.locator('.inspect-btn').first().click();
+      assert(!await page.locator('#packet-inspector').evaluate(n=>n.hidden),'The packet inspector opens while SSH is up');
+      assert(await dialog.evaluate(n=>n.open),'SSH stays open');
+      await page.locator('#packet-close').click();
+    }
     await page.locator('#vm-dialog-close').click();
     assert(!await dialog.evaluate(n=>n.open));
     assert.equal(await frame.getAttribute('src'),'about:blank','Closing unloads the frame (SSH and VNC disconnect)');
@@ -89,10 +104,12 @@ try {
   assert(page.url().includes('/labs/k8s-lab/map'),'The map stays where it is');
   const cable = page.locator(`.nic[data-vm="${target.vm}"][data-nic="${target.nic}"]`);
   const advance = async () => {
-    const before=requests;
+    // Wait for the poll to be *processed*, not only requested: the status line was already
+    // "Live", so a check on it alone raced the response (flaky "Stopping disables SSH").
+    const before=requests, shown=await page.locator('#map-live').textContent();
     tick+=2;
     await page.clock.runFor(2100);
-    await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Live'));
+    await page.waitForFunction(prev=>{const t=document.getElementById('map-live').textContent; return t.startsWith('Live') && t!==prev;}, shown);
     assert(requests>before);
   };
   assert.equal(await page.locator('.transmitting,.receiving').count(),0,'First sample is only a baseline');

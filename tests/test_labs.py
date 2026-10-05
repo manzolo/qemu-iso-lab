@@ -175,7 +175,7 @@ class LabsTests(BaseVmctlTestCase):
         self.assertNotIn('class="vm-action"', snapshot)
         self.assertIn('class="vm-action"', page)
         self.assertIn('id="vm-dialog"', page)
-        self.assertIn("open in a dialog", page)
+        self.assertIn("Console and Manage a dialog", page)
 
     def test_group_up_skips_members_without_a_disk_and_starts_in_order(self):
         cfg = self.tracked_config()

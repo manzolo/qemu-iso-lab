@@ -462,6 +462,15 @@ try {
   assert(!(await page.locator('#hover-shot').isVisible()));
   assert.equal(screenRequests,labStoppedAt);
   check('lab VM icons show live previews and pulsing running dots, respect reduced motion and stop previewing on leave or context menu');
+  const labOrder = () => page.locator('#labs-view [data-lab]').evaluateAll(cards=>cards.map(card=>card.dataset.lab));
+  assert.deepEqual(await labOrder(),['proxmox-lab','new-lab'],'Idle labs keep the catalog order');
+  state.vms.find(vm=>vm.name==='alpine-ci').running=true;
+  await page.evaluate(()=>refresh(true));
+  assert.deepEqual(await labOrder(),['new-lab','proxmox-lab'],'A lab with a machine on comes first');
+  state.vms.find(vm=>vm.name==='alpine-ci').running=false;
+  await page.evaluate(()=>refresh(true));
+  assert.deepEqual(await labOrder(),['proxmox-lab','new-lab']);
+  check('lab cards: the labs with a running machine come first');
   for (const width of [1440,912,390]) {
     await page.setViewportSize({width,height:909});
     await page.locator('#search').fill('proxmox');

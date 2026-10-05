@@ -74,7 +74,7 @@ acknowledgment, flags, window and options, UDP, ICMP with id and sequence) and a
 those header bytes with offsets; the payload is never captured, and the detail says how many
 bytes of it were on the wire.
 
-Under every machine of the live map (`/labs/<lab>/map`, the card's *Map*) three buttons open a dialog on the page itself: **SSH** (the browser terminal), **Console** (the live console) and **Manage** (the dashboard's Machine panel with its actions: start, stop, checkpoints, options). SSH and Console are available while the VM runs; *Open in a tab* at the top of the dialog gives the same view its own tab. The exported HTML snapshot (`vmctl group map`) carries no buttons.
+Under every machine of the live map (`/labs/<lab>/map`, the card's *Map*) three buttons open on the page itself: **SSH** (the browser terminal in a small window you can move by its header and resize, so it sits next to the packet inspector), **Console** (the live console, a dialog) and **Manage** (the dashboard's Machine panel with its actions: start, stop, checkpoints, options). SSH and Console are available while the VM runs; *Open in a tab* at the top of the dialog gives the same view its own tab. The exported HTML snapshot (`vmctl group map`) carries no buttons.
 
 A network made with `vmctl link` (the dashboard's *session* card, group `link:<segment>`) has the
 same map: `vmctl group map link:session`, or the card's **Map**. Its members are the linked VMs

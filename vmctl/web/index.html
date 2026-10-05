@@ -1493,7 +1493,11 @@ function renderLabs() {
   const byName = Object.fromEntries(S.vms.map((r) => [r.name, r]));
   const menuButton = (kind, name) => `<button class="${kind === "lab" ? "lab-menu" : "member-menu"}" data-${kind}-menu="${esc(name)}" aria-label="Actions for ${kind === "lab" ? "lab " : ""}${esc(name)}" title="${kind === "lab" ? "Lab actions" : "VM actions"}" aria-haspopup="menu" aria-controls="vm-context" aria-expanded="false">${kind === "lab" ? "Actions " : ""}⋯</button>`;
   const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
-  $("labs-view").innerHTML = S.labs.filter((lab) => words.every((w) => (lab.group + " " + lab.members.join(" ")).toLowerCase().includes(w))).map((lab) => {
+  // A lab with a machine on comes first (the VM list's "Running first"; no scrolling past
+  // idle labs to reach the one in use, Manzolo 2026-10-05), the catalog order otherwise.
+  const alive = (lab) => lab.members.some((n) => byName[n]?.running);
+  $("labs-view").innerHTML = S.labs.filter((lab) => words.every((w) => (lab.group + " " + lab.members.join(" ")).toLowerCase().includes(w)))
+    .sort((x, y) => Number(alive(y)) - Number(alive(x))).map((lab) => {
     const names = lab.start_order || lab.members, members = names.map((n) => byName[n]).filter(Boolean);
     if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="lab-controls"><span class="chip completed">session · ${members.length} linked${(lab.pending || []).length ? ` · ${lab.pending.length} off` : ""}</span>${menuButton("lab",lab.group)}</span></div>
       <p class="lab-order">Made with <span class="mono">vmctl link</span> (or using the network buttons / multiple selection). A private /24 segment: stopped members join at their next start; it touches no profile and lasts until Unlink all.</p>
