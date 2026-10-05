@@ -37,4 +37,7 @@ def install(root: Path, data_home: Path) -> Path:
 
 if __name__ == "__main__":
     data_home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
-    print(f"  application menu: {install(Path(sys.argv[1]).resolve(), data_home)}")
+    desktop = install(Path(sys.argv[1]).resolve(), data_home)
+    home = str(Path.home())
+    shown = "~" + str(desktop)[len(home):] if str(desktop).startswith(home + "/") else str(desktop)
+    print(f"  application menu: {shown}")
