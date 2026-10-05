@@ -163,7 +163,7 @@ class TrafficMonitor:
                             agent_stats[str(interface.get("hardware-address", "")).lower()] = interface.get("statistics")
                 except VMError:
                     pass
-            for nic in qemu.network_specs(vm):
+            for nic in member.get("nics") or qemu.network_specs(vm):  # the model's NICs include a link session's
                 entry = {"vm": member["name"], "nic": nic["id"], "mac": nic["mac"],
                          "packets_available": False, "packets": [],
                          "packet_reason": "VM stopped" if not member["running"] else "Packet inspection is available on LAN links; NAT has no packet capture.",
@@ -176,7 +176,7 @@ class TrafficMonitor:
                     entry.update(available=True, source="guest agent", rx=stats["rx-bytes"], tx=stats["tx-bytes"],
                                  time=time.monotonic(), epoch="qga")
                 if nic["type"] == "segment":
-                    endpoint = qemu.segment_endpoint(str(nic["name"]), nic["mcast"])
+                    endpoint = qemu.segment_endpoint(str(nic.get("segment") or nic.get("name")), nic.get("mcast"))
                     segments.setdefault(endpoint, []).append(entry)
                 elif not entry["available"]:
                     entry["reason"] = "NAT traffic needs guest-agent counters"

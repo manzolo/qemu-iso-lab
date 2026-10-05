@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from vmctl import cloud_init, config, netlab, proxmox, pvecluster, qemu, runtime, state, ui
+from vmctl import cloud_init, config, netlab, proxmox, pvecluster, qemu, runtime, state, ui, vmlink
 from vmctl.errors import VMError
 
 # The tracked profiles' shared password ("lab"): a hash the map can recognise without cracking it.
@@ -90,7 +90,21 @@ def has_segment(vm: dict[str, Any]) -> bool:
         return False
 
 
+SESSION_PREFIX = "link:"  # the temporary labs of `vmctl link`, named after their segment (vmlink.session_labs)
+
+
+def session_record(group: str) -> dict[str, Any] | None:
+    """The link record behind a ``link:<segment>`` group, None for a declared group or a gone segment."""
+    if not group.startswith(SESSION_PREFIX):
+        return None
+    segment = group[len(SESSION_PREFIX):]
+    return next((record for record in vmlink.all_records() if record["segment"] == segment), None)
+
+
 def group_members(cfg: dict[str, Any], group: str) -> list[str]:
+    record = session_record(group)
+    if record is not None:
+        return [name for name in record["members"] if name in cfg["vms"]]
     return [name for name, vm in config.sorted_vm_items(cfg) if group in config.declared_groups(vm)]
 
 
@@ -229,6 +243,8 @@ def model(cfg: dict[str, Any], group: str, states: dict[str, dict[str, Any]] | N
     if not names:
         raise VMError(f"No profile declares the group '{group}' (meta.groups)")
     states = states or {}
+    # A `vmctl link` session: the VMs' own NICs plus the hot-plugged one on the shared segment.
+    session = session_record(group)
     lab_addresses, lab_forwards = _netlab_addresses(cfg, names)
     members: list[dict[str, Any]] = []
     segments: dict[str, dict[str, Any]] = {}
@@ -251,15 +267,16 @@ def model(cfg: dict[str, Any], group: str, states: dict[str, dict[str, Any]] | N
             else:
                 segment = str(spec["name"])
                 address = lab_addresses.get(name) or str(raw_nics.get(spec["id"], {}).get("address") or "")
-                nic.update(segment=segment, address=address)
-                seg = segments.setdefault(segment, {"name": segment, "subnet": "", "members": []})
-                seg["members"].append(name)
-                if address and not seg["subnet"]:
-                    try:
-                        seg["subnet"] = str(ipaddress.ip_interface(address).network)
-                    except ValueError:
-                        pass
+                nic.update(segment=segment, address=address, mcast=spec.get("mcast"))
+                _join_segment(segments, segment, name, address)
             nics.append(nic)
+        if session is not None:
+            linked = session["members"][name]
+            address = str(linked.get("address") or "")
+            nics.append({"id": vmlink.netdev_id(session["segment"]), "type": "segment", "segment": session["segment"],
+                         "mac": str(linked.get("mac") or vmlink.nic_mac(session["segment"], name)), "address": address,
+                         "mcast": None, "linked": True, "up": vmlink.is_up(linked)})
+            _join_segment(segments, session["segment"], name, address)
         meta = vm.get("meta", {})
         state = states.get(name, {})
         members.append({
@@ -277,6 +294,12 @@ def model(cfg: dict[str, Any], group: str, states: dict[str, dict[str, Any]] | N
         })
     lab: dict[str, Any] = {"group": group, "members": members, "segments": list(segments.values()),
                            "start_order": [member["name"] for member in members]}
+    if session is not None:
+        lab.update(session=True, title=f"Linked VMs on segment {session['segment']}",
+                   summary=f"Made with vmctl link: a private segment between running VMs of this host "
+                           f"({', '.join(names)}), no profile touched, gone with vmctl link --off.",
+                   content=None, runbook=_session_runbook(session, members))
+        return lab
     content = load_content(group)
     if content is not None and set(content["members"]) != set(names):
         raise VMError(f"{content['dir']}/lab.json lists {', '.join(content['members'])} but the profiles declaring "
@@ -284,6 +307,39 @@ def model(cfg: dict[str, Any], group: str, states: dict[str, dict[str, Any]] | N
     lab["content"] = content
     lab["runbook"] = runbook(cfg, lab)
     return lab
+
+
+def _join_segment(segments: dict[str, dict[str, Any]], segment: str, name: str, address: str) -> None:
+    seg = segments.setdefault(segment, {"name": segment, "subnet": "", "members": []})
+    seg["members"].append(name)
+    if address and not seg["subnet"]:
+        try:
+            seg["subnet"] = str(ipaddress.ip_interface(address).network)
+        except ValueError:
+            pass
+
+
+def _session_runbook(record: dict[str, Any], members: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The commands behind a `vmctl link` session: how it was made, how to look at it, how it ends."""
+    segment = str(record["segment"])
+    names = [m["name"] for m in members]
+    flag = "" if segment == vmlink.DEFAULT_SEGMENT else f" --segment {segment}"
+    addresses = {m["name"]: next((str(n["address"]).split("/")[0] for n in m["nics"] if n.get("linked")), "") for m in members}
+    pings = [m for m in members if m["running"]]
+    phases: list[dict[str, Any]] = [{"title": "Link", "text": "Running headless VMs get a NIC on the segment over QMP; a stopped one joins at its next start.",
+               "blocks": [_block("do", "host", [f"vmctl link {' '.join(names)}{flag}"]), _block("check", "host", [f"vmctl link --status{flag}"])]}]
+    if len(pings) >= 2:
+        a, b = pings[0], pings[1]
+        phases.append({"title": "Reach each other", "text": "The addresses are static, set in the guest by MAC; the map's lens shows the frames on the cable.",
+                       "blocks": [_block("check", a["name"], [f"ping -c 3 {addresses[b['name']]}"]),
+                                  _block("check", b["name"], [f"ping -c 3 {addresses[a['name']]}"])]})
+    phases.append({"title": "Unlink", "text": "Boot-time NICs on q35's root bus cannot be unplugged live: the record goes, the NIC at the next boot.",
+                   "blocks": [_block("do", "host", [f"vmctl link --off{flag}"])]})
+    ssh_of = {m["name"]: m["ssh"] for m in members}
+    for phase in phases:
+        for block in phase["blocks"]:
+            block["ssh"] = ssh_of.get(block["where"], "")
+    return phases
 
 
 def _ssh_line(name: str, vm: dict[str, Any]) -> str:
@@ -890,8 +946,9 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
     group = esc(lab["group"])
     order = " → ".join(esc(name) for name in lab["start_order"])
     content = lab.get("content") or {}
-    heading = esc(str(content.get("title") or lab["group"]))
-    intro = f'<p>{esc(content["summary"])}</p>' if content.get("summary") else ""
+    heading = esc(str(content.get("title") or lab.get("title") or lab["group"]))
+    summary = content.get("summary") or lab.get("summary")
+    intro = f'<p>{esc(str(summary))}</p>' if summary else ""
     if content:
         pieces = [f'content in <code>{esc(content["dir"])}/</code>']
         if content.get("guides"):

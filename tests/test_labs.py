@@ -224,3 +224,40 @@ class GroupInstallTests(BaseVmctlTestCase):
         self.assertEqual([call.args[0] for call in clean.call_args_list],
                          ["proxmox-lab-client", "proxmox-ve-node3", "proxmox-ve-node2", "proxmox-ve"])
         self.assertEqual([call.args[0].vm for call in stop.call_args_list], ["proxmox-ve"])
+
+
+class LinkSessionLabTests(LabsTests):
+    """A `vmctl link` session is a lab too (group `link:<segment>`): members from the link record,
+    the hot-plugged NIC on the segment next to the profiles' own, a map, a runbook."""
+
+    def test_session_group_models_the_linked_vms(self):
+        cfg = self.tracked_config()
+        links = self.root / "artifacts/labs/links"
+        links.mkdir(parents=True)
+        (links / "session.json").write_text(json.dumps({"segment": "session", "members": {
+            "ubuntu-26.04": {"address": "192.168.100.1/24", "mac": "52:54:01:46:e7:08", "pid": 1, "netdev": "link-session"},
+            "windows-11": {"address": "192.168.100.2/24", "mac": "52:54:01:e0:1f:a4"},
+        }}))
+        # prune() would turn a member whose QEMU is gone back into pending: the record is taken as written.
+        with mock.patch.object(labs.vmlink, "prune", side_effect=lambda record: record), \
+                mock.patch.object(labs.vmlink, "is_up", side_effect=lambda m: bool(m.get("pid"))):
+            self.assertEqual(labs.group_members(cfg, "link:session"), ["ubuntu-26.04", "windows-11"])
+            self.assertEqual(labs.group_members(cfg, "link:nowhere"), [])
+            lab = labs.model(cfg, "link:session", {"ubuntu-26.04": {"running": True, "install": "verified"}})
+        self.assertTrue(lab["session"])
+        self.assertEqual(lab["title"], "Linked VMs on segment session")
+        ubuntu, windows = lab["members"]
+        linked = [nic for nic in ubuntu["nics"] if nic.get("linked")]
+        self.assertEqual(len(linked), 1)
+        self.assertEqual((linked[0]["segment"], linked[0]["address"], linked[0]["mac"], linked[0]["up"]),
+                         ("session", "192.168.100.1/24", "52:54:01:46:e7:08", True))
+        self.assertEqual([nic["type"] for nic in windows["nics"]], ["user", "segment"])
+        self.assertEqual(lab["segments"], [{"name": "session", "subnet": "192.168.100.0/24", "members": ["ubuntu-26.04", "windows-11"]}])
+        self.assertIsNone(lab["content"])
+        commands = [cmd for phase in lab["runbook"] for block in phase["blocks"] for cmd in block["commands"]]
+        self.assertIn("vmctl link ubuntu-26.04 windows-11", commands)
+        self.assertIn("vmctl link --off", commands)
+        html = labs.render_html(lab)
+        self.assertIn("Linked VMs on segment session", html)
+        self.assertIn('data-segment="session"', html)
+        self.assertEqual(html.count('class="inspect-btn"'), 2)

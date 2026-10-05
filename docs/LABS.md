@@ -72,7 +72,12 @@ by any text (an IP, a port, a flag), the footer counts what is shown out of what
 VLAN, ARP, IPv4/IPv6 with TTL, identification, flags and fragment offset, TCP with sequence,
 acknowledgment, flags, window and options, UDP, ICMP with id and sequence) and a hex dump of
 those header bytes with offsets; the payload is never captured, and the detail says how many
-bytes of it were on the wire. The panel shows recent TX/RX packet headers:
+bytes of it were on the wire.
+
+A network made with `vmctl link` (the dashboard's *session* card, group `link:<segment>`) has the
+same map: `vmctl group map link:session`, or the card's **Map**. Its members are the linked VMs
+with their own NAT NICs plus the hot-plugged one on the segment, the runbook is the link, a ping
+each way and the unlink, and the lens on the segment cable inspects the frames between them. The panel shows recent TX/RX packet headers:
 source/destination IPs and ports, ICMP echo request/reply with sequence number, TCP flags,
 UDP, ARP and IPv6. Unsupported or truncated headers are labelled rather than guessed.
 The list is a bounded sample: up to 24 recent entries per NIC from the last 30 seconds,
