@@ -1421,7 +1421,7 @@ function render() {
   if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
   renderDetails();
 }
-let detailsSignature = "", labsSignature = "";
+let detailsSignature = "", labsSignature = "", labsOrder = [];
 function renderDetails() {
   const signature = JSON.stringify([selected, !!visible().length, S.vms.find((x) => x.name === selected), vmJobs.get(selected), submittingVms.has(selected), cancellingJobs.has("vm:"+selected)]);
   if (signature === detailsSignature) return;
@@ -1532,6 +1532,18 @@ function renderLabs() {
     contextOrigin = button; contextTrigger = button; button.setAttribute("aria-expanded", "true");
   }; });
   $("labs-view").querySelectorAll("[data-args]").forEach((b) => (b.onclick = () => run(JSON.parse(b.dataset.args))));
+  // A lab that just climbed the list because one of its machines is working (a job runs on a
+  // member) is scrolled into view: it jumped to the top the moment the user clicked it, out of
+  // sight on a long page (Manzolo, 2026-10-05).
+  const order = [...$("labs-view").querySelectorAll("[data-lab]")].map((card) => card.dataset.lab);
+  const climbed = order.find((group, index) => {
+    const before = labsOrder.indexOf(group);
+    return before > index && (S.labs.find((lab) => lab.group === group)?.members || []).some((name) => vmJobs.get(name)?.status === "running");
+  });
+  labsOrder = order;
+  if (climbed && !$("labs-view").classList.contains("hidden")) {
+    $("labs-view").querySelector(`[data-lab="${CSS.escape(climbed)}"]`)?.scrollIntoView({block:"start", behavior:"smooth"});
+  }
   $("labs-view").querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.map)}/map?token=${encodeURIComponent(TOKEN)}`, "_blank")));
   // The guide in the language of the page's browser when the lab has it.
   $("labs-view").querySelectorAll("[data-guide]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.guide)}/guide?lang=${(navigator.language || "en").slice(0,2)}&token=${encodeURIComponent(TOKEN)}`, "_blank")));

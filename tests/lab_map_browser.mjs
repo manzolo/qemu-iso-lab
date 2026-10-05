@@ -81,7 +81,7 @@ try {
       const after=await dialog.boundingBox();
       assert(Math.abs(after.x-(before.x-200))<2 && Math.abs(after.y-(before.y+120))<2,`Dragged by the header: ${JSON.stringify([before,after])}`);
       assert.equal(await dialog.evaluate(n=>n.classList.contains('dragging')),false);
-      await page.locator('.inspect-btn').first().click();
+      await page.locator('.lan-nic .inspect-btn').last().click();  // a lens the SSH window does not cover
       assert(!await page.locator('#packet-inspector').evaluate(n=>n.hidden),'The packet inspector opens while SSH is up');
       assert(await dialog.evaluate(n=>n.open),'SSH stays open');
       await page.locator('#packet-close').click();
@@ -181,7 +181,30 @@ try {
   await page.locator('#packet-search').fill('16443');
   assert((await page.locator('#packet-rows').textContent()).includes('16443'));
   assert(!(await page.locator('#packet-rows').textContent()).includes('Echo request'),'Search narrows to matching rows');
+  // Wireshark-style expressions: a port is a port, not a substring (16443 is not 1644).
+  const rowsFor = async expr => { await page.locator('#packet-search').fill(expr); return page.locator('#packet-rows tr.packet-row').count(); };
+  const total = await rowsFor(''), tcp = await rowsFor('tcp'), icmp = await rowsFor('icmp'), rxRows = await rowsFor('rx');
+  assert(tcp >= 1 && icmp >= 2 && rxRows >= 1 && tcp + icmp === total, `fixture rows: ${total} = ${tcp} TCP + ${icmp} ICMP, ${rxRows} RX`);
+  assert.equal(await rowsFor('port 16443'), tcp);
+  assert.equal(await rowsFor('port 1644'), 0, 'port 1644 does not match 16443');
+  assert.equal(await rowsFor('tcp.port == 16443'), tcp);
+  assert.equal(await rowsFor('udp.port == 16443'), 0);
+  assert.equal(await rowsFor('src.port 43210 and dst 172.20.6.11'), tcp);
+  assert.equal(await rowsFor('not icmp'), tcp);
+  assert.equal(await rowsFor('icmp and host 172.20.6.11'), icmp);
+  assert.equal(await rowsFor('ip.src == 172.20.6.0/24 && rx'), rxRows);
+  assert.equal(await rowsFor('ip.src == 172.20.7.0/24'), 0);
+  assert.equal(await rowsFor('len > 74'), icmp);
+  assert.equal(await rowsFor('icmp.type == 8 or info contains "syn ack"'), total);
+  assert.equal(await rowsFor('(tcp or udp) and not port 22'), tcp);
+  assert.equal(await rowsFor('eth.src 52:54:00:00:00:01 and ipv4'), total);
+  assert.equal(await rowsFor('port !='), total, 'A broken filter shows every packet…');
+  assert.equal(await page.locator('#packet-search').getAttribute('aria-invalid'), 'true');
+  assert((await page.locator('#packet-state').textContent()).startsWith('Filter error'), '…and says so');
+  assert.equal(await rowsFor('(tcp'), total);
+  assert.equal(await rowsFor('Echo reply'), rxRows, 'Plain words still search the text');
   await page.locator('#packet-search').fill('');
+  assert.equal(await page.locator('#packet-search').getAttribute('aria-invalid'), 'false');
   // A row opens its detail: the decoded layers and the header bytes, never a payload.
   await page.locator('tr.packet-row').first().click();
   assert.equal(await page.locator('tr.packet-detail-row').count(),1,'One detail row under the clicked packet');
@@ -225,7 +248,7 @@ try {
   await page.keyboard.press('Escape');
   assert(await page.locator('#packet-inspector').isHidden());
   assert(await lens.evaluate(n=>document.activeElement===n),'Dismissal returns focus to the lens');
-  assert.equal(await page.locator('.nat-nic .inspect-btn').count(),0,'NAT links have no lens: the host cannot capture there');
+  assert.equal(await page.locator('.nat-nic .inspect-btn').count(),0,'NAT links have no lens while lab_traffic.NAT_CAPTURE is off');
   await lens.focus();
   await lens.press('Enter');
   assert(await page.locator('#packet-inspector').isVisible(),'Enter on the lens opens the inspector');

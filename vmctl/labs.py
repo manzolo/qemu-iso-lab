@@ -618,6 +618,9 @@ def _internet_node(x: float, y: float) -> list[str]:
             f'<text class="node-t" x="{x + 100}" y="{y + 40}" text-anchor="middle">Internet</text></g>']
 
 
+NAT_LENS = False  # see lab_traffic.NAT_CAPTURE (2026-10-05: QEMU's filter-dump wedged pfSense's QMP monitor)
+
+
 def _svg(lab: dict[str, Any], interactive: bool = False) -> str:
     members = lab["members"]
     count = max(1, len(members))
@@ -675,7 +678,14 @@ def _svg(lab: dict[str, Any], interactive: bool = False) -> str:
                     fit = f' textLength="{pill_w - 18}" lengthAdjust="spacingAndGlyphs"' if _pill_width(text) > pill_w else ""
                     out.append(f'<rect class="pill" x="{cx - pill_w / 2}" y="{y}" width="{pill_w}" height="{_PILL_H}" rx="6"/>')
                     out.append(f'<text class="pill-t" x="{cx}" y="{y + 16.5}" text-anchor="middle"{fit}>{esc(text)}</text>')
-                out.append(f'<text class="traffic-label" x="{cx + 10}" y="{box_y - 12}"></text></g>')
+                out.append(f'<text class="traffic-label" x="{cx + 10}" y="{box_y - 12}"></text>')
+                if NAT_LENS:  # the lens of the NAT link, for the day lab_traffic.NAT_CAPTURE is on
+                    bx, by = cx - 14, box_y - 17
+                    out.append(f'<g class="inspect-btn" role="button" tabindex="0" aria-controls="packet-inspector" aria-pressed="false" '
+                               f'aria-label="Inspect packets: {esc(member["name"])} / {esc(nic["id"])} (NAT)">'
+                               f'<circle class="bg" cx="{bx}" cy="{by}" r="11"/><circle class="lens" cx="{bx - 1.5}" cy="{by - 1.5}" r="4"/>'
+                               f'<line class="lens" x1="{bx + 1.5}" y1="{by + 1.5}" x2="{bx + 5}" y2="{by + 5}"/></g>')
+                out.append('</g>')
         out.append(f'<g class="vm {status} {power}"><title>{esc(member["label"])} · {badge}</title>'
                    f'<rect class="vm-panel" x="{x}" y="{box_y}" width="{_BOX_W}" height="{box_h}" rx="14"/>'
                    f'<path class="vm-accent" d="M{x + 20} {box_y}h{_BOX_W - 40}"/>')
@@ -852,7 +862,9 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .packet-inspector .chip { padding:3px 9px; border-radius:999px; font-size:11px; font-family:ui-monospace, monospace; }
 .packet-inspector .chip-tx[aria-pressed="true"] { color:#78dff7; } .packet-inspector .chip-rx[aria-pressed="true"] { color:#c2adff; }
 .packet-inspector #packet-search { flex:1 1 160px; min-width:120px; background:#0b1420; color:#dce9f5; border:1px solid #3c5c74; border-radius:6px; padding:4px 8px; font:12px ui-monospace, monospace; }
+.packet-inspector #packet-search[aria-invalid="true"] { border-color:#e07a7a; box-shadow:0 0 0 2px #e07a7a33; }
 .packet-inspector #packet-state { margin:0; padding:6px 16px; font-size:11px; color:#9bb7cf; }
+.packet-inspector #packet-state.error { color:#f0a0a0; }
 .packet-scroll { flex:1 1 auto; overflow:auto; }
 .packet-inspector table { border:0; border-radius:0; background:transparent; table-layout:fixed; width:100%; margin:0; }
 .packet-inspector th, .packet-inspector td { border-color:#263b50; padding:8px; font-size:11px; }
@@ -1017,7 +1029,7 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None, *, inter
 <div class="packet-filters" role="group" aria-label="Packet filters">
 <span class="packet-chips" data-filter="proto"><button type="button" class="chip" data-proto="all" aria-pressed="true">All</button><button type="button" class="chip" data-proto="TCP" aria-pressed="false">TCP</button><button type="button" class="chip" data-proto="UDP" aria-pressed="false">UDP</button><button type="button" class="chip" data-proto="ICMP" aria-pressed="false">ICMP</button><button type="button" class="chip" data-proto="ARP" aria-pressed="false">ARP</button><button type="button" class="chip" data-proto="other" aria-pressed="false">Other</button></span>
 <span class="packet-chips" data-filter="dir"><button type="button" class="chip chip-tx" data-dir="TX" aria-pressed="true">TX</button><button type="button" class="chip chip-rx" data-dir="RX" aria-pressed="true">RX</button></span>
-<input id="packet-search" type="search" placeholder="IP, port, text…" aria-label="Filter packets by text" autocomplete="off">
+<input id="packet-search" type="search" placeholder="tcp.port == 80 · host 192.168.0.10 · not arp · text" aria-label="Packet filter: Wireshark-style expression or plain text" autocomplete="off" spellcheck="false" title="Filter expressions: tcp.port == 80 · udp.port != 53 · port 22 · src.port 443 · host 10.0.2.2 · ip.src 192.168.0.0/24 · dst 192.168.0.10 · eth.src 52:54:00:… · len > 1000 · tcp.flags contains SYN · icmp.type == 8 · tcp / udp / icmp / arp / ipv6 / tx / rx · and, or, not, parentheses · a plain word searches the text">
 </div>
 <p id="packet-state"></p>
 <div class="packet-scroll"><table aria-label="Recent packets"><thead><tr><th class="packet-time">Time</th><th class="packet-dir">Dir</th><th class="packet-proto">Protocol</th><th>Source → destination / detail</th><th class="packet-size">Bytes</th></tr></thead><tbody id="packet-rows"></tbody></table>

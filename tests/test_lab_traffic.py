@@ -40,18 +40,45 @@ class TrafficTests(unittest.TestCase):
         lab_traffic.count_frame(frame("00:00:00:00:00:04", "00:00:00:00:00:05"), self.counters)
         self.assertEqual(self.counters, {mac: {"rx": 0, "tx": 0} for mac in (A, B, C)})
 
-    def sample(self, running=True, agent=False, reply=None, segment_error=None):
+    def sample(self, running=True, agent=False, reply=None, segment_error=None, nat=None):
         vm = {"guest_agent": agent}
         nics = [{"id": "wan", "type": "user", "mac": A},
                 {"id": "lan", "type": "segment", "mac": B, "name": "test", "mcast": "239.1.2.3:34567"}]
         lab = {"members": [{"name": "testvm", "running": running}]}
         with mock.patch.object(lab_traffic.config, "get_vm", return_value=vm), \
+             mock.patch.object(lab_traffic, "NAT_CAPTURE", True), \
              mock.patch.object(lab_traffic.qemu, "network_specs", return_value=nics), \
              mock.patch.object(lab_traffic.guest_agent, "command", return_value=reply) as command, \
+             mock.patch.object(self.monitor, "nat", side_effect=None if nat else VMError("no QMP socket"), return_value=nat), \
              mock.patch.object(self.monitor, "segment", side_effect=segment_error,
                                return_value={"time": 2, "epoch": 1, "counters": {B: {"rx": 98, "tx": 196}}}) as segment:
             entries = self.monitor.sample({}, lab)
         return entries, command, segment
+
+    def test_nat_capture_brings_counters_and_packets_before_the_agent(self):
+        packet = {"id": 1, "protocol": "TCP", "direction": "TX"}
+        entries, _, _ = self.sample(agent=True, reply=[{"hardware-address": A, "statistics": {"rx-bytes": 12, "tx-bytes": 34}}],
+                                    nat={"time": 3, "epoch": 2, "packets": [packet], "counters": {"rx": 500, "tx": 700}})
+        self.assertEqual((entries[0]["source"], entries[0]["rx"], entries[0]["tx"]), ("QEMU capture", 500, 700))
+        self.assertTrue(entries[0]["packets_available"])
+        self.assertEqual(entries[0]["packets"], [packet])
+
+    def test_nat_capture_is_off_by_default(self):
+        with mock.patch.object(self.monitor, "nat") as nat, \
+             mock.patch.object(lab_traffic.config, "get_vm", return_value={}), \
+             mock.patch.object(lab_traffic.qemu, "network_specs", return_value=[{"id": "wan", "type": "user", "mac": A}]):
+            entry = self.monitor.sample({}, {"members": [{"name": "vm", "running": True}]})[0]
+        nat.assert_not_called()
+        self.assertFalse(entry["available"])
+        self.assertIn("guest-agent", entry["reason"])
+
+    def test_nat_without_qmp_falls_back_to_the_agent_and_says_why(self):
+        entries, _, _ = self.sample()
+        self.assertFalse(entries[0]["available"])
+        self.assertIn("no QMP socket", entries[0]["packet_reason"])
+        entries, _, _ = self.sample(agent=True, reply=[{"hardware-address": A, "statistics": {"rx-bytes": 12, "tx-bytes": 34}}])
+        self.assertEqual((entries[0]["source"], entries[0]["rx"]), ("guest agent", 12))
+        self.assertFalse(entries[0]["packets_available"])
 
     def test_stopped_vms_are_never_probed(self):
         entries, command, segment = self.sample(running=False, agent=True)
@@ -115,6 +142,90 @@ class TrafficTests(unittest.TestCase):
         self.assertTrue(entries[1]["available"])
         self.assertFalse(entries[1]["packets_available"])
         self.assertIn("capture failed", entries[1]["packet_reason"])
+
+
+def pcap(records, order="<"):
+    """A pcap stream the way QEMU's filter-dump writes it: 24-byte header, then records."""
+    import struct
+    magic = b"\xd4\xc3\xb2\xa1" if order == "<" else b"\xa1\xb2\xc3\xd4"
+    data = magic + struct.pack(order + "HHiIII", 2, 4, 0, 0, 128, 1)
+    for length, captured in records:
+        data += struct.pack(order + "IIII", 1, 0, len(captured), length) + captured
+    return data
+
+
+class PcapReaderTests(unittest.TestCase):
+    def test_records_come_out_whole_whatever_the_chunking(self):
+        reader = lab_traffic.PcapReader()
+        stream = pcap([(1514, frame()), (60, frame(B, A)[:60])])
+        out = []
+        for i in range(0, len(stream), 7):  # 7-byte chunks: headers and records split anywhere
+            out += list(reader.feed(stream[i:i + 7]))
+        self.assertEqual([(length, len(data)) for length, data in out], [(1514, 98), (60, 60)])
+        self.assertEqual(out[0][1][6:12].hex(":"), A)
+
+    def test_big_endian_and_garbage(self):
+        reader = lab_traffic.PcapReader()
+        self.assertEqual([length for length, _ in reader.feed(pcap([(98, frame())], ">"))], [98])
+        with self.assertRaises(ValueError):
+            list(lab_traffic.PcapReader().feed(b"not a pcap at all, really not"))
+
+
+class NatCaptureTests(unittest.TestCase):
+    """The filter-dump is added over QMP, read as QEMU appends to it, and removed with its file."""
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.root, ignore_errors=True))
+        self.sock = self.root / "qmp.sock"
+        self.sock.write_bytes(b"")
+        self.calls = []
+
+    def qmp(self, sock, command, *, arguments=None, timeout=5.0):
+        self.calls.append((command, arguments))
+        if command == "object-add":
+            if self.fail_add:
+                self.fail_add = False
+                raise VMError("QMP object-add: attempt to add duplicate property 'vmctl-dump-n1' to object")
+            with open(arguments["file"], "wb") as handle:  # what QEMU does: the header right away
+                handle.write(pcap([]))
+        return {}
+
+    def capture(self, fail_add=False):
+        self.fail_add = fail_add
+        cap = lab_traffic.NatCapture("vm", {}, "n1", A, qmp=self.qmp, sock=self.sock)
+        self.addCleanup(cap.close)
+        return cap
+
+    def test_counts_both_directions_and_keeps_headers_only(self):
+        cap = self.capture()
+        add = self.calls[0][1]
+        self.assertEqual((add["qom-type"], add["netdev"], add["maxlen"], add["id"]), ("filter-dump", "n1", 128, "vmctl-dump-n1"))
+        self.assertEqual(add["file"], str(self.root / "capture-n1.pcap"))
+        with open(cap.path, "ab") as handle:
+            handle.write(pcap([(1514, frame(A, B)[:128]), (60, frame(B, A)[:60])])[24:])
+        for _ in range(40):
+            if cap.sample()["counters"]["rx"]:
+                break
+            import time
+            time.sleep(.05)
+        sample = cap.sample()
+        self.assertEqual(sample["counters"], {"tx": 1514, "rx": 60})
+        self.assertEqual([(p["direction"], p["bytes"]) for p in sample["packets"]], [("RX", 60), ("TX", 1514)])
+        cap.close()
+        self.assertEqual(self.calls[-1], ("object-del", {"id": "vmctl-dump-n1"}))
+        self.assertFalse(cap.path.exists())
+
+    def test_a_leftover_object_is_replaced(self):
+        self.capture(fail_add=True)
+        self.assertEqual([call[0] for call in self.calls], ["object-add", "object-del", "object-add"])
+
+    def test_no_socket_means_no_capture(self):
+        self.sock.unlink()
+        with self.assertRaises(VMError):
+            lab_traffic.NatCapture("vm", {}, "n1", A, qmp=self.qmp, sock=self.sock)
+        self.assertEqual(self.calls, [])
 
 
 if __name__ == "__main__":

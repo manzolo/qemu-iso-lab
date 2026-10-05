@@ -21,7 +21,7 @@
   let clearedBelow = 0;     // Clear drops what the current sample still carries, until newer ids arrive
   let expanded = new Set(), lastShown = [];  // opened rows (by packet id) and the list on screen
   let lastSignature = '';  // the rows are rebuilt only when the list or the opened rows change (a detail under the pointer must not vanish)
-  const filters = {proto: 'all', dirs: new Set(['TX', 'RX']), text: ''};
+  const filters = {proto: 'all', dirs: new Set(['TX', 'RX']), expr: null, error: ''};
   let anchor = {x:24, y:24}, dragged = null;
   const keyOf = node => JSON.stringify([node.dataset.vm, node.dataset.nic]);
   const buttonOf = key => [...map.querySelectorAll('.nic')].find(node => keyOf(node) === key)?.querySelector('.inspect-btn');
@@ -34,12 +34,126 @@
   const protoClass = packet => ['TCP', 'UDP', 'ARP'].includes(packet.protocol) ? packet.protocol
     : packet.protocol.startsWith('ICMP') ? 'ICMP' : 'other';
   const endpointText = (address, port) => port === undefined ? address : `${address.includes(':') ? `[${address}]` : address}:${port}`;
+  const haystack = packet => `${packet.protocol} ${endpointText(packet.source, packet.source_port)} ${endpointText(packet.destination, packet.destination_port)} ${packet.info} ${packet.source_mac} ${packet.destination_mac}`.toLowerCase();
+  // --- The filter box: a small Wireshark/tcpdump-style language (2026-10-05, Manzolo: "port 80"
+  // must not match 8080). `tcp.port == 80`, `port 22`, `host 10.0.2.2`, `ip.src 192.168.0.0/24`,
+  // `len > 1000`, `tcp.flags contains SYN`, `icmp.type == 8`, bare `tcp`/`arp`/`ipv6`/`tx`,
+  // `and`/`or`/`not`/parentheses. A word that is no field or protocol searches the text as before.
+  const layerField = (packet, layer, field) => {
+    const names = layer === 'ip' ? ['ipv4', 'ipv6'] : [layer];
+    const found = (packet.layers || []).find(l => names.includes(String(l.name).toLowerCase()));
+    if (!found) return undefined;
+    const entry = (found.fields || []).find(([key]) => String(key).toLowerCase().includes(field));
+    return entry ? String(entry[1]) : undefined;
+  };
+  const FIELDS = {
+    port: p => [p.source_port, p.destination_port], 'tcp.port': p => p.protocol === 'TCP' ? [p.source_port, p.destination_port] : [],
+    'udp.port': p => p.protocol === 'UDP' ? [p.source_port, p.destination_port] : [],
+    srcport: p => p.source_port, sport: p => p.source_port, 'src.port': p => p.source_port,
+    'tcp.srcport': p => p.protocol === 'TCP' ? p.source_port : undefined, 'udp.srcport': p => p.protocol === 'UDP' ? p.source_port : undefined,
+    dstport: p => p.destination_port, dport: p => p.destination_port, 'dst.port': p => p.destination_port,
+    'tcp.dstport': p => p.protocol === 'TCP' ? p.destination_port : undefined, 'udp.dstport': p => p.protocol === 'UDP' ? p.destination_port : undefined,
+    host: p => [p.source, p.destination], addr: p => [p.source, p.destination], ip: p => [p.source, p.destination],
+    'ip.addr': p => [p.source, p.destination], 'ipv6.addr': p => [p.source, p.destination],
+    src: p => p.source, 'ip.src': p => p.source, 'ipv6.src': p => p.source, saddr: p => p.source, 'src.host': p => p.source,
+    dst: p => p.destination, 'ip.dst': p => p.destination, 'ipv6.dst': p => p.destination, daddr: p => p.destination, 'dst.host': p => p.destination,
+    mac: p => [p.source_mac, p.destination_mac], ether: p => [p.source_mac, p.destination_mac], 'eth.addr': p => [p.source_mac, p.destination_mac],
+    'eth.src': p => p.source_mac, 'eth.dst': p => p.destination_mac,
+    len: p => p.bytes, length: p => p.bytes, bytes: p => p.bytes, size: p => p.bytes, 'frame.len': p => p.bytes,
+    proto: p => p.protocol, protocol: p => p.protocol, dir: p => p.direction, direction: p => p.direction, info: p => p.info, detail: p => p.info,
+    flags: p => layerField(p, 'tcp', 'flags'), 'tcp.flags': p => layerField(p, 'tcp', 'flags'),
+    'icmp.type': p => layerField(p, 'icmp', 'type'), 'icmpv6.type': p => layerField(p, 'icmpv6', 'type'),
+    'icmp.code': p => layerField(p, 'icmp', 'code'), ttl: p => layerField(p, 'ipv4', 'time to live'), 'ip.ttl': p => layerField(p, 'ipv4', 'time to live'),
+  };
+  const FUZZY = new Set(['flags', 'tcp.flags', 'icmp.type', 'icmpv6.type', 'info', 'detail']);  // "==" means "contains" on texts
+  const PROTOS = {
+    tcp: p => p.protocol === 'TCP', udp: p => p.protocol === 'UDP', icmp: p => p.protocol === 'ICMP', icmpv6: p => p.protocol === 'ICMPv6',
+    arp: p => p.protocol === 'ARP', ip: p => (p.layers || []).some(l => l.name === 'IPv4'), ipv4: p => (p.layers || []).some(l => l.name === 'IPv4'),
+    ipv6: p => (p.layers || []).some(l => l.name === 'IPv6'), vlan: p => /VLAN/.test(p.info || ''), eth: () => true, ethernet: () => true,
+    tx: p => p.direction === 'TX', rx: p => p.direction === 'RX', multicast: p => !!p.multicast, broadcast: p => p.destination_mac === 'ff:ff:ff:ff:ff:ff',
+  };
+  const ipv4 = text => { const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(text)); return m && m.slice(1).every(n => +n < 256) ? ((+m[1] << 24) | (+m[2] << 16) | (+m[3] << 8) | +m[4]) >>> 0 : null; };
+  const compare = (candidate, op, value, fuzzy) => {
+    if (candidate === undefined || candidate === null || candidate === '') return false;
+    const left = String(candidate).toLowerCase(), right = String(value).toLowerCase();
+    const cidr = /^(.+)\/(\d{1,2})$/.exec(right);
+    if (cidr && ipv4(cidr[1]) !== null && ipv4(left) !== null && (op === '==' || op === '!=')) {
+      const bits = Math.min(32, +cidr[2]), mask = bits ? (~0 << (32 - bits)) >>> 0 : 0;
+      const inside = ((ipv4(left) & mask) >>> 0) === ((ipv4(cidr[1]) & mask) >>> 0);
+      return op === '==' ? inside : !inside;
+    }
+    const numeric = left !== '' && right !== '' && !isNaN(left) && !isNaN(right);
+    if (op === '>' || op === '<' || op === '>=' || op === '<=') {
+      if (!numeric) return false;
+      const a = +left, b = +right;
+      return op === '>' ? a > b : op === '<' ? a < b : op === '>=' ? a >= b : a <= b;
+    }
+    const equal = numeric ? +left === +right : fuzzy ? left.includes(right) : left === right;
+    return op === 'contains' ? left.includes(right) : op === '!=' ? !equal : equal;
+  };
+  const compileFilter = text => {
+    const tokens = [], re = /\s*(\(|\)|&&|\|\||==|!=|>=|<=|=|>|<|!|"[^"]*"|'[^']*'|[^\s()!=<>&|"']+)/y;
+    let m;
+    while (re.lastIndex < text.length && (m = re.exec(text))) tokens.push(m[1]);
+    if (re.lastIndex < text.length && text.slice(re.lastIndex).trim()) throw new Error(`Cannot read "${text.slice(re.lastIndex).trim()}"`);
+    let i = 0;
+    const peek = () => tokens[i], next = () => tokens[i++];
+    const lower = t => (t || '').toLowerCase();
+    const isOp = t => ['==', '=', '!=', '>=', '<=', '>', '<', 'contains', '~'].includes(lower(t));
+    const isKeyword = t => ['and', 'or', 'not', '&&', '||', '!', ')', '(', undefined].includes(lower(t)) || isOp(t);
+    const unquote = t => /^(["']).*\1$/.test(t) ? t.slice(1, -1) : t;
+    const term = () => {
+      const word = next();
+      if (word === undefined) throw new Error('Missing a term at the end');
+      const name = lower(word);
+      if (isOp(peek())) {
+        let op = lower(next()); if (op === '=') op = '=='; if (op === '~') op = 'contains';
+        if (peek() === undefined || isKeyword(peek())) throw new Error(`Missing a value after "${word} ${op}"`);
+        const value = unquote(next());
+        const getter = FIELDS[name] || (name.includes('.') ? (p => layerField(p, name.split('.')[0], name.split('.').slice(1).join(' '))) : null);
+        if (!getter) throw new Error(`Unknown field "${word}"`);
+        const fuzzy = FUZZY.has(name) || !FIELDS[name];
+        return p => { const got = getter(p); const list = Array.isArray(got) ? got : [got];
+          return op === '!=' ? list.every(c => c === undefined || c === null || c === '' || compare(c, op, value, fuzzy)) && list.some(c => c !== undefined && c !== null && c !== '') : list.some(c => compare(c, op, value, fuzzy)); };
+      }
+      if (FIELDS[name] && peek() !== undefined && !isKeyword(peek())) {  // tcpdump style: port 80, host 10.0.2.2
+        const value = unquote(next()), getter = FIELDS[name], fuzzy = FUZZY.has(name);
+        return p => { const got = getter(p); return (Array.isArray(got) ? got : [got]).some(c => compare(c, '==', value, fuzzy)); };
+      }
+      if (PROTOS[name]) return PROTOS[name];
+      if (FIELDS[name]) return p => { const got = FIELDS[name](p); return (Array.isArray(got) ? got : [got]).some(c => c !== undefined && c !== null && c !== ''); };
+      const needle = unquote(word).toLowerCase();
+      return p => haystack(p).includes(needle);
+    };
+    const unary = () => {
+      const t = lower(peek());
+      if (t === 'not' || t === '!') { next(); const inner = unary(); return p => !inner(p); }
+      if (t === '(') { next(); const inner = expression(); if (next() !== ')') throw new Error('Missing ")"'); return inner; }
+      if (t === ')') throw new Error('Unexpected ")"');
+      return term();
+    };
+    const conjunction = () => {  // two terms side by side are an implicit "and" ("echo reply")
+      let left = unary();
+      while (peek() !== undefined && !['or', '||', ')'].includes(lower(peek()))) {
+        if (['and', '&&'].includes(lower(peek()))) next();
+        const right = unary(); const l = left; left = p => l(p) && right(p);
+      }
+      return left;
+    };
+    const expression = () => {
+      let left = conjunction();
+      while (['or', '||'].includes(lower(peek()))) { next(); const right = conjunction(); const l = left; left = p => l(p) || right(p); }
+      return left;
+    };
+    if (!tokens.length) return null;
+    const compiled = expression();
+    if (i < tokens.length) throw new Error(`Unexpected "${tokens[i]}"`);
+    return compiled;
+  };
   const matches = packet => {
     if (filters.proto !== 'all' && protoClass(packet) !== filters.proto) return false;
     if (!filters.dirs.has(packet.direction)) return false;
-    if (!filters.text) return true;
-    const hay = `${packet.protocol} ${endpointText(packet.source, packet.source_port)} ${endpointText(packet.destination, packet.destination_port)} ${packet.info} ${packet.source_mac} ${packet.destination_mac}`.toLowerCase();
-    return hay.includes(filters.text);
+    return !filters.expr || filters.expr(packet);
   };
   const absorb = () => {
     const sample = samples.get(selected);
@@ -64,8 +178,9 @@
     document.getElementById('packet-link').textContent = `${vm} / ${nic}`;
     const sample = samples.get(selected);
     const state = document.getElementById('packet-state');
-    state.textContent = !fresh ? 'Updates unavailable or paused · last observed headers' : paused
+    state.textContent = filters.error ? `Filter error: ${filters.error} · showing every packet` : !fresh ? 'Updates unavailable or paused · last observed headers' : paused
       ? 'Paused · the list is frozen, capture goes on' : sample?.packets_available ? 'Live · newest packets first' : 'Packet capture unavailable';
+    state.classList.toggle('error', !!filters.error);
     {
       if (!paused) absorb();
       const all = [...history.values()].sort((a, b) => b.id - a.id);
@@ -219,7 +334,12 @@
     inspector.querySelectorAll('.chip[data-dir]').forEach(other => other.setAttribute('aria-pressed', String(filters.dirs.has(other.dataset.dir))));
     renderInspector();
   }));
-  searchBox.addEventListener('input', () => { filters.text = searchBox.value.trim().toLowerCase(); renderInspector(); });
+  searchBox.addEventListener('input', () => {
+    try { filters.expr = compileFilter(searchBox.value.trim()); filters.error = ''; }
+    catch (error) { filters.expr = null; filters.error = error.message; }
+    searchBox.setAttribute('aria-invalid', String(!!filters.error));
+    renderInspector();
+  });
   // Drag by the header; the resize handle is the browser's own (CSS resize).
   const head = document.getElementById('packet-drag');
   head.addEventListener('pointerdown', event => {

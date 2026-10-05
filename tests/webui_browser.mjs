@@ -464,13 +464,25 @@ try {
   check('lab VM icons show live previews and pulsing running dots, respect reduced motion and stop previewing on leave or context menu');
   const labOrder = () => page.locator('#labs-view [data-lab]').evaluateAll(cards=>cards.map(card=>card.dataset.lab));
   assert.deepEqual(await labOrder(),['proxmox-lab','new-lab'],'Idle labs keep the catalog order');
+  await page.evaluate(()=>{ window.__scrolled=[]; Element.prototype.scrollIntoView=function(){ window.__scrolled.push(this.dataset.lab||this.id||this.tagName); }; });
   state.vms.find(vm=>vm.name==='alpine-ci').running=true;
   await page.evaluate(()=>refresh(true));
   assert.deepEqual(await labOrder(),['new-lab','proxmox-lab'],'A lab with a machine on comes first');
+  assert(!(await page.evaluate(()=>window.__scrolled)).includes('new-lab'),'No job on the lab: the page does not move');
   state.vms.find(vm=>vm.name==='alpine-ci').running=false;
   await page.evaluate(()=>refresh(true));
   assert.deepEqual(await labOrder(),['proxmox-lab','new-lab']);
-  check('lab cards: the labs with a running machine come first');
+  // The lab the user just started climbs to the top and the page follows it.
+  await page.evaluate(()=>{ vmJobs.set('alpine-ci',{status:'running',command:'start'}); });
+  state.vms.find(vm=>vm.name==='alpine-ci').running=true;
+  await page.evaluate(()=>refresh(true));
+  assert.deepEqual(await labOrder(),['new-lab','proxmox-lab']);
+  assert((await page.evaluate(()=>window.__scrolled)).includes('new-lab'),'The climbing lab with a running job is scrolled into view');
+  await page.evaluate(()=>{ vmJobs.delete('alpine-ci'); });
+  state.vms.find(vm=>vm.name==='alpine-ci').running=false;
+  await page.evaluate(()=>refresh(true));
+  assert.deepEqual(await labOrder(),['proxmox-lab','new-lab']);
+  check('lab cards: the labs with a running machine come first, and the page follows the one just started');
   for (const width of [1440,912,390]) {
     await page.setViewportSize({width,height:909});
     await page.locator('#search').fill('proxmox');

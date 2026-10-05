@@ -63,11 +63,23 @@ automatically, roughly every two seconds. LEDs show VM power, not a connectivity
 the cable glow, moving pulses and TX/RX byte rates summarize activity during the sample
 interval rather than tracing individual packets or proving that the guest received them.
 
-Click the small lens on a LAN cable (or focus it and press Enter) to open the **Packet inspector**;
+Click the small lens on a cable (or focus it and press Enter) to open the **Packet inspector**;
 it stays open until **Close** or Escape (nothing opens on hover), can be dragged by its title bar
-and resized from its corner. The list accumulates what the polls bring (up to 500 headers);
-the chips filter by protocol (TCP, UDP, ICMP, ARP, other) and direction (TX, RX), the box filters
-by any text (an IP, a port, a flag), the footer counts what is shown out of what was seen;
+and resized from its corner. A LAN cable is read from the segment's multicast group on the
+loopback. A NAT cable (slirp) has nothing on the host to listen to: its counters come from the
+guest agent when the guest has one (pfSense has none, hence *Traffic unavailable* there); a
+capture through QEMU's own `filter-dump` is written and tested but switched off
+(`lab_traffic.NAT_CAPTURE`) until its first live incident is understood. The list accumulates what
+the polls bring (up to 500 headers); the chips filter by protocol (TCP, UDP, ICMP, ARP, other)
+and direction (TX, RX), the footer counts what is shown out of what was seen. The box takes a
+**Wireshark/tcpdump-style expression**, so `port 80` never matches 8080: `tcp.port == 80`,
+`udp.port != 53`, `port 22`, `src.port 443` / `dst.port 22`, `host 10.0.2.2`, `src 192.168.0.10`,
+`ip.dst == 192.168.0.0/24`, `eth.src 52:54:00:…`, `len > 1000`, `tcp.flags contains SYN`,
+`icmp.type == 8`, `ttl < 64`, the bare words `tcp` `udp` `icmp` `icmpv6` `arp` `ipv4` `ipv6`
+`vlan` `tx` `rx` `multicast` `broadcast`, combined with `and` `or` `not` and parentheses
+(`&&` `||` `!` work too); `=` means `==`, `~` means `contains`. A word that is no field or
+protocol searches the text of the rows as before. A broken expression is flagged in red with
+the reason and the list shows every packet;
 **Pause** freezes the list while the capture goes on, **Clear** starts it afresh. A click on a row opens the packet itself: every decoded header with its fields (Ethernet,
 VLAN, ARP, IPv4/IPv6 with TTL, identification, flags and fragment offset, TCP with sequence,
 acknowledgment, flags, window and options, UDP, ICMP with id and sequence) and a hex dump of
