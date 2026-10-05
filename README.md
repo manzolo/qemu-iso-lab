@@ -4,7 +4,7 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)
 ![Profiles](https://img.shields.io/badge/profiles-100%2B-84c9e7)
 [![Catalog](https://img.shields.io/badge/catalog-browse%20online-7ddfc5)](https://manzolo.github.io/qemu-iso-lab/)
-[![Tour](https://img.shields.io/badge/tour-8%20chapters%20%2B%2010%20lessons-7ddfc5)](https://manzolo.github.io/qemu-iso-lab/tour.html)
+[![Tour](https://img.shields.io/badge/tour-8%20chapters%20%2B%2011%20lessons-7ddfc5)](https://manzolo.github.io/qemu-iso-lab/tour.html)
 
 **Linux, BSD and Windows virtual machines on QEMU/KVM, installed with zero clicks.**
 One JSON profile per VM describes the ISO (downloaded and checksummed), the disk, the
