@@ -612,6 +612,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/assets/icons.js":
             self._send(HTTPStatus.OK, (WEB_DIR / "icons.js").read_bytes(), "text/javascript; charset=utf-8")
             return
+        if path in ("/assets/qemu-iso-lab.svg", "/favicon.ico"):
+            self._send(HTTPStatus.OK, (WEB_DIR / "qemu-iso-lab.svg").read_bytes(), "image/svg+xml")
+            return
         if not self._allowed():
             return
         query = parse_qs(url.query)

@@ -1,5 +1,5 @@
 #!/bin/sh
-# First run on a fresh host: link vmctl and vmtui into ~/.local/bin, install every missing
+# First run: link vmctl, vmtui and qemu-iso-lab into ~/.local/bin, install every missing
 # dependency (asks first; Textual goes into .venv-tui without sudo), then check the host.
 # Needs only sh and python3: a fresh Ubuntu has no make, so this is the Quick Start entry
 # point and `make setup` just calls it. Extra arguments go to `vmctl setup --install`
@@ -16,8 +16,11 @@ fi
 mkdir -p "$PREFIX/bin"
 ln -sfn "$ROOT/bin/vmctl" "$PREFIX/bin/vmctl"
 ln -sfn "$ROOT/bin/vmtui" "$PREFIX/bin/vmtui"
-printf '  linked %s/bin/vmctl and vmtui -> %s/bin\n' "$PREFIX" "$ROOT"
+ln -sfn "$ROOT/bin/qemu-iso-lab" "$PREFIX/bin/qemu-iso-lab"
+printf '  linked vmctl, vmtui and qemu-iso-lab in %s/bin -> %s/bin\n' "$PREFIX" "$ROOT"
 
 "$ROOT/bin/vmctl" setup --install "$@"
 
+python3 "$ROOT/tools/install_launchers.py" "$ROOT"
 "$ROOT/bin/vmctl" welcome
+printf '\nStart QEMU ISO Lab from your applications menu, or run:\n  "%s/bin/qemu-iso-lab"\n' "$PREFIX"

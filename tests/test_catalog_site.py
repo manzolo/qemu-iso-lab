@@ -1,4 +1,5 @@
 """The catalog site: built from the tracked catalog only, self-contained, every profile on it."""
+import html
 import json
 import shutil
 import subprocess
@@ -112,15 +113,32 @@ class CatalogSiteTests(unittest.TestCase):
 
     def test_the_page_is_self_contained_and_ships_the_dashboard_icons(self):
         html = (self.out / "index.html").read_text(encoding="utf-8")
-        for asset in ("icons.js", ".nojekyll", "catalog.json"):
+        for asset in ("icons.js", ".nojekyll", "catalog.json", "qemu-iso-lab.svg"):
             self.assertTrue((self.out / asset).exists(), asset)
         self.assertEqual((self.out / "icons.js").read_bytes(), (ROOT / "vmctl" / "web" / "icons.js").read_bytes())
+        self.assertIn('<link rel="icon" type="image/svg+xml" href="qemu-iso-lab.svg">', html)  # the project icon, one per page
+        self.assertNotIn('href="data:image/svg+xml', html)
         self.assertNotIn("http://", html.split("<script id=\"data\"")[0].replace("http://www.w3.org", ""))
         self.assertNotIn("cdn.", html)
         self.assertIn('<script src="icons.js">', html)
         self.assertIn('window.ICON_SPRITE = ""', html)  # the sprite is inlined: icons work from file:// too
         self.assertIn('<symbol id="arch"', html)
         self.assertNotIn("</script>", json.dumps(self.data).replace("</", "<\\/"))  # the embedded JSON cannot close its tag
+
+    def test_install_commands_have_published_scripts_and_copy_buttons(self):
+        page = (self.out / "index.html").read_text(encoding="utf-8")
+        self.assertIn('href="install-windows.cmd" download=', page)
+        cmd = (self.out / "install-windows.cmd").read_bytes()
+        self.assertIn(b"\r\n", cmd)
+        self.assertEqual(cmd.replace(b"\r\n", b"\n"), (ROOT / "install-windows.cmd").read_bytes())
+        for source, published, command in (
+            ("install.sh", "install.sh", build_catalog_site.LINUX_INSTALL),
+            ("setup-windows.ps1", "install.ps1", build_catalog_site.WINDOWS_INSTALL),
+        ):
+            self.assertEqual((self.out / published).read_bytes(), (ROOT / source).read_bytes())
+            self.assertIn(f'data-copy="{html.escape(command, quote=True)}"', page)
+            self.assertIn(build_catalog_site.SITE_URL + published, command)
+            self.assertIn(command, (ROOT / "README.md").read_text(encoding="utf-8"))
 
     def test_commands_follow_the_kind_of_profile(self):
         by_name = {p["name"]: p for p in self.data["profiles"]}

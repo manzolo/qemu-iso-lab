@@ -44,6 +44,45 @@ with English and Italian voice and subtitles: the catalog, the setup, a first VM
 
 ## Quick start
 
+**Linux** — paste this into a terminal (it needs `curl`; the script is [install.sh](install.sh)):
+
+```sh
+sh -c "$(curl -fsSL https://manzolo.github.io/qemu-iso-lab/install.sh)"
+```
+
+It clones the project into `~/qemu-iso-lab` (`git` and `python3` are installed first if
+missing, with apt, pacman, dnf or zypper), runs `setup.sh`, which lists the host tools it would
+install and **asks before touching anything**, and adds **QEMU ISO Lab** to your applications
+menu plus the `qemu-iso-lab` command to `~/.local/bin`. About two minutes on a host that
+already has QEMU. No VM image is downloaded until you choose one.
+
+**Windows 11** — [download the installer](https://manzolo.github.io/qemu-iso-lab/install-windows.cmd)
+and double-click it. Windows warns about a downloaded script: choose **Run** (*Cancel* is the
+default button). vmctl needs Linux, so the installer sets up **WSL2 + Ubuntu 24.04** and runs the
+Linux installer inside; that takes **three runs**, and each one ends by saying what to do next:
+
+1. installs WSL (accept the administrator prompt), then **restart Windows**;
+2. installs Ubuntu and asks you to choose a Linux user name and password;
+3. clones the project, runs `setup.sh` in Ubuntu (asks before installing, then wants that
+   password for `sudo`) and puts **QEMU ISO Lab** on the desktop and in the Start menu.
+
+The same from PowerShell: `irm https://manzolo.github.io/qemu-iso-lab/install.ps1 | iex`
+(the script is [setup-windows.ps1](setup-windows.ps1)). Hardware virtualization must be enabled
+in the firmware for KVM.
+
+When setup finishes, open **QEMU ISO Lab** from the applications menu (Linux) or the desktop
+(Windows): a terminal window opens and the browser lands on the dashboard. Keep that terminal
+open while you use the lab; closing it (or Ctrl-C) stops the dashboard, not the VMs. On Linux
+the command `qemu-iso-lab` does the same (`~/qemu-iso-lab/bin/qemu-iso-lab` while `~/.local/bin`
+is not on your PATH).
+
+Running the installer again is safe: on Linux it reuses the checkout without pulling or touching
+local changes (`VMCTL_INSTALL_DIR=/other/path` installs elsewhere); on Windows it continues
+where it stopped.
+
+<details>
+<summary><b>Manual installation / already cloned the repository</b></summary>
+
 ```bash
 git clone https://github.com/manzolo/qemu-iso-lab.git && cd qemu-iso-lab
 ./setup.sh        # links vmctl + vmtui into ~/.local/bin, installs what is missing, checks the host
@@ -60,6 +99,8 @@ every supported distribution ships, and ends with a welcome screen listing the f
 (`vmctl welcome` prints it again any time). It uses `apt` or `pacman` for QEMU, OVMF and the
 helpers, and puts Textual (the terminal dashboard) in the repository's `.venv-tui` without sudo.
 Running it again only installs what is missing.
+
+</details>
 
 Or skip the dashboard and go straight to a VM, from an empty disk to a logged-in guest:
 
@@ -100,7 +141,8 @@ vmctl needs Linux (KVM, `/proc`, Unix sockets), so on Windows 11 it runs inside 
 distribution, which gets `/dev/kvm` through nested virtualization. `setup-windows.ps1` does
 it all: it installs WSL and Ubuntu 24.04 if missing, turns nested virtualization on in
 `.wslconfig`, clones the repository inside Ubuntu, runs `./setup.sh` there and adds you to the
-`kvm` group. Download [`setup-windows.ps1`](setup-windows.ps1) and, in PowerShell:
+`kvm` group. Use the PowerShell one-liner above, or download
+[`setup-windows.ps1`](setup-windows.ps1) and, in PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1       # run it again after a reboot it asks for

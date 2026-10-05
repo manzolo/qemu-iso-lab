@@ -141,6 +141,21 @@ class WelcomeTests(unittest.TestCase):
             self.assertEqual(lifecycle.cmd_welcome(argparse.Namespace(no_menu=False)), 0)
         menu.assert_not_called()
 
+    def test_commands_are_absolute_while_local_bin_is_not_on_path(self):
+        # The one-line installer clones and runs setup.sh by itself: the user who pasted it is still
+        # in $HOME when this screen is printed, where `./bin/vmctl` is a command the shell cannot find.
+        from vmctl import host_setup, state
+
+        root = Path("/tmp/some checkout")
+        with mock.patch.object(state, "ROOT", root):
+            self.assertEqual(host_setup.local_bin_prefix(), str(root / "bin"))
+        text = host_setup.render_welcome(profiles=1, on_path=False, kvm=(True, ""), textual=True, missing=[],
+                                         local_bin=str(root / "bin"))
+        self.assertIn(f"{root}/bin/vmctl web --open", text)
+        self.assertIn("from anywhere", text)
+        self.assertNotIn("./bin/", text)
+        self.assertEqual(host_setup.welcome_choices(False, str(root / "bin"))[1][2], [f"{root}/bin/vmtui"])
+
     def test_commands_use_the_shim_until_local_bin_is_on_path(self):
         from vmctl import host_setup
 

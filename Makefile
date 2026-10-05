@@ -21,11 +21,12 @@ help: ## Show this help
 setup: ## First run: link vmctl/vmtui, install every missing dependency (Textual included, asks first), then check the host (same as ./setup.sh, which needs no make)
 	@./setup.sh
 
-install-cli: ## Symlink vmctl and vmtui into $(PREFIX)/bin (default ~/.local/bin)
+install-cli: ## Symlink vmctl, vmtui and qemu-iso-lab into $(PREFIX)/bin (default ~/.local/bin)
 	@mkdir -p "$(PREFIX)/bin"
 	@ln -sfn "$(BIN)/vmctl" "$(PREFIX)/bin/vmctl"
 	@ln -sfn "$(BIN)/vmtui" "$(PREFIX)/bin/vmtui"
-	@printf "  linked %s/bin/vmctl and vmtui -> %s\n" "$(PREFIX)" "$(BIN)"
+	@ln -sfn "$(BIN)/qemu-iso-lab" "$(PREFIX)/bin/qemu-iso-lab"
+	@printf "  linked vmctl, vmtui and qemu-iso-lab in %s/bin -> %s\n" "$(PREFIX)" "$(BIN)"
 	@case ":$$PATH:" in *":$(PREFIX)/bin:"*) ;; *) printf "  note: %s/bin is not in your PATH\n" "$(PREFIX)";; esac
 
 # `make install textual growisofs`: the words after `install` are tool names, not targets.
@@ -38,7 +39,7 @@ install: ## Install host dependencies: every missing one, or only those named (m
 	@./bin/vmctl setup --install $(INSTALL_NAMES)
 
 uninstall-cli: ## Remove the symlinks created by install-cli
-	@rm -f "$(PREFIX)/bin/vmctl" "$(PREFIX)/bin/vmtui"
+	@rm -f "$(PREFIX)/bin/vmctl" "$(PREFIX)/bin/vmtui" "$(PREFIX)/bin/qemu-iso-lab"
 
 test: ## Run the unit tests (pytest), then the dashboard tests with .venv-tui's Textual
 	@python3 -m pytest -q tests/

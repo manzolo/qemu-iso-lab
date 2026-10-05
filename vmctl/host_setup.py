@@ -511,16 +511,26 @@ def vmctl_on_path(prefix: Path | None = None) -> bool:
         return False
 
 
-def render_welcome(*, profiles: int, on_path: bool, kvm: tuple[bool, str], textual: bool, missing: list[str]) -> str:
+def local_bin_prefix() -> str:
+    """How the welcome names the checkout's bin/ while vmctl is not on PATH: the absolute path.
+
+    `./bin/vmctl` is true only in the checkout, and the reader's shell may be anywhere: the one-line
+    installer clones and runs setup.sh by itself, so the user who pasted it is still in $HOME when
+    the screen is printed (verified in the Lubuntu studio, 2026-10-05)."""
+    return str(Path(state.ROOT) / "bin")
+
+
+def render_welcome(*, profiles: int, on_path: bool, kvm: tuple[bool, str], textual: bool, missing: list[str],
+                   local_bin: str = "./bin") -> str:
     """The screen `vmctl welcome` prints and setup.sh ends with: what to do next, in order.
 
     Every command stands alone on its own line (a triple-click copies exactly it, nothing to trim:
     zsh does not take `# comments` pasted interactively) and uses what works on this host: no make,
-    `./bin/vmctl` while ~/.local/bin is not on PATH. It fits 80 columns."""
+    `<local_bin>/vmctl` while ~/.local/bin is not on PATH. It fits 80 columns."""
     from vmctl import ui
 
-    cmd = "vmctl" if on_path else "./bin/vmctl"
-    tui = "vmtui" if on_path else "./bin/vmtui"
+    cmd = "vmctl" if on_path else f"{local_bin}/vmctl"
+    tui = "vmtui" if on_path else f"{local_bin}/vmtui"
     kvm_ok, kvm_note = kvm
 
     def step(number: str, title: str, *commands: str) -> list[str]:
@@ -530,8 +540,9 @@ def render_welcome(*, profiles: int, on_path: bool, kvm: tuple[bool, str], textu
     facts = [f"{profiles} profiles", "KVM ok" if kvm_ok else "no KVM", "Textual ok" if textual else "no Textual"]
     lines = ["", f"  {ui.style('QEMU ISO Lab is ready', ui.BOLD, ui.GREEN)}   {ui.style(' · '.join(facts), ui.CYAN)}", ""]
     if not on_path:
-        lines += ["  " + ui.style("~/.local/bin is not on your PATH yet, so the commands start with ./bin/", ui.YELLOW),
-                  "  (run them from this directory, or open a new login shell), or first:",
+        where = "from this directory" if local_bin == "./bin" else "from anywhere"
+        lines += ["  " + ui.style(f"~/.local/bin is not on your PATH yet, so the commands start with {local_bin}/", ui.YELLOW),
+                  f"  (run them {where}, or open a new login shell), or first:",
                   "       " + ui.style('export PATH="$HOME/.local/bin:$PATH"', ui.GREEN), ""]
     if missing:
         lines += ["  " + ui.style("Still missing: " + ", ".join(missing), ui.YELLOW),
@@ -550,10 +561,10 @@ def render_welcome(*, profiles: int, on_path: bool, kvm: tuple[bool, str], textu
     return "\n".join(lines)
 
 
-def welcome_choices(on_path: bool) -> list[tuple[str, str, list[str]]]:
+def welcome_choices(on_path: bool, local_bin: str = "./bin") -> list[tuple[str, str, list[str]]]:
     """The menu under the welcome screen: (key, what it does, the command), the same numbers as the steps."""
-    cmd = "vmctl" if on_path else "./bin/vmctl"
-    tui = "vmtui" if on_path else "./bin/vmtui"
+    cmd = "vmctl" if on_path else f"{local_bin}/vmctl"
+    tui = "vmtui" if on_path else f"{local_bin}/vmtui"
     return [("1", "Open the lab in your browser", [cmd, "web", "--open"]),
             ("2", "Terminal dashboard", [tui]),
             ("3", "Install debian-server with zero clicks (~10 min)", [cmd, "bootstrap-preseed", "debian-server"]),

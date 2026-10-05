@@ -12,7 +12,8 @@ python -m pytest tests/test_archinstall.py -v  # single test file
 python -m pytest tests/ -k "test_render"       # filter by name
 make ci                                        # python -m unittest discover -s tests -v (what GitHub Actions runs)
 make lint                                      # python -m mypy vmctl/ --strict (enforced)
-make install-cli                               # symlink vmctl + vmtui into ~/.local/bin
+make install-cli                               # symlink vmctl + vmtui + qemu-iso-lab (bin/qemu-iso-lab = `vmctl web --open`, what the app-menu entry runs) into ~/.local/bin
+sh -c "$(curl -fsSL https://manzolo.github.io/qemu-iso-lab/install.sh)"   # the README's one-line install (install.sh: git+python3 via apt/pacman/dnf/zypper, clone into ~/qemu-iso-lab or $VMCTL_INSTALL_DIR, ./setup.sh; a rerun reuses the checkout, never pulls); Windows: install-windows.cmd (double-click, three runs: WSL → restart → Ubuntu → clone+setup+shortcuts) downloads setup-windows.ps1 as install.ps1; both published by tools/build_catalog_site.py next to the catalog; tests/test_installer.py runs install.sh against stub tools, tested live on both studio VMs 2026-10-05
 make web                                       # vmctl web --open: the lab in a browser on 127.0.0.1 (token in the URL), every command as a job
 ./setup.sh (= make setup)                      # first run, needs only sh + python3 (a fresh Ubuntu has no make): install-cli + vmctl setup --install (every missing dependency, Textual included, asks first) + host check; vmctl setup alone only checks (-v: one line per tool); ends with `vmctl welcome` (what to do next, `./bin/` paths while ~/.local/bin is not on PATH)
 make install [names]                           # vmctl setup --install: every missing host dependency, or only the named ones (make install textual growisofs); textual goes into .venv-tui
@@ -76,7 +77,7 @@ Before pushing, run the relevant local tests first. Do not use GitHub Actions as
 
 ## Architecture
 
-`bin/vmctl` is a 12-line shim that calls `vmctl.cli:main`; `make install-cli` symlinks it (and `vmtui`) into `~/.local/bin`, and both resolve the repository root through the symlink. The `Makefile` carries developer targets only and must not grow VM-lifecycle targets again: new user-facing behaviour goes into a `vmctl` subcommand, registered in `cli.py` inside one of the `COMMAND_GROUPS` (a test fails otherwise). `bin/vmtui` is an independent menu wrapper (fzf backend, `dialog` fallback, `VMTUI_UI` to force one) that shells out to `vmctl`.
+`bin/vmctl` is a 12-line shim that calls `vmctl.cli:main`; `make install-cli` and `setup.sh` symlink it (with `vmtui` and `qemu-iso-lab`) into `~/.local/bin`, and all three resolve the repository root through the symlink. `setup.sh` also writes `~/.local/share/applications/qemu-iso-lab.desktop` (`tools/install_launchers.py`, `Terminal=true`: the dashboard's terminal stays visible) and ends with `vmctl welcome`, whose commands are absolute paths while `~/.local/bin` is not on PATH (`host_setup.local_bin_prefix`: the one-line installer leaves the user's shell in `$HOME`, where `./bin/vmctl` means nothing). The `Makefile` carries developer targets only and must not grow VM-lifecycle targets again: new user-facing behaviour goes into a `vmctl` subcommand, registered in `cli.py` inside one of the `COMMAND_GROUPS` (a test fails otherwise). `bin/vmtui` is an independent menu wrapper (fzf backend, `dialog` fallback, `VMTUI_UI` to force one) that shells out to `vmctl`.
 
 ### Module import order (no cycles allowed)
 

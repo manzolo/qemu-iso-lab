@@ -19,6 +19,10 @@ itself running under KVM, on a fast connection. A physical host is faster.
 
 ## 1. Get the code
 
+For the shortcut, use the [one-command installer for Linux or Windows](../README.md#quick-start),
+then continue at [step 3](#3-open-the-dashboard) (on Linux, first `cd ~/qemu-iso-lab`).
+The screenshots below show the equivalent manual steps.
+
 Open a terminal. Only `git` and `python3` are needed; `make` is not.
 
 ```bash

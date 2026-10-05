@@ -15,8 +15,12 @@ sudo apt install -y qemu-system-x86 qemu-utils ovmf python3 openssh-client libvi
 # Arch / CachyOS
 sudo pacman -S qemu-desktop qemu-base edk2-ovmf python openssh libvirt make dialog fzf cloud-image-utils xorriso virtiofsd virt-viewer p7zip dvd+rw-tools python-bcrypt swtpm gdisk ddrescue partclone util-linux
 
+# La via breve: una riga sola (clona in ~/qemu-iso-lab, lancia setup.sh, aggiunge "QEMU ISO Lab" al menu applicazioni)
+sh -c "$(curl -fsSL https://manzolo.github.io/qemu-iso-lab/install.sh)"
+
+# Oppure a mano:
 git clone git@github.com:manzolo/qemu-iso-lab.git && cd qemu-iso-lab
-./setup.sh                # vmctl + vmtui in ~/.local/bin, installa cio' che manca (chiede prima), controlla l'host (come make setup)
+./setup.sh                # vmctl, vmtui e qemu-iso-lab in ~/.local/bin, installa cio' che manca (chiede prima), controlla l'host (come make setup)
 vmctl setup               # in seguito: solo il controllo (-v elenca ogni tool)
 ```
 

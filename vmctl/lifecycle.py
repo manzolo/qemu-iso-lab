@@ -5173,12 +5173,14 @@ def cmd_welcome(args: argparse.Namespace) -> int:
         profiles = 0
     missing = [name for name in state.REQUIRED_COMMANDS if not host_setup.tool_present(name)]
     on_path = host_setup.vmctl_on_path()
+    local_bin = host_setup.local_bin_prefix()
     print(host_setup.render_welcome(profiles=profiles, on_path=on_path, kvm=host_setup.kvm_status(),
-                                    textual=host_setup.tool_present(host_setup.TEXTUAL), missing=missing))
+                                    textual=host_setup.tool_present(host_setup.TEXTUAL), missing=missing,
+                                    local_bin=local_bin))
     # Straight after ./setup.sh the next step is one keypress away; a pipe or a script gets the screen only.
     if getattr(args, "no_menu", False) or not (sys.stdin.isatty() and sys.stdout.isatty()):
         return 0
-    command = host_setup.welcome_menu(host_setup.welcome_choices(on_path))
+    command = host_setup.welcome_menu(host_setup.welcome_choices(on_path, local_bin))
     if command is None:
         return 0
     executable = state.ROOT / "bin" / Path(command[0]).name

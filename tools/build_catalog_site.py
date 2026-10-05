@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import html
 import json
 import shutil
 import subprocess
@@ -32,6 +33,8 @@ from vmctl import config, lifecycle, profile_versions, state  # noqa: E402
 
 SITE_URL = "https://manzolo.github.io/qemu-iso-lab/"
 REPO_URL = "https://github.com/manzolo/qemu-iso-lab"
+LINUX_INSTALL = f'sh -c "$(curl -fsSL {SITE_URL}install.sh)"'
+WINDOWS_INSTALL = f"irm {SITE_URL}install.ps1 | iex"
 FAMILY_LABELS = {
     "debian": "Debian, Ubuntu and flavours", "arch": "Arch family", "fedora": "Fedora", "rhel": "RHEL family",
     "opensuse": "openSUSE", "nix": "NixOS", "alpine": "Alpine", "void": "Void", "mint": "Linux Mint", "kali": "Kali",
@@ -140,8 +143,8 @@ PAGE = r"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QEMU ISO Lab · catalog</title>
+<link rel="icon" type="image/svg+xml" href="qemu-iso-lab.svg">
 <meta name="description" content="Every VM profile of QEMU ISO Lab: Linux, BSD and Windows on QEMU/KVM, installed with zero clicks. Pick the ones you want.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%237ddfc5'/%3E%3Cpath d='M7 8l4 4-4 4M12 16h5' stroke='%230c111b' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root { color-scheme:dark; --bg:#0b1017; --panel:#131c27; --panel2:#192432; --line:#293646; --text:#edf3fa; --muted:#9aabbe; --accent:#8aead0; --ok:#8aead0; --warn:#f1ca8a; --btn:#202d3d; }
 * { box-sizing:border-box; }
@@ -286,12 +289,11 @@ footer { color:var(--muted); font-size:11px; padding:30px 0 0; }
 </header>
 <main id="catalog">
   <div class="catalog-heading"><div><h1>Find your next machine</h1><div class="metrics"><span><strong id="m-profiles">—</strong> profiles</span><span><strong id="m-unattended">—</strong> automated</span><span><strong id="m-verified">—</strong> verified</span></div></div><span id="count" role="status" aria-live="polite"></span></div>
-  <details class="setup"><summary>New here? Get started</summary>
+  <details class="setup" open><summary>Install with one command</summary>
     <div class="start" id="get-started"><div class="terminal-bar"><i></i><i></i><i></i><span>your lab starts here</span></div><div class="terminal-body">
-      <div class="terminal-step"><small>01 / Get the toolkit</small><code>git clone __REPO__.git</code><code>cd qemu-iso-lab</code></div>
-      <div class="terminal-step"><small>02 / Set up your host</small><code>./setup.sh</code></div>
-      <div class="terminal-step"><small>03 / Open your dashboard</small><code>vmctl web --open</code></div>
-    </div>__TOUR_START__<div class="terminal-note"><span>Linux + KVM · Windows 11 + WSL2</span><button data-copy="git clone __REPO__.git &amp;&amp; cd qemu-iso-lab&#10;./setup.sh&#10;vmctl web --open">Copy setup</button></div></div>
+      <div class="terminal-step"><small>Linux / Terminal · curl required</small><code>__LINUX_INSTALL__</code><button data-copy="__LINUX_INSTALL__">Copy Linux</button></div>
+      <div class="terminal-step"><small>Windows 11 / Double-click installer · WSL2 + Ubuntu</small><a href="install-windows.cmd" download="Install QEMU ISO Lab.cmd">Download Windows installer (.cmd)</a><small>Or paste into PowerShell:</small><code>__WINDOWS_INSTALL__</code><button data-copy="__WINDOWS_INSTALL__">Copy Windows</button></div>
+    </div><div class="terminal-note"><span>Then open QEMU ISO Lab from your applications menu (Linux), desktop or Start menu (Windows). Linux terminal: <code>qemu-iso-lab</code>. Keep its terminal window open while using the dashboard.</span></div><div class="terminal-note"><span>Installs into ~/qemu-iso-lab. Setup asks before installing host tools. On Windows, rerun the installer after WSL setup or a reboot.</span></div>__TOUR_START__<div class="terminal-note"><span>Read the scripts: <a href="install.sh">Linux</a> · <a href="install.ps1">Windows</a></span><a href="__REPO__#quick-start">Manual setup ↗</a></div></div>
   </details>
   <div id="toolbar">
     <div class="search-row"><div class="search-wrap"><input id="search" type="search" placeholder="Search profiles… e.g. ubuntu 26, fedora kde" autocomplete="off" aria-label="Search profiles"><kbd aria-hidden="true">/</kbd></div>
@@ -464,8 +466,8 @@ TOUR_PAGE = r"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QEMU ISO Lab · tour</title>
+<link rel="icon" type="image/svg+xml" href="qemu-iso-lab.svg">
 <meta name="description" content="Short clips, spoken and subtitled in English and Italian: the catalog, the setup, a first VM, the console in the browser, a lab, and a lab of your own.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%237ddfc5'/%3E%3Cpath d='M7 8l4 4-4 4M12 16h5' stroke='%230c111b' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root { color-scheme:dark; --bg:#0b1017; --panel:#131c27; --panel2:#192432; --line:#293646; --text:#edf3fa; --muted:#9aabbe; --accent:#8aead0; --btn:#202d3d; }
 * { box-sizing:border-box; }
@@ -642,8 +644,8 @@ GUIDE_PAGE = r"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__GROUP__ · guide</title>
+<link rel="icon" type="image/svg+xml" href="https://manzolo.github.io/qemu-iso-lab/qemu-iso-lab.svg">
 <meta name="description" content="__DESCRIPTION__">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%237ddfc5'/%3E%3Cpath d='M7 8l4 4-4 4M12 16h5' stroke='%230c111b' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root { color-scheme:dark; --bg:#0b1017; --panel:#131c27; --panel2:#192432; --line:#293646; --text:#edf3fa; --muted:#9aabbe; --accent:#8aead0; --btn:#202d3d; }
 * { box-sizing:border-box; }
@@ -781,6 +783,12 @@ def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "c
     data["clip_style"] = clip_style
     web = root / "vmctl" / "web"
     shutil.copy2(web / "icons.js", out / "icons.js")
+    shutil.copy2(web / "qemu-iso-lab.svg", out / "qemu-iso-lab.svg")  # the favicon of every page
+    # Stable, short installer URLs published alongside the catalog.
+    shutil.copy2(root / "install.sh", out / "install.sh")
+    shutil.copy2(root / "setup-windows.ps1", out / "install.ps1")
+    # cmd.exe expects Windows line endings even though the source is maintained on Linux.
+    (out / "install-windows.cmd").write_bytes((root / "install-windows.cmd").read_text().replace("\n", "\r\n").encode("utf-8"))
     # The sprite is inlined (hidden) so <use href="#arch"> works from file:// too, not only over HTTP.
     sprite = (web / "distro-icons.svg").read_text(encoding="utf-8").replace('<svg xmlns="http://www.w3.org/2000/svg">', '<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">', 1)
     tour = collect_tour(media if media is not None else root / "docs" / "media", out)
@@ -800,7 +808,9 @@ def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "c
                   'with English and Italian voice and subtitles.</span><a href="tour.html">▶ Take the tour</a></div>') if tour else ""
     page = (PAGE.replace("__TOUR_NAV__", tour_nav).replace("__TOUR_START__", tour_start).replace("__SPRITE__", sprite).replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
             .replace("__VMCTL__", data["vmctl_version"]).replace("__GENERATED__", data["generated"])
-            .replace("__COMMIT__", f" · {data['commit']}" if data["commit"] else "").replace("__REPO__", REPO_URL))
+            .replace("__COMMIT__", f" · {data['commit']}" if data["commit"] else "").replace("__REPO__", REPO_URL)
+            .replace("__LINUX_INSTALL__", html.escape(LINUX_INSTALL, quote=True))
+            .replace("__WINDOWS_INSTALL__", html.escape(WINDOWS_INSTALL, quote=True)))
     (out / "index.html").write_text(page, encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
     return data
