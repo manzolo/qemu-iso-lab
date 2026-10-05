@@ -714,7 +714,9 @@
         node.classList.remove('transmitting', 'receiving');
         illuminate(node.querySelector('.link'), 0);
         if (!sample?.available || !node.classList.contains('online')) {
-          label.textContent = node.classList.contains('online') ? 'Traffic unavailable' : 'Link off';
+          // A NAT link of a guest without an agent says why (pfSense: "Traffic unavailable" looked like a fault, 2026-10-05).
+          label.textContent = !node.classList.contains('online') ? 'Link off'
+            : /guest-agent/.test(sample?.reason || '') ? 'No counters: no guest agent' : 'Traffic unavailable';
           return;
         }
         next.set(key, sample);
