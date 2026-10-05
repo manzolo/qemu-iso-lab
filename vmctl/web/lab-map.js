@@ -21,7 +21,7 @@
   let clearedBelow = 0;     // Clear drops what the current sample still carries, until newer ids arrive
   let expanded = new Set(), lastShown = [];  // opened rows (by packet id) and the list on screen
   let lastSignature = '';  // the rows are rebuilt only when the list or the opened rows change (a detail under the pointer must not vanish)
-  const filters = {proto: 'all', dirs: new Set(['TX', 'RX']), expr: null, error: ''};
+  const filters = {proto: 'all', dirs: new Set(['TX', 'RX']), expr: null, error: '', hint: ''};
   let anchor = {x:24, y:24}, dragged = null;
   const keyOf = node => JSON.stringify([node.dataset.vm, node.dataset.nic]);
   const buttonOf = key => [...map.querySelectorAll('.nic')].find(node => keyOf(node) === key)?.querySelector('.inspect-btn');
@@ -102,13 +102,18 @@
     const isOp = t => ['==', '=', '!=', '>=', '<=', '>', '<', 'contains', '~'].includes(lower(t));
     const isKeyword = t => ['and', 'or', 'not', '&&', '||', '!', ')', '(', undefined].includes(lower(t)) || isOp(t);
     const unquote = t => /^(["']).*\1$/.test(t) ? t.slice(1, -1) : t;
+    if (tokens.length > 1 && tokens.every(t => !FIELDS[lower(t)] && !PROTOS[lower(t)] && !isKeyword(t))) {
+      const needle = tokens.map(unquote).join(' ').toLowerCase();
+      return p => haystack(p).includes(needle);
+    }
     const term = () => {
       const word = next();
       if (word === undefined) throw new Error('Missing a term at the end');
       const name = lower(word);
       if (isOp(peek())) {
         let op = lower(next()); if (op === '=') op = '=='; if (op === '~') op = 'contains';
-        if (peek() === undefined || isKeyword(peek())) throw new Error(`Missing a value after "${word} ${op}"`);
+        if (peek() === undefined) throw new Error(`Missing a value after "${word} ${op}"`);
+        if (isKeyword(peek())) throw new Error(`Unexpected "${peek()}" after "${word} ${op}"`);
         const value = unquote(next());
         const getter = FIELDS[name] || (name.includes('.') ? (p => layerField(p, name.split('.')[0], name.split('.').slice(1).join(' '))) : null);
         if (!getter) throw new Error(`Unknown field "${word}"`);
@@ -150,6 +155,206 @@
     if (i < tokens.length) throw new Error(`Unexpected "${tokens[i]}"`);
     return compiled;
   };
+  // Completion uses the same fields/getters as the filter, and only this NIC's history.
+  // Token offsets keep the suffix intact when editing in the middle of an expression.
+  const suggestions = document.getElementById('packet-suggestions');
+  const guide = document.getElementById('packet-filter-guide');
+  const helpButton = document.getElementById('packet-filter-help');
+  const editor = searchBox.closest('.packet-filter-editor');
+  let completions = [], activeCompletion = -1;
+  const operators = ['==', '!=', '>', '<', '>=', '<=', 'contains'];
+  const isOperator = word => [...operators, '=', '~'].includes(word);
+  const isJoin = word => ['and', 'or', '&&', '||'].includes(word);
+  const fieldKind = field => /port$/.test(field) ? 'port'
+    : /^(len|length|bytes|size|frame.len|ttl|ip.ttl)$/.test(field) ? 'number'
+    : /^(mac|ether|eth\.)/.test(field) ? 'MAC address'
+    : /^(host|addr|ip|src|dst|saddr|daddr|ip\.(addr|src|dst)|ipv6\.(addr|src|dst)|(src|dst)\.host)$/.test(field) ? 'IP address'
+    : 'text';
+  const describeField = field => {
+    const kind = fieldKind(field);
+    const side = /src|^s(port|addr)$/.test(field) ? 'Source' : /dst|^d(port|addr)$/.test(field) ? 'Destination' : 'Source or destination';
+    if (kind === 'port') return `${side} ${field.startsWith('tcp.') ? 'TCP ' : field.startsWith('udp.') ? 'UDP ' : ''}port`;
+    if (kind.endsWith('address')) return `${side} ${kind}`;
+    if (kind === 'number') return /ttl/.test(field) ? 'IPv4 time to live' : 'Frame length in bytes';
+    if (/flags/.test(field)) return 'TCP flags, e.g. contains SYN';
+    if (/icmp/.test(field)) return 'ICMP header type or code';
+    return /dir/.test(field) ? 'Packet direction: TX or RX' : /proto/.test(field) ? 'Packet protocol' : 'Packet detail text';
+  };
+  const completionContext = () => {
+    const text = searchBox.value, cursor = searchBox.selectionStart ?? text.length;
+    const tokens = [...text.matchAll(/"[^"]*(?:"|$)|'[^']*(?:'|$)|&&|\|\||==|!=|>=|<=|[()=<>!~]|[^\s()=<>!~&|"']+/g)]
+      .map(m => ({word:m[0], start:m.index, end:m.index + m[0].length}));
+    const current = tokens.find(t => t.start <= cursor && cursor <= t.end && !['(', ')'].includes(t.word));
+    const start = current?.start ?? cursor;
+    const end = Math.max(current?.end ?? cursor, searchBox.selectionEnd ?? cursor);
+    let phase = 'term', field = '', depth = 0;
+    for (const token of tokens.filter(t => t.end <= start)) {
+      const word = token.word.toLowerCase();
+      if (word === '(') { depth++; phase = 'term'; }
+      else if (word === ')') { depth--; phase = 'join'; }
+      else if (isJoin(word)) { phase = 'term'; field = ''; }
+      else if (phase === 'term' && ['not', '!'].includes(word)) continue;
+      else if (phase === 'term') { field = word; phase = FIELDS[word] ? 'field' : 'join'; }
+      else if (phase === 'field' && isOperator(word)) phase = 'value';
+      else phase = 'join';
+    }
+    return {phase, field, depth, start, end, cursor, prefix:text.slice(start, cursor).toLowerCase()};
+  };
+  const observedValues = field => {
+    const getter = FIELDS[field];
+    if (!getter) return [];
+    const values = new Set();
+    for (const packet of history.values()) {
+      const got = getter(packet);
+      for (const value of Array.isArray(got) ? got : [got]) {
+        if (value !== undefined && value !== null && value !== '') values.add(String(value));
+      }
+    }
+    return [...values].sort((a, b) => a.localeCompare(b, undefined, {numeric:true}));
+  };
+  const closeSuggestions = () => {
+    suggestions.hidden = true;
+    searchBox.setAttribute('aria-expanded', 'false');
+    searchBox.removeAttribute('aria-activedescendant');
+    completions = []; activeCompletion = -1;
+  };
+  const closeGuide = () => { guide.hidden = true; helpButton.setAttribute('aria-expanded', 'false'); };
+  const sizePopup = popup => {
+    const room = inspector.getBoundingClientRect().bottom - editor.getBoundingClientRect().bottom - 16;
+    popup.style.maxHeight = `${Math.max(0, Math.min(260, room))}px`;
+  };
+  const selectCompletion = index => {
+    activeCompletion = index;
+    [...suggestions.children].forEach((node, i) => node.setAttribute('aria-selected', String(i === index)));
+    const node = suggestions.children[index];
+    if (node) { searchBox.setAttribute('aria-activedescendant', node.id); node.scrollIntoView({block:'nearest'}); }
+    else searchBox.removeAttribute('aria-activedescendant');
+  };
+  const showSuggestions = () => {
+    closeGuide();
+    const context = completionContext(), {phase, field, prefix, depth} = context;
+    const choices = [];
+    const add = (value, description, append = false) => choices.push({value, description, append});
+    const joins = (append = false) => {
+      add('and', 'Match both conditions', append); add('or', 'Match either condition', append);
+      if (depth > 0) add(')', 'Close this group', append);
+    };
+    if (phase === 'term') {
+      const names = prefix ? [...new Set([...Object.keys(FIELDS), ...Object.keys(PROTOS), 'not', '('])]
+        : ['tcp', 'udp', 'ip.src', 'ip.dst', 'tcp.port', 'host'];
+      for (const name of names) add(name, FIELDS[name] ? describeField(name) : name === 'not' ? 'Exclude a condition' : name === '(' ? 'Group conditions' : `Match ${name.toUpperCase()} packets`);
+    } else if (phase === 'field' || phase === 'value') {
+      const kind = fieldKind(field);
+      if (phase === 'field') {
+        const ops = ['port', 'number'].includes(kind) ? operators.slice(0, 6)
+          : kind === 'text' ? ['contains', '==', '!='] : ['==', '!='];
+        const descriptions = {'==':'Equal to', '!=':'Different from', '>':'Greater than', '<':'Less than', '>=':'At least', '<=':'At most', contains:'Contains text'};
+        for (const op of ops) add(op, descriptions[op]);
+        if (PROTOS[field]) joins();
+      }
+      const ports = {'22':'SSH', '53':'DNS', '80':'HTTP', '443':'HTTPS', '67':'DHCP server', '68':'DHCP client'};
+      const observed = observedValues(field);
+      const defaults = kind === 'port' ? ['53', '80', '443', '22', '67', '68']
+        : /flags/.test(field) ? ['SYN', 'ACK', 'FIN', 'RST', 'PSH', 'URG']
+        : /^(dir|direction)$/.test(field) ? ['TX', 'RX'] : [];
+      for (const value of [...new Set([...observed, ...defaults])]) {
+        // Quote text for the existing grammar; never turn packet text into markup.
+        const quoted = /[\s()=<>!&|"']/.test(value)
+          ? !value.includes('"') ? `"${value}"` : !value.includes("'") ? `'${value}'` : null : value;
+        if (quoted === null) continue;
+        add(quoted, [kind === 'port' ? ports[value] : '', observed.includes(value) ? 'Observed on this link' : 'Example value'].filter(Boolean).join(' · '));
+      }
+      if (prefix && ((['port', 'number'].includes(kind) && /^\d+$/.test(prefix)) || observed.some(v => v.toLowerCase() === prefix))) joins(true);
+    } else joins();
+    const needle = prefix.replace(/^["']/, '');
+    completions = choices.filter(c => c.append || c.value.toLowerCase().replace(/^["']/, '').startsWith(needle)).slice(0, 6)
+      .map(c => ({...c, start:c.append ? context.end : context.start, end:context.end}));
+    if (!completions.length) { closeSuggestions(); return; }
+    suggestions.replaceChildren(...completions.map((choice, i) => {
+      const node = document.createElement('div');
+      node.className = 'packet-filter-option'; node.id = `packet-suggestion-${i}`;
+      node.setAttribute('role', 'option'); node.setAttribute('aria-selected', 'false');
+      const code = document.createElement('code'), detail = document.createElement('small');
+      code.textContent = choice.value; detail.textContent = choice.description;
+      node.append(code, detail);
+      node.addEventListener('pointerdown', event => event.preventDefault());
+      node.addEventListener('click', () => acceptCompletion(i));
+      return node;
+    }));
+    suggestions.hidden = false; sizePopup(suggestions);
+    searchBox.setAttribute('aria-expanded', 'true'); selectCompletion(-1);
+  };
+  const acceptCompletion = index => {
+    const choice = completions[index];
+    if (!choice) return;
+    const before = searchBox.value.slice(0, choice.start), after = searchBox.value.slice(choice.end);
+    const text = `${choice.append && before && !/\s$/.test(before) ? ' ' : ''}${choice.value}${/^\s/.test(after) ? '' : ' '}`;
+    searchBox.value = before + text + after;
+    searchBox.focus();
+    const cursor = before.length + text.length + (/^\s/.test(after) ? 1 : 0);
+    searchBox.setSelectionRange(cursor, cursor);
+    updateFilter(); showSuggestions();
+  };
+  const updateFilter = () => {
+    filters.hint = '';
+    try { filters.expr = compileFilter(searchBox.value.trim()); filters.error = ''; }
+    catch (error) {
+      let quote = '';
+      for (const char of searchBox.value) {
+        if (char === quote) quote = '';
+        else if (!quote && ['"', "'"].includes(char)) quote = char;
+      }
+      const pending = document.activeElement === searchBox && (quote || /^(Missing a value|Missing a term|Missing "\)")/.test(error.message));
+      if (pending) {
+        filters.error = '';
+        const {field} = completionContext();
+        const kind = fieldKind(field);
+        filters.hint = quote ? `Close the quoted value with ${quote}` : error.message.startsWith('Missing a value') ? `Enter ${kind === 'IP address' ? 'an IP address or IPv4 subnet' : kind === 'port' ? 'a port number' : 'a value'}`
+          : error.message.startsWith('Missing a term') ? 'Add a condition' : 'Close the group with )';
+        filters.hint += ' · previous filter remains active';
+      } else { filters.expr = null; filters.error = error.message; }
+    }
+    searchBox.setAttribute('aria-invalid', String(!!filters.error));
+    renderInspector();
+  };
+  searchBox.addEventListener('input', event => { if (!event.isComposing) { updateFilter(); showSuggestions(); } });
+  searchBox.addEventListener('compositionend', () => { updateFilter(); showSuggestions(); });
+  searchBox.addEventListener('focus', showSuggestions);
+  searchBox.addEventListener('click', showSuggestions);
+  searchBox.addEventListener('keyup', event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) showSuggestions(); });
+  searchBox.addEventListener('blur', () => { closeSuggestions(); if (filters.hint) updateFilter(); });
+  searchBox.addEventListener('keydown', event => {
+    if (event.isComposing) return;
+    if ((event.ctrlKey && event.code === 'Space') || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (suggestions.hidden || event.code === 'Space') showSuggestions();
+      if (completions.length && event.code !== 'Space') {
+        const index = activeCompletion < 0 ? (event.key === 'ArrowUp' ? completions.length - 1 : 0)
+          : (activeCompletion + (event.key === 'ArrowUp' ? -1 : 1) + completions.length) % completions.length;
+        selectCompletion(index);
+      }
+    } else if (event.key === 'Enter' && !suggestions.hidden) {
+      event.preventDefault(); acceptCompletion(activeCompletion < 0 ? 0 : activeCompletion);
+    }
+  });
+  editor.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && (!suggestions.hidden || !guide.hidden)) {
+      event.preventDefault(); event.stopPropagation(); closeSuggestions(); closeGuide();
+    }
+  });
+  helpButton.addEventListener('click', () => {
+    const opening = guide.hidden;
+    closeSuggestions(); closeGuide();
+    if (opening) { guide.hidden = false; helpButton.setAttribute('aria-expanded', 'true'); sizePopup(guide); }
+  });
+  guide.querySelectorAll('[data-expression]').forEach(button => button.addEventListener('click', () => {
+    searchBox.value = button.dataset.expression;
+    searchBox.focus(); searchBox.setSelectionRange(searchBox.value.length, searchBox.value.length);
+    closeGuide(); closeSuggestions(); updateFilter();
+  }));
+  document.addEventListener('pointerdown', event => { if (!editor.contains(event.target)) { closeSuggestions(); closeGuide(); } });
+  editor.addEventListener('focusout', event => { if (!editor.contains(event.relatedTarget)) { closeSuggestions(); closeGuide(); } });
+  new ResizeObserver(() => { if (!suggestions.hidden) sizePopup(suggestions); if (!guide.hidden) sizePopup(guide); }).observe(inspector);
   const matches = packet => {
     if (filters.proto !== 'all' && protoClass(packet) !== filters.proto) return false;
     if (!filters.dirs.has(packet.direction)) return false;
@@ -178,8 +383,8 @@
     document.getElementById('packet-link').textContent = `${vm} / ${nic}`;
     const sample = samples.get(selected);
     const state = document.getElementById('packet-state');
-    state.textContent = filters.error ? `Filter error: ${filters.error} · showing every packet` : !fresh ? 'Updates unavailable or paused · last observed headers' : paused
-      ? 'Paused · the list is frozen, capture goes on' : sample?.packets_available ? 'Live · newest packets first' : 'Packet capture unavailable';
+    state.textContent = filters.hint || (filters.error ? `Filter error: ${filters.error} · showing every packet` : !fresh ? 'Updates unavailable or paused · last observed headers' : paused
+      ? 'Paused · the list is frozen, capture goes on' : sample?.packets_available ? 'Live · newest packets first' : 'Packet capture unavailable');
     state.classList.toggle('error', !!filters.error);
     {
       if (!paused) absorb();
@@ -298,6 +503,7 @@
     renderInspector();
   }
   const closeInspector = (restoreFocus = false) => {
+    closeSuggestions(); closeGuide();
     const trigger = selected ? buttonOf(selected) : null;
     selected = null; paused = false; history = new Map(); clearedBelow = 0; expanded = new Set(); lastShown = []; dragged = null;
     renderInspector();
@@ -334,12 +540,6 @@
     inspector.querySelectorAll('.chip[data-dir]').forEach(other => other.setAttribute('aria-pressed', String(filters.dirs.has(other.dataset.dir))));
     renderInspector();
   }));
-  searchBox.addEventListener('input', () => {
-    try { filters.expr = compileFilter(searchBox.value.trim()); filters.error = ''; }
-    catch (error) { filters.expr = null; filters.error = error.message; }
-    searchBox.setAttribute('aria-invalid', String(!!filters.error));
-    renderInspector();
-  });
   // Drag by the header; the resize handle is the browser's own (CSS resize).
   const head = document.getElementById('packet-drag');
   head.addEventListener('pointerdown', event => {

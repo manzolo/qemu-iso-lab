@@ -1,10 +1,92 @@
 {
   "title": "Git lab: commits, branches, merge, conflicts, stash, rebase and git flow",
-  "summary": "One server with a repository already made for you: ~/workspace with real branches, a merge history, a conflict already resolved, a stash demo, a rebased branch, a finished git-flow release tagged v1.0, and a bare remote at /srv/git/lab.git. The exercises read Git from underneath (commits as objects, branches as files holding one hash, the index) and then practise every operation; ~/reset-git-lab.sh rebuilds the repository when you have changed its history. Ported from qlab's git-lab.",
+  "summary": "One server with a repository already made for you: ~/workspace with real branches, a merge history, a conflict already resolved, a stash demo, a rebased branch, a finished git-flow release tagged v1.0, and a bare remote at /srv/git/lab.git. Exercise 0 is for beginners: a repository made from nothing, the first commits, diff, undo, a branch, a remote. The other exercises read Git from underneath (commits as objects, branches as files holding one hash, the index) and then practise every operation; ~/reset-git-lab.sh rebuilds the repository when you have changed its history. Ported from qlab's git-lab.",
   "members": [
     "git-lab-server"
   ],
   "exercises": [
+    {
+      "title": "First steps: your first repository",
+      "text": "For whoever has never used Git: a repository made from nothing in ~/first-repo, the first commits, a change seen with diff, an undo, a branch merged back, a .gitignore, and a remote to push to and clone from. Nothing here touches ~/workspace; the other exercises then open Git from underneath.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "git-lab-server",
+          "commands": [
+            "git --version",
+            "git config --global --list    # name and e-mail: Git writes them into every commit (set in the lab; elsewhere: git config --global user.name 'Your Name')"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "git-lab-server",
+          "commands": [
+            "mkdir -p ~/first-repo && cd ~/first-repo && git init -b main",
+            "git status    # an empty repository: nothing tracked yet",
+            "echo 'Shopping list' > list.txt && git status    # list.txt is untracked",
+            "git add list.txt && git status    # staged: in the index, ready to commit",
+            "git commit -m 'Start the shopping list' && git log --oneline"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/first-repo && echo 'milk' >> list.txt && echo 'bread' >> list.txt",
+            "git diff    # what changed since the last commit",
+            "git add list.txt && git commit -m 'Add milk and bread'",
+            "git log --oneline && git show --stat HEAD"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/first-repo && echo 'oops' >> list.txt && git diff --stat",
+            "git restore list.txt && git diff --stat    # the file is back to the last commit",
+            "echo 'eggs' >> list.txt && git add list.txt && git restore --staged list.txt && git status --short    # unstaged, the change stays",
+            "git commit -am 'Add eggs'    # -a stages every tracked file that changed"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/first-repo && git switch -c weekend    # a new branch, and you are on it",
+            "echo 'cake' >> list.txt && git commit -am 'Weekend: cake'",
+            "git switch main && cat list.txt    # no cake on main",
+            "git merge weekend && cat list.txt && git log --oneline --graph",
+            "git branch -d weekend"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "git-lab-server",
+          "commands": [
+            "cd ~/first-repo && echo 'scratch' > notes.tmp && printf '*.tmp\\n' > .gitignore && git status --short    # notes.tmp is not even listed",
+            "git add .gitignore && git commit -m 'Ignore temporary files'"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "git-lab-server",
+          "commands": [
+            "git init --bare ~/first-remote.git    # a Git server is just a bare repository",
+            "cd ~/first-repo && git remote add origin ~/first-remote.git && git push -u origin main",
+            "git clone ~/first-remote.git ~/first-clone && git -C ~/first-clone log --oneline",
+            "echo 'coffee' >> list.txt && git commit -am 'Add coffee' && git push",
+            "git -C ~/first-clone pull && cat ~/first-clone/list.txt"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "git-lab-server",
+          "commands": [
+            "rm -rf ~/first-repo ~/first-remote.git ~/first-clone    # start over any time"
+          ]
+        }
+      ]
+    },
     {
       "title": "Git anatomy",
       "text": "A repository is a .git/ directory: objects, refs, HEAD and config. The lab's working copy is ~/workspace, its remote the bare repository /srv/git/lab.git: the same files, with no working tree beside them.",

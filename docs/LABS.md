@@ -100,6 +100,16 @@ are not retained or sent to the browser. The inspector works on QEMU LAN segment
 when guest-agent counters supply the byte rates. NAT has no packet capture; its panel
 explains the limitation. Closing or hiding a panel does not stop the map's counters.
 
+The inspector's filter offers contextual completion: type `tcp.` for fields, then choose an
+operator and a value. IP addresses, MAC addresses and ports come from the selected link's
+packet history; common ports also have service labels (these are hints, not application
+detection). Use ↑/↓ and Enter to choose, Esc to dismiss, or Ctrl+Space to reopen suggestions.
+Completion replaces the token at the cursor and preserves the rest of the expression.
+The **?** button opens clickable examples. While a condition is incomplete, a hint explains
+what to enter and the previous valid filter remains active; leaving it incomplete marks an
+error. Plain text, expressions such as `tcp.port == 80`, shorthand such as `host 10.0.2.2`,
+and combinations using `and`, `or`, `not` and parentheses are supported.
+
 For QEMU segments the web server passively counts Ethernet frames on the existing loopback
 multicast group and attributes them by MAC address. No guest installation or VM restart is
 needed. Only the header summaries above are kept in memory, and listeners close after 15 seconds without map

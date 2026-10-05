@@ -1422,6 +1422,7 @@ function render() {
   renderDetails();
 }
 let detailsSignature = "", labsSignature = "", labsOrder = [];
+const labsFollow = new Map();  // lab -> when the user started it from this page: its card is followed when it climbs
 function renderDetails() {
   const signature = JSON.stringify([selected, !!visible().length, S.vms.find((x) => x.name === selected), vmJobs.get(selected), submittingVms.has(selected), cancellingJobs.has("vm:"+selected)]);
   if (signature === detailsSignature) return;
@@ -1538,10 +1539,14 @@ function renderLabs() {
   const order = [...$("labs-view").querySelectorAll("[data-lab]")].map((card) => card.dataset.lab);
   const climbed = order.find((group, index) => {
     const before = labsOrder.indexOf(group);
-    return before > index && (S.labs.find((lab) => lab.group === group)?.members || []).some((name) => vmJobs.get(name)?.status === "running");
+    if (before <= index) return false;
+    const started = labsFollow.get(group);
+    return (started !== undefined && Date.now() - started < 15 * 60 * 1000)
+      || (S.labs.find((lab) => lab.group === group)?.members || []).some((name) => vmJobs.get(name)?.status === "running");
   });
   labsOrder = order;
   if (climbed && !$("labs-view").classList.contains("hidden")) {
+    labsFollow.delete(climbed);
     $("labs-view").querySelector(`[data-lab="${CSS.escape(climbed)}"]`)?.scrollIntoView({block:"start", behavior:"smooth"});
   }
   $("labs-view").querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.map)}/map?token=${encodeURIComponent(TOKEN)}`, "_blank")));
@@ -1625,6 +1630,7 @@ async function run(args, danger, afterStart = false) {
   const previous = vm && vmJobs.get(vm);
   const consoleRequest = afterStart && vm ? {accepted:false, popup:afterStart === "detached" ? reserveConsoleWindow(vm) : null} : null;
   if (vm) { discardPendingConsole(vm); if (consoleRequest) pendingConsoles.set(vm, consoleRequest); }
+  if (args[0] === "group" && args[2] && ["up", "install", "reset", "checkpoint", "test"].includes(args[1])) labsFollow.set(args[2], Date.now());
   if (vm) { submittingVms.add(vm); vmJobs.set(vm, {status:"running", command:args[0]}); jobsRevision++; render(); }
   try {
     const res = await api("/api/run", { args, confirmed: !!destructive });

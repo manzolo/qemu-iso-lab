@@ -217,6 +217,28 @@ class NatCaptureTests(unittest.TestCase):
         self.assertEqual(self.calls[-1], ("object-del", {"id": "vmctl-dump-n1"}))
         self.assertFalse(cap.path.exists())
 
+    def test_the_capture_file_is_capped_by_truncation_not_by_qmp(self):
+        cap = self.capture()
+        record = pcap([(70000, frame(A, B) + bytes(60000))])[24:]  # 60 KB a record: the blocks given back are measurable
+        import os
+        import time
+        fd = os.open(cap.path, os.O_WRONLY)  # like QEMU: one descriptor, its own offset, no O_APPEND
+        self.addCleanup(os.close, fd)
+        os.lseek(fd, 0, os.SEEK_END)
+        with mock.patch.object(lab_traffic, "PCAP_CAP_BYTES", len(record) * 4):
+            for _ in range(10):  # QEMU keeps writing at its offset past our truncation (a hole before it)
+                os.write(fd, record)
+                time.sleep(.3)
+            for _ in range(40):
+                if cap.sample()["counters"]["tx"] >= 70000 * 10:
+                    break
+                time.sleep(.05)
+        sample = cap.sample()
+        self.assertEqual(sample["counters"]["tx"], 70000 * 10, "every record counted across the truncations")
+        self.assertGreater(cap.truncated, 0, "the file was truncated at least once")
+        self.assertLess(cap.path.stat().st_blocks * 512, len(record) * 10, "the blocks before the cut went back to the file system")
+        self.assertEqual([call[0] for call in self.calls], ["object-add"], "no QMP command for the cap")
+
     def test_a_leftover_object_is_replaced(self):
         self.capture(fail_add=True)
         self.assertEqual([call[0] for call in self.calls], ["object-add", "object-del", "object-add"])

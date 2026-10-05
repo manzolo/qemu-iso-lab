@@ -863,6 +863,14 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .packet-inspector .chip-tx[aria-pressed="true"] { color:#78dff7; } .packet-inspector .chip-rx[aria-pressed="true"] { color:#c2adff; }
 .packet-inspector #packet-search { flex:1 1 160px; min-width:120px; background:#0b1420; color:#dce9f5; border:1px solid #3c5c74; border-radius:6px; padding:4px 8px; font:12px ui-monospace, monospace; }
 .packet-inspector #packet-search[aria-invalid="true"] { border-color:#e07a7a; box-shadow:0 0 0 2px #e07a7a33; }
+.packet-filter-editor { position:relative; display:flex; gap:6px; flex:1 1 280px; min-width:0; }
+.packet-filter-popup { position:absolute; z-index:3; top:calc(100% + 6px); left:0; right:0; max-height:260px; overflow:auto; background:#132638; border:1px solid #56839e; border-radius:8px; box-shadow:0 10px 28px #0008; padding:5px; }
+.packet-filter-popup[hidden] { display:none; }
+.packet-filter-option, .packet-inspector .packet-filter-example { display:flex; flex-direction:column; gap:3px; padding:7px 9px; border:0; border-radius:4px; cursor:pointer; text-align:left; width:100%; background:transparent; box-sizing:border-box; }
+.packet-filter-option[aria-selected="true"], .packet-filter-option:hover, .packet-inspector .packet-filter-example:hover { background:#245369; }
+.packet-filter-popup code { color:#d9f5ff; font:12px ui-monospace, monospace; overflow-wrap:anywhere; }
+.packet-filter-popup small, .packet-filter-popup p { color:#9bb7cf; font-size:11px; }
+.packet-filter-popup p { margin:5px 9px; }
 .packet-inspector #packet-state { margin:0; padding:6px 16px; font-size:11px; color:#9bb7cf; }
 .packet-inspector #packet-state.error { color:#f0a0a0; }
 .packet-scroll { flex:1 1 auto; overflow:auto; }
@@ -1029,7 +1037,20 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None, *, inter
 <div class="packet-filters" role="group" aria-label="Packet filters">
 <span class="packet-chips" data-filter="proto"><button type="button" class="chip" data-proto="all" aria-pressed="true">All</button><button type="button" class="chip" data-proto="TCP" aria-pressed="false">TCP</button><button type="button" class="chip" data-proto="UDP" aria-pressed="false">UDP</button><button type="button" class="chip" data-proto="ICMP" aria-pressed="false">ICMP</button><button type="button" class="chip" data-proto="ARP" aria-pressed="false">ARP</button><button type="button" class="chip" data-proto="other" aria-pressed="false">Other</button></span>
 <span class="packet-chips" data-filter="dir"><button type="button" class="chip chip-tx" data-dir="TX" aria-pressed="true">TX</button><button type="button" class="chip chip-rx" data-dir="RX" aria-pressed="true">RX</button></span>
-<input id="packet-search" type="search" placeholder="tcp.port == 80 · host 192.168.0.10 · not arp · text" aria-label="Packet filter: Wireshark-style expression or plain text" autocomplete="off" spellcheck="false" title="Filter expressions: tcp.port == 80 · udp.port != 53 · port 22 · src.port 443 · host 10.0.2.2 · ip.src 192.168.0.0/24 · dst 192.168.0.10 · eth.src 52:54:00:… · len > 1000 · tcp.flags contains SYN · icmp.type == 8 · tcp / udp / icmp / arp / ipv6 / tx / rx · and, or, not, parentheses · a plain word searches the text">
+<div class="packet-filter-editor">
+<input id="packet-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="packet-suggestions" aria-describedby="packet-state" placeholder="tcp.port == 80 · host 192.168.0.10 · text" aria-label="Packet filter: Wireshark-style expression or plain text" autocomplete="off" spellcheck="false">
+<button id="packet-filter-help" type="button" aria-label="Filter examples and keyboard help" aria-expanded="false" aria-controls="packet-filter-guide">?</button>
+<div id="packet-suggestions" class="packet-filter-popup" role="listbox" aria-label="Filter suggestions" hidden></div>
+<div id="packet-filter-guide" class="packet-filter-popup" role="region" aria-label="Filter examples" hidden>
+<p>Choose an example to replace the filter. Plain text searches packet details.</p>
+<button type="button" class="packet-filter-example" data-expression="tcp.port == 80"><code>tcp.port == 80</code><small>TCP packets to or from port 80</small></button>
+<button type="button" class="packet-filter-example" data-expression="udp.port == 53"><code>udp.port == 53</code><small>UDP packets to or from port 53 (DNS)</small></button>
+<button type="button" class="packet-filter-example" data-expression="ip.src == 192.168.0.0/24"><code>ip.src == 192.168.0.0/24</code><small>Source in this IPv4 subnet — edit for your LAN</small></button>
+<button type="button" class="packet-filter-example" data-expression="tcp.flags contains SYN"><code>tcp.flags contains SYN</code><small>TCP connection attempts</small></button>
+<button type="button" class="packet-filter-example" data-expression="(tcp or udp) and not port 22"><code>(tcp or udp) and not port 22</code><small>Combine conditions and exclude SSH</small></button>
+<p>↑ ↓ choose · Enter insert · Esc dismiss · Ctrl+Space suggest. Port labels describe common services, not detected applications.</p>
+</div>
+</div>
 </div>
 <p id="packet-state"></p>
 <div class="packet-scroll"><table aria-label="Recent packets"><thead><tr><th class="packet-time">Time</th><th class="packet-dir">Dir</th><th class="packet-proto">Protocol</th><th>Source → destination / detail</th><th class="packet-size">Bytes</th></tr></thead><tbody id="packet-rows"></tbody></table>

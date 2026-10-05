@@ -230,7 +230,7 @@ try {
     vm("pkill -INT -f 'x11gra[b]'; for i in $(seq 50); do pgrep -f 'x11gra[b]' >/dev/null || break; sleep 0.2; done");
     execFileSync("scp", [...SSH, "-q", `${VM}:lab/video/rec.mkv`, join(outDir, "raw.mkv")]);
   }
-  writeFileSync(join(outDir, "cues.json"), JSON.stringify({ clip: name, title: clip.title, lab: clip.lab || null, series: clip.series || "tour", cues: log, steps, ff }, null, 2));
+  writeFileSync(join(outDir, "cues.json"), JSON.stringify({ clip: name, title: clip.title, lab: clip.lab || null, series: clip.series || "tour", order: clip.order ?? 1, cues: log, steps, ff }, null, 2));
   console.log(dry ? `-> ${outDir}: rehearsal, ${shots} screenshots (one per cue) to read before the take` : `-> ${outDir}`);
 }
 process.exit(0);

@@ -2,7 +2,7 @@
 
 One server with a repository already made for you, and Git looked at from underneath before it is
 practised: a commit is an object you can read, a branch is a file with one hash in it, the index sits
-between your files and the history. Ported from qlab's git-lab.
+between your files and the history. Ported from qlab's git-lab. **Beginners start at exercise 0**, a repository made from nothing.
 
 | VM | What it holds | SSH from the host |
 |---|---|---|
@@ -21,6 +21,90 @@ vmctl group install git-lab      # one cloud image, about a minute after the dow
 vmctl shell git-lab-server
 cd ~/workspace
 ```
+
+## Exercise 0: first steps, for beginners
+
+Never used Git? Start here: a repository made from nothing in `~/first-repo`, away from
+`~/workspace`, and the everyday moves. Git keeps **snapshots** of your work: whenever you are
+happy with how things stand, you take one (a *commit*) with a message saying why. First check
+who you are: Git writes a name and an e-mail into every commit (set in the lab already; elsewhere
+`git config --global user.name 'Your Name'` and `user.email` do it).
+
+```sh
+git --version
+git config --global --list
+```
+
+**A repository from nothing.** `git init` creates the hidden `.git/` directory where Git keeps
+everything. `git status` is the command to repeat whenever in doubt: it says which branch you
+are on and the state of every file. A new file is *untracked* until you add it; `git add` puts it
+in the *index*, the list of what goes into the next commit; `git commit -m` takes the snapshot.
+
+```sh
+mkdir -p ~/first-repo && cd ~/first-repo && git init -b main
+git status
+echo 'Shopping list' > list.txt && git status
+git add list.txt && git status
+git commit -m 'Start the shopping list' && git log --oneline
+```
+
+**Change, see the change, commit again.** `git diff` shows line by line what differs from the
+last commit (`+` added, `-` removed). `git log --oneline` is the history in short, `git show`
+opens one commit.
+
+```sh
+echo 'milk' >> list.txt && echo 'bread' >> list.txt
+git diff
+git add list.txt && git commit -m 'Add milk and bread'
+git log --oneline && git show --stat HEAD
+```
+
+**Undo before it is too late.** `git restore <file>` throws away that file's uncommitted changes;
+`git restore --staged` takes it out of the index and leaves the change in the working copy.
+`git commit -a` adds by itself every tracked file that changed.
+
+```sh
+echo 'oops' >> list.txt && git diff --stat
+git restore list.txt && git diff --stat
+echo 'eggs' >> list.txt && git add list.txt && git restore --staged list.txt && git status --short
+git commit -am 'Add eggs'
+```
+
+**A branch for an idea, merged when it works.** A branch is a separate line of work: you try
+there without touching `main`, and when you are happy you join it with `merge`. Here `main` did
+not move in the meantime, so Git *fast-forwards*: it just moves `main` ahead.
+
+```sh
+git switch -c weekend
+echo 'cake' >> list.txt && git commit -am 'Weekend: cake'
+git switch main && cat list.txt
+git merge weekend && cat list.txt && git log --oneline --graph
+git branch -d weekend
+```
+
+**What Git must not track.** Temporary files, builds, secrets: a `.gitignore` with their names
+(or patterns) takes them out of `git status`, and `git add` skips them.
+
+```sh
+echo 'scratch' > notes.tmp && printf '*.tmp\n' > .gitignore && git status --short
+git add .gitignore && git commit -m 'Ignore temporary files'
+```
+
+**A remote: push, clone, pull.** A Git server is a *bare* repository (no working copy), here a
+directory; on GitHub or GitLab only the address changes. `remote add` names it, `push -u` sends
+the branch and ties it to it, `clone` makes a complete copy elsewhere, `pull` fetches the new
+commits.
+
+```sh
+git init --bare ~/first-remote.git
+git remote add origin ~/first-remote.git && git push -u origin main
+git clone ~/first-remote.git ~/first-clone && git -C ~/first-clone log --oneline
+echo 'coffee' >> list.txt && git commit -am 'Add coffee' && git push
+git -C ~/first-clone pull && cat ~/first-clone/list.txt
+```
+
+To start over: `rm -rf ~/first-repo ~/first-remote.git ~/first-clone`. Then, with these moves in
+hand, the exercises that follow open Git from underneath, on `~/workspace`.
 
 ## Exercise 1: Git anatomy
 

@@ -66,9 +66,10 @@ class CatalogSiteTests(unittest.TestCase):
         clip = {"id": "01-x", "title": {"en": "1 · X", "it": "1 · X it"}, "duration": 12.0, "video": "01-x.mp4",
                 "poster": "01-x.jpg", "subtitles": {"en": "01-x.en.vtt", "it": "01-x.it.vtt"}}
         voiced = {**clip, "id": "02-y", "video": {"it": "02-y.it.mp4", "en": "02-y.en.mp4"}, "series": "labs", "lab": "lvm-lab", "steps": [{"t": 3.5, "cmd": "sudo pvs"}]}  # narrated: one file per language; a lab lesson with its commands
-        for name in ("01-x.mp4", "01-x.jpg", "01-x.en.vtt", "01-x.it.vtt", "02-y.it.mp4", "02-y.en.mp4"):
+        for name in ("01-x.mp4", "01-x.jpg", "01-x.en.vtt", "01-x.it.vtt", "02-y.it.mp4", "02-y.en.mp4", "03-z.mp4"):
             (media / "tour" / name).write_bytes(b"x")
-        (media / "tour" / "tour.json").write_text(json.dumps({"clips": [clip, voiced]}))
+        second = {**voiced, "id": "03-z", "title": {"en": "LVM again: snapshots", "it": "LVM ancora: snapshot"}, "video": "03-z.mp4"}  # a second lesson on the same lab
+        (media / "tour" / "tour.json").write_text(json.dumps({"clips": [clip, voiced, second]}))
         out = Path(self.tempdir.name) / "site-tour"
         build_catalog_site.build(ROOT, out, media=media)
         tour = (out / "tour.html").read_text(encoding="utf-8")
@@ -80,8 +81,12 @@ class CatalogSiteTests(unittest.TestCase):
         # The lesson reaches the lab's card in the catalog, and only that lab's.
         labs = {lab["group"]: lab for lab in json.loads((out / "catalog.json").read_text(encoding="utf-8"))["labs"]}
         self.assertEqual(labs["lvm-lab"]["clip"], "tour.html#02-y")
+        self.assertEqual([c["href"] for c in labs["lvm-lab"]["clips"]], ["tour.html#02-y", "tour.html#03-z"])
         self.assertIsNone(labs["vpn-lab"]["clip"])
-        self.assertIn("Watch the lesson", (out / "labs" / "lvm-lab" / "guide.en.html").read_text(encoding="utf-8"))
+        self.assertEqual(labs["vpn-lab"]["clips"], [])
+        guide = (out / "labs" / "lvm-lab" / "guide.en.html").read_text(encoding="utf-8")
+        self.assertIn("▶ LVM again: snapshots", guide)  # two lessons: each link carries its title
+        self.assertIn("LVM ancora: snapshot", (out / "labs" / "lvm-lab" / "guide.it.html").read_text(encoding="utf-8"))
         self.assertIn('"guides": {"en": "labs/lvm-lab/guide.en.html"', tour)  # the lesson links its guide
         self.assertIn('"steps": [{"t": 3.5, "cmd": "sudo pvs"}]', tour)  # and its commands, for the player's panel
         self.assertIn('href="tour.html"', (out / "index.html").read_text(encoding="utf-8"))

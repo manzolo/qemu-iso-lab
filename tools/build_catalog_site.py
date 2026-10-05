@@ -403,7 +403,7 @@ function labCard(l) {
   const facts = [`<b>${l.members.length}</b> machine${l.members.length === 1 ? "" : "s"}`, l.exercises ? `<b>${l.exercises}</b> exercises` : "", l.tests ? `<b>${l.tests}</b> tests` : "", l.cluster ? "cluster" : ""].filter(Boolean);
   const members = l.members.map(m => `<li><a href="#${esc(m.name)}" data-goto="${esc(m.name)}" class="mono">${esc(m.name)}</a>${m.role ? `<span>${esc(m.role)}</span>` : ""}</li>`).join("");
   const guides = Object.entries(l.guides).map(([lang, url]) => `<a href="${esc(url)}">Guide ${lang.toUpperCase()}</a>`).join("") + (l.source ? `<a href="${esc(l.source)}" target="_blank" rel="noopener" class="src">Source ↗</a>` : "");
-  const lesson = l.clip ? `<a class="lesson" href="${esc(l.clip)}">▶ Watch the lesson</a>` : "";
+  const lesson = (l.clips || []).map((c, i, all) => `<a class="lesson" href="${esc(c.href)}" title="${esc((c.title || {}).en || "")}">▶ ${all.length > 1 ? esc(((c.title || {}).en || "Lesson").replace(/^.*?:\s*/, "")) : "Watch the lesson"}</a>`).join("");
   return `<article class="card lab" id="lab-${esc(l.group)}" style="--tint:#8aead0">
     <div class="cover"><span class="cover-top">${l.cluster ? "Cluster" : "Lab"}</span>${catalogIcon(l.cluster ? "cluster" : "network")}<span class="cover-label">${esc(l.group)}</span></div>
     <div class="card-body"><div class="card-head"><div class="name">${esc(l.title)}</div>${l.summary ? `<div class="desc">${esc(l.summary)}</div>` : ""}</div>
@@ -706,7 +706,10 @@ def write_guides(root: Path, out: Path, labs: list[dict[str, Any]]) -> None:
             source = root / "vms" / "labs" / group / f"guide.{lang}.md"
             body = labs_mod.render_markdown(source.read_text(encoding="utf-8"))
             langs = " · ".join(f"<b>{code.upper()}</b>" if code == lang else f'<a href="guide.{code}.html">{code.upper()}</a>' for code in pages)
-            lesson = f'<a class="lesson" href="../../{html_mod.escape(lab["clip"])}">▶ Watch the lesson</a>' if lab.get("clip") else ""
+            clips = lab.get("clips") or ([{"href": lab["clip"], "title": {}}] if lab.get("clip") else [])
+            lesson = "".join(f'<a class="lesson" href="../../{html_mod.escape(c["href"])}">▶ '
+                             f'{html_mod.escape((c.get("title") or {}).get(lang) or (c.get("title") or {}).get("en") or "Watch the lesson") if len(clips) > 1 else "Watch the lesson"}</a>'
+                             for c in clips)
             page = (GUIDE_PAGE.replace("__LANG__", lang).replace("__GROUP__", html_mod.escape(group)).replace("__LANGS__", langs)
                     .replace("__LESSON__", lesson).replace("__SOURCE__", f"{REPO_URL}/blob/main/vms/labs/{group}/guide.{lang}.md")
                     .replace("__DESCRIPTION__", html_mod.escape(lab["title"])).replace("__BODY__", body).replace("__REPO__", REPO_URL))
@@ -792,9 +795,15 @@ def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "c
     # The sprite is inlined (hidden) so <use href="#arch"> works from file:// too, not only over HTTP.
     sprite = (web / "distro-icons.svg").read_text(encoding="utf-8").replace('<svg xmlns="http://www.w3.org/2000/svg">', '<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">', 1)
     tour = collect_tour(media if media is not None else root / "docs" / "media", out)
-    lessons = {clip["lab"]: clip["id"] for clip in tour if clip.get("lab")}
+    # A lab may have several lessons (git-lab: one for beginners, one from underneath): `clips`
+    # lists them in the tour's order, `clip` stays the first for the pages that want one link.
+    lessons: dict[str, list[dict[str, Any]]] = {}
+    for clip in tour:
+        if clip.get("lab"):
+            lessons.setdefault(clip["lab"], []).append({"href": f"tour.html#{clip['id']}", "title": clip["title"]})
     for lab in data["labs"]:
-        lab["clip"] = f"tour.html#{lessons[lab['group']]}" if lab["group"] in lessons else None
+        lab["clips"] = lessons.get(lab["group"], [])
+        lab["clip"] = lab["clips"][0]["href"] if lab["clips"] else None
     write_guides(root, out, data["labs"])
     guides = {lab["group"]: lab["guides"] for lab in data["labs"]}
     for clip in tour:

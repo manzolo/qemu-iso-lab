@@ -12,6 +12,7 @@ poll, at ``TrafficMonitor.close`` or at exit. Guest-agent counters are the fallb
 from __future__ import annotations
 
 import atexit
+import os
 import socket
 import struct
 import threading
@@ -30,6 +31,7 @@ PACKET_SECONDS = 30
 PACKETS_PER_SECOND = 100
 PACKETS_PER_NIC = 24
 PCAP_SNAPLEN = 128   # Ethernet + IPv6 + a TCP header with options; the payload stays out
+PCAP_CAP_BYTES = 32 * 1024 * 1024  # the capture file is truncated to a sparse file past this (Manzolo, 2026-10-05: "un tetto")
 # OFF until understood on a disposable VM: on 2026-10-05 the first live use on pfsense-lab left
 # QEMU's QMP monitor answering nothing (every command timed out, the guest kept running) with a
 # filter-dump writing into an unlinked file (108 MB in ten minutes). The code and its tests stay.
@@ -192,6 +194,7 @@ class NatCapture:
         self.last_used = time.monotonic()
         self.epoch = self.last_used
         self.error = ""
+        self.truncated = 0  # bytes already given back to the file system (a hole at the file's start)
         self.stop = threading.Event()
         self._remove_file()
         self._attach()
@@ -224,6 +227,12 @@ class NatCapture:
         except VMError:
             pass  # QEMU is gone, or the object already is
         self._remove_file()
+
+    def _truncate(self) -> None:
+        try:
+            os.truncate(self.path, 0)
+        except OSError as exc:
+            self.error = str(exc)
 
     def _remove_file(self) -> None:
         try:
@@ -258,6 +267,12 @@ class NatCapture:
                         if len(data) >= 14:
                             self.counters["tx" if data[6:12].hex(":") == self.mac else "rx"] += length
                         self.history.add(data, now, length)
+                if position - self.truncated >= PCAP_CAP_BYTES:
+                    # A cap without touching QMP: everything read so far becomes a hole. QEMU keeps
+                    # writing at its own offset, so the file stays readable from `position` on,
+                    # while the blocks before it go back to the file system.
+                    self._truncate()
+                    self.truncated = position
         except (OSError, ValueError) as exc:
             self.error = str(exc)
         finally:

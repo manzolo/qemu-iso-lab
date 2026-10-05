@@ -482,6 +482,14 @@ try {
   state.vms.find(vm=>vm.name==='alpine-ci').running=false;
   await page.evaluate(()=>refresh(true));
   assert.deepEqual(await labOrder(),['proxmox-lab','new-lab']);
+  // A stack started from its card (a group job, no member job yet) is followed too.
+  await page.evaluate(()=>{ window.__scrolled=[]; labsFollow.set('new-lab', Date.now()); });
+  state.vms.find(vm=>vm.name==='alpine-ci').running=true;
+  await page.evaluate(()=>refresh(true));
+  assert((await page.evaluate(()=>window.__scrolled)).includes('new-lab'),'A lab started from its card is followed when it climbs');
+  assert.equal(await page.evaluate(()=>labsFollow.has('new-lab')),false,'followed once');
+  state.vms.find(vm=>vm.name==='alpine-ci').running=false;
+  await page.evaluate(()=>refresh(true));
   check('lab cards: the labs with a running machine come first, and the page follows the one just started');
   for (const width of [1440,912,390]) {
     await page.setViewportSize({width,height:909});

@@ -129,6 +129,8 @@ Another voice: `--speaker "<name>"` (XTTS's built-in speakers), or a recording o
 
 ## Lab lessons
 
+A lab may have more than one lesson: `export const order = 0` puts a clip before the lab's others on the tour page and on its card (`lab-git-basics`, for beginners, comes before `lab-git`); without it a lesson has order 1 and lessons of one lab sort by name.
+
 Besides the tour's chapters, a clip can be a **lesson on one lab**: `export const series = "labs"`
 and `export const lab = "<group>"` in the clip. Eight so far, one per lab with content:
 `lab-lvm` (LVM from scratch), `lab-vpn` (WireGuard by hand, the two captures, the iptables fence),

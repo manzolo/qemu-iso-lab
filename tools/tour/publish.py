@@ -62,12 +62,13 @@ def main() -> None:
         steps_file = d / f"{name}.voice.steps.json"
         steps = json.loads(steps_file.read_text(encoding="utf-8")) if steps_file.is_file() else []
         clips[name] = {"id": name, "title": meta["title"], "duration": round(length, 1), "lab": meta.get("lab"), "series": meta.get("series") or "tour",
+                       "order": meta.get("order", 1),  # several lessons on one lab: the beginners' one (order 0) first
                        "steps": [{"t": st["start"], "cmd": st["cmd"]} for st in steps],
                        "video": f"{name}.mp4", "poster": f"{name}.jpg",
                        "subtitles": {lang: f"{name}.{lang}.vtt" for lang in ("en", "it")}}
         print(f"{name}: {length:.1f}s")
-    # The tour's chapters first, in order, then the lab lessons.
-    ordered = sorted(clips, key=lambda k: (clips[k].get("series") != "tour", k))
+    # The tour's chapters first, in order, then the lab lessons by lab, a lab's own lessons by order.
+    ordered = sorted(clips, key=lambda k: (clips[k].get("series") != "tour", clips[k].get("lab") or k, clips[k].get("order", 1), k))
     index.write_text(json.dumps({"clips": [clips[k] for k in ordered]}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"{index}: {len(clips)} clips. Now publish the media branch and run the Pages workflow (see the docstring).")
 
