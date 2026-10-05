@@ -317,7 +317,7 @@ try {
   await page.keyboard.press('Escape');
   assert(await page.locator('#packet-inspector').isHidden());
   assert(await lens.evaluate(n=>document.activeElement===n),'Dismissal returns focus to the lens');
-  assert.equal(await page.locator('.nat-nic .inspect-btn').count(),0,'NAT links have no lens while lab_traffic.NAT_CAPTURE is off');
+  assert.equal(await page.locator('.nat-nic .inspect-btn').count(),3,'NAT links have a lens: QEMU filter-dump feeds the inspector');
   await lens.focus();
   await lens.press('Enter');
   assert(await page.locator('#packet-inspector').isVisible(),'Enter on the lens opens the inspector');

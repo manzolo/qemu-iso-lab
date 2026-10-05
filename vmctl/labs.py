@@ -618,7 +618,7 @@ def _internet_node(x: float, y: float) -> list[str]:
             f'<text class="node-t" x="{x + 100}" y="{y + 40}" text-anchor="middle">Internet</text></g>']
 
 
-NAT_LENS = False  # see lab_traffic.NAT_CAPTURE (2026-10-05: QEMU's filter-dump wedged pfSense's QMP monitor)
+NAT_LENS = True  # the lens of the NAT cable, fed by lab_traffic.NatCapture
 
 
 def _svg(lab: dict[str, Any], interactive: bool = False) -> str:

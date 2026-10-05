@@ -686,7 +686,15 @@
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-      const response = await fetch(endpoint, {cache: 'no-store', signal: controller.signal});
+      // The NIC open in the inspector gets every packet newer than the ones the page holds,
+      // not only the server's last 24 (an SSH session on the same link drowned the rest).
+      const url = new URL(endpoint);
+      if (selected) {
+        const [vm, nic] = JSON.parse(selected);
+        url.searchParams.set('inspect', `${vm}/${nic}`);
+        url.searchParams.set('since', String(Math.max(clearedBelow, 0, ...history.keys())));
+      }
+      const response = await fetch(url, {cache: 'no-store', signal: controller.signal});
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       if (typeof data.svg !== 'string' || !data.states || !Array.isArray(data.traffic)) throw new Error('Invalid snapshot');

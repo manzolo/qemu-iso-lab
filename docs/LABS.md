@@ -66,10 +66,13 @@ interval rather than tracing individual packets or proving that the guest receiv
 Click the small lens on a cable (or focus it and press Enter) to open the **Packet inspector**;
 it stays open until **Close** or Escape (nothing opens on hover), can be dragged by its title bar
 and resized from its corner. A LAN cable is read from the segment's multicast group on the
-loopback. A NAT cable (slirp) has nothing on the host to listen to: its counters come from the
-guest agent when the guest has one (pfSense has none, hence *Traffic unavailable* there); a
-capture through QEMU's own `filter-dump` is written and tested but switched off
-(`lab_traffic.NAT_CAPTURE`) until its first live incident is understood. The list accumulates what
+loopback. A **NAT cable** (slirp) has nothing on the host to listen to, so the map hot-adds
+QEMU's own `filter-dump` over QMP while the map is open: QEMU writes the first 128 bytes of every
+frame to a temporary pcap under `artifacts/<vm>/runtime/` (kept under 32 MiB), the map reads it,
+and the filter and its file go away 15 s after the map stops polling. That needs a VM started
+headless (a QMP socket); otherwise the guest agent's counters, when there is an agent. The cable
+open in the inspector gets every new header at each poll, so an SSH session on the same link
+does not hide the rest. The list accumulates what
 the polls bring (up to 500 headers); the chips filter by protocol (TCP, UDP, ICMP, ARP, other)
 and direction (TX, RX), the footer counts what is shown out of what was seen. The box takes a
 **Wireshark/tcpdump-style expression**, so `port 80` never matches 8080: `tcp.port == 80`,
@@ -97,8 +100,7 @@ UDP, ARP and IPv6. Unsupported or truncated headers are labelled rather than gue
 The list is a bounded sample: up to 24 recent entries per NIC from the last 30 seconds,
 with at most 100 summaries per second and 128 retained summaries per segment. Payloads
 are not retained or sent to the browser. The inspector works on QEMU LAN segments, even
-when guest-agent counters supply the byte rates. NAT has no packet capture; its panel
-explains the limitation. Closing or hiding a panel does not stop the map's counters.
+when guest-agent counters supply the byte rates. Closing or hiding a panel does not stop the map's counters.
 
 The inspector's filter offers contextual completion: type `tcp.` for fields, then choose an
 operator and a value. IP addresses, MAC addresses and ports come from the selected link's

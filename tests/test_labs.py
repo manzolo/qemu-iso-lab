@@ -289,4 +289,4 @@ class LinkSessionLabTests(LabsTests):
         html = labs.render_html(lab)
         self.assertIn("Linked VMs on segment session", html)
         self.assertIn('data-segment="session"', html)
-        self.assertEqual(html.count('class="inspect-btn"'), 2)
+        self.assertEqual(html.count('class="inspect-btn"'), 4)  # the session link and the NAT NIC of each VM

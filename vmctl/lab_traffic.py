@@ -26,16 +26,16 @@ from vmctl.errors import VMError
 
 
 IDLE_SECONDS = 15
-PACKET_HISTORY = 128
+PACKET_HISTORY = 200  # per listener: two polls at 100 sampled frames/s; the inspected NIC gets every new one (`since`), the others 24
 PACKET_SECONDS = 30
 PACKETS_PER_SECOND = 100
 PACKETS_PER_NIC = 24
 PCAP_SNAPLEN = 128   # Ethernet + IPv6 + a TCP header with options; the payload stays out
+NAT_RETRY_SECONDS = 60  # a NAT link whose capture failed is not tried again before this
 PCAP_CAP_BYTES = 32 * 1024 * 1024  # the capture file is truncated to a sparse file past this (Manzolo, 2026-10-05: "un tetto")
-# OFF until understood on a disposable VM: on 2026-10-05 the first live use on pfsense-lab left
-# QEMU's QMP monitor answering nothing (every command timed out, the guest kept running) with a
-# filter-dump writing into an unlinked file (108 MB in ten minutes). The code and its tests stay.
-NAT_CAPTURE = False
+# On again 2026-10-05: the wedged monitor of that evening was QEMU's duplicate-id object-add
+# (see NatCapture.__init__), now impossible, plus the map retrying every poll (NAT_RETRY_SECONDS).
+NAT_CAPTURE = True
 NAT_REASON = "NAT traffic needs the VM's QMP socket (a headless start) or guest-agent counters"
 
 
@@ -61,15 +61,21 @@ class PacketHistory:
             self.sequence += 1
             self.records.append({**summary, "id": self.sequence, "time": time.time(), "observed": now})
 
-    def for_mac(self, mac: str, now: float) -> list[dict[str, Any]]:
+    def for_mac(self, mac: str, now: float, since: int | None = None) -> list[dict[str, Any]]:
+        """The newest PACKETS_PER_NIC headers of this MAC, or with ``since`` every one newer than
+        that id (the NIC open in the inspector: an SSH session on the same link sends more than
+        24 frames between two polls, and the HTTP request in the middle never reached the page)."""
         while self.records and self.records[0]["observed"] < now - PACKET_SECONDS:
             self.records.popleft()
-        found = []
+        found: list[dict[str, Any]] = []
+        limit = PACKET_HISTORY if since is not None else PACKETS_PER_NIC
         for record in reversed(self.records):
+            if since is not None and record["id"] <= since:
+                break
             direction = "TX" if record["source_mac"] == mac else "RX" if record["destination_mac"] == mac or record["multicast"] else ""
             if direction:
                 found.append({key: value for key, value in record.items() if key != "observed"} | {"direction": direction})
-            if len(found) >= PACKETS_PER_NIC:
+            if len(found) >= limit:
                 break
         return found
 
@@ -133,13 +139,13 @@ class SegmentListener:
             with self.lock:
                 self.history.records.clear()
 
-    def sample(self, macs: list[str]) -> dict[str, Any]:
+    def sample(self, macs: list[str], focus: tuple[str, int] | None = None) -> dict[str, Any]:
         with self.lock:
             self.last_used = time.monotonic()
             for mac in macs:
                 self.counters.setdefault(mac, {"rx": 0, "tx": 0})
             return {"time": self.last_used, "epoch": self.epoch,
-                    "packets": {mac: self.history.for_mac(mac, self.last_used) for mac in macs},
+                    "packets": {mac: self.history.for_mac(mac, self.last_used, focus[1] if focus and focus[0] == mac else None) for mac in macs},
                     "counters": {mac: dict(self.counters[mac]) for mac in macs}}
 
     def close(self) -> None:
@@ -176,6 +182,7 @@ class PcapReader:
 
 class NatCapture:
     """QEMU's filter-dump on one NAT netdev of a running headless VM, read as it is written."""
+    serial = 0
     def __init__(self, vm_name: str, vm: dict[str, Any], nic: str, mac: str,
                  qmp: Callable[..., Any] | None = None, sock: Path | None = None) -> None:
         self.vm, self.nic, self.mac = vm_name, nic, mac
@@ -186,8 +193,13 @@ class NatCapture:
             raise VMError("no QMP socket") from None
         if not self.sock.exists():
             raise VMError("no QMP socket: the VM did not start headless")
-        self.path = self.sock.parent / f"capture-{nic}.pcap"
-        self.object_id = f"vmctl-dump-{nic}"
+        # A fresh id and file per capture: QEMU 10.2's object-add of a filter-dump whose id exists
+        # fails AND leaves the QMP monitor mute for ~3.5 minutes (reproduced 2026-10-05 on an
+        # ephemeral mysql-lab-server; the map's 2 s polls then kept pfsense-lab's monitor wedged).
+        NatCapture.serial += 1
+        self.prefix = f"vmctl-dump-{nic}-"
+        self.object_id = f"{self.prefix}{os.getpid()}-{NatCapture.serial}"
+        self.path = self.sock.parent / f"capture-{nic}-{os.getpid()}-{NatCapture.serial}.pcap"
         self.lock = threading.Lock()
         self.counters = {"rx": 0, "tx": 0}
         self.history = PacketHistory()
@@ -196,7 +208,7 @@ class NatCapture:
         self.error = ""
         self.truncated = 0  # bytes already given back to the file system (a hole at the file's start)
         self.stop = threading.Event()
-        self._remove_file()
+        self._remove_leftovers()
         self._attach()
         self.thread = threading.Thread(target=self._read, name=f"nat-capture-{vm_name}-{nic}", daemon=True)
         self.thread.start()
@@ -205,21 +217,24 @@ class NatCapture:
         with qemu.QMP_LOCK:
             return self.qmp(self.sock, command, arguments=arguments, timeout=3)
 
-    def _attach(self) -> None:
-        arguments = {"qom-type": "filter-dump", "id": self.object_id, "netdev": self.nic,
-                     "file": str(self.path), "maxlen": PCAP_SNAPLEN}
-        for attempt in range(3):  # another vmctl (a second dashboard) may hold the one QMP client slot
+    def _remove_leftovers(self) -> None:
+        """Filters of this NIC left by a server that died (its object, then its file): listed with
+        qom-list, deleted with object-del. Never an object-add over an existing id (see __init__),
+        never a file unlinked while a filter may still write into it."""
+        listing = self._qmp("qom-list", path="/objects")
+        for entry in listing if isinstance(listing, list) else []:
+            name = str(entry.get("name", "")) if isinstance(entry, dict) else ""
+            if name.startswith(self.prefix):
+                self._qmp("object-del", id=name)
+        for stale in self.sock.parent.glob(f"capture-{self.nic}-*.pcap"):
             try:
-                self._qmp("object-add", **arguments)
-                return
-            except VMError as exc:
-                if "duplicate" in str(exc):
-                    self._qmp("object-del", id=self.object_id)  # left behind by a server that died
-                    self._qmp("object-add", **arguments)
-                    return
-                if attempt == 2 or not any(word in str(exc) for word in ("reset", "refused", "Broken pipe", "closed")):
-                    raise
-                time.sleep(.3)
+                stale.unlink()
+            except OSError:
+                pass
+
+    def _attach(self) -> None:
+        self._qmp("object-add", **{"qom-type": "filter-dump", "id": self.object_id, "netdev": self.nic,
+                                   "file": str(self.path), "maxlen": PCAP_SNAPLEN})
 
     def _detach(self) -> None:
         try:
@@ -281,10 +296,10 @@ class NatCapture:
             with self.lock:
                 self.history.records.clear()
 
-    def sample(self) -> dict[str, Any]:
+    def sample(self, since: int | None = None) -> dict[str, Any]:
         with self.lock:
             self.last_used = time.monotonic()
-            return {"time": self.last_used, "epoch": self.epoch, "packets": self.history.for_mac(self.mac, self.last_used),
+            return {"time": self.last_used, "epoch": self.epoch, "packets": self.history.for_mac(self.mac, self.last_used, since),
                     "counters": dict(self.counters)}
 
     def close(self) -> None:
@@ -298,18 +313,27 @@ class TrafficMonitor:
         self.sample_lock = threading.Lock()
         self.listeners: dict[str, SegmentListener] = {}
         self.captures: dict[str, NatCapture] = {}
+        self.nat_failures: dict[str, tuple[float, str]] = {}
 
-    def nat(self, vm_name: str, vm: dict[str, Any], nic: dict[str, Any]) -> dict[str, Any]:
+    def nat(self, vm_name: str, vm: dict[str, Any], nic: dict[str, Any], since: int | None = None) -> dict[str, Any]:
         with self.lock:
             self.captures = {key: value for key, value in self.captures.items() if not value.stop.is_set()}
             key = f"{vm_name}/{nic['id']}"
             if key not in self.captures:
+                failed = self.nat_failures.get(key)
+                if failed and time.monotonic() - failed[0] < NAT_RETRY_SECONDS:
+                    raise VMError(failed[1])  # no QMP storm from the map's 2 s polls after a failure
                 if len(self.captures) >= 64:
                     raise VMError("Too many monitored NAT links")
-                self.captures[key] = NatCapture(vm_name, vm, str(nic["id"]), str(nic["mac"]))
-            return self.captures[key].sample()
+                try:
+                    self.captures[key] = NatCapture(vm_name, vm, str(nic["id"]), str(nic["mac"]))
+                except (OSError, VMError) as exc:
+                    self.nat_failures[key] = (time.monotonic(), str(exc))
+                    raise
+                self.nat_failures.pop(key, None)
+            return self.captures[key].sample(since)
 
-    def segment(self, endpoint: str, macs: list[str]) -> dict[str, Any]:
+    def segment(self, endpoint: str, macs: list[str], focus: tuple[str, int] | None = None) -> dict[str, Any]:
         with self.lock:
             # Dead/expired listeners hold neither sockets nor packet buffers.
             self.listeners = {key: value for key, value in self.listeners.items() if not value.stop.is_set()}
@@ -317,14 +341,16 @@ class TrafficMonitor:
                 if len(self.listeners) >= 64:
                     raise VMError("Too many monitored segments")
                 self.listeners[endpoint] = SegmentListener(endpoint)
-            return self.listeners[endpoint].sample(macs)
+            return self.listeners[endpoint].sample(macs, focus)
 
-    def sample(self, cfg: dict[str, Any], lab: dict[str, Any]) -> list[dict[str, Any]]:
+    def sample(self, cfg: dict[str, Any], lab: dict[str, Any], inspect: tuple[str, str, int] | None = None) -> list[dict[str, Any]]:
+        """``inspect`` = (vm, nic, last packet id the page has): that NIC gets every newer header."""
         # Several open maps must not query the same guest agent concurrently.
         with self.sample_lock:
-            return self._sample(cfg, lab)
+            return self._sample(cfg, lab, inspect)
 
-    def _sample(self, cfg: dict[str, Any], lab: dict[str, Any]) -> list[dict[str, Any]]:
+    def _sample(self, cfg: dict[str, Any], lab: dict[str, Any], inspect: tuple[str, str, int] | None = None) -> list[dict[str, Any]]:
+        focus: tuple[str, int] | None = None
         entries = []
         segments: dict[str, list[dict[str, Any]]] = {}
         for member in lab["members"]:
@@ -349,7 +375,8 @@ class TrafficMonitor:
                 if nic["type"] == "user" and NAT_CAPTURE:
                     # QEMU's own capture first: it needs no agent and brings the headers too.
                     try:
-                        sample = self.nat(member["name"], vm, nic)
+                        since = inspect[2] if inspect and inspect[:2] == (member["name"], nic["id"]) else None
+                        sample = self.nat(member["name"], vm, nic, since)
                         entry.update(available=True, source="QEMU capture", time=sample["time"], epoch=sample["epoch"],
                                      packets_available=True, packet_reason="", packets=sample["packets"], **sample["counters"])
                     except (OSError, ValueError, VMError) as exc:
@@ -365,7 +392,8 @@ class TrafficMonitor:
                     entry["reason"] = NAT_REASON
         for endpoint, members in segments.items():
             try:
-                sample = self.segment(endpoint, [m["mac"] for m in members])
+                focus = next(((m["mac"], inspect[2]) for m in members if inspect and inspect[:2] == (m["vm"], m["nic"])), None)
+                sample = self.segment(endpoint, [m["mac"] for m in members], focus) if focus else self.segment(endpoint, [m["mac"] for m in members])
                 for entry in members:
                     if not entry["available"]:
                         entry.update(available=True, source="segment frames", time=sample["time"], epoch=sample["epoch"],

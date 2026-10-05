@@ -374,8 +374,9 @@ def lab_map_page(group: str) -> bytes | None:
     return labs.render_html(lab, interactive=True).encode("utf-8")
 
 
-def lab_map_state(group: str) -> dict[str, Any] | None:
-    """Refresh the topology and sample each NIC without changing a VM."""
+def lab_map_state(group: str, inspect: tuple[str, str, int] | None = None) -> dict[str, Any] | None:
+    """Refresh the topology and sample each NIC without changing a VM; ``inspect`` = the NIC open
+    in the packet inspector and the last packet id the page holds (every newer one comes back)."""
     from vmctl import lab_traffic, labs, lifecycle
 
     if Path(group).name != group or not group:
@@ -386,7 +387,7 @@ def lab_map_state(group: str) -> dict[str, Any] | None:
         return None
     states = lifecycle.group_states(cfg, names)
     lab = labs.model(cfg, group, states)
-    return {"svg": labs._svg(lab, interactive=True), "states": states, "traffic": lab_traffic.monitor.sample(cfg, lab)}
+    return {"svg": labs._svg(lab, interactive=True), "states": states, "traffic": lab_traffic.monitor.sample(cfg, lab, inspect)}
 
 
 def lab_guide_page(group: str, lang: str | None, token: str = "") -> bytes | None:
@@ -695,7 +696,12 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._send(HTTPStatus.OK, page, "text/html; charset=utf-8")
             elif path.startswith("/labs/") and path.endswith("/map-state"):
-                snapshot = lab_map_state(path.split("/")[2])
+                inspected = (query.get("inspect") or [""])[0].split("/", 1)
+                try:
+                    since = max(0, int((query.get("since") or ["0"])[0]))
+                except ValueError:
+                    since = 0
+                snapshot = lab_map_state(path.split("/")[2], (inspected[0], inspected[1], since) if len(inspected) == 2 else None)
                 if snapshot is None:
                     self._error("Lab not found", HTTPStatus.NOT_FOUND)
                 else:

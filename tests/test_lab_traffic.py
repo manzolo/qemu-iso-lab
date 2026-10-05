@@ -63,8 +63,8 @@ class TrafficTests(unittest.TestCase):
         self.assertTrue(entries[0]["packets_available"])
         self.assertEqual(entries[0]["packets"], [packet])
 
-    def test_nat_capture_is_off_by_default(self):
-        with mock.patch.object(self.monitor, "nat") as nat, \
+    def test_nat_capture_can_be_switched_off(self):
+        with mock.patch.object(lab_traffic, "NAT_CAPTURE", False), mock.patch.object(self.monitor, "nat") as nat, \
              mock.patch.object(lab_traffic.config, "get_vm", return_value={}), \
              mock.patch.object(lab_traffic.qemu, "network_specs", return_value=[{"id": "wan", "type": "user", "mac": A}]):
             entry = self.monitor.sample({}, {"members": [{"name": "vm", "running": True}]})[0]
@@ -154,6 +154,30 @@ def pcap(records, order="<"):
     return data
 
 
+class InspectedNicTests(unittest.TestCase):
+    def test_the_inspected_nic_gets_every_header_newer_than_the_page_holds(self):
+        history = lab_traffic.PacketHistory()
+        for i in range(60):  # one burst: more than PACKETS_PER_NIC between two polls
+            history.add(frame(A, B), float(i) / 100)
+        self.assertEqual(len(history.for_mac(A, 1.0)), lab_traffic.PACKETS_PER_NIC)
+        every = history.for_mac(A, 1.0, since=0)
+        self.assertEqual(len(every), 60)
+        self.assertEqual([p["id"] for p in history.for_mac(A, 1.0, since=55)], [60, 59, 58, 57, 56])
+        self.assertEqual(history.for_mac(A, 1.0, since=60), [])
+
+    def test_the_monitor_passes_since_to_the_inspected_nic_only(self):
+        monitor = lab_traffic.TrafficMonitor()
+        self.addCleanup(monitor.close)
+        nics = [{"id": "lan", "type": "segment", "mac": B, "name": "t", "mcast": "239.1.2.3:34567"}]
+        with mock.patch.object(lab_traffic.config, "get_vm", return_value={}), \
+             mock.patch.object(lab_traffic.qemu, "network_specs", return_value=nics), \
+             mock.patch.object(monitor, "segment", return_value={"time": 2, "epoch": 1, "counters": {B: {"rx": 0, "tx": 0}}}) as segment:
+            monitor.sample({}, {"members": [{"name": "vm", "running": True}]}, ("vm", "lan", 41))
+            monitor.sample({}, {"members": [{"name": "vm", "running": True}]}, ("other", "lan", 41))
+        self.assertEqual(segment.call_args_list[0].args, ("239.1.2.3:34567", [B], (B, 41)))
+        self.assertEqual(segment.call_args_list[1].args, ("239.1.2.3:34567", [B]))
+
+
 class PcapReaderTests(unittest.TestCase):
     def test_records_come_out_whole_whatever_the_chunking(self):
         reader = lab_traffic.PcapReader()
@@ -181,28 +205,34 @@ class NatCaptureTests(unittest.TestCase):
         self.sock = self.root / "qmp.sock"
         self.sock.write_bytes(b"")
         self.calls = []
+        self.objects = []
 
     def qmp(self, sock, command, *, arguments=None, timeout=5.0):
         self.calls.append((command, arguments))
+        if command == "qom-list":
+            return [{"name": "type", "type": "string"}] + [{"name": n, "type": "child<filter-dump>"} for n in self.objects]
+        if command == "object-del":
+            self.objects.remove(arguments["id"])
         if command == "object-add":
-            if self.fail_add:
-                self.fail_add = False
-                raise VMError("QMP object-add: attempt to add duplicate property 'vmctl-dump-n1' to object")
+            if arguments["id"] in self.objects:  # what QEMU 10.2 answers (and then its monitor goes mute)
+                raise VMError(f"QMP object-add: attempt to add duplicate property '{arguments['id']}' to object")
+            self.objects.append(arguments["id"])
             with open(arguments["file"], "wb") as handle:  # what QEMU does: the header right away
                 handle.write(pcap([]))
         return {}
 
-    def capture(self, fail_add=False):
-        self.fail_add = fail_add
+    def capture(self):
         cap = lab_traffic.NatCapture("vm", {}, "n1", A, qmp=self.qmp, sock=self.sock)
         self.addCleanup(cap.close)
         return cap
 
     def test_counts_both_directions_and_keeps_headers_only(self):
         cap = self.capture()
-        add = self.calls[0][1]
-        self.assertEqual((add["qom-type"], add["netdev"], add["maxlen"], add["id"]), ("filter-dump", "n1", 128, "vmctl-dump-n1"))
-        self.assertEqual(add["file"], str(self.root / "capture-n1.pcap"))
+        add = [args for command, args in self.calls if command == "object-add"][0]
+        self.assertEqual((add["qom-type"], add["netdev"], add["maxlen"]), ("filter-dump", "n1", 128))
+        self.assertTrue(add["id"].startswith("vmctl-dump-n1-"))
+        self.assertEqual(add["file"], str(cap.path))
+        self.assertTrue(cap.path.name.startswith("capture-n1-"))
         with open(cap.path, "ab") as handle:
             handle.write(pcap([(1514, frame(A, B)[:128]), (60, frame(B, A)[:60])])[24:])
         for _ in range(40):
@@ -214,8 +244,9 @@ class NatCaptureTests(unittest.TestCase):
         self.assertEqual(sample["counters"], {"tx": 1514, "rx": 60})
         self.assertEqual([(p["direction"], p["bytes"]) for p in sample["packets"]], [("RX", 60), ("TX", 1514)])
         cap.close()
-        self.assertEqual(self.calls[-1], ("object-del", {"id": "vmctl-dump-n1"}))
+        self.assertEqual(self.calls[-1], ("object-del", {"id": cap.object_id}))
         self.assertFalse(cap.path.exists())
+        self.assertEqual(self.objects, [])
 
     def test_the_capture_file_is_capped_by_truncation_not_by_qmp(self):
         cap = self.capture()
@@ -237,11 +268,28 @@ class NatCaptureTests(unittest.TestCase):
         self.assertEqual(sample["counters"]["tx"], 70000 * 10, "every record counted across the truncations")
         self.assertGreater(cap.truncated, 0, "the file was truncated at least once")
         self.assertLess(cap.path.stat().st_blocks * 512, len(record) * 10, "the blocks before the cut went back to the file system")
-        self.assertEqual([call[0] for call in self.calls], ["object-add"], "no QMP command for the cap")
+        self.assertEqual([call[0] for call in self.calls], ["qom-list", "object-add"], "no QMP command for the cap")
 
-    def test_a_leftover_object_is_replaced(self):
-        self.capture(fail_add=True)
-        self.assertEqual([call[0] for call in self.calls], ["object-add", "object-del", "object-add"])
+    def test_a_leftover_is_deleted_and_never_added_over(self):
+        self.objects.append("vmctl-dump-n1-999-7")           # a server that died with its filter on
+        (self.root / "capture-n1-999-7.pcap").write_bytes(b"old")
+        self.objects.append("vmctl-dump-n2-999-1")           # another NIC's: not ours to touch
+        cap = self.capture()
+        self.assertEqual([c[0] for c in self.calls], ["qom-list", "object-del", "object-add"])
+        self.assertEqual(self.calls[1][1], {"id": "vmctl-dump-n1-999-7"})
+        self.assertFalse((self.root / "capture-n1-999-7.pcap").exists(), "its file goes once its object is gone")
+        self.assertEqual(sorted(self.objects), sorted(["vmctl-dump-n2-999-1", cap.object_id]))
+        second = self.capture()  # two captures in one process never share an id
+        self.assertNotEqual(second.object_id, cap.object_id)
+
+    def test_a_failed_attach_is_not_retried_by_every_poll(self):
+        monitor = lab_traffic.TrafficMonitor()
+        self.addCleanup(monitor.close)
+        with mock.patch.object(lab_traffic, "NatCapture", side_effect=VMError("QMP qom-list: timed out")) as factory:
+            for _ in range(5):
+                with self.assertRaises(VMError):
+                    monitor.nat("vm", {}, {"id": "n1", "mac": A})
+        self.assertEqual(factory.call_count, 1)
 
     def test_no_socket_means_no_capture(self):
         self.sock.unlink()

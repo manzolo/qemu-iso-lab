@@ -1316,8 +1316,7 @@ def vm_has_local_state(vm: dict[str, Any]) -> bool:
     disk_path = runtime.resolve_path(vm["disk"]["path"])
     if disk_path.exists():
         return True
-    iso_path = runtime.resolve_path(vm["iso"])
-    if iso_path.exists():
+    if vm.get("iso") and runtime.resolve_path(vm["iso"]).exists():  # a disk_image profile (serenityos) has no ISO
         return True
     firmware = vm.get("firmware", {})
     if firmware.get("type") == "efi":

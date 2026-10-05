@@ -634,7 +634,11 @@ class ServerTests(BaseVmctlTestCase):
             status, body = self.get("/labs/netlab/map-state")
             self.assertEqual(status, 200)
             self.assertEqual(json.loads(body)["traffic"], [])
-            sample.assert_called_once_with("netlab")
+            sample.assert_called_once_with("netlab", None)
+            self.get("/labs/netlab/map-state?inspect=pfsense-lab/wan&since=41")
+            self.assertEqual(sample.call_args.args, ("netlab", ("pfsense-lab", "wan", 41)))
+            self.get("/labs/netlab/map-state?inspect=pfsense-lab/wan&since=x")  # a bad id is 0, never an error
+            self.assertEqual(sample.call_args.args, ("netlab", ("pfsense-lab", "wan", 0)))
             sample.return_value = None
             self.assertEqual(self.get("/labs/missing/map-state")[0], 404)
         self.assertIsNone(webui.lab_map_state("../etc"))
