@@ -245,6 +245,32 @@ The terminal twin is `vmctl identity` (`--user`, `--ask-password`, `--realname`,
 `--keyboard`, `--timezone`; no option shows it), which the command center does not list so
 that no password lands in a job log.
 
+## Integration, diagnostics, guest commands and uploads
+
+Integration checks run only on request and are cached for five seconds. They reuse the console
+channel inspection, SSH error classification, guest-agent ping and SFTP; they never wake the
+guest or generate SSH keys. A clipboard channel alone is reported as unverified.
+Diagnostics use fixed, read-only commands for Windows or the guest's detected init/package
+family (including SysV/older APT guests), with a 10-second and 128-KiB output limit per command.
+The text download is also saved as `artifacts/<vm>/logs/diagnostics-<UTC timestamp>.txt` and
+includes the tails of existing serial logs, even when SSH is unavailable.
+
+Guest commands require confirmation each time and use the existing VM job slot. They record
+stdout, stderr and exit status, bounded to 60 seconds and 1 MiB of output. Cancelling one closes
+SSH without powering off the VM; a remote process may continue. Previous jobs are retained under
+`artifacts/<vm>/runtime/tui-job/history/` and can be opened from **VM command history**.
+Multiple file uploads share one SFTP session and run sequentially; each file is limited to
+256 MiB, staged under a temporary name, then renamed without replacing existing files.
+Use the **×** on a completed recording notice to dismiss it without downloading; **Saved recording**
+in the console still opens its download options.
+
+A temporary display disconnection shows a central reconnect status. When the server confirms
+that the guest has stopped, the console closes automatically (including separate windows); an
+active install/start operation continues waiting through guest restarts. The console also lets
+you watch unattended installs. The graphical console and browser SSH terminal load noVNC and
+xterm.js from a CDN; the dashboard and screenshot view need no external assets. After updating
+the code, restart `vmctl web` and open its newly printed URL to load new API features.
+
 ## Safety
 
 The page can delete disks and start anything `vmctl` can, so:

@@ -8,11 +8,16 @@ essential steps in Italian for the terminal-at-hand case.
 
 | Page | Read it when | One line |
 |---|---|---|
+| [INSTALL.md](INSTALL.md) | the one-line installer is not enough: a cloned checkout, another distribution, Windows by hand, updating | What the installers do, host packages per distribution, WSL2, `vmctl update` |
+| [FIRST_VM.md](FIRST_VM.md) ([PDF](FIRST_VM.pdf)) | you want to see one VM through its whole lifecycle | From `git clone` to a running Ubuntu desktop, every screen of the web dashboard |
+| [GALLERY.md](GALLERY.md) | you want a look before trying | Thirteen captures from the tour's recordings and the slideshow |
 | [Catalog site](https://manzolo.github.io/qemu-iso-lab/) | you want to browse the profiles before cloning | Every profile, its version and history, what to run; tick the ones you want and copy the `vmctl catalog add` line |
 | [PROFILES.md](PROFILES.md) | you look at `vms/profiles/*.json` for the first time, or add a VM | The profile model: core fields, ISO sources and discovery, disk, EFI/BIOS, video variants, `networks`, `shared_dir`, artifacts, Windows import templates |
 | [UNATTENDED.md](UNATTENDED.md) | you run any `vmctl bootstrap-*` | Every unattended installer step by step (Ubuntu, Debian, RHEL/Fedora, Arch/CachyOS, Omarchy, Alpine, Windows, pfSense), the completion-token rule, `boot-check` and `check-vms` |
 | [PROVISIONING.md](PROVISIONING.md) | you want your dotfiles, packages or commands in a fresh guest | `cloud_init`, `ssh_provision`, `autoinstall`, `copy_from_host`, `post_install_run`, sudo, guest identity and `local.json` |
-| [LABS.md](LABS.md) | you want a group of VMs working together | The two labs (network lab, Proxmox cluster) at a glance: members, commands, the dashboard's Labs view and the network maps, with links to the full guides |
+| [LABS.md](LABS.md) | you want a group of VMs working together | The labs (network, Proxmox cluster, Docker, Git, Kubernetes, LVM, mdadm, MySQL, SSH, VPN, ZFS) at a glance: members, commands, the dashboard's Labs view, the live network map with its packet inspector, temporary links |
+| [CHECKPOINTS.md](CHECKPOINTS.md) | you want a copy of a VM to go back to | `vmctl checkpoint create/restore`, `vmctl group checkpoint/reset` |
+| [CLONE.md](CLONE.md) | you want an independent second VM | `vmctl clone`, guest identity regeneration, deleting a clone |
 | [NETWORK-LAB.md](NETWORK-LAB.md) | you build the pfSense + Pi-hole + client lab | Topology, `networks` and phases, host access through the router, the libvirt road, differences from kvm-lab, verification checklist |
 | [LIBVIRT.md](LIBVIRT.md) | you want a vmctl VM in virt-manager | `export-libvirt` / `unexport-libvirt`: what is translated, what is not, how to come back |
 | [IMPORT_DISKS.md](IMPORT_DISKS.md) | you write a VM to a real disk, or read a real disk into a VM | `vmctl flash` (full or allocated-block copy, GPT repair, optional NTFS expansion) and `vmctl import-device` (full or allocated-block, resume) |
