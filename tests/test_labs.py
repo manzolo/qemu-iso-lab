@@ -131,6 +131,23 @@ class LabsTests(BaseVmctlTestCase):
         self.assertIn("MAC not specified</text>", page)
         self.assertIn("<code>MAC not specified</code>", page)
 
+    def test_map_cables_follow_each_vm_power_state(self):
+        from xml.etree import ElementTree as ET
+
+        lab = labs.model(self.tracked_config(), "k8s-lab", {
+            "k8s-lab-main": {"running": True, "install": "verified"},
+            "k8s-lab-node1": {"running": False, "install": "verified"},
+        })
+        lab["members"][0]["name"] = 'host<&"'
+        tree = ET.fromstring(labs._svg(lab))
+        cables = [node for node in tree.iter() if "data-nic" in node.attrib]
+        self.assertEqual(len(cables), sum(len(member["nics"]) for member in lab["members"]))
+        for cable in cables:
+            expected = "online" if cable.attrib["data-vm"] == 'host<&"' else "offline"
+            self.assertIn(expected, cable.attrib["class"].split())
+            link = next(node for node in cable if node.attrib.get("class", "").startswith("link "))
+            self.assertIn(expected, link.attrib["class"].split())
+
     def test_group_up_skips_members_without_a_disk_and_starts_in_order(self):
         cfg = self.tracked_config()
         states = {name: {"running": False, "install": "verified"} for name in labs.group_members(cfg, "proxmox-lab")}

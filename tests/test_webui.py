@@ -626,6 +626,18 @@ class ServerTests(BaseVmctlTestCase):
         page.assert_any_call("netlab")
         self.assertIsNone(vmctl.webui.lab_map_page("../etc"))
 
+    def test_lab_telemetry_requires_authentication_and_handles_missing_labs(self):
+        with mock.patch.object(webui, "lab_map_state", return_value={"svg": "<svg/>", "traffic": []}) as sample:
+            self.assertEqual(self.get("/labs/netlab/map-state", token=None)[0], 401)
+            sample.assert_not_called()
+            status, body = self.get("/labs/netlab/map-state")
+            self.assertEqual(status, 200)
+            self.assertEqual(json.loads(body)["traffic"], [])
+            sample.assert_called_once_with("netlab")
+            sample.return_value = None
+            self.assertEqual(self.get("/labs/missing/map-state")[0], 404)
+        self.assertIsNone(webui.lab_map_state("../etc"))
+
 
 if __name__ == "__main__":
     unittest.main()

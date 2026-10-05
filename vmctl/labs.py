@@ -498,8 +498,8 @@ def tests_summary(results: list[dict[str, Any]]) -> tuple[str, str]:
 
 # --- the map ---------------------------------------------------------------------------------
 
-_BOX_W, _BOX_H, _GAP, _MARGIN = 240, 124, 36, 40
-_TOP_Y, _TOP_H = 24, 70           # the host and Internet nodes
+_BOX_W, _BOX_H, _GAP, _MARGIN = 284, 190, 44, 44
+_TOP_Y, _TOP_H = 30, 78           # the host and Internet nodes
 _NAT_Y = _TOP_Y + _TOP_H + 46     # the NAT bus every VM hangs from
 _PILL_H, _PILL_GAP = 24, 8        # one forward = one pill on the VM's cable
 
@@ -508,96 +508,151 @@ def _pill_width(text: str) -> float:
     return 18 + 7.4 * len(text)
 
 
+def _device_icon(role: str, x: float, y: float) -> str:
+    """Small vector devices, sharing the enclosing node's power state."""
+    if role in ("client", "desktop", "host"):
+        shapes = ('<path class="device-top" d="M5 8 13 2H65L57 8Z"/>'
+                  '<rect class="device-body" x="5" y="8" width="52" height="35" rx="4"/>'
+                  '<path class="device-side" d="M57 8 65 2V36L57 43Z"/>'
+                  '<rect class="device-screen" x="10" y="13" width="42" height="24" rx="2"/>'
+                  '<path class="device-detail" d="m17 20 5 4-5 4m11 0h12M31 44v8m-14 2h29"/>'
+                  '<circle class="device-led" cx="48" cy="40" r="1.5"/>')
+    elif role in ("router", "firewall"):
+        shapes = ('<path class="device-top" d="M3 24 17 12H66L53 24Z"/>'
+                  '<path class="device-side" d="m53 24 13-12v23L53 48Z"/>'
+                  '<rect class="device-body" x="3" y="24" width="50" height="24" rx="3"/>'
+                  '<path class="device-detail" d="M17 18h24m-4-3 4 3-4 3M12 33h7v7h-7m13-7h7v7h-7m13-7h7v7h-7"/>'
+                  '<circle class="device-led" cx="9" cy="44" r="2"/>')
+    else:
+        shapes = ('<path class="device-top" d="M13 9 25 1H60L48 9Z"/>'
+                  '<path class="device-side" d="m48 9 12-8v46L48 57Z"/>'
+                  '<rect class="device-body" x="13" y="9" width="35" height="48" rx="3"/>'
+                  '<rect class="device-slot" x="18" y="15" width="25" height="9" rx="2"/>'
+                  '<rect class="device-slot" x="18" y="28" width="25" height="9" rx="2"/>'
+                  '<path class="device-detail" d="M20 46h12m-12 4h12"/>'
+                  '<circle class="device-led" cx="38" cy="19.5" r="2"/>'
+                  '<circle class="device-led" cx="38" cy="32.5" r="2"/>'
+                  '<circle class="device-led" cx="39" cy="48" r="2.5"/>')
+    return f'<g class="device" transform="translate({x} {y})">{shapes}</g>'
+
+
+def _link(x1: float, y1: float, x2: float, y2: float, active: bool, kind: str) -> str:
+    power = "online" if active else "offline"
+    coords = f'x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}"'
+    return (f'<g class="link {kind} {power}"><line class="cable" {coords}/>'
+            f'<line class="signal tx" {coords}/><line class="signal rx" {coords}/>'
+            f'<circle class="socket" cx="{x1}" cy="{y1}" r="4"/>'
+            f'<circle class="socket" cx="{x2}" cy="{y2}" r="4"/></g>')
+
+
 def _host_node(x: float, y: float) -> list[str]:
     """The computer running QEMU: a monitor icon, its address and what reaches the lab from it."""
     return [
-        f'<g class="node host-n"><rect x="{x}" y="{y}" width="300" height="{_TOP_H}" rx="12"/>',
-        f'<rect class="icon" x="{x + 16}" y="{y + 15}" width="44" height="30" rx="4"/>',
-        f'<rect class="icon-s" x="{x + 32}" y="{y + 47}" width="12" height="6"/>',
-        f'<rect class="icon-s" x="{x + 25}" y="{y + 53}" width="26" height="4" rx="2"/>',
-        f'<text class="node-t" x="{x + 76}" y="{y + 31}">Host · 127.0.0.1</text>',
-        f'<text class="small" x="{x + 76}" y="{y + 52}">this computer: vmctl, SSH, browser</text></g>',
+        f'<g class="node host-n online"><rect class="node-panel" x="{x}" y="{y}" width="320" height="{_TOP_H}" rx="12"/>',
+        _device_icon("host", x + 10, y + 10),
+        f'<text class="node-t" x="{x + 88}" y="{y + 32}">Host · 127.0.0.1</text>',
+        f'<text class="small" x="{x + 88}" y="{y + 53}">vmctl / SSH / browser</text></g>',
     ]
 
 
 def _internet_node(x: float, y: float) -> list[str]:
     cloud = (f"M{x + 40} {y + 58} h120 a26 26 0 0 0 0 -52 a34 34 0 0 0 -62 -8 "
              f"a30 30 0 0 0 -56 14 a22 22 0 0 0 -2 46 z")
-    return [f'<g class="node net-n"><path d="{cloud}"/>',
+    return [f'<g class="node net-n"><path class="cloud" d="{cloud}"/>',
             f'<text class="node-t" x="{x + 100}" y="{y + 40}" text-anchor="middle">Internet</text></g>']
 
 
 def _svg(lab: dict[str, Any]) -> str:
     members = lab["members"]
     count = max(1, len(members))
-    box_h = _BOX_H + 22 * max((len(member["services"]) for member in members), default=0)
-    width = max(820, 2 * _MARGIN + count * _BOX_W + (count - 1) * _GAP)
-    pills = max((len(nic["forwards"]) for m in members for nic in m["nics"] if nic["type"] == "user"), default=0)
-    box_y = _NAT_Y + 26 + pills * (_PILL_H + _PILL_GAP) + 16
-    seg_top = box_y + box_h + 90
-    height = seg_top + 70 * max(1, len(lab["segments"])) + 10
-    x_of = {m["name"]: _MARGIN + index * (_BOX_W + _GAP) for index, m in enumerate(members)}
-    seg_y = {seg["name"]: seg_top + 70 * index for index, seg in enumerate(lab["segments"])}
+    box_h = _BOX_H + 22 * max((len(m["services"]) for m in members), default=0)
+    width = max(860, 2 * _MARGIN + count * _BOX_W + (count - 1) * _GAP)
+    pills = max((len(n["forwards"]) for m in members for n in m["nics"] if n["type"] == "user"), default=0)
+    box_y = _NAT_Y + 48 + pills * (_PILL_H + _PILL_GAP)
+    seg_top = box_y + box_h + 100
+    height = seg_top + 100 * max(1, len(lab["segments"]))
+    start_x = (width - count * _BOX_W - (count - 1) * _GAP) / 2
+    x_of = {m["name"]: start_x + i * (_BOX_W + _GAP) for i, m in enumerate(members)}
+    seg_y = {seg["name"]: seg_top + 100 * i for i, seg in enumerate(lab["segments"])}
     esc = html.escape
-    out: list[str] = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Network map of {esc(lab["group"])}">']
-    # Top: the host and the Internet, joined by the NAT bus. Each VM's slirp NIC is its own NAT: the
-    # guest reaches the Internet through it, the host reaches the guest only through the forwards.
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" role="img" aria-label="Network map of {esc(lab["group"])}">',
+           '<defs><linearGradient id="chassis" x2="0" y2="1"><stop stop-color="#21364b"/><stop offset="1" stop-color="#101e2e"/></linearGradient>'
+           '<linearGradient id="panel" x2="0" y2="1"><stop stop-color="#15283b"/><stop offset="1" stop-color="#0d1929"/></linearGradient>'
+           '<pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#274054" stroke-width=".5" opacity=".5"/></pattern></defs>',
+           f'<rect width="{width}" height="{height}" fill="url(#grid)"/>']
     internet_x = width - _MARGIN - 200
+    nat_active = any(m["running"] and any(n["type"] == "user" for n in m["nics"]) for m in members)
+    out.append(_link(_MARGIN, _NAT_Y, width - _MARGIN, _NAT_Y, nat_active, "nat-bus"))
+    out.append(_link(_MARGIN + 160, _TOP_Y + _TOP_H, _MARGIN + 160, _NAT_Y, nat_active, "uplink"))
+    out.append(_link(internet_x + 100, _TOP_Y + _TOP_H - 20, internet_x + 100, _NAT_Y, nat_active, "uplink"))
     out += _host_node(_MARGIN, _TOP_Y)
     out += _internet_node(internet_x, _TOP_Y)
-    out.append(f'<line class="natbus" x1="{_MARGIN}" y1="{_NAT_Y}" x2="{width - _MARGIN}" y2="{_NAT_Y}"/>')
-    out.append(f'<line class="natbus-l" x1="{_MARGIN + 150}" y1="{_TOP_Y + _TOP_H}" x2="{_MARGIN + 150}" y2="{_NAT_Y}"/>')
-    out.append(f'<line class="natbus-l" x1="{internet_x + 100}" y1="{_TOP_Y + _TOP_H - 6}" x2="{internet_x + 100}" y2="{_NAT_Y}"/>')
-    out.append(f'<text class="small" x="{width / 2}" y="{_NAT_Y - 10}" text-anchor="middle">'
-               f'NAT (slirp {SLIRP_SUBNET}, one per VM) · forwards on 127.0.0.1</text>')
+    out.append(f'<text class="network-caption" x="{width / 2}" y="{_NAT_Y - 13}" text-anchor="middle">NAT / {SLIRP_SUBNET} per VM / localhost forwards</text>')
+    # Shared segments are a logical bus, not an extra switch or a claimed Internet probe.
+    for seg in lab["segments"]:
+        y = seg_y[seg["name"]]
+        active = any(m["running"] and m["name"] in seg["members"] for m in members)
+        out.append(_link(_MARGIN, y, width - _MARGIN, y, active, "segment-bus"))
+        subnet = f' · {seg["subnet"]}' if seg["subnet"] else ""
+        out.append(f'<text class="bus-t" x="{_MARGIN}" y="{y + 29}">segment {esc(seg["name"])}{esc(subnet)}</text>')
+        out.append(f'<text class="network-caption" x="{width - _MARGIN}" y="{y + 29}" text-anchor="end">ISOLATED LAN</text>')
     for member in members:
         x = x_of[member["name"]]
         cx = x + _BOX_W / 2
-        for nic in [nic for nic in member["nics"] if nic["type"] == "user"]:
-            out.append(f'<circle class="natport" cx="{cx}" cy="{_NAT_Y}" r="5"/>')
-            out.append(f'<line class="nat" x1="{cx}" y1="{_NAT_Y}" x2="{cx}" y2="{box_y}"/>')
-            for line, fwd in enumerate(nic["forwards"]):
-                if fwd.get("via"):
-                    text = f'{fwd["host_port"]} → {fwd["via"]}'
-                else:
-                    what = f' {fwd["what"]}' if fwd["what"] and len(fwd["what"]) <= 12 else ""
-                    text = f'{fwd["host_port"]} → :{fwd["guest"]}{what}'
-                pill_w = _pill_width(text)
-                y = _NAT_Y + 22 + line * (_PILL_H + _PILL_GAP)
-                out.append(f'<rect class="pill" x="{cx - pill_w / 2}" y="{y}" width="{pill_w}" height="{_PILL_H}" rx="12"/>')
-                out.append(f'<text class="pill-t" x="{cx}" y="{y + 16.5}" text-anchor="middle">{esc(text)}</text>')
-        state = "running" if member["running"] else ("stopped" if member["install"] not in ("", "no disk") else "absent")
-        badge = {"running": "● running", "stopped": "○ stopped", "absent": "no disk"}[state]
-        out.append(f'<g class="vm {state}"><rect x="{x}" y="{box_y}" width="{_BOX_W}" height="{box_h}" rx="12"/>')
-        out.append(f'<text class="vm-n" x="{x + 14}" y="{box_y + 28}">{esc(member["name"])}</text>')
+        power = "online" if member["running"] else "offline"
+        status = "running" if member["running"] else ("stopped" if member["install"] not in ("", "no disk") else "absent")
+        badge = {"running": "RUNNING", "stopped": "STOPPED", "absent": "NO DISK"}[status]
+        for nic in member["nics"]:
+            attrs = f'data-vm="{esc(member["name"])}" data-nic="{esc(nic["id"])}"'
+            if nic["type"] == "user":
+                out.append(f'<g class="nic nat-nic {power}" {attrs}><title>NAT · {esc(member["name"])} · {badge}</title>')
+                out.append(_link(cx, box_y, cx, _NAT_Y, member["running"], "nat"))
+                for line, fwd in enumerate(nic["forwards"]):
+                    if fwd.get("via"):
+                        text = f'{fwd["host_port"]} → {fwd["via"]}'
+                    else:
+                        what = f' {fwd["what"]}' if fwd["what"] and len(fwd["what"]) <= 12 else ""
+                        text = f'{fwd["host_port"]} → :{fwd["guest"]}{what}'
+                    pill_w = min(_BOX_W + _GAP - 12, _pill_width(text))
+                    y = _NAT_Y + 18 + line * (_PILL_H + _PILL_GAP)
+                    fit = f' textLength="{pill_w - 18}" lengthAdjust="spacingAndGlyphs"' if _pill_width(text) > pill_w else ""
+                    out.append(f'<rect class="pill" x="{cx - pill_w / 2}" y="{y}" width="{pill_w}" height="{_PILL_H}" rx="6"/>')
+                    out.append(f'<text class="pill-t" x="{cx}" y="{y + 16.5}" text-anchor="middle"{fit}>{esc(text)}</text>')
+                out.append(f'<text class="traffic-label" x="{cx + 10}" y="{box_y - 12}"></text></g>')
+        out.append(f'<g class="vm {status} {power}"><title>{esc(member["label"])} · {badge}</title>'
+                   f'<rect class="vm-panel" x="{x}" y="{box_y}" width="{_BOX_W}" height="{box_h}" rx="14"/>'
+                   f'<path class="vm-accent" d="M{x + 20} {box_y}h{_BOX_W - 40}"/>')
         role = member["role"] or "vm"
+        out.append(_device_icon(role, x + 15, box_y + 16))
+        out.append(f'<circle class="status-led" cx="{x + _BOX_W - 94}" cy="{box_y + 33}" r="3"/>')
+        out.append(f'<text class="badge {status}" x="{x + _BOX_W - 82}" y="{box_y + 37}">{badge}</text>')
+        out.append(f'<text class="role" x="{x + 94}" y="{box_y + 65}">{esc(role.upper())}</text>')
+        fit = f' textLength="{_BOX_W - 36}" lengthAdjust="spacingAndGlyphs"' if len(member["name"]) > 25 else ""
+        out.append(f'<text class="vm-n" x="{x + 18}" y="{box_y + 106}"{fit}>{esc(member["name"])}</text>')
         ram = f'{member["memory_mb"] / 1024:g} GB' if member["memory_mb"] >= 1024 else f'{member["memory_mb"]} MB'
         disks = f' · {member["disks"]} disks' if member["disks"] > 1 else ""
-        out.append(f'<text class="small" x="{x + 14}" y="{box_y + 50}">{esc(role)} · {ram} · {member["cpus"]} vCPU{disks}</text>')
-        out.append(f'<text class="badge {state}" x="{x + 14}" y="{box_y + 76}">{badge}</text>')
-        if member["install"] and state != "absent":
-            out.append(f'<text class="small" x="{x + 14}" y="{box_y + 98}">disk: {esc(member["install"])}</text>')
+        out.append(f'<text class="small" x="{x + 18}" y="{box_y + 131}">{ram} RAM · {member["cpus"]} vCPU{disks}</text>')
+        out.append(f'<path class="divider" d="M{x + 18} {box_y + 146}h{_BOX_W - 36}"/>')
+        out.append(f'<text class="small" x="{x + 18}" y="{box_y + 170}">disk / {esc(member["install"] or "not prepared")}</text>')
         for index, service in enumerate(member["services"]):
             where = str(service.get("address") or "").split("/")[0]
             label = f'CT {service.get("container", "?")} {service.get("name", "")} · {where}'
-            out.append(f'<text class="svc" x="{x + 14}" y="{box_y + _BOX_H + 6 + 20 * index}">▣ {esc(label)}</text>')
+            out.append(f'<text class="svc" x="{x + 18}" y="{box_y + _BOX_H + 6 + 22 * index}">{esc(label)}</text>')
         out.append('</g>')
-        for nic in member["nics"]:
-            if nic["type"] != "segment":
-                continue
+        lans = [nic for nic in member["nics"] if nic["type"] == "segment"]
+        for index, nic in enumerate(lans):
             y = seg_y[nic["segment"]]
-            out.append(f'<line class="seg-l" x1="{cx}" y1="{box_y + box_h}" x2="{cx}" y2="{y}"/>')
-            out.append(f'<circle class="port" cx="{cx}" cy="{y}" r="5"/>')
-            out.append(f'<text class="addr" x="{cx + 8}" y="{box_y + box_h + 22}">{esc(nic["address"] or "address not declared")}</text>')
-            out.append(f'<text class="small" x="{cx + 8}" y="{box_y + box_h + 38}">{esc(nic["mac"] or "MAC not specified")}</text>')
-    for seg in lab["segments"]:
-        y = seg_y[seg["name"]]
-        out.append(f'<line class="bus" x1="{_MARGIN}" y1="{y}" x2="{width - _MARGIN}" y2="{y}"/>')
-        subnet = f' · {seg["subnet"]}' if seg["subnet"] else ""
-        out.append(f'<text class="bus-t" x="{_MARGIN}" y="{y + 26}">segment {esc(seg["name"])}{esc(subnet)}</text>')
+            # Separate ports and labels for guests attached to more than one segment.
+            port_x = x + 24 + index * 18
+            attrs = f'data-vm="{esc(member["name"])}" data-nic="{esc(nic["id"])}"'
+            out.append(f'<g class="nic lan-nic {power}" {attrs}><title>{esc(nic["segment"])} · {esc(member["name"])} · {badge}</title>')
+            out.append(_link(port_x, box_y + box_h, port_x, y, member["running"], "seg-l"))
+            label_x = x + 32 + len(lans) * 18
+            out.append(f'<text class="addr" x="{label_x}" y="{y - 58}">{esc(nic["address"] or "address not declared")}</text>')
+            out.append(f'<text class="small mac" x="{label_x}" y="{y - 39}">{esc(nic["mac"] or "MAC not specified")}</text>')
+            out.append(f'<text class="traffic-label" x="{label_x}" y="{y - 17}"></text></g>')
     out.append('</svg>')
     return "\n".join(out)
-
 
 _CSS = """
 :root { --bg:#f6f8fb; --fg:#17202b; --muted:#5b6778; --card:#ffffff; --line:#c7d1dd;
@@ -609,26 +664,69 @@ body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,
 main { max-width:1200px; margin:0 auto; padding:24px 16px 48px; }
 h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8px; }
 .sub { color:var(--muted); margin:0 0 20px; }
-.map { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:8px; overflow-x:auto; }
-svg { width:100%; min-width:680px; height:auto; display:block; }
-svg text { fill:var(--fg); font:14px system-ui, sans-serif; }
-svg .small { fill:var(--muted); font-size:12.5px; } svg .fwd { fill:var(--accent); font-size:11.5px; }
-svg .node rect, svg .node path { fill:var(--card); stroke:var(--accent); stroke-width:2; }
-svg .node .icon { fill:none; stroke:var(--accent); stroke-width:2.5; } svg .node .icon-s { fill:var(--accent); stroke:none; }
-svg .node-t { font-weight:700; font-size:16px; fill:var(--accent); }
-svg .natbus { stroke:var(--accent); stroke-width:3; stroke-linecap:round; }
-svg .natbus-l { stroke:var(--accent); stroke-width:2; }
-svg .natport { fill:var(--accent); }
-svg .nat { stroke:var(--accent); stroke-width:1.8; stroke-dasharray:5 4; }
-svg .pill { fill:var(--card); stroke:var(--accent); stroke-width:1.5; }
-svg .pill-t { fill:var(--accent); font-size:12.5px; font-weight:600; }
-svg .vm rect { fill:var(--card); stroke:var(--line); stroke-width:1.5; }
-svg .vm.running rect { stroke:var(--ok); stroke-width:2.5; }
-svg .vm-n { font-weight:700; font-size:17px; }
-svg .badge.running { fill:var(--ok); font-weight:600; } svg .badge.stopped { fill:var(--muted); }
-svg .badge.absent { fill:var(--warn); }
-svg .seg-l, svg .bus { stroke:var(--bus); stroke-width:2.5; } svg .bus { stroke-width:4; stroke-linecap:round; }
-svg .port { fill:var(--bus); } svg .svc { fill:var(--bus); font-size:12px; font-weight:600; } svg .bus-t { fill:var(--bus); font-weight:600; } svg .addr { font-weight:600; }
+.map-shell { margin:24px 0 12px; border:1px solid #2b4258; border-radius:16px; overflow:hidden; background:#091321; color:#e4eef9; box-shadow:0 16px 50px #0002; }
+.map-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:16px 22px; border-bottom:1px solid #24384c; background:#102031; }
+.map-title { font-size:12px; font-weight:750; letter-spacing:.14em; }
+.map-legend { display:flex; gap:18px; font-size:12px; color:#a5b9cf; align-items:center; }
+.map-legend span { display:flex; align-items:center; gap:6px; }
+.map-legend i { display:inline-block; width:7px; height:7px; border-radius:50%; background:#52657a; }
+.map-legend .on { background:#4fe0b6; box-shadow:0 0 9px #4fe0b655; }
+.map-legend .flow { background:#70d9ff; border-radius:2px; width:15px; height:3px; }
+.map { overflow-x:auto; background:radial-gradient(ellipse at 48% 40%, #12283c99, transparent 65%); }
+.map-footer { display:flex; gap:12px; justify-content:space-between; flex-wrap:wrap; padding:12px 22px; border-top:1px solid #24384c; font-size:12px; color:#9bb0c6; }
+#map-live { color:#83d9ed; }
+.map svg { width:100%; min-width:850px; height:auto; display:block; }
+.map svg text { fill:#e0ebf7; font:14px system-ui, sans-serif; }
+.map svg .small { fill:#97aec6; font-size:12.5px; }
+.map svg .mac { font:11px ui-monospace, monospace; fill:#8197ae; }
+.map svg .network-caption { fill:#8fa7bf; font:10px ui-monospace, monospace; letter-spacing:.07em; }
+.map svg .node-panel, .map svg .cloud { fill:url(#panel); stroke:#3c718a; stroke-width:1.5; }
+.map svg .node-t { font-weight:650; font-size:16px; fill:#a3dff4; }
+.map svg .device-body { fill:url(#chassis); stroke:#7597b4; stroke-width:1.2; }
+.map svg .device-top { fill:#354c63; stroke:#7597b4; stroke-width:1; }
+.map svg .device-side { fill:#152438; stroke:#7597b4; stroke-width:1; }
+.map svg .device-slot, .map svg .device-screen { fill:#0a1625; stroke:#49667f; stroke-width:1; }
+.map svg .device-detail { fill:none; stroke:#7794ac; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+.map svg .device-led, .map svg .status-led { fill:#536477; }
+.map svg .online .device-led, .map svg .online .status-led { fill:#50e6b5; filter:drop-shadow(0 0 4px #50e6b588); }
+.map svg .online .device-screen { fill:#103345; stroke:#479eac; }
+.map svg .online .device-detail { stroke:#7ce1e7; }
+.map svg .link { --cable:#58c9ef; }
+.map svg .link.segment-bus, .map svg .link.seg-l { --cable:#a997ff; }
+.map svg .cable { stroke:#34475c; stroke-width:2; fill:none; }
+.map svg .offline .cable { stroke-dasharray:5 6; }
+.map svg .online .cable { stroke:var(--cable); stroke-opacity:.65; filter:drop-shadow(0 0 4px var(--cable)); }
+.map svg .segment-bus .cable, .map svg .nat-bus .cable { stroke-width:3; }
+.map svg .socket { fill:#132337; stroke:#536b82; stroke-width:1.5; }
+.map svg .online .socket { fill:var(--cable); stroke:#cfedff; filter:drop-shadow(0 0 4px var(--cable)); }
+.map svg .signal { stroke:#c9f6ff; stroke-width:3; stroke-dasharray:3 24; stroke-linecap:round; opacity:0; pointer-events:none; }
+.map svg .signal.tx { transform:translateX(-2px); }
+.map svg .signal.rx { transform:translateX(2px); stroke:#c4b5ff; }
+.map svg .nic.transmitting .signal.tx { opacity:1; animation:packet-flow .75s linear infinite; filter:drop-shadow(0 0 5px #72e7ff); }
+.map svg .nic.receiving .signal.rx { opacity:1; animation:packet-flow .75s linear infinite reverse; }
+@keyframes packet-flow { to { stroke-dashoffset:-54; } }
+.map svg .pill { fill:#102236; stroke:#36506a; stroke-width:1; }
+.map svg .online .pill { stroke:#43869b; }
+.map svg .pill-t { fill:#a3b9d0; font:11.5px ui-monospace, monospace; }
+.map svg .online .pill-t { fill:#a5e8fb; }
+.map svg .vm-panel { fill:url(#panel); stroke:#334a62; stroke-width:1.2; }
+.map svg .vm.online .vm-panel { stroke:#398573; filter:drop-shadow(0 4px 12px #42ddb112); }
+.map svg .vm-accent { stroke:#53677c; stroke-width:2; }
+.map svg .vm.online .vm-accent { stroke:#50e6b5; filter:drop-shadow(0 0 5px #50e6b566); }
+.map svg .vm-n { font-weight:650; font-size:18px; letter-spacing:-.3px; }
+.map svg .role { fill:#8ca7c0; font:10px ui-monospace, monospace; letter-spacing:.12em; }
+.map svg .badge { fill:#97aabd; font:10px ui-monospace, monospace; letter-spacing:.04em; }
+.map svg .badge.running { fill:#62e3bc; } .map svg .badge.absent { fill:#e7b768; }
+.map svg .divider { stroke:#293e53; stroke-width:1; }
+.map svg .svc { fill:#bcb0fa; font-size:12px; }
+.map svg .bus-t { fill:#b6aafa; font:12px ui-monospace, monospace; }
+.map svg .addr { font:12px ui-monospace, monospace; fill:#c8daf0; }
+.map svg .traffic-label { fill:#77def3; font:10px ui-monospace, monospace; }
+.map svg .nic.offline .traffic-label { fill:#778b9f; }
+@media (prefers-reduced-motion: reduce) {
+  .map svg .nic.transmitting .signal.tx, .map svg .nic.receiving .signal.rx { animation:none; }
+}
+@media (max-width:600px) { .map-toolbar, .map-footer { padding:12px; } .map-legend { gap:12px; } }
 table { border-collapse:collapse; width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
 th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; font-size:14px; }
 th { color:var(--muted); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.03em; }
@@ -719,8 +817,8 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
             link = f'<a href="{esc(url)}">{esc(url)}</a>' if url else esc(str(service.get("address") or ""))
             nics.append(f'<b>CT {esc(str(service.get("container", "?")))} {esc(str(service.get("name", "")))}</b><br>{link}')
         state = "running" if member["running"] else "stopped"
-        rows.append(f'<tr><td><b>{esc(member["name"])}</b><br><span class="sub">{esc(member["label"])}</span></td>'
-                    f'<td>{esc(member["role"])}</td><td>{state}<br><span class="sub">{esc(member["install"])}</span></td>'
+        rows.append(f'<tr data-member="{esc(member["name"])}"><td><b>{esc(member["name"])}</b><br><span class="sub">{esc(member["label"])}</span></td>'
+                    f'<td>{esc(member["role"])}</td><td><span class="member-state">{state}</span><br><span class="sub member-install">{esc(member["install"])}</span></td>'
                     f'<td>{_login_html(member.get("login"))}</td>'
                     f'<td>{"<br><br>".join(nics)}</td></tr>')
     group = esc(lab["group"])
@@ -740,9 +838,13 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
 <title>{group} network map</title><style>{_CSS}</style></head>
 <body><main>
 <h1>{heading}</h1>
-<p class="sub">{group} · {len(lab["members"])} VMs · {running} running · {len(lab["segments"])} segment(s) · generated {when} by <code>vmctl group map {group}</code></p>
+<p class="sub">{group} · {len(lab["members"])} VMs · <span id="running-count">{running} running</span> · {len(lab["segments"])} segment(s) · generated {when} by <code>vmctl group map {group}</code></p>
 {intro}
-<div class="map">{_svg(lab)}</div>
+<section class="map-shell" aria-label="Lab topology">
+<div class="map-toolbar"><span class="map-title">NETWORK TOPOLOGY</span><div class="map-legend"><span><i class="on"></i>VM on</span><span><i></i>VM off</span><span><i class="flow"></i>Measured traffic</span></div></div>
+<div class="map" id="lab-topology">{_svg(lab)}</div>
+<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>Lights = VM power · pulses = observed TX / RX · hover a cable for details</span></div>
+</section>
 <p class="sub">Every NAT NIC is a private slirp {SLIRP_SUBNET} of its own VM: the guest reaches the Internet, the host reaches it only through the forwards on 127.0.0.1. The segments are shared between the VMs of this host only.</p>
 <h2>Access</h2>
 {_access_html(lab)}
@@ -752,7 +854,7 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None) -> str:
 <h2>Runbook</h2>
 <p class="sub">Start order: {order}. Every command below comes from the same profiles as the map, in the order you would run them: <b>run</b> changes something, <b>check</b> is read-only, <b>try</b> is a reversible experiment.</p>
 {_runbook_html(lab.get("runbook") or [])}
-</main></body></html>
+</main><script id="lab-map-script">{(Path(__file__).parent / "web" / "lab-map.js").read_text()}</script></body></html>
 """
 
 

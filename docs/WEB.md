@@ -307,6 +307,7 @@ The page can delete disks and start anything `vmctl` can, so:
 | GET | `/api/vm/<vm>/history` | the VM's current job and the archived ones (`runtime/tui-job/history/`, the last 100), each openable as a log |
 | GET (WebSocket) | `/api/vm/<vm>/vnc?token=` | the VM's VNC socket, relayed both ways (noVNC in the page) |
 | GET | `/labs/<group>/map` | the lab's network map page (`vmctl group map <group>` writes it) |
+| GET | `/labs/<group>/map-state` | authenticated live topology, VM states and per-NIC traffic counters |
 
 Every call sends the token as `X-Vmctl-Token` (or `?token=` for images and the map tab).
 

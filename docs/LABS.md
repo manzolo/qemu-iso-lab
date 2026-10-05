@@ -56,6 +56,27 @@ host, the NAT forwards on 127.0.0.1, every member with its state and the segment
 addresses. Below the drawing, an **Access** table lists every web GUI, SSH command and login, and
 a **runbook** walks through the lab step by step (each block marked *run*, *check* or *try*).
 
+The diagram uses device icons, power LEDs and illuminated cables for running VMs; stopped
+VMs have dim, dashed cables. In the web UI the map refreshes automatically, roughly every
+two seconds. Moving pulses and TX/RX byte rates appear only when measured counters increase.
+Lights show VM power, not a connectivity test; pulses summarize activity during the sample
+interval rather than tracing individual packets or proving that the guest received them.
+
+For QEMU segments the web server passively counts Ethernet frames on the existing loopback
+multicast group and attributes them by MAC address. No guest installation or VM restart is
+needed. Packet contents are not saved, and listeners close after 15 seconds without map
+requests. Rates are observed traffic and may undercount if the listener drops frames under
+load. When available, QEMU guest-agent interface counters are used instead, including for
+NAT NICs. An unmeasurable NIC says **Traffic unavailable**; NAT requires an enabled, running
+guest agent with interface statistics. A failed refresh clears the animation and marks the
+view stale. Hidden tabs pause polling, and the system's reduced-motion preference disables
+the moving pulses. Exported HTML opened as a file remains a static snapshot.
+
+Local checks: `python3 -m unittest discover -s tests -p 'test_lab*.py'`,
+`python3 tests/lab_traffic_smoke.py` for isolated multicast capture, and
+`PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/lab_map_browser.mjs`
+for browser behavior (optionally set `PLAYWRIGHT_CHROMIUM_EXECUTABLE`).
+
 ![Map of the Proxmox lab: three nodes and the client on pve-lan, forwards for SSH and the web GUIs](screenshots/lab-map-proxmox.png)
 
 ![Map of the network lab: pfSense in front, Pi-hole and Lubuntu behind it, forwards through the router's WAN](screenshots/lab-map-netlab.png)

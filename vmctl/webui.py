@@ -371,6 +371,21 @@ def lab_map_page(group: str) -> bytes | None:
     return path.read_bytes()
 
 
+def lab_map_state(group: str) -> dict[str, Any] | None:
+    """Refresh the topology and sample each NIC without changing a VM."""
+    from vmctl import lab_traffic, labs, lifecycle
+
+    if Path(group).name != group or not group:
+        return None
+    cfg = config.load_config()
+    names = labs.group_members(cfg, group)
+    if not names:
+        return None
+    states = lifecycle.group_states(cfg, names)
+    lab = labs.model(cfg, group, states)
+    return {"svg": labs._svg(lab), "states": states, "traffic": lab_traffic.monitor.sample(cfg, lab)}
+
+
 def lab_guide_page(group: str, lang: str | None, token: str = "") -> bytes | None:
     """The lab's guide (vms/labs/<group>/guide.<lang>.md) rendered as a page; None without one."""
     from vmctl import labs
@@ -674,6 +689,12 @@ class Handler(BaseHTTPRequestHandler):
                     self._error(f"No guide for {group}", HTTPStatus.NOT_FOUND)
                 else:
                     self._send(HTTPStatus.OK, page, "text/html; charset=utf-8")
+            elif path.startswith("/labs/") and path.endswith("/map-state"):
+                snapshot = lab_map_state(path.split("/")[2])
+                if snapshot is None:
+                    self._error("Lab not found", HTTPStatus.NOT_FOUND)
+                else:
+                    self._json(snapshot)
             elif path.startswith("/labs/") and path.endswith("/map"):
                 group = unquote(path.split("/")[2])
                 page = lab_map_page(group)
@@ -933,8 +954,11 @@ def make_server(port: int, token: str) -> ThreadingHTTPServer:
     transfers = web_transfers.Transfers()
     class WebServer(ThreadingHTTPServer):
         def server_close(self) -> None:
+            from vmctl import lab_traffic
+
             uploads.close_all()
             transfers.close_all()
+            lab_traffic.monitor.close()
             super().server_close()
 
     handler: type[Handler] = type("BoundHandler", (Handler,), {"token": token, "port": port, "snapshot": Snapshot(),
