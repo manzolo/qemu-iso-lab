@@ -140,7 +140,9 @@ export async function run(d) {
   await d.sleep(1500);
   await d.type("qemu", 160);
   await d.sleep(3500);
-  await d.key("Escape");
+  await d.key("Escape");  // clears the search field
+  await d.sleep(400);
+  await d.key("Escape");  // closes the menu
   await d.sleep(800);
   await d.cue("next");
   await d.sleep(1000);
