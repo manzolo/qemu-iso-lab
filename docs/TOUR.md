@@ -110,10 +110,17 @@ reads every cue in both languages. A sentence starts with its subtitle; where it
 cue, the last frame of the cue is held (both languages share one video, so the longer one wins).
 The WAVs are cached by text and voice: after a correction only the changed sentences are spoken again.
 
-What the subtitles write and the voice should say differently is the `SPOKEN` table in
-`narrate.py`: full stops are dropped (XTTS reads a sentence-ending "." aloud, "punto"), `qemu-iso-lab`
-becomes "QEMU ISO Lab", `VM` "V M", and in Italian `console` is written `consolle` so it is said
-the Italian way; the buttons' own names (Open console, Consoles) stay English.
+What the subtitles write and the voice should say differently is `spoken()` in `narrate.py`
+(the `SPOKEN` table plus, for Italian, every number, dotted version and file name spelled out in
+words: `24.04` -> "ventiquattro punto zero quattro", `setup.sh` -> "setup punto esse acca"), and
+full stops are dropped everywhere, also before a closing quote or bracket: XTTS read a
+sentence-ending "." aloud and invented words for versions and file names (2026-10-05).
+`qemu-iso-lab` becomes "QEMU ISO Lab", `VM` "V M", and in Italian `console` is written
+`consolle` so it is said the Italian way; the buttons' own names (Open console, Consoles) stay
+English. **Before synthesizing, read what the voice will get**: `narrate.py --show <clip>` prints
+every cue next to its spoken form. Since 2026-10-05 the voice is **Italian only** by default
+(`--voice it`): the English track of the MP4 carries the Italian voice under the English
+subtitles; `--voice it,en` synthesizes both. `tests/test_tour_narrate.py` pins the filter.
 
 Another voice: `--speaker "<name>"` (XTTS's built-in speakers), or a recording of your own with
 `--speaker-wav file.wav` (15–25 s of plain speech, quiet room). On a PipeWire host:

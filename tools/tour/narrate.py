@@ -29,17 +29,92 @@ SPOKEN = {
     # Italian words that XTTS reads the English way: console -> consolle (con-SOL-le), never the
     # buttons' own names (Open console, Consoles), which are English on the screen too.
     "it": [(r"(?<!Open )\bconsole\b", "consolle"), (r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Canc", "Control Alt Canc"),
-           (r"…", ","), (r"\bVM\b", "V M"), (r"\bMy VMs\b", "My V Ms")],
+           (r"…", ","), (r"\bVM\b", "V M"), (r"\bMy VMs\b", "My V Ms"),
+           (r"(?i)\bmicrok8s\b", "micro k8s")],  # then the mixed-token rule spells k8s
 }
 
 
+# File extensions the Italian voice must spell: "setup.sh" read raw came out as a made-up word.
+EXTENSIONS_IT = {"sh": "esse acca", "json": "jason", "iso": "iso", "md": "emme di", "exe": "exe", "cmd": "ci emme di",
+                 "ps1": "pi esse uno", "qcow2": "qcow due", "py": "pi greco", "txt": "ti ics ti", "yaml": "yaml", "toml": "toml"}
+
+_UNITS_IT = ["zero", "uno", "due", "tre", "quattro", "cinque", "sei", "sette", "otto", "nove", "dieci", "undici", "dodici",
+             "tredici", "quattordici", "quindici", "sedici", "diciassette", "diciotto", "diciannove"]
+_TENS_IT = ["", "", "venti", "trenta", "quaranta", "cinquanta", "sessanta", "settanta", "ottanta", "novanta"]
+
+
+def number_it(digits: str) -> str:
+    """An integer in Italian words. A leading zero is read digit by digit ("04" -> "zero quattro",
+    the way Ubuntu's 24.04 is said); five digits or more are read digit by digit too."""
+    if digits.startswith("0") and len(digits) > 1 or len(digits) > 4:
+        return " ".join(_UNITS_IT[int(c)] for c in digits)
+    n = int(digits)
+    if n < 20:
+        return _UNITS_IT[n]
+    if n < 100:
+        tens, unit = divmod(n, 10)
+        word = _TENS_IT[tens]
+        if unit in (1, 8):
+            word = word[:-1]  # ventuno, ventotto
+        return word + (_UNITS_IT[unit] if unit else "")
+    if n < 1000:
+        hundreds, rest = divmod(n, 100)
+        word = ("cento" if hundreds == 1 else _UNITS_IT[hundreds] + "cento")
+        if rest and rest // 10 == 8:
+            word = word[:-1]  # centottanta
+        return word + (number_it(str(rest)) if rest else "")
+    thousands, rest = divmod(n, 1000)
+    word = "mille" if thousands == 1 else number_it(str(thousands)) + "mila"
+    return word + (number_it(str(rest)) if rest else "")
+
+
+_LETTERS_IT = {"a": "a", "b": "bi", "c": "ci", "d": "di", "e": "e", "f": "effe", "g": "gi", "h": "acca", "i": "i", "j": "i lunga",
+               "k": "kappa", "l": "elle", "m": "emme", "n": "enne", "o": "o", "p": "pi", "q": "cu", "r": "erre", "s": "esse",
+               "t": "ti", "u": "u", "v": "vu", "w": "doppia vu", "x": "ics", "y": "ipsilon", "z": "zeta"}
+
+
+def mixed_token_it(token: str) -> str:
+    """A word with digits inside, the way an Italian would say it: `microk8s` -> "micro kappa otto
+    esse", `ext4` -> "ext quattro", `x86_64` -> "ics ottantasei sessantaquattro", `ttyS0` -> "tty esse
+    zero". Runs of three letters or more stay words, shorter ones are spelled with the Italian letter
+    names; XTTS given "microk8s" raw produced something unintelligible (Manzolo, 2026-10-05)."""
+    parts = []
+    # Letter runs split where the case changes too: MicroK8s -> Micro, K, 8, s; ttyS0 -> tty, S, 0.
+    for run in re.findall(r"[A-Z]?[a-z]+|[A-Z]+|\d+", token):
+        if run.isdigit():
+            parts.append(number_it(run))
+        elif len(run) >= 3:
+            parts.append(run)
+        else:
+            parts.append(" ".join(_LETTERS_IT[c] for c in run.lower()))
+    return " ".join(parts)
+
+
 def spoken(text: str, lang: str) -> str:
+    """What XTTS is given for a cue: the subtitle text rewritten the way the voice should say it.
+
+    `narrate.py --show <clip>` prints it per cue, to be read before anything is synthesized: the
+    Italian voice read a sentence-ending full stop aloud and invented words for "24.04" and
+    "setup.sh" (Manzolo, 2026-10-05), so every number, dotted version and file name is spelled
+    out in words here, and no full stop is left for the model to pronounce."""
     for pattern, repl in SPOKEN[lang]:
         text = re.sub(pattern, repl, text)
-    # XTTS reads a sentence-ending full stop aloud ("punto", "dot"): none at the end, a comma
-    # between sentences; a dot inside a number (24.04) is followed by a digit and stays.
-    text = re.sub(r"\.(?=\s|$)", ",", text)
-    return text.strip(" ,")
+    if lang == "it":
+        text = re.sub(r"\b(\w+)\.(" + "|".join(EXTENSIONS_IT) + r")\b",
+                      lambda m: f"{m.group(1)} punto {EXTENSIONS_IT[m.group(2)]}", text)
+        # Letters and digits in one word: microk8s, k8s, ext4, x86_64, ttyS0, md0.
+        text = re.sub(r"\b(?=[A-Za-z0-9_]*\d)(?=[A-Za-z0-9_]*[A-Za-z])[A-Za-z0-9_]+\b",
+                      lambda m: mixed_token_it(m.group(0)), text)
+        # Versions and decimals: 24.04 -> ventiquattro punto zero quattro, 3.0.1 -> tre punto zero punto uno.
+        text = re.sub(r"\b\d+(?:\.\d+)+\b", lambda m: " punto ".join(number_it(p) for p in m.group(0).split(".")), text)
+        text = re.sub(r"\b\d+\b", lambda m: number_it(m.group(0)), text)
+    # XTTS reads a sentence-ending full stop aloud ("punto", "dot"): a comma instead, between
+    # sentences and before a closing quote or bracket. The cue still ends with a soft mark (a comma
+    # if it has none), the convention of manzolo/poetry-voice's ensure_soft_punctuation.
+    text = re.sub(r"\.(?=[\s\"”»')\]]|$)", ",", text)
+    text = re.sub(r"\s+,", ",", text).strip()
+    text = text.rstrip(",").rstrip()
+    return text if text.endswith((";", ":", "!", "?")) else text + ","
 
 
 def duration(path: Path) -> float:
@@ -55,21 +130,34 @@ def main() -> None:
     ap.add_argument("--music", default=None, help="a background track (public domain or CC0: see artifacts/tour/music/CREDITS.md), "
                     "looped under the whole clip, faded in and out, ducked under the voice")
     ap.add_argument("--music-db", type=float, default=-8.0, help="gain on the track before ducking (default -8 dB: the public-domain piano of CREDITS.md sits about 17 dB under the voice in the pauses)")
+    ap.add_argument("--voice", default="it", help="languages to synthesize, comma-separated (default: it only, the "
+                    "decision of 2026-10-05; the English track then carries the Italian voice under English subtitles; "
+                    "--voice it,en for both)")
+    ap.add_argument("--show", action="store_true", help="print what the voice will be given, per cue and language, and stop: "
+                    "read it before synthesizing (numbers, versions and file names are spelled out)")
     args = ap.parse_args()
     d = Path(args.clip)
     meta = json.loads((d / "cues.json").read_text())
     name = meta["clip"]
+    voice_langs = tuple(lang for lang in LANGS if lang in args.voice.split(","))
+    if args.show:
+        for i, c in enumerate(meta["cues"]):
+            for lang in voice_langs:
+                print(f"{i:02} {lang}  {c[lang]}\n       -> {spoken(c[lang], lang)}")
+        return
     src = build.cut(d, meta)  # cut.mkv and the cue times on its timeline
     total = duration(src)
     voice_id = args.speaker_wav or args.speaker
     jobs, files = [], {}
     for i, c in enumerate(meta["cues"]):
-        for lang in LANGS:
+        for lang in voice_langs:
             text = spoken(c[lang], lang)
             key = hashlib.sha256(f"{voice_id}|{lang}|{text}".encode()).hexdigest()[:12]
             out = (d / "voice" / f"{i:02}-{lang}-{key}.wav").resolve()
             files[(i, lang)] = out
             jobs.append({"text": text, "lang": lang, "out": str(out)})
+        for lang in LANGS:  # a language without its own voice gets the first synthesized one
+            files.setdefault((i, lang), files[(i, voice_langs[0])])
     spec = d / "voice" / "jobs.json"
     spec.parent.mkdir(exist_ok=True)
     spec.write_text(json.dumps({"speaker": args.speaker, "speaker_wav": args.speaker_wav, "jobs": jobs}, ensure_ascii=False))
@@ -164,4 +252,5 @@ def main() -> None:
     print(f"{d / (name + '.voice.mp4')}: {total:.1f}s -> {new_total:.1f}s (held {shift:.1f}s)")
 
 
-main()
+if __name__ == "__main__":
+    main()
