@@ -34,7 +34,9 @@ SPOKEN = {
            # English loanwords read letter by letter in Italian: "file" came out as "fi-le" (Manzolo, 2026-10-05).
            (r"\bfiles?\b", "fail"),
            (r"/proc\b", "proc"), (r"\by\b", "ipsilon"), (r"\bkvm\b", "KVM"),
-           (r"\bv(\d+(?:\.\d+)*)\b", r"vu \1")],  # a tag v1.0: "vu uno punto zero" (the version rule takes the rest)
+           (r"\bv(\d+(?:\.\d+)*)\b", r"vu \1"),  # a tag v1.0: "vu uno punto zero" (the version rule takes the rest)
+           # Enclitic imperatives get the stress wrong ("aprìlo"): say them in two words (Manzolo, 2026-10-05).
+           (r"\baprilo\b", "apri il fail"), (r"\bchiudilo\b", "chiudi il fail")],
 }
 
 

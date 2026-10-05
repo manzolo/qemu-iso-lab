@@ -159,13 +159,19 @@ mid-loop hangs the rest on the DROP; Docker 29 moved a container's `IPAddress` u
 `02w-windows` (after `02-setup`, "On Windows: WSL2 from nothing to the dashboard") is recorded on
 the Windows 11 studio, `tools/tour/win/README.md`: a libvirt copy of the `windows-11` disk with the
 Hyper-V enlightenments WSL needs, a `demo` desktop and an agent that types and records inside it.
-No `.mjs` drives it: it is two segments (`segA` up to `Restart-Computer`, `segB` after the reboot)
-recorded step by step through `tools/tour/win/wq` from the clean snapshot, joined with ffmpeg's
-concat demuxer into `raw.mkv`; `tools/tour/win/02w-windows.cues.json` is the cues, steps and
-fast-forwards written from the timings the agent printed (`RecTime`), then `build.py` and
-`narrate.py` as for every clip. Retaking it: restore `windows11-studio.clean.*`, follow the cues'
-order, answer each question only after a screenshot shows it (WSL's user prompt is pre-filled,
-setup.sh asks `[y/N]` and twice for sudo, the welcome screen waits for Enter).
+No `.mjs` drives it: it is two segments (`02w-a.mkv` up to the restart WSL asks for, `02w-b.mkv`
+after it) recorded step by step through `tools/tour/win/wq` from the snapshot
+`1-windows-installato` (`RecStart`/`RecStop`, clicks through `SetCursorPos` + `mouse_event` in
+the agent's scope, see `tools/tour/win/README.md`), then `tools/tour/win/assemble_02w.py` keeps
+only the useful ranges of the two files (the operator's thinking time between steps goes), writes
+`raw.mkv` and `cues.json` with the cue starts and fast-forwards mapped onto that timeline
+(`tools/tour/win/02w-windows.cues.json` is its output), then `build.py` and `narrate.py` as for
+every clip. Since v0.20.0 (2026-10-05) it shows the catalog site, Edge's *Keep* and *Open file*,
+Windows' *Run*, the three runs of `install-windows.cmd` and the desktop icon. Retaking it: revert
+the snapshot, follow the cues' order, answer each question only after a screenshot shows it (WSL's
+user prompt is pre-filled, setup.sh asks `[y/N]` and twice for sudo, the welcome screen waits for
+Enter), note the host time of every step and read the real cut points off a timestamped contact
+sheet of each segment (`ffmpeg -vf fps=1/5,tile=10x13`) before editing `RANGES`/`CUES`.
 
 ## Before a take (2026-10-04)
 

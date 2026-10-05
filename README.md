@@ -57,9 +57,10 @@ menu plus the `qemu-iso-lab` command to `~/.local/bin`. About two minutes on a h
 already has QEMU. No VM image is downloaded until you choose one.
 
 **Windows 11** — [download the installer](https://manzolo.github.io/qemu-iso-lab/install-windows.cmd)
-and double-click it. Windows warns about a downloaded script: choose **Run** (*Cancel* is the
-default button). vmctl needs Linux, so the installer sets up **WSL2 + Ubuntu 24.04** and runs the
-Linux installer inside; that takes **three runs**, and each one ends by saying what to do next:
+and open it. It is an unsigned script, so the browser asks whether to keep it (Edge: *Keep*, then
+*Open file*) and Windows warns once more: choose **Run** (*Cancel* is the default button). vmctl
+needs Linux, so the installer sets up **WSL2 + Ubuntu 24.04** and runs the Linux installer inside;
+that takes **three runs**, and each one ends by saying what to do next:
 
 1. installs WSL (accept the administrator prompt), then **restart Windows**;
 2. installs Ubuntu and asks you to choose a Linux user name and password;
