@@ -55,6 +55,8 @@ class SpokenTests(unittest.TestCase):
         self.assertEqual(narrate.spoken("MicroK8s su k8s-lab-main, disco vda1 in ext4.", "it"),
                          "micro kappa otto esse su kappa otto esse-lab-main, disco vda uno in ext quattro,")
         self.assertEqual(narrate.spoken("lo snap di microk8s", "it"), "lo snap di micro kappa otto esse,")
+        self.assertEqual(narrate.spoken("Il wg0.conf del client, taggato v1.0, con fail2ban e resize2fs.", "it"),
+                         "Il doppia vu gi zero punto conf del client, taggato vu uno punto zero, con fail due ban e resize due effe esse,")
 
     def test_english_keeps_its_own_table(self):
         self.assertEqual(narrate.spoken("Ubuntu 24.04 with vmctl and 2 VMs.", "en"), "Ubuntu 24.04 with vm control and 2 V Ms,")

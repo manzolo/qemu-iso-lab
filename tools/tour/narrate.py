@@ -33,13 +33,16 @@ SPOKEN = {
            (r"(?i)\bmicrok8s\b", "micro k8s"),  # then the mixed-token rule spells k8s
            # English loanwords read letter by letter in Italian: "file" came out as "fi-le" (Manzolo, 2026-10-05).
            (r"\bfiles?\b", "fail"),
-           (r"/proc\b", "proc"), (r"\by\b", "ipsilon"), (r"\bkvm\b", "KVM")],
+           (r"/proc\b", "proc"), (r"\by\b", "ipsilon"), (r"\bkvm\b", "KVM"),
+           (r"\bv(\d+(?:\.\d+)*)\b", r"vu \1")],  # a tag v1.0: "vu uno punto zero" (the version rule takes the rest)
 }
 
 
 # File extensions the Italian voice must spell: "setup.sh" read raw came out as a made-up word.
 EXTENSIONS_IT = {"sh": "esse acca", "json": "jason", "iso": "iso", "md": "emme di", "exe": "exe", "cmd": "ci emme di",
-                 "ps1": "pi esse uno", "qcow2": "qcow due", "py": "pi greco", "txt": "ti ics ti", "yaml": "yaml", "toml": "toml"}
+                 "ps1": "pi esse uno", "qcow2": "qcow due", "py": "pi greco", "txt": "ti ics ti", "yaml": "yaml", "toml": "toml",
+                 "conf": "conf", "cfg": "ci effe gi", "log": "log", "service": "service", "img": "img", "pdf": "pi di effe",
+                 "html": "acca ti emme elle", "csv": "ci esse vu", "gif": "gif", "mp4": "emme pi quattro"}
 
 _UNITS_IT = ["zero", "uno", "due", "tre", "quattro", "cinque", "sei", "sette", "otto", "nove", "dieci", "undici", "dodici",
              "tredici", "quattordici", "quindici", "sedici", "diciassette", "diciotto", "diciannove"]
