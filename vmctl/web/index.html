@@ -543,6 +543,15 @@ body.console-embedded #vnc-close,body.console-embedded #console-back,body.consol
 /* `?detached=1#ssh=<vm>`: the browser SSH terminal alone, the whole window (the lab map's SSH dialog embeds it). */
 body.console-detached #terminal-dialog { position:fixed; inset:0; margin:0; width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; border:0; border-radius:0; }
 body.console-embedded #terminal-full { display:none; }
+/* Inside the map's SSH window the window's own title bar names the VM and closes it: the terminal
+   keeps one slim row (status, Reconnect) and no footer, so two headers do not eat a small window.
+   #terminal-dialog only: the SSH docked next to a /multi console keeps its header and Close. */
+body.console-embedded #terminal-dialog #terminal-shell > header { padding:3px 8px; gap:8px; background:#0f1d2b; flex-wrap:nowrap; }
+body.console-embedded #terminal-dialog #terminal-shell > header > div:first-child,
+body.console-embedded #terminal-dialog #terminal-close,
+body.console-embedded #terminal-dialog .console-footer { display:none; }
+body.console-embedded #terminal-dialog .console-toolbar { width:auto; margin-left:auto; }
+body.console-embedded #terminal-dialog .console-toolbar button { min-height:24px; padding:2px 8px; }
 /* `?panel=1#vm=<vm>`: the Machine panel alone, every dialog still at hand (the lab map's Manage dialog embeds it). */
 body.panel-only > :not(main):not(dialog):not(#toast):not(script), body.panel-only main > :not(#machine-panel) { display:none !important; }
 body.panel-only main { display:block; padding:14px; }

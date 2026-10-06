@@ -838,7 +838,11 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .vm-resize[data-dir=ne] { top:0; right:0; cursor:nesw-resize; } .vm-resize[data-dir=sw] { bottom:0; left:0; cursor:nesw-resize; }
 .vm-resize[data-dir=nw] { top:0; left:0; cursor:nwse-resize; } .vm-resize[data-dir=se] { bottom:0; right:0; cursor:nwse-resize; }
 .vm-resize[data-dir=se]::after { content:""; position:absolute; right:4px; bottom:4px; width:9px; height:9px; border-right:2px solid #6f93ad; border-bottom:2px solid #6f93ad; border-bottom-right-radius:3px; }
-.vm-dialog.floating header { cursor:grab; user-select:none; }
+.vm-dialog.floating header { cursor:grab; user-select:none; padding:4px 6px 4px 12px; }
+.vm-dialog.floating header > div:first-child { display:flex; align-items:baseline; gap:8px; min-width:0; }
+.vm-dialog.floating .vm-dialog-eyebrow { font-size:10px; }
+.vm-dialog.floating h2 { font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vm-dialog.floating .vm-dialog-tools a, .vm-dialog.floating .vm-dialog-tools button { font-size:12px; padding:3px 9px; }
 .vm-dialog.dragging header { cursor:grabbing; }
 .vm-dialog.dragging iframe { pointer-events:none; }
 @media (max-width:600px) { .vm-dialog { width:100vw; height:100dvh; border-radius:0; border:0; } .vm-dialog.floating { width:calc(100vw - 16px); height:min(60dvh, calc(100dvh - 16px)); } }
