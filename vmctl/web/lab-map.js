@@ -857,9 +857,17 @@
       });
       lastUpdate = new Date().toLocaleTimeString();
       status.textContent = `Live · refreshed ${lastUpdate}`;
-    } catch {
+      document.body.classList.remove('offline');
+    } catch (error) {
       clearTraffic();
-      status.textContent = `Updates unavailable${lastUpdate ? ` · last update ${lastUpdate}` : ''}`;
+      // vmctl web stopped (no answer) or restarted (401: a new token this URL does not have):
+      // said in words, and the map fades, since what it shows is the last state read.
+      const renewed = /HTTP 401/.test(error?.message || '');
+      const gone = error instanceof TypeError || error?.name === 'AbortError';
+      status.textContent = renewed ? 'Server restarted with a new token · open the URL vmctl web printed'
+        : gone ? `Offline · vmctl web is not answering${lastUpdate ? ` (last update ${lastUpdate})` : ''}`
+        : `Updates unavailable${lastUpdate ? ` · last update ${lastUpdate}` : ''}`;
+      document.body.classList.toggle('offline', renewed || gone);
     } finally {
       clearTimeout(timeout);
       timer = setTimeout(refresh, 2000);

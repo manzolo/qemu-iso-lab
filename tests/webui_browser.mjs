@@ -91,7 +91,7 @@ const server = createServer(async (req,res) => {
     if (req.method === 'POST') { let body=''; for await (const chunk of req) body+=chunk; const data=JSON.parse(body); assert.equal(data.revision,String(overrideRevision)); savedOverride=data.override; overrideRevision++; }
     return res.end(JSON.stringify({name:'arch-noctalia',base:profileBase,effective:{...profileBase,...savedOverride},override:savedOverride,revision:String(overrideRevision),local_only:false}));
   }
-  if (req.url.startsWith('/api/state')) { const body=JSON.stringify(failState ? {error:'fixture offline'} : state); if (holdState) await new Promise(resolve=>stateWaiters.push(resolve)); res.statusCode=failState ? 503 : 200; return res.end(body); }
+  if (req.url.startsWith('/api/state')) { const body=JSON.stringify(failState ? {error:'fixture offline'} : state); if (holdState) await new Promise(resolve=>stateWaiters.push(resolve)); res.statusCode=failState ? (failState===true ? 503 : failState) : 200; return res.end(body); }
   if (req.url === '/api/commands') return res.end(JSON.stringify(catalog));
   if (req.url === '/api/jobs') return res.end(JSON.stringify(hideJobs ? [] : [{id:jobId,status:jobStatus,command:jobCommand,updated:1789900000}]));
   if (req.url === '/api/recordings') {
@@ -985,7 +985,28 @@ try {
   assert(!(await page.locator('#recording-controls').isVisible()));
   check('fullscreen fills viewport; recording survives reload, notice can be dismissed without downloading, saved recording stays accessible');
   failState=true; await page.evaluate(()=>refresh()); assert.equal(await page.locator('#connection').textContent(),'Disconnected · retrying');
-  failState=false; await page.evaluate(()=>refresh()); assert.equal(await page.locator('#connection').textContent(),'Live'); check('connection recovery');
+  assert(await page.locator('#offline-banner').isHidden(),'One HTTP error is not offline yet');
+  await page.evaluate(()=>refresh());
+  assert.equal(await page.locator('#connection').textContent(),'Offline');
+  assert(await page.locator('#offline-banner').isVisible(),'The second failure in a row says Offline');
+  assert.match(await page.locator('#offline-text').textContent(),/not answering since .*vmctl web/);
+  assert(await page.evaluate(()=>document.body.classList.contains('offline') && getComputedStyle(document.querySelector('main')).pointerEvents==='none'),'The stale page takes no clicks');
+  assert(await page.evaluate(()=>document.title.startsWith('Offline · ')));
+  failState=false; await page.locator('#offline-retry').click();
+  await page.waitForFunction(()=>document.getElementById('connection').textContent==='Live');
+  assert(await page.locator('#offline-banner').isHidden()); assert(await page.evaluate(()=>!document.body.classList.contains('offline') && !document.title.startsWith('Offline')));
+  // A new server (new token) answers 401: said at once, with the way out.
+  failState=401; await page.evaluate(()=>refresh());
+  assert.equal(await page.locator('#offline-title').textContent(),'Server restarted');
+  assert.match(await page.locator('#offline-text').textContent(),/new token/);
+  failState=false; await page.evaluate(()=>refresh());
+  // No answer at all (vmctl web stopped): offline at the first failure.
+  await page.route('**/api/state*', route=>route.abort('connectionrefused'));
+  await page.evaluate(()=>refresh());
+  assert.equal(await page.locator('#offline-title').textContent(),'Offline');
+  assert(await page.locator('#offline-banner').isVisible(),'A refused connection is offline at once');
+  await page.unroute('**/api/state*');
+  await page.evaluate(()=>refresh()); assert.equal(await page.locator('#connection').textContent(),'Live'); check('connection recovery, offline banner (server stopped, server restarted with a new token)');
   const initialY=(await page.locator('#profiles-view').boundingBox()).y;
   jobId='vm:arch-noctalia'; holdRun=true;
   await page.locator('#details').getByRole('button',{name:'Stop',exact:true}).click();

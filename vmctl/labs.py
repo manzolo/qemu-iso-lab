@@ -839,6 +839,8 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .vm-resize[data-dir=nw] { top:0; left:0; cursor:nwse-resize; } .vm-resize[data-dir=se] { bottom:0; right:0; cursor:nwse-resize; }
 .vm-resize[data-dir=se]::after { content:""; position:absolute; right:4px; bottom:4px; width:9px; height:9px; border-right:2px solid #6f93ad; border-bottom:2px solid #6f93ad; border-bottom-right-radius:3px; }
 .float-window { display:flex; }
+body.offline #map-live { color:#ff9aab; font-weight:600; }
+body.offline #lab-topology { opacity:.45; filter:grayscale(.75); transition:opacity .3s, filter .3s; }
 .float-window[data-action=console] { width:min(960px, calc(100vw - 24px)); height:min(640px, calc(100dvh - 24px)); }
 .float-window.front { border-color:#4f7d9c; }
 .float-window.front header { background:#132a3d; }

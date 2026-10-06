@@ -40,7 +40,8 @@ try {
     assert(url.pathname.endsWith('/map-state'));
     assert.equal(url.searchParams.get('token'),'fixture-token');
     requests++;
-    if(fail) return route.fulfill({status:503,body:'unavailable'});
+    if(fail==='down') return route.abort('connectionrefused');
+    if(fail) return route.fulfill({status:fail===true?503:fail,body:'unavailable'});
     const traffic=fixture.nics.map(n=>({...n,time:tick,epoch,packets_available:false,packets:[],
       packet_reason:'Packet inspection is available on LAN links; NAT has no packet capture.',
       ...(n.vm===target.vm && n.nic===target.nic ? {rx,tx,available:!unavailable && !stopped,
@@ -413,6 +414,16 @@ try {
   await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Updates unavailable'));
   assert.equal(await page.locator('.transmitting,.receiving').count(),0,'Failure clears old traffic');
   assert((await page.locator('#packet-state').textContent()).includes('Updates unavailable'));
+  assert(!await page.evaluate(()=>document.body.classList.contains('offline')),'A 503 is not offline');
+  // vmctl web stopped (no answer) or restarted with a new token (401): said in words, the map fades.
+  fail='down'; await page.clock.runFor(2100);
+  await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Offline · vmctl web is not answering'));
+  assert(await page.evaluate(()=>document.body.classList.contains('offline')));
+  fail=401; await page.clock.runFor(2100);
+  await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Server restarted with a new token'));
+  fail=true; await page.clock.runFor(2100);
+  await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Updates unavailable'));
+  assert(!await page.evaluate(()=>document.body.classList.contains('offline')));
   await page.keyboard.press('Escape');
   assert(await page.locator('#packet-inspector').isHidden());
   assert(await lens.evaluate(n=>document.activeElement===n),'Dismissal returns focus to the lens');

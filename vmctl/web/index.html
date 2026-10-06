@@ -29,6 +29,20 @@ header h1 b { color:var(--accent); }
 #summary { font-size:12px; color:var(--muted); }
 #connection { margin-left:auto; font-size:12px; color:var(--ok); display:flex; align-items:center; gap:7px; }
 #connection.s-warn { color:var(--warn); }
+#connection.s-bad { color:var(--bad); font-weight:600; }
+/* The server is gone (vmctl web stopped) or came back with a new token: a banner says so in words,
+   and the page behind it fades and takes no clicks, because every button would fail and every
+   state shown is the last one read (Manzolo, 2026-10-06: "Disconnected · retrying" alone in a
+   corner did not say it). */
+#offline-banner { position:sticky; top:0; z-index:60; display:flex; align-items:center; gap:10px 16px; flex-wrap:wrap; padding:12px 24px; background:#3d1820; color:#ffe3e8; border-bottom:1px solid #8a3a4a; font-size:13px; line-height:1.5; box-shadow:0 8px 24px #0006; }
+#offline-banner[hidden] { display:none; }
+#offline-banner strong { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--bad); display:flex; align-items:center; gap:8px; }
+#offline-banner strong::before { content:""; width:9px; height:9px; border-radius:50%; background:var(--bad); box-shadow:0 0 0 4px #ff9aab33; }
+#offline-banner span { flex:1 1 360px; min-width:0; }
+#offline-banner code { background:#0006; border:1px solid #8a3a4a; border-radius:5px; padding:1px 6px; color:#fff; }
+#offline-banner button { flex-shrink:0; }
+body.offline .overview, body.offline main { opacity:.45; filter:grayscale(.75); pointer-events:none; user-select:none; transition:opacity .3s, filter .3s; }
+body.console-embedded #offline-banner, body.panel-only #offline-banner { padding:6px 10px; font-size:12px; }
 #connection::before,.state::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; display:inline-block; flex-shrink:0; }
 #version { font:12px ui-monospace,monospace; border-left:1px solid var(--line); padding-left:14px; }
 .overview { padding:28px 24px 20px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
@@ -782,6 +796,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   <button id="identity-open" title="The guest identity of local.json: user, password, real name">Identity</button>
   <span id="version" class="s-muted"></span>
 </header>
+<div id="offline-banner" role="alert" hidden><strong id="offline-title">Offline</strong><span id="offline-text"></span><button id="offline-retry" type="button">Retry now</button></div>
 <section class="overview" aria-label="Lab overview">
   <div><div class="eyebrow">Your local workspace</div><h2>Virtual machines</h2><p>Build, run and explore your lab.</p></div>
   <div class="metrics"><div class="metric"><strong id="total-count">—</strong><span id="total-label">Profiles</span></div><div class="metric"><strong id="running-count" class="s-ok">—</strong><span>Running</span></div><div class="metric"><strong id="disk-count">—</strong><span id="activity-metric-label">Active jobs</span></div></div>
@@ -3479,6 +3494,32 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const r = rows[Math.max(0, Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (r) { selected = r.name; render(); document.querySelector("tr.sel")?.scrollIntoView({ block: "nearest" }); } }
 });
 let stateRefresh = null, freshRequested = false;
+// Offline: no answer at all (vmctl web stopped: fetch rejects with no status) is said at once; an
+// HTTP error only from the second failure in a row (a busy server is not a dead one); 401 means a
+// new server with a new token, which this page's URL can never reach.
+let lastStateAt = null, stateFailures = 0;
+const PAGE_TITLE = document.title;
+function serverBack() {
+  lastStateAt = new Date(); stateFailures = 0;
+  if (!document.body.classList.contains("offline")) return;
+  document.body.classList.remove("offline"); $("offline-banner").hidden = true; document.title = PAGE_TITLE;
+  toast("Connected to vmctl web again");
+}
+function serverLost(e) {
+  stateFailures += 1;
+  const gone = !e.status, renewed = e.status === 401;
+  $("connection").title = e.message;
+  if (!gone && !renewed && stateFailures < 2) { $("connection").textContent = "Disconnected · retrying"; $("connection").className = "s-warn"; return; }
+  const since = lastStateAt ? ` since ${lastStateAt.toLocaleTimeString()}` : "";
+  $("connection").textContent = renewed ? "Server restarted" : "Offline"; $("connection").className = "s-bad";
+  $("offline-title").textContent = renewed ? "Server restarted" : "Offline";
+  $("offline-text").innerHTML = renewed
+    ? "vmctl web is running again with a <b>new token</b>, which this page's link does not have: open the URL it printed (or run <code>vmctl web --open</code>). The VMs were not touched."
+    : `vmctl web is not answering${esc(since)}. The VMs keep running and their jobs go on, but what this page shows is the last state it read and its buttons are off. Start it again with <code>vmctl web</code> (or <code>make web</code>) and open the URL it prints: a new server has a new token.`;
+  $("offline-banner").hidden = false; document.body.classList.add("offline");
+  document.title = (renewed ? "Restarted · " : "Offline · ") + PAGE_TITLE;
+}
+$("offline-retry").onclick = () => refresh(true);
 async function refresh(fresh = false) {
   freshRequested ||= fresh === true || [...vmJobs.values()].some(j => j.confirming || j.unconfirmed);
   if (stateRefresh) return stateRefresh;
@@ -3502,8 +3543,8 @@ async function refresh(fresh = false) {
           }
         }
         $("version").textContent = "vmctl " + S.version; $("connection").textContent = "Live";
-        $("connection").className = ""; $("connection").removeAttribute("title"); render(); renderActivity(); openStartedConsoles();
-      } catch (e) { $("connection").textContent = "Disconnected · retrying"; $("connection").className = "s-warn"; $("connection").title = e.message; }
+        $("connection").className = ""; $("connection").removeAttribute("title"); serverBack(); render(); renderActivity(); openStartedConsoles();
+      } catch (e) { serverLost(e); }
     } while (freshRequested);
   })();
   try { await stateRefresh; } finally { stateRefresh = null; }
