@@ -566,7 +566,7 @@ function load(index, play) {
   history.replaceState(null, "", "#" + clip.id);
   if (play) video.play().catch(() => {});
 }
-// Since 2026-10-05 a clip is one file (Italian voice, the subtitles follow the language switch); older tour.json entries carried one per language.
+// A narrated clip has one file per language: the voice follows the language switch (a string = one file for both).
 function videoOf(clip) { return typeof clip.video === "string" ? clip.video : (clip.video[lang] || Object.values(clip.video)[0]); }
 function render() {
   const t = TEXT[lang], clip = TOUR.clips[current];

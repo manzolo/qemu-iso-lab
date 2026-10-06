@@ -118,9 +118,8 @@ sentence-ending "." aloud and invented words for versions and file names (2026-1
 `qemu-iso-lab` becomes "QEMU ISO Lab", `VM` "V M", and in Italian `console` is written
 `consolle` so it is said the Italian way; the buttons' own names (Open console, Consoles) stay
 English. **Before synthesizing, read what the voice will get**: `narrate.py --show <clip>` prints
-every cue next to its spoken form. Since 2026-10-05 the voice is **Italian only** by default
-(`--voice it`): the English track of the MP4 carries the Italian voice under the English
-subtitles; `--voice it,en` synthesizes both. `tests/test_tour_narrate.py` pins the filter.
+every cue next to its spoken form. Both voices are synthesized by default
+(`--voice it,en`); `--voice it` puts the Italian voice on both tracks. `tests/test_tour_narrate.py` pins the filter.
 
 Another voice: `--speaker "<name>"` (XTTS's built-in speakers), or a recording of your own with
 `--speaker-wav file.wav` (15–25 s of plain speech, quiet room). On a PipeWire host:
@@ -219,10 +218,9 @@ gh workflow run pages.yml --ref main                             # a push to med
 ```
 
 `docs/media/` is the worktree of the orphan `media` branch (one commit, replaced every time, like
-the install clips). Per clip: one `<clip>.mp4` (the video with the Italian voice; until 2026-10-05
-there was one file per language, the same video twice, and the branch weighed double),
-`<clip>.{en,it}.vtt`, `<clip>.jpg`, and `tour.json`, whose `video` entries for both languages
-name that one file. `tools/build_catalog_site.py` turns them into `tour.html` and the
+the install clips). Per clip: `<clip>.{it,en}.mp4` (the video with that language's voice; on
+2026-10-05/06 the clips carried the Italian voice only, one file),
+`<clip>.{en,it}.vtt`, `<clip>.jpg`, and `tour.json`, whose `video` names the file per language. `tools/build_catalog_site.py` turns them into `tour.html` and the
 catalog's "▶ Tour" link; without `tour/tour.json` the site has neither.
 
 ## Pitfalls met on the way (2026-10-03)

@@ -149,9 +149,8 @@ def main() -> None:
     ap.add_argument("--music", default=None, help="a background track (public domain or CC0: see artifacts/tour/music/CREDITS.md), "
                     "looped under the whole clip, faded in and out, ducked under the voice")
     ap.add_argument("--music-db", type=float, default=-8.0, help="gain on the track before ducking (default -8 dB: the public-domain piano of CREDITS.md sits about 17 dB under the voice in the pauses)")
-    ap.add_argument("--voice", default="it", help="languages to synthesize, comma-separated (default: it only, the "
-                    "decision of 2026-10-05; the English track then carries the Italian voice under English subtitles; "
-                    "--voice it,en for both)")
+    ap.add_argument("--voice", default="it,en", help="languages to synthesize, comma-separated (default: both; "
+                    "with one, every track carries that voice)")
     ap.add_argument("--show", action="store_true", help="print what the voice will be given, per cue and language, and stop: "
                     "read it before synthesizing (numbers, versions and file names are spelled out)")
     args = ap.parse_args()
