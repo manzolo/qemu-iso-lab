@@ -162,7 +162,7 @@ script's output as it comes, counts its `[PASS]`/`[FAIL]` lines and ends with on
 and one for the lab; the exit status is 1 when a check failed. A script whose exit status is not
 its number of failed checks (SSH down, a bash error) is reported as an *error*, not as a failed
 check. `--json` prints the same as data (the web's *Run tests* button on the lab card runs it as
-a job). On the lab card the buttons run something (Start/Stop stack, Status, Run tests) and the links open a page: **Guide** is `vms/labs/<lab>/guide.<lang>.md` rendered at `/labs/<lab>/guide?lang=en|it` (the browser's language when the lab has it, a link to the other one at the top; `labs.render_markdown` escapes every piece of text and only http(s) links are links), **Map** is the network map and **Consoles** opens every member of the lab side by side on `/multi`
+a job; it sits under *More lab actions* with *Status*). On the lab card the buttons run something (Start/Stop stack, Reset lab) or open the network **Map** in a new tab, and the links open a page: **Guide** is `vms/labs/<lab>/guide.<lang>.md` rendered at `/labs/<lab>/guide?lang=en|it` (the browser's language when the lab has it, a link to the other one at the top; `labs.render_markdown` escapes every piece of text and only http(s) links are links), and **Consoles** opens every member of the lab side by side on `/multi`
 (like *Start in console* on a selection, stopped members started), with the page headed by the
 lab, its title in the network bar and each member's address on the lab's segment next to its name. `check-vms` runs the tests too: when every member of a lab with tests was in the run and
 passed, the members start on their fresh disks and a `lab-<name>` row records the outcome (SKIP

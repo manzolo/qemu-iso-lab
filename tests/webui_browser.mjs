@@ -428,6 +428,27 @@ try {
   assert.equal(await page.locator('.lab').first().locator('.buttons button').first().textContent(),'Start stack');
   assert.equal(await page.locator('.lab').nth(1).locator('.buttons button').first().textContent(),'Install lab');
   await shot('labs'); check('installed and new labs have different primary actions');
+  {
+    // A lab command shows at once that it is at work: spinner + label on its button, the lab's
+    // other commands wait, the bar runs; then the running job keeps it so until it ends.
+    const card=page.locator('.lab').first(), saved=[jobId,jobStatus,jobCommand];
+    holdRun=true; jobId='web:lab';
+    await card.locator('.buttons button').first().click();
+    await page.waitForFunction(()=>document.querySelector('.lab.busy button.working'));
+    assert.equal((await card.locator('button.working').textContent()).trim(),'Starting stack…');
+    assert.equal(await card.locator('.lab-footer [data-args]:not([disabled])').count(),0,'The other lab commands wait');
+    assert.equal(await card.getAttribute('aria-busy'),'true');
+    holdRun=false; releaseRun();
+    await page.waitForFunction(()=>document.getElementById('activity-command')?.textContent==='vmctl group up proxmox-lab');
+    await page.evaluate(()=>refreshJobs());
+    assert(await card.evaluate(n=>n.classList.contains('busy')),'Busy while the job runs');
+    jobStatus='completed'; await page.evaluate(()=>refreshJobs());
+    await page.waitForFunction(()=>!document.querySelector('.lab.busy'));
+    assert.equal((await card.locator('.buttons button').first().textContent()).trim(),'Start stack');
+    [jobId,jobStatus,jobCommand]=saved; requests=[];
+    await page.evaluate(()=>refreshJobs());
+    check('a lab command shows it is at work from the click to the end of its job');
+  }
   state.vms.find(vm=>vm.name==='proxmox-ve').running=true;
   await page.evaluate(()=>refresh(true));
   const labIcon=page.locator('[data-member="proxmox-ve"] .catalog-icon');

@@ -354,6 +354,15 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .lab-head h2 { border:0; padding:0; color:var(--text); font-size:15px; text-transform:none; letter-spacing:0; }
 .lab-progress { height:3px; background:var(--btn); border-radius:3px; margin-bottom:12px; overflow:hidden; }
 .lab-progress span { display:block; height:100%; background:var(--accent); }
+/* A lab command at work (Start stack, Stop stack...): the clicked button turns into its spinner
+   and label at once, the other commands of the lab wait, the bar under the title runs (Manzolo,
+   2026-10-06: a few seconds passed before anything said the click was taken). */
+.lab button.working, .lab button.working:disabled { display:inline-flex; align-items:center; gap:8px; opacity:1; cursor:progress; }
+.lab .spin { width:11px; height:11px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:activity-spin .8s linear infinite; flex-shrink:0; }
+.lab.busy .lab-progress { background:linear-gradient(90deg, var(--btn) 0%, #7ddfc566 50%, var(--btn) 100%) 0 0 / 200% 100%; animation:lab-working 1.4s linear infinite; }
+.lab.busy .lab-chip-work { color:var(--accent); }
+@keyframes lab-working { from { background-position:200% 0; } to { background-position:-200% 0; } }
+@media (prefers-reduced-motion:reduce) { .lab .spin, .lab.busy .lab-progress { animation:none; } }
 .lab .members div { padding:10px 0; align-items:center; gap:10px; }
 .lab .members button { background:none; padding:0; text-align:left; color:var(--text); }
 .lab .members button[data-member] { flex:1; }
@@ -1473,6 +1482,24 @@ function render() {
   renderDetails();
 }
 let detailsSignature = "", labsSignature = "", labsOrder = [];
+// Lab commands in flight: the click itself (until /api/run answers with a job), then that job
+// while /api/jobs lists it running; any running `vmctl group <cmd> <lab>` job counts too.
+const labPending = new Map();  // lab -> {action, job, at}
+const LAB_WORKING = {up:"Starting stack…", down:"Stopping stack…", install:"Installing…", reset:"Resetting…", test:"Running tests…",
+  status:"Reading status…", clean:"Cleaning…", checkpoint:"Saving reset point…", cluster:"Forming cluster…", map:"Generating map…"};
+function labWork(group) {
+  const pending = labPending.get(group);
+  if (pending) {
+    const job = pending.job && knownJobs.find(j => j.id === pending.job);
+    if ((job && job.status !== "running") || (!job && Date.now() - pending.at > 20000)) labPending.delete(group);
+    else return pending.action;
+  }
+  for (const job of knownJobs) {
+    const match = job.status === "running" && /^vmctl group (\S+) (\S+)/.exec(job.command || "");
+    if (match && match[2] === group) return match[1];
+  }
+  return null;
+}
 const labsFollow = new Map();  // lab -> when the user started it from this page: its card is followed when it climbs
 function renderDetails() {
   const signature = JSON.stringify([selected, !!visible().length, S.vms.find((x) => x.name === selected), vmJobs.get(selected), submittingVms.has(selected), cancellingJobs.has("vm:"+selected)]);
@@ -1539,7 +1566,7 @@ function renderDetails() {
   $("details").querySelectorAll("[data-action]").forEach(b => b.onclick = () => runAction(r, actions[+b.dataset.action]));
 }
 function renderLabs() {
-  const signature = JSON.stringify([S.labs, S.vms, [...vmJobs], $("search").value]);
+  const signature = JSON.stringify([S.labs, S.vms, [...vmJobs], $("search").value, S.labs.map(lab => labWork(lab.group))]);
   if (signature === labsSignature) return;
   labsSignature = signature;
   const byName = Object.fromEntries(S.vms.map((r) => [r.name, r]));
@@ -1559,17 +1586,24 @@ function renderLabs() {
     const up = members.filter((m) => m.running).length;
     const installed = names.length > 0 && names.every((n) => byName[n]?.installed);
     const cluster = members.some((m) => m.family === "proxmox");
-    const btn = (label,args,cls="") => `<button class="${cls}" data-args='${esc(JSON.stringify(args))}'>${label}</button>`;
-    const primary = installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab",["group","install",lab.group],"primary");
+    const work = labWork(lab.group);
+    const spinner = `<span class="spin" aria-hidden="true"></span>`;
+    const btn = (label,args,cls="") => {
+      const mine = work && args[0] === "group" && args[1] === work;
+      return `<button class="${cls}${mine ? " working" : ""}" data-args='${esc(JSON.stringify(args))}'${work ? " disabled" : ""}${mine ? ' aria-busy="true"' : ""}>${mine ? spinner + esc(LAB_WORKING[work] || "Working…") : label}</button>`;
+    };
+    // The stack command at work keeps the primary place whatever the members say meanwhile.
+    const primary = ["up","down","install"].includes(work) ? btn("", ["group",work,lab.group], "primary")
+      : installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab",["group","install",lab.group],"primary");
     const subtitle = lab.title || (cluster ? `Proxmox VE: ${names.length - 1} nodes and a client on one segment` : `${names.length} machine${names.length === 1 ? "" : "s"} on a shared network`);
     const facts = [`${names.length} machine${names.length === 1 ? "" : "s"}`, lab.tests ? `${lab.tests} test script${lab.tests === 1 ? "" : "s"}` : "", (lab.guides || []).length ? `guide ${lab.guides.map(g => g.toUpperCase()).join(" · ")}` : "", cluster ? "cluster" : ""].filter(Boolean);
     const link = (attr, label, icon, title) => `<button ${attr} title="${esc(title)}">${consoleIcon(icon)}${label}</button>`;
-    return `<section class="card lab" data-lab="${esc(lab.group)}"><div class="lab-head" tabindex="0" aria-label="${esc(lab.group)}. Right-click for stack actions."><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<span class="lab-name"><h2>${esc(lab.group)}</h2><p class="lab-title">${esc(subtitle)}</p></span></span><span class="lab-controls"><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span>${menuButton("lab",lab.group)}</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
+    return `<section class="card lab${work ? " busy" : ""}" data-lab="${esc(lab.group)}"${work ? ' aria-busy="true"' : ""}><div class="lab-head" tabindex="0" aria-label="${esc(lab.group)}. Right-click for stack actions."><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<span class="lab-name"><h2>${esc(lab.group)}</h2><p class="lab-title">${esc(subtitle)}</p></span></span><span class="lab-controls"><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span>${menuButton("lab",lab.group)}</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
       <div class="lab-facts">${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
       <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button class="${m.running ? "member-running" : ""}" data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc([].concat((lab.addresses || {})[m.name] || []).join(" · ") || "Open profile →")}</span></span></button>${stateBadge(m)}${menuButton("member",m.name)}</div>`; }).join("")}</div>
-      <div class="lab-footer"><div class="buttons">${primary}${installed && up > 0 && up < members.length ? btn("Stop stack",["group","down",lab.group]) : ""}${btn("Status",["group","status",lab.group])}${installed && lab.tests ? btn("Run tests",["group","test",lab.group]) : ""}${installed ? btn("Reset lab…",["group","reset",lab.group],"danger") : ""}</div>
-      <div class="lab-links">${consoleTargets(names).length ? link(`data-lab-consoles="${esc(lab.group)}"`, "Consoles", "detach", "Every member of the lab in one page of consoles, side by side, started if stopped") : ""}${link(`data-map="${esc(lab.group)}"`, "Map", "integration", "The network map, the access table and the runbook, in a new tab")}${(lab.guides || []).length ? link(`data-guide="${esc(lab.group)}"`, "Guide", "files", "The lab's walkthrough, in a new tab") : ""}</div></div>
-      <details class="lab-secondary"><summary>More lab actions</summary><p class="lab-order">Start order: ${esc(names.join(" → "))}</p><div class="buttons">${installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group])}${up && !installed ? btn("Stop stack",["group","down",lab.group]) : ""}${cluster ? btn("Form cluster",["group","cluster",lab.group]) : ""}${btn("Generate map",["group","map",lab.group])}${installed ? btn("Save as reset point…",["group","checkpoint",lab.group],"danger") : ""}${btn("Clean lab…",["group","clean",lab.group],"danger")}</div><p class="lab-order">Reset lab puts every member back to its reset point (written by Install lab, or by Save as reset point) and starts the stack again.</p></details></section>`;
+      <div class="lab-footer"><div class="buttons">${primary}${installed && up > 0 && up < members.length && !["up","down"].includes(work) ? btn("Stop stack",["group","down",lab.group]) : ""}<button data-map="${esc(lab.group)}" title="The network map, the access table and the runbook, in a new tab">Map</button>${installed ? btn("Reset lab…",["group","reset",lab.group],"danger") : ""}</div>
+      <div class="lab-links">${consoleTargets(names).length ? link(`data-lab-consoles="${esc(lab.group)}"`, "Consoles", "detach", "Every member of the lab in one page of consoles, side by side, started if stopped") : ""}${(lab.guides || []).length ? link(`data-guide="${esc(lab.group)}"`, "Guide", "files", "The lab's walkthrough, in a new tab") : ""}</div></div>
+      <details class="lab-secondary"><summary>More lab actions</summary><p class="lab-order">Start order: ${esc(names.join(" → "))}</p><div class="buttons">${installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group])}${up && !installed ? btn("Stop stack",["group","down",lab.group]) : ""}${installed && lab.tests ? btn("Run tests",["group","test",lab.group]) : ""}${btn("Status",["group","status",lab.group])}${cluster ? btn("Form cluster",["group","cluster",lab.group]) : ""}${btn("Generate map",["group","map",lab.group])}${installed ? btn("Save as reset point…",["group","checkpoint",lab.group],"danger") : ""}${btn("Clean lab…",["group","clean",lab.group],"danger")}</div><p class="lab-order">Reset lab puts every member back to its reset point (written by Install lab, or by Save as reset point) and starts the stack again.</p></details></section>`;
   }).join("") || '<p class="s-muted">No matching labs.</p>';
   bindStateLogs($("labs-view"));
   // The lab's members side by side (/multi), like Start in console on a selection; the page knows the lab.
@@ -1682,6 +1716,8 @@ async function run(args, danger, afterStart = false) {
   const consoleRequest = afterStart && vm ? {accepted:false, popup:afterStart === "detached" ? reserveConsoleWindow(vm) : null} : null;
   if (vm) { discardPendingConsole(vm); if (consoleRequest) pendingConsoles.set(vm, consoleRequest); }
   if (args[0] === "group" && args[2] && ["up", "install", "reset", "checkpoint", "test"].includes(args[1])) labsFollow.set(args[2], Date.now());
+  const labGroup = args[0] === "group" && args[2] && S.labs.some(l => l.group === args[2]) ? args[2] : null;
+  if (labGroup) { labPending.set(labGroup, {action:args[1], job:null, at:Date.now()}); render(); }
   if (vm) { submittingVms.add(vm); vmJobs.set(vm, {status:"running", command:args[0]}); jobsRevision++; render(); }
   try {
     const res = await api("/api/run", { args, confirmed: !!destructive });
@@ -1690,6 +1726,7 @@ async function run(args, danger, afterStart = false) {
     if ($("cmd-dialog").open) $("cmd-dialog").close();
     jobsRevision++;
     activityJob = {id:res.job, command:res.command, status:"running", updated:Date.now()/1000};
+    if (labGroup && labPending.get(labGroup)?.action === args[1]) labPending.get(labGroup).job = res.job;
     if (res.job.startsWith("vm:")) vmJobs.set(res.job.slice(3), {status:"running",command:args[0]});
     else if (vm) { if (previous) vmJobs.set(vm, previous); else vmJobs.delete(vm); }
     if (consoleRequest && res.job === "vm:" + vm) consoleRequest.accepted = true;
@@ -1698,6 +1735,7 @@ async function run(args, danger, afterStart = false) {
     refresh(true); refreshJobs();
     return true;
   } catch (e) {
+    if (labGroup) labPending.delete(labGroup);
     if (vm) { if (previous) vmJobs.set(vm, previous); else vmJobs.delete(vm); }
     if (vm) discardPendingConsole(vm);
     toast(e.message, true);
