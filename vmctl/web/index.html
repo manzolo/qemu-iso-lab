@@ -744,8 +744,10 @@ main > section { min-width:0; }
 .profile-title { min-width:0; }
 #details .name { font-size:18px; margin:0 0 4px; line-height:1.25; }
 #details .desc { font-size:12px; margin:0; }
-.primary-actions button { grid-column:auto; }
-.primary-actions .main-action, .primary-actions button:nth-child(n+4), .primary-actions button:last-child:nth-child(2) { grid-column:1/-1; }
+/* `.actions button:last-child` spans both columns (the generic rule above): here the last button
+   is Stop, which must sit next to Open SSH, so every rule carries .actions.primary-actions. */
+.actions.primary-actions button, .actions.primary-actions button:last-child { grid-column:auto; margin-top:0; }
+.actions.primary-actions .main-action, .actions.primary-actions button:nth-child(n+4), .actions.primary-actions button:last-child:nth-child(2) { grid-column:1/-1; }
 .primary-actions button .al { white-space:nowrap; }
 .primary-actions button:not(.main-action) { min-height:36px; padding:8px 10px; }
 .primary-actions button:not(.main-action) kbd { margin-left:auto; }
