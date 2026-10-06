@@ -81,6 +81,20 @@ try {
       const after=await dialog.boundingBox();
       assert(Math.abs(after.x-(before.x-200))<2 && Math.abs(after.y-(before.y+120))<2,`Dragged by the header: ${JSON.stringify([before,after])}`);
       assert.equal(await dialog.evaluate(n=>n.classList.contains('dragging')),false);
+      // Resized from its corner and its left edge (the browser's CSS handle sat under the iframe).
+      const grip=async(dir,dx,dy)=>{const g=await page.locator(`#vm-dialog .vm-resize[data-dir="${dir}"]`).boundingBox();
+        await page.mouse.move(g.x+g.width/2,g.y+g.height/2); await page.mouse.down();
+        await page.mouse.move(g.x+g.width/2+dx,g.y+g.height/2+dy,{steps:4}); await page.mouse.up();};
+      await grip('se',120,90);
+      const grown=await dialog.boundingBox();
+      assert(Math.abs(grown.width-(after.width+120))<2 && Math.abs(grown.height-(after.height+90))<2,`Resized by its corner: ${JSON.stringify([after,grown])}`);
+      await grip('w',-60,0);
+      const wider=await dialog.boundingBox();
+      assert(Math.abs(wider.x-(grown.x-60))<2 && Math.abs(wider.width-(grown.width+60))<2 && Math.abs(wider.y-grown.y)<2,`Resized by its left edge: ${JSON.stringify([grown,wider])}`);
+      await grip('se',-2000,-2000);
+      const least=await dialog.boundingBox();
+      assert(least.width>=319 && least.height>=199,`Never smaller than 320x200: ${JSON.stringify(least)}`);
+      assert.equal(await dialog.evaluate(n=>n.classList.contains('dragging')),false);
       await page.locator('.lan-nic .inspect-btn').last().click();  // a lens the SSH window does not cover
       assert(!await page.locator('#packet-inspector').evaluate(n=>n.hidden),'The packet inspector opens while SSH is up');
       assert(await dialog.evaluate(n=>n.open),'SSH stays open');

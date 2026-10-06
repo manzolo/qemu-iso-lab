@@ -574,11 +574,12 @@
     url.hash = `${action}=${encodeURIComponent(vm)}`;
     return url;
   };
-  // SSH is a small window that floats over the map (non-modal, dragged by its header, resized by
-  // the browser's handle): a shell on one machine next to the packet inspector is how the
+  // SSH is a small window that floats over the map (non-modal, dragged by its header, resized from
+  // any edge or corner: the browser's own CSS handle sat under the terminal's iframe, which took
+  // the pointer, so the window could not be resized at all, Manzolo 2026-10-06): a shell on one machine next to the packet inspector is how the
   // analyser gets tested (Manzolo, 2026-10-05). Console and Manage stay modal dialogs.
   const FLOATING = new Set(['ssh']);
-  let dialogOpener = null, floatAt = null;
+  let dialogOpener = null, floatAt = null, floatSize = null;
   const placeFloating = () => {
     const width = vmDialog.offsetWidth, height = vmDialog.offsetHeight;
     const at = floatAt || {x: innerWidth - width - 16, y: 16};
@@ -597,7 +598,8 @@
     vmFrame.src = actionUrl(action, vm, true).href;
     vmDialog.dataset.vm = vm; vmDialog.dataset.action = action;
     vmDialog.classList.toggle('floating', floating);
-    if (!floating) { vmDialog.style.left = vmDialog.style.top = ''; }
+    if (!floating) { vmDialog.style.left = vmDialog.style.top = vmDialog.style.width = vmDialog.style.height = ''; }
+    else if (floatSize) { vmDialog.style.width = `${floatSize.w}px`; vmDialog.style.height = `${floatSize.h}px`; }
     if (!vmDialog.open) { if (floating) vmDialog.show(); else vmDialog.showModal(); }
     if (floating) placeFloating();
     vmFrame.focus();
@@ -613,6 +615,31 @@
     window.addEventListener('pointerup', up);
     event.preventDefault();
   });
+  // The edges: the iframe stops taking the pointer while the window is resized (.dragging), and the
+  // terminal refits itself (its ResizeObserver). The size is kept for the next SSH window.
+  vmDialog?.querySelectorAll('.vm-resize').forEach(grip => grip.addEventListener('pointerdown', event => {
+    if (!vmDialog.classList.contains('floating')) return;
+    const dir = grip.dataset.dir, start = vmDialog.getBoundingClientRect(), x0 = event.clientX, y0 = event.clientY;
+    const MIN_W = 320, MIN_H = 200;
+    vmDialog.classList.add('dragging');
+    grip.setPointerCapture?.(event.pointerId);
+    const move = e => {
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      let {left, top, width, height} = start;
+      if (dir.includes('e')) width = Math.min(innerWidth - left - 8, Math.max(MIN_W, start.width + dx));
+      if (dir.includes('s')) height = Math.min(innerHeight - top - 8, Math.max(MIN_H, start.height + dy));
+      if (dir.includes('w')) { width = Math.max(MIN_W, Math.min(start.right - 8, start.width - dx)); left = start.right - width; }
+      if (dir.includes('n')) { height = Math.max(MIN_H, Math.min(start.bottom - 8, start.height - dy)); top = start.bottom - height; }
+      floatSize = {w: Math.round(width), h: Math.round(height)}; floatAt = {x: left, y: top};
+      vmDialog.style.width = `${floatSize.w}px`; vmDialog.style.height = `${floatSize.h}px`;
+      placeFloating();
+    };
+    const up = () => { vmDialog.classList.remove('dragging'); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    event.preventDefault(); event.stopPropagation();
+  }));
   window.addEventListener('resize', () => { if (vmDialog?.open && vmDialog.classList.contains('floating')) placeFloating(); });
   // The `close` event arrives a task later than close(): unload the frame right away, and again
   // on the event for an Escape (the dialog's own cancel), which never comes through here.
