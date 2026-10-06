@@ -160,7 +160,8 @@ def render_usage(data: dict[str, Any], top: int) -> None:
         for vm in data["vms"][:top]:
             other = vm["other"] + vm["recordings"]
             details = "" if compact else f"  {human(vm['disks']):>9}  {human(vm['checkpoints']):>11}  {human(other):>9}"
-            print(f"  {ui.style(f'{clipped(vm['name'], name_width):<{name_width}}', ui.CYAN)}  {human(vm['total']):>9}{details}")
+            name = clipped(str(vm["name"]), name_width).ljust(name_width)  # no nested quotes: Python 3.10 refuses them
+            print(f"  {ui.style(name, ui.CYAN)}  {human(vm['total']):>9}{details}")
         if len(data["vms"]) > top:
             print(f"  + {len(data['vms']) - top} more: vmctl usage --top N")
     print()
