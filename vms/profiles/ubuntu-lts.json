@@ -69,7 +69,8 @@
           }
         ],
         "runcmd": [
-          "systemctl set-default graphical.target"
+          "systemctl set-default graphical.target",
+          "install -d -m0700 -o {{user}} -g {{user}} /home/{{user}}/.config && echo yes > /home/{{user}}/.config/gnome-initial-setup-done && chown {{user}}:{{user}} /home/{{user}}/.config/gnome-initial-setup-done; pkill -u {{user}} -f 'gnome-initial-setup --existing-user' || true"
         ]
       },
       "ssh_provision": {
@@ -838,7 +839,7 @@
           "ubuntu-releases"
         ],
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "notes": "Ubuntu Server 20.04.6 autoinstall plus the ubuntu-desktop metapackage: GNOME 3.36 on gdm3 with the autologin drop-in. Its subiquity (22.07) installs `packages` with only the CD pool in the target's sources (the mirror waits in sources.list.curtin.old), so ubuntu-desktop is 'Unable to locate' there (verified live): the desktop is installed by a late-command through curtin in-target instead, after the mirror sources are back. Same recipe otherwise as ubuntu-gnome-24.04, which stands for 24.04 in this series.",
       "autoinstall": {
@@ -879,7 +880,7 @@
           "ubuntu-releases"
         ],
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "notes": "Ubuntu Server 22.04.5 autoinstall plus the ubuntu-desktop metapackage: GNOME 42 on gdm3 with the autologin drop-in; same recipe as ubuntu-gnome-24.04, which stands for 24.04 in this series.",
       "autoinstall": {
@@ -922,7 +923,7 @@
           "ubuntu-releases"
         ],
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "notes": "Ubuntu Server 26.04 autoinstall plus the ubuntu-desktop metapackage, the newest entry of the per-release desktop series (24.04's entry is ubuntu-gnome-24.04). Same recipe as 22.04 and 24.04, unchanged: gdm3 autologin drop-in, the user in the autologin and nopasswdlogin groups, a ttyS0 getty, and a post-install that asserts an active local graphical session rather than an enabled display manager. The ISO is the one ubuntu-server-live and ubuntu-server-ci already pin. Live PASS 2026-09-20 in 12.9 min: 26.04's subiquity resolves ubuntu-desktop from autoinstall 'packages' (no late_commands with curtin in-target, which 20.04 needed), and gdm3.service still answers because Ubuntu keeps it an alias of gdm.service, so the verify-desktop service gate holds.",
       "autoinstall": {

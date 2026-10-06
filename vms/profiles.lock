@@ -607,9 +607,14 @@
       ]
     },
     "edubuntu-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:33e690d11db5ed4cf142a8e63517fe583e1806fde8b3485adca62fcf0ad80a40",
+      "version": "1.0.1",
+      "fingerprint": "sha256:31061acece7a4575da92aeae83098cbc104d6c284012048e6cf2e2929631d1b1",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -618,9 +623,14 @@
       ]
     },
     "edubuntu-26.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:86a1ea7213843bb1c8fe6b56fc02cdee9409a77ba8a836ec4a7dc490a122ff09",
+      "version": "1.0.1",
+      "fingerprint": "sha256:d22667c6ac6b95f7a536875f667b10b4b3a6e5a93044fa67d93044d7e05e66c5",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1033,9 +1043,14 @@
       ]
     },
     "kubuntu-20.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:e3bb272db74a3503425d873ee4ae73a4f469891e30e7263c0a32dfccd2d0e108",
+      "version": "1.0.1",
+      "fingerprint": "sha256:a882e2a35886e5da51d10feb7b5ca4dd97dd9b2b02d936e874363951630186ee",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1044,9 +1059,14 @@
       ]
     },
     "kubuntu-22.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:a995710a50583daefd8fdc78e695d6da6ecb013364add1314943dc437bd15350",
+      "version": "1.0.1",
+      "fingerprint": "sha256:4fe574df3e45afc1fde037b31848fb56118aefb3487cf79748ef948bfdfec7b5",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1055,9 +1075,14 @@
       ]
     },
     "kubuntu-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:2162da93d3796221569af70df3b49df9e3cbfec170f77c91e6b0e72e05edefd5",
+      "version": "1.0.1",
+      "fingerprint": "sha256:ab998336725b5c629849b7fedaa983e2682d1eb6c6009608c04385627f463f66",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -1066,9 +1091,14 @@
       ]
     },
     "kubuntu-26.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:399718c64645590bc71f37b885aa4ba2a6c79dc67bde415eecb9100a0d0bb4cc",
+      "version": "1.0.1",
+      "fingerprint": "sha256:004b642ddc484d18d81c54c6a342ad150108e99b95a6859e60ed67204a6b4658",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1170,9 +1200,14 @@
       ]
     },
     "lubuntu-20.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:d7cf2a615ab6cf490a1aecea6741dc879f73e7b5cb2c4c0929466fd3293cb95f",
+      "version": "1.0.1",
+      "fingerprint": "sha256:c342746f5f8b5a1cd31a38827e2b4663a6f1db42d9cbede442ed47ef3bcd3cb4",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1181,9 +1216,14 @@
       ]
     },
     "lubuntu-22.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:d4fde6631c58dd93bb48c6637018eb2ff3a818dff88debcaef412ffc7b958d7b",
+      "version": "1.0.1",
+      "fingerprint": "sha256:2a28163518fa45fb9be520d909e499e26e75d952f56e4bb07feff4bc17ff5710",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1192,9 +1232,14 @@
       ]
     },
     "lubuntu-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:c47609ecce410c8ffa7eacb5b3fedab9b473716e6027c3a0ea0b5f0756af4b74",
+      "version": "1.0.1",
+      "fingerprint": "sha256:db0d3cb1d4ff70cc94ea3adc3d0570013fcbe0dfc899d09b879b96488db0e680",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -1203,9 +1248,14 @@
       ]
     },
     "lubuntu-26.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:7381bb4decc8dc584de47ddaca0cfce1c977a9a98c971d94e4639eb168105d11",
+      "version": "1.0.1",
+      "fingerprint": "sha256:79e61a0b40583bf8a8f4754c28368a08baae3f031ff278114ca3d3ab70c20e3f",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1952,9 +2002,14 @@
       ]
     },
     "ubuntu-20.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:42f3504a6add03edde0ae418928a9a07cf66efded2fd7423cfb78aabfbe56dfa",
+      "version": "1.0.1",
+      "fingerprint": "sha256:fdd6baf003829acff3344b0e4c6b4627b1135cccdca173acb816fbdc0a015cd5",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -1974,9 +2029,14 @@
       ]
     },
     "ubuntu-22.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:47207e6ffd0cfc094ec2d9ed62f94f18ed1959c6b25f68cf02935ef1835bceda",
+      "version": "1.0.1",
+      "fingerprint": "sha256:3484758d642d543d6e552af7ec9db7864e39d8c65b693df122c44d8661f69698",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2018,9 +2078,14 @@
       ]
     },
     "ubuntu-26.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:100b947931634be4ea9ffe2e924df3f802e1483ebf3bb1a55a1b47198424234e",
+      "version": "1.0.1",
+      "fingerprint": "sha256:932ce3c59772b850cafc9f55a18d41b7d3aae4d018785c535928a296803573ab",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2062,9 +2127,14 @@
       ]
     },
     "ubuntu-budgie-20.04": {
-      "version": "1.0.2",
-      "fingerprint": "sha256:441a04e05481a388ef8518a1af13caf34320b52e61e7ecf2a5ae7a36ce92284c",
+      "version": "1.0.3",
+      "fingerprint": "sha256:4a9ffce7ffaf3b28ea0a8874b00ef8aa115a7c60b0276f4ed558aa096e16bb34",
       "history": [
+        {
+          "version": "1.0.3",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.2",
           "date": "2026-10-01",
@@ -2083,9 +2153,14 @@
       ]
     },
     "ubuntu-budgie-22.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:3df631e2b268aa02adf24afcc0440977a7382f0ff78198fce8c1f89654a53d96",
+      "version": "1.0.1",
+      "fingerprint": "sha256:4cbd8e0f4cbd3a3d2c6ff0c7fe233461ce914973e2118d096920c7440c45c756",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2094,9 +2169,14 @@
       ]
     },
     "ubuntu-budgie-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:cf35a05003d73a2a00a8d30724c9ccce84493900c9664360f5bafd61c50ae8fd",
+      "version": "1.0.1",
+      "fingerprint": "sha256:40f2669f71365efceb4e42305cd2d23e3ffe3f335419bf69422b08a070217c3c",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2105,9 +2185,14 @@
       ]
     },
     "ubuntu-budgie-26.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:f7356dc84b9584b086da970acb17ce86456e54724b95909f1580817adf6d72c3",
+      "version": "1.0.1",
+      "fingerprint": "sha256:0286037b73fe10a00b868f1faaf72ac7a8e238e1143085ab662d7cc504cfe052",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2116,9 +2201,14 @@
       ]
     },
     "ubuntu-cinnamon-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:cdad90d4462627c36084e76f0c90212288a5bd9f337facd2ff4450edaf89fe7b",
+      "version": "1.0.1",
+      "fingerprint": "sha256:e78df119e237634d199eb7bda885d8d9d2b7b38cbb3438d25d2bce79fdc3086b",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2127,9 +2217,14 @@
       ]
     },
     "ubuntu-cinnamon-26.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:8cae220715778c7cbc8d36afde6ec336bac0c2c12e6d835eab0e259c08081eed",
+      "version": "1.0.1",
+      "fingerprint": "sha256:72377a5980c909e6d195fcec83c143f4c7e24aedd6821c2f2f40a3a602a7d451",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2149,9 +2244,14 @@
       ]
     },
     "ubuntu-gnome-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:1bb8c7caa0a072327d2b72662da32d47be339839af288049cf1938bdeabe6e52",
+      "version": "1.0.1",
+      "fingerprint": "sha256:5a58e22a44125784584d35ff84a08a2e367a93bce856b06fe0fbdb1808a54146",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2182,9 +2282,14 @@
       ]
     },
     "ubuntu-mate-20.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:b8d7aec445dcdbc4177667d106e5ba5705500656f486c55773bda3a0d82f0b66",
+      "version": "1.0.1",
+      "fingerprint": "sha256:d9a1cb6ed7998a447767e5f06e1adfce998acf43aa59100547ac8142e2a2c036",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2193,9 +2298,14 @@
       ]
     },
     "ubuntu-mate-22.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:cc1c5e96e853e1539843e3ac744daedf4613c0ba4527094f20a4d77c042f6731",
+      "version": "1.0.1",
+      "fingerprint": "sha256:20b25e0b95ebdcca78f8e6117949ef6b84e3d9417a8ddda2c6a56f05de8bc644",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2204,9 +2314,14 @@
       ]
     },
     "ubuntu-mate-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:6270272c03135ef5d2b59facf739b3eaee4ada43feeda2cf7a3ce9a526d5e5cb",
+      "version": "1.0.1",
+      "fingerprint": "sha256:7529af37970423c9152ae6080e9bc1a370bdddff9b4d5fe30643b86d54ddec10",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2215,9 +2330,14 @@
       ]
     },
     "ubuntu-mate-26.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:105b1ebf03f2c4ceec0a2c2729a3a55483a5919b695bea4837e18dc0ff4ddd59",
+      "version": "1.0.1",
+      "fingerprint": "sha256:92a5580d79dcbed2856ee13d80de9fed732265dc88cd99c8a40eba0a61e1871f",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2259,9 +2379,14 @@
       ]
     },
     "ubuntu-unity-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:190719ef9110c3f52861f2f05b835291524ae3c4ff67115f8e8ba6f172b50c49",
+      "version": "1.0.1",
+      "fingerprint": "sha256:7ff3e528cac94d970c251568b95f5f75feb219525c666bf1b063745dae289eca",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2270,9 +2395,14 @@
       ]
     },
     "ubuntu-unity-26.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:c0c4b23dd1c2eb091aad8e41c45fb94b32077a025988c9e6d3b35dbb724fff99",
+      "version": "1.0.1",
+      "fingerprint": "sha256:248be00227cf31a213783e08176e6d82f8fac53ad0cfe3e39367782c010c0365",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2281,9 +2411,14 @@
       ]
     },
     "ubuntustudio-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:583247b4a837ff5d5fc545c060fab4904c693ae780943edb34b0f7ca2ecf196c",
+      "version": "1.0.1",
+      "fingerprint": "sha256:e02486e02467c27b623c8826d7e9036cee55ed1716094482bf582e6594eb337c",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2504,9 +2639,14 @@
       ]
     },
     "xubuntu-20.04": {
-      "version": "1.0.3",
-      "fingerprint": "sha256:facbc138d96f3941475e5236c08d2f627484cfc522c0531b706dcfa5ad0e493b",
+      "version": "1.0.4",
+      "fingerprint": "sha256:2da223a06edc264452c1f901e224149b58e1c533bc59a3b90c7f61c608dc1de7",
       "history": [
+        {
+          "version": "1.0.4",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.3",
           "date": "2026-10-01",
@@ -2530,9 +2670,14 @@
       ]
     },
     "xubuntu-22.04": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:c010bd1e74bca9822da627f2dcfab2a89bd2b3836e56b129ed925bbacb68e244",
+      "version": "1.0.2",
+      "fingerprint": "sha256:ab9a4ef543d497564a238baa94696999622fcfc6896b9c3df78e01658c0d335a",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-28",
@@ -2546,9 +2691,14 @@
       ]
     },
     "xubuntu-24.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:719a24080e1f94fd7bf5b3310a637be84c42f9ef0337b21b5516deb03f3a817f",
+      "version": "1.0.1",
+      "fingerprint": "sha256:fb25cd707043e1fda0b3338736a4b3e96cce85f288c908726e32ddf9696dd773",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2557,9 +2707,14 @@
       ]
     },
     "xubuntu-26.04": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:923f697f167c6eb9fb0d5b2c751eff6571165ca9a3942f59ea2a0d0ccfdf0a4f",
+      "version": "1.0.2",
+      "fingerprint": "sha256:20067f1341748351a934383f25ee9ecf0ca9b4ef57a677e5d66258e3cc13b35d",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-10-06",
+          "note": "first boot: gnome-initial-setup-done for the user, and its Welcome window closed if the session was faster than cloud-init"
+        },
         {
           "version": "1.0.1",
           "date": "2026-09-28",
