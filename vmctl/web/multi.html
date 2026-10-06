@@ -165,7 +165,7 @@ window.addEventListener("dragend", () => { for (const pane of frames.values()) p
 let busyNetwork = false, pollTimer = null;
 function writeHash() {
   history.replaceState(null, "", "/multi#vms=" + panes.map(encodeURIComponent).join(",") + (labName ? "&lab=" + encodeURIComponent(labName) : ""));
-  const heading = labName ? `${labName} · ${panes.join(" · ")}` : panes.join(" · ");
+  const heading = labName ? `${labName.replace(/^link:/, "session ")} · ${panes.join(" · ")}` : panes.join(" · ");
   document.title = (panes.length ? heading + " · " : "") + "Consoles · QEMU ISO Lab";
   $("title").textContent = panes.length ? heading : "Consoles";
 }
@@ -199,6 +199,7 @@ function commonSegments(names) {
 }
 function renderNetwork() {
   const status = $("network-status"), button = $("network-toggle"), segments = commonSegments(panes);
+  if (!loaded) { status.className = ""; status.innerHTML = '<span class="dot"></span>Reading the state of the lab…'; status.title = ""; button.disabled = true; button.textContent = "Link network"; button.className = ""; return; }
   const linkedAny = panes.some(n => (rowOf(n)?.links || []).length);
   status.className = segments.length ? "linked" : linkedAny ? "partial" : "";
   if (segments.length) {
@@ -324,7 +325,7 @@ $("add-vm").onchange = () => { const name = $("add-vm").value; if (!name) return
 async function poll() {
   pollTimer = null;
   try {
-    S = await api("/api/state?fresh=1"); loaded = true;
+    S = await api(loaded ? "/api/state?fresh=1" : "/api/state"); loaded = true;  // the cached snapshot first: the consoles open at once
     if (startWanted) {
       startWanted = false; writeHash();
       for (const name of panes) { const r = rowOf(name); if (r && !r.running && r.installed && !busy(r)) startVm(name); }
