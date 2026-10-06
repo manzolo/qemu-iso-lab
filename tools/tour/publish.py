@@ -37,9 +37,10 @@ def duration(path: Path) -> float:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("clips", nargs="*")
+    ap.add_argument("--index-only", action="store_true", help="only rewrite tour.json's order, no clip re-encoded")
     ap.add_argument("--poster-at", type=float, default=30.0, help="second of the poster frame (default 30)")
     args = ap.parse_args()
-    names = args.clips or sorted(d.name for d in OUT.iterdir() if (d / f"{d.name}.voice.mp4").is_file())
+    names = [] if args.index_only else args.clips or sorted(d.name for d in OUT.iterdir() if (d / f"{d.name}.voice.mp4").is_file())
     if not DEST.parent.is_dir():
         raise SystemExit(f"{DEST.parent} is missing: git fetch origin media && git worktree add docs/media media")
     DEST.mkdir(exist_ok=True)
@@ -65,10 +66,19 @@ def main() -> None:
                        "video": {lang: f"{name}.{lang}.mp4" for lang in LANGS}, "poster": f"{name}.jpg",
                        "subtitles": {lang: f"{name}.{lang}.vtt" for lang in ("en", "it")}}
         print(f"{name}: {length:.1f}s")
-    # The tour's chapters first, in order, then the lab lessons by lab, a lab's own lessons by order.
-    ordered = sorted(clips, key=lambda k: (clips[k].get("series") != "tour", clips[k].get("lab") or k, clips[k].get("order", 1), k))
-    index.write_text(json.dumps({"clips": [clips[k] for k in ordered]}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    index.write_text(json.dumps({"clips": [clips[k] for k in ordered(clips)]}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"{index}: {len(clips)} clips. Now publish the media branch and run the Pages workflow (see the docstring).")
+
+
+def ordered(clips: dict) -> list:
+    """The tour's chapters first, by id (05-lab records on vpn-lab: its lab must not move it after
+    07-map, as it did on 2026-10-06), then the lab lessons by lab, a lab's own lessons by order."""
+    def key(k: str) -> tuple:
+        clip = clips[k]
+        if clip.get("series", "tour") == "tour":
+            return (0, k, 0)
+        return (1, clip.get("lab") or k, clip.get("order", 1), k)
+    return sorted(clips, key=key)
 
 
 main()
