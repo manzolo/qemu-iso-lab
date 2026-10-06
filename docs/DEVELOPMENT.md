@@ -36,6 +36,15 @@ The `Makefile` carries developer targets only. User-facing behaviour is a
   `preseed.py`, `kickstart.py`, `omarchy.py`, `cloud_init.py`); the `cmd_*`
   handlers live in `lifecycle.py`.
 
+## Browser regressions
+
+`make browser-test` drives the web dashboard (`tests/webui_browser.mjs`: fixture API, noVNC
+stub, no VM touched) and the lab map (`tests/lab_map_browser.mjs`) in a headless Chromium.
+Playwright is pinned in `tools/browser-test/package.json` and installed there, with its
+Chromium, on the first run (`node_modules/` is gitignored; `PLAYWRIGHT_MODULE=/path/to/
+playwright/index.mjs` still points the tests at another copy). About four minutes; run it
+after touching `vmctl/web/`.
+
 ## Before pushing
 
 GitHub Actions is a confirmation step, not the first feedback loop. Run the

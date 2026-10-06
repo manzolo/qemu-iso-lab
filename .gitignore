@@ -43,3 +43,5 @@ vms/profiles/local.json.backup-*
 
 # The catalog clips live on the orphan branch "media" (one commit, force-pushed): docs/media is its worktree
 docs/media/
+tools/browser-test/node_modules/
+tools/browser-test/package-lock.json

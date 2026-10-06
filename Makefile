@@ -10,7 +10,7 @@ PREFIX ?= $(HOME)/.local
 TIMEOUT ?= 3600
 BIN := $(abspath bin)
 
-.PHONY: help setup install-cli uninstall-cli install test lint check ci tui usage web tui-classic init-local-profile validate-vms groups guides
+.PHONY: help setup install-cli uninstall-cli install test lint check ci tui usage browser-test web tui-classic init-local-profile validate-vms groups guides
 
 help: ## Show this help
 	@printf "\033[1mqemu-iso-lab: developer targets\033[0m\n\n"
@@ -64,6 +64,11 @@ ci: ## Unit tests exactly as GitHub Actions runs them
 
 tui: ## Open the text UI (same as running vmtui: Textual when installed, else fzf/dialog)
 	@./bin/vmtui
+
+browser-test: ## The browser regressions of the web dashboard and the lab map (Playwright in tools/browser-test/, installed on the first run with its Chromium)
+	@test -d tools/browser-test/node_modules || (npm --prefix tools/browser-test install --no-audit --no-fund && npx --prefix tools/browser-test playwright install chromium)
+	node tests/webui_browser.mjs
+	node tests/lab_map_browser.mjs
 
 usage: ## What the checkout holds on disk: ISO cache, VM disks, checkpoints, reports... (vmctl usage)
 	@./bin/vmctl usage

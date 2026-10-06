@@ -1,9 +1,13 @@
-// Optional: PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/lab_map_browser.mjs
+// Optional: make browser-test (or PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/lab_map_browser.mjs)
 // Synthetic telemetry and intercepted HTTP only: no VM is started or probed.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+// The Playwright of tools/browser-test/ (make browser-test installs it), or PLAYWRIGHT_MODULE, or a global one.
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+const localPlaywright = join(dirname(fileURLToPath(import.meta.url)), '..', 'tools', 'browser-test', 'node_modules', 'playwright', 'index.mjs');
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || (existsSync(localPlaywright) ? localPlaywright : 'playwright'));
 const root = fileURLToPath(new URL('../', import.meta.url));
 const fixture = JSON.parse(execFileSync('python3', ['-c', `
 import json

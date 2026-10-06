@@ -1,11 +1,15 @@
-// Optional browser regression: PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/webui_browser.mjs
+// Optional browser regression: make browser-test (or PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/webui_browser.mjs)
 // Uses a fixture API and a noVNC stub: no real VM, job or disk is touched.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+// The Playwright of tools/browser-test/ (make browser-test installs it), or PLAYWRIGHT_MODULE, or a global one.
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+const localPlaywright = join(dirname(fileURLToPath(import.meta.url)), '..', 'tools', 'browser-test', 'node_modules', 'playwright', 'index.mjs');
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || (existsSync(localPlaywright) ? localPlaywright : 'playwright'));
 const root = fileURLToPath(new URL('../', import.meta.url));
 const html = readFileSync(root + 'vmctl/web/index.html');
 const catalog = JSON.parse(execFileSync('python3', ['-c', 'import json; from vmctl.webui import command_catalog; print(json.dumps(command_catalog()))'], { cwd: root }));

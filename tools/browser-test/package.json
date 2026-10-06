@@ -1,0 +1,8 @@
+{
+  "name": "qemu-iso-lab-browser-test",
+  "private": true,
+  "description": "The Playwright the browser regressions use (tests/webui_browser.mjs, tests/lab_map_browser.mjs): make browser-test installs it here, nothing of it ships",
+  "devDependencies": {
+    "playwright": "1.61.0"
+  }
+}
