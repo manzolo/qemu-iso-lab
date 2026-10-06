@@ -25,6 +25,8 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   let tick=1, fail=false, unavailable=false, stopped=false, requests=0, rx=0, tx=0, epoch=1;
+  const powerCommands = [];
+  let powerError = false, jobStatus = 'running', jobText = '';
   const target = fixture.nics.find(n=>n.vm==='k8s-lab-main' && n.nic!==fixture.nics[0].nic);
   const packet = () => ({id:tick,time:1720000000+tick,source:'172.20.6.1',destination:'172.20.6.11',
     source_mac:'52:54:00:00:00:01',destination_mac:'52:54:00:00:00:02',direction:'TX',protocol:'ICMP',
@@ -37,6 +39,16 @@ try {
     const url = new URL(route.request().url());
     if(url.pathname==='/') return route.fulfill({contentType:'text/html',body:'<title>VM action target</title>'});
     if(url.pathname.endsWith('/map')) return route.fulfill({contentType:'text/html',body:fixture.html});
+    if(url.pathname==='/api/run') {
+      assert.equal(route.request().headers()['x-vmctl-token'], 'fixture-token');
+      assert.equal(route.request().method(), 'POST');
+      powerCommands.push(route.request().postDataJSON());
+      return route.fulfill(powerError ? {status:409,json:{error:'VM already has an active job'}} : {json:{job:'vm:fixture'}});
+    }
+    if(url.pathname==='/api/jobs/vm%3Afixture/log') {
+      assert.equal(route.request().headers()['x-vmctl-token'], 'fixture-token');
+      return route.fulfill({json:{status:jobStatus,text:jobText,offset:jobText.length,size:jobText.length}});
+    }
     assert(url.pathname.endsWith('/map-state'));
     assert.equal(url.searchParams.get('token'),'fixture-token');
     requests++;
@@ -57,6 +69,87 @@ try {
   await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Live'));
   const action = (kind, vm='k8s-lab-main') => page.locator(`.vm-action[data-vm="${vm}"][data-action="${kind}"]`);
   const dialog = page.locator('#vm-dialog'), frame = page.locator('#vm-dialog-frame');
+  // Power controls use intercepted jobs only: never start or stop a real guest.
+  const power = (vm='k8s-lab-main') => action('power', vm);
+  const finishPower = async (status='completed', text='') => {
+    jobStatus=status; jobText=text;
+    await page.clock.runFor(2200);
+    await page.waitForFunction(()=>!document.querySelector('.vm-power[aria-busy="true"]'));
+    jobStatus='running'; jobText='';
+  };
+  assert.equal(await page.locator('.vm-power').count(), 3);
+  if(process.env.MAP_SCREENSHOT) {
+    await page.locator('#lab-topology').screenshot({path:process.env.MAP_SCREENSHOT.replace('.png','-power.png')});
+    await page.evaluate(()=>window.scrollTo(0,0));
+  }
+  await power('k8s-lab-node2').click();
+  await page.waitForFunction(()=>document.querySelector('.vm-power[aria-busy="true"]'));
+  assert.deepEqual(powerCommands.at(-1), {args:['start','k8s-lab-node2','--headless','--background'],confirmed:false});
+  await power('k8s-lab-node2').click({force:true});
+  assert.equal(powerCommands.length, 1, 'Pending start cannot be submitted twice');
+  await finishPower();
+  // A shutdown asks in a card next to the button, never the browser's confirm().
+  page.on('dialog', d => { throw new Error(`No browser dialog expected: ${d.message()}`); });
+  const ask = page.locator('#power-confirm');
+  await power().click();
+  assert(await ask.isVisible(),'Shutting down asks first');
+  assert.equal(await page.locator('#power-confirm-title').textContent(),'Shut down k8s-lab-main?');
+  assert(await page.locator('#power-confirm [data-power-ok]').evaluate(n=>document.activeElement===n),'The focus is on Shut down');
+  await page.locator('#power-confirm [data-power-cancel]').click();
+  assert(await ask.isHidden());
+  assert.equal(powerCommands.length, 1, 'Cancel sends nothing');
+  assert(await power().evaluate(n=>document.activeElement===n),'Cancel gives the focus back to the button');
+  await power().click(); await page.keyboard.press('Escape');
+  assert(await ask.isHidden()); assert.equal(powerCommands.length, 1, 'Escape sends nothing');
+  await power().click(); await page.mouse.click(5,5);
+  assert(await ask.isHidden()); assert.equal(powerCommands.length, 1, 'A click elsewhere sends nothing');
+  await power().click();
+  await page.locator('#power-confirm [data-power-ok]').click();
+  assert(await ask.isHidden());
+  await page.waitForFunction(()=>document.querySelector('.vm-power[aria-busy="true"]'));
+  assert.deepEqual(powerCommands.at(-1), {args:['stop','k8s-lab-main'],confirmed:true});
+  await finishPower();
+  const hold = async () => {
+    await power().scrollIntoViewIfNeeded();  // clicking Shut down in the card may have scrolled the page
+    const box = await power().boundingBox();
+    await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
+    await page.mouse.down();
+  };
+  await hold();
+  await page.clock.runFor(900);
+  await page.mouse.move(5,5); await page.mouse.up();
+  await page.clock.runFor(1300);
+  assert.equal(powerCommands.length, 2, 'Leaving the button cancels the hold');
+  await hold();
+  await page.clock.runFor(500); await page.keyboard.press('Escape');
+  await page.clock.runFor(1700); await page.mouse.up();
+  assert.equal(powerCommands.length, 2, 'Escape cancels the hold and its release click');
+  await hold();
+  await power().dispatchEvent('pointercancel');
+  await page.clock.runFor(2100); await page.mouse.up();
+  assert.equal(powerCommands.length, 2, 'An interrupted touch gesture does nothing');
+  await hold();
+  await page.clock.runFor(1900);
+  assert.equal(powerCommands.length, 2, 'Force stop needs the full two seconds');
+  assert(await power().evaluate(n=>n.classList.contains('holding')));
+  await page.clock.runFor(150);
+  await page.waitForFunction(()=>document.querySelector('.vm-power[aria-busy="true"]'));
+  await page.mouse.up();
+  assert.deepEqual(powerCommands.at(-1), {args:['stop','k8s-lab-main','--force'],confirmed:true});
+  assert.equal(powerCommands.length, 3, 'Release after the hold does not also shut down');
+  await finishPower('failed (1)', 'Permission denied by the host');
+  assert((await page.locator('#power-notice').textContent()).includes('Permission denied by the host'));
+  assert(await page.locator('#power-notice').evaluate(n=>n.classList.contains('error')));
+  await power().focus();
+  await page.keyboard.down(' '); await page.clock.runFor(2100); await page.keyboard.up(' ');
+  assert.equal(powerCommands.length, 4, 'Holding Space also force stops once');
+  await finishPower();
+  powerError=true;
+  await power('k8s-lab-node2').press('Enter');
+  await page.waitForFunction(()=>document.getElementById('power-notice').textContent.includes('VM already has an active job'));
+  assert.equal(await power('k8s-lab-node2').getAttribute('aria-busy'), 'false');
+  powerError=false;
+  await page.evaluate(()=>window.scrollTo(0,0));  // the power card's clicks may have scrolled the page
   // Manage opens the page's modal dialog: the Machine panel alone.
   for (const kind of ['vm']) {
     assert.equal(await action(kind).getAttribute('href'),null,'No link: a dialog opens');
@@ -89,6 +182,11 @@ try {
   assert.equal(sshUrl.hash,'#ssh=k8s-lab-main'); assert.equal(sshUrl.searchParams.get('detached'),'1'); assert.equal(sshUrl.searchParams.get('token'),'fixture-token');
   assert.equal(new URL(await win.locator('.float-tab').getAttribute('href')).hash,'#ssh=k8s-lab-main');
   assert.equal(await win.locator('h2').textContent(),'k8s-lab-main');
+  for (const light of ['.float-close','.float-min','.float-tab']) {
+    // The lights sit above the resize grips: their centre and their edge hit the light itself.
+    const hits = await win.locator(light).evaluate(n=>{ const r=n.getBoundingClientRect(); return [[r.left+r.width/2,r.top+r.height/2],[r.left+1,r.top+1]].map(([x,y])=>{ const e=document.elementFromPoint(x,y); return e===n || n.contains(e); }); });
+    assert.deepEqual(hits,[true,true],`${light} is not covered by a resize grip`);
+  }
   {
     // Dragged by its header, the map (and its lens) still usable underneath.
     const before=await win.boundingBox(), head=await win.locator('header').boundingBox();
@@ -406,6 +504,7 @@ try {
   assert.equal(await cable.locator('.traffic-label').textContent(),'Link off');
   assert.equal(await page.locator('#running-count').textContent(),'1 running');
   assert.equal(await page.locator('[data-member="k8s-lab-main"] .member-state').textContent(),'stopped');
+  assert.equal(await power().getAttribute('data-running'),'false','Power button follows live state');
   await page.locator('#packet-clear').click();
   assert.equal(await page.locator('#packet-empty').textContent(),'VM stopped');
   assert(await page.locator('#packet-inspector').isVisible(),'The open inspector survives topology replacement');
@@ -413,6 +512,7 @@ try {
   await page.clock.runFor(2100);
   await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Updates unavailable'));
   assert.equal(await page.locator('.transmitting,.receiving').count(),0,'Failure clears old traffic');
+  assert.equal(await power().getAttribute('aria-disabled'),'true','Stale state disables power actions');
   assert((await page.locator('#packet-state').textContent()).includes('Updates unavailable'));
   assert(!await page.evaluate(()=>document.body.classList.contains('offline')),'A 503 is not offline');
   // vmctl web stopped (no answer) or restarted with a new token (401): said in words, the map fades.
@@ -443,7 +543,7 @@ try {
   assert(popupBounds.y + popupBounds.height <= panelBounds.y + panelBounds.height, 'Suggestions stay within the panel');
   if(process.env.MAP_SCREENSHOT) await page.screenshot({path:process.env.MAP_SCREENSHOT.replace('.png','-completion-mobile.png')});
   assert.deepEqual(errors,[]);
-  console.log('PASS: VM action dialogs, NIC attribution, live traffic, lens inspector (no hover), filters/search/clear, contextual completion and examples, packet detail, pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
+  console.log('PASS: headless power on, confirmed shutdown, pointer/keyboard force stop, hold cancellation, power job errors, VM action dialogs, NIC attribution, live traffic, lens inspector (no hover), filters/search/clear, contextual completion and examples, packet detail, pause/resume, offline/stale, keyboard, reduced motion, mobile layout');
 } finally {
   await browser.close();
 }

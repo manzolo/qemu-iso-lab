@@ -169,6 +169,10 @@ class LabsTests(BaseVmctlTestCase):
                     for node in tree.iter() if "data-action" in node.attrib}
         buttons = actions()
         for member in lab["members"]:
+            power = buttons[member["name"], "power"]
+            self.assertEqual(power["data-running"], str(bool(member["running"])).lower())
+            self.assertEqual(power["aria-disabled"], "false")
+            self.assertIn("Hold for 2 seconds" if member["running"] else "Start headless", power["aria-label"])
             for action in ("ssh", "console", "vm"):
                 self.assertEqual(buttons[member["name"], action]["aria-disabled"],
                                  str(not (member["running"] or action == "vm")).lower())
@@ -181,6 +185,7 @@ class LabsTests(BaseVmctlTestCase):
             self.assertNotIn("target", attrs)
         snapshot, page = labs.render_html(lab), labs.render_html(lab, interactive=True)
         self.assertNotIn('class="vm-action"', snapshot)
+        self.assertNotIn('class="vm-action vm-power"', snapshot)
         self.assertIn('class="vm-action"', page)
         self.assertIn('id="vm-dialog"', page)
         self.assertIn("SSH and Console open a window per machine", page)

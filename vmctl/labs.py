@@ -716,6 +716,15 @@ def _svg(lab: dict[str, Any], interactive: bool = False) -> str:
             label = f'CT {service.get("container", "?")} {service.get("name", "")} · {where}'
             out.append(f'<text class="svc" x="{x + 18}" y="{box_y + _BOX_H + 6 + 22 * index}">{esc(label)}</text>')
         if interactive:
+            hint = ("Click to shut down · Hold for 2 seconds to force stop (unsaved changes may be lost)"
+                    if member["running"] else "Start headless in the background")
+            out.append(f'<g class="vm-action vm-power" role="button" tabindex="0" data-action="power" '
+                       f'data-vm="{esc(member["name"])}" data-running="{str(bool(member["running"])).lower()}" '
+                       f'aria-disabled="false" aria-label="Power: {esc(member["name"])} · {hint}" '
+                       f'transform="translate({x + _BOX_W - 34} {box_y + 68})">'
+                       f'<title>{hint}</title><circle class="power-face" r="20"/>'
+                       '<circle class="power-progress" r="23" pathLength="100"/>'
+                       '<path class="power-symbol" d="M0 -10v10 M-6 -6a9 9 0 1 0 12 0"/></g>')
             actions = [("ssh", "SSH", bool(member["running"] and member["ssh"])),
                        ("console", "Console", bool(member["running"])), ("vm", "Manage", True)]
             for index, (action, label, enabled) in enumerate(actions):
@@ -828,6 +837,29 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .map svg .vm-action:focus-visible { outline:none; }
 .map svg .vm-action[aria-disabled="true"] { opacity:.4; cursor:default; }
 .map svg .vm-action[aria-disabled="true"] rect { fill:#142333; stroke:#385066; }
+.map svg .vm-power { color:#8fa7bf; touch-action:none; user-select:none; }
+.map svg .power-face { fill:#122334; stroke:currentColor; stroke-width:1.5; }
+.map svg .power-symbol { fill:none; stroke:currentColor; stroke-width:2.5; stroke-linecap:round; }
+.map svg .vm-power[data-running="true"] { color:#62e3bc; filter:drop-shadow(0 0 5px #50e6b544); }
+.map svg .vm-power:hover .power-face, .map svg .vm-power:focus-visible .power-face { fill:#254052; stroke:#dcf8ff; stroke-width:2.5; }
+.map svg .power-progress { fill:none; stroke:#ff967b; stroke-width:3; stroke-dasharray:100; stroke-dashoffset:100; transform:rotate(-90deg); pointer-events:none; }
+.map svg .vm-power.holding { color:#ff967b; }
+.map svg .vm-power.holding .power-progress { animation:power-hold 2s linear forwards; }
+.map svg .vm-power[aria-busy="true"] { color:#e7b768; cursor:wait; }
+@keyframes power-hold { to { stroke-dashoffset:0; } }
+.power-confirm { position:absolute; z-index:40; width:min(320px, calc(100vw - 16px)); box-sizing:border-box; padding:14px 16px 12px; background:#101c2a; color:#dce9f5; border:1px solid #3c5c74; border-radius:12px; box-shadow:0 18px 48px rgba(0,0,0,.55); animation:power-pop .14s ease-out; }
+.power-confirm[hidden] { display:none; }
+.power-confirm strong { display:block; font-size:.95rem; margin-bottom:4px; overflow-wrap:anywhere; }
+.power-confirm p { margin:0 0 12px; color:#9fb7cc; font-size:12.5px; line-height:1.45; }
+.power-confirm-buttons { display:flex; justify-content:flex-end; gap:8px; }
+.power-confirm button { font:inherit; font-size:13px; color:#cfe3f1; background:#15293b; border:1px solid #38566d; border-radius:8px; padding:6px 14px; cursor:pointer; }
+.power-confirm button:hover, .power-confirm button:focus-visible { background:#204258; border-color:#91dbef; outline:none; }
+.power-confirm button.danger { color:#fff; background:#7a3326; border-color:#c4644f; }
+.power-confirm button.danger:hover, .power-confirm button.danger:focus-visible { background:#94402f; border-color:#ff967b; }
+@keyframes power-pop { from { opacity:0; transform:translateY(-4px); } }
+@media (prefers-reduced-motion:reduce) { .power-confirm { animation:none; } }
+.power-notice { margin:10px 0 0; padding:10px 14px; border:1px solid #38566d; border-radius:8px; background:#122334; color:#b8d9e9; white-space:pre-wrap; overflow-wrap:anywhere; }
+.power-notice.error { border-color:#bd6d62; color:#ffb4a5; }
 .vm-dialog { width:min(1280px, calc(100vw - 32px)); height:min(900px, calc(100dvh - 32px)); max-width:none; max-height:none; padding:0; border:1px solid #2f4a62; border-radius:14px; background:#0b1520; color:#e3edf7; display:none; flex-direction:column; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.6); }
 .vm-dialog[open] { display:flex; }
 .vm-dialog::backdrop { background:rgba(3,9,16,.72); backdrop-filter:blur(2px); }
@@ -841,10 +873,11 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .vm-dialog.floating { position:fixed; margin:0; inset:auto; width:min(760px, calc(100vw - 24px)); height:min(480px, calc(100dvh - 24px)); min-width:320px; min-height:200px; box-sizing:border-box; z-index:25; }
 .vm-resize { display:none; position:absolute; z-index:2; touch-action:none; }
 .vm-dialog.floating .vm-resize { display:block; }
-.vm-resize[data-dir=n], .vm-resize[data-dir=s] { left:12px; right:12px; height:8px; cursor:ns-resize; }
-.vm-resize[data-dir=e], .vm-resize[data-dir=w] { top:12px; bottom:12px; width:8px; cursor:ew-resize; }
+.vm-resize[data-dir=n], .vm-resize[data-dir=s] { left:12px; right:12px; height:5px; cursor:ns-resize; }
+.vm-resize[data-dir=e], .vm-resize[data-dir=w] { top:12px; bottom:12px; width:6px; cursor:ew-resize; }
 .vm-resize[data-dir=n] { top:0; } .vm-resize[data-dir=s] { bottom:0; } .vm-resize[data-dir=e] { right:0; } .vm-resize[data-dir=w] { left:0; }
-.vm-resize[data-dir=ne], .vm-resize[data-dir=nw], .vm-resize[data-dir=se], .vm-resize[data-dir=sw] { width:18px; height:18px; }
+.vm-resize[data-dir=ne], .vm-resize[data-dir=nw], .vm-resize[data-dir=se], .vm-resize[data-dir=sw] { width:12px; height:12px; }
+.vm-resize[data-dir=se] { width:18px; height:18px; }
 .vm-resize[data-dir=ne] { top:0; right:0; cursor:nesw-resize; } .vm-resize[data-dir=sw] { bottom:0; left:0; cursor:nesw-resize; }
 .vm-resize[data-dir=nw] { top:0; left:0; cursor:nwse-resize; } .vm-resize[data-dir=se] { bottom:0; right:0; cursor:nwse-resize; }
 .vm-resize[data-dir=se]::after { content:""; position:absolute; right:4px; bottom:4px; width:9px; height:9px; border-right:2px solid #6f93ad; border-bottom:2px solid #6f93ad; border-bottom-right-radius:3px; }
@@ -854,13 +887,16 @@ body.offline #lab-topology { opacity:.45; filter:grayscale(.75); transition:opac
 .float-window[data-action=console] { width:min(960px, calc(100vw - 24px)); height:min(640px, calc(100dvh - 24px)); }
 .float-window.front { border-color:#4f7d9c; }
 .float-window.front header { background:#132a3d; }
-.vm-dialog.floating header { cursor:grab; user-select:none; padding:4px 6px 4px 12px; }
+.vm-dialog.floating header { cursor:grab; user-select:none; padding:6px 8px 6px 16px; }
 .vm-dialog.floating .vm-dialog-titles { display:flex; align-items:baseline; gap:8px; min-width:0; }
 .vm-dialog-titles { min-width:0; }
 /* The window controls the macOS way (Manzolo, 2026-10-06): red closes, yellow minimizes (SSH and
    console windows; grey on the Manage dialog), green opens the same view in a tab; the symbol shows on hover. */
-.lights { display:flex; gap:8px; align-items:center; flex-shrink:0; }
-.light { width:13px; height:13px; border-radius:50%; border:0; padding:0; margin:0; display:inline-grid; place-items:center; font:700 10px/1 system-ui, sans-serif; color:transparent; cursor:pointer; text-decoration:none; box-shadow:inset 0 0 0 .5px rgba(0,0,0,.4); }
+/* Above the resize grips (the top-left corner grip took the red light's clicks, Manzolo
+   2026-10-06), each light with a hit area larger than its dot. */
+.lights { display:flex; gap:9px; align-items:center; flex-shrink:0; position:relative; z-index:3; }
+.light { position:relative; width:13px; height:13px; border-radius:50%; border:0; padding:0; margin:0; display:inline-grid; place-items:center; font:700 10px/1 system-ui, sans-serif; color:transparent; cursor:pointer; text-decoration:none; box-shadow:inset 0 0 0 .5px rgba(0,0,0,.4); }
+.light::before { content:""; position:absolute; inset:-5px; border-radius:50%; }
 .light.close { background:#ff5f57; } .light.min { background:#febc2e; } .light.tab { background:#28c840; }
 .light.off { background:#3d4c5a; cursor:default; }
 .light.close::after { content:"×"; } .light.min:not(.off)::after { content:"−"; } .light.tab::after { content:"↗"; font-size:9px; }
@@ -1066,6 +1102,8 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None, *, inter
 <section class="map-shell" aria-label="Lab topology">
 <div class="map-toolbar"><span class="map-title">NETWORK TOPOLOGY</span><div class="map-legend"><span><i class="on"></i>VM on</span><span><i></i>VM off</span><span><i class="flow"></i>Measured traffic</span></div></div>
 <div class="map" id="lab-topology">{_svg(lab, interactive=interactive)}</div>
+{"<p id='power-notice' class='power-notice' role='status' hidden></p>" if interactive else ""}
+{"<p class='sub'>Power: click to start headless or confirm shutdown · Hold for 2 seconds to force stop (unsaved changes may be lost).</p>" if interactive else ""}
 <div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>The lens on a LAN cable opens its packet inspector{" · SSH and Console open a window per machine (several at once) you can move by its title, resize from any edge and minimize, Manage a dialog" if interactive else ""}</span></div>
 </section>
 <dialog id="vm-dialog" class="vm-dialog" aria-labelledby="vm-dialog-title">

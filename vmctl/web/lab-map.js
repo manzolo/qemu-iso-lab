@@ -738,10 +738,169 @@
     const node = event.target.closest?.('.vm-action');
     return node && node.getAttribute('aria-disabled') !== 'true' ? node : null;
   };
+  const powerJobs = new Map();
+  const powerNotice = document.getElementById('power-notice');
+  let powerHold = null, suppressPowerClick = false;
+  const tellPower = (message, error = false) => {
+    powerNotice.hidden = false;
+    powerNotice.textContent = message;
+    powerNotice.classList.toggle('error', error);
+  };
+  const paintPower = () => map.querySelectorAll('.vm-power').forEach(node => {
+    const busy = powerJobs.has(node.dataset.vm);
+    node.setAttribute('aria-disabled', String(busy || !fresh));
+    node.setAttribute('aria-busy', String(busy));
+  });
+  const powerApi = async (path, body) => {
+    const response = await fetch(path, {
+      method: body ? 'POST' : 'GET', cache:'no-store',
+      headers: {'X-Vmctl-Token': endpoint.searchParams.get('token') || '', ...(body ? {'Content-Type':'application/json'} : {})},
+      ...(body ? {body:JSON.stringify(body)} : {}),
+      signal:AbortSignal.timeout(8000),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  };
+  // A shutdown asks first, in a small card next to the button rather than the browser's
+  // confirm() (Manzolo, 2026-10-06): Shut down / Cancel, Escape or a click elsewhere cancels, and
+  // the card names the faster way (the two-second hold).
+  let powerAsk = null;
+  const closePowerAsk = (refocus = false) => {
+    if (!powerAsk) return;
+    const {card, vm} = powerAsk;
+    powerAsk = null; card.hidden = true;
+    if (refocus) map.querySelector(`.vm-power[data-vm="${CSS.escape(vm)}"]`)?.focus({preventScroll:true});
+  };
+  const askShutdown = node => {
+    const vm = node.dataset.vm;
+    let card = document.getElementById('power-confirm');
+    if (!card) {
+      card = document.createElement('div');
+      card.id = 'power-confirm'; card.className = 'power-confirm'; card.hidden = true;
+      card.setAttribute('role', 'alertdialog'); card.setAttribute('aria-labelledby', 'power-confirm-title'); card.setAttribute('aria-describedby', 'power-confirm-text');
+      card.innerHTML = '<strong id="power-confirm-title"></strong><p id="power-confirm-text">The guest is asked to power off; if it does not answer, vmctl stops the process. Holding the power button for two seconds forces it right away.</p>'
+        + '<div class="power-confirm-buttons"><button type="button" data-power-cancel>Cancel</button><button type="button" class="danger" data-power-ok>Shut down</button></div>';
+      card.addEventListener('click', event => {
+        if (event.target.closest('[data-power-cancel]')) closePowerAsk(true);
+        else if (event.target.closest('[data-power-ok]') && powerAsk) {
+          const current = map.querySelector(`.vm-power[data-vm="${CSS.escape(powerAsk.vm)}"]`);
+          closePowerAsk(true);
+          if (current?.dataset.running === 'true') submitPower(current, false);
+        }
+      });
+      card.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closePowerAsk(true); }
+        if (event.key === 'Tab') {  // the two buttons keep the focus while the card is up
+          const buttons = [...card.querySelectorAll('button')], at = buttons.indexOf(document.activeElement);
+          event.preventDefault(); buttons[(at + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
+        }
+      });
+      document.body.append(card);
+    }
+    card.querySelector('#power-confirm-title').textContent = `Shut down ${vm}?`;
+    card.hidden = false;
+    const rect = node.getBoundingClientRect(), width = card.offsetWidth, height = card.offsetHeight;
+    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, innerWidth - width - 8));
+    const below = rect.bottom + 10 + height <= innerHeight - 8;
+    card.style.left = `${left + scrollX}px`;
+    card.style.top = `${(below ? rect.bottom + 10 : Math.max(8, rect.top - height - 10)) + scrollY}px`;
+    card.classList.toggle('above', !below);
+    powerAsk = {card, vm};
+    card.querySelector('[data-power-ok]').focus({preventScroll:true});
+  };
+  document.addEventListener('pointerdown', event => {
+    if (powerAsk && !event.target.closest('#power-confirm') && !event.target.closest(`.vm-power[data-vm="${CSS.escape(powerAsk.vm)}"]`)) closePowerAsk();
+  }, true);
+  window.addEventListener('resize', () => closePowerAsk());
+  const runPower = (node, force = false) => {
+    const vm = node.dataset.vm, running = node.dataset.running === 'true';
+    if (!fresh || powerJobs.has(vm) || (force && !running)) return;
+    if (running && !force) { if (powerAsk?.vm === vm) closePowerAsk(true); else askShutdown(node); return; }
+    submitPower(node, force);
+  };
+  const submitPower = async (node, force) => {
+    const vm = node.dataset.vm, running = node.dataset.running === 'true';
+    if (!fresh || powerJobs.has(vm)) return;
+    const args = running ? ['stop', vm, ...(force ? ['--force'] : [])] : ['start', vm, '--headless', '--background'];
+    const label = force ? 'Force stopping' : running ? 'Shutting down' : 'Starting headless';
+    const job = {id:null, label, offset:0, tail:''};
+    powerJobs.set(vm, job); paintPower();
+    tellPower(`${label}: ${vm}…`);
+    try {
+      const result = await powerApi('/api/run', {args, confirmed:running});
+      job.id = result.job;
+    } catch (error) {
+      powerJobs.delete(vm); paintPower();
+      tellPower(`${vm}: ${error.message}. Check Manage / Jobs before retrying.`, true);
+    }
+  };
+  const checkPowerJobs = async () => {
+    await Promise.all([...powerJobs].map(async ([vm, job]) => {
+      if (!job.id) return;
+      try {
+        const result = await powerApi(`/api/jobs/${encodeURIComponent(job.id)}/log?offset=${job.offset}`);
+        job.offset = result.offset;
+        job.tail = (job.tail + result.text).slice(-2000);
+        if (result.status === 'running') return;
+        powerJobs.delete(vm);
+        const ok = result.status === 'completed';
+        tellPower(`${vm}: ${job.label} ${ok ? 'completed' : result.status}.${ok ? '' : '\n' + job.tail}`, !ok);
+      } catch (error) {
+        tellPower(`${vm}: cannot check the power operation (${error.message}). Retrying; see Manage / Jobs.`, true);
+      }
+    }));
+    paintPower();
+  };
+  const cancelPowerHold = (cancelClick = true) => {
+    if (!powerHold) return;
+    clearTimeout(powerHold.timer);
+    powerHold.node.classList.remove('holding');
+    powerHold = null;
+    if (cancelClick) suppressPowerClick = true;
+  };
+  const beginPowerHold = (node, input) => {
+    cancelPowerHold(); suppressPowerClick = false;
+    if (powerAsk && powerAsk.vm !== node.dataset.vm) closePowerAsk();
+    if (!fresh || powerJobs.has(node.dataset.vm) || node.dataset.running !== 'true') return;
+    node.classList.add('holding');
+    powerHold = {node, input, timer:setTimeout(() => {
+      cancelPowerHold();
+      closePowerAsk();
+      runPower(node, true);
+    }, 2000)};
+  };
+  map.addEventListener('pointerdown', event => {
+    const node = actionOf(event);
+    if (node?.dataset.action !== 'power' || event.button !== 0 || !event.isPrimary) return;
+    node.focus({preventScroll:true});
+    beginPowerHold(node, 'pointer');
+  });
+  map.addEventListener('pointerout', event => {
+    if (powerHold?.input === 'pointer' && !powerHold.node.contains(event.relatedTarget)) cancelPowerHold();
+  });
+  window.addEventListener('pointermove', event => {
+    if (powerHold?.input !== 'pointer') return;
+    // Touch pointers have implicit capture: leaving the button need not emit pointerout.
+    const rect = powerHold.node.getBoundingClientRect();
+    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) cancelPowerHold();
+  });
+  window.addEventListener('pointerup', () => cancelPowerHold(false));
+  window.addEventListener('pointercancel', () => cancelPowerHold());
+  window.addEventListener('blur', () => cancelPowerHold());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelPowerHold(); });
+  map.addEventListener('focusout', () => cancelPowerHold());
+  map.addEventListener('contextmenu', event => {
+    if (event.target.closest?.('.vm-power')) event.preventDefault();
+  });
   map.addEventListener('click', event => {
     const node = actionOf(event);
     if (!node) return;
     event.preventDefault();
+    if (node.dataset.action === 'power') {
+      if (!suppressPowerClick) runPower(node);
+      return;
+    }
     openAction(node.dataset.action, node.dataset.vm, {vm: node.dataset.vm, action: node.dataset.action});
   });
   map.addEventListener('keydown', event => {
@@ -749,8 +908,21 @@
     const node = actionOf(event);
     if (!node) return;
     event.preventDefault();
+    if (node.dataset.action === 'power') {
+      if (!event.repeat) beginPowerHold(node, event.key);
+      return;
+    }
     openAction(node.dataset.action, node.dataset.vm, {vm: node.dataset.vm, action: node.dataset.action});
   });
+  map.addEventListener('keyup', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const node = actionOf(event);
+    if (node?.dataset.action !== 'power') return;
+    event.preventDefault();
+    cancelPowerHold(false);
+    if (!suppressPowerClick) runPower(node);
+  });
+  window.addEventListener('keydown', event => { if (event.key === 'Escape') cancelPowerHold(); });
   const illuminate = (link, bytes) => {
     if (!link) return;
     link.classList.toggle('active', bytes > 0);
@@ -770,6 +942,7 @@
     previous.clear();
     map.querySelectorAll('.link.active').forEach(link => illuminate(link, 0));
     fresh = false;
+    cancelPowerHold(); paintPower();
     renderInspector();
   };
   const rate = bytes => {
@@ -801,6 +974,7 @@
       if (typeof data.svg !== 'string' || !data.states || !Array.isArray(data.traffic)) throw new Error('Invalid snapshot');
       if (document.hidden) { clearTraffic(); return; }
       if (data.svg !== lastSvg) {
+        cancelPowerHold();
         const hadFocus = document.activeElement?.closest?.('.inspect-btn') ? keyOf(document.activeElement.closest('.nic')) : null;
         const actionFocus = document.activeElement?.closest?.('.vm-action')?.dataset;
         map.innerHTML = data.svg; lastSvg = data.svg; prepareCables();
@@ -846,6 +1020,7 @@
       map.querySelectorAll('.segment-track').forEach(track => illuminate(track.querySelector('.link'), segmentRates.get(track.dataset.segment) || 0));
       illuminate(map.querySelector('.nat-bus'), natRate);
       fresh = true;
+      paintPower();
       renderInspector();
       document.getElementById('running-count').textContent = `${Object.values(data.states).filter(vm => vm.running).length} running`;
       document.querySelectorAll('[data-member]').forEach(row => {
@@ -858,6 +1033,7 @@
       lastUpdate = new Date().toLocaleTimeString();
       status.textContent = `Live · refreshed ${lastUpdate}`;
       document.body.classList.remove('offline');
+      await checkPowerJobs();
     } catch (error) {
       clearTraffic();
       // vmctl web stopped (no answer) or restarted (401: a new token this URL does not have):
@@ -874,5 +1050,6 @@
     }
   }
   window.addEventListener('pagehide', () => { clearTimeout(timer); clearTraffic(); });
+  paintPower();
   refresh();
 })();
