@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import vmctl
-from vmctl import clone, config, disk_inspect, flash, import_dev, lifecycle, local_identity, ui, updater, webui
+from vmctl import clone, config, disk_inspect, flash, import_dev, lifecycle, local_identity, ui, updater, usage, webui
 from vmctl.errors import VMError
 
 
@@ -22,7 +22,7 @@ COMMAND_HELP: dict[str, str] = {}
 # Every public subcommand must appear in exactly one group (enforced by tests).
 COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Discover", "what is configured, what exists on disk, what the host can run",
-     ["list", "status", "show", "catalog", "protect", "unprotect", "identity", "guest-user", "setup", "update", "welcome"]),
+     ["list", "status", "show", "catalog", "protect", "unprotect", "identity", "guest-user", "setup", "update", "welcome", "usage"]),
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
@@ -613,6 +613,11 @@ to yours: the record in artifacts/<vm>/state.json says who is there, and a reins
     p = _add(subparsers, "welcome", help="what to do next after setup: the first commands, with the paths that work on this host; in a terminal it then asks which one to run (--no-menu: print only)")
     p.add_argument("--no-menu", action="store_true", help="print the screen without asking what to run next")
     p.set_defaults(func=lifecycle.cmd_welcome)
+
+    p = _add(subparsers, "usage", help="what the checkout holds on disk, by section (ISO cache, VM disks, checkpoints, reports, recordings...) and the heaviest VMs; allocated space, not apparent size")
+    p.add_argument("--top", type=int, default=10, help="how many VMs to list (default: 10; 0 for none)")
+    p.add_argument("--json", action="store_true", help="the same as JSON")
+    p.set_defaults(func=usage.cmd_usage)
 
     p = _add(subparsers, "setup", help="verify host prerequisites; --install installs the missing ones")
     p.add_argument("--install", nargs="*", metavar="NAME", default=None,

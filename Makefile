@@ -10,7 +10,7 @@ PREFIX ?= $(HOME)/.local
 TIMEOUT ?= 3600
 BIN := $(abspath bin)
 
-.PHONY: help setup install-cli uninstall-cli install test lint check ci tui web tui-classic init-local-profile validate-vms groups guides
+.PHONY: help setup install-cli uninstall-cli install test lint check ci tui usage web tui-classic init-local-profile validate-vms groups guides
 
 help: ## Show this help
 	@printf "\033[1mqemu-iso-lab: developer targets\033[0m\n\n"
@@ -64,6 +64,9 @@ ci: ## Unit tests exactly as GitHub Actions runs them
 
 tui: ## Open the text UI (same as running vmtui: Textual when installed, else fzf/dialog)
 	@./bin/vmtui
+
+usage: ## What the checkout holds on disk: ISO cache, VM disks, checkpoints, reports... (vmctl usage)
+	@./bin/vmctl usage
 
 web: ## Open the lab in the browser (vmctl web --open, 127.0.0.1 only; PORT=8765)
 	@./bin/vmctl web --open --port $(or $(PORT),8765)
