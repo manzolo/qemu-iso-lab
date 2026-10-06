@@ -382,8 +382,10 @@ def post_install_copy(
     if source_sudo and recursive:
         raise VMError("copy_from_host does not support source_sudo for recursive directories")
 
+    temp_dir: Path | None = None  # the root-read copy, removed with its directory at the end
     if source_sudo:
-        temp_source = Path(tempfile.mkdtemp(prefix="vmctl-copy-src-", dir="/tmp")) / source.name
+        temp_dir = Path(tempfile.mkdtemp(prefix="vmctl-copy-src-", dir="/tmp"))
+        temp_source = temp_dir / source.name
         try:
             runtime.run(
                 ["sudo", "cp", "--archive", str(source), str(temp_source)],
@@ -395,8 +397,7 @@ def post_install_copy(
             flash.maybe_restore_sudo_owner(temp_source)
             source = temp_source
         except Exception:
-            if temp_source.exists():
-                temp_source.unlink(missing_ok=True)
+            shutil.rmtree(temp_dir, ignore_errors=True)
             raise
 
     if recursive:
@@ -451,8 +452,8 @@ def post_install_copy(
                 )
         finally:
             shutil.rmtree(staging_dir, ignore_errors=True)
-            if source_sudo and source.exists():
-                source.unlink(missing_ok=True)
+            if temp_dir is not None:
+                shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
     dest_parent = str(Path(dest_raw).parent)
@@ -497,8 +498,8 @@ def post_install_copy(
                 append=True,
             )
     finally:
-        if source_sudo and source.exists():
-            source.unlink(missing_ok=True)
+        if temp_dir is not None:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def post_install_run(
