@@ -19,7 +19,7 @@
       "meta": {
         "slug": "lubuntu",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "30G"
@@ -67,7 +67,7 @@
       "meta": {
         "slug": "kubuntu",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "30G"
@@ -115,7 +115,7 @@
       "meta": {
         "slug": "xubuntu",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "30G"
@@ -163,7 +163,7 @@
       "meta": {
         "slug": "ubuntu-mate",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "30G"
@@ -211,7 +211,7 @@
       "meta": {
         "slug": "ubuntu-budgie",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "30G"
@@ -262,7 +262,7 @@
           "ubuntu-releases"
         ],
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "35G"
@@ -305,7 +305,7 @@
       "meta": {
         "slug": "ubuntu-unity",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "40G"
@@ -347,7 +347,7 @@
       "meta": {
         "slug": "ubuntu-cinnamon",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "40G"
@@ -389,7 +389,7 @@
       "meta": {
         "slug": "ubuntustudio",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "80G"
@@ -431,7 +431,7 @@
       "meta": {
         "slug": "edubuntu",
         "verified": "2026-09-26",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "disk": {
         "size": "60G"
