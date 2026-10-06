@@ -334,6 +334,8 @@ class ServerTests(BaseVmctlTestCase):
                 conn.request("POST", f"/api/vm/testvm/{endpoint}", body="{}")
                 response = conn.getresponse()
                 self.assertEqual(response.status, 401)
+                # The unread body must not become the next request of a kept-alive connection.
+                self.assertEqual(response.getheader("Connection"), "close")
                 response.read()
                 conn.close()
                 terminal.assert_not_called()

@@ -588,6 +588,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
+            if getattr(self, "close_connection", False):
+                self.send_header("Connection", "close")
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
@@ -603,15 +605,21 @@ class Handler(BaseHTTPRequestHandler):
 
     hosts: frozenset[str] = frozenset()  # the Host values accepted, set by make_server (127.0.0.1 and localhost; --lan adds the host's addresses)
 
+    def _refuse(self, message: str, status: int) -> None:
+        # The request body stays unread: on a kept-alive HTTP/1.1 connection it would be parsed as
+        # the next request (a 400 "Bad request syntax" written to a client already gone).
+        self.close_connection = True
+        self._error(message, status)
+
     def _allowed(self) -> bool:
         host = self.headers.get("Host", "")
         if host not in self.hosts:
-            self._error("Host not allowed", HTTPStatus.FORBIDDEN)
+            self._refuse("Host not allowed", HTTPStatus.FORBIDDEN)
             return False
         query = parse_qs(urlparse(self.path).query)
         given = self.headers.get("X-Vmctl-Token") or (query.get("token") or [""])[0]
         if not secrets.compare_digest(given, self.token):
-            self._error("Missing or wrong token: open the URL vmctl web printed", HTTPStatus.UNAUTHORIZED)
+            self._refuse("Missing or wrong token: open the URL vmctl web printed", HTTPStatus.UNAUTHORIZED)
             return False
         return True
 
