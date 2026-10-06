@@ -35,6 +35,7 @@ lists the host tools it needs and asks before installing them. It also adds
 
 **Windows 11** — [download and run the installer](https://manzolo.github.io/qemu-iso-lab/install-windows.cmd).
 It sets up WSL2 + Ubuntu in three runs, guiding you through the restart and setup.
+The same from PowerShell: `irm https://manzolo.github.io/qemu-iso-lab/install.ps1 | iex`.
 See the [Windows instructions](docs/INSTALL.md#windows-11) for unsigned-script prompts and requirements.
 
 Open **QEMU ISO Lab** from your applications menu or Windows desktop, then:
