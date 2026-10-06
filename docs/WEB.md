@@ -48,7 +48,10 @@ What the page offers:
   app menu started has no terminal to Ctrl-C in); `vmctl web --stop [--port N]` does the same
   from a terminal. Jobs and VMs keep running either way.
 - The session card (`vmctl link`) has the same toolbar as a lab: Map, Consoles, Unlink all;
-  Status is in its Actions ⋯ menu. In /multi the screens hang from the top of their panes.
+  Status is in its Actions ⋯ menu. In /multi the screens hang from the top of their panes, the
+  header is one line (the lab or "Consoles", the machine count, the network pill with an (i)
+  that opens the addresses, Add a machine, the layout, Dashboard); the first snapshot is the
+  cached one so the consoles open at once.
 - **Recent activity** is folded under the lists; its heading opens it and the browser remembers
   the choice. The job at work still shows in the bottom bar and in the header's Activity.
 - **Catalog** leaves the members of a declared lab to the Labs view (like My VMs); a running lab

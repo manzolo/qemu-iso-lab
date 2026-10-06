@@ -21,17 +21,46 @@ button.warn { color:var(--warn); }
 button.active { background:#183b3c; border-color:#397d75; color:#9bf0da; }
 select { background:#101b2a; color:var(--text); border:1px solid #34465d; border-radius:8px; padding:7px 9px; font-size:12px; max-width:220px; }
 a { color:var(--accent); }
-header#top { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--line); background:linear-gradient(125deg,#182637,#121d2d 65%); }
-.brand { display:flex; flex-direction:column; min-width:0; }
+/* One line: the title gives way (ellipsis) before anything wraps; only a phone wraps it. */
+header#top { display:flex; align-items:center; gap:12px; flex-wrap:nowrap; padding:10px 16px; border-bottom:1px solid var(--line); background:linear-gradient(125deg,#182637,#121d2d 65%); }
+.brand { display:flex; flex-direction:column; flex:0 1 auto; min-width:90px; }
+.brand .eyebrow { white-space:nowrap; }
+#network { flex:0 0 auto; }
+.actions { flex:0 0 auto; }
+/* A narrow window: two tidy rows, the title with Dashboard, the network pill with the tools
+   (Manzolo, 2026-10-06: the wrapped header was a mess). */
+@media(max-width:760px) {
+  header#top { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 10px; align-items:center; }
+  .brand { grid-column:1; grid-row:1; }
+  #dashboard { grid-column:2; grid-row:1; justify-self:end; }
+  #network { grid-column:1; grid-row:2; justify-self:start; min-width:0; max-width:100%; }
+  #network-status { max-width:150px; }
+  .actions { grid-column:2; grid-row:2; justify-self:end; margin-left:0; }
+  #add-vm { max-width:130px; }
+}
 .brand .eyebrow { font-size:10px; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
-.brand h1 { margin:0; font-size:15px; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px; }
+.brand h1 { margin:0; font-size:15px; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px; min-width:0; }
 #network { display:flex; align-items:center; gap:10px; padding:5px 6px 5px 12px; border:1px solid #304257; border-radius:12px; background:#0b142344; font-size:12px; }
-#network-status { color:var(--muted); max-width:520px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#network-status { color:var(--muted); max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #network-status.linked { color:var(--accent); }
 #network-status .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--muted); margin-right:7px; vertical-align:middle; }
 #network-status.linked .dot { background:var(--accent); box-shadow:0 0 8px #7ddfc566; }
 #network-status.partial .dot { background:var(--warn); }
 .actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
+/* The (i) of the network pill: the addresses and the segment, on request (Manzolo, 2026-10-06:
+   the pill stays short so the header keeps one line). */
+#network-info { width:22px; height:22px; padding:0; border-radius:50%; border:1px solid #397d75; background:#183b3c; color:var(--accent); font:italic 700 12px Georgia,serif; line-height:1; }
+#network-info:hover { background:#1f4b4a; }
+#network-info[hidden] { display:none; }
+#network-details { margin:0; padding:12px 14px; border:1px solid #304257; border-radius:12px; background:#121d2d; color:var(--text); font-size:12px; min-width:280px; max-width:min(520px,90vw); box-shadow:0 14px 40px #0008; }
+#network-details h3 { margin:0 0 8px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+#network-details dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0; }
+#network-details dt { color:var(--text); font-family:ui-monospace,monospace; }
+#network-details dd { margin:0; color:var(--muted); }
+#network-details dd .mono { color:var(--accent); }
+#network-details p { margin:8px 0 0; color:var(--muted); }
+.button-link { padding:6px 10px; border:1px solid #304257; border-radius:10px; background:#0b142344; color:var(--accent); text-decoration:none; font-size:13px; }
+.button-link:hover { background:#183b3c; border-color:#397d75; }
 .segmented { display:flex; gap:2px; padding:3px; border:1px solid #304257; border-radius:10px; background:#0b142344; }
 .segmented button { border-color:transparent; background:transparent; padding:5px 9px; font-size:14px; line-height:1; }
 .segmented button.active { background:#183b3c; border-color:#397d75; }
@@ -80,13 +109,14 @@ dialog .option input { margin-top:3px; accent-color:var(--bad); }
 </head>
 <body>
 <header id="top">
-  <div class="brand"><span class="eyebrow">QEMU ISO Lab · Consoles</span><h1 id="title">Consoles</h1></div>
-  <div id="network" aria-label="Private network between the machines"><span id="network-status"><span class="dot"></span>Not linked</span><button id="network-toggle" disabled>Link network</button></div>
+  <div class="brand"><span class="eyebrow" id="eyebrow">QEMU ISO Lab · Consoles</span><h1 id="title">Consoles</h1></div>
+  <div id="network" aria-label="Private network between the machines"><span id="network-status"><span class="dot"></span>Not linked</span><button id="network-info" popovertarget="network-details" aria-label="Details of the network" title="Details of the network" hidden>i</button><button id="network-toggle" disabled>Link network</button></div>
+  <div id="network-details" popover role="dialog" aria-label="Network details"></div>
   <div class="actions">
     <select id="add-vm" aria-label="Add a machine"><option value="">Add a machine…</option></select>
     <div class="segmented" role="group" aria-label="Layout"><button data-layout="columns" title="Side by side">▥</button><button data-layout="rows" title="Stacked">▤</button><button data-layout="grid" title="Grid">▦</button></div>
-    <a href="/" id="dashboard">Dashboard</a>
   </div>
+  <a href="/" id="dashboard" class="button-link">Dashboard</a>
 </header>
 <main id="panes" class="columns"></main>
 <dialog id="confirm"><h2 id="confirm-title"></h2><p id="confirm-message"></p><pre id="confirm-command" class="mono"></pre><label id="confirm-option-row" class="option" hidden><input id="confirm-option" type="checkbox"><span id="confirm-option-label"></span></label><div class="buttons"><button id="confirm-no">Cancel</button><button id="confirm-yes" class="primary">Run</button></div></dialog>
@@ -165,9 +195,12 @@ window.addEventListener("dragend", () => { for (const pane of frames.values()) p
 let busyNetwork = false, pollTimer = null;
 function writeHash() {
   history.replaceState(null, "", "/multi#vms=" + panes.map(encodeURIComponent).join(",") + (labName ? "&lab=" + encodeURIComponent(labName) : ""));
-  const heading = labName ? `${labName.replace(/^link:/, "")} · ${panes.join(" · ")}` : panes.join(" · ");
-  document.title = (panes.length ? heading + " · " : "") + "Consoles · QEMU ISO Lab";
-  $("title").textContent = panes.length ? heading : "Consoles";
+  // The title is the lab (or the page's name): the machines are named by their panes (Manzolo,
+  // 2026-10-06: "tutti i nomi macchina a che servono?"); the tab's title keeps them for the taskbar.
+  const heading = labName ? labName.replace(/^link:/, "") : "Consoles";
+  document.title = (panes.length ? panes.join(" · ") + " · " : "") + heading + " · QEMU ISO Lab";
+  $("title").textContent = heading;
+  $("eyebrow").textContent = "QEMU ISO Lab · Consoles" + (panes.length ? ` · ${panes.length} machine${panes.length === 1 ? "" : "s"}` : "");
 }
 const rowOf = (name) => S.vms.find(r => r.name === name);
 // The lab a machine belongs to (the page's own lab first), and its addresses on the lab's segment.
@@ -197,26 +230,36 @@ function commonSegments(names) {
   if (!rows.length || rows.some(r => !r)) return [];
   return [...new Set((rows[0].links || []).map(l => l.segment))].filter(seg => rows.every(r => (r.links || []).some(l => l.segment === seg))).sort();
 }
+function networkDetails(title, rows, note = "") {
+  const info = $("network-info"), box = $("network-details");
+  info.hidden = !rows.length;
+  if (!rows.length) { box.innerHTML = ""; if (box.matches(":popover-open")) box.hidePopover(); return; }
+  box.innerHTML = `<h3>${esc(title)}</h3><dl>${rows.map(([name, value, extra]) => `<dt>${esc(name)}</dt><dd><span class="mono">${esc(value || "—")}</span>${extra ? " · " + esc(extra) : ""}</dd>`).join("")}</dl>${note ? `<p>${esc(note)}</p>` : ""}`;
+}
 function renderNetwork() {
   const status = $("network-status"), button = $("network-toggle"), segments = commonSegments(panes);
-  if (!loaded) { status.className = ""; status.innerHTML = '<span class="dot"></span>Reading the state of the lab…'; status.title = ""; button.disabled = true; button.textContent = "Link network"; button.className = ""; return; }
+  if (!loaded) { status.className = ""; status.innerHTML = '<span class="dot"></span>Reading the state of the lab…'; status.title = ""; button.disabled = true; button.textContent = "Link network"; button.className = ""; networkDetails("", []); return; }
   const linkedAny = panes.some(n => (rowOf(n)?.links || []).length);
   status.className = segments.length ? "linked" : linkedAny ? "partial" : "";
   if (segments.length) {
     const seg = segments[0];
     const members = panes.map(n => { const l = (rowOf(n).links || []).find(l => l.segment === seg); return `${n} ${l.address}${l.up ? "" : " (at next start)"}`; });
-    status.innerHTML = `<span class="dot"></span>Linked on <span class="mono">${esc(seg)}</span>: ${esc(members.join(" · "))}`;
-    status.title = members.join("\n");
+    status.innerHTML = `<span class="dot"></span>Linked on <span class="mono">${esc(seg)}</span>`;
+    status.title = "Details: the (i)";
+    networkDetails(`Linked on ${seg}`, panes.map(n => { const l = (rowOf(n).links || []).find(l => l.segment === seg); return [n, l.address, l.up ? "" : "attached at the next start"]; }),
+      "A private network between these machines (vmctl link): no profile is touched, it lasts until Unlink network.");
     button.textContent = "Unlink network"; button.className = "warn";
   } else if (panes.length && panes.every(n => labOf(n) && labOf(n).group === (labOf(panes[0]) || {}).group)) {
     // A lab's stack: its members already share the lab's own segment, the addresses sit next to each name.
     const lab = labOf(panes[0]);
     status.className = "linked";
-    status.innerHTML = `<span class="dot"></span>Lab <span class="mono">${esc(lab.group)}</span>${lab.title ? ": " + esc(lab.title) : ""} · the members share its segment`;
-    status.title = panes.map(n => `${n} ${labAddresses(n).join(" ")}`).join("\n");
+    status.innerHTML = `<span class="dot"></span>Lab <span class="mono">${esc(lab.group)}</span>`;
+    status.title = "Details: the (i)";
+    networkDetails(`Lab ${lab.group}` + (lab.title ? " · " + lab.title : ""), panes.map(n => [n, labAddresses(n).join(" · ")]), "The members share the lab's own segment.");
     button.textContent = "Link network"; button.className = "";
   } else {
     status.innerHTML = `<span class="dot"></span>${linkedAny ? "Not all machines share a network" : panes.length < 2 ? "Add a second machine to link them" : "Not linked"}`;
+    networkDetails("", []);
     status.title = "A private network between the machines of this page: 192.168.100.x on the session segment, hot-plugged into running VMs, attached at the next start otherwise.";
     button.textContent = "Link network"; button.className = "";
   }
