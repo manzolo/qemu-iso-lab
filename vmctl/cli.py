@@ -581,6 +581,8 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--lan", action="store_true", help="also answer on this computer's network addresses (a phone or another PC on your LAN), over HTTPS with a "
                    "self-signed certificate made once (accept it in the browser): same token, the printed URL is the key to the lab; "
                    "use only on a network you trust")
+    p.add_argument("--idle-exit", type=float, default=0, metavar="MINUTES",
+                   help="stop by itself after MINUTES with no page open (what the app-menu entry uses; jobs keep running)")
     p.set_defaults(func=webui.cmd_web)
 
     p = _add(subparsers, "guest-user", help="the guest user on a VM's disk, the one SSH logs in as (recorded at install; name one for a disk installed before)",

@@ -14,16 +14,60 @@ from tools.install_launchers import desktop_exec, install
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class Executed(Exception):
+    pass
+
+
 class LauncherTests(unittest.TestCase):
-    def test_short_command_resolves_symlink_and_forwards_web_options(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            link = Path(tmp) / "qemu-iso-lab"
-            link.symlink_to(ROOT / "bin/qemu-iso-lab")
-            with mock.patch.object(sys, "argv", [str(link), "--port", "9000"]), mock.patch("os.execv") as execute:
+    def run_launcher(self, *, tty: bool, env: dict[str, str]):
+        """bin/qemu-iso-lab copied into a temp checkout and called through a symlink, with stdin a
+        terminal or not: returns (os.execv call, subprocess.Popen call, the temp checkout)."""
+        tmp = Path(self.temp_dir())
+        repo = tmp / "checkout"
+        (repo / "bin").mkdir(parents=True)
+        shutil.copy2(ROOT / "bin/qemu-iso-lab", repo / "bin/qemu-iso-lab")
+        link = tmp / "qemu-iso-lab"
+        link.symlink_to(repo / "bin/qemu-iso-lab")
+        with mock.patch.object(sys, "argv", [str(link), "--port", "9000"]), \
+             mock.patch.object(sys.stdin, "isatty", return_value=tty), \
+             mock.patch.dict(os.environ, env), \
+             mock.patch("subprocess.Popen") as popen, \
+             mock.patch("os.execv", side_effect=Executed) as execute:
+            for name in ("DISPLAY", "WAYLAND_DISPLAY"):
+                if name not in env:
+                    os.environ.pop(name, None)
+            try:
                 runpy.run_path(str(link), run_name="__main__")
-            execute.assert_called_once_with(sys.executable, [
-                sys.executable, "-u", str(ROOT / "bin/vmctl"), "web", "--open", "--port", "9000",
-            ])
+            except Executed:  # a real execv never returns
+                pass
+        return execute, popen, repo
+
+    def temp_dir(self) -> str:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return tmp.name
+
+    def web(self, repo: Path) -> list[str]:
+        return [sys.executable, "-u", str(repo / "bin/vmctl"), "web", "--open", "--port", "9000"]
+
+    def test_from_a_terminal_it_runs_in_the_foreground(self):
+        execute, popen, repo = self.run_launcher(tty=True, env={"WAYLAND_DISPLAY": "wayland-1"})
+        execute.assert_called_once_with(sys.executable, self.web(repo))
+        popen.assert_not_called()
+
+    def test_from_the_app_menu_it_starts_in_the_background_with_no_window(self):
+        # No Terminal=true (DankMaterialShell runs it in an xterm that may not exist) and no
+        # terminal window left open: the server goes to the background and stops when idle.
+        execute, popen, repo = self.run_launcher(tty=False, env={"WAYLAND_DISPLAY": "wayland-1"})
+        execute.assert_not_called()
+        self.assertEqual(popen.call_args.args[0], [*self.web(repo), "--idle-exit", "15"])
+        self.assertTrue(popen.call_args.kwargs["start_new_session"])
+        self.assertTrue((repo / "artifacts/.web/server.log").is_file())
+
+    def test_without_a_desktop_it_stays_in_the_foreground(self):
+        execute, popen, repo = self.run_launcher(tty=False, env={})
+        execute.assert_called_once_with(sys.executable, self.web(repo))
+        popen.assert_not_called()
 
     def test_setup_installs_command_and_menu_entry_in_custom_user_locations(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -50,7 +94,7 @@ class LauncherTests(unittest.TestCase):
                 self.assertEqual((prefix / "bin" / name).resolve(), repo / "bin" / name)
             desktop = data / "applications/qemu-iso-lab.desktop"
             self.assertIn(f'Exec="{repo}/bin/qemu-iso-lab"', desktop.read_text())
-            self.assertIn("Terminal=true", desktop.read_text())
+            self.assertIn("Terminal=false", desktop.read_text())
             self.assertIn("Icon=qemu-iso-lab\n", desktop.read_text())
             icon = data / "icons/hicolor/scalable/apps/qemu-iso-lab.svg"
             self.assertEqual(icon.read_bytes(), (ROOT / "vmctl/web/qemu-iso-lab.svg").read_bytes())

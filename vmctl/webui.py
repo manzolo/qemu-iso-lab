@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import errno
 import hashlib
 import io
 import json
@@ -580,8 +581,17 @@ class Handler(BaseHTTPRequestHandler):
     uploads = web_files.UploadSessions()
     transfers = web_transfers.Transfers()
 
+    activity: Activity
+
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - BaseHTTPRequestHandler API
         return
+
+    def handle(self) -> None:
+        self.activity.enter()
+        try:
+            super().handle()
+        finally:
+            self.activity.leave()
 
     def _send(self, status: int, body: bytes, content_type: str) -> None:
         try:
@@ -621,6 +631,7 @@ class Handler(BaseHTTPRequestHandler):
         if not secrets.compare_digest(given, self.token):
             self._refuse("Missing or wrong token: open the URL vmctl web printed", HTTPStatus.UNAUTHORIZED)
             return False
+        self.activity.seen()
         return True
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
@@ -1046,6 +1057,93 @@ def tls_context(lan_addresses_now: list[str] | None = None) -> ssl.SSLContext:
     return context
 
 
+class Activity:
+    """When the last request with the token arrived and how many connections are open: what
+    `vmctl web --idle-exit` measures (an open dashboard polls every few seconds, a console or SSH
+    pane is a connection that stays open)."""
+
+    def __init__(self, clock: Any = time.monotonic) -> None:
+        self.clock = clock
+        self.lock = threading.Lock()
+        self.last = clock()
+        self.open = 0
+
+    def seen(self) -> None:
+        with self.lock:
+            self.last = self.clock()
+
+    def enter(self) -> None:
+        with self.lock:
+            self.open += 1
+
+    def leave(self) -> None:
+        with self.lock:
+            self.open -= 1
+            self.last = self.clock()
+
+    def idle_for(self) -> float:
+        with self.lock:
+            return 0.0 if self.open else self.clock() - self.last
+
+
+def server_record(port: int) -> Path:
+    """The running server's port and URL (token included, so 0600): a second `vmctl web` on the
+    same port opens that page instead of failing on a port in use (the app-menu entry clicked twice)."""
+    return state.ROOT / "artifacts" / ".web" / f"server-{port}.json"
+
+
+def write_server_record(port: int, url: str, lan: bool) -> None:
+    path = server_record(port)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump({"pid": os.getpid(), "port": port, "url": url, "lan": lan}, handle)
+    os.replace(tmp, path)
+
+
+def remove_server_record(port: int) -> None:
+    with contextlib.suppress(OSError, ValueError):
+        if json.loads(server_record(port).read_text(encoding="utf-8")).get("pid") == os.getpid():
+            server_record(port).unlink()
+
+
+def running_server(port: int, lan: bool) -> str | None:
+    """The URL of the vmctl web already serving ``port``, None when the port belongs to someone else."""
+    try:
+        record = json.loads(server_record(port).read_text(encoding="utf-8"))
+        pid = int(record["pid"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if record.get("port") != port or bool(record.get("lan")) != lan or not is_web_process(pid):
+        return None
+    url = record.get("url")
+    return url if isinstance(url, str) else None
+
+
+def is_web_process(pid: int) -> bool:
+    """A record left by a server that died is stale once its pid is gone or reused."""
+    try:
+        return b"web" in Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+    except OSError:
+        return False
+
+
+def exit_when_idle(server: ThreadingHTTPServer, seconds: float, poll: float = 30.0) -> None:
+    """Stop the server once no page has talked to it for ``seconds`` and no console recording runs:
+    started from the app menu it has no terminal to Ctrl-C in. Jobs are processes of their own and
+    keep running, as after Ctrl-C."""
+    handler: Any = server.RequestHandlerClass
+    while True:
+        time.sleep(min(poll, seconds))
+        recording = any(not session.finished for session in list(handler.recordings.sessions.values()))
+        if not recording and handler.activity.idle_for() >= seconds:
+            ui.print_note(f"No page open for {seconds / 60:g} minutes: stopping (started with --idle-exit).")
+            sys.stdout.flush()
+            server.shutdown()
+            return
+
+
 def make_server(port: int, token: str, lan: bool = False) -> ThreadingHTTPServer:
     """The server on 127.0.0.1 over plain HTTP, or with *lan* on every interface over HTTPS (a
     self-signed certificate: the browser warns once): the same token, the Host check widened to the
@@ -1064,7 +1162,7 @@ def make_server(port: int, token: str, lan: bool = False) -> ThreadingHTTPServer
     handler: type[Handler] = type("BoundHandler", (Handler,), {"token": token, "port": port, "snapshot": Snapshot(),
                                                               "recordings": web_recording.Recordings(),
                                                               "connections": integration.ConnectionCache(), "uploads": uploads,
-                                                              "transfers": transfers})
+                                                              "transfers": transfers, "activity": Activity()})
     server = WebServer(("0.0.0.0" if lan else "127.0.0.1", port), handler)
     server.daemon_threads = True
     if lan:
@@ -1110,6 +1208,12 @@ def cmd_web(args: argparse.Namespace) -> int:
     try:
         server = make_server(args.port, token, lan=lan)
     except OSError as exc:
+        existing = running_server(args.port, lan) if exc.errno == errno.EADDRINUSE else None
+        if existing:
+            ui.print_status("ok", f"vmctl web is already running: {existing}")
+            if getattr(args, "open", False) and not open_browser(existing):
+                ui.print_status("warn", "No graphical browser found: open the URL above in one.", ok=False)
+            return 0
         where = "every interface" if lan else "127.0.0.1"
         raise VMError(f"Cannot listen on {where}:{args.port}: {exc} (choose another with --port)") from exc
     port = server.server_address[1]
@@ -1133,11 +1237,16 @@ def cmd_web(args: argparse.Namespace) -> int:
         ui.print_status("warn", "No graphical browser found: open the URL above in one "
                         "(on Ubuntu: sudo snap install firefox).", ok=False)
         sys.stdout.flush()
+    write_server_record(port, url, lan)
+    idle = float(getattr(args, "idle_exit", 0) or 0)
+    if idle > 0:
+        threading.Thread(target=exit_when_idle, args=(server, idle * 60), daemon=True).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        remove_server_record(port)
         handler_class: Any = server.RequestHandlerClass
         handler_class.recordings.close()
         server.server_close()

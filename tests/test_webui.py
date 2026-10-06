@@ -2,6 +2,7 @@
 
 import http.client
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -697,3 +698,81 @@ class LanModeTests(unittest.TestCase):
                     again.server_close()
                 finally:
                     wide.server_close()
+
+
+class ServerLifetimeTests(BaseVmctlTestCase):
+    """The app-menu entry runs `vmctl web --open --idle-exit 15` in the background: a second click
+    must open the running server's page, and the server must stop once no page is open."""
+
+    def serve(self, idle_exit=0):
+        import argparse
+        from unittest import mock
+
+        args = argparse.Namespace(port=0, open=False, lan=False, idle_exit=idle_exit)
+        servers = []
+        real = webui.make_server
+
+        def capture(*a, **k):
+            servers.append(real(*a, **k))
+            return servers[-1]
+
+        with mock.patch.object(webui, "make_server", side_effect=capture):
+            thread = threading.Thread(target=webui.cmd_web, args=(args,), daemon=True)
+            thread.start()
+            for _ in range(200):
+                if servers and webui.server_record(servers[0].server_address[1]).is_file():
+                    break
+                time.sleep(0.02)
+        return servers[0], thread
+
+    def test_a_second_launch_opens_the_running_server_instead_of_failing(self):
+        import argparse
+        from unittest import mock
+
+        server, thread = self.serve()
+        port = server.server_address[1]
+        record = json.loads(webui.server_record(port).read_text())
+        self.assertEqual((record["pid"], record["port"]), (os.getpid(), port))
+        self.assertEqual(webui.server_record(port).stat().st_mode & 0o777, 0o600)  # the URL carries the token
+        with mock.patch.object(webui, "is_web_process", return_value=True), \
+             mock.patch.object(webui, "open_browser", return_value=True) as browser:
+            self.assertEqual(webui.cmd_web(argparse.Namespace(port=port, open=True, lan=False, idle_exit=0)), 0)
+            browser.assert_called_once_with(record["url"])
+            with self.assertRaisesRegex(VMError, "Cannot listen"):  # --lan is another server: no reuse
+                webui.cmd_web(argparse.Namespace(port=port, open=True, lan=True, idle_exit=0))
+        with self.assertRaisesRegex(VMError, "Cannot listen"):  # the pytest process is no vmctl web: a stale record
+            webui.cmd_web(argparse.Namespace(port=port, open=True, lan=False, idle_exit=0))
+        server.shutdown()
+        thread.join(10)
+        self.assertFalse(webui.server_record(port).exists())
+
+    def test_a_port_held_by_someone_else_is_still_an_error(self):
+        import argparse
+        import socket as socketlib
+
+        holder = socketlib.socket()
+        holder.bind(("127.0.0.1", 0))
+        holder.listen()
+        self.addCleanup(holder.close)
+        with self.assertRaisesRegex(VMError, "Cannot listen"):
+            webui.cmd_web(argparse.Namespace(port=holder.getsockname()[1], open=False, lan=False, idle_exit=0))
+
+    def test_activity_counts_open_connections_and_the_last_request(self):
+        now = [100.0]
+        activity = webui.Activity(clock=lambda: now[0])
+        now[0] = 160.0
+        self.assertEqual(activity.idle_for(), 60.0)
+        activity.enter()  # a console's WebSocket: busy however long it stays quiet
+        now[0] = 1000.0
+        self.assertEqual(activity.idle_for(), 0.0)
+        activity.leave()
+        now[0] = 1010.0
+        self.assertEqual(activity.idle_for(), 10.0)
+        activity.seen()
+        self.assertEqual(activity.idle_for(), 0.0)
+
+    def test_idle_exit_stops_the_server(self):
+        server, thread = self.serve(idle_exit=0.0001)  # 6 ms: exit_when_idle polls that often
+        thread.join(10)
+        self.assertFalse(thread.is_alive())
+        self.assertFalse(webui.server_record(server.server_address[1]).exists())
