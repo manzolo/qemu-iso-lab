@@ -44,6 +44,11 @@ What the page offers:
 - **Clean** on a VM starred in My VMs with data asks first and runs `vmctl clean <vm> --starred`:
   the disk goes, the star stays (removing the star first dropped the VM out of My VMs, to be
   found again in the catalog). A VM protected with `vmctl protect` is still refused.
+- **Quit** in the header stops the server behind the page after a confirmation (the one the
+  app menu started has no terminal to Ctrl-C in); `vmctl web --stop [--port N]` does the same
+  from a terminal. Jobs and VMs keep running either way.
+- The session card (`vmctl link`) has the same toolbar as a lab: Map, Consoles, Unlink all;
+  Status is in its Actions ⋯ menu. In /multi the screens hang from the top of their panes.
 - **Recent activity** is folded under the lists; its heading opens it and the browser remembers
   the choice. The job at work still shows in the bottom bar and in the header's Activity.
 - **Catalog** leaves the members of a declared lab to the Labs view (like My VMs); a running lab

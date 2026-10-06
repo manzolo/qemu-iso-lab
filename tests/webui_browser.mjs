@@ -23,6 +23,7 @@ const filesFor = vm => { if (!vmFiles.has(vm)) vmFiles.set(vm,new Map([['hello.t
 const transfers = new Map(), transferRequests = [];
 let holdTransfers = false, fileListingDelay = 0;
 let screenDelay = 700;
+const shutdownRequests = [];
 let screenRequests = 0, failScreen = false, holdState = false, stateWaiters = [], dynamicVmJobs = false;
 const profileBase = {name:'Arch Linux + Noctalia',memory_mb:8192,cpus:4,post_install:{commands:Array.from({length:35},(_,i)=>'echo catalog step '+i)}};
 const server = createServer(async (req,res) => {
@@ -123,6 +124,7 @@ const server = createServer(async (req,res) => {
     for (const vm of state.vms) { const named=data.names.includes(vm.name); if (data.action==='add' && named && !vm.mine) { vm.mine=true; added.push(vm.name); } if (data.action==='remove' && named && vm.mine) { vm.mine=false; removed.push(vm.name); } }
     return res.end(JSON.stringify({selected:state.vms.filter(v=>v.mine).map(v=>v.name), added, removed}));
   }
+  if (req.url === '/api/shutdown') { let body=''; for await (const chunk of req) body+=chunk; shutdownRequests.push(JSON.parse(body)); return res.end(JSON.stringify({stopping:true})); }
   if (req.url === '/api/run') {
     let body=''; for await (const chunk of req) body+=chunk;
     if (holdRun) await new Promise(resolve=>releaseRun=resolve);
@@ -1447,5 +1449,15 @@ try {
   assert.equal(context.pages().length,pagesBeforeBackground);
   assert(!(await page.locator('#vnc-dialog').isVisible()));
   check('rejected, failed and cancelled starts close pending windows; background start opens no console');
+  // Quit: the server started from the app menu has no terminal to Ctrl-C in. Last, since the page is offline after it.
+  await page.locator('#server-quit').click();
+  assert.equal(await page.locator('#confirm-title').textContent(),'Stop vmctl web?');
+  await page.locator('#confirm-no').click();
+  assert.deepEqual(shutdownRequests,[],'Cancel sends nothing');
+  await page.locator('#server-quit').click(); await page.locator('#confirm-yes').click();
+  await page.waitForFunction(()=>document.getElementById('offline-title').textContent==='Stopped');
+  assert.deepEqual(shutdownRequests,[{confirmed:true}]);
+  assert(await page.locator('#server-quit').isHidden(),'No Quit while offline');
+  check('Quit asks, stops the server and says so');
   assert.deepEqual(errors,[]); check('no browser JavaScript errors');
 } finally { if (browser) await browser.close(); server.closeAllConnections(); await new Promise(resolve=>server.close(resolve)); }

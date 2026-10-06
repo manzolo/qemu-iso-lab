@@ -931,6 +931,14 @@ class Handler(BaseHTTPRequestHandler):
                 with self.snapshot.lock:
                     self.snapshot.value = None
                 self._json(result)
+            elif path == "/api/shutdown":
+                # The page's Quit (started from the app menu there is no terminal to Ctrl-C in):
+                # the server closes after this answer, jobs and VMs go on. {"confirmed": true}.
+                if body.get("confirmed") is not True:
+                    raise VMError("Pass confirmed: true to stop the server")
+                self.close_connection = True
+                self._json({"stopping": True})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
             elif path == "/api/protect":
                 # vmctl protect / unprotect: {"action": add|remove, "names": [...]}, saved in local.json.
                 names = body.get("names") or []
@@ -1202,7 +1210,33 @@ def open_browser(url: str) -> bool:
     return bool(webbrowser.open(url))
 
 
+def stop_server(port: int) -> int:
+    """`vmctl web --stop`: SIGINT to the server recorded for the port (it closes as on Ctrl-C and
+    removes its record); 0 when it is gone, 1 when nothing of ours listens there."""
+    try:
+        record = json.loads(server_record(port).read_text(encoding="utf-8"))
+        pid = int(record["pid"])
+    except (OSError, ValueError, KeyError, TypeError):
+        ui.print_status("warn", f"No vmctl web of this checkout is recorded on port {port}.", ok=False)
+        return 1
+    if not is_web_process(pid):
+        ui.print_status("warn", f"The vmctl web recorded on port {port} (pid {pid}) is already gone.", ok=False)
+        with contextlib.suppress(OSError):
+            server_record(port).unlink()
+        return 1
+    os.kill(pid, signal.SIGINT)
+    for _ in range(100):
+        if not is_web_process(pid):
+            ui.print_status("ok", f"vmctl web on port {port} stopped (pid {pid}). Jobs and VMs keep running.")
+            return 0
+        time.sleep(0.1)
+    ui.print_status("warn", f"vmctl web (pid {pid}) has not stopped after 10 s; kill it by hand if it must go.", ok=False)
+    return 1
+
+
 def cmd_web(args: argparse.Namespace) -> int:
+    if getattr(args, "stop", False):
+        return stop_server(args.port)
     token = secrets.token_urlsafe(18)
     lan = bool(getattr(args, "lan", False))
     try:

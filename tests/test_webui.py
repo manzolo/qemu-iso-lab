@@ -1,5 +1,6 @@
 """vmctl web: the command catalog, request validation, the token/Host guard and jobs."""
 
+import argparse
 import http.client
 import json
 import os
@@ -745,6 +746,33 @@ class ServerLifetimeTests(BaseVmctlTestCase):
         server.shutdown()
         thread.join(10)
         self.assertFalse(webui.server_record(port).exists())
+
+    def test_the_page_can_stop_the_server_and_so_can_vmctl_web_stop(self):
+        import http.client as httplib
+
+        server, thread = self.serve()
+        port = server.server_address[1]
+        conn = httplib.HTTPConnection("127.0.0.1", port, timeout=10)
+        token = json.loads(webui.server_record(port).read_text())["url"].split("token=")[1]
+        headers = {"Host": f"127.0.0.1:{port}", "X-Vmctl-Token": token, "Content-Type": "application/json"}
+        conn.request("POST", "/api/shutdown", body=json.dumps({}), headers=headers)
+        self.assertEqual(conn.getresponse().status, 400)  # confirmed: true required
+        self.assertTrue(thread.is_alive())
+        conn = httplib.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("POST", "/api/shutdown", body=json.dumps({"confirmed": True}), headers=headers)
+        self.assertEqual(json.loads(conn.getresponse().read()), {"stopping": True})
+        thread.join(10)
+        self.assertFalse(thread.is_alive())
+        self.assertFalse(webui.server_record(port).exists())
+        # --stop: SIGINT to the recorded pid (here: the server's own shutdown, the pid is this process)
+        server, thread = self.serve()
+        port = server.server_address[1]
+        with mock.patch.object(webui, "is_web_process", side_effect=lambda pid: thread.is_alive()), \
+             mock.patch.object(webui.os, "kill", side_effect=lambda pid, sig: server.shutdown()) as kill:
+            self.assertEqual(webui.cmd_web(argparse.Namespace(port=port, stop=True)), 0)
+        self.assertEqual(kill.call_args.args, (os.getpid(), webui.signal.SIGINT))
+        thread.join(10)
+        self.assertEqual(webui.cmd_web(argparse.Namespace(port=port, stop=True)), 1)  # nothing recorded any more
 
     def test_a_port_held_by_someone_else_is_still_an_error(self):
         import argparse

@@ -434,6 +434,10 @@ tr.row.lit td:first-child { box-shadow:inset 4px 0 var(--accent), inset 0 1px va
 .console-toolbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .console-toolbar button { font-size:12px; }
 #vnc-screen { flex:1; min-width:0; min-height:0; background:#060a10; position:relative; overflow:hidden; }
+/* Side by side (/multi) the screens hang from the top: noVNC centres its canvas with an inline
+   margin:auto, so two guests with different aspect ratios sat at different heights (Manzolo,
+   2026-10-06: "troppo disallineato"); the dialog alone keeps the centred screen. */
+body.console-embedded #vnc-screen canvas { margin-top:0 !important; }
 .console-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 18px; background:#111a28; border-top:1px solid var(--line); flex-shrink:0; }
 #vnc-note { margin:0; font-size:12px; color:var(--muted); }
 #vnc-status { white-space:nowrap; }
@@ -645,8 +649,10 @@ body.panel-only main > section:last-child { position:static; }
 .profile-heading button { background:transparent; color:var(--accent); font-size:11px; padding:5px 8px; border:1px solid var(--line); }
 #profile-mine { margin-right:6px; padding:4px 9px; font-size:13px; line-height:1; color:var(--warn); }
 #profile-mine.chosen { background:#3a3320; border-color:#6b5a2a; }
-#identity-open { padding:6px 10px; background:#172333; border:1px solid var(--line); border-radius:20px; font-size:11px; }
-#identity-open:hover { background:#233449; border-color:#496078; }
+#identity-open, #server-quit { padding:6px 10px; background:#172333; border:1px solid var(--line); border-radius:20px; font-size:11px; }
+#identity-open:hover, #server-quit:hover { background:#233449; border-color:#496078; }
+#server-quit:hover { color:var(--bad); border-color:#603846; }
+body.panel-only #server-quit, body.offline #server-quit { display:none; }
 #identity-dialog { width:min(640px,94vw); }
 #identity-dialog .body { display:flex; flex-direction:column; gap:16px; }
 #identity-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
@@ -880,6 +886,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   <span id="connection" role="status">Connecting</span>
   <div id="activity" class="hidden"><button id="activity-toggle" popovertarget="activity-panel" aria-label="Latest activity" aria-expanded="false"><span id="activity-symbol" aria-hidden="true"></span><span id="activity-label">Activity</span></button></div>
   <button id="identity-open" title="The guest identity of local.json: user, password, real name">Identity</button>
+  <button id="server-quit" title="Stop vmctl web (the server behind this page); jobs and VMs keep running">Quit</button>
   <span id="version" class="s-muted"></span>
 </header>
 <div id="offline-banner" role="alert" hidden><strong id="offline-title">Offline</strong><span id="offline-text"></span><button id="offline-retry" type="button">Retry now</button></div>
@@ -1698,8 +1705,8 @@ function renderLabs() {
     if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="lab-controls"><span class="chip completed">session · ${members.length} linked${(lab.pending || []).length ? ` · ${lab.pending.length} off` : ""}</span>${menuButton("lab",lab.group)}</span></div>
       <p class="lab-order">Made with <span class="mono">vmctl link</span> (or using the network buttons / multiple selection). A private /24 segment: stopped members join at their next start; it touches no profile and lasts until Unlink all.</p>
       <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button class="${m.running ? "member-running" : ""}" data-member="${esc(m.name)}" title="Open profile">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "")}</span></span></button>${stateBadge(m)}${powerButton(m)}${menuButton("member",m.name)}</div>`).join("")}</div>
-      <div class="lab-footer"><div class="buttons"><button data-args='${esc(JSON.stringify(["link", "--status", "--segment", lab.segment]))}'>Status</button><button class="danger" data-args='${esc(JSON.stringify(["link", "--off", "--segment", lab.segment]))}'>Unlink all</button></div>
-      <div class="lab-links"><button data-map="${esc(lab.group)}" title="The network map of this session: the linked VMs, their addresses, the frames on the cable">${consoleIcon("integration")}Map</button></div></div></section>`;
+      <div class="lab-footer"><div class="lab-toolbar"><button data-map="${esc(lab.group)}" title="The network map of this session: the linked VMs, their addresses, the frames on the cable">${consoleIcon("integration")}Map</button>${consoleTargets(members.map(m => m.name)).length ? `<button data-lab-consoles="${esc(lab.group)}" title="The linked machines in one page of consoles, side by side (a stopped one stays stopped)">${consoleIcon("detach")}Consoles</button>` : ""}<button class="danger" data-args='${esc(JSON.stringify(["link", "--off", "--segment", lab.segment]))}'>${consoleIcon("close")}Unlink all</button></div></div>
+      <div class="lab-more" hidden><button data-args='${esc(JSON.stringify(["link", "--status", "--segment", lab.segment]))}'>Status</button></div></section>`;
     const up = members.filter((m) => m.running).length;
     const installed = names.length > 0 && names.every((n) => byName[n]?.installed);
     const cluster = members.some((m) => m.family === "proxmox");
@@ -3320,6 +3327,13 @@ async function openIdentity(welcome = false) {
   if (!d.open) d.showModal();
 }
 $("identity-open").onclick = () => openIdentity(false);
+// Quit: the server started from the app menu has no terminal to Ctrl-C in (Manzolo, 2026-10-06).
+$("server-quit").onclick = async () => {
+  if (!await askConfirm({ eyebrow: "Server", title: "Stop vmctl web?", message: "The server behind this page closes; the VMs and the jobs started here keep running. Start it again from the app menu or with vmctl web --open.", command: "vmctl web --stop", button: "Stop the server" })) return;
+  try { await api("/api/shutdown", { confirmed: true }); } catch (e) { if (e.status) { toast(e.message, true); return; } }
+  stateFailures = 2; serverLost({ status: 0, message: "stopped from this page" });
+  $("offline-title").textContent = "Stopped"; $("offline-text").innerHTML = "vmctl web was stopped from this page. The VMs keep running and their jobs go on. Start it again from the app menu or with <code>vmctl web --open</code>.";
+};
 $("identity-skip").onclick = () => $("identity-dialog").close();
 $("identity-form").onsubmit = async (e) => {
   e.preventDefault();
