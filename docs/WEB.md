@@ -6,7 +6,14 @@ vmctl web --lan     # also from a phone or another PC on your network: prints ht
 ```
 
 `vmctl web` serves the lab in a browser on **127.0.0.1 only** and prints a URL with a random
-token. It drives the same backend as `vmctl` and `vmtui`. To see one VM through its whole
+token. It drives the same backend as `vmctl` and `vmtui`.
+
+The **QEMU ISO Lab** entry of the applications menu starts it in the background, with no
+window (output in `artifacts/.web/server.log`), and the server stops by itself 15 minutes after
+the last page closed (`vmctl web --idle-exit 15`; jobs keep running, as after Ctrl-C). Clicking
+the entry again, or running `vmctl web --open` on the same port, opens the page of the server
+already running instead of failing on a port in use (`artifacts/.web/server-<port>.json`, 0600:
+it holds the token). To see one VM through its whole
 lifecycle from the page, screen by screen, read [From zero to a running VM](FIRST_VM.md).
 
 What the page offers:
@@ -16,6 +23,24 @@ What the page offers:
   The **Sort** selector defaults to running machines first, then natural name order (Windows 7
   before Windows 11), with name A–Z, name Z–A and installed first as alternatives. The browser remembers
   your choice across reloads; changing it keeps the selected machine.
+- **Power button** on every machine with a disk (the list, the lab cards, the map): a click
+  starts it headless in the background, a click on a running one asks before the shutdown (Force
+  is an option of the dialog), holding it for two seconds forces it off at once; while a job
+  works on the machine the button pulses and opens that job's log.
+- **State column**: the state on one line (a dot, or the green pill of a running machine, the
+  spinner of a job) and the installation under it; the details are in the machine panel.
+- **Lab cards**: the members with their power buttons, then one row of buttons: the stack's
+  power (Start / Stop stack, Install lab), Map, Consoles, Guide. Reset, Reinstall, Run tests,
+  Status, Form cluster, Save as reset point and Clean are in the card's **Actions ⋯** menu (also
+  the right click on the card).
+- A lab that climbs to the top of the Labs view (you started it, or a job runs on a member) stays
+  lit for three seconds while the other cards fade, so the eye follows it.
+- A lab card's **Consoles** opens its members side by side without starting them: a stopped
+  member shows as stopped, with its own Start; the stack starts with Start stack, in its order.
+- **Recent activity** is folded under the lists; its heading opens it and the browser remembers
+  the choice. The job at work still shows in the bottom bar and in the header's Activity.
+- **Catalog** leaves the members of a declared lab to the Labs view (like My VMs); a running lab
+  shows as a *Labs running* line under the title in both views.
 - **My VMs**: the profiles you chose out of the catalog, plus whatever is running right now
   outside a lab. The members of a running lab stay in the Labs view (a starred one still shows
   here), and a *Labs running: k8s-lab (3) →* line under the title leads to their cards. Its opposite is **Hide from the lists** (right-click a row, or a

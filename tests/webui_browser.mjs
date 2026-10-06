@@ -425,17 +425,17 @@ try {
   await page.evaluate(()=>render());
   assert.equal(await page.locator('[data-section=installation]').getAttribute('open'),''); check('polling preserves expanded profile');
   await page.locator('[data-filter=labs]').click();
-  assert.equal(await page.locator('.lab').first().locator('.buttons button').first().textContent(),'Start stack');
-  assert.equal(await page.locator('.lab').nth(1).locator('.buttons button').first().textContent(),'Install lab');
+  assert.equal(await page.locator('.lab').first().locator('.lab-toolbar button').first().textContent(),'Start stack');
+  assert.equal(await page.locator('.lab').nth(1).locator('.lab-toolbar button').first().textContent(),'Install lab');
   await shot('labs'); check('installed and new labs have different primary actions');
   {
     // A lab command shows at once that it is at work: spinner + label on its button, the lab's
     // other commands wait, the bar runs; then the running job keeps it so until it ends.
     const card=page.locator('.lab').first(), saved=[jobId,jobStatus,jobCommand];
     holdRun=true; jobId='web:lab';
-    await card.locator('.buttons button').first().click();
+    await card.locator('.lab-toolbar button').first().click();
     await page.waitForFunction(()=>document.querySelector('.lab.busy button.working'));
-    assert.equal((await card.locator('button.working').textContent()).trim(),'Starting stack…');
+    assert.equal((await card.locator('button.working').textContent()).trim(),'Starting…');
     assert.equal(await card.locator('.lab-footer [data-args]:not([disabled])').count(),0,'The other lab commands wait');
     assert.equal(await card.getAttribute('aria-busy'),'true');
     holdRun=false; releaseRun();
@@ -444,7 +444,7 @@ try {
     assert(await card.evaluate(n=>n.classList.contains('busy')),'Busy while the job runs');
     jobStatus='completed'; await page.evaluate(()=>refreshJobs());
     await page.waitForFunction(()=>!document.querySelector('.lab.busy'));
-    assert.equal((await card.locator('.buttons button').first().textContent()).trim(),'Start stack');
+    assert.equal((await card.locator('.lab-toolbar button').first().textContent()).trim(),'Start stack');
     [jobId,jobStatus,jobCommand]=saved; requests=[];
     await page.evaluate(()=>refreshJobs());
     check('a lab command shows it is at work from the click to the end of its job');
@@ -499,6 +499,9 @@ try {
   await page.evaluate(()=>refresh(true));
   assert.deepEqual(await labOrder(),['new-lab','proxmox-lab']);
   assert((await page.evaluate(()=>window.__scrolled)).includes('new-lab'),'The climbing lab with a running job is scrolled into view');
+  assert(await page.locator('#labs-view.spotlight [data-lab="new-lab"].lit').count()===1 && await page.locator('#labs-view [data-lab="proxmox-lab"].lit').count()===0,'The climbing lab is lit, the others fade');
+  await page.evaluate(()=>{ labSpotlight.until=0; paintLabSpotlight(); });
+  assert.equal(await page.locator('#labs-view.spotlight').count(),0,'The spotlight ends by itself');
   await page.evaluate(()=>{ vmJobs.delete('alpine-ci'); });
   state.vms.find(vm=>vm.name==='alpine-ci').running=false;
   await page.evaluate(()=>refresh(true));
@@ -579,7 +582,7 @@ try {
   assert.equal(await page.locator('#labs-view [data-lab="proxmox-lab"] [data-lab-consoles]').count(),1);
   assert.equal(await page.locator('#labs-view [data-lab="new-lab"] [data-lab-consoles]').count(),0);
   const labConsoles=context.waitForEvent('page'); await page.locator('#labs-view [data-lab="proxmox-lab"] [data-lab-consoles]').click();
-  const labPage=await labConsoles; assert.equal(new URL(labPage.url()).hash,'#vms=proxmox-ve,proxmox-ve-node2&start=1&lab=proxmox-lab'); await labPage.close();
+  const labPage=await labConsoles; assert.equal(new URL(labPage.url()).hash,'#vms=proxmox-ve,proxmox-ve-node2&lab=proxmox-lab','A lab\'s Consoles never starts the members'); await labPage.close();
   check('a lab card opens its members in one page of consoles');
   await page.locator('#labs-view [data-vm="proxmox-ve"] .state').click({button:'right'});
   assert.equal(await page.locator('#vm-context .context-title').textContent(),'proxmox-ve');
@@ -660,6 +663,12 @@ try {
   await page.waitForFunction(()=>document.getElementById('toast').textContent==='Fixture cancellation failed');
   assert(!(await page.locator('#activity-cancel').isDisabled()));
   failCancel=false;
+  // Recent activity is folded until its heading is clicked; the browser remembers it open.
+  assert(await page.locator('#job-rows').isHidden());
+  assert.equal(await page.locator('#jobs-toggle').getAttribute('aria-expanded'),'false');
+  await page.locator('#jobs-toggle').click();
+  assert(await page.locator('#job-rows').isVisible());
+  assert.equal(await page.evaluate(()=>localStorage.getItem('vmctl-jobs-open')),'1');
   await page.locator('#job-rows [data-job-cancel]').click(); await page.locator('#confirm-yes').click();
   await page.waitForFunction(()=>document.getElementById('activity-status').textContent==='Cancelled');
   assert.equal(cancelRequests.at(-1),'/api/jobs/web%3Afixture/cancel');
@@ -1328,6 +1337,10 @@ try {
   await page.evaluate(()=>refresh(true));
   assert.deepEqual(await page.locator('#rows [data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia','debian-server'],'A running lab member is not in My VMs');
   assert.match((await page.locator('#labs-running').textContent()).replace(/\s+/g,' '),/Labs running:\s*proxmox-lab \(1\) →/);
+  await page.locator('[data-filter="all"]').click();
+  assert.equal(await page.locator('#rows [data-vm="proxmox-ve"]').count(),0,'The catalog leaves lab members to the Labs view');
+  assert(await page.locator('#labs-running').isVisible(),'The catalog has the Labs running line too');
+  await page.locator('[data-filter="mine"]').click();
   await page.locator('#labs-running [data-running-lab="proxmox-lab"]').click();
   assert.equal(await page.locator('[data-filter].active').getAttribute('data-filter'),'labs');
   await page.locator('[data-filter="mine"]').click();
@@ -1349,6 +1362,56 @@ try {
   await page.locator('#selection-clear').click();
   await page.evaluate(()=>refresh(true));
   check('My VMs: context menu, filter, details button and selection bar');
+  {
+    // The power button of every row (the map's own): a click starts a stopped VM headless, a click
+    // on a running one asks first, holding it two seconds forces it off; it never selects the row.
+    const saved=[jobId,jobStatus,jobCommand], power=(vm)=>page.locator(`#rows [data-vm="${vm}"] [data-power]`);
+    dynamicVmJobs=true;  // the job of a start/stop is vm:<name>, as on the server
+    await page.locator('[data-filter="all"]').click();
+    assert.equal(await page.locator('#rows [data-vm="alpine-ci"] [data-power]').count(),0,'No disk, no power button');
+    assert(await power('arch-noctalia').evaluate(n=>n.classList.contains('on')));
+    const selectedBefore=await page.locator('#rows tr.sel').getAttribute('data-vm');
+    requests=[];
+    await power('arch-noctalia').click();
+    await page.locator('#confirm-dialog').waitFor({state:'visible'});
+    assert.equal(await page.locator('#confirm-title').textContent(),'Shut down arch-noctalia?');
+    await page.locator('#confirm-no').click();
+    assert.equal(requests.length,0,'Cancel sends nothing');
+    assert.equal(await page.locator('#rows tr.sel').getAttribute('data-vm'),selectedBefore,'The power button does not select the row');
+    const box=await power('arch-noctalia').boundingBox();
+    await page.mouse.move(box.x+box.width/2,box.y+box.height/2); await page.mouse.down();
+    await page.waitForFunction(()=>document.querySelector('#rows [data-vm="arch-noctalia"] .vm-power.holding'));
+    await page.evaluate(()=>{ vmJobs.set('debian-server',{status:'running',command:'start'}); render(); });  // a job elsewhere mid-hold
+    await page.waitForTimeout(600);
+    assert(await page.locator('#rows [data-vm="arch-noctalia"] .vm-power.holding').count()===1,'The held button survives a render');
+    await page.waitForTimeout(1600); await page.mouse.up();
+    await page.evaluate(()=>{ vmJobs.delete('debian-server'); });
+    await page.waitForFunction(()=>window.fetch && true);
+    await page.waitForTimeout(200);
+    assert.deepEqual(requests.at(-1),{args:['stop','arch-noctalia','--force'],confirmed:true},'Held two seconds: forced off with no dialog');
+    assert.equal(await page.locator('#rows [data-vm="alpine-ci"] .vm-power-slot').count(),1,'A slot keeps the badges in line');
+    assert(await page.locator('#confirm-dialog').isHidden());
+    await page.waitForFunction(()=>document.querySelector('#rows [data-vm="arch-noctalia"] .vm-power.busy'));
+    await page.evaluate(()=>{ vmJobs.clear(); render(); });
+    [jobId,jobStatus,jobCommand]=saved; await page.evaluate(()=>refreshJobs());
+    requests=[];
+    await power('debian-server').click();
+    await page.waitForFunction(()=>document.querySelector('#rows [data-vm="debian-server"] .vm-power.busy'));
+    assert.deepEqual(requests.at(-1).args,['start','debian-server','--headless','--background']);
+    // Running first: the started row climbs the moment it runs; the list follows it and lights it.
+    const scrolled=[]; await page.exposeFunction('__rowScrolled', vm=>scrolled.push(vm));
+    await page.evaluate(()=>{ Element.prototype.scrollIntoView=function(){ if (this.dataset.vm) window.__rowScrolled(this.dataset.vm); }; });
+    state.vms.find(vm=>vm.name==='debian-server').running=true; await page.evaluate(()=>refresh(true));
+    await page.waitForFunction(()=>document.querySelector('#list.spotlight tr[data-vm="debian-server"].lit'));
+    assert.deepEqual(scrolled,['debian-server'],'The list scrolls to the climbing row');
+    assert.equal(await page.locator('#rows tr.lit').count(),1);
+    await page.evaluate(()=>{ rowSpotlight.until=0; paintRowSpotlight(); });
+    assert.equal(await page.locator('#list.spotlight').count(),0);
+    state.vms.find(vm=>vm.name==='debian-server').running=false;
+    await page.evaluate(()=>{ vmJobs.clear(); render(); });
+    [jobId,jobStatus,jobCommand]=saved; requests=[]; dynamicVmJobs=false; await page.evaluate(()=>refreshJobs());
+    check('power button: start headless, confirmed shutdown, two-second hold forces it off, never selects the row');
+  }
   await page.setViewportSize({width:1440,height:1000});
   state.vms[0].running=false; jobId='vm:arch-noctalia'; jobStatus='completed';
   await page.evaluate(()=>{vmJobs.clear();}); await page.evaluate(()=>refresh(true));

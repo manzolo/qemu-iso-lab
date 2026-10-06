@@ -137,7 +137,7 @@ let panes = [...new Set(readHash().vms)];
 let startWanted = readHash().start;
 // Opened from a lab card (#lab=<group>): the page is that lab's, and shows its addresses.
 const labName = readHash().lab;
-let S = { vms: [] };                  // the dashboard snapshot (/api/state)
+let S = { vms: [] }, loaded = false;  // the dashboard snapshot (/api/state); loaded once it arrived
 const local = new Map();              // name -> "start" | "stop" | "link" submitted here, until the state shows it
 const frames = new Map();             // name -> pane element (iframes must survive re-renders)
 // Drops inside a console are handled by that iframe. Forward drops on its outer
@@ -275,7 +275,7 @@ function renderPane(name) {
   if (local.get(name) === "stop" && r && !r.running) local.delete(name);
   const starting = local.get(name) === "start", stopping = local.get(name) === "stop";
   let state, cls;
-  if (!r) [state, cls] = ["Unknown profile", "bad"];
+  if (!r) [state, cls] = loaded ? ["Unknown profile", "bad"] : ["Loading…", "busy"];  // not "Unknown" before the first snapshot
   else if (stopping) [state, cls] = ["Stopping…", "busy"];
   else if (starting) [state, cls] = ["Starting…", "busy"];
   else if (r.running) [state, cls] = [r.job_status === "running" ? "Running · job" : "Running", "ok"];
@@ -299,7 +299,7 @@ function renderPane(name) {
     f.src = consoleUrl(name); body.appendChild(f);
   } else if (!running) {
     if (frame) frame.remove();
-    const hint = !r ? "This name is not in the catalog." : starting ? "The console opens here as soon as the VM runs." : stopping ? "Waiting for the guest to power off." : r.job_status === "running" ? "A job is running on this VM; the console opens when it is running headless." : !r.installed ? "Install it from the dashboard first." : "Start it to see its display.";
+    const hint = !r ? (loaded ? "This name is not in the catalog." : "Reading the state of the lab…") : starting ? "The console opens here as soon as the VM runs." : stopping ? "Waiting for the guest to power off." : r.job_status === "running" ? "A job is running on this VM; the console opens when it is running headless." : !r.installed ? "Install it from the dashboard first." : "Start it to see its display.";
     body.innerHTML = `<div class="placeholder"><div>${starting || stopping ? '<div class="spinner"></div>' : ""}<strong>${esc(name)} · ${esc(state)}</strong><p>${esc(hint)}</p>${r && !r.running && r.installed && !busy(r) ? '<button class="primary" data-start>Start</button>' : ""}</div></div>`;
     const b = body.querySelector("[data-start]"); if (b) b.onclick = () => startVm(name);
   }
@@ -324,7 +324,7 @@ $("add-vm").onchange = () => { const name = $("add-vm").value; if (!name) return
 async function poll() {
   pollTimer = null;
   try {
-    S = await api("/api/state?fresh=1");
+    S = await api("/api/state?fresh=1"); loaded = true;
     if (startWanted) {
       startWanted = false; writeHash();
       for (const name of panes) { const r = rowOf(name); if (r && !r.running && r.installed && !busy(r)) startVm(name); }

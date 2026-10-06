@@ -29,10 +29,14 @@ header h1 b { color:var(--accent); }
 #summary { font-size:12px; color:var(--muted); }
 #connection { margin-left:auto; font-size:12px; color:var(--ok); display:flex; align-items:center; gap:7px; }
 #connection.s-warn { color:var(--warn); }
-.labs-running { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 12px; font-size:13px; color:var(--muted); }
+/* The line under the list's heading: the labs with a machine on, as pills that lead to the Labs
+   view; aligned with the heading and the hint under it (Manzolo, 2026-10-06: it sat on the edge). */
+.labs-running { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:0; padding:8px 18px; border-bottom:1px solid var(--line); background:#ffffff03; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
 .labs-running[hidden] { display:none; }
-.labs-running button { padding:4px 10px; font-size:12px; border-radius:999px; border-color:#2f6b5e; background:#16302c; color:var(--text); }
-.labs-running button::before { content:""; display:inline-block; width:6px; height:6px; margin-right:6px; border-radius:50%; background:var(--live); vertical-align:middle; }
+.labs-running button { padding:3px 10px 3px 8px; font-size:12px; letter-spacing:0; text-transform:none; border-radius:999px; border:1px solid #2f6b5e; background:#16302c; color:var(--text); display:inline-flex; align-items:center; gap:6px; }
+.labs-running button:hover { background:#1e4038; border-color:var(--accent); }
+.labs-running button::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--live); box-shadow:0 0 5px var(--live); }
+.labs-running button .s-muted { font-weight:400; }
 #connection.s-bad { color:var(--bad); font-weight:600; }
 /* The server is gone (vmctl web stopped) or came back with a new token: a banner says so in words,
    and the page behind it fades and takes no clicks, because every button would fail and every
@@ -49,15 +53,15 @@ body.offline .overview, body.offline main { opacity:.45; filter:grayscale(.75); 
 body.console-embedded #offline-banner, body.panel-only #offline-banner { padding:6px 10px; font-size:12px; }
 #connection::before,.state::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; display:inline-block; flex-shrink:0; }
 #version { font:12px ui-monospace,monospace; border-left:1px solid var(--line); padding-left:14px; }
-.overview { padding:28px 24px 20px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.overview { padding:14px 24px 10px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
 .eyebrow { color:var(--accent); text-transform:uppercase; font-size:10px; font-weight:700; letter-spacing:.16em; }
-.overview h2 { font-size:28px; letter-spacing:-.04em; margin:4px 0; }
-.overview p { margin:0; color:var(--muted); font-size:13px; }
+.overview h2 { font-size:22px; letter-spacing:-.03em; margin:2px 0; }
+.overview p { margin:0; color:var(--muted); font-size:12px; }
 .metrics { display:flex; gap:10px; }
-.metric { min-width:112px; padding:12px 18px; background:#172333a6; border:1px solid var(--line); border-radius:12px; }
-.metric strong { display:block; font-size:25px; line-height:1.3; font-weight:600; }
+.metric { min-width:96px; padding:7px 14px; background:#172333a6; border:1px solid var(--line); border-radius:10px; }
+.metric strong { display:block; font-size:20px; line-height:1.25; font-weight:600; }
 .metric span { color:var(--muted); font-size:11px; }
-#workspace-nav { display:flex; gap:8px; padding:0 24px 16px; }
+#workspace-nav { display:flex; gap:8px; padding:0 24px 12px; }
 #toolbar { display:flex; gap:12px; padding:0 24px 16px; align-items:center; flex-wrap:wrap; }
 .search-box { flex:1 1 220px; position:relative; }
 #search { width:100%; padding-right:42px; }
@@ -153,11 +157,14 @@ body.dragging { user-select:none; cursor:grabbing; }
 .style-tag.auto { color:var(--ok); border-color:#2f5a52; background:#16302c; }
 .profile-desc { display:block; color:var(--muted); font-size:11px; margin-top:3px; max-width:300px; overflow:hidden; text-overflow:ellipsis; }
 #list { max-height:520px; overflow:auto; }
-.state { display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:600; border:1px solid currentColor; border-radius:6px; padding:3px 7px; }
-.state.busy::before { width:10px; height:10px; background:none; border:2px solid currentColor; border-right-color:transparent; animation:activity-spin 1.2s linear infinite; }
-button.state { background:transparent; text-align:left; }
-/* Running is the one state that is filled (its dot sits on the icon): installation states stay outlined. */
-.state.s-live { background:var(--live); border-color:var(--live); color:#0b2616; }
+/* One line per machine: a dot and the state, then the installation in muted text. Only Running
+   is a filled pill (its dot sits on the icon), a working state shows its spinner; nothing else is
+   boxed (Manzolo, 2026-10-06: the outlined Stopped over a tiny "Boot verified" line was ugly). */
+.state { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; border:0; border-radius:999px; padding:0; }
+.state::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor; opacity:.7; flex-shrink:0; }
+.state.busy::before { width:10px; height:10px; background:none; border:2px solid currentColor; border-right-color:transparent; opacity:1; animation:activity-spin 1.2s linear infinite; }
+button.state { background:transparent; text-align:left; cursor:pointer; }
+.state.s-live { background:var(--live); color:#0b2616; padding:2px 9px; font-size:11px; }
 .state.s-live::before { display:none; }
 /* Stopped machines have a dimmed icon; running ones keep full colour and a green dot on it. */
 tr.row:not(.on) .vm-select .catalog-icon { filter:saturate(.35) brightness(.78); }
@@ -165,7 +172,7 @@ tr.row:not(.on) .vm-select .catalog-icon { filter:saturate(.35) brightness(.78);
 tr.row.on .vm-select::before, .member-running .catalog-icon::before { content:""; position:absolute; top:-3px; right:-3px; width:9px; height:9px; border:2px solid var(--panel); border-radius:50%; background:var(--live); box-shadow:0 0 6px var(--live); pointer-events:none; z-index:1; animation:running-pulse 1.8s ease-in-out infinite; }
 @keyframes running-pulse { 50% { opacity:.45; box-shadow:0 0 2px var(--live); } }
 @media(prefers-reduced-motion:reduce) { tr.row.on .vm-select::before, .member-running .catalog-icon::before { animation:none; } }
-button.state:hover { background:#453c28; }
+button.state:hover { text-decoration:underline; }
 .s-ok { color:var(--ok); } .s-live { color:var(--live); } .s-warn { color:var(--warn); } .s-bad { color:var(--bad); } .s-info { color:#9ebdff; } .s-muted { color:var(--muted); }
 #details { padding:18px; }
 #details .name { font-size:20px; font-weight:600; margin:10px 0 3px; overflow-wrap:anywhere; letter-spacing:-.04em; }
@@ -209,6 +216,14 @@ button.warn:hover { background:#3a3128; border-color:#7a6440; }
 .note a, .iso-result a { color:inherit; text-decoration:underline; overflow-wrap:anywhere; }
 .note { background:var(--panel2); border-left:3px solid var(--warn); padding:10px 12px; border-radius:6px; white-space:pre-wrap; font-size:13px; margin:10px 0; }
 #jobs { margin:0 24px 24px; }
+/* Folded by default (Manzolo, 2026-10-06: forty jobs under the labs were noise); the heading opens
+   it, the browser remembers the choice. The bottom job bar still shows the job at work. */
+#jobs-toggle { display:inline-flex; align-items:center; gap:8px; padding:0; border:0; background:none; color:inherit; font:inherit; letter-spacing:inherit; text-transform:inherit; cursor:pointer; }
+#jobs-toggle:hover { color:var(--text); }
+.jobs-chevron { display:inline-block; transition:transform .15s; }
+#jobs:not(.collapsed) .jobs-chevron { transform:rotate(90deg); }
+#jobs.collapsed .table-wrap { display:none; }
+#jobs.collapsed .section-heading { border-bottom:0; }
 .section-heading { display:flex; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); align-items:center; }
 .section-heading h2 { padding:0; border:0; color:var(--text); }
 .section-heading p { margin:4px 0 0; font-size:12px; color:var(--muted); }
@@ -325,6 +340,32 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .lab-links button { display:inline-flex; align-items:center; gap:6px; background:none; border:0; padding:2px 0; color:var(--accent); font-size:13px; }
 .lab-links button:hover { text-decoration:underline; }
 .lab-links button svg { width:15px; height:15px; }
+/* One row of equal buttons under the members (Manzolo, 2026-10-06: the mix of filled buttons,
+   red Reset, text links and a "More lab actions" fold was not nice): the stack's power first,
+   then Map, Consoles, Guide. Everything else is in the card's Actions ⋯ menu. */
+.lab-toolbar { display:flex; flex-wrap:wrap; gap:6px; border-top:1px solid var(--line); padding-top:14px; }
+.lab-toolbar button { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:6px 11px; font-size:13px; white-space:nowrap; transition:background .3s ease, color .3s ease, border-color .3s ease, opacity .3s ease; }
+.lab-toolbar button.primary { min-width:124px; justify-content:center; }
+.lab-toolbar button svg { width:15px; height:15px; flex-shrink:0; }
+.lab-toolbar button.primary svg { stroke-width:2.2; }
+/* The power button of every machine, the map's own (lab-map.js): click starts it headless,
+   click on a running one asks before shutting it down, two seconds held force it off. */
+.vm-power-slot { flex:0 0 32px; width:32px; }
+.vm-power { position:relative; display:grid; place-items:center; flex:0 0 32px; width:32px; height:32px; padding:0; border-radius:50%; border:1px solid var(--line); background:#101926; color:#8fa7bf; touch-action:none; user-select:none; }
+.vm-power svg { width:16px; height:16px; pointer-events:none; }
+.vm-power .power-ring { position:absolute; inset:-3px; width:auto; height:auto; transform:rotate(-90deg); pointer-events:none; }
+.vm-power .power-ring circle { fill:none; stroke:#ff967b; stroke-width:2.5; stroke-dasharray:0 100; }
+.vm-power.on { color:#62e3bc; border-color:#3e7d6c; box-shadow:0 0 8px #50e6b533; }
+.vm-power:hover:not(.busy), .vm-power:focus-visible { background:#254052; border-color:#dcf8ff; color:#dcf8ff; }
+.vm-power.on:hover:not(.busy) { color:#ffb19c; border-color:#ff967b; }
+.vm-power.holding { color:#ff967b; border-color:#ff967b; }
+.vm-power.holding .power-ring circle { animation:power-hold 2s linear forwards; }
+.vm-power.busy { color:#e7b768; border-color:#e7b76888; cursor:progress; animation:power-busy 1.2s ease-in-out infinite; }
+@keyframes power-hold { to { stroke-dasharray:100 0; } }
+@keyframes power-busy { 50% { box-shadow:0 0 10px #e7b76866; } }
+@media (prefers-reduced-motion:reduce) { .vm-power.busy { animation:none; } }
+.state-cell { display:flex; align-items:center; gap:10px; }
+.state-cell > span:last-child { display:flex; flex-direction:column; align-items:flex-start; gap:3px; line-height:1.3; white-space:nowrap; }
 .lab .members { margin:8px 0 12px; font-size:13px; }
 .lab .members div { display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding:3px 0; }
 .lab .buttons { display:flex; flex-wrap:wrap; gap:6px; }
@@ -353,7 +394,17 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .lab-menu { padding:6px 9px; border:1px solid var(--line); background:transparent; font-size:12px; }
 .lab-head h2 { border:0; padding:0; color:var(--text); font-size:15px; text-transform:none; letter-spacing:0; }
 .lab-progress { height:3px; background:var(--btn); border-radius:3px; margin-bottom:12px; overflow:hidden; }
-.lab-progress span { display:block; height:100%; background:var(--accent); }
+.lab-progress span { display:block; height:100%; background:var(--accent); transition:width .8s ease; }
+.lab { transition:opacity .5s ease, filter .5s ease, box-shadow .5s ease; }
+/* The lab that just climbed to the top stays lit for a few seconds while the others fade, so the
+   eye finds where the card went (Manzolo, 2026-10-06). */
+.labs.spotlight .lab:not(.lit) { opacity:.38; filter:saturate(.4); }
+tr.row { transition:opacity .5s ease, filter .5s ease; }
+#list.spotlight tr.row:not(.lit) { opacity:.35; filter:saturate(.4); }
+tr.row.lit td { box-shadow:inset 0 1px var(--accent), inset 0 -1px var(--accent); }
+tr.row.lit td:first-child { box-shadow:inset 4px 0 var(--accent), inset 0 1px var(--accent), inset 0 -1px var(--accent); }
+.lab.lit { box-shadow:0 0 0 2px var(--accent), 0 14px 40px #0006; }
+@media (prefers-reduced-motion:reduce) { .lab, .lab-toolbar button, .lab-progress span, tr.row { transition:none; } }
 /* A lab command at work (Start stack, Stop stack...): the clicked button turns into its spinner
    and label at once, the other commands of the lab wait, the bar under the title runs (Manzolo,
    2026-10-06: a few seconds passed before anything said the click was taken). */
@@ -771,9 +822,11 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 #toolbar { padding-bottom:10px; }
 #status-filters { margin:0 24px 16px; padding:0; background:none; border:0; flex-wrap:wrap; }
 #status-filters button { font-size:12px; padding:5px 10px; }
-.installation-status { display:block; font-size:10px; font-weight:400; margin-top:5px; white-space:normal; }
+.installation-status { display:block; font-size:11px; font-weight:400; white-space:nowrap; }
+.state-cell .installation-status.s-muted { color:#7d8da3; }
 .machine-state { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
 .machine-state .installation-status { margin:0; font-size:11px; }
+.machine-state .state { font-size:12px; }
 .profile-heading { gap:6px; }
 .profile-heading h2 { flex:1; white-space:nowrap; }
 .start-options > summary { color:var(--muted); cursor:pointer; font-size:12px; }
@@ -845,8 +898,8 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   <section class="card" id="machine-panel" tabindex="-1" aria-label="Machine details"><div class="profile-heading"><h2>Machine</h2><button id="profile-protect" class="hidden" aria-label="Protect this disk">🔓</button><button id="profile-mine" class="hidden" aria-label="Add to My VMs">☆</button><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
 </main>
 <div id="labs-view" class="labs hidden"></div>
-<section id="jobs" class="card"><div class="section-heading"><div><h2>Recent activity</h2><p>Jobs from the web and TUI keep running when you close this page.</p></div><span id="job-count" class="chip">0 jobs</span></div>
-  <div class="table-wrap"><table aria-label="Recent jobs"><tbody id="job-rows"><tr><td colspan="4" class="s-muted">No jobs yet. Start a machine or run a command to see its progress here.</td></tr></tbody></table></div>
+<section id="jobs" class="card collapsed"><div class="section-heading"><div><h2><button id="jobs-toggle" type="button" aria-expanded="false" aria-controls="jobs-body"><span class="jobs-chevron" aria-hidden="true">▸</span>Recent activity</button></h2><p>Jobs from the web and TUI keep running when you close this page.</p></div><span id="job-count" class="chip">0 jobs</span></div>
+  <div class="table-wrap" id="jobs-body"><table aria-label="Recent jobs"><tbody id="job-rows"><tr><td colspan="4" class="s-muted">No jobs yet. Start a machine or run a command to see its progress here.</td></tr></tbody></table></div>
 </section>
 
 <dialog id="log-dialog" aria-labelledby="log-title"><header><h1 id="log-title">Job</h1><span><button id="log-cancel" class="danger hidden">Cancel job</button> <button data-close>Close</button></span></header>
@@ -1093,10 +1146,10 @@ function installationOf(r) {
   if (installationJob(r) && r.job_status && !["running","completed"].includes(r.job_status)) return ["Installation " + r.job_status, "s-bad"];
   return ({ verified:["Boot verified ✓","s-muted"], installed:["Installed","s-muted"], unverified:["Boot unverified","s-warn"], incomplete:["Installation incomplete","s-bad"], empty:["Empty disk","s-muted"], "no disk":[r.iso_source === "manual" ? "ISO needed" : "Not installed",r.iso_source === "manual" ? "s-warn" : "s-muted"] })[r.install_label] || ["Installation unknown","s-muted"];
 }
-function installationBadge(r) {
+function installationBadge(r, inRow = false) {
   const [label, color] = installationOf(r);
   const detail = [r.install_detail, r.verify_at ? "Verified: " + r.verify_at : ""].filter(Boolean).join(" · ");
-  return `<span class="installation-status ${color}" title="${esc(detail)}">${esc(label)}</span>`;
+  return `<span class="installation-status ${color}"${detail && !inRow ? ` title="${esc(detail)}"` : ""}>${esc(label)}</span>`;
 }
 function prefersSsh(r) {
   return !!r.ssh_port && ["server","minimal","baseline","hypervisor","router","pfsense","pihole","ci","ci-installed"].includes(r.role);
@@ -1341,10 +1394,12 @@ $("selection-link").onclick = () => runSelectedNetwork();
 function consoleTargets(names = [...checkedVms]) {
   return S.vms.filter(r => names.includes(r.name) && (r.running || (r.installed && withVMJob(r).job_status !== "running")));
 }
-function openMultiConsole(names = consoleTargets().map(r => r.name), lab = "") {
+// A lab's Consoles never starts its members (Manzolo, 2026-10-06): a stack starts with Start
+// stack, in its order; the page shows the stopped ones as such, each with its own Start.
+function openMultiConsole(names = consoleTargets().map(r => r.name), lab = "", start = !lab) {
   if (!names.length) return;
   const url = new URL(location.origin + "/multi"); url.searchParams.set("token", TOKEN);
-  url.hash = "vms=" + names.map(encodeURIComponent).join(",") + "&start=1" + (lab ? "&lab=" + encodeURIComponent(lab) : "");
+  url.hash = "vms=" + names.map(encodeURIComponent).join(",") + (start ? "&start=1" : "") + (lab ? "&lab=" + encodeURIComponent(lab) : "");
   // Opened on the click itself: a window opened after an await is blocked by the browser.
   const tab = window.open(url.href, "_blank");
   if (!tab) { toast("Allow pop-up windows for this page, then try Start in console again.", true); return; }
@@ -1373,11 +1428,11 @@ function selectRow(name, event) {
   if (event.target.closest(".vm-select")) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === name)?.querySelector(".vm-select")?.focus({preventScroll:true});
 }
 
-// The labs with a machine on, on My VMs: their members are not in the list (unless starred), so
-// one line says they run and leads to their cards.
+// The labs with a machine on, on My VMs and the Catalog: their members are not in the list (on My
+// VMs unless starred), so one line says they run and leads to their cards.
 function renderLabsRunning() {
   const bar = $("labs-running"), counts = new Map();
-  if (filter === "mine") for (const r of S.vms) if (r.lab && r.running) counts.set(r.lab, (counts.get(r.lab) || 0) + 1);
+  if (filter === "mine" || filter === "all") for (const r of S.vms) if (r.lab && r.running) counts.set(r.lab, (counts.get(r.lab) || 0) + 1);
   bar.hidden = !counts.size;
   if (!counts.size) { bar.replaceChildren(); return; }
   const key = [...counts].map(([lab, n]) => lab + ":" + n).join(",");
@@ -1401,6 +1456,9 @@ function scopeRows() {
     // My VMs: the selection, plus what runs outside a declared lab (catalog.in_my_vms): a running
     // lab's members stay in the Labs view, the "Labs running" line below the title leads there.
     && (filter !== "mine" || r.mine || (r.running && !r.lab))
+    // Catalog: the lab members live in the Labs view, as on My VMs (Manzolo, 2026-10-06: a running
+    // lab's machines sat on top of the catalog under Running first).
+    && (filter !== "all" || !r.lab)
     && (statusFilter === "hidden" && filter === "all" ? r.hidden : !r.hidden || r.running || r.installed));
 }
 function matchesStatus(r, mode = statusFilter) {
@@ -1472,12 +1530,13 @@ function render() {
   }
   // Never rebuild the rows during a drag: the dragged icon would be destroyed and Chromium then
   // aborts the drop silently (the 5 s state poll did exactly that on a drag longer than a few seconds).
-  if (dragVm || dragState.start) return;
+  if (dragVm || dragState.start || powerHold) return;
   const focused = document.activeElement, focusedVm = focused.closest?.("#rows [data-vm]")?.dataset.vm;
-  const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : null;
-  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.hidden ? '<span class="style-tag" title="Hidden from the lists: shown here because it runs or holds a disk, or because the Hidden filter is on">hidden</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : r.manual === "todo" ? '<span class="style-tag todo" title="Manual for now: its automation is still to write (the notes say which flow)">to automate</span>' : '<span class="style-tag" title="' + ({live:"Live media: it boots, it does not install itself", image:"A ready disk image: it boots", template:"An import template, not an installer", ci:"The CI boot check", twin:"You install it by hand; " + esc(r.automated_as) + " installs the same system itself"}[r.manual] || "You install it by hand") + '">manual' + (r.manual === "twin" ? " · see " + esc(r.automated_as) : "") + '</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td>${stateBadge(r)}${installationBadge(r)}</td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+  const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : focused.matches(".vm-power") ? ".vm-power" : null;
+  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.hidden ? '<span class="style-tag" title="Hidden from the lists: shown here because it runs or holds a disk, or because the Hidden filter is on">hidden</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : r.manual === "todo" ? '<span class="style-tag todo" title="Manual for now: its automation is still to write (the notes say which flow)">to automate</span>' : '<span class="style-tag" title="' + ({live:"Live media: it boots, it does not install itself", image:"A ready disk image: it boots", template:"An import template, not an installer", ci:"The CI boot check", twin:"You install it by hand; " + esc(r.automated_as) + " installs the same system itself"}[r.manual] || "You install it by hand") + '">manual' + (r.manual === "twin" ? " · see " + esc(r.automated_as) : "") + '</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td><span class="state-cell">${powerButton(r)}<span>${stateBadge(r)}${installationBadge(r, true)}</span></span></td><td class="mono">${ram(r)}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted">${filter === "mine" && !$("search").value ? "No matching VMs. Browse the Catalog to add profiles to My VMs, or clear the filters." : "No matching profiles."}</td></tr>`);
   bindStateLogs($("rows"));
+  followClimbedRow();
   if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
   renderDetails();
 }
@@ -1485,7 +1544,7 @@ let detailsSignature = "", labsSignature = "", labsOrder = [];
 // Lab commands in flight: the click itself (until /api/run answers with a job), then that job
 // while /api/jobs lists it running; any running `vmctl group <cmd> <lab>` job counts too.
 const labPending = new Map();  // lab -> {action, job, at}
-const LAB_WORKING = {up:"Starting stack…", down:"Stopping stack…", install:"Installing…", reset:"Resetting…", test:"Running tests…",
+const LAB_WORKING = {up:"Starting…", down:"Stopping…", install:"Installing…", reset:"Resetting…", test:"Running tests…",
   status:"Reading status…", clean:"Cleaning…", checkpoint:"Saving reset point…", cluster:"Forming cluster…", map:"Generating map…"};
 function labWork(group) {
   const pending = labPending.get(group);
@@ -1565,7 +1624,40 @@ function renderDetails() {
   $("details").querySelectorAll("[data-command]").forEach(b => b.onclick = async () => { await openCommands(r.name); selectCommand(b.dataset.command); });
   $("details").querySelectorAll("[data-action]").forEach(b => b.onclick = () => runAction(r, actions[+b.dataset.action]));
 }
+const LAB_SPOTLIGHT_MS = 3000;
+// The same for a machine the user started from the list: under "Running first" its row climbs to
+// the top the moment it runs, out of sight on a long list (Manzolo, 2026-10-06: "è scomparsa"), so
+// the list scrolls to it and lights it for a few seconds while the other rows fade.
+let rowsOrder = [], rowSpotlight = null;
+const rowsFollow = new Map();  // vm -> when the user started it here
+function paintRowSpotlight() {
+  const on = !!rowSpotlight && Date.now() < rowSpotlight.until;
+  $("list").classList.toggle("spotlight", on);
+  $("rows").querySelectorAll("tr[data-vm]").forEach(tr => tr.classList.toggle("lit", on && tr.dataset.vm === rowSpotlight.vm));
+}
+function followClimbedRow() {
+  const order = [...$("rows").querySelectorAll("tr[data-vm]")].map(tr => tr.dataset.vm);
+  const climbed = order.find((name, index) => {
+    const before = rowsOrder.indexOf(name), started = rowsFollow.get(name);
+    return before > index && started !== undefined && Date.now() - started < 15 * 60 * 1000;
+  });
+  rowsOrder = order;
+  if (climbed) {
+    rowsFollow.delete(climbed);
+    $("rows").querySelector(`tr[data-vm="${CSS.escape(climbed)}"]`)?.scrollIntoView({block:"center", behavior:"smooth"});
+    rowSpotlight = {vm:climbed, until:Date.now() + LAB_SPOTLIGHT_MS};
+    setTimeout(paintRowSpotlight, LAB_SPOTLIGHT_MS + 50);
+  }
+  paintRowSpotlight();
+}
+let labSpotlight = null;  // {group, until}: the card that just climbed, lit while the others fade
+function paintLabSpotlight() {
+  const view = $("labs-view"), on = !!labSpotlight && Date.now() < labSpotlight.until;
+  view.classList.toggle("spotlight", on);
+  view.querySelectorAll("[data-lab]").forEach(card => card.classList.toggle("lit", on && card.dataset.lab === labSpotlight.group));
+}
 function renderLabs() {
+  if (powerHold) return;  // a member's power button is held: the card is rebuilt when it is released
   const signature = JSON.stringify([S.labs, S.vms, [...vmJobs], $("search").value, S.labs.map(lab => labWork(lab.group))]);
   if (signature === labsSignature) return;
   labsSignature = signature;
@@ -1580,7 +1672,7 @@ function renderLabs() {
     const names = lab.start_order || lab.members, members = names.map((n) => byName[n]).filter(Boolean);
     if (lab.session) return `<section class="card lab session" data-lab="${esc(lab.group)}"><div class="lab-head"><span class="lab-identity">${catalogIcon("network")}<h2>${esc(lab.segment)}</h2></span><span class="lab-controls"><span class="chip completed">session · ${members.length} linked${(lab.pending || []).length ? ` · ${lab.pending.length} off` : ""}</span>${menuButton("lab",lab.group)}</span></div>
       <p class="lab-order">Made with <span class="mono">vmctl link</span> (or using the network buttons / multiple selection). A private /24 segment: stopped members join at their next start; it touches no profile and lasts until Unlink all.</p>
-      <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button class="${m.running ? "member-running" : ""}" data-member="${esc(m.name)}" title="Open profile">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "")}</span></span></button>${stateBadge(m)}${menuButton("member",m.name)}</div>`).join("")}</div>
+      <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button class="${m.running ? "member-running" : ""}" data-member="${esc(m.name)}" title="Open profile">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc((lab.addresses || {})[m.name] || "")}</span></span></button>${stateBadge(m)}${powerButton(m)}${menuButton("member",m.name)}</div>`).join("")}</div>
       <div class="lab-footer"><div class="buttons"><button data-args='${esc(JSON.stringify(["link", "--status", "--segment", lab.segment]))}'>Status</button><button class="danger" data-args='${esc(JSON.stringify(["link", "--off", "--segment", lab.segment]))}'>Unlink all</button></div>
       <div class="lab-links"><button data-map="${esc(lab.group)}" title="The network map of this session: the linked VMs, their addresses, the frames on the cable">${consoleIcon("integration")}Map</button></div></div></section>`;
     const up = members.filter((m) => m.running).length;
@@ -1593,17 +1685,25 @@ function renderLabs() {
       return `<button class="${cls}${mine ? " working" : ""}" data-args='${esc(JSON.stringify(args))}'${work ? " disabled" : ""}${mine ? ' aria-busy="true"' : ""}>${mine ? spinner + esc(LAB_WORKING[work] || "Working…") : label}</button>`;
     };
     // The stack command at work keeps the primary place whatever the members say meanwhile.
+    const power = consoleIcon("power");
     const primary = ["up","down","install"].includes(work) ? btn("", ["group",work,lab.group], "primary")
-      : installed ? (up === members.length ? btn("Stop stack",["group","down",lab.group],"primary") : btn("Start stack",["group","up",lab.group],"primary")) : btn("Install lab",["group","install",lab.group],"primary");
+      : installed ? (up === members.length ? btn(power + "Stop stack",["group","down",lab.group],"primary") : btn(power + "Start stack",["group","up",lab.group],"primary")) : btn(consoleIcon("download") + "Install lab",["group","install",lab.group],"primary");
     const subtitle = lab.title || (cluster ? `Proxmox VE: ${names.length - 1} nodes and a client on one segment` : `${names.length} machine${names.length === 1 ? "" : "s"} on a shared network`);
     const facts = [`${names.length} machine${names.length === 1 ? "" : "s"}`, lab.tests ? `${lab.tests} test script${lab.tests === 1 ? "" : "s"}` : "", (lab.guides || []).length ? `guide ${lab.guides.map(g => g.toUpperCase()).join(" · ")}` : "", cluster ? "cluster" : ""].filter(Boolean);
     const link = (attr, label, icon, title) => `<button ${attr} title="${esc(title)}">${consoleIcon(icon)}${label}</button>`;
+    // Not shown: the card's Actions ⋯ menu (openLabContext) lists these together with the toolbar.
+    const more = [installed && up > 0 && up < members.length && !["up","down"].includes(work) ? btn("Stop stack",["group","down",lab.group]) : "",
+      installed ? btn("Reset lab…",["group","reset",lab.group],"danger") : "",
+      installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group]),
+      up && !installed ? btn("Stop stack",["group","down",lab.group]) : "",
+      installed && lab.tests ? btn("Run tests",["group","test",lab.group]) : "", btn("Status",["group","status",lab.group]),
+      cluster ? btn("Form cluster",["group","cluster",lab.group]) : "", btn("Generate map",["group","map",lab.group]),
+      installed ? btn("Save as reset point…",["group","checkpoint",lab.group],"danger") : "", btn("Clean lab…",["group","clean",lab.group],"danger")].join("");
     return `<section class="card lab${work ? " busy" : ""}" data-lab="${esc(lab.group)}"${work ? ' aria-busy="true"' : ""}><div class="lab-head" tabindex="0" aria-label="${esc(lab.group)}. Right-click for stack actions."><span class="lab-identity">${catalogIcon(cluster ? "cluster" : "network")}<span class="lab-name"><h2>${esc(lab.group)}</h2><p class="lab-title">${esc(subtitle)}</p></span></span><span class="lab-controls"><span class="chip ${up ? "completed" : ""}">${up} / ${names.length} running</span>${menuButton("lab",lab.group)}</span></div><div class="lab-progress"><span style="width:${names.length ? up/names.length*100 : 0}%"></span></div>
       <div class="lab-facts">${facts.map(f => `<span>${esc(f)}</span>`).join("")}</div>
-      <div class="members">${members.map((m) => { const [s,c] = stateOf(m); return `<div data-vm="${esc(m.name)}"><button class="${m.running ? "member-running" : ""}" data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc([].concat((lab.addresses || {})[m.name] || []).join(" · ") || "Open profile →")}</span></span></button>${stateBadge(m)}${menuButton("member",m.name)}</div>`; }).join("")}</div>
-      <div class="lab-footer"><div class="buttons">${primary}${installed && up > 0 && up < members.length && !["up","down"].includes(work) ? btn("Stop stack",["group","down",lab.group]) : ""}<button data-map="${esc(lab.group)}" title="The network map, the access table and the runbook, in a new tab">Map</button>${installed ? btn("Reset lab…",["group","reset",lab.group],"danger") : ""}</div>
-      <div class="lab-links">${consoleTargets(names).length ? link(`data-lab-consoles="${esc(lab.group)}"`, "Consoles", "detach", "Every member of the lab in one page of consoles, side by side, started if stopped") : ""}${(lab.guides || []).length ? link(`data-guide="${esc(lab.group)}"`, "Guide", "files", "The lab's walkthrough, in a new tab") : ""}</div></div>
-      <details class="lab-secondary"><summary>More lab actions</summary><p class="lab-order">Start order: ${esc(names.join(" → "))}</p><div class="buttons">${installed ? btn("Reinstall lab…",["group","install",lab.group],"danger") : btn("Start stack",["group","up",lab.group])}${up && !installed ? btn("Stop stack",["group","down",lab.group]) : ""}${installed && lab.tests ? btn("Run tests",["group","test",lab.group]) : ""}${btn("Status",["group","status",lab.group])}${cluster ? btn("Form cluster",["group","cluster",lab.group]) : ""}${btn("Generate map",["group","map",lab.group])}${installed ? btn("Save as reset point…",["group","checkpoint",lab.group],"danger") : ""}${btn("Clean lab…",["group","clean",lab.group],"danger")}</div><p class="lab-order">Reset lab puts every member back to its reset point (written by Install lab, or by Save as reset point) and starts the stack again.</p></details></section>`;
+      <div class="members">${members.map((m) => `<div data-vm="${esc(m.name)}"><button class="${m.running ? "member-running" : ""}" data-member="${esc(m.name)}" title="Open profile; right-click for VM actions">${catalogIcon(osIconKey(m))}<span class="profile-text"><span class="mono">${esc(m.name)}</span><span class="member-address">${esc([].concat((lab.addresses || {})[m.name] || []).join(" · ") || "Open profile →")}</span></span></button>${stateBadge(m)}${powerButton(m)}${menuButton("member",m.name)}</div>`).join("")}</div>
+      <div class="lab-footer"><div class="lab-toolbar">${primary}${link(`data-map="${esc(lab.group)}"`, "Map", "integration", "The network map, the access table and the runbook, in a new tab")}${consoleTargets(names).length ? link(`data-lab-consoles="${esc(lab.group)}"`, "Consoles", "detach", "Every member of the lab in one page of consoles, side by side (a stopped one stays stopped)") : ""}${(lab.guides || []).length ? link(`data-guide="${esc(lab.group)}"`, "Guide", "files", "The lab's walkthrough, in a new tab") : ""}</div></div>
+      <div class="lab-more" hidden>${more}</div></section>`;
   }).join("") || '<p class="s-muted">No matching labs.</p>';
   bindStateLogs($("labs-view"));
   // The lab's members side by side (/multi), like Start in console on a selection; the page knows the lab.
@@ -1633,7 +1733,10 @@ function renderLabs() {
   if (climbed && !$("labs-view").classList.contains("hidden")) {
     labsFollow.delete(climbed);
     $("labs-view").querySelector(`[data-lab="${CSS.escape(climbed)}"]`)?.scrollIntoView({block:"start", behavior:"smooth"});
+    labSpotlight = {group:climbed, until:Date.now() + LAB_SPOTLIGHT_MS};
+    setTimeout(paintLabSpotlight, LAB_SPOTLIGHT_MS + 50);
   }
+  paintLabSpotlight();
   $("labs-view").querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.map)}/map?token=${encodeURIComponent(TOKEN)}`, "_blank")));
   // The guide in the language of the page's browser when the lab has it.
   $("labs-view").querySelectorAll("[data-guide]").forEach((b) => (b.onclick = () => window.open(`/labs/${encodeURIComponent(b.dataset.guide)}/guide?lang=${(navigator.language || "en").slice(0,2)}&token=${encodeURIComponent(TOKEN)}`, "_blank")));
@@ -1705,17 +1808,18 @@ function groupInstallOverwrites(args) {
   const names = lab ? (lab.start_order || lab.members || []).map(m => typeof m === "string" ? m : m.name) : [];
   return names.filter(n => { const r = S.vms.find(v => v.name === n); return r && r.install_label !== "no disk" && !["installed", "verified"].includes(r.install_label); });
 }
-async function run(args, danger, afterStart = false) {
+async function run(args, danger, afterStart = false, preconfirmed = false) {
   const cmd = catalog.find((c) => c.name === args[0]);
   const destructive = danger || (cmd && (cmd.destructive || cmd.destructive_actions.includes(args[1]))) || groupInstallOverwrites(args).length > 0 || (args[0] === "check-vms" && args.includes("--clean-first"));
   const forceStop = args[0] === "stop" && args.includes("--force");
-  if (destructive && !await askConfirm({ title: forceStop ? "Force stop this VM?" : "This deletes or overwrites data", message: forceStop ? "Power off the VM immediately. Unsaved guest changes may be lost; the disk and logs are kept." : "The command runs as a job and cannot be undone.", command: "vmctl " + args.join(" "), button: forceStop ? "Force stop" : "Run it" })) return;
+  if (destructive && !preconfirmed && !await askConfirm({ title: forceStop ? "Force stop this VM?" : "This deletes or overwrites data", message: forceStop ? "Power off the VM immediately. Unsaved guest changes may be lost; the disk and logs are kept." : "The command runs as a job and cannot be undone.", command: "vmctl " + args.join(" "), button: forceStop ? "Force stop" : "Run it" })) return;
   const vm = S.vms.find(r => r.name === args[1])?.name;
   if (vm && submittingVms.has(vm)) return;
   const previous = vm && vmJobs.get(vm);
   const consoleRequest = afterStart && vm ? {accepted:false, popup:afterStart === "detached" ? reserveConsoleWindow(vm) : null} : null;
   if (vm) { discardPendingConsole(vm); if (consoleRequest) pendingConsoles.set(vm, consoleRequest); }
   if (args[0] === "group" && args[2] && ["up", "install", "reset", "checkpoint", "test"].includes(args[1])) labsFollow.set(args[2], Date.now());
+  if (vm && args[0] === "start") rowsFollow.set(vm, Date.now());  // the row climbs under "Running first": the list follows it
   const labGroup = args[0] === "group" && args[2] && S.labs.some(l => l.group === args[2]) ? args[2] : null;
   if (labGroup) { labPending.set(labGroup, {action:args[1], job:null, at:Date.now()}); render(); }
   if (vm) { submittingVms.add(vm); vmJobs.set(vm, {status:"running", command:args[0]}); jobsRevision++; render(); }
@@ -3297,10 +3401,10 @@ function openLabContext(card, x, y) {
   // Use the same buttons/commands as the stack card so the two entry points stay in sync.
   const entries = [...card.querySelectorAll("[data-args],[data-map],[data-guide],[data-lab-consoles]")].map(button => {
     const args = button.dataset.args ? JSON.parse(button.dataset.args) : null, action = args?.[1];
-    const danger = ["clean","install"].includes(action) && (action === "clean" || button.classList.contains("danger"));
+    const danger = button.classList.contains("danger");
     const group = danger ? "Danger zone" : ["up","down","install"].includes(action) ? "Power" : "Inspect & manage";
     return {label:button.textContent, group, danger, warn:action === "down", icon:({up:"play",down:"stop",install:"wand",status:"list",map:"external",clean:"trash",cluster:"sliders"})[action] || "external", run:()=>button.click()};
-  });
+  }).filter((entry, i, all) => all.findIndex(other => other.label === entry.label) === i);  // Stop stack can be in both places
   const groups = ["Power","Inspect & manage","Danger zone"];
   entries.sort((a,b) => groups.indexOf(a.group)-groups.indexOf(b.group));
   showContext(card.dataset.lab, entries, x, y, "Stack actions");
@@ -3423,6 +3527,56 @@ $("list").addEventListener("scroll", hideHoverShot);
 // this session. Pointer events, not the browser's native drag and drop: Chromium on Wayland loses the
 // drop (the rows dimmed, nothing happened), and pointers also work on touch screens.
 const networkGlyph = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="5" rx="1"/><path d="M12 8v5M5 16v-3h14v3"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/></svg>';
+// --- The power button of every machine (My VMs, Catalog, lab cards), the map's own: a click starts
+// a stopped VM headless in the background, a click on a running one asks before the shutdown (with
+// Force as an option), holding it two seconds forces it off at once, a click while a job works on
+// the VM opens that job's log.
+function powerButton(r) {
+  if (!(r.running || r.installed || r.prepared)) return '<span class="vm-power-slot" aria-hidden="true"></span>';  // the badges stay in line
+  const current = withVMJob(r), busy = current.job_status === "running" || submittingVms.has(r.name);
+  const label = busy ? `${r.name}: ${activeJobLabel(current)} · open the log` : r.running ? `Shut down ${r.name} (hold 2 s to force it off)` : `Start ${r.name} headless`;
+  return `<button type="button" class="vm-power${r.running ? " on" : ""}${busy ? " busy" : ""}" data-power="${esc(r.name)}" aria-label="${esc(label)}" title="${esc(label)}"${busy ? ' aria-busy="true"' : ""}>${consoleIcon("power")}<svg class="power-ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16.5" pathLength="100"/></svg></button>`;
+}
+// While a button is held the lists are not rebuilt (render() and renderLabs() return early): the
+// job that a lab member's start just submitted used to replace the button mid-hold, and the ring
+// stopped as if the finger had lifted (Manzolo, 2026-10-06). A hold that fired suppresses the
+// click the release still produces, for a moment, like the link handle's drag.
+let powerHold = null, powerFired = false, suppressPowerClick = false;
+function endPowerHold() {
+  if (!powerHold) return;
+  clearTimeout(powerHold.timer); powerHold.button.classList.remove("holding"); powerHold = null;
+  render();
+}
+document.addEventListener("pointerdown", (e) => {
+  const button = e.target.closest?.("[data-power]");
+  if (!button || e.button !== 0 || button.classList.contains("busy")) return;
+  const vm = button.dataset.power;
+  if (!S.vms.find(r => r.name === vm)?.running) return;
+  endPowerHold(); button.classList.add("holding");
+  powerHold = {button, vm, timer:setTimeout(() => {
+    powerFired = true; endPowerHold();
+    run(["stop", vm, "--force"], true, false, true);
+  }, 2000)};
+});
+for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, () => {
+  if (powerFired) { powerFired = false; suppressPowerClick = true; setTimeout(() => { suppressPowerClick = false; }, 0); }
+  endPowerHold();
+});
+document.addEventListener("pointerout", (e) => { if (powerHold && e.target.closest?.("[data-power]") === powerHold.button && !powerHold.button.contains(e.relatedTarget)) endPowerHold(); });
+document.addEventListener("click", async (e) => {
+  const button = e.target.closest?.("[data-power]");
+  if (!button) return;
+  e.preventDefault(); e.stopPropagation();  // not a row selection, not the member's profile
+  if (suppressPowerClick) return;  // the release after a hold that already forced the VM off
+  const r = S.vms.find(v => v.name === button.dataset.power);
+  if (!r) return;
+  const current = withVMJob(r);
+  if (current.job_status === "running" || submittingVms.has(r.name)) return openLog("vm:" + r.name, activeJobLabel(current) + " · " + r.name);
+  if (!r.running) return run(["start", r.name, "--headless", "--background"]);
+  const answer = await askConfirm({eyebrow:"Power", title:`Shut down ${r.name}?`, message:"Ask the guest to power off: the guest agent, then ACPI, then SSH. Holding the power button for two seconds forces it off right away.", command:`vmctl stop ${r.name}`, button:"Shut down",
+    option:{label:"Force: signal QEMU directly, no guest shutdown (a guest at a boot menu or stuck in an installer answers nothing; unsaved guest changes are lost)", command:`vmctl stop ${r.name} --force`, button:"Force stop"}});
+  if (answer) run(answer.option ? ["stop", r.name, "--force"] : ["stop", r.name], !!answer.option, false, true);
+}, true);
 function linkHandle(r) {
   return r.running || r.installed ? `<button class="link-handle" aria-label="Network connections for ${esc(r.name)}" title="Network · click to choose a VM, or drag to link / unlink">${networkGlyph}</button>` : "";
 }
@@ -3513,7 +3667,7 @@ function mainAction(r) {
   return actionsFor(r).find(a => !a.disabled && !a.alternative && !a.danger && !a.warn && !a.job && !a.cancelJob && !a.mine && !a.hide && !a.protect && !a.screen && !(a.args && a.args[0] === "checkpoint"));
 }
 $("rows").ondblclick = (e) => {
-  if (e.target.closest(".link-handle, .vm-select")) return;
+  if (e.target.closest(".link-handle, .vm-select, .vm-power")) return;
   const tr = e.target.closest("[data-vm]"), r = tr && S.vms.find(v => v.name === tr.dataset.vm);
   if (!r) return;
   const action = mainAction(r);
@@ -3522,6 +3676,13 @@ $("rows").ondblclick = (e) => {
   runAction(r, action);
 };
 $("rows").onclick = (e) => { if (suppressLinkClick) return; if (e.target.closest(".link-handle")) { openLinkPicker(e.target.closest("[data-vm]").dataset.vm); return; } const tr = e.target.closest("[data-vm]"); if (tr) selectRow(tr.dataset.vm, e); };
+function setJobsOpen(open, remember = true) {
+  $("jobs").classList.toggle("collapsed", !open);
+  $("jobs-toggle").setAttribute("aria-expanded", String(open));
+  if (remember) try { localStorage.setItem("vmctl-jobs-open", open ? "1" : "0"); } catch (_) {}
+}
+try { setJobsOpen(localStorage.getItem("vmctl-jobs-open") === "1", false); } catch (_) {}
+$("jobs-toggle").onclick = () => setJobsOpen($("jobs").classList.contains("collapsed"));
 $("search-clear").onclick = () => { $("search").value = ""; $("search").oninput(); $("search").focus(); };
 $("search").oninput = () => { checkedVms.clear(); selectionAnchor = ""; render(); };
 $("search").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); $("search").value = ""; render(); $("search").blur(); } });
