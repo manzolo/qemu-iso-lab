@@ -10,6 +10,7 @@ essential steps in Italian for the terminal-at-hand case.
 |---|---|---|
 | [INSTALL.md](INSTALL.md) | the one-line installer is not enough: a cloned checkout, another distribution, Windows by hand, updating | What the installers do, host packages per distribution, WSL2, `vmctl update` |
 | [FIRST_VM.md](FIRST_VM.md) ([PDF](FIRST_VM.pdf)) | you want to see one VM through its whole lifecycle | From `git clone` to a running Ubuntu desktop, every screen of the web dashboard |
+| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | you want a command or a ready-to-run install recipe | Everyday commands, example installs, shell completion and install flows by OS family |
 | [GALLERY.md](GALLERY.md) | you want a look before trying | Thirteen captures from the tour's recordings and the slideshow |
 | [Catalog site](https://manzolo.github.io/qemu-iso-lab/) | you want to browse the profiles before cloning | Every profile, its version and history, what to run; tick the ones you want and copy the `vmctl catalog add` line |
 | [PROFILES.md](PROFILES.md) | you look at `vms/profiles/*.json` for the first time, or add a VM | The profile model: core fields, ISO sources and discovery, disk, EFI/BIOS, video variants, `networks`, `shared_dir`, artifacts, Windows import templates |
