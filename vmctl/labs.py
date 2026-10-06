@@ -821,7 +821,7 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .vm-dialog { width:min(1280px, calc(100vw - 32px)); height:min(900px, calc(100dvh - 32px)); max-width:none; max-height:none; padding:0; border:1px solid #2f4a62; border-radius:14px; background:#0b1520; color:#e3edf7; display:none; flex-direction:column; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.6); }
 .vm-dialog[open] { display:flex; }
 .vm-dialog::backdrop { background:rgba(3,9,16,.72); backdrop-filter:blur(2px); }
-.vm-dialog header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid #22384c; background:#0f1d2b; }
+.vm-dialog header { display:flex; justify-content:flex-start; align-items:center; gap:14px; padding:10px 16px; border-bottom:1px solid #22384c; background:#0f1d2b; }
 .vm-dialog h2 { margin:0; font-size:1.05rem; font-family:ui-monospace, monospace; }
 .vm-dialog-eyebrow { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#7fb4c9; }
 .vm-dialog-tools { display:flex; gap:8px; align-items:center; }
@@ -838,8 +838,27 @@ h1 { font-size:1.5rem; margin:0 0 4px; } h2 { font-size:1.05rem; margin:28px 0 8
 .vm-resize[data-dir=ne] { top:0; right:0; cursor:nesw-resize; } .vm-resize[data-dir=sw] { bottom:0; left:0; cursor:nesw-resize; }
 .vm-resize[data-dir=nw] { top:0; left:0; cursor:nwse-resize; } .vm-resize[data-dir=se] { bottom:0; right:0; cursor:nwse-resize; }
 .vm-resize[data-dir=se]::after { content:""; position:absolute; right:4px; bottom:4px; width:9px; height:9px; border-right:2px solid #6f93ad; border-bottom:2px solid #6f93ad; border-bottom-right-radius:3px; }
+.float-window { display:flex; }
+.float-window[data-action=console] { width:min(960px, calc(100vw - 24px)); height:min(640px, calc(100dvh - 24px)); }
+.float-window.front { border-color:#4f7d9c; }
+.float-window.front header { background:#132a3d; }
 .vm-dialog.floating header { cursor:grab; user-select:none; padding:4px 6px 4px 12px; }
-.vm-dialog.floating header > div:first-child { display:flex; align-items:baseline; gap:8px; min-width:0; }
+.vm-dialog.floating .vm-dialog-titles { display:flex; align-items:baseline; gap:8px; min-width:0; }
+.vm-dialog-titles { min-width:0; }
+/* The window controls the macOS way (Manzolo, 2026-10-06): red closes, yellow minimizes (SSH and
+   console windows; grey on the Manage dialog), green opens the same view in a tab; the symbol shows on hover. */
+.lights { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+.light { width:13px; height:13px; border-radius:50%; border:0; padding:0; margin:0; display:inline-grid; place-items:center; font:700 10px/1 system-ui, sans-serif; color:transparent; cursor:pointer; text-decoration:none; box-shadow:inset 0 0 0 .5px rgba(0,0,0,.4); }
+.light.close { background:#ff5f57; } .light.min { background:#febc2e; } .light.tab { background:#28c840; }
+.light.off { background:#3d4c5a; cursor:default; }
+.light.close::after { content:"×"; } .light.min:not(.off)::after { content:"−"; } .light.tab::after { content:"↗"; font-size:9px; }
+.lights:hover .light, .light:focus-visible { color:rgba(0,0,0,.6); }
+.light:focus-visible { outline:2px solid #91dbef; outline-offset:2px; }
+@media (pointer:coarse) { .light { width:18px; height:18px; } .lights { gap:12px; } }
+.float-dock { position:fixed; left:12px; bottom:12px; z-index:24; display:flex; flex-wrap:wrap; gap:8px; max-width:calc(100vw - 24px); }
+.float-dock button { font:12px ui-monospace, monospace; color:#dce9f5; background:#132a3d; border:1px solid #4f7d9c; border-radius:8px; padding:6px 10px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,.45); }
+.float-dock button:hover, .float-dock button:focus-visible { background:#1d3d55; border-color:#91dbef; }
+.float-window.minimized { display:none; }
 .vm-dialog.floating .vm-dialog-eyebrow { font-size:10px; }
 .vm-dialog.floating h2 { font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .vm-dialog.floating .vm-dialog-tools a, .vm-dialog.floating .vm-dialog-tools button { font-size:12px; padding:3px 9px; }
@@ -1035,13 +1054,12 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None, *, inter
 <section class="map-shell" aria-label="Lab topology">
 <div class="map-toolbar"><span class="map-title">NETWORK TOPOLOGY</span><div class="map-legend"><span><i class="on"></i>VM on</span><span><i></i>VM off</span><span><i class="flow"></i>Measured traffic</span></div></div>
 <div class="map" id="lab-topology">{_svg(lab, interactive=interactive)}</div>
-<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>The lens on a LAN cable opens its packet inspector{" · SSH opens a small window you can move by its title and resize from any edge, Console and Manage a dialog" if interactive else ""}</span></div>
+<div class="map-footer"><span id="map-live" role="status">Snapshot · generated with vmctl</span><span>The lens on a LAN cable opens its packet inspector{" · SSH and Console open a window per machine (several at once) you can move by its title, resize from any edge and minimize, Manage a dialog" if interactive else ""}</span></div>
 </section>
 <dialog id="vm-dialog" class="vm-dialog" aria-labelledby="vm-dialog-title">
-<header id="vm-dialog-drag"><div><div class="vm-dialog-eyebrow" id="vm-dialog-kind">Console</div><h2 id="vm-dialog-title">VM</h2></div>
-<div class="vm-dialog-tools"><a id="vm-dialog-tab" href="#" target="_blank" rel="noopener noreferrer">Open in a tab ↗</a><button type="button" id="vm-dialog-close">Close</button></div></header>
+<header id="vm-dialog-drag"><div class="lights"><button type="button" id="vm-dialog-close" class="light close" title="Close" aria-label="Close"></button><span class="light min off" aria-hidden="true"></span><a id="vm-dialog-tab" class="light tab" href="#" target="_blank" rel="noopener noreferrer" title="Open in a tab" aria-label="Open in a tab"></a></div>
+<div class="vm-dialog-titles"><div class="vm-dialog-eyebrow" id="vm-dialog-kind">Console</div><h2 id="vm-dialog-title">VM</h2></div></header>
 <iframe id="vm-dialog-frame" title="VM" src="about:blank"></iframe>
-<div class="vm-resize" data-dir="n" aria-hidden="true"></div><div class="vm-resize" data-dir="s" aria-hidden="true"></div><div class="vm-resize" data-dir="e" aria-hidden="true"></div><div class="vm-resize" data-dir="w" aria-hidden="true"></div><div class="vm-resize" data-dir="ne" aria-hidden="true"></div><div class="vm-resize" data-dir="nw" aria-hidden="true"></div><div class="vm-resize" data-dir="se" aria-hidden="true"></div><div class="vm-resize" data-dir="sw" aria-hidden="true"></div>
 </dialog>
 <aside id="packet-inspector" class="packet-inspector" aria-label="Packet inspector" hidden>
 <div class="packet-head" id="packet-drag" title="Drag to move"><div><strong>PACKET INSPECTOR</strong><span id="packet-link"></span></div><div class="packet-actions">

@@ -56,9 +56,8 @@ try {
   await page.waitForFunction(()=>document.getElementById('map-live').textContent.startsWith('Live'));
   const action = (kind, vm='k8s-lab-main') => page.locator(`.vm-action[data-vm="${vm}"][data-action="${kind}"]`);
   const dialog = page.locator('#vm-dialog'), frame = page.locator('#vm-dialog-frame');
-  // The three buttons under a machine open a dialog on this page, never a tab: the embedded
-  // detached console, the SSH terminal alone, or the Machine panel alone.
-  for (const kind of ['ssh','console','vm']) {
+  // Manage opens the page's modal dialog: the Machine panel alone.
+  for (const kind of ['vm']) {
     assert.equal(await action(kind).getAttribute('href'),null,'No link: a dialog opens');
     await action(kind).click();
     assert(await dialog.evaluate(n=>n.open),`${kind} opens the dialog`);
@@ -71,49 +70,135 @@ try {
     const tab=new URL(await page.locator('#vm-dialog-tab').getAttribute('href'));
     assert.equal(tab.hash,`#${kind}=k8s-lab-main`); assert.equal(tab.searchParams.get('panel'),null,'The tab gets the whole dashboard');
     assert.equal(await page.locator('#vm-dialog-title').textContent(),'k8s-lab-main');
-    assert.equal(await dialog.evaluate(n=>n.matches(':modal')),kind!=='ssh',`${kind}: SSH floats, the others are modal`);
-    assert.equal(await dialog.evaluate(n=>n.classList.contains('floating')),kind==='ssh');
-    if (kind==='ssh') {
-      // A floating window: dragged by its header, the map (and its lens) still usable underneath.
-      const before=await dialog.boundingBox(), head=await page.locator('#vm-dialog-drag').boundingBox();
-      await page.mouse.move(head.x+head.width/2,head.y+head.height/2); await page.mouse.down();
-      await page.mouse.move(head.x+head.width/2-200,head.y+head.height/2+120,{steps:4}); await page.mouse.up();
-      const after=await dialog.boundingBox();
-      assert(Math.abs(after.x-(before.x-200))<2 && Math.abs(after.y-(before.y+120))<2,`Dragged by the header: ${JSON.stringify([before,after])}`);
-      assert.equal(await dialog.evaluate(n=>n.classList.contains('dragging')),false);
-      // Resized from its corner and its left edge (the browser's CSS handle sat under the iframe).
-      const grip=async(dir,dx,dy)=>{const g=await page.locator(`#vm-dialog .vm-resize[data-dir="${dir}"]`).boundingBox();
-        await page.mouse.move(g.x+g.width/2,g.y+g.height/2); await page.mouse.down();
-        await page.mouse.move(g.x+g.width/2+dx,g.y+g.height/2+dy,{steps:4}); await page.mouse.up();};
-      await grip('se',120,90);
-      const grown=await dialog.boundingBox();
-      assert(Math.abs(grown.width-(after.width+120))<2 && Math.abs(grown.height-(after.height+90))<2,`Resized by its corner: ${JSON.stringify([after,grown])}`);
-      await grip('w',-60,0);
-      const wider=await dialog.boundingBox();
-      assert(Math.abs(wider.x-(grown.x-60))<2 && Math.abs(wider.width-(grown.width+60))<2 && Math.abs(wider.y-grown.y)<2,`Resized by its left edge: ${JSON.stringify([grown,wider])}`);
-      await grip('se',-2000,-2000);
-      const least=await dialog.boundingBox();
-      assert(least.width>=319 && least.height>=199,`Never smaller than 320x200: ${JSON.stringify(least)}`);
-      assert.equal(await dialog.evaluate(n=>n.classList.contains('dragging')),false);
-      await page.locator('.lan-nic .inspect-btn').last().click();  // a lens the SSH window does not cover
-      assert(!await page.locator('#packet-inspector').evaluate(n=>n.hidden),'The packet inspector opens while SSH is up');
-      assert(await dialog.evaluate(n=>n.open),'SSH stays open');
-      await page.locator('#packet-close').click();
-    }
+    assert(await dialog.evaluate(n=>n.matches(':modal')),`${kind} is modal`);
+    assert.equal(await page.locator('#vm-dialog .light.min.off').count(),1,'No minimize on the modal dialog');
     await page.locator('#vm-dialog-close').click();
     assert(!await dialog.evaluate(n=>n.open));
-    assert.equal(await frame.getAttribute('src'),'about:blank','Closing unloads the frame (SSH and VNC disconnect)');
+    assert.equal(await frame.getAttribute('src'),'about:blank','Closing unloads the frame (VNC disconnects)');
   }
   assert(await action('vm').evaluate(n=>document.activeElement===n),'Closing gives the focus back to the button that opened it');
-  await action('ssh','k8s-lab-node2').click({force:true});
-  assert(!await dialog.evaluate(n=>n.open),'A disabled button opens nothing');
-  assert.equal(await action('console','k8s-lab-node2').getAttribute('tabindex'),'-1');
-  assert.equal(await action('vm','k8s-lab-node2').getAttribute('aria-disabled'),'false','Stopped VMs can still be managed');
-  await action('ssh').focus(); await page.keyboard.press('Enter');
-  assert(await dialog.evaluate(n=>n.open),'Enter opens the dialog too');
-  const embedded = page.frames().find(f=>f.url().startsWith('http://lab.test/?'));
+  // SSH and Console: a floating window per machine and kind, several at once, each closed alone.
+  const sshWin = (vm, kind='ssh') => page.locator(`.float-window[data-action="${kind}"][data-vm="${vm}"]`);
+  assert.equal(await action('ssh').getAttribute('href'),null);
+  await action('ssh').click();
+  const win = sshWin('k8s-lab-main');
+  assert.equal(await win.count(),1,'SSH opens its own window');
+  assert(!await dialog.evaluate(n=>n.open),'Not the modal dialog');
+  const sshUrl=new URL(await win.locator('iframe').getAttribute('src'));
+  assert.equal(sshUrl.hash,'#ssh=k8s-lab-main'); assert.equal(sshUrl.searchParams.get('detached'),'1'); assert.equal(sshUrl.searchParams.get('token'),'fixture-token');
+  assert.equal(new URL(await win.locator('.float-tab').getAttribute('href')).hash,'#ssh=k8s-lab-main');
+  assert.equal(await win.locator('h2').textContent(),'k8s-lab-main');
+  {
+    // Dragged by its header, the map (and its lens) still usable underneath.
+    const before=await win.boundingBox(), head=await win.locator('header').boundingBox();
+    await page.mouse.move(head.x+head.width/2,head.y+head.height/2); await page.mouse.down();
+    await page.mouse.move(head.x+head.width/2-200,head.y+head.height/2+120,{steps:4}); await page.mouse.up();
+    const after=await win.boundingBox();
+    assert(Math.abs(after.x-(before.x-200))<2 && Math.abs(after.y-(before.y+120))<2,`Dragged by the header: ${JSON.stringify([before,after])}`);
+    assert.equal(await win.evaluate(n=>n.classList.contains('dragging')),false);
+    // Resized from its corner and its left edge (the browser's CSS handle sat under the iframe).
+    const grip=async(dir,dx,dy)=>{const g=await win.locator(`.vm-resize[data-dir="${dir}"]`).boundingBox();
+      await page.mouse.move(g.x+g.width/2,g.y+g.height/2); await page.mouse.down();
+      await page.mouse.move(g.x+g.width/2+dx,g.y+g.height/2+dy,{steps:4}); await page.mouse.up();};
+    await grip('se',120,90);
+    const grown=await win.boundingBox();
+    assert(Math.abs(grown.width-(after.width+120))<2 && Math.abs(grown.height-(after.height+90))<2,`Resized by its corner: ${JSON.stringify([after,grown])}`);
+    await grip('w',-60,0);
+    const wider=await win.boundingBox();
+    assert(Math.abs(wider.x-(grown.x-60))<2 && Math.abs(wider.width-(grown.width+60))<2 && Math.abs(wider.y-grown.y)<2,`Resized by its left edge: ${JSON.stringify([grown,wider])}`);
+    await grip('se',-2000,-2000);
+    const least=await win.boundingBox();
+    assert(least.width>=319 && least.height>=199,`Never smaller than 320x200: ${JSON.stringify(least)}`);
+    await grip('se',300,200);
+    await page.locator('.lan-nic .inspect-btn').first().click({force:true});
+    assert(!await page.locator('#packet-inspector').evaluate(n=>n.hidden),'The packet inspector opens while SSH is up');
+    assert.equal(await win.count(),1,'SSH stays open');
+    await page.locator('#packet-close').click();
+  }
+  // A second machine: a second window, offset from the first, in front of it.
+  const second = sshWin('k8s-lab-node1');
+  await action('ssh','k8s-lab-node1').click({force:true});
+  assert.equal(await page.locator('.float-window').count(),2,'Two SSH windows at once');
+  const [a,b]=[await win.boundingBox(), await second.boundingBox()];
+  assert(a.x!==b.x || a.y!==b.y,'The second window does not sit exactly on the first');
+  const z = loc => loc.evaluate(n=>Number(n.style.zIndex));
+  assert(await z(second) > await z(win),'The new window is in front');
+  assert(await second.evaluate(n=>n.classList.contains('front')));
+  await win.locator('header h2').click();
+  assert(await z(win) > await z(second),'A click brings a window to the front');
+  // The SSH button of a machine whose window is open brings it forward, no second session.
+  await action('ssh','k8s-lab-node1').click({force:true});
+  assert.equal(await page.locator('.float-window').count(),2);
+  assert(await z(second) > await z(win),'Its button raises the open window');
+  // Yellow minimizes into the dock, the SSH session stays (same frame); the dock button and the
+  // machine's SSH button both bring it back.
+  const secondFrame = await second.locator('iframe').getAttribute('src');
+  await second.locator('.float-min').click();
+  assert(!await second.isVisible(),'Minimized');
+  assert.equal(await second.count(),1,'Still there: the SSH session stays connected');
+  const chip = page.locator('.float-dock button[data-key="ssh:k8s-lab-node1"]');
+  assert.equal((await chip.textContent()).trim(),'▸ SSH · k8s-lab-node1');
+  await chip.click();
+  assert(await second.isVisible(),'Restored from the dock');
+  assert.equal(await second.locator('iframe').getAttribute('src'),secondFrame,'Same frame: no new SSH session');
+  assert.equal(await page.locator('.float-dock').count(),0,'The empty dock goes away');
+  assert(await z(second) > await z(win),'Restored in front');
+  await second.locator('.float-min').click();
+  await action('ssh','k8s-lab-node1').click({force:true});
+  assert(await second.isVisible(),'Its SSH button restores it too');
+  // Green opens the same view in a tab, red closes, the modal dialog has them too (yellow grey).
+  assert.equal(await second.locator('.float-tab').getAttribute('target'),'_blank');
+  // Consoles float too, next to the SSH windows of the same machines.
+  await action('console').click();
+  const screen = sshWin('k8s-lab-main','console');
+  assert.equal(await screen.count(),1,'The console opens its own window');
+  assert(!await dialog.evaluate(n=>n.open),'Not the modal dialog');
+  const consoleUrl=new URL(await screen.locator('iframe').getAttribute('src'));
+  assert.equal(consoleUrl.hash,'#console=k8s-lab-main'); assert.equal(consoleUrl.searchParams.get('detached'),'1'); assert.equal(consoleUrl.searchParams.get('token'),'fixture-token');
+  assert.equal(await screen.locator('.vm-dialog-eyebrow').textContent(),'Console');
+  assert.equal(await win.count(),1,'The SSH window of the same machine stays');
+  await action('console','k8s-lab-node1').click({force:true});
+  assert.equal(await page.locator('.float-window[data-action="console"]').count(),2,'Two consoles at once');
+  assert.equal(await page.locator('.float-window').count(),4);
+  {
+    const g=await screen.locator('.vm-resize[data-dir="se"]').boundingBox(), before=await screen.boundingBox();
+    await page.mouse.move(g.x+g.width/2,g.y+g.height/2); await page.mouse.down();
+    await page.mouse.move(g.x+g.width/2-80,g.y+g.height/2-60,{steps:3}); await page.mouse.up();
+    const after=await screen.boundingBox();
+    assert(Math.abs(after.width-(before.width-80))<2 && Math.abs(after.height-(before.height-60))<2,'A console resizes too');
+  }
+  await screen.locator('.float-min').click();
+  assert.equal((await page.locator('.float-dock button[data-key="console:k8s-lab-main"]').textContent()).trim(),'▸ Console · k8s-lab-main');
+  await action('console').click();
+  assert(await screen.isVisible(),'Its Console button restores it');
+  await screen.locator('.float-close').click();
+  await sshWin('k8s-lab-node1','console').locator('.float-close').click();
+  assert.equal(await page.locator('.float-window[data-action="console"]').count(),0);
+  assert.equal(await page.locator('.float-window[data-action="ssh"]').count(),2,'Closing the consoles leaves the SSH windows');
+  // Closing one leaves the other.
+  await second.locator('.float-close').click();
+  assert.equal(await second.count(),0,'Closed (its frame goes with it: SSH disconnects)');
+  assert.equal(await win.count(),1,'The other SSH window stays');
+  assert(await action('ssh','k8s-lab-node1').evaluate(n=>document.activeElement===n),'Focus back on the button that opened it');
+  // The terminal ending by itself (vmctl-close from its frame) closes its window only.
+  await action('ssh','k8s-lab-node1').click({force:true});
+  const embedded = await (await sshWin('k8s-lab-node1').locator('iframe').elementHandle()).contentFrame();
   assert(embedded);
   await embedded.evaluate(()=>window.parent.postMessage({type:'vmctl-close'}, location.origin));
+  await page.waitForFunction(()=>!document.querySelector('.float-window[data-vm="k8s-lab-node1"]'));
+  assert.equal(await win.count(),1,'vmctl-close from one terminal leaves the other window');
+  await win.locator('.float-close').click();
+  assert.equal(await page.locator('.float-window').count(),0);
+  await action('ssh','k8s-lab-node2').click({force:true});
+  await action('console','k8s-lab-node2').click({force:true});
+  assert.equal(await page.locator('.float-window').count(),0,'A disabled button opens nothing');
+  assert.equal(await action('console','k8s-lab-node2').getAttribute('tabindex'),'-1');
+  assert.equal(await action('vm','k8s-lab-node2').getAttribute('aria-disabled'),'false','Stopped VMs can still be managed');
+  await action('vm').focus(); await page.keyboard.press('Enter');
+  assert(await dialog.evaluate(n=>n.open),'Enter opens the dialog too');
+  const embeddedConsole = await (await frame.elementHandle()).contentFrame();
+  assert(embeddedConsole);
+  await embeddedConsole.evaluate(()=>window.parent.postMessage({type:'vmctl-close'}, location.origin));
   await page.waitForFunction(()=>!document.getElementById('vm-dialog').open);
   assert(page.url().includes('/labs/k8s-lab/map'),'The map stays where it is');
   const cable = page.locator(`.nic[data-vm="${target.vm}"][data-nic="${target.nic}"]`);

@@ -558,10 +558,10 @@
     map.querySelector('svg')?.setAttribute('role', 'group');
     map.querySelectorAll('.nic title').forEach(title => title.remove());
   };
-  // SSH, Console and Manage under a machine open the dashboard's own view of it in a dialog on
-  // this page (Manzolo wanted dialogs, not new tabs, 2026-10-05): the embedded detached console,
-  // the browser SSH terminal, or the Machine panel alone (`panel=1`). "Open in a tab" keeps the
-  // old behaviour at hand. Closing the dialog unloads the frame, so SSH and VNC disconnect.
+  // SSH, Console and Manage under a machine open the dashboard's own view of it on this page
+  // (Manzolo wanted dialogs, not new tabs, 2026-10-05): the embedded detached console, the
+  // browser SSH terminal, or the Machine panel alone (`panel=1`). "Open in a tab" keeps the old
+  // behaviour at hand. Closing a window unloads its frame, so SSH and VNC disconnect.
   const vmDialog = document.getElementById('vm-dialog');
   const vmFrame = document.getElementById('vm-dialog-frame');
   const vmTab = document.getElementById('vm-dialog-tab');
@@ -574,22 +574,13 @@
     url.hash = `${action}=${encodeURIComponent(vm)}`;
     return url;
   };
-  // SSH is a small window that floats over the map (non-modal, dragged by its header, resized from
-  // any edge or corner: the browser's own CSS handle sat under the terminal's iframe, which took
-  // the pointer, so the window could not be resized at all, Manzolo 2026-10-06): a shell on one machine next to the packet inspector is how the
-  // analyser gets tested (Manzolo, 2026-10-05). Console and Manage stay modal dialogs.
-  const FLOATING = new Set(['ssh']);
-  let dialogOpener = null, floatAt = null, floatSize = null;
-  const placeFloating = () => {
-    const width = vmDialog.offsetWidth, height = vmDialog.offsetHeight;
-    const at = floatAt || {x: innerWidth - width - 16, y: 16};
-    vmDialog.style.left = `${Math.max(8, Math.min(at.x, innerWidth - width - 8))}px`;
-    vmDialog.style.top = `${Math.max(8, Math.min(at.y, innerHeight - height - 8))}px`;
+  const focusOpener = key => {
+    if (key) [...map.querySelectorAll('.vm-action')].find(n => n.dataset.vm === key.vm && n.dataset.action === key.action)?.focus({preventScroll:true});
   };
+  // Console and Manage: one modal dialog.
+  let dialogOpener = null;
   const openVmDialog = (action, vm, opener) => {
-    if (!vmDialog || !ACTIONS[action]) return;
-    const floating = FLOATING.has(action);
-    if (vmDialog.open && vmDialog.classList.contains('floating') !== floating) closeVmDialog();
+    if (!vmDialog) return;
     dialogOpener = opener || null;
     document.getElementById('vm-dialog-kind').textContent = ACTIONS[action];
     document.getElementById('vm-dialog-title').textContent = vm;
@@ -597,58 +588,16 @@
     vmTab.href = actionUrl(action, vm, false).href;
     vmFrame.src = actionUrl(action, vm, true).href;
     vmDialog.dataset.vm = vm; vmDialog.dataset.action = action;
-    vmDialog.classList.toggle('floating', floating);
-    if (!floating) { vmDialog.style.left = vmDialog.style.top = vmDialog.style.width = vmDialog.style.height = ''; }
-    else if (floatSize) { vmDialog.style.width = `${floatSize.w}px`; vmDialog.style.height = `${floatSize.h}px`; }
-    if (!vmDialog.open) { if (floating) vmDialog.show(); else vmDialog.showModal(); }
-    if (floating) placeFloating();
+    if (!vmDialog.open) vmDialog.showModal();
     vmFrame.focus();
   };
-  document.getElementById('vm-dialog-drag')?.addEventListener('pointerdown', event => {
-    if (!vmDialog.classList.contains('floating') || event.target.closest('button, a')) return;
-    const rect = vmDialog.getBoundingClientRect();
-    const offset = {x: event.clientX - rect.left, y: event.clientY - rect.top};
-    vmDialog.classList.add('dragging');
-    const move = e => { floatAt = {x: e.clientX - offset.x, y: e.clientY - offset.y}; placeFloating(); };
-    const up = () => { vmDialog.classList.remove('dragging'); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    event.preventDefault();
-  });
-  // The edges: the iframe stops taking the pointer while the window is resized (.dragging), and the
-  // terminal refits itself (its ResizeObserver). The size is kept for the next SSH window.
-  vmDialog?.querySelectorAll('.vm-resize').forEach(grip => grip.addEventListener('pointerdown', event => {
-    if (!vmDialog.classList.contains('floating')) return;
-    const dir = grip.dataset.dir, start = vmDialog.getBoundingClientRect(), x0 = event.clientX, y0 = event.clientY;
-    const MIN_W = 320, MIN_H = 200;
-    vmDialog.classList.add('dragging');
-    grip.setPointerCapture?.(event.pointerId);
-    const move = e => {
-      const dx = e.clientX - x0, dy = e.clientY - y0;
-      let {left, top, width, height} = start;
-      if (dir.includes('e')) width = Math.min(innerWidth - left - 8, Math.max(MIN_W, start.width + dx));
-      if (dir.includes('s')) height = Math.min(innerHeight - top - 8, Math.max(MIN_H, start.height + dy));
-      if (dir.includes('w')) { width = Math.max(MIN_W, Math.min(start.right - 8, start.width - dx)); left = start.right - width; }
-      if (dir.includes('n')) { height = Math.max(MIN_H, Math.min(start.bottom - 8, start.height - dy)); top = start.bottom - height; }
-      floatSize = {w: Math.round(width), h: Math.round(height)}; floatAt = {x: left, y: top};
-      vmDialog.style.width = `${floatSize.w}px`; vmDialog.style.height = `${floatSize.h}px`;
-      placeFloating();
-    };
-    const up = () => { vmDialog.classList.remove('dragging'); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
-    event.preventDefault(); event.stopPropagation();
-  }));
-  window.addEventListener('resize', () => { if (vmDialog?.open && vmDialog.classList.contains('floating')) placeFloating(); });
   // The `close` event arrives a task later than close(): unload the frame right away, and again
   // on the event for an Escape (the dialog's own cancel), which never comes through here.
   const releaseVmDialog = () => {
     if (vmFrame.getAttribute('src') !== 'about:blank') vmFrame.src = 'about:blank';
     delete vmDialog.dataset.vm; delete vmDialog.dataset.action;
-    vmDialog.classList.remove('floating', 'dragging');
     const key = dialogOpener; dialogOpener = null;
-    if (key) [...map.querySelectorAll('.vm-action')].find(n => n.dataset.vm === key.vm && n.dataset.action === key.action)?.focus({preventScroll:true});
+    focusOpener(key);
   };
   const closeVmDialog = () => {
     if (!vmDialog?.open) return;
@@ -656,10 +605,135 @@
   };
   vmDialog?.addEventListener('close', releaseVmDialog);
   document.getElementById('vm-dialog-close')?.addEventListener('click', closeVmDialog);
+  // SSH and Console: one window per machine and kind floating over the map (non-modal, dragged by
+  // its header, resized from any edge or corner), so a shell or a screen of each member of a lab
+  // sits next to the packet inspector and any one of them closes alone (Manzolo, 2026-10-06;
+  // until then a second one replaced the first, and the console was a modal dialog). A click on a
+  // window, or into its frame, brings it to the front; the button of a machine whose window is
+  // open brings that window forward instead of a second session. The browser's own CSS resize
+  // handle sat under the iframe, which took the pointer. The yellow light minimizes a window to a
+  // button in the dock at the bottom left: its session stays connected (the frame stays loaded)
+  // and the button, or the machine's own button, brings it back.
+  const FLOATING = new Set(['ssh', 'console']);
+  const floats = new Map();  // `${action}:${vm}` -> {win, frame, action, vm, at, opener}
+  const floatSize = {};      // the last size per kind, for its next window
+  let floatTop = 25;
+  const MIN_W = 320, MIN_H = 200;
+  const floatKey = (action, vm) => `${action}:${vm}`;
+  const isMin = entry => entry.win.classList.contains('minimized');
+  const place = entry => {
+    const {win} = entry, width = win.offsetWidth, height = win.offsetHeight;
+    const at = entry.at || {x: innerWidth - width - 16, y: 16};
+    entry.at = {x: Math.max(8, Math.min(at.x, innerWidth - width - 8)), y: Math.max(8, Math.min(at.y, innerHeight - height - 8))};
+    win.style.left = `${entry.at.x}px`; win.style.top = `${entry.at.y}px`;
+  };
+  const raise = entry => {
+    if (!entry) return;
+    entry.win.style.zIndex = String(++floatTop);
+    floats.forEach(other => other.win.classList.toggle('front', other === entry));
+  };
+  let dock = null;
+  const dockButton = key => [...(dock?.children || [])].find(n => n.dataset.key === key);
+  const restoreFloat = entry => {
+    if (!isMin(entry)) return;
+    entry.win.classList.remove('minimized');
+    dockButton(floatKey(entry.action, entry.vm))?.remove();
+    if (dock && !dock.children.length) { dock.remove(); dock = null; }
+    place(entry);
+  };
+  const minimizeFloat = entry => {
+    if (isMin(entry)) return;
+    entry.win.classList.add('minimized');
+    if (!dock) { dock = el('div', 'float-dock'); dock.setAttribute('aria-label', 'Minimized windows'); document.body.append(dock); }
+    const chip = el('button', '', `▸ ${entry.action === 'ssh' ? 'SSH' : ACTIONS[entry.action]} · ${entry.vm}`);
+    chip.type = 'button'; chip.dataset.key = floatKey(entry.action, entry.vm); chip.dataset.vm = entry.vm; chip.dataset.action = entry.action;
+    chip.title = `Restore the ${ACTIONS[entry.action]} of ${entry.vm}`;
+    chip.addEventListener('click', () => { restoreFloat(entry); raise(entry); entry.frame.focus(); });
+    dock.append(chip);
+    chip.focus();
+  };
+  const closeFloat = entry => {
+    if (!entry || floats.get(floatKey(entry.action, entry.vm)) !== entry) return;
+    restoreFloat(entry);
+    floats.delete(floatKey(entry.action, entry.vm));
+    entry.frame.src = 'about:blank'; entry.win.remove();
+    focusOpener(entry.opener);
+  };
+  const dragWith = (event, win, onMove) => {
+    win.classList.add('dragging');
+    event.target.setPointerCapture?.(event.pointerId);
+    const up = () => { win.classList.remove('dragging'); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    event.preventDefault(); event.stopPropagation();
+  };
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
+  const openFloat = (action, vm, opener) => {
+    const open = floats.get(floatKey(action, vm));
+    if (open) { restoreFloat(open); raise(open); open.frame.focus(); return; }
+    const name = ACTIONS[action];
+    const win = el('section', 'vm-dialog floating float-window');
+    win.setAttribute('role', 'dialog'); win.setAttribute('aria-label', `${name} · ${vm}`);
+    win.dataset.vm = vm; win.dataset.action = action;
+    const header = el('header'), titles = el('div', 'vm-dialog-titles');
+    titles.append(el('div', 'vm-dialog-eyebrow', name), el('h2', '', vm));
+    const lights = el('div', 'lights'), close = el('button', 'light close float-close'), min = el('button', 'light min float-min'), tab = el('a', 'light tab float-tab');
+    for (const [node, verb] of [[close, 'Close'], [min, 'Minimize'], [tab, 'Open in a tab']]) { node.title = verb; node.setAttribute('aria-label', `${verb}: ${name} of ${vm}`); }
+    close.type = min.type = 'button';
+    tab.href = actionUrl(action, vm, false).href; tab.target = '_blank'; tab.rel = 'noopener noreferrer';
+    lights.append(close, min, tab); header.append(lights, titles);
+    const frame = el('iframe'); frame.title = `${name} · ${vm}`;
+    win.append(header, frame);
+    for (const dir of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) { const grip = el('div', 'vm-resize'); grip.dataset.dir = dir; grip.setAttribute('aria-hidden', 'true'); win.append(grip); }
+    const size = floatSize[action];
+    if (size) { win.style.width = `${size.w}px`; win.style.height = `${size.h}px`; }
+    document.body.append(win);
+    // A new window steps down and left from the last one, so none hides another completely.
+    const last = [...floats.values()].filter(other => !isMin(other)).pop();
+    const entry = {win, frame, action, vm, opener: opener || null, at: last ? {x: last.at.x - 32, y: last.at.y + 32} : null};
+    floats.set(floatKey(action, vm), entry);
+    place(entry); raise(entry);
+    frame.src = actionUrl(action, vm, true).href;
+    close.addEventListener('click', () => closeFloat(entry));
+    min.addEventListener('click', () => minimizeFloat(entry));
+    win.addEventListener('pointerdown', () => raise(entry), true);
+    header.addEventListener('pointerdown', event => {
+      if (event.target.closest('button, a')) return;
+      const rect = win.getBoundingClientRect(), offset = {x: event.clientX - rect.left, y: event.clientY - rect.top};
+      dragWith(event, win, e => { entry.at = {x: e.clientX - offset.x, y: e.clientY - offset.y}; place(entry); });
+    });
+    win.querySelectorAll('.vm-resize').forEach(grip => grip.addEventListener('pointerdown', event => {
+      const dir = grip.dataset.dir, start = win.getBoundingClientRect(), x0 = event.clientX, y0 = event.clientY;
+      dragWith(event, win, e => {
+        const dx = e.clientX - x0, dy = e.clientY - y0;
+        let {left, top, width, height} = start;
+        if (dir.includes('e')) width = Math.min(innerWidth - left - 8, Math.max(MIN_W, start.width + dx));
+        if (dir.includes('s')) height = Math.min(innerHeight - top - 8, Math.max(MIN_H, start.height + dy));
+        if (dir.includes('w')) { width = Math.max(MIN_W, Math.min(start.right - 8, start.width - dx)); left = start.right - width; }
+        if (dir.includes('n')) { height = Math.max(MIN_H, Math.min(start.bottom - 8, start.height - dy)); top = start.bottom - height; }
+        floatSize[action] = {w: Math.round(width), h: Math.round(height)}; entry.at = {x: left, y: top};
+        win.style.width = `${floatSize[action].w}px`; win.style.height = `${floatSize[action].h}px`;
+        place(entry);
+      });
+    }));
+    frame.focus();
+  };
+  // Clicks inside a frame never reach this page: the frame taking the focus is the signal.
+  window.addEventListener('blur', () => setTimeout(() => {
+    const active = document.activeElement;
+    if (active?.tagName === 'IFRAME') raise([...floats.values()].find(entry => entry.frame === active));
+  }));
+  window.addEventListener('resize', () => floats.forEach(entry => { if (!isMin(entry)) place(entry); }));
   window.addEventListener('message', event => {
-    if (event.origin !== location.origin || event.source !== vmFrame?.contentWindow) return;
-    if (event.data && event.data.type === 'vmctl-close') closeVmDialog();
+    if (event.origin !== location.origin || !(event.data && event.data.type === 'vmctl-close')) return;
+    if (event.source === vmFrame?.contentWindow) { closeVmDialog(); return; }
+    closeFloat([...floats.values()].find(entry => entry.frame.contentWindow === event.source));
   });
+  const openAction = (action, vm, opener) => {
+    if (!ACTIONS[action]) return;
+    if (FLOATING.has(action)) openFloat(action, vm, opener); else openVmDialog(action, vm, opener);
+  };
   const actionOf = event => {
     const node = event.target.closest?.('.vm-action');
     return node && node.getAttribute('aria-disabled') !== 'true' ? node : null;
@@ -668,14 +742,14 @@
     const node = actionOf(event);
     if (!node) return;
     event.preventDefault();
-    openVmDialog(node.dataset.action, node.dataset.vm, {vm: node.dataset.vm, action: node.dataset.action});
+    openAction(node.dataset.action, node.dataset.vm, {vm: node.dataset.vm, action: node.dataset.action});
   });
   map.addEventListener('keydown', event => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const node = actionOf(event);
     if (!node) return;
     event.preventDefault();
-    openVmDialog(node.dataset.action, node.dataset.vm, {vm: node.dataset.vm, action: node.dataset.action});
+    openAction(node.dataset.action, node.dataset.vm, {vm: node.dataset.vm, action: node.dataset.action});
   });
   const illuminate = (link, bytes) => {
     if (!link) return;
