@@ -18,6 +18,7 @@ const state = { version:'0.4.0', vms:[machine('arch-noctalia',{running:true}),ma
 let requests = [], failRun = false, failState = false, sshLaunches = 0, overrideRevision = 1, savedOverride = {};
 let jobStatus = 'completed', jobCommand = 'vmctl start arch-noctalia --headless --background', cancelRequests = [], failCancel = false, cancelResult = true;
 let jobId = 'web:fixture', holdRun = false, releaseRun;
+let savedCheckpoints = [], checkpointBlocked = {create:'',restore:'',delete:''}, failCheckpoints = false;
 let hideJobs = false, recording = null, recordingExports = [], failExport = false;
 let clipboardChannel = true, consoleRunning = true, failConsoleInfo = false, failFiles = false;
 let connectionChecks = 0, guestCommands = [], uploadSessions = 0, uploadSessionIds = [];
@@ -98,6 +99,10 @@ const server = createServer(async (req,res) => {
   }
   if (req.url.startsWith('/api/state')) { const body=JSON.stringify(failState ? {error:'fixture offline'} : state); if (holdState) await new Promise(resolve=>stateWaiters.push(resolve)); res.statusCode=failState ? (failState===true ? 503 : failState) : 200; return res.end(body); }
   if (req.url === '/api/commands') return res.end(JSON.stringify(catalog));
+  if (req.url.endsWith('/checkpoints')) {
+    res.statusCode = failCheckpoints ? 503 : 200;
+    return res.end(JSON.stringify(failCheckpoints ? {error:'Fixture checkpoint listing unavailable'} : {checkpoints:savedCheckpoints,blocked:checkpointBlocked,job:null}));
+  }
   if (req.url === '/api/jobs') return res.end(JSON.stringify(hideJobs ? [] : [{id:jobId,status:jobStatus,command:jobCommand,updated:1789900000}]));
   if (req.url === '/api/recordings') {
     let body=''; for await (const chunk of req) body+=chunk;
@@ -114,7 +119,7 @@ const server = createServer(async (req,res) => {
   }
   if (req.url.includes('/log?')) {
     const log = 'Fixture job output.\n', offset = Number(new URL(req.url,'http://fixture').searchParams.get('offset'));
-    return res.end(JSON.stringify({text:log.slice(offset),offset:log.length,size:log.length,status:jobStatus}));
+    return res.end(JSON.stringify({text:log.slice(offset),offset:log.length,size:log.length,status:jobStatus,command:jobCommand}));
   }
   if (req.url.endsWith('/cancel')) {
     cancelRequests.push(req.url); res.statusCode = failCancel ? 500 : 200;
@@ -240,8 +245,9 @@ try {
   assert(await page.locator('[data-section=checkpoints] summary').isVisible());
   await page.locator('[data-section=checkpoints] summary').click();
   await page.locator('[data-command=checkpoint]').click();
-  assert.equal(await page.evaluate(()=>pal.cmd),'checkpoint');
-  await page.locator('#cmd-dialog [data-close]').click();
+  assert.equal(await page.locator('#checkpoint-title').textContent(),'debian-server');
+  assert(await page.locator('#checkpoint-dialog').isVisible());
+  await page.locator('#checkpoint-dialog [data-close]').click();
   await page.locator('[data-section=configuration] summary').click();
   assert((await page.locator('[data-section=configuration]').textContent()).includes('Firmware'));
   await page.locator('#rows [data-vm="arch-noctalia"] .profile-name').click();
@@ -639,7 +645,7 @@ try {
   await page.locator('#cmd-filter').fill('show'); await page.locator('#cmd-copy').click();
   assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'vmctl show arch-noctalia'); check('copy command');
   await page.locator('#cmd-filter').fill('does-not-exist'); assert(await page.locator('#cmd-run').isDisabled()); check('empty search');
-  await page.locator('#cmd-filter').fill('checkpoint'); await page.locator('#arg0').selectOption('restore');
+  await page.locator('#cmd-filter').fill('clean'); await page.locator('#cmd-list [data-cmd=clean]').click();
   assert(!(await page.locator('#cmd-warning').evaluate(el=>el.classList.contains('hidden'))));
   await page.locator('#cmd-run').click(); await page.locator('#confirm-no').click(); assert.equal(requests.length,0); check('destructive command confirmation');
   await page.locator('#cmd-filter').fill('show'); failRun=true; await page.locator('#cmd-run').click();
@@ -1453,6 +1459,81 @@ try {
   assert.equal(context.pages().length,pagesBeforeBackground);
   assert(!(await page.locator('#vnc-dialog').isVisible()));
   check('rejected, failed and cancelled starts close pending windows; background start opens no console');
+  // Checkpoints: reading is not a job, operations and their results stay in the manager.
+  jobStatus='completed'; jobId='vm:arch-noctalia';
+  await page.evaluate(()=>{selected='arch-noctalia';render();});
+  await page.locator('[data-section=checkpoints] summary').click();
+  const beforeListing=requests.length;
+  await page.locator('[data-command=checkpoint]').click();
+  await page.getByText('No checkpoints yet',{exact:true}).waitFor();
+  assert.equal(requests.length,beforeListing);
+  assert(await page.locator('#checkpoint-dialog').isVisible());
+  await page.locator('#checkpoint-name').fill('before-update');
+  await page.locator('#checkpoint-note').fill('Fresh install <safe>');
+  await page.locator('#checkpoint-compress').check();
+  await page.locator('#checkpoint-save').click();
+  await page.waitForFunction(()=>checkpointOperations.get('arch-noctalia')?.job);
+  assert.deepEqual(requests.at(-1),{args:['checkpoint','create','arch-noctalia','before-update','--note','Fresh install <safe>','--compress'],confirmed:false});
+  assert(await page.locator('#checkpoint-save').isDisabled());
+  await page.locator('#checkpoint-dialog [data-close]').click();
+  await page.locator('[data-command=checkpoint]').click();
+  assert(await page.locator('#checkpoint-save').isDisabled(),'Running operation survives closing/reopening');
+  savedCheckpoints=[{name:'before-update',created_at:'2026-10-06T12:00:00Z',note:'Fresh install <safe>',host_bytes:2400000000,virtual_bytes:32000000000,format:'qcow2',compressed:true,nvram:true,extra_disks:1,complete:true,label:'verified'}];
+  jobStatus='completed';
+  await page.locator('#checkpoint-progress').filter({hasText:'created.'}).waitFor();
+  await page.locator('.checkpoint-card h3').filter({hasText:'before-update'}).waitFor();
+  assert((await page.locator('#checkpoint-list').textContent()).includes('Fresh install <safe>'));
+  assert.equal(await page.locator('#checkpoint-list safe').count(),0);
+  await shot('checkpoint-manager');
+  const beforeDuplicate=requests.length;
+  await page.locator('#checkpoint-name').fill('before-update');
+  await page.locator('#checkpoint-save').click();
+  await page.locator('#checkpoint-error').filter({hasText:'already exists'}).waitFor();
+  assert.equal(requests.length,beforeDuplicate);
+  await page.locator('[data-checkpoint-restore]').click();
+  assert((await page.locator('#confirm-message').textContent()).includes('will be lost'));
+  await page.locator('#confirm-no').click();
+  assert.equal(requests.length,beforeDuplicate);
+  await page.locator('[data-checkpoint-restore]').click(); await page.locator('#confirm-yes').click();
+  await page.waitForFunction(()=>checkpointOperations.get('arch-noctalia')?.command?.includes('restore'));
+  assert.deepEqual(requests.at(-1),{args:['checkpoint','restore','arch-noctalia','before-update'],confirmed:true});
+  jobStatus='failed (1)';
+  await page.locator('#checkpoint-progress').filter({hasText:'failed (1)'}).waitFor();
+  assert(await page.locator('#checkpoint-output').isVisible());
+  assert(await page.locator('#checkpoint-dialog').isVisible());
+  await page.locator('[data-checkpoint-delete]').click(); await page.locator('#confirm-yes').click();
+  await page.waitForFunction(()=>checkpointOperations.get('arch-noctalia')?.command?.includes('delete'));
+  assert.deepEqual(requests.at(-1),{args:['checkpoint','delete','arch-noctalia','before-update'],confirmed:true});
+  jobStatus='completed'; savedCheckpoints=[];
+  await page.locator('#checkpoint-progress').filter({hasText:'deleted.'}).waitFor();
+  await page.getByText('No checkpoints yet',{exact:true}).waitFor();
+  checkpointBlocked={create:'Stop the VM first.',restore:'Stop the VM first.',delete:''};
+  await page.locator('#checkpoint-refresh').click();
+  await page.locator('#checkpoint-restrictions').filter({hasText:'Stop the VM first.'}).waitFor();
+  assert(await page.locator('#checkpoint-save').isDisabled());
+  failCheckpoints=true;
+  await page.locator('#checkpoint-refresh').click();
+  await page.locator('#checkpoint-error').filter({hasText:'Fixture checkpoint listing unavailable'}).waitFor();
+  failCheckpoints=false; checkpointBlocked={create:'',restore:'',delete:''};
+  await page.locator('#checkpoint-refresh').click();
+  await page.waitForFunction(()=>!checkpointView.loading && !checkpointView.error);
+  failRun=true;
+  await page.locator('#checkpoint-name').fill('rejected'); await page.locator('#checkpoint-save').click();
+  await page.locator('#checkpoint-progress').filter({hasText:'Fixture rejected'}).waitFor();
+  assert(await page.locator('#checkpoint-save').isEnabled());
+  failRun=false;
+  await page.locator('#checkpoint-dialog [data-close]').click();
+  await page.evaluate(async()=>{await openCommands('arch-noctalia');selectCommand('checkpoint');});
+  assert.equal(await page.locator('#cmd-run').textContent(),'Manage checkpoints…');
+  const beforeManager=requests.length;
+  await page.locator('#cmd-run').click(); await page.locator('#checkpoint-dialog').waitFor();
+  assert.equal(requests.length,beforeManager);
+  await page.setViewportSize({width:390,height:844});
+  assert(await page.locator('#checkpoint-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth));
+  await shot('checkpoint-manager-mobile');
+  await page.setViewportSize({width:1440,height:1000});
+  await page.locator('#checkpoint-dialog [data-close]').click();
+  check('checkpoint manager: inline reads, create, duplicate guard, confirmed restore/delete, progress, reopen, errors and mobile layout');
   // Quit: the server started from the app menu has no terminal to Ctrl-C in. Last, since the page is offline after it.
   await page.locator('#server-quit').click();
   assert.equal(await page.locator('#confirm-title').textContent(),'Stop vmctl web?');

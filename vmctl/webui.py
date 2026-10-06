@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import catalog, config, integration, isofile, local_identity, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording, web_transfers
+from vmctl import catalog, checkpoint, config, integration, isofile, local_identity, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording, web_transfers
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
@@ -191,6 +191,32 @@ def job_directory(job_id: str) -> Path:
     raise VMError(f"Unknown job: {job_id}")
 
 
+def checkpoint_inventory(name: str) -> dict[str, Any]:
+    """Read checkpoints without creating a job; the CLI rechecks guards before each write."""
+    from vmctl import lifecycle, vmstate
+
+    vm = config.get_vm(config.load_config(), name)
+    directory = tui_jobs.job_dir(state.ROOT, name)
+    busy = tui_jobs.status(directory) == "running"
+    blocked = {"create": "", "restore": "", "delete": "A job is running for this VM." if busy else ""}
+    try:
+        lifecycle.ensure_vm_quiescent(name, vm, "manage checkpoints for")
+        checkpoint.check_profile(name, vm)
+    except VMError as exc:
+        blocked["create"] = blocked["restore"] = str(exc)
+    if not blocked["create"]:
+        if any(not disk["path"].is_file() for disk in checkpoint.disks_of(vm)):
+            blocked["create"] = "A VM disk is missing. Install or prepare the VM before creating a checkpoint."
+    if not blocked["restore"]:
+        try:
+            vmstate.refuse_if_protected(name, "restore a checkpoint", allow_starred=True)
+        except VMError as exc:
+            blocked["restore"] = str(exc)
+    argv = tui_jobs.command(directory) if busy else []
+    job = {"id": f"vm:{name}", "command": display_job_command(argv)} if argv[1:2] == ["checkpoint"] else None
+    return {"vm": name, "checkpoints": checkpoint.list_checkpoints(name), "blocked": blocked, "job": job}
+
+
 def vm_history(name: str) -> list[dict[str, Any]]:
     config.get_vm(config.load_config(), name)
     directory = tui_jobs.job_dir(state.ROOT, name)
@@ -259,7 +285,8 @@ def read_log(job_id: str, offset: int) -> dict[str, Any]:
         fh.seek(offset)
         data = fh.read(LOG_CHUNK)
     return {"text": data.decode(errors="replace"), "offset": offset + len(data), "size": size,
-            "status": tui_jobs.status(directory) or "unknown"}
+            "status": tui_jobs.status(directory) or "unknown",
+            "command": display_job_command(tui_jobs.command(directory))}
 
 
 def cancel_job(job_id: str, force_stop: bool = False) -> bool:
@@ -693,6 +720,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(self.connections.get(path[len("/api/vm/"):-len("/connections")], console_info))
             elif path.startswith("/api/vm/") and path.endswith("/history"):
                 self._json(vm_history(path[len("/api/vm/"):-len("/history")]))
+            elif path.startswith("/api/vm/") and path.endswith("/checkpoints"):
+                self._json(checkpoint_inventory(path[len("/api/vm/"):-len("/checkpoints")]))
             elif path.startswith("/api/vm/") and path.endswith("/files"):
                 vm = config.get_vm(config.load_config(), path[len("/api/vm/"):-len("/files")])
                 with web_files.SFTP(vm, timeout=30) as client:

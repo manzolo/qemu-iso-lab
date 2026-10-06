@@ -272,6 +272,25 @@ dialog .body { padding:20px; overflow:auto; max-height:calc(90dvh - 80px); }
 pre.log { background:#05080d; color:#c9d4e3; border:1px solid #1f2b3d; border-radius:8px; padding:12px 14px; margin:0; height:64vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.5 ui-monospace,"Cascadia Code","JetBrains Mono","DejaVu Sans Mono",Menlo,monospace; tab-size:4; }
 pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:#5ee08e; } pre.log .l-warn { color:var(--warn); } pre.log .l-bad { color:var(--bad); } pre.log .l-cmd { color:#9ebdff; } pre.log .l-note { color:#8fb3c9; } pre.log .l-dim { color:#7d8a9c; }
 #log-dialog { width:min(1100px,96vw); }
+#checkpoint-dialog { width:min(940px,96vw); max-height:90dvh; }
+#checkpoint-dialog[open] { display:flex; flex-direction:column; }
+#checkpoint-dialog .body { overflow:auto; }
+.checkpoint-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+.checkpoint-toolbar h2 { flex:1; font-size:16px; margin:0; }
+.checkpoint-card { border:1px solid var(--line); border-radius:10px; padding:16px; margin:10px 0; }
+.checkpoint-card h3 { margin:0; overflow-wrap:anywhere; }
+.checkpoint-card p { white-space:pre-wrap; overflow-wrap:anywhere; }
+.checkpoint-meta { display:flex; flex-wrap:wrap; gap:6px 20px; color:var(--muted); font-size:12px; margin:10px 0; }
+#checkpoint-create { border-top:1px solid var(--line); padding-top:18px; margin-top:22px; }
+#checkpoint-create .form-fields { grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); margin:12px 0; }
+#checkpoint-operation { border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:16px; }
+#checkpoint-output { max-height:190px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
+#checkpoint-dialog .actions { display:flex; flex-wrap:wrap; gap:10px; border:0; padding:0; }
+#checkpoint-dialog .actions button { margin:0; }
+#checkpoint-dialog .actions button.primary { background:var(--accent); color:#102c29; }
+#checkpoint-dialog .actions button.danger { color:var(--bad); border-color:#603846; background:#30212e; }
+#checkpoint-title { overflow-wrap:anywhere; }
+#checkpoint-create h2 { font-size:18px; }
 #cmd-dialog { width:min(1180px,96vw); height:min(820px,90dvh); max-height:90dvh; overflow:hidden; }
 #cmd-dialog[open] { display:flex; flex-direction:column; }
 .dialog-subtitle { font-size:12px; color:var(--muted); margin-top:3px; }
@@ -938,6 +957,21 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
       <div class="command-footer"><div class="preview-label">Command preview</div><div id="preview" class="mono"></div><p id="cmd-warning" class="hidden" role="status"></p><div class="command-buttons"><span id="cmd-validation" role="status">Review before running.</span><button id="cmd-copy">Copy</button><button id="cmd-run" class="primary">Run command</button></div></div>
     </div>
   </div></dialog>
+<dialog id="checkpoint-dialog" aria-labelledby="checkpoint-title"><header><div><div class="eyebrow">Checkpoints</div><h1 id="checkpoint-title"></h1></div><button data-close>Close</button></header>
+  <div class="body">
+    <p class="help">Save the disks and EFI variables of a stopped VM. Checkpoints survive cleaning the VM; restoring replaces its current disks.</p>
+    <section id="checkpoint-operation" class="hidden" aria-label="Checkpoint operation"><p id="checkpoint-progress" role="status"></p><details id="checkpoint-log"><summary>Operation details</summary><pre id="checkpoint-output"></pre></details></section>
+    <div class="checkpoint-toolbar"><h2 id="checkpoint-count">Saved checkpoints</h2><button id="checkpoint-refresh">Refresh</button></div>
+    <p id="checkpoint-error" class="s-bad" role="alert"></p>
+    <p id="checkpoint-restrictions" class="help"></p>
+    <div id="checkpoint-list" aria-busy="true"></div>
+    <form id="checkpoint-create"><h2>Create checkpoint</h2>
+      <div class="form-fields"><div class="field"><label for="checkpoint-name">Name</label><input id="checkpoint-name" type="text" required maxlength="64" pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{0,63}" placeholder="before-update" autocomplete="off"><span class="help">Up to 64 letters, digits, dots, underscores or hyphens. Start with a letter or digit.</span></div>
+      <div class="field"><label for="checkpoint-note">Note (optional)</label><input id="checkpoint-note" type="text" placeholder="What is saved in this checkpoint?"></div></div>
+      <div class="actions"><label class="check"><input id="checkpoint-compress" type="checkbox">Compress (qcow2, slower)</label><button id="checkpoint-save" class="primary" type="submit" disabled>Create checkpoint</button></div>
+      <p id="checkpoint-create-hint" class="help"></p>
+    </form>
+  </div></dialog>
 <dialog id="screen-dialog"><header><h1 id="screen-title">Screen</h1><button data-close>Close</button></header>
   <div class="body" id="screen"><img id="screen-img" alt="VM screen"><p class="s-muted" id="screen-note">Loading the screen…</p></div></dialog>
 <dialog id="vnc-dialog" aria-labelledby="vnc-title"><div id="console-shell"><button id="console-tools" aria-label="Show console controls">Controls ▾</button>
@@ -1112,7 +1146,7 @@ async function api(path, body) {
   const res = await fetch(path, { method: body ? "POST" : "GET", headers: { "X-Vmctl-Token": TOKEN, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({ error: res.statusText }));
   if (!res.ok) {
-    const error = new Error(res.status === 404 && (/\/(override|ssh-terminal|terminal|devices)$/.test(path) || path.startsWith("/api/recordings")) ? "This server needs a restart to load the new features. Restart make web and open its new URL." : data.error || res.statusText);
+    const error = new Error(res.status === 404 && (/\/(override|ssh-terminal|terminal|devices|checkpoints)$/.test(path) || path.startsWith("/api/recordings")) ? "This server needs a restart to load the new features. Restart make web and open its new URL." : data.error || res.statusText);
     error.status = res.status; throw error;
   }
   return data;
@@ -1232,7 +1266,7 @@ function actionsFor(r) {
     a.push({ label: "Start ephemeral (changes discarded)", args: ["start", n, "--headless", "--background", "--ephemeral"], afterStart:prefersSsh(r) ? false : "detached", alternative:true, icon:"play", tone:"info" });
     // vmctl start --boot-iso: the profile's ISO inserted and booted first, the disk attached (rescue, live session)
     if (r.iso_source === "cached" && !r.has_disk_image) a.push({ label: "Start from the ISO (rescue, live)", args: ["start", n, "--headless", "--background", "--boot-iso"], afterStart:"detached", alternative:true, icon:"disc", tone:"info" });
-    a.push({ label: "Checkpoint now", args: ["checkpoint", "create", n, "web-" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")], icon:"bookmark", tone:"info" });
+    a.push({ label: "Checkpoints…", args: ["checkpoint", "list", n], icon:"bookmark", tone:"info" });
   } else if (r.job_status !== "running" && r.has_disk_image) {
     // Built, not installed (SerenityOS): the prepared image becomes the disk, then it boots.
     if (r.iso_source === "manual") a.push({ label: "Get the disk image…", help: true, icon:"disc", tone:"warn" });
@@ -1328,7 +1362,7 @@ const FKEYS = [
   ["F3", "Open console", (a) => a.console],
   ["F4", "SSH in the browser", (a) => a.ssh],
   ["F6", "Live screenshot", (a) => a.screen],
-  ["F7", "Checkpoint now", (a) => a.args?.[0] === "checkpoint"],
+  ["F7", "Checkpoints", (a) => a.args?.[0] === "checkpoint"],
   ["F8", "Stop", (a) => a.args?.[0] === "stop" && !a.args.includes("--force")],
   ["F9", "Job log", (a) => a.job],
   ["F10", "All commands", (a) => !!a.form],
@@ -1641,7 +1675,7 @@ function renderDetails() {
     ${prefersSsh(r) && !r.running && r.installed ? '<p class="operation-note">Open SSH after the guest has booted.</p>' : ""}
     <div class="access">${factList(access)}</div>
     <div class="resources"><div class="resource"><strong>${esc(memory)}</strong><span>Memory</span></div><div class="resource"><strong>${esc(r.cpus)}</strong><span>vCPUs</span></div><div class="resource"><strong>${esc(r.disk_capacity || "—")}</strong><span>Disk capacity</span>${r.prepared ? `<em>${esc(r.disk_host || "?")} on host</em>` : ""}</div></div>
-    ${section("checkpoints", "Checkpoints", `<p class="help">${r.has_checkpoints ? "Saved checkpoints available." : "Save a restore point before changing this machine."}</p><div class="actions">${buttons(a => a.args?.[0] === "checkpoint")}<button data-command="checkpoint">Manage checkpoints…</button></div>`, r.has_checkpoints ? "saved" : "")}
+    ${section("checkpoints", "Checkpoints", `<p class="help">${r.has_checkpoints ? "Saved checkpoints available." : "Save a restore point before changing this machine."}</p><div class="actions"><button data-command="checkpoint">Manage checkpoints…</button></div>`, r.has_checkpoints ? "saved" : "")}
     ${section("network", "Network", network.length ? factList(network) + '<button id="machine-link">Connect another VM…</button>' : `<p class="help">No private VM links.</p><button id="machine-link" ${!r.installed && !r.running ? "disabled" : ""}>Connect another VM…</button>`, network.length ? `${network.length} link${network.length === 1 ? "" : "s"}` : "")}
     ${section("configuration", "Configuration", factList(config) + '<button id="machine-config">Edit configuration…</button>')}
     ${section("installation", "Installation details", `<p class="help">${esc(r.install_detail || installationOf(r)[0])}</p>${r.verify_at ? `<p class="help">Verified: ${esc(r.verify_at)}</p>` : ""}`)}
@@ -1653,7 +1687,7 @@ function renderDetails() {
   if ($("ssh-open")) $("ssh-open").onclick = () => openSsh(r);
   $("machine-link").onclick = () => openLinkPicker(r.name);
   $("machine-config").onclick = () => openProfileEditor(r.name);
-  $("details").querySelectorAll("[data-command]").forEach(b => b.onclick = async () => { await openCommands(r.name); selectCommand(b.dataset.command); });
+  $("details").querySelectorAll("[data-command]").forEach(b => b.onclick = async () => { if (b.dataset.command === "checkpoint") return openCheckpoints(r.name); await openCommands(r.name); selectCommand(b.dataset.command); });
   $("details").querySelectorAll("[data-action]").forEach(b => b.onclick = () => runAction(r, actions[+b.dataset.action]));
 }
 const LAB_SPOTLIGHT_MS = 3000;
@@ -1880,6 +1914,7 @@ async function run(args, danger, afterStart = false, preconfirmed = false) {
 }
 function runAction(r, a) {
   if (a.disabled) return;
+  if (a.args?.[0] === "checkpoint") return openCheckpoints(r.name);
   if (a.cancelJob) return cancelJob(a.cancelJob, a.forceStop);
   if (a.job) return openLog(a.job, (installationJob(r) ? "Installation" : r.job_command || "Job") + " · " + r.name);
   if (a.screen) return openScreen(r.name);
@@ -3074,6 +3109,8 @@ function selectCommand(name, focus = false) {
 }
 function renderCommandForm() {
   const c = catalog.find((x) => x.name === pal.cmd);
+  $("cmd-copy").classList.toggle("hidden", c?.name === "checkpoint");
+  $("preview").parentElement.querySelector(".preview-label").textContent = c?.name === "checkpoint" ? "Checkpoint manager" : "Command preview";
   $("cmd-form").dataset.command = draftKey();
   $("cmd-run").disabled = !c; $("cmd-copy").disabled = !c;
   $("cmd-warning").classList.add("hidden");
@@ -3082,6 +3119,11 @@ function renderCommandForm() {
     $("cmd-form").innerHTML = ""; $("preview").textContent = "—"; $("cmd-validation").textContent = "Choose a command to continue."; return;
   }
   $("cmd-head").innerHTML = `<div class="eyebrow">${esc(c.group)} · ${esc(pal.scope === "vm" ? pal.vm : "workspace")}</div><h3>${esc(c.name)}</h3><p>${esc(c.help)}</p>${c.terminal_only ? '<div class="note"><b>Open in a terminal</b> runs it in a terminal window on the host: sudo asks for your password there and the CLI asks its own questions (expansion, resume). It overwrites the target: stop the VM first and check that the device is the right disk.</div>' : ""}`;
+  if (c.name === "checkpoint") {
+    $("cmd-form").innerHTML = `<div class="field"><label for="checkpoint-target">Target machine</label><select id="checkpoint-target">${S.vms.map(r => `<option value="${esc(r.name)}" ${r.name === pal.vm ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select><p class="help">Browse saved checkpoints, create a named copy, restore or delete. Results and operation logs stay in the manager.</p></div>`;
+    $("checkpoint-target").onchange = preview;
+    preview(); return;
+  }
   const field = (a, i) => {
     const id = "arg" + i, label = a.flag || a.dest, attr = `id="${id}" data-arg="${i}" aria-describedby="help${i}" ${a.required ? "required" : ""}`;
     if (a.dest === "vm" && !a.flag && pal.scope === "vm") return `<div class="field"><label for="${id}">Target machine</label><div><span class="fixed">${esc(pal.vm)}</span><input type="hidden" id="${id}" data-arg="${i}" value="${esc(pal.vm)}"></div></div>`;
@@ -3175,6 +3217,14 @@ function destructiveCommand(args) {
   return !!(c && (c.destructive || c.terminal_only || c.destructive_actions.includes(args[1]))) || groupInstallOverwrites(args).length > 0 || (args[0] === "check-vms" && args.includes("--clean-first"));
 }
 function preview() {
+  if (pal.cmd === "checkpoint") {
+    $("preview").textContent = $("checkpoint-target")?.value || "Choose a machine";
+    $("cmd-run").textContent = "Manage checkpoints…";
+    $("cmd-run").disabled = !$("checkpoint-target")?.value;
+    $("cmd-run").classList.remove("danger"); $("cmd-run").classList.add("primary");
+    $("cmd-validation").textContent = "Opens the checkpoint manager";
+    return;
+  }
   if (!pal.cmd) return;
   const c = catalog.find((x) => x.name === pal.cmd), args = buildArgs();
   $("preview").textContent = (c.terminal_only ? "bin/vmctl " : "vmctl ") + args.map((a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`)).join(" ");
@@ -3194,6 +3244,7 @@ function preview() {
 }
 async function submitCommand() {
   if (!pal.cmd || commandBusy) return;
+  if (pal.cmd === "checkpoint") return openCheckpoints($("checkpoint-target").value);
   preview(); if ($("cmd-run").disabled) return;
   saveDraft(); commandBusy = true; preview();
   const c = catalog.find((x) => x.name === pal.cmd);
@@ -3222,6 +3273,119 @@ $("cmd-form").onsubmit = (e) => { e.preventDefault(); };
 $("cmd-run").onclick = submitCommand;
 $("cmd-copy").onclick = async () => { try { await navigator.clipboard.writeText($("preview").textContent); toast("Command copied"); } catch (e) { toast("Cannot access the clipboard. Select and copy the preview instead.", true); } };
 $("all-commands").onclick = () => openCommands(selected);
+
+// --- checkpoint manager: reads stay here, writes use the existing guarded CLI jobs.
+let checkpointView = null;
+const checkpointOperations = new Map();
+function checkpointBusy(vm) {
+  const op = checkpointOperations.get(vm);
+  return op && !op.done;
+}
+function renderCheckpoints(view) {
+  if (checkpointView !== view) return;
+  const data = view.data, busy = checkpointBusy(view.vm), op = checkpointOperations.get(view.vm);
+  const rows = [...(data?.checkpoints || [])].reverse();
+  $("checkpoint-list").setAttribute("aria-busy", String(view.loading));
+  $("checkpoint-refresh").disabled = view.loading;
+  $("checkpoint-count").textContent = data ? `${rows.length} saved checkpoint${rows.length === 1 ? "" : "s"} · ${fmtBytes(rows.reduce((sum, row) => sum + (row.host_bytes || 0), 0))} on host` : "Saved checkpoints";
+  $("checkpoint-error").textContent = view.error || "";
+  $("checkpoint-restrictions").textContent = [...new Set(Object.values(data?.blocked || {}).filter(Boolean))].join(" ");
+  $("checkpoint-create-hint").textContent = data?.blocked.create || (busy ? "Wait for the current operation to finish." : "Existing names are kept: choose a new name for each checkpoint.");
+  for (const id of ["checkpoint-name", "checkpoint-note", "checkpoint-compress", "checkpoint-save"]) $(id).disabled = !data || view.loading || !!busy || !!data.blocked.create;
+  $("checkpoint-list").innerHTML = !data ? '<p class="help">' + (view.error ? "Could not load checkpoints. Use Refresh to retry." : "Loading checkpoints…") + '</p>' : rows.map((row, index) => {
+    const date = row.created_at && new Date(row.created_at);
+    const created = date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : "Date unknown";
+    const restoreReason = data.blocked.restore || (!row.complete ? "The saved disk is missing." : "");
+    const disabled = view.loading || busy;
+    return `<article class="checkpoint-card"><h3 class="mono">${esc(row.name)}</h3><div class="checkpoint-meta"><span>${esc(created)}</span><span>${esc(fmtBytes(row.host_bytes || 0))} on host</span><span>${row.virtual_bytes ? esc(fmtBytes(row.virtual_bytes)) : "Unknown"} disk capacity</span><span>${esc(row.format || "unknown format")}${row.compressed ? " · compressed" : ""}</span><span>${1 + (row.extra_disks || 0)} disk(s)${row.nvram ? " + EFI variables" : ""}</span></div>${row.note ? `<p>${esc(row.note)}</p>` : ""}<p class="help">${esc(row.complete ? row.detail || row.label : "Saved disk missing — this checkpoint cannot be restored.")}</p><div class="actions"><button data-checkpoint-restore="${index}" ${disabled || restoreReason ? "disabled" : ""} title="${esc(restoreReason)}">Restore…</button><button data-checkpoint-delete="${index}" class="danger" ${disabled || data.blocked.delete ? "disabled" : ""} title="${esc(data.blocked.delete)}">Delete…</button></div></article>`;
+  }).join("") || '<div class="checkpoint-card"><h3>No checkpoints yet</h3><p class="help">Create a named restore point below before changing this machine.</p></div>';
+  $("checkpoint-list").querySelectorAll("[data-checkpoint-restore]").forEach(b => b.onclick = () => checkpointAction("restore", rows[+b.dataset.checkpointRestore].name));
+  $("checkpoint-list").querySelectorAll("[data-checkpoint-delete]").forEach(b => b.onclick = () => checkpointAction("delete", rows[+b.dataset.checkpointDelete].name));
+  $("checkpoint-operation").classList.toggle("hidden", !op);
+  if (op) {
+    $("checkpoint-progress").textContent = op.message;
+    $("checkpoint-progress").className = op.failed ? "s-bad" : "";
+    $("checkpoint-output").textContent = op.output || "Waiting for output…";
+    if (op.failed) $("checkpoint-log").open = true;
+  }
+}
+async function loadCheckpoints(view) {
+  if (view.loading) return;
+  view.loading = true; view.error = ""; renderCheckpoints(view);
+  try {
+    const data = await api(`/api/vm/${encodeURIComponent(view.vm)}/checkpoints`);
+    if (checkpointView !== view) return;
+    view.data = data;
+    if (data.job && !checkpointBusy(view.vm)) checkpointOperations.set(view.vm, {job:data.job.id, command:data.job.command, offset:0, output:"", message:"Checkpoint operation in progress…", done:false});
+  } catch (e) { view.error = e.message; }
+  finally { view.loading = false; renderCheckpoints(view); }
+}
+function scheduleCheckpointPoll(view) {
+  if (checkpointView !== view) return;
+  clearTimeout(view.timer);
+  if (checkpointBusy(view.vm)) view.timer = setTimeout(() => pollCheckpoint(view), 1000);
+}
+async function pollCheckpoint(view) {
+  if (checkpointView !== view) return;
+  const op = checkpointOperations.get(view.vm);
+  if (!op || op.done) return;
+  if (!op.job) { scheduleCheckpointPoll(view); return; }
+  try {
+    const log = await api(`/api/jobs/${encodeURIComponent(op.job)}/log?offset=${op.offset}`);
+    if (checkpointView !== view || checkpointOperations.get(view.vm) !== op) return;
+    if (log.command && log.command !== op.command) {
+      op.done = true; op.failed = true; op.message = "Another job has replaced this operation. Refresh the list to check its result; the previous log is in VM history.";
+      await loadCheckpoints(view);
+    } else {
+      view.error = "";
+      op.offset = log.offset; op.output = (op.output + ansi(log.text)).slice(-160000);
+      if (log.status !== "running" && log.offset >= log.size) {
+        op.done = true; op.failed = log.status !== "completed";
+        op.message = op.failed ? `Checkpoint operation ${log.status}. See operation details below.` : (op.success || "Checkpoint operation completed.");
+        await loadCheckpoints(view);
+        refresh(true); refreshJobs();
+      } else { op.message = "Checkpoint operation in progress… You can close this panel and return later."; }
+    }
+  } catch (e) { view.error = `Cannot read progress: ${e.message}. Retrying…`; }
+  renderCheckpoints(view); scheduleCheckpointPoll(view);
+}
+async function openCheckpoints(vm) {
+  if (!vm) return;
+  if ($("cmd-dialog").open) $("cmd-dialog").close();
+  if (checkpointView) clearTimeout(checkpointView.timer);
+  const view = checkpointView = {vm, data:null, loading:false, error:"", timer:null};
+  $("checkpoint-title").textContent = vm;
+  $("checkpoint-create").reset(); $("checkpoint-log").open = false;
+  $("checkpoint-dialog").showModal();
+  await loadCheckpoints(view); scheduleCheckpointPoll(view);
+}
+async function checkpointAction(action, name) {
+  const view = checkpointView;
+  if (!view?.data || view.loading || checkpointBusy(view.vm) || view.data.blocked[action]) return;
+  if (action === "create" && view.data.checkpoints.some(row => row.name === name)) {
+    view.error = `A checkpoint named “${name}” already exists. Choose a different name.`; renderCheckpoints(view); return;
+  }
+  const args = ["checkpoint", action, view.vm, name];
+  if (action === "create") {
+    if ($("checkpoint-note").value.trim()) args.push("--note", $("checkpoint-note").value.trim());
+    if ($("checkpoint-compress").checked) args.push("--compress");
+  } else if (!await askConfirm({eyebrow:"Checkpoint · " + view.vm, title:action === "restore" ? `Restore “${name}”?` : `Delete “${name}”?`, message:action === "restore" ? "The current VM disks and EFI variables will be replaced. Changes made since this checkpoint will be lost. The saved checkpoint is kept and the VM stays stopped." : "This saved checkpoint will be permanently deleted. The current VM disks and other checkpoints are kept.", facts:[["Machine",view.vm],["Checkpoint",name]], button:action === "restore" ? "Restore checkpoint" : "Delete checkpoint"})) return;
+  if (checkpointView !== view || checkpointBusy(view.vm)) return;
+  const op = {done:false, output:"", offset:0, message:"Starting checkpoint operation…", success:`Checkpoint “${name}” ${ {create:"created", restore:"restored", delete:"deleted"}[action] }.`};
+  checkpointOperations.set(view.vm, op); view.error = ""; renderCheckpoints(view);
+  try {
+    const result = await api("/api/run", {args, confirmed:action !== "create"});
+    op.job = result.job; op.command = result.command;
+    op.message = "Checkpoint operation in progress… You can close this panel and return later.";
+    rememberCommand("checkpoint"); refreshJobs();
+    if (checkpointView === view && action === "create") $("checkpoint-create").reset();
+  } catch (e) { op.done = true; op.failed = true; op.message = e.message; op.output = e.message; }
+  // The request may have completed after closing and reopening this VM's manager.
+  if (checkpointView?.vm === view.vm) { renderCheckpoints(checkpointView); scheduleCheckpointPoll(checkpointView); }
+}
+$("checkpoint-create").onsubmit = e => { e.preventDefault(); if ($("checkpoint-create").reportValidity()) checkpointAction("create", $("checkpoint-name").value.trim()); };
+$("checkpoint-refresh").onclick = async () => { const view = checkpointView; if (view) { await loadCheckpoints(view); scheduleCheckpointPoll(view); } };
+$("checkpoint-dialog").addEventListener("close", () => { if (checkpointView) clearTimeout(checkpointView.timer); checkpointView = null; });
 
 // --- local profile editor
 let profileEdit = null, profileGeneration = 0;

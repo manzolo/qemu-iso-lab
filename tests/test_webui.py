@@ -282,6 +282,59 @@ class RequestTests(BaseVmctlTestCase):
                 webui.cancel_job("vm:testvm", force_stop=True)
 
 
+class CheckpointInventoryTests(BaseVmctlTestCase):
+    def setUp(self):
+        super().setUp()
+        self.create_disk()
+        for target, value in (("vmctl.lifecycle.ensure_vm_quiescent", None),
+                              ("vmctl.tui_jobs.status", None)):
+            patcher = mock.patch(target, return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_empty_inventory_allows_create_without_starting_a_job(self):
+        with mock.patch.object(webui, "start_job") as start:
+            data = webui.checkpoint_inventory(self.vm_name)
+        self.assertEqual(data["checkpoints"], [])
+        self.assertEqual(data["blocked"], {"create": "", "restore": "", "delete": ""})
+        self.assertIsNone(data["job"])
+        start.assert_not_called()
+
+    def test_missing_disk_allows_restore_but_not_create(self):
+        (self.root / self.vm_config["disk"]["path"]).unlink()
+        data = webui.checkpoint_inventory(self.vm_name)
+        self.assertIn("missing", data["blocked"]["create"])
+        self.assertEqual(data["blocked"]["restore"], "")
+
+    def test_running_vm_allows_reading_and_deleting_saved_checkpoints(self):
+        with mock.patch("vmctl.lifecycle.ensure_vm_quiescent", side_effect=VMError("Stop it first")):
+            data = webui.checkpoint_inventory(self.vm_name)
+        self.assertEqual(data["blocked"], {"create": "Stop it first", "restore": "Stop it first", "delete": ""})
+
+    def test_protection_blocks_restore_only(self):
+        with mock.patch("vmctl.vmstate.refuse_if_protected", side_effect=VMError("Protected disk")) as guard:
+            data = webui.checkpoint_inventory(self.vm_name)
+        self.assertEqual(data["blocked"]["restore"], "Protected disk")
+        self.assertEqual(data["blocked"]["create"], "")
+        self.assertTrue(guard.call_args.kwargs["allow_starred"])
+
+    def test_unsupported_profile_keeps_saved_checkpoints_browsable(self):
+        self.vm_config["tpm"] = {"version": "2.0"}
+        self.write_config_dir()
+        data = webui.checkpoint_inventory(self.vm_name)
+        self.assertIn("TPM", data["blocked"]["create"])
+        self.assertIn("TPM", data["blocked"]["restore"])
+        self.assertEqual(data["blocked"]["delete"], "")
+
+    def test_running_checkpoint_can_be_followed_after_reopening(self):
+        with mock.patch("vmctl.tui_jobs.status", return_value="running"), \
+                mock.patch("vmctl.tui_jobs.command", return_value=[str(self.root / "bin/vmctl"), "checkpoint", "create", self.vm_name, "saved"]), \
+                mock.patch("vmctl.lifecycle.ensure_vm_quiescent", side_effect=VMError("Job running")):
+            data = webui.checkpoint_inventory(self.vm_name)
+        self.assertEqual(data["job"], {"id": "vm:testvm", "command": "vmctl checkpoint create testvm saved"})
+        self.assertTrue(all(data["blocked"].values()))
+
+
 class ServerTests(BaseVmctlTestCase):
     def setUp(self):
         super().setUp()
@@ -313,6 +366,19 @@ class ServerTests(BaseVmctlTestCase):
         handler.wfile.write.side_effect = BrokenPipeError()
         handler._json({"example": True})
         self.assertTrue(handler.close_connection)
+
+    def test_checkpoint_inventory_requires_auth_and_valid_vm(self):
+        with mock.patch("vmctl.lifecycle.ensure_vm_quiescent"), \
+                mock.patch("vmctl.checkpoint.list_checkpoints", return_value=[{"name": "before-update", "note": "Saved work"}]) as listing, \
+                mock.patch.object(webui, "start_job") as start:
+            self.assertEqual(self.get("/api/vm/testvm/checkpoints", token=None)[0], 401)
+            self.assertEqual(self.get("/api/vm/unknown/checkpoints")[0], 400)
+            listing.assert_not_called()
+            status, body = self.get("/api/vm/test%76m/checkpoints")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["checkpoints"], [{"name": "before-update", "note": "Saved work"}])
+        listing.assert_called_once_with("testvm")
+        start.assert_not_called()
 
     def test_local_distribution_sprite_is_public_and_contains_only_static_artwork(self):
         import xml.etree.ElementTree as ET

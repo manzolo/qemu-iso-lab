@@ -16,6 +16,14 @@ In the TUI the same actions live under **MAINTENANCE → Checkpoints** for a sto
 one entry per checkpoint (creation time, bytes on the host, what its record knew about the
 disk), *Create checkpoint*, and *Restore* / *Delete* behind a confirmation.
 
+In the web UI, open **Checkpoints → Manage checkpoints…** in the VM panel, or press **F7**
+for a stopped, installed VM. The command center's `checkpoint` entry opens the same manager.
+Saved checkpoints appear immediately with dates, notes, host usage, disk capacity and EFI
+state. Create one with a name and optional note/compression; restore or delete from its card
+after confirmation. Progress, errors and logs remain in the manager, and the list refreshes
+when the operation finishes. You can close the panel and return while a copy is running.
+After updating the web backend, restart `vmctl web` and open its new URL to load new APIs.
+
 ## What a checkpoint is
 
 `artifacts/<vm>/checkpoints/<name>/`:

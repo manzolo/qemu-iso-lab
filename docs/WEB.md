@@ -70,7 +70,12 @@ What the page offers:
   sense for the selected VM: *Unattended install* (the flow `check-vms` would run), *Get the ISO…*
   for a medium only you can provide, *Download the ISO*, *Boot headless*, *Boot with display*
   (a QEMU window on the host), *Console*, *Screenshot*, *Open viewer on the host*, *Stop*,
-  *Checkpoint now*, *Clean*. *Get the ISO…* shows where to download the medium (the links open
+  *Checkpoints…*, *Clean*. The checkpoint manager shows saved names, dates, notes, disk sizes
+  and EFI state, with creation, restore and delete controls. Listing never starts a job;
+  operation progress, logs and results stay in the panel, and the list refreshes on completion.
+  Restore and delete ask for confirmation; unavailable operations explain their restrictions.
+  Closing and reopening the panel resumes following a running checkpoint operation.
+  *Get the ISO…* shows where to download the medium (the links open
   in a new tab) and a **Choose ISO…** button: a picker over this computer's folders (Home,
   Downloads, `isos/` and the folders your other profiles' media already live in, `GET /api/fs`),
   with the file checked on the spot (`POST /api/vm/<vm>/iso-check`: ISO 9660, pinned hashes, for
