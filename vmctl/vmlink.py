@@ -211,8 +211,20 @@ def guest_script(family: str, mac: str, address: str) -> str | None:
                 f"nmcli con delete \"vmctl-link-$IF\" >/dev/null 2>&1; "
                 f"nmcli con add type ethernet ifname \"$IF\" con-name \"vmctl-link-$IF\" ipv4.method manual ipv4.addresses {address} "
                 f"ipv6.method disabled autoconnect yes >/dev/null && nmcli con up \"vmctl-link-$IF\" >/dev/null; "
-                f"else ip link set \"$IF\" up && ip addr replace {address} dev \"$IF\"; fi && echo \"$IF\"")
+                f"else ip link set \"$IF\" up && ip addr replace {address} dev \"$IF\"; fi && {networkd_unmanaged(mac)}echo \"$IF\"")
     return None
+
+
+def networkd_unmanaged(mac: str) -> str:
+    """Shell that tells a running systemd-networkd to leave the link NIC alone (a .network by MAC
+    with Unmanaged=yes, kept for the next boots). Without it, a catch-all .network (Ubuntu 26.04's
+    initramfs leaves dracut's `DHCP=yes` on every link in /run/systemd/network) runs DHCP on the
+    segment, where no server answers, and systemd-networkd-wait-online holds graphical.target
+    for its 120 s: a black screen for two minutes at every boot of a linked desktop (2026-10-06)."""
+    unit = f"[Match]\\nMACAddress={mac}\\n\\n[Link]\\nUnmanaged=yes\\n"
+    return (f"if command -v networkctl >/dev/null 2>&1 && systemctl is-active -q systemd-networkd 2>/dev/null; then "
+            f"mkdir -p /etc/systemd/network && printf '{unit}' > \"/etc/systemd/network/10-vmctl-link-$IF.network\" "
+            f"&& networkctl reload >/dev/null 2>&1; fi; ")
 
 
 def configures_windows(vm: dict[str, Any]) -> bool:

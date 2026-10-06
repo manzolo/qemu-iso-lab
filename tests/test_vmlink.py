@@ -186,6 +186,11 @@ class GuestScriptTests(unittest.TestCase):
         self.assertIn("nmcli con add type ethernet", linux)  # NetworkManager guests keep the address this way
         self.assertIn("ipv4.addresses 192.168.100.1/24", linux)
         self.assertIn("52:54:01:aa:bb:cc", linux)
+        # systemd-networkd leaves the NIC alone, or its wait-online holds the boot (Ubuntu 26.04, 2026-10-06)
+        self.assertIn("Unmanaged=yes", linux)
+        self.assertIn("MACAddress=52:54:01:aa:bb:cc", linux)
+        self.assertIn("networkctl reload", linux)
+        self.assertLess(linux.index("networkctl reload"), linux.index('echo "$IF"'))
         bsd = vmlink.guest_script("freebsd", "52:54:01:aa:bb:cc", "192.168.100.1/24")
         self.assertIn("ifconfig \"$IF\" inet 192.168.100.1/24 up", bsd)
         self.assertIsNone(vmlink.guest_script("windows", "52:54:01:aa:bb:cc", "192.168.100.1/24"))
