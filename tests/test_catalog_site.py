@@ -115,6 +115,9 @@ class CatalogSiteTests(unittest.TestCase):
         page = (self.out / "index.html").read_text(encoding="utf-8")
         self.assertIn('<section id="labs"', page)
         self.assertIn("function labCard", page)
+        # A filter folds the labs into one line (no filter applies to them), "Show the labs" undoes it.
+        self.assertIn("labs-folded", page)
+        self.assertIn("data-show-labs", page)
 
     def test_the_page_is_self_contained_and_ships_the_dashboard_icons(self):
         html = (self.out / "index.html").read_text(encoding="utf-8")

@@ -228,6 +228,8 @@ h2.family::after { content:""; height:1px; background:var(--line); flex:1; margi
 .lab-links .lesson { font-weight:650; border:1px solid #8aead040; border-radius:7px; padding:4px 10px; background:#8aead010; }
 .lab-links .src { color:var(--muted); margin-left:auto; }
 .labs-lead { color:var(--muted); font-size:12px; margin:-4px 0 14px; }
+.labs-folded { display:flex; align-items:center; justify-content:space-between; gap:10px 16px; flex-wrap:wrap; margin:0 0 18px; padding:10px 14px; border:1px dashed var(--line); border-radius:10px; color:var(--muted); font-size:13px; }
+.labs-folded b { color:var(--text); }
 #labs[hidden] { display:none; }
 .card-head { min-width:0; min-height:48px; }
 .card-head .name { font-weight:650; font-size:15px; letter-spacing:-.25px; overflow-wrap:anywhere; line-height:1.4; }
@@ -412,9 +414,23 @@ function labCard(l) {
     <div class="lab-links">${lesson}${guides}</div></div>
   </article>`;
 }
+// The labs sit between the filters and the profiles and no filter applies to them (a lab is no
+// desktop or server): with every card still on top, a click on Desktop seemed to change nothing
+// but the count (Manzolo, 2026-10-06). While a filter is on they fold into one line that leads
+// back to them; a search hides them as before.
+const filtering = () => !!(kind || role || family);
+function resetFilters() {
+  $("search").value = ""; $("family").value = ""; kind = role = family = "";
+  for (const group of ["kind", "role"]) for (const b of $(group).children) { b.classList.toggle("active", b.dataset.v === ""); b.setAttribute("aria-pressed", b.dataset.v === ""); }
+  render();
+}
 function renderLabs() {
   const searching = !!$("search").value.trim();
   $("labs").hidden = searching || !DATA.labs.length;
+  if (!searching && filtering()) {
+    $("labs").innerHTML = `<p class="labs-folded"><span><b>${DATA.labs.length} labs</b> are left out while a filter is on: each holds several machines.</span><button data-show-labs>Show the labs</button></p>`;
+    return;
+  }
   $("labs").innerHTML = searching ? "" : `<h2 class="family">Labs <span>${DATA.labs.length}</span></h2><p class="labs-lead">Several machines on a private network, installed and started as one stack, with a guide, exercises and tests. <a href="__REPO__/blob/main/docs/LABS.md">About labs ↗</a> · make your own with <code>vmctl group new</code>.</p><div class="grid">${DATA.labs.map(labCard).join("")}</div>`;
 }
 function render() {
@@ -440,11 +456,10 @@ document.addEventListener("click", (e) => {
   const pick = e.target.closest("[data-pick]"), copyButton = e.target.closest("[data-copy]");
   if (pick) { const n = pick.dataset.pick; picked.has(n) ? picked.delete(n) : picked.add(n); const c = pick.closest(".card"); c.classList.toggle("picked", picked.has(n)); pick.textContent = picked.has(n) ? "✓" : "+"; pick.setAttribute("aria-pressed", picked.has(n)); pick.setAttribute("aria-label", `${picked.has(n) ? "Remove" : "Select"} ${n}`); renderBasket(); }
   if (copyButton) copy(copyButton.dataset.copy, copyButton);
-  if (e.target.closest("[data-reset]")) {
-    $("search").value = ""; $("family").value = ""; kind = role = family = "";
-    for (const group of ["kind", "role"]) for (const b of $(group).children) { b.classList.toggle("active", b.dataset.v === ""); b.setAttribute("aria-pressed", b.dataset.v === ""); }
-    render(); $("search").focus();
-  }
+  if (e.target.closest("[data-reset]")) { resetFilters(); $("search").focus(); }
+  // "Show the labs", and the header's Labs link while a filter or a search hides them.
+  const toLabs = e.target.closest('[data-show-labs], nav a[href="#labs"]');
+  if (toLabs && (filtering() || $("search").value.trim())) { e.preventDefault(); resetFilters(); $("labs").scrollIntoView({ behavior: "smooth", block: "start" }); history.replaceState(null, "", "#labs"); }
   const play = e.target.closest("[data-play]"); if (play) openPlayer(play.dataset.play);
 });
 for (const group of ["kind", "role"]) $(group).addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; [...$(group).children].forEach(x => { x.classList.toggle("active", x === b); x.setAttribute("aria-pressed", x === b); }); if (group === "kind") kind = b.dataset.v; else role = b.dataset.v; render(); });
@@ -536,8 +551,8 @@ ol li.series h3 { margin:10px 0 2px; font-size:11px; text-transform:uppercase; l
 <script>
 const TOUR = JSON.parse(document.getElementById("data").textContent);
 const TEXT = {
-  en: { steps: "Command at this moment", stepsNone: "Commands appear here as they are typed", copied: "Copied", follow: "Follow along with the guide:", series: { tour: "The tour", labs: "Lab lessons" }, title: "Take the tour", lead: "Eight short chapters, from the catalog to the network map, then lessons on single labs. Italian voice, subtitles in English and Italian; each chapter plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked. The voice is synthetic (XTTS-v2).", clip: "Clip", of: "of" },
-  it: { steps: "Comando di questo momento", stepsNone: "I comandi compaiono qui man mano che vengono battuti", copied: "Copiato", follow: "Segui la guida passo passo:", series: { tour: "Il tour", labs: "Lezioni dei lab" }, title: "Il tour", lead: "Otto capitoli brevi, dal catalogo alla mappa di rete, poi le lezioni sui singoli lab. Voce italiana, sottotitoli in italiano e in inglese; ogni capitolo prosegue nel successivo.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate. La voce è sintetica (XTTS-v2).", clip: "Clip", of: "di" },
+  en: { steps: "Command at this moment", stepsNone: "Commands appear here as they are typed", copied: "Copied", follow: "Follow along with the guide:", series: { tour: "The tour", labs: "Lab lessons" }, title: "Take the tour", lead: "Eight short chapters, from the catalog to the network map, then lessons on single labs. Spoken and subtitled in English and Italian (the language switch changes both); each chapter plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked. The voice is synthetic (XTTS-v2).", clip: "Clip", of: "of" },
+  it: { steps: "Comando di questo momento", stepsNone: "I comandi compaiono qui man mano che vengono battuti", copied: "Copiato", follow: "Segui la guida passo passo:", series: { tour: "Il tour", labs: "Lezioni dei lab" }, title: "Il tour", lead: "Otto capitoli brevi, dal catalogo alla mappa di rete, poi le lezioni sui singoli lab. Voce e sottotitoli in italiano e in inglese (il cambio di lingua cambia entrambi); ogni capitolo prosegue nel successivo.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate. La voce è sintetica (XTTS-v2).", clip: "Clip", of: "di" },
 };
 let lang = "en", current = 0;
 try { lang = localStorage.getItem("qil-tour-lang") || ((navigator.language || "en").startsWith("it") ? "it" : "en"); } catch { lang = (navigator.language || "en").startsWith("it") ? "it" : "en"; }
@@ -814,7 +829,7 @@ def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "c
     (out / "catalog.json").write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     tour_nav = '<a class="tour" href="tour.html">▶ Tour</a>' if tour else ""
     tour_start = ('<div class="terminal-note"><span>New to it? Short clips show the whole road, '
-                  'Italian voice with English and Italian subtitles.</span><a href="tour.html">▶ Take the tour</a></div>') if tour else ""
+                  'spoken and subtitled in English and Italian.</span><a href="tour.html">▶ Take the tour</a></div>') if tour else ""
     page = (PAGE.replace("__TOUR_NAV__", tour_nav).replace("__TOUR_START__", tour_start).replace("__SPRITE__", sprite).replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
             .replace("__VMCTL__", data["vmctl_version"]).replace("__GENERATED__", data["generated"])
             .replace("__COMMIT__", f" · {data['commit']}" if data["commit"] else "").replace("__REPO__", REPO_URL)
