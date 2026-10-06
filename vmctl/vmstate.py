@@ -192,7 +192,7 @@ def refuse_if_protected(vm_name: str, action: str, *, allow_starred: bool = Fals
                       f"vmctl unprotect {vm_name} first if that is really what you want.")
     if reason == "star" and not allow_starred:
         raise VMError(f"'{vm_name}' is in My VMs and its disk holds data, so it is protected: refusing to {action}. "
-                      f"vmctl catalog remove {vm_name} first if that is really what you want.")
+                      f"vmctl clean {vm_name} --starred keeps the star and cleans; vmctl catalog remove {vm_name} drops the star.")
 
 
 def qcow2_has_backing_file(path: Path) -> bool:

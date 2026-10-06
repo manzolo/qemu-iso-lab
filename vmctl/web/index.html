@@ -61,7 +61,8 @@ body.console-embedded #offline-banner, body.panel-only #offline-banner { padding
 .metric { min-width:96px; padding:7px 14px; background:#172333a6; border:1px solid var(--line); border-radius:10px; }
 .metric strong { display:block; font-size:20px; line-height:1.25; font-weight:600; }
 .metric span { color:var(--muted); font-size:11px; }
-#workspace-nav { display:flex; gap:8px; padding:0 24px 12px; }
+#workspace-nav { display:flex; gap:4px; padding:0 24px; margin:0 0 14px; border-bottom:1px solid var(--line); }
+.tab-count { font-size:11px; font-weight:400; color:var(--muted); background:#ffffff0a; border:1px solid var(--line); border-radius:999px; padding:1px 7px; min-width:22px; text-align:center; }
 #toolbar { display:flex; gap:12px; padding:0 24px 16px; align-items:center; flex-wrap:wrap; }
 .search-box { flex:1 1 220px; position:relative; }
 #search { width:100%; padding-right:42px; }
@@ -743,8 +744,16 @@ main > section { min-width:0; }
 .profile-title { min-width:0; }
 #details .name { font-size:18px; margin:0 0 4px; line-height:1.25; }
 #details .desc { font-size:12px; margin:0; }
-.primary-actions button { grid-column:1/-1; }
+.primary-actions button { grid-column:auto; }
+.primary-actions .main-action, .primary-actions button:nth-child(n+4), .primary-actions button:last-child:nth-child(2) { grid-column:1/-1; }
+.primary-actions button .al { white-space:nowrap; }
+.primary-actions button:not(.main-action) { min-height:36px; padding:8px 10px; }
+.primary-actions button:not(.main-action) kbd { margin-left:auto; }
 .actions.primary-actions { border:0; padding:0; margin:14px 0; }
+.access { background:#101926; border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin:14px 0; }
+.access .facts { margin:0; gap:8px 14px; }
+.access .facts dt { font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding-top:2px; }
+.resource em { display:block; font-style:normal; color:var(--muted); font-size:10px; margin-top:3px; }
 .operation-note { margin:0 0 14px; color:var(--muted); font-size:11px; line-height:1.6; }
 .primary-actions button:last-child { background:var(--btn); color:var(--text); border:1px solid transparent; margin:0; }
 .primary-actions button.primary { background:var(--accent); color:#102c29; }
@@ -817,8 +826,10 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 @media(prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } }
 
 /* Workspace navigation and machine filters have separate scopes. */
-#workspace-nav button { background:transparent; color:var(--muted); border-bottom:2px solid transparent; border-radius:6px 6px 0 0; padding:9px 16px; }
-#workspace-nav button.active { color:var(--accent); border-bottom-color:var(--accent); background:#18312f; }
+#workspace-nav button { display:inline-flex; align-items:center; gap:8px; margin-bottom:-1px; background:transparent; color:var(--muted); border:1px solid transparent; border-bottom:0; border-radius:9px 9px 0 0; padding:9px 16px 10px; font-weight:500; transition:color .2s ease, background .2s ease; }
+#workspace-nav button:hover { color:var(--text); background:#ffffff06; }
+#workspace-nav button.active { color:var(--accent); background:var(--panel); border-color:var(--line); box-shadow:inset 0 2px 0 var(--accent); }
+#workspace-nav button.active .tab-count { color:var(--accent); border-color:#2f6b5e; background:#16302c; }
 #toolbar { padding-bottom:10px; }
 #status-filters { margin:0 24px 16px; padding:0; background:none; border:0; flex-wrap:wrap; }
 #status-filters button { font-size:12px; padding:5px 10px; }
@@ -833,8 +844,15 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 .start-options .actions { border:0; padding:0; margin:10px 0; }
 .start-options .actions button { grid-column:1/-1; margin:0; }
 .disk-footprint { color:var(--muted); font-size:11px; margin:-6px 0 14px; }
-.machine-tools { margin-top:10px; padding-top:10px; }
-.machine-tools > summary { color:var(--text); }
+.machine-tools { margin-top:0; padding-top:0; }
+.machine-tools > summary { display:flex; align-items:center; gap:9px; padding:11px 4px; color:var(--text); font-size:13px; list-style:none; border-radius:7px; transition:background .2s ease, color .2s ease; }
+.machine-tools > summary::-webkit-details-marker { display:none; }
+.machine-tools > summary::before { content:""; width:6px; height:6px; border-right:1.5px solid var(--muted); border-bottom:1.5px solid var(--muted); transform:rotate(-45deg); transition:transform .2s ease; flex-shrink:0; margin-left:2px; }
+.machine-tools[open] > summary::before { transform:rotate(45deg); }
+.machine-tools > summary:hover { background:#ffffff06; color:var(--accent); }
+.machine-tools > summary .count { margin-left:auto; color:var(--muted); font-size:11px; font-weight:400; }
+.machine-tools > :not(summary) { margin-left:4px; margin-right:4px; }
+.machine-tools[open] { padding-bottom:10px; }
 .more-commands { margin-top:14px; }
 .more-commands button { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; padding:6px 0; color:var(--muted); background:none; font-size:12px; text-align:left; }
 @media(min-width:1450px) { #status-filters { margin-left:max(24px,calc((100vw - 1450px)/2)); margin-right:max(24px,calc((100vw - 1450px)/2)); } }
@@ -867,10 +885,10 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   <div><div class="eyebrow">Your local workspace</div><h2>Virtual machines</h2><p>Build, run and explore your lab.</p></div>
   <div class="metrics"><div class="metric"><strong id="total-count">—</strong><span id="total-label">Profiles</span></div><div class="metric"><strong id="running-count" class="s-ok">—</strong><span>Running</span></div><div class="metric"><strong id="disk-count">—</strong><span id="activity-metric-label">Active jobs</span></div></div>
 </section>
-<nav id="workspace-nav" aria-label="Workspace">
-  <button data-filter="mine" aria-pressed="false" title="Your chosen profiles, plus running machines outside a lab">My VMs</button>
-  <button data-filter="all" class="active" aria-pressed="true">Catalog</button>
-  <button data-filter="labs" aria-pressed="false">Labs</button>
+<nav id="workspace-nav" aria-label="Workspace" role="tablist">
+  <button data-filter="mine" role="tab" aria-pressed="false" title="Your chosen profiles, plus running machines outside a lab">My VMs<span class="tab-count" id="tab-count-mine" hidden></span></button>
+  <button data-filter="all" role="tab" class="active" aria-pressed="true">Catalog<span class="tab-count" id="tab-count-all" hidden></span></button>
+  <button data-filter="labs" role="tab" aria-pressed="false">Labs<span class="tab-count" id="tab-count-labs" hidden></span></button>
 </nav>
 <div id="toolbar">
   <div class="search-box"><input id="search" aria-label="Search profiles" placeholder="Search profiles or distributions…" autocomplete="off"><kbd>/</kbd><button id="search-clear" class="hidden" aria-label="Clear search" title="Clear search">×</button></div>
@@ -1223,10 +1241,13 @@ function actionsFor(r) {
     if (vmJobs.get(n)?.confirming) a.push({label:"Force stop", args:["stop",n,"--force"], danger:true, primary:true, icon:"power", tone:"bad"});
     else a.push({ label:forceStop ? "Force stop" : "Cancel job", cancelJob:"vm:" + n, forceStop, primary:true, danger:forceStop, icon:"power", tone:"bad", disabled:submittingVms.has(n) || cancellingJobs.has("vm:"+n) });
   }
-  if (!r.running && (r.prepared || r.installed)) a.push({ label: r.protected ? (r.protected_by === "star" ? "Clean: protected by My VMs (remove the star first)" : "Clean: protected (unprotect first)") : "Clean: delete the disk", args: ["clean", n], disabled:busy || !!r.protected, danger: true, icon:"trash", tone:"bad" });
+  // A starred VM is cleaned with --starred after the confirmation and keeps its star (removing it
+  // first dropped the VM out of My VMs, Manzolo 2026-10-06); only vmctl protect still refuses.
+  if (!r.running && (r.prepared || r.installed)) a.push(r.protected_by === "star" ? { label: "Clean: delete the disk (stays in My VMs)", args: ["clean", n, "--starred"], disabled:busy, danger: true, icon:"trash", tone:"bad" }
+    : { label: r.protected ? "Clean: protected (unprotect first)" : "Clean: delete the disk", args: ["clean", n], disabled:busy || !!r.protected, danger: true, icon:"trash", tone:"bad" });
   a.push({ label: r.mine ? "Remove from My VMs" : "Add to My VMs", mine: r.mine ? "remove" : "add", icon:"star", tone:"info" });
   a.push({ label: r.hidden ? "Show in the lists again" : "Hide from the lists", hide: r.hidden ? "unhide" : "hide", icon:"list", tone:"info" });
-  if (r.protected || r.prepared || r.installed) a.push(r.protected_by === "star" ? { label: "Protected by My VMs: remove the star to unlock", protect: "star", icon:"lock", tone:"info", disabled: true }
+  if (r.protected || r.prepared || r.installed) a.push(r.protected_by === "star" ? { label: "Protected by My VMs: the matrix and clean --all leave it alone", protect: "star", icon:"lock", tone:"info", disabled: true }
     : { label: r.protected ? "Unprotect the disk" : "Protect the disk", protect: r.protected ? "remove" : "add", icon:"lock", tone:"info" });
   a.push({ label: "More commands…", form: n, icon:"list" });
   return a;
@@ -1502,6 +1523,9 @@ function render() {
   $("search-clear").classList.toggle("hidden", !$("search").value);
   const all = S.vms, withData = all.filter((r) => r.installed).length, running = all.filter((r) => r.running).length;
   $("summary").textContent = `${withData} installed · ${S.labs.length} labs`;
+  for (const [id, n] of [["mine", all.filter(r => r.mine || (r.running && !r.lab)).length], ["all", all.filter(r => !r.lab && !r.hidden).length], ["labs", S.labs.length]]) {
+    const chip = $("tab-count-" + id); chip.textContent = n; chip.hidden = !all.length;
+  }
   $("total-count").textContent = filter === "all" ? all.length : withData; $("total-label").textContent = filter === "all" ? "Profiles" : "Installed"; $("running-count").textContent = running;
   $("disk-count").textContent = new Set([...knownJobs.filter(j => j.status === "running").map(j => j.id), ...all.filter(r => withVMJob(r).job_status === "running").map(r => "vm:" + r.name)]).size;
   const labs = filter === "labs", inLab = filter === "lab" && !!labProfile;
@@ -1571,9 +1595,9 @@ function renderDetails() {
   $("profile-protect").classList.toggle("hidden", !r || !visible().length || !(r.protected || r.prepared || r.installed));
   if (r) {
     const p = $("profile-protect"); p.textContent = r.protected ? "🔒" : "🔓"; p.classList.toggle("chosen", !!r.protected);
-    p.title = p.ariaLabel = r.protected_by === "star" ? "Protected: in My VMs and its disk holds data · remove the star (☆) to unlock"
+    p.title = p.ariaLabel = r.protected_by === "star" ? "Protected: in My VMs and its disk holds data · the matrix, clean --all, reinstall and checkpoint restore leave it alone; Clean asks you first"
       : r.protected ? "Protected: clean, reinstall and checkpoint restore refuse this disk · click to unprotect" : "Protect this disk against clean, reinstall and checkpoint restore";
-    p.onclick = () => r.protected_by === "star" ? toast("Protected by My VMs: remove the star (☆) to unlock the disk.") : setProtect(r.protected ? "remove" : "add", [r.name]);
+    p.onclick = () => r.protected_by === "star" ? toast("Protected by My VMs: Clean asks you first and keeps the star; remove the star (☆) to unprotect it entirely.") : setProtect(r.protected ? "remove" : "add", [r.name]);
   }
   if (r) {
     const b = $("profile-mine"); b.textContent = r.mine ? "★" : "☆"; b.classList.toggle("chosen", !!r.mine);
@@ -1585,7 +1609,7 @@ function renderDetails() {
   const expanded = $("details").dataset.vm === r.name ? [...$("details").querySelectorAll("details[open]")].map(el=>el.dataset.section) : [];
   $("details").dataset.vm = r.name;
   const factList = facts => `<dl class="facts">${facts.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
-  const section = (id, label, content) => `<details class="machine-tools" data-section="${id}"><summary>${label}</summary>${content}</details>`;
+  const section = (id, label, content, count = "") => `<details class="machine-tools" data-section="${id}"><summary>${label}${count ? `<span class="count">${esc(count)}</span>` : ""}</summary>${content}</details>`;
   const actionButton = (x,i) => `<button aria-label="${esc(x.label)}" data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
   const isExtra = a => !a.primary && (a.danger || a.screen || a.alternative || ["attach","checkpoint"].includes(a.args?.[0]));
   const buttons = predicate => actions.map((a,i) => predicate(a) ? actionButton(a,i) : "").join("");
@@ -1593,7 +1617,7 @@ function renderDetails() {
   const alternativeActions = buttons(a => a.alternative);
   const more = buttons(a => a.form);
   const access = [
-    ...((r.logins || []).length ? [["Login", r.logins.map(l => `<span class="mono">${esc(l.user)}</span> / ${l.password ? `<span class="mono">${esc(l.password)}</span>` : '<span class="s-muted">no password</span>'}${l.note ? ` <span class="s-muted">· ${esc(l.note)}</span>` : ""}`).join("<br>")]] : []),
+    ...((r.logins || []).length ? [["Login", r.logins.map(l => `<span class="mono">${esc(l.user)}</span> / ${l.password ? `<span class="mono">${esc(l.password)}</span>` : '<span class="s-muted">no password</span>'}${l.note ? ` <span class="s-muted login-note" title="${esc(l.note)}">· ${esc(l.note.length > 28 ? l.note.slice(0, 27) + "…" : l.note)}</span>` : ""}`).join("<br>")]] : []),
     ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">${esc(r.ssh_user || "")}${r.ssh_user ? "@" : ""}127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options (F4)" aria-label="Open SSH console options">Options…</button></span>` + (r.installed_user && r.profile_user && r.installed_user !== r.profile_user ? `<br><span class="s-warn">installed as ${esc(r.installed_user)}; the profile names ${esc(r.profile_user)} now (reinstall to move the disk to it)</span>` : "") : "Not configured"]
   ];
   const config = [["Firmware", esc(r.firmware)],
@@ -1606,11 +1630,10 @@ function renderDetails() {
     ${operationNote(r)}
     ${alternativeActions ? `<details class="start-options" data-section="start"><summary>Other ways to start</summary><div class="actions">${alternativeActions}</div></details>` : ""}
     ${prefersSsh(r) && !r.running && r.installed ? '<p class="operation-note">Open SSH after the guest has booted.</p>' : ""}
-    ${factList(access)}
-    <div class="resources"><div class="resource"><strong>${esc(memory)}</strong><span>Memory</span></div><div class="resource"><strong>${esc(r.cpus)}</strong><span>vCPUs</span></div><div class="resource"><strong>${esc(r.disk_capacity || "—")}</strong><span>Disk capacity</span></div></div>
-    ${r.prepared ? `<p class="disk-footprint">${esc(r.disk_host || "?")} on host</p>` : ""}
-    ${section("checkpoints", "Checkpoints", `<p class="help">${r.has_checkpoints ? "Saved checkpoints available." : "Save a restore point before changing this machine."}</p><div class="actions">${buttons(a => a.args?.[0] === "checkpoint")}<button data-command="checkpoint">Manage checkpoints…</button></div>`)}
-    ${section("network", "Network", network.length ? factList(network) + '<button id="machine-link">Connect another VM…</button>' : `<p class="help">No private VM links.</p><button id="machine-link" ${!r.installed && !r.running ? "disabled" : ""}>Connect another VM…</button>`)}
+    <div class="access">${factList(access)}</div>
+    <div class="resources"><div class="resource"><strong>${esc(memory)}</strong><span>Memory</span></div><div class="resource"><strong>${esc(r.cpus)}</strong><span>vCPUs</span></div><div class="resource"><strong>${esc(r.disk_capacity || "—")}</strong><span>Disk capacity</span>${r.prepared ? `<em>${esc(r.disk_host || "?")} on host</em>` : ""}</div></div>
+    ${section("checkpoints", "Checkpoints", `<p class="help">${r.has_checkpoints ? "Saved checkpoints available." : "Save a restore point before changing this machine."}</p><div class="actions">${buttons(a => a.args?.[0] === "checkpoint")}<button data-command="checkpoint">Manage checkpoints…</button></div>`, r.has_checkpoints ? "saved" : "")}
+    ${section("network", "Network", network.length ? factList(network) + '<button id="machine-link">Connect another VM…</button>' : `<p class="help">No private VM links.</p><button id="machine-link" ${!r.installed && !r.running ? "disabled" : ""}>Connect another VM…</button>`, network.length ? `${network.length} link${network.length === 1 ? "" : "s"}` : "")}
     ${section("configuration", "Configuration", factList(config) + '<button id="machine-config">Edit configuration…</button>')}
     ${section("installation", "Installation details", `<p class="help">${esc(r.install_detail || installationOf(r)[0])}</p>${r.verify_at ? `<p class="help">Verified: ${esc(r.verify_at)}</p>` : ""}`)}
     ${r.iso_source === "manual" && !r.installed ? `<div class="note">${linkHtml((r.iso_help || "").replace(/\\n/g, "\n"))}</div>` : ""}

@@ -632,6 +632,8 @@ to yours: the record in artifacts/<vm>/state.json says who is there, and a reins
     p.add_argument("--checkpoints", action="store_true", help="also remove the VM's checkpoints (artifacts/<vm>/checkpoints)")
     p.add_argument("--remove-profile", action="store_true",
                    help="also delete the profile from vms/profiles/local.json: for a clone or a profile that exists only there (checkpoints go too); tracked profiles are refused")
+    p.add_argument("--starred", action="store_true",
+                   help="also a VM protected only by its star in My VMs (the star stays, so it is still yours after the clean); a VM protected with vmctl protect is still refused")
     p.set_defaults(func=lifecycle.cmd_clean)
 
     p = _add(subparsers, "checkpoint", help="create/list/restore/delete named copies of a stopped VM's disk + EFI vars (full qemu-img copy, survives clean)",

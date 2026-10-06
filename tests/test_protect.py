@@ -78,6 +78,23 @@ class ProtectTests(BaseVmctlTestCase):
         self.assertFalse(other.exists())
         self.assertIn(f"{self.vm_name}: protected, left as it is", out.getvalue())
 
+    def test_clean_starred_cleans_a_star_protected_vm_and_keeps_the_star(self):
+        # Removing the star to clean dropped the VM out of My VMs (Manzolo, 2026-10-06).
+        mine = self.disk(self.vm_name)
+        catalog.update("add", [self.vm_name], self.cfg)
+        self.assertEqual(vmstate.protection_reason(self.vm_name), "star")
+        with mock.patch.object(lifecycle, "cmd_stop"):
+            with self.assertRaisesRegex(VMError, "--starred keeps the star"):
+                lifecycle.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False, checkpoints=False, remove_profile=False))
+            self.assertTrue(mine.exists())
+            lifecycle.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False, checkpoints=False, remove_profile=False, starred=True))
+        self.assertFalse(mine.exists())
+        self.assertIn(self.vm_name, catalog.selected())
+        catalog.update_protected("add", [self.vm_name], self.cfg)  # vmctl protect: --starred does not lift it
+        self.disk(self.vm_name)
+        with mock.patch.object(lifecycle, "cmd_stop"), self.assertRaisesRegex(VMError, "is protected: refusing"):
+            lifecycle.cmd_clean(argparse.Namespace(vm=self.vm_name, all=False, dry_run=False, checkpoints=False, remove_profile=False, starred=True))
+
     def test_clean_refuses_a_vm_defined_in_libvirt_and_clean_all_skips_it(self):
         # 2026-10-01: clean --all deleted windows-11's disk under a libvirt domain and its snapshot.
         mine, other = self.disk(self.vm_name), self.disk("other")

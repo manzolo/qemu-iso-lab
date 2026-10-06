@@ -213,7 +213,8 @@ try {
   await shot('dashboard'); check('dashboard and profile');
   assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(),'Stopped');
   assert.equal(await page.locator('#rows [data-vm="debian-server"] .installation-status').textContent(),'Boot verified ✓');
-  assert.equal(await page.locator('#workspace-nav button').allTextContents().then(x=>x.join(',')),'My VMs,Catalog,Labs');
+  assert.equal(await page.locator('#workspace-nav button').evaluateAll(b=>b.map(x=>x.firstChild.textContent).join(',')),'My VMs,Catalog,Labs');
+  assert.deepEqual(await page.locator('#workspace-nav .tab-count').allTextContents(),['1','5','2'],'The tabs count what they hold: running outside a lab, the catalog, labs (the fixture rows carry no lab here)');
   await page.locator('[data-status-filter=running]').click();
   assert.deepEqual(await page.locator('#rows tr[data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia']);
   await page.locator('[data-status-filter=stopped]').click();

@@ -5263,8 +5263,9 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return 1
 
 
-def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: bool = False, check_libvirt: bool = True) -> None:
-    vmstate.refuse_if_protected(name, "delete its disk")
+def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: bool = False, check_libvirt: bool = True,
+             allow_starred: bool = False) -> None:
+    vmstate.refuse_if_protected(name, "delete its disk", allow_starred=allow_starred)
     if check_libvirt:
         refuse_if_libvirt(name, "delete the disk")
     # A web/TUI clean is itself a job under runtime/. Keep its open log and lock
@@ -5347,6 +5348,10 @@ def cmd_clean(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     checkpoints = bool(getattr(args, "checkpoints", False))
     remove_profile = bool(getattr(args, "remove_profile", False))
+    # --starred: the star of My VMs protects the disk against the matrix, clean --all and a slip, not
+    # against the owner's own explicit clean of one VM (the web asks first); removing the star to
+    # clean dropped the VM out of My VMs, to be hunted in the catalog (Manzolo, 2026-10-06).
+    starred = bool(getattr(args, "starred", False))
     # The guest disk is about to be deleted, so skip guest shutdown and its grace periods.
     if args.all:
         if remove_profile:
@@ -5369,10 +5374,10 @@ def cmd_clean(args: argparse.Namespace) -> int:
         # Refuse before deleting anything: a tracked profile keeps its artifacts too.
         if name in clone.tracked_profile_names():
             raise VMError(f"'{name}' is a tracked profile; --remove-profile removes only profiles that live in local.json alone (clones)")
-    vmstate.refuse_if_protected(name, "delete its disk")  # before the force-stop, not after it
+    vmstate.refuse_if_protected(name, "delete its disk", allow_starred=starred)  # before the force-stop, not after it
     refuse_if_libvirt(name, "delete the disk")
     cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
-    clean_vm(name, vm, dry_run=args.dry_run, checkpoints=remove_profile or checkpoints)
+    clean_vm(name, vm, dry_run=args.dry_run, checkpoints=remove_profile or checkpoints, allow_starred=starred)
     if remove_profile:
         clone.delete_local_profile(name, dry_run=args.dry_run)
     return 0

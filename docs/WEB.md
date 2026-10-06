@@ -37,6 +37,13 @@ What the page offers:
   lit for three seconds while the other cards fade, so the eye follows it.
 - A lab card's **Consoles** opens its members side by side without starting them: a stopped
   member shows as stopped, with its own Start; the stack starts with Start stack, in its order.
+- **Machine panel**: the first action full width, the next two side by side; login and SSH in
+  one block (a long password note shows whole on hover); the host footprint inside the disk
+  tile; the sections are rows with a chevron and, where it helps, a count (links, checkpoints).
+- The workspace tabs (My VMs, Catalog, Labs) carry what they hold as a count.
+- **Clean** on a VM starred in My VMs with data asks first and runs `vmctl clean <vm> --starred`:
+  the disk goes, the star stays (removing the star first dropped the VM out of My VMs, to be
+  found again in the catalog). A VM protected with `vmctl protect` is still refused.
 - **Recent activity** is folded under the lists; its heading opens it and the browser remembers
   the choice. The job at work still shows in the bottom bar and in the header's Activity.
 - **Catalog** leaves the members of a declared lab to the Labs view (like My VMs); a running lab
