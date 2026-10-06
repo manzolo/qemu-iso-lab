@@ -128,20 +128,24 @@ def clipped(text: str, width: int) -> str:
 
 
 def render_usage(data: dict[str, Any], top: int) -> None:
-    """Plain, like the rest of vmctl's output: the sections, the heaviest VMs, the commands that
-    free space. No bars and no rainbow (Manzolo, 2026-10-06: "meno maranza")."""
+    """The sections with a one-colour bar, the heaviest VMs, the commands that free space: vmctl's
+    own palette, sparingly (Manzolo, 2026-10-06: Codex's rainbow bars were too much, plain text
+    too little)."""
     sections, total = data["sections"], int(data["total"])
     columns = max(40, min(110, shutil.get_terminal_size(fallback=(100, 24)).columns))
     ui.print_header(f"Disk usage of {ui.pretty_path(Path(data['root']))}")
     ui.print_kv("allocated", f"{human(total)} · {len(data['vms'])} VMs (blocks on disk, not the images' capacity)")
     print()
-    label_width = min(max(len(label) for _, label in SECTIONS), columns - 24)
+    bar_width = 16 if columns >= 90 else 10 if columns >= 72 else 0
+    label_width = min(max(len(label) for _, label in SECTIONS), columns - 24 - (bar_width + 2 if bar_width else 0))
     for key, label in SECTIONS:
         size = int(sections[key])
         if not size:
             continue
-        share = f"{100 * size / total if total else 0:5.1f}%"
-        print(f"  {clipped(label, label_width):<{label_width}}  {human(size):>10}  {share}")
+        share = 100 * size / total if total else 0
+        filled = min(bar_width, round(share / 100 * bar_width)) if bar_width else 0
+        bar = f"  {ui.style('▇' * filled if filled else '▏', ui.CYAN)}" if bar_width else ""  # a sliver for what is there but small
+        print(f"  {clipped(label, label_width):<{label_width}}  {ui.style(f'{human(size):>10}', ui.BOLD)}  {share:5.1f}%{bar}")
     print(f"  {ui.style('total', ui.BOLD):<{label_width + len(ui.BOLD) + len(ui.RESET)}}  {ui.style(f'{human(total):>10}', ui.BOLD)}")
 
     if top and data["vms"]:
@@ -152,11 +156,11 @@ def render_usage(data: dict[str, Any], top: int) -> None:
         longest = max(len(vm["name"]) for vm in data["vms"][:top])
         name_width = min(columns - (16 if compact else 50), max(24, longest))
         details_header = "" if compact else f"  {'DISKS':>9}  {'CHECKPOINTS':>11}  {'OTHER':>9}"
-        print(f"  {'VM':<{name_width}}  {'TOTAL':>9}{details_header}")
+        print(ui.style(f"  {'VM':<{name_width}}  {'TOTAL':>9}{details_header}", ui.BOLD))
         for vm in data["vms"][:top]:
             other = vm["other"] + vm["recordings"]
             details = "" if compact else f"  {human(vm['disks']):>9}  {human(vm['checkpoints']):>11}  {human(other):>9}"
-            print(f"  {clipped(vm['name'], name_width):<{name_width}}  {human(vm['total']):>9}{details}")
+            print(f"  {ui.style(f'{clipped(vm['name'], name_width):<{name_width}}', ui.CYAN)}  {human(vm['total']):>9}{details}")
         if len(data["vms"]) > top:
             print(f"  + {len(data['vms']) - top} more: vmctl usage --top N")
     print()
