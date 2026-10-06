@@ -9,6 +9,7 @@ import subprocess
 import sys
 from typing import Any
 
+from vmctl.catalog import in_my_vms
 from vmctl.config import natural_key
 
 Facts = dict[str, Any]
@@ -21,8 +22,8 @@ def visible_rows(rows: list[Facts], query: str, mode: str) -> list[Facts]:
                        for word in words)
                 and (mode != "disk" or row["prepared"])
                 and (mode != "running" or row["running"])
-                # My VMs: the selection, plus whatever runs right now (a running VM never hides).
-                and (mode != "mine" or row.get("mine") or row["running"])
+                # My VMs: the selection, plus what runs right now outside a declared lab.
+                and (mode != "mine" or in_my_vms(bool(row.get("mine")), bool(row["running"]), row.get("lab")))
                 # Hidden profiles leave every list unless they run or hold a disk; "hidden" lists them.
                 and (row.get("hidden", False) if mode == "hidden"
                      else not row.get("hidden") or row["running"] or row["installed"])]

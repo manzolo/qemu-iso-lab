@@ -1228,10 +1228,11 @@ def cmd_list(args: argparse.Namespace) -> int:
         return print_groups(cfg, args)
 
     if getattr(args, "mine", False):
-        # The dashboards' My VMs view: the selection plus whatever is running right now.
+        # The dashboards' My VMs view: the selection plus what runs outside a declared lab.
         chosen = set(catalog.selected())
+        owners = labs.lab_of(cfg)
         cfg = {"vms": {name: vm for name, vm in cfg["vms"].items()
-                       if name in chosen or running_qemu_pid(name, vm) is not None}}
+                       if catalog.in_my_vms(name in chosen, running_qemu_pid(name, vm) is not None, owners.get(name))}}
 
     if getattr(args, "names", False):
         for name in config.sorted_vm_names(cfg):

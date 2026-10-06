@@ -29,6 +29,10 @@ header h1 b { color:var(--accent); }
 #summary { font-size:12px; color:var(--muted); }
 #connection { margin-left:auto; font-size:12px; color:var(--ok); display:flex; align-items:center; gap:7px; }
 #connection.s-warn { color:var(--warn); }
+.labs-running { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 12px; font-size:13px; color:var(--muted); }
+.labs-running[hidden] { display:none; }
+.labs-running button { padding:4px 10px; font-size:12px; border-radius:999px; border-color:#2f6b5e; background:#16302c; color:var(--text); }
+.labs-running button::before { content:""; display:inline-block; width:6px; height:6px; margin-right:6px; border-radius:50%; background:var(--live); vertical-align:middle; }
 #connection.s-bad { color:var(--bad); font-weight:600; }
 /* The server is gone (vmctl web stopped) or came back with a new token: a banner says so in words,
    and the page behind it fades and takes no clicks, because every button would fail and every
@@ -802,7 +806,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   <div class="metrics"><div class="metric"><strong id="total-count">—</strong><span id="total-label">Profiles</span></div><div class="metric"><strong id="running-count" class="s-ok">—</strong><span>Running</span></div><div class="metric"><strong id="disk-count">—</strong><span id="activity-metric-label">Active jobs</span></div></div>
 </section>
 <nav id="workspace-nav" aria-label="Workspace">
-  <button data-filter="mine" aria-pressed="false" title="Your chosen profiles, plus running machines">My VMs</button>
+  <button data-filter="mine" aria-pressed="false" title="Your chosen profiles, plus running machines outside a lab">My VMs</button>
   <button data-filter="all" class="active" aria-pressed="true">Catalog</button>
   <button data-filter="labs" aria-pressed="false">Labs</button>
 </nav>
@@ -824,6 +828,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <main id="profiles-view">
   <nav id="lab-navigation" class="lab-navigation hidden" aria-label="Lab navigation"><button id="back-to-labs">← Labs</button><span aria-hidden="true">/</span><span id="lab-origin" class="mono"></span><span aria-hidden="true">/</span><span id="lab-current-vm" class="mono" aria-current="page"></span></nav>
   <section class="card"><div class="list-heading"><h2 id="list-title">Profiles</h2><label class="list-sort" for="vm-sort">Sort<select id="vm-sort"><option value="running">Running first</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="installed">Installed first</option></select></label></div>
+    <div id="labs-running" class="labs-running" hidden></div>
     <p id="selection-hint">Double-click to open · Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
     <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-console" title="Start the selected machines and open their consoles side by side on one page">Start in console</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
@@ -1359,13 +1364,34 @@ function selectRow(name, event) {
   if (event.target.closest(".vm-select")) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === name)?.querySelector(".vm-select")?.focus({preventScroll:true});
 }
 
+// The labs with a machine on, on My VMs: their members are not in the list (unless starred), so
+// one line says they run and leads to their cards.
+function renderLabsRunning() {
+  const bar = $("labs-running"), counts = new Map();
+  if (filter === "mine") for (const r of S.vms) if (r.lab && r.running) counts.set(r.lab, (counts.get(r.lab) || 0) + 1);
+  bar.hidden = !counts.size;
+  if (!counts.size) { bar.replaceChildren(); return; }
+  const key = [...counts].map(([lab, n]) => lab + ":" + n).join(",");
+  if (bar.dataset.key === key) return;
+  bar.dataset.key = key;
+  bar.innerHTML = `<span>Labs running:</span>` + [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([lab, n]) =>
+    `<button type="button" data-running-lab="${esc(lab)}" title="Open the Labs view at ${esc(lab)}">${esc(lab)} <span class="s-muted">(${n})</span> →</button>`).join("");
+}
+$("labs-running").addEventListener("click", (event) => {
+  const lab = event.target.closest("[data-running-lab]")?.dataset.runningLab;
+  if (!lab) return;
+  setFilter("labs");
+  requestAnimationFrame(() => document.querySelector(`#labs-view [data-lab="${CSS.escape(lab)}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" }));
+});
 function setStatusFilter(name) {
   statusFilter = name; checkedVms.clear(); selectionAnchor = ""; render();
 }
 function scopeRows() {
   const members = filter === "lab" ? S.labs.find(lab => lab.group === labProfile?.group)?.members || [] : null;
   return S.vms.filter(r => (!members || members.includes(r.name))
-    && (filter !== "mine" || r.mine || r.running)
+    // My VMs: the selection, plus what runs outside a declared lab (catalog.in_my_vms): a running
+    // lab's members stay in the Labs view, the "Labs running" line below the title leads there.
+    && (filter !== "mine" || r.mine || (r.running && !r.lab))
     && (statusFilter === "hidden" && filter === "all" ? r.hidden : !r.hidden || r.running || r.installed));
 }
 function matchesStatus(r, mode = statusFilter) {
@@ -1425,6 +1451,7 @@ function render() {
     if (b.dataset.statusFilter === "hidden") b.classList.toggle("hidden", filter !== "all" || !all.some(r => r.hidden));
   });
   renderSelection();
+  renderLabsRunning();
   if (labs) return renderLabs();
   const rows = visible();
   const total = scopeRows().length;

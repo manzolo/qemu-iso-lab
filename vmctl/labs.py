@@ -118,6 +118,16 @@ def lab_groups(cfg: dict[str, Any]) -> list[str]:
             if group in with_content or all(has_segment(config.get_vm(cfg, name)) for name in group_members(cfg, group))]
 
 
+def lab_of(cfg: dict[str, Any]) -> dict[str, str]:
+    """Every member of a declared lab -> that lab (the first in name order when a VM is in two).
+    The temporary ``link:`` labs are not declared and own nobody: their VMs are the user's."""
+    owners: dict[str, str] = {}
+    for group in lab_groups(cfg):
+        for name in group_members(cfg, group):
+            owners.setdefault(name, group)
+    return owners
+
+
 # --- lab content: vms/labs/<lab>/ ------------------------------------------------------------
 #
 # What a lab brings besides its profiles (docs/QLAB_IMPORT.md, F3): lab.json (title, summary,

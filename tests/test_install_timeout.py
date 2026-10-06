@@ -94,13 +94,15 @@ class TimeoutEvidenceTests(BaseVmctlTestCase):
         script = ("import time,sys; print('Configuring apt', flush=True); "
                   "print('!! ERROR: Architecture not supported', flush=True); "
                   "print('The specified Ubuntu archive mirror does not seem to support your architecture.', flush=True); "
-                  "print('[Press enter to continue]', flush=True); time.sleep(60)")
+                  "print('[Press enter to continue]', flush=True); time.sleep(600)")
         started = time.monotonic()
         with mock.patch("sys.stdout", new_callable=io.StringIO):
             with self.assertRaises(self.vmctl.VMError) as caught:
-                self.vmctl.run_and_expect([sys.executable, "-c", script], "==> Debian preseed install complete!", 60,
+                self.vmctl.run_and_expect([sys.executable, "-c", script], "==> Debian preseed install complete!", 300,
                                           fail_on=self.vmctl.DI_FAILURES)
-        self.assertLess(time.monotonic() - started, 20)
+        # About FAIL_ON_SETTLE_SEC (5 s) here; a loaded CI runner took 25 s on 2026-10-06, so the
+        # bound only proves that the error, not the 300 s timeout, ended the run.
+        self.assertLess(time.monotonic() - started, 60)
         message = str(caught.exception)
         self.assertIn("stopped on its own error: !! ERROR: Architecture not supported", message)
         self.assertIn("does not seem to support your architecture", message)  # the lines after it settled in

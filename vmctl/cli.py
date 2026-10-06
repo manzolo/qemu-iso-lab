@@ -101,7 +101,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     p.add_argument("--names", action="store_true", help="emit only the profile names, one per line (for scripts and shell completion)")
     p.add_argument("--groups", action="store_true", help="list the profile groups (categories) that check-vms --group accepts, with their members")
-    p.add_argument("--mine", action="store_true", help="only My VMs (vmctl catalog), plus whatever is running")
+    p.add_argument("--mine", action="store_true", help="only My VMs (vmctl catalog), plus what is running outside a lab")
     p.set_defaults(func=lifecycle.cmd_list)
 
     p = _add(subparsers, "catalog", help="My VMs: the profiles you chose out of the catalog (the dashboards open on them)",
@@ -114,7 +114,8 @@ def build_parser() -> argparse.ArgumentParser:
   vmctl catalog hide windows-98 menuetos   leave these out of the dashboards' lists (unhide to show them again)
 
 The dashboards (vmctl web, vmtui) open on the My VMs filter while the selection has names: the
-chosen profiles, plus whatever is running right now so that a running VM never hides.
+chosen profiles, plus whatever is running right now outside a lab (a running lab's members stay
+in the Labs view unless starred).
 An empty selection is the whole catalog. A hidden profile leaves the All / With disk lists (it
 still shows while it runs or holds a disk, and the Hidden filter lists them all); hiding takes
 the star away. Only the view changes: vmctl list, check-vms and the groups still see every profile.""")

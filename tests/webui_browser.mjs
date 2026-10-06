@@ -1301,6 +1301,17 @@ try {
   await page.locator('[data-filter="mine"]').click();
   assert.deepEqual(await page.locator('#rows [data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia','debian-server']);
   assert.match(await page.locator('#list-title').textContent(),/^My VMs/);
+  assert(await page.locator('#labs-running').isHidden(),'No lab running, no line');
+  // A running member of a declared lab stays in the Labs view: one line leads there.
+  const labVm=state.vms.find(v=>v.name==='proxmox-ve'); labVm.running=true; labVm.lab='proxmox-lab';
+  await page.evaluate(()=>refresh(true));
+  assert.deepEqual(await page.locator('#rows [data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia','debian-server'],'A running lab member is not in My VMs');
+  assert.match((await page.locator('#labs-running').textContent()).replace(/\s+/g,' '),/Labs running:\s*proxmox-lab \(1\) →/);
+  await page.locator('#labs-running [data-running-lab="proxmox-lab"]').click();
+  assert.equal(await page.locator('[data-filter].active').getAttribute('data-filter'),'labs');
+  await page.locator('[data-filter="mine"]').click();
+  labVm.running=false; delete labVm.lab; await page.evaluate(()=>refresh(true));
+  assert(await page.locator('#labs-running').isHidden());
   await row('debian-server').click();
   assert.equal(await page.locator('#profile-mine').textContent(),'★');
   await page.locator('#profile-mine').click();

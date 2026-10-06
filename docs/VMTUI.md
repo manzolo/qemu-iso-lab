@@ -38,7 +38,8 @@ profile's details and quick actions, and installation activity. It reads the sam
 snapshot as the classic menus and refreshes every 15 seconds (or with F5),
 preserving the selected profile and search. ISO availability is shown separately
 from the disk's installation state. With disk includes empty prepared disks. My VMs is the
-selection of `vmctl catalog` (plus whatever is running) and is the opening view
+selection of `vmctl catalog` (plus whatever is running outside a declared lab: a running lab's
+members stay in the Labs filter unless starred) and is the opening view
 while it has names; *All actions… → Add to My VMs* chooses a profile from either dashboard.
 
 The details panel grows with the terminal, and wide tables include profile

@@ -3,9 +3,10 @@ import argparse
 import io
 import json
 from contextlib import redirect_stdout
+from unittest import mock
 
 from tests._common import BaseVmctlTestCase
-from vmctl import catalog, config, lifecycle, ui
+from vmctl import catalog, config, labs, lifecycle, ui
 from vmctl.errors import VMError
 
 
@@ -94,6 +95,12 @@ class CatalogTests(BaseVmctlTestCase):
         rows = [row("a", hidden=True), row("b", hidden=True, running=True), row("c", hidden=True, installed=True, prepared=True), row("d")]
         self.assertEqual([r["name"] for r in tui_bridge.visible_rows(rows, "", "all")], ["b", "c", "d"])
         self.assertEqual([r["name"] for r in tui_bridge.visible_rows(rows, "", "hidden")], ["b", "c", "a"])
+        # My VMs: the selection plus what runs, except a running member of a declared lab (unless starred)
+        rows = [row("solo", running=True), row("member", running=True, lab="netlab"), row("starred", mine=True, lab="netlab"), row("idle")]
+        self.assertEqual([r["name"] for r in tui_bridge.visible_rows(rows, "", "mine")], ["solo", "starred"])
+        self.assertTrue(catalog.in_my_vms(False, True, None))
+        self.assertFalse(catalog.in_my_vms(False, True, "netlab"))
+        self.assertTrue(catalog.in_my_vms(True, False, "netlab"))
         out = io.StringIO()
         with redirect_stdout(out):
             lifecycle.cmd_catalog(argparse.Namespace(action="hide", vms=["other"], json=False, names=False, dry_run=False))
@@ -132,3 +139,12 @@ class CatalogTests(BaseVmctlTestCase):
         with redirect_stdout(output):
             lifecycle.cmd_list(argparse.Namespace(mine=True, names=True, json=False, groups=False))
         self.assertEqual(output.getvalue().split(), ["third"])
+
+    def test_list_mine_leaves_a_running_lab_member_to_the_labs_view(self):
+        running = {"other", "third"}
+        with mock.patch.object(lifecycle, "running_qemu_pid", side_effect=lambda name, vm: 1 if name in running else None), \
+             mock.patch.object(labs, "lab_of", return_value={"third": "some-lab"}):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                lifecycle.cmd_list(argparse.Namespace(mine=True, names=True, json=False, groups=False))
+        self.assertEqual(output.getvalue().split(), ["other"])

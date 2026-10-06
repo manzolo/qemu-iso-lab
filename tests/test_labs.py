@@ -20,6 +20,14 @@ class LabsTests(BaseVmctlTestCase):
         cfg = self.tracked_config()
         self.assertEqual(labs.lab_groups(cfg), ["docker-lab", "git-lab", "k8s-lab", "lvm-lab", "mdadm-lab", "mysql-lab", "netlab", "proxmox-lab", "ssh-lab", "vpn-lab", "zfs-lab"])
 
+    def test_lab_of_names_the_declared_lab_of_every_member_and_nobody_else(self):
+        owners = labs.lab_of(self.tracked_config())
+        self.assertEqual(owners["pfsense-lab"], "netlab")
+        self.assertEqual(owners["k8s-lab-node1"], "k8s-lab")
+        self.assertEqual(owners["docker-lab-server"], "docker-lab")  # a lab because of its content
+        self.assertNotIn("debian-server", owners)
+        self.assertNotIn("alpine-ci", owners)  # in categories (smoke, ci), in no lab
+
     def test_start_order_puts_infrastructure_then_services_first(self):
         cfg = self.tracked_config()
         self.assertEqual(labs.model(cfg, "netlab")["start_order"], ["pfsense-lab", "pihole-lab", "lubuntu-lab"])

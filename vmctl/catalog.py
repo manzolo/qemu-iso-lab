@@ -72,6 +72,14 @@ def selection_of(document: dict[str, Any], key: str = KEY, field: str = "selecte
     return names
 
 
+def in_my_vms(mine: bool, running: bool, lab: str | None) -> bool:
+    """Who the My VMs view lists: the selection, plus what runs right now unless a declared lab
+    owns it. A running lab fills the list with members nobody chose one by one, and they already
+    have their place in the Labs view (Manzolo, 2026-10-06); a starred member still shows. The
+    dashboards and ``vmctl list --mine`` all ask this; the web page says the same in JS."""
+    return mine or (running and not lab)
+
+
 def selected() -> list[str]:
     """The saved selection. Names no longer in the catalog (a cleaned clone) stay until removed."""
     return selection_of(_document())

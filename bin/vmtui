@@ -673,6 +673,10 @@ state.ROOT = Path(sys.argv[1])
 state.CONFIG_DIR = Path(sys.argv[2])
 VMS = config.load_config()["vms"]
 MINE = set(catalog.selected())  # My VMs: the names chosen in local.json ("catalog")
+try:  # the declared lab of every member: My VMs leaves a running lab's members to the Labs view
+    LAB_OF = labs.lab_of({"vms": VMS})
+except Exception:  # a broken lab.json must not take the dashboard down
+    LAB_OF = {}
 HIDDEN = set(catalog.hidden())  # vmctl catalog hide: left out of the lists unless running or with a disk
 FLAGGED = vmstate.flagged_names()  # vmctl protect; a starred VM with a disk is protected too (vmstate.protection_reason)
 
@@ -736,6 +740,7 @@ def facts(name, vm):
     return {
         "name": name,
         "mine": name in MINE,
+        "lab": LAB_OF.get(name),  # the declared lab it belongs to, None outside one
         "hidden": name in HIDDEN,
         "manual": str(meta.get("manual") or ""),  # why a manual profile is manual (meta.manual)
         "automated_as": str(meta.get("automated_as") or ""),
@@ -929,8 +934,8 @@ else:
     # A hidden profile leaves every list, unless it runs or holds a disk (never out of sight then).
     rows = [f for f in rows if not f["hidden"] or f["running"] or f["installed"]]
 if mode == "mine":
-    # My VMs, plus whatever runs right now: a running VM never hides.
-    rows = [f for f in rows if f["mine"] or f["running"]]
+    # My VMs, plus what runs right now outside a declared lab (catalog.in_my_vms).
+    rows = [f for f in rows if catalog.in_my_vms(f["mine"], f["running"], f["lab"])]
 elif mode == "installed":
     rows = [f for f in rows if f["prepared"] or f["installed"] or f["running"]]
 elif mode == "running":
@@ -2711,7 +2716,7 @@ choose_filter() {
     local selected
     selected=$(MENU_CANCEL_LABEL="Back" menu_choose \
         "Filter" "Which VMs should the dashboard list?" \
-        "My VMs"    "The profiles you chose (vmctl catalog add), plus whatever is running" \
+        "My VMs"    "The profiles you chose (vmctl catalog add), plus what runs outside a lab" \
         "All"       "Every profile in the catalog" \
         "Installed" "Only VMs that have a disk image (installed or just prepared)" \
         "Running"   "Only VMs running right now" \

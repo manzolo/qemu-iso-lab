@@ -16,8 +16,9 @@ What the page offers:
   The **Sort** selector defaults to running machines first, then natural name order (Windows 7
   before Windows 11), with name A–Z, name Z–A and installed first as alternatives. The browser remembers
   your choice across reloads; changing it keeps the selected machine.
-- **My VMs**: the profiles you chose out of the catalog (plus whatever is running right now,
-  so a running VM never hides). Its opposite is **Hide from the lists** (right-click a row, or a
+- **My VMs**: the profiles you chose out of the catalog, plus whatever is running right now
+  outside a lab. The members of a running lab stay in the Labs view (a starred one still shows
+  here), and a *Labs running: k8s-lab (3) →* line under the title leads to their cards. Its opposite is **Hide from the lists** (right-click a row, or a
   selection): a hidden profile leaves All and With disk, still shows while it runs or holds a
   disk, and the *Hidden* chip (shown while there are any) lists them to bring them back;
   hiding takes the star away. `vmctl catalog hide|unhide` from the terminal; `check-vms`,
