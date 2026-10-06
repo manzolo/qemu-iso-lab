@@ -165,7 +165,7 @@ window.addEventListener("dragend", () => { for (const pane of frames.values()) p
 let busyNetwork = false, pollTimer = null;
 function writeHash() {
   history.replaceState(null, "", "/multi#vms=" + panes.map(encodeURIComponent).join(",") + (labName ? "&lab=" + encodeURIComponent(labName) : ""));
-  const heading = labName ? `${labName.replace(/^link:/, "session ")} · ${panes.join(" · ")}` : panes.join(" · ");
+  const heading = labName ? `${labName.replace(/^link:/, "")} · ${panes.join(" · ")}` : panes.join(" · ");
   document.title = (panes.length ? heading + " · " : "") + "Consoles · QEMU ISO Lab";
   $("title").textContent = panes.length ? heading : "Consoles";
 }
