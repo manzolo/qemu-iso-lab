@@ -69,7 +69,10 @@ class CatalogSiteTests(unittest.TestCase):
         for name in ("01-x.mp4", "01-x.jpg", "01-x.en.vtt", "01-x.it.vtt", "02-y.it.mp4", "02-y.en.mp4", "03-z.mp4"):
             (media / "tour" / name).write_bytes(b"x")
         second = {**voiced, "id": "03-z", "title": {"en": "LVM again: snapshots", "it": "LVM ancora: snapshot"}, "video": "03-z.mp4"}  # a second lesson on the same lab
-        (media / "tour" / "tour.json").write_text(json.dumps({"clips": [clip, voiced, second]}))
+        course = {**voiced, "id": "course-lvm-1", "series": "courses", "track": "zfs-course", "order": 1, "video": "03-z.mp4",
+                  "title": {"en": "ZFS 1/5 · Pools", "it": "ZFS 1/5 · Pool"}}
+        voiced["track"] = second["track"] = "storage"
+        (media / "tour" / "tour.json").write_text(json.dumps({"clips": [clip, voiced, second, course]}))
         out = Path(self.tempdir.name) / "site-tour"
         build_catalog_site.build(ROOT, out, media=media)
         tour = (out / "tour.html").read_text(encoding="utf-8")
@@ -81,7 +84,13 @@ class CatalogSiteTests(unittest.TestCase):
         # The lesson reaches the lab's card in the catalog, and only that lab's.
         labs = {lab["group"]: lab for lab in json.loads((out / "catalog.json").read_text(encoding="utf-8"))["labs"]}
         self.assertEqual(labs["lvm-lab"]["clip"], "tour.html#02-y")
-        self.assertEqual([c["href"] for c in labs["lvm-lab"]["clips"]], ["tour.html#02-y", "tour.html#03-z"])
+        self.assertEqual([c["href"] for c in labs["lvm-lab"]["clips"]], ["tour.html#02-y", "tour.html#03-z"])  # not the course's episode
+        # The labs' learning path and the courses: headings per track, running numbers.
+        self.assertIn('"track": "storage"', tour)
+        self.assertIn('storage: "Storage"', tour)
+        self.assertIn('"zfs-course": "ZFS in cinque puntate"', tour)
+        self.assertIn('courses: "Corsi"', tour)
+        self.assertIn('<li class="track"><h4>', tour)
         self.assertIsNone(labs["vpn-lab"]["clip"])
         self.assertEqual(labs["vpn-lab"]["clips"], [])
         guide = (out / "labs" / "lvm-lab" / "guide.en.html").read_text(encoding="utf-8")

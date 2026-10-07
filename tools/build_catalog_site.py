@@ -514,6 +514,8 @@ ol button[aria-current=true] { border-color:var(--accent); background:#8aead00d;
 ol img { width:120px; aspect-ratio:16/9; object-fit:cover; border-radius:7px; display:block; background:#000; }
 ol b { display:block; font-size:13px; line-height:1.3; } ol small { color:var(--muted); font-size:11px; }
 ol li.series h3 { margin:10px 0 2px; font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); } ol li.series:first-child h3 { margin-top:0; }
+ol li.track h4 { margin:8px 0 0 2px; font-size:11px; font-weight:650; color:var(--accent); letter-spacing:.04em; }
+ol b .num { color:var(--muted); font-weight:600; }
 .note { color:var(--muted); font-size:12px; margin-top:12px; }
 .follow { margin:12px 0 0; font-size:13px; color:var(--muted); } .follow a { font-weight:650; border:1px solid #8aead040; border-radius:7px; padding:3px 10px; background:#8aead010; } .follow a.now-lang { background:#8aead025; }
 .follow[hidden] { display:none; }
@@ -551,8 +553,8 @@ ol li.series h3 { margin:10px 0 2px; font-size:11px; text-transform:uppercase; l
 <script>
 const TOUR = JSON.parse(document.getElementById("data").textContent);
 const TEXT = {
-  en: { steps: "Command at this moment", stepsNone: "Commands appear here as they are typed", copied: "Copied", follow: "Follow along with the guide:", series: { tour: "The tour", labs: "Lab lessons" }, title: "Take the tour", lead: "Eight short chapters, from the catalog to the network map, then lessons on single labs. Spoken and subtitled in English and Italian (the language switch changes both); each chapter plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked. The voice is synthetic (XTTS-v2).", clip: "Clip", of: "of" },
-  it: { steps: "Comando di questo momento", stepsNone: "I comandi compaiono qui man mano che vengono battuti", copied: "Copiato", follow: "Segui la guida passo passo:", series: { tour: "Il tour", labs: "Lezioni dei lab" }, title: "Il tour", lead: "Otto capitoli brevi, dal catalogo alla mappa di rete, poi le lezioni sui singoli lab. Voce e sottotitoli in italiano e in inglese (il cambio di lingua cambia entrambi); ogni capitolo prosegue nel successivo.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate. La voce è sintetica (XTTS-v2).", clip: "Clip", of: "di" },
+  en: { steps: "Command at this moment", stepsNone: "Commands appear here as they are typed", copied: "Copied", follow: "Follow along with the guide:", series: { tour: "The tour", labs: "Lab lessons", courses: "Courses" }, tracks: { basics: "First steps", storage: "Storage", network: "Networking", services: "Services and containers", virtualization: "Virtualization", other: "More labs", "zfs-course": "ZFS in five episodes" }, title: "Take the tour", lead: "Eight short chapters, from the catalog to the network map, then lessons on single labs along a learning path, and slower courses in several episodes. Spoken and subtitled in English and Italian (the language switch changes both); each chapter plays on into the next.", note: "Recorded on a real install of qemu-iso-lab; the waits are sped up and marked. The voice is synthetic (XTTS-v2).", clip: "Clip", of: "of" },
+  it: { steps: "Comando di questo momento", stepsNone: "I comandi compaiono qui man mano che vengono battuti", copied: "Copiato", follow: "Segui la guida passo passo:", series: { tour: "Il tour", labs: "Lezioni dei lab", courses: "Corsi" }, tracks: { basics: "Primi passi", storage: "Storage", network: "Rete", services: "Servizi e container", virtualization: "Virtualizzazione", other: "Altri lab", "zfs-course": "ZFS in cinque puntate" }, title: "Il tour", lead: "Otto capitoli brevi, dal catalogo alla mappa di rete, poi le lezioni sui singoli lab in ordine di percorso, e corsi più lenti in più puntate. Voce e sottotitoli in italiano e in inglese (il cambio di lingua cambia entrambi); ogni capitolo prosegue nel successivo.", note: "Registrate su un'installazione vera di qemu-iso-lab; le attese sono accelerate e segnalate. La voce è sintetica (XTTS-v2).", clip: "Clip", of: "di" },
 };
 let lang = "en", current = 0;
 try { lang = localStorage.getItem("qil-tour-lang") || ((navigator.language || "en").startsWith("it") ? "it" : "en"); } catch { lang = (navigator.language || "en").startsWith("it") ? "it" : "en"; }
@@ -599,11 +601,16 @@ function render() {
   const series = (c) => c.series || "tour", same = TOUR.clips.filter((c) => series(c) === series(clip));
   $("now-meta").textContent = `${t.series[series(clip)] || series(clip)} · ${t.clip} ${same.indexOf(clip) + 1} ${t.of} ${same.length} · ${mmss(clip.duration)}`;
   document.querySelectorAll(".lang button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
-  let last = null;
+  // A heading per series, a smaller one per track (the labs' learning path, a course), and a running
+  // number per series except the tour, whose titles carry their own.
+  let last = null, lastTrack = null, n = 0;
   $("list").innerHTML = TOUR.clips.map((c, i) => {
-    const head = series(c) !== last ? `<li class="series"><h3>${esc(t.series[series(c)] || series(c))}</h3></li>` : "";
-    last = series(c);
-    return head + `<li><button data-i="${i}" aria-current="${i === current}"><img src="${esc(c.poster)}" alt="" loading="lazy"><span><b>${esc(c.title[lang])}</b><small>${mmss(c.duration)}</small></span></button></li>`;
+    let head = "";
+    if (series(c) !== last) { head = `<li class="series"><h3>${esc(t.series[series(c)] || series(c))}</h3></li>`; last = series(c); lastTrack = null; n = 0; }
+    if (c.track && c.track !== lastTrack) head += `<li class="track"><h4>${esc((t.tracks || {})[c.track] || c.track)}</h4></li>`;
+    lastTrack = c.track || null;
+    const num = series(c) === "tour" ? "" : `<span class="num">${++n} · </span>`;
+    return head + `<li><button data-i="${i}" aria-current="${i === current}"><img src="${esc(c.poster)}" alt="" loading="lazy"><span><b>${num}${esc(c.title[lang])}</b><small>${mmss(c.duration)}</small></span></button></li>`;
   }).join("");
 }
 $("list").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (b) load(Number(b.dataset.i), true); };
@@ -814,7 +821,7 @@ def build(root: Path, out: Path, media: Path | None = None, clip_style: str = "c
     # lists them in the tour's order, `clip` stays the first for the pages that want one link.
     lessons: dict[str, list[dict[str, Any]]] = {}
     for clip in tour:
-        if clip.get("lab"):
+        if clip.get("lab") and clip.get("series") != "courses":  # a course's episodes stay on the tour page
             lessons.setdefault(clip["lab"], []).append({"href": f"tour.html#{clip['id']}", "title": clip["title"]})
     for lab in data["labs"]:
         lab["clips"] = lessons.get(lab["group"], [])

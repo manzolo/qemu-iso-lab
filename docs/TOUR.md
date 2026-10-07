@@ -130,6 +130,18 @@ Another voice: `--speaker "<name>"` (XTTS's built-in speakers), or a recording o
 
 A lab may have more than one lesson: `export const order = 0` puts a clip before the lab's others on the tour page and on its card (`lab-git-basics`, for beginners, comes before `lab-git`); without it a lesson has order 1 and lessons of one lab sort by name.
 
+The tour page lists the lessons along a **learning path** (2026-10-07; alphabetical by lab was a
+jumble): `LAB_TRACKS` in `tools/tour/publish.py` names the tracks (first steps, storage,
+networking, services and containers, virtualization) and their labs in order, `ordered()` writes
+each clip's `track` into `tour.json`, and the page shows a heading per track and numbers the
+lessons. **A new lab goes into `LAB_TRACKS`** (publish.py warns and lists it last otherwise;
+`tests/test_tour_publish.py` fails while a lab with content has no track). A reorder needs no
+re-encoding: `tools/tour/publish.py --index-only`, then the media branch and the Pages workflow.
+
+**Courses** (`export const series = "courses"`, `lab`, `order` = the episode) are slower series in
+several episodes after the lessons, one heading per course (`track` `<lab>-course`, e.g.
+`zfs-course`); their episodes link the lab's guide but stay off the lab's card.
+
 Besides the tour's chapters, a clip can be a **lesson on one lab**: `export const series = "labs"`
 and `export const lab = "<group>"` in the clip. Eight so far, one per lab with content:
 `lab-lvm` (LVM from scratch), `lab-vpn` (WireGuard by hand, the two captures, the iptables fence),

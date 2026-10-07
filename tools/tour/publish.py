@@ -70,15 +70,51 @@ def main() -> None:
     print(f"{index}: {len(clips)} clips. Now publish the media branch and run the Pages workflow (see the docstring).")
 
 
+# The lab lessons in the order of a learning path (Manzolo, 2026-10-07: alphabetical by lab was a
+# jumble): one heading per track on tour.html, the labs of a track in this order, a lab's own
+# lessons by their `order`. A lab missing here goes last, with a warning: add it where it belongs.
+LAB_TRACKS = [
+    ("basics", ["git-lab", "ssh-lab"]),
+    ("storage", ["lvm-lab", "mdadm-lab", "zfs-lab"]),
+    ("network", ["netlab", "vpn-lab"]),
+    ("services", ["mysql-lab", "docker-lab", "k8s-lab"]),
+    ("virtualization", ["proxmox-lab"]),
+]
+SERIES = ("tour", "labs", "courses")
+
+
+def track_of(clip: dict) -> str | None:
+    """The heading a clip sits under: the lab's track for a lesson, `<lab>-course` for a course
+    (zfs-lab -> zfs-course), none for the tour's chapters."""
+    series, lab = clip.get("series", "tour"), clip.get("lab") or ""
+    if series == "labs":
+        return next((track for track, labs in LAB_TRACKS if lab in labs), "other")
+    if series == "courses":
+        return clip.get("track") or f"{lab.removesuffix('-lab')}-course"
+    return None
+
+
 def ordered(clips: dict) -> list:
     """The tour's chapters first, by id (05-lab records on vpn-lab: its lab must not move it after
-    07-map, as it did on 2026-10-06), then the lab lessons by lab, a lab's own lessons by order."""
+    07-map, as it did on 2026-10-06), then the lab lessons along LAB_TRACKS (a lab's own lessons by
+    order), then the courses, each by its episodes' order. Sets every clip's `track`."""
+    position = {lab: (t, i) for t, (_, labs) in enumerate(LAB_TRACKS) for i, lab in enumerate(labs)}
+
     def key(k: str) -> tuple:
         clip = clips[k]
-        if clip.get("series", "tour") == "tour":
-            return (0, k, 0)
-        return (1, clip.get("lab") or k, clip.get("order", 1), k)
+        clip["track"] = track_of(clip)
+        series = clip.get("series", "tour")
+        if series == "tour":
+            return (0, 0, 0, k, 0)
+        if series == "labs":
+            lab = clip.get("lab") or k
+            if lab not in position:
+                print(f"warning: {k}: lab {lab} is in no track of LAB_TRACKS (tools/tour/publish.py): listed last")
+            t, i = position.get(lab, (len(LAB_TRACKS), 0))
+            return (1, t, i, lab, clip.get("order", 1))
+        return (2 + (SERIES.index(series) if series in SERIES else len(SERIES)), 0, 0, clip.get("track") or k, clip.get("order", 1))
     return sorted(clips, key=key)
 
 
-main()
+if __name__ == "__main__":
+    main()
