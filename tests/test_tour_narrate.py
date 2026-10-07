@@ -40,6 +40,16 @@ class SpokenTests(unittest.TestCase):
         self.assertEqual(narrate.spoken("Memoria, CPU e il setup: Ctrl+Alt+Canc.", "it"), "Memoria, ci pi ù e il setàp: Control Alt kanch,")
         self.assertEqual(narrate.spoken("Gestito da HA, IT-Tools, nessuno shutdown.", "it"), "Gestito da alta affidabilità, ai ti tùls, nessuno sciatdàun,")
         self.assertEqual(narrate.spoken("Managed by HA.", "en"), "Managed by H A,")
+        # The ZFS course: commands in lower case, options, a path, a column.
+        self.assertEqual(narrate.spoken("zpool list e zfs list, la .zfs, con -r e -nv, colonna CKSUM, uno spare.", "it"),
+                         "zeta pool list e zeta effe esse list, la punto zeta effe esse, con meno erre e meno enne vu, colonna checksum, uno spèr,")
+        self.assertEqual(narrate.spoken("Un vdev, un mirror, gli slot sul bus.", "it"), "Un vidèv, un mìrror, gli slot sul bas,")
+        self.assertEqual(narrate.spoken("Un Service NodePort, due services.", "it"), "Un sèrvis NodePort, due sèrvisis,")
+        self.assertEqual(narrate.spoken("Un Secret per MariaDB.", "it"), "Un sìcret per maria di bi,")
+        self.assertEqual(narrate.spoken("Un container, tre containers.", "it"), "Un contèinar, tre contèinar,")
+        self.assertEqual(narrate.spoken("rollout undo torna indietro.", "it"), "rollout andù torna indietro,")
+        self.assertEqual(narrate.spoken("Two vdevs, needs -r, the .zfs directory, lz4.", "en"),
+                         "Two V devs, needs dash r, the dot Z F S directory, L Z four,")
         self.assertEqual(narrate.spoken("Ed ecco il lab: tutto il catalogo!", "it"), "Ed ecco il lab: tutto il catalogo!")
         self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un fàil privato,")
         self.assertEqual(narrate.spoken("I file del profilo.", "it"), "I fàil del profilo,")

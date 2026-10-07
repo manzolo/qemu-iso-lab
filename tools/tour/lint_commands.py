@@ -67,6 +67,43 @@ def problems(command: str) -> list[str]:
     return found
 
 
+# Variables a lesson may use without showing where they come from: the shell sets them.
+SHELL_VARS = {"HOME", "USER", "PATH", "PWD", "SHELL", "HOSTNAME", "LANG", "TERM", "UID", "RANDOM", "OLDPWD"}
+
+
+def outside_single_quotes(command: str) -> str:
+    """The command without its single-quoted pieces (awk '$2==...' is not a shell variable)."""
+    return re.sub(r"'[^']*'", "''", command)
+
+
+def variables_used(command: str) -> set[str]:
+    code = outside_single_quotes(command.split("    #", 1)[0])
+    return set(re.findall(r"\$\{?([A-Za-z_][A-Za-z0-9_]*|[1-9])", code))
+
+
+def variables_set(command: str) -> set[str]:
+    code = outside_single_quotes(command.split("    #", 1)[0])
+    names = set(re.findall(r"(?:^|[;&|(]\s*|\bexport\s+|\blocal\s+)([A-Za-z_][A-Za-z0-9_]*)=", code))
+    names |= set(re.findall(r"\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b", code))
+    names |= set(re.findall(r"\bread\s+(?:-\w+\s+)*([A-Za-z_][A-Za-z0-9_]*)", code))
+    if re.search(r"\bset\s+--\s", code):
+        names |= {str(i) for i in range(1, 10)}
+    return names
+
+
+def unset_variables(commands: list[str]) -> list[str]:
+    """A rule of the lessons (Manzolo, 2026-10-07: "se c'e' un comando con una variabile deve essere
+    prima mostrato come si inizializza"): every $NAME (or $1..$9) a command uses was set on camera
+    by an earlier command of the same clip (or by that command itself, before its use). The order is
+    the one typed, so rec.mjs checks the steps of a rehearsal (--dry) rather than the source."""
+    known, report = set(SHELL_VARS), []
+    for command in commands:
+        known |= variables_set(command)
+        for name in sorted(variables_used(command) - known):
+            report.append(f"${name} is used before the clip shows where it comes from: {command.strip()[:120]}")
+    return report
+
+
 def clip_commands(path: Path) -> list[tuple[int, str]]:
     """The JavaScript string literals passed to d.run / d.guest, unescaped the way JS would."""
     out = []
@@ -126,6 +163,11 @@ def lint(paths: list[Path]) -> list[str]:
 
 
 def main() -> int:
+    if sys.argv[1:2] == ["--steps"]:  # rec.mjs --dry: the commands a rehearsal typed, in order
+        steps = [step["cmd"] for step in json.loads(Path(sys.argv[2]).read_text(encoding="utf-8")).get("steps", [])]
+        report = unset_variables(steps) + [f"{m}: {c.strip()[:120]}" for c in steps for m in problems(c)]
+        print("\n".join(report) if report else f"{len(steps)} commands: every variable shown before its use")
+        return 1 if report else 0
     paths = [Path(p).resolve() for p in sys.argv[1:]] or default_paths()
     report = lint(paths)
     print("\n".join(report) if report else f"{len(paths)} files: no command that breaks in an interactive shell")

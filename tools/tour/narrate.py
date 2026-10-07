@@ -25,7 +25,11 @@ LANGS = ("it", "en")
 # What the subtitles write and the voice should say instead.
 SPOKEN = {
     "en": [(r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Del", "Control Alt Delete"),
-           (r"…", ","), (r"\bVMs\b", "V Ms"), (r"\bVM\b", "V M"), (r"\bHA\b", "H A")],
+           (r"…", ","), (r"\bVMs\b", "V Ms"), (r"\bVM\b", "V M"), (r"\bHA\b", "H A"),
+           # The ZFS course (2026-10-07): options, paths and column names as one says them.
+           (r"(?<![\w-])-nv\b", "dash n v"), (r"(?<![\w-])-([ri])\b", r"dash \1"), (r"\.zfs\b", "dot Z F S"),
+           (r"/srv/web\b", "slash srv slash web"), (r"\bCKSUM\b", "checksum"), (r"\blz4\b", "L Z four"),
+           (r"\blsblk\b", "L S block"), (r"\bDISKS\b", "disks"), (r"\bmkfs\b", "make F S"), (r"\bfstab\b", "F S tab"), (r"\bdb\b", "D B"), (r"\bvdevs?\b", lambda m: "V devs" if m.group(0).endswith("s") else "V dev")],
     # Italian words that XTTS reads the English way: console -> consolle (con-SOL-le), never the
     # buttons' own names (Open console, Consoles), which are English on the screen too.
     # console/consoles/GitHub: "consolle" and the English spelling both came out wrong in the
@@ -35,6 +39,15 @@ SPOKEN = {
            # proxmox-lab (2026-10-07): HA would be the verb "ha" (a silent h), and "acca a" did not
            # convince Manzolo either: say it in full, as the cues do. IT-Tools would be the pronoun "it".
            (r"\bHA\b", "alta affidabilità"), (r"\bIT-Tools\b", "ai ti tùls"), (r"\bshutdown\b", "sciatdàun"),
+           # The ZFS course (2026-10-07): the commands in lower case, the options, paths and columns,
+           # and the English words an Italian voice reads letter by letter.
+           (r"\bzpool\b", "zeta pool"), (r"(?<![\w.])zfs\b", "zeta effe esse"), (r"\.zfs\b", "punto zeta effe esse"),
+           (r"(?<![\w-])-nv\b", "meno enne vu"), (r"(?<![\w-])-r\b", "meno erre"), (r"(?<![\w-])-i\b", "meno i"),
+           (r"/srv/web\b", "slash esse erre vu slash web"), (r"\bCKSUM\b", "checksum"), (r"\bRAIDZ\b", "raid zeta"),
+           (r"\bvdevs?\b", "vidèv"), (r"\bmirror\b", "mìrror"), (r"\bbus\b", "bas"),  # sample A, chosen by ear (2026-10-07) (r"\blsblk\b", "elle esse blok"), (r"\bDISKS\b", "disks"), (r"\bmkfs\b", "make effe esse"), (r"\bfstab\b", "effe esse tab"), (r"\bdb\b", "di bi"),
+           (r"\b[Cc]ontainers?\b", "contèinar"), (r"\bundo\b", "andù"), (r"\b[Ss]ecrets\b", "sìcrets"), (r"\b[Ss]ecret\b", "sìcret"), (r"\bMariaDB\b", "maria di bi"),  # Manzolo, 2026-10-07
+           (r"\b[Ss]ervices\b", "sèrvisis"), (r"\b[Ss]ervice\b", "sèrvis"),  # Kubernetes' Service, as an Italian says the English word (Manzolo, 2026-10-07)
+           (r"\bspare\b", "spèr"), (r"\bscrub\b", "scràb"), (r"\bresilver\b", "risìlver"),
            (r"\bCPUs?\b", "ci pi ù"), (r"\b[Ss]etup\b", "setàp"), (r"\bCanc\b", "kanch"),  # the soft final c: "kanch" chosen by ear among three samples
            (r"…", ","), (r"\bVM\b", "V M"), (r"\bMy VMs\b", "My V Ms"),
            (r"(?i)\bmicrok8s\b", "micro k8s"),  # then the mixed-token rule spells k8s

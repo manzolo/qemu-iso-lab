@@ -10,11 +10,12 @@ assert "one disk goes offline" on zfs-lab-server sudo zpool offline tank "$DISK1
 assert_contains "the pool is DEGRADED and still serving" "$(on zfs-lab-server sudo zpool list -H -o health tank 2>/dev/null || true)" "^DEGRADED$"
 assert "a write succeeds while degraded" on zfs-lab-server "echo written-while-degraded | sudo tee /tank/data/degraded >/dev/null"
 assert "the disk comes back online" on zfs-lab-server sudo zpool online tank "$DISK1"
-zfs_settle
+# zpool wait, not a poll of the status: a poll could look before the resilver had even started
+# (the course rehearsal of 2026-10-07 failed one check of this script that way, once).
+on zfs-lab-server sudo zpool wait -t resilver tank >/dev/null 2>&1 || zfs_settle
 assert_contains "the pool is ONLINE after the resilver" "$(on zfs-lab-server sudo zpool list -H -o health tank 2>/dev/null || true)" "^ONLINE$"
 assert_contains "the status records the resilver" "$(on zfs-lab-server sudo zpool status tank 2>/dev/null || true)" "resilvered"
-assert "a scrub starts" on zfs-lab-server sudo zpool scrub tank
-zfs_settle
+assert "a scrub runs to its end" on zfs-lab-server sudo zpool scrub -w tank
 status=$(on zfs-lab-server sudo zpool status tank 2>/dev/null || true)
 assert_contains "the scrub repaired nothing" "$status" "scrub repaired 0B"
 assert_contains "no known data errors" "$status" "No known data errors"

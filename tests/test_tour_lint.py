@@ -28,5 +28,19 @@ class TourLintTests(unittest.TestCase):
             self.assertEqual(problems(fine), [], fine)
 
 
+class VariablesShownFirstTests(unittest.TestCase):
+    def test_a_variable_is_shown_before_it_is_used(self):
+        unset = lint_commands.unset_variables
+        self.assertEqual(unset(["echo $DISKS"]), ["$DISKS is used before the clip shows where it comes from: echo $DISKS"])
+        self.assertTrue(unset(["sudo zpool create tank mirror $1 $2"]))  # positional names need a set --
+        shown = [
+            "DISKS=$(lsblk -dnpo NAME,SIZE | awk '$2==\"2G\" {print $1}')",  # awk's $2 and $1 are not the shell's
+            "echo $DISKS", "set -- $DISKS", "sudo zpool create tank mirror $1 $2",
+            "for d in $DISKS; do sudo wipefs -a $d; done", "echo $HOME",
+            "kubectl get pods    # a comment may mention $ANYTHING",
+        ]
+        self.assertEqual(unset(shown), [])
+
+
 if __name__ == "__main__":
     unittest.main()

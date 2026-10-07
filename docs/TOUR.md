@@ -126,6 +126,25 @@ Another voice: `--speaker "<name>"` (XTTS's built-in speakers), or a recording o
 `pw-record --rate=22050 --channels=1 --sample-count=551250 my-voice.wav` (25 s); stopping
 `pw-record` with a signal (`timeout`) truncates the file to a couple of seconds.
 
+## How a lesson types its commands (2026-10-07)
+
+Rules approved by Manzolo on the ZFS course, for every clip from now on (the older lessons are
+redone with them one by one):
+
+- **One short command per step.** No `&&`, `;` or `for` chains, no `-o custom-columns`/`jsonpath`,
+  no SQL squeezed into `-e "..."` (type it into the client, a line at a time). A table too wide for
+  the screen gets a smaller font (`d.openTerminal(14)`), not hand-picked columns.
+- **Nothing typed that the lesson does not explain.** The guest's prompt stamp goes into its
+  `~/.bashrc` off camera (`d.session`), the ssh line and the login banner are cleared with Ctrl+L,
+  `d.clearScreen()` replaces a typed `clear`. Waits, cleanups and setup run off camera (`d.vm`, a
+  `vmctl shell` the viewer does not see) while the voice explains.
+- **Every variable is shown where it is born**: a command that uses `$NAME` (or `$1`..`$9`) comes
+  after the command that sets it (`NAME=...`, `set --`, `for NAME in`, `read NAME`), on camera.
+  `rec.mjs --dry` enforces it: at the end of a rehearsal the typed steps go through
+  `tools/tour/lint_commands.py --steps`, and a variable used before it was shown (or a command that
+  stops to ask) fails the rehearsal with exit 3. Single-quoted text (`awk '$2==...'`) and the
+  shell's own variables (`$HOME`, `$USER`...) do not count.
+
 ## Lab lessons
 
 A lab may have more than one lesson: `export const order = 0` puts a clip before the lab's others on the tour page and on its card (`lab-git-basics`, for beginners, comes before `lab-git`); without it a lesson has order 1 and lessons of one lab sort by name.

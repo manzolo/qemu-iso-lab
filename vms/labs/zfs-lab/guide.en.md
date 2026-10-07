@@ -120,6 +120,47 @@ for d in $DISKS; do sudo zpool labelclear -f $d; sudo wipefs -a $d; done
 lsblk
 ```
 
+## The ZFS course: one step further
+
+The five episodes of the course (tour page, *Courses*) go a little beyond the exercises. Their extra
+commands, on a pool rebuilt from empty disks (`set -- $DISKS` names them `$1`..`$4`):
+
+```sh
+set -- $DISKS
+sudo zpool create -f tank raidz $1 $2 $3 && sudo zpool add -f tank spare $4   # 1: RAIDZ on three, a hot spare
+sudo zpool list -o name,size,alloc,free tank; sudo zfs list tank             # raw space vs usable space
+sudo zpool iostat -v tank; sudo zpool history tank
+
+sudo zfs create tank/projects; sudo zfs create tank/projects/web; sudo zfs create tank/projects/db
+sudo zfs set compression=lz4 tank/projects                                    # 2: inherited by web and db
+sudo zfs get -r -o name,property,value,source compression tank/projects
+sudo zfs set quota=200M tank/projects/web                                     # a ceiling ("Disk quota exceeded")
+sudo zfs set reservation=500M tank/projects/db                                # space guaranteed, taken from the others
+sudo zfs set recordsize=16K tank/projects/db                                  # small blocks for a database
+sudo zfs set compression=off tank/projects/db; sudo zfs inherit compression tank/projects/db
+sudo zfs set mountpoint=/srv/web tank/projects/web
+```
+
+A deleted file's space comes back a few seconds later: ZFS frees it in the background.
+
+```sh
+sudo zfs snapshot tank/projects/web@monday                                    # 3: snapshots
+ls /srv/web/.zfs/snapshot/monday/                                             # browse it, copy one file back
+sudo zfs rollback -r tank/projects/web@monday                                 # -r destroys the later snapshots
+sudo zfs hold keep tank/projects/web@monday; sudo zfs destroy tank/projects/web@monday   # refused: dataset is busy
+sudo zfs release keep tank/projects/web@monday
+sudo zfs clone tank/projects/web@monday tank/web-test; sudo zfs list -o name,origin -r tank
+sudo zfs destroy tank/web-test
+
+sudo dd if=/dev/urandom of=$2 bs=1M seek=300 count=600 conv=notrunc status=none   # 4: silent corruption, lab disks only
+sudo zpool scrub -w tank; sudo zpool status tank                              # CKSUM counted and repaired
+sudo zpool clear tank; grep scrub /etc/cron.d/zfsutils-linux                   # Ubuntu scrubs every month
+sudo zpool replace tank $2 $4; sudo zpool detach tank $2                       # the spare takes the disk's place
+
+sudo zfs send -nv -i @s1 tank/web@s2                                          # 5: estimate an incremental stream
+sudo zpool export tank; sudo zpool import; sudo zpool import tank archive     # move a pool, rename it on import
+```
+
 ## Tests
 
 ```sh

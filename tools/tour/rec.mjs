@@ -84,8 +84,9 @@ const d = {
   ffEnd() { const s = ff[ff.length - 1]; if (s && s.end === null) s.end = (Date.now() - t0) / 1000; },
   async key(keys) { vm(`DISPLAY=:0 xdotool key ${keys}`); },
   // A maximized qterminal with the demo shell (prompt demo@lab, BROWSER = the CDP Chromium).
-  async openTerminal() {
-    vm("pkill -x qterminal; sleep 1.5; sed -i 's/^fontSize=.*/fontSize=17/' ~/.config/qterminal.org/qterminal.ini; " +
+  // fontSize: 17 by default; a lesson whose tables are wide (kubectl -o wide) asks for less.
+  async openTerminal(fontSize = 17) {
+    vm(`pkill -x qterminal; sleep 1.5; sed -i 's/^fontSize=.*/fontSize=${fontSize}/' ~/.config/qterminal.org/qterminal.ini; ` +
        "DISPLAY=:0 setsid -f qterminal -e 'bash --rcfile ~/lab/video/demo.bashrc -i' </dev/null >/dev/null 2>&1");
     for (let i = 0; i < 40; i++) {
       await sleep(250);
@@ -128,6 +129,13 @@ const d = {
   // vmctl shell) and leaves the output on screen for `read` ms; leave() exits and waits for the host prompt.
   async session(vm, checkout = "~/lab/demo/qemu-iso-lab") {
     d._guest = { vm, checkout };
+    // The stamp goes into the guest's ~/.bashrc through a second, invisible shell: typed on camera,
+    // "PROMPT_COMMAND='date +%s%N >/tmp/.p'; clear" opened every lesson with a line nobody could
+    // explain (Manzolo, 2026-10-07).
+    const rc = "grep -q vmctl-tour-stamp ~/.bashrc 2>/dev/null || echo \"PROMPT_COMMAND='date +%s%N >/tmp/.p'  # vmctl-tour-stamp\" >> ~/.bashrc";
+    try { vm_(`cd ${checkout} && ./bin/vmctl shell ${vm} -- ${JSON.stringify(rc)} >/dev/null 2>&1`); } catch {}
+    const stampNow = () => vm_(`cd ${checkout} && ./bin/vmctl shell ${vm} -- cat /tmp/.p 2>/dev/null || true`).trim();
+    const stampBefore = stampNow();
     await d.run(`vmctl shell ${vm}`, { wait: false });
     // A login can take a minute (pam_motd on a server): past 4 s the wait is fast-forwarded in the edit.
     const started = Date.now();
@@ -145,10 +153,18 @@ const d = {
     // studio's password).
     if (!inside) throw new Error(`no SSH session in ${vm} after 90 s: is it running? (vmctl status, its post-install log)`);
     await sleep(1500);
-    await d.type("PROMPT_COMMAND='date +%s%N >/tmp/.p'; clear", 30);
-    await d.key("Return");
-    await sleep(1500);
+    // The login's first prompt has moved the stamp: nothing to type. A shell that does not read
+    // ~/.bashrc gets it typed, as before.
+    if (stampNow() === stampBefore) {
+      await d.type("PROMPT_COMMAND='date +%s%N >/tmp/.p'; clear", 30);
+      await d.key("Return");
+      await sleep(1500);
+    }
+    // The ssh line vmctl prints and the login banner are noise on camera: a clean screen.
+    await d.clearScreen();
   },
+  // Clears the screen with Ctrl+L: no "clear" typed on camera.
+  async clearScreen() { await d.key("ctrl+l"); await sleep(400); },
   async guest(cmd, { read = 3500, delay = 40, timeout = 120000 } = {}) {
     const { vm: g, checkout } = d._guest;
     const stamp = () => vm_(`cd ${checkout} && ./bin/vmctl shell ${g} -- cat /tmp/.p 2>/dev/null || true`).trim();
@@ -233,4 +249,14 @@ try {
   writeFileSync(join(outDir, "cues.json"), JSON.stringify({ clip: name, title: clip.title, lab: clip.lab || null, series: clip.series || "tour", order: clip.order ?? 1, cues: log, steps, ff }, null, 2));
   console.log(dry ? `-> ${outDir}: rehearsal, ${shots} screenshots (one per cue) to read before the take` : `-> ${outDir}`);
 }
-process.exit(0);
+// The commands this run typed, in order, through the lessons' rules (tools/tour/lint_commands.py
+// --steps): a variable used before the clip shows where it comes from, a command that would stop
+// to ask. A rehearsal that breaks one fails, so the take is not recorded like that.
+let lintOk = true;
+try {
+  console.log(execFileSync("python3", [join(dirname(new URL(import.meta.url).pathname), "lint_commands.py"), "--steps", join(outDir, "cues.json")], { encoding: "utf8" }).trim());
+} catch (e) {
+  lintOk = false;
+  console.log(`LESSON RULES BROKEN:\n${(e.stdout || "").trim()}`);
+}
+process.exit(dry && !lintOk ? 3 : 0);
