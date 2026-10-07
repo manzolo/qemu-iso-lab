@@ -337,7 +337,10 @@ diagnosis above only exists because the disk was copied aside by hand while the 
     **Android** (added 2026-10-07, Manzolo: "segnamolo come distro da provare"): an Android-x86 /
     BlissOS profile, then scrcpy (5.0: hardware decoding with VA-API) over `adb connect` to a
     forwarded port as its console, smoother than VNC and with clipboard and audio; maybe an
-    android-lab later.
+    android-lab later. Started by Codex the same evening from `docs/prompts/android-lab.md` and
+    parked on the local branch `wip/android` (`vmctl/android.py`, `docs/ANDROID.md`, untested;
+    research notes in `artifacts/android-research/`, untracked): interrupted at its usage limit while
+    checking the swcodec linker configuration over adb. Resume with `git switch wip/android`.
 11. Next labs (k3s cluster, multi-segment routing, highly available web, Samba AD) and the
     Proxmox lab's extensions (a Ceph variant; ZFS replication + HA are its exercises 3-5 since 2026-10-07): [LAB_IDEAS.md](LAB_IDEAS.md).
 
