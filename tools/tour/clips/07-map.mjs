@@ -40,6 +40,7 @@ export async function setup(d) {
   await d.page.keyboard.press("Escape").catch(() => {});
   await d.page.goto(d.restartWeb());
   await d.page.locator("#search").waitFor();
+  await d.page.locator("#rows tr[data-vm]").first().waitFor({ timeout: 30000 });  // the first state, before any click (clip 06, 2026-10-07)
   await d.page.locator("#vnc-dialog").evaluate((x) => x.open && x.close()).catch(() => {});
   await d.page.locator("#log-dialog").evaluate((x) => x.open && x.close()).catch(() => {});
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1500 300 0.1");

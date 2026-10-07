@@ -36,6 +36,7 @@ class SpokenTests(unittest.TestCase):
         # and the English spelling both came out wrong in the showcase).
         self.assertEqual(narrate.spoken("Apri la console. Poi Open console.", "it"), "Apri la consòl, Poi Open consòl,")
         self.assertEqual(narrate.spoken("Le loro consoles, su GitHub.", "it"), "Le loro consòl, su ghit-hab,")
+        self.assertEqual(narrate.spoken("Lancialo: tiralo su, poi segnalo guasto.", "it"), "Làncialo: tìralo su, poi ségnalo guasto,")
         self.assertEqual(narrate.spoken("Memoria, CPU e il setup: Ctrl+Alt+Canc.", "it"), "Memoria, ci pi ù e il setàp: Control Alt kanch,")
         self.assertEqual(narrate.spoken("Ed ecco il lab: tutto il catalogo!", "it"), "Ed ecco il lab: tutto il catalogo!")
         self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un fàil privato,")

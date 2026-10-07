@@ -40,7 +40,14 @@ SPOKEN = {
            (r"/proc\b", "proc"), (r"\by\b", "ipsilon"), (r"\bkvm\b", "KVM"),
            (r"\bv(\d+(?:\.\d+)*)\b", r"vu \1"),  # a tag v1.0: "vu uno punto zero" (the version rule takes the rest)
            # Enclitic imperatives get the stress wrong ("aprìlo"): say them in two words (Manzolo, 2026-10-05).
-           (r"\baprilo\b", "apri il fàil"), (r"\bchiudilo\b", "chiudi il fàil")],
+           (r"\baprilo\b", "apri il fàil"), (r"\bchiudilo\b", "chiudi il fàil"),
+           # The other imperatives with an attached pronoun get their stress written (Manzolo chose
+           # the accent over two words by ear, 2026-10-07): "Lancialo" was read lan-CIA-lo.
+           *[(rf"\b{w[0]}(?i:{w[1:]})\b", s) for w, s in (("Lancialo", "Làncialo"), ("lancialo", "làncialo"),
+             ("Allargalo", "Allàrgalo"), ("allargalo", "allàrgalo"), ("Formattalo", "Formàttalo"), ("formattalo", "formàttalo"),
+             ("Montalo", "Mòntalo"), ("montalo", "mòntalo"), ("Riassemblalo", "Riassèmblalo"), ("riassemblalo", "riassèmblalo"),
+             ("Tiralo", "Tìralo"), ("tiralo", "tìralo"), ("Toglilo", "Tòglilo"), ("toglilo", "tòglilo"),
+             ("Fattelo", "Fàttelo"), ("fattelo", "fàttelo"), ("Segnalo", "Ségnalo"), ("segnalo", "ségnalo"))]],
 }
 
 
