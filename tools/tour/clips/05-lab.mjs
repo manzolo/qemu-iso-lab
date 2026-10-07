@@ -61,7 +61,7 @@ export async function run(d) {
   const p = d.page;
   const card = () => p.locator(`section.lab[data-lab="${LAB}"]`);
   await d.cue("labs");
-  await d.click(p.getByRole("button", { name: "Labs", exact: true }).first());
+  await d.click(p.getByRole("tab", { name: /Labs/ }));
   await d.sleep(1200);
   await card().scrollIntoViewIfNeeded();
   await d.hover(card().locator(".lab-name"));
@@ -70,7 +70,7 @@ export async function run(d) {
   await d.sleep(1200);
 
   await d.cue("install");
-  await d.click(card().locator(".lab-footer .buttons button").first());
+  await d.click(card().locator(".lab-toolbar button.primary"));
   await confirmIfAsked(d);
   await d.sleep(2000);
   await d.click(p.locator("#job-bar-log"));
@@ -117,7 +117,10 @@ export async function run(d) {
   await d.sleep(800);
 
   await d.cue("tests");
-  await d.click(card().getByRole("button", { name: "Run tests" }));
+  // Run tests lives in the card's Actions menu since v0.25 (one toolbar per card).
+  await d.click(card().locator(".lab-menu"));
+  await d.sleep(900);
+  await d.click(p.locator('#vm-context button[aria-label="Run tests"]'));
   await confirmIfAsked(d);
   await d.sleep(1500);
   await d.click(p.locator("#job-bar-log"));
