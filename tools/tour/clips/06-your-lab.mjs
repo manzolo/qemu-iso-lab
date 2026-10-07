@@ -60,7 +60,7 @@ export async function setup(d) {
   d.vm(`cd ${CHECKOUT} && for v in ${MEMBERS.join(" ")}; do ./bin/vmctl stop $v >/dev/null 2>&1; done; ` +
        `./bin/vmctl group clean ${LAB} --yes >/dev/null 2>&1; ./bin/vmctl group remove ${LAB} >/dev/null 2>&1; rm -rf artifacts/${LAB}-*; true`);
   const ctx = d.page.context();
-  for (const p of ctx.pages()) if (p !== d.page && p.url() !== "about:blank") await p.close();
+  for (const p of ctx.pages()) if (p !== d.page) await p.close();
   await d.page.goto("about:blank");
   await d.openTerminal();
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
@@ -93,11 +93,21 @@ export async function run(d) {
 
   await d.cue("card");
   const url = d.restartWeb();
-  d.vm(`DISPLAY=:0 ~/lab/video/open-in-cdp.sh '${url}'`);
-  const p = await d.newestPage();
+  // Opened by Playwright, not by open-in-cdp.sh: Chromium 154's /json/new dropped the ?token= of
+  // the URL and the dashboard came up with no data (2026-10-07 rehearsal).
+  const p = await d.page.context().newPage();
+  await p.goto(url);
+  d.page = p;
+  await d.focusBrowser();
+  await p.bringToFront();
   await d.focusBrowser();
   await p.locator("#search").waitFor();
+  // The first state picks the opening view by itself: a click before it was overridden (the
+  // rehearsal stayed on Catalog). Wait for the rows, then make sure Labs is the tab in front.
+  await p.locator("#rows tr[data-vm]").first().waitFor({ timeout: 30000 });
+  await d.sleep(800);
   await d.click(p.getByRole("tab", { name: /Labs/ }));
+  await p.locator('#workspace-nav [data-filter="labs"].active').waitFor({ timeout: 10000 });
   const card = () => p.locator(`section.lab[data-lab="${LAB}"]`);
   await card().scrollIntoViewIfNeeded();
   await d.hover(card().locator(".lab-name"));

@@ -30,9 +30,9 @@ SPOKEN = {
     # buttons' own names (Open console, Consoles), which are English on the screen too.
     # console/consoles/GitHub: "consolle" and the English spelling both came out wrong in the
     # showcase (Manzolo, 2026-10-07): say them the way an Italian says the English word.
-    "it": [(r"\b[Cc]onsoles?\b", "consòl"), (r"\bGitHub\b", "ghit-hab"), (r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Canc", "Control Alt Cancella"),
+    "it": [(r"\b[Cc]onsoles?\b", "consòl"), (r"\bGitHub\b", "ghit-hab"), (r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Canc", "Control Alt kanch"),
            # Manzolo, 2026-10-07: CPU, setup and Canc came out wrong in Italian.
-           (r"\bCPUs?\b", "ci pi ù"), (r"\b[Ss]etup\b", "setàp"), (r"\bCanc\b", "Cancella"),
+           (r"\bCPUs?\b", "ci pi ù"), (r"\b[Ss]etup\b", "setàp"), (r"\bCanc\b", "kanch"),  # the soft final c: "kanch" chosen by ear among three samples
            (r"…", ","), (r"\bVM\b", "V M"), (r"\bMy VMs\b", "My V Ms"),
            (r"(?i)\bmicrok8s\b", "micro k8s"),  # then the mixed-token rule spells k8s
            # English loanwords read letter by letter in Italian: "file" came out as "fi-le" (Manzolo, 2026-10-05).
