@@ -49,7 +49,7 @@ export async function run(d) {
   const p = d.page;
   const card = () => p.locator(`section.lab[data-lab="${LAB}"]`);
   await d.cue("labs");
-  await d.click(p.getByRole("button", { name: "Labs", exact: true }).first());
+  await d.click(p.getByRole("tab", { name: /Labs/ }));
   await d.sleep(1200);
   await card().scrollIntoViewIfNeeded();
   await d.hover(card().locator(".lab-name"));

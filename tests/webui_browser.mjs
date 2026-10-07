@@ -438,7 +438,7 @@ try {
   await page.evaluate(()=>render());
   assert.equal(await page.locator('[data-section=installation]').getAttribute('open'),''); check('polling preserves expanded profile');
   await page.locator('[data-filter=labs]').click();
-  assert.equal(await page.locator('.lab').first().locator('.lab-toolbar button').first().textContent(),'Start stack');
+  assert.equal(await page.locator('.lab').first().locator('.lab-toolbar button').first().textContent(),'Start');
   assert.equal(await page.locator('.lab').nth(1).locator('.lab-toolbar button').first().textContent(),'Install lab');
   await shot('labs'); check('installed and new labs have different primary actions');
   {
@@ -457,7 +457,7 @@ try {
     assert(await card.evaluate(n=>n.classList.contains('busy')),'Busy while the job runs');
     jobStatus='completed'; await page.evaluate(()=>refreshJobs());
     await page.waitForFunction(()=>!document.querySelector('.lab.busy'));
-    assert.equal((await card.locator('.lab-toolbar button').first().textContent()).trim(),'Start stack');
+    assert.equal((await card.locator('.lab-toolbar button').first().textContent()).trim(),'Start');
     [jobId,jobStatus,jobCommand]=saved; requests=[];
     await page.evaluate(()=>refreshJobs());
     check('a lab command shows it is at work from the click to the end of its job');
