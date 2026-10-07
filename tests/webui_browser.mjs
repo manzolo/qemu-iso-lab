@@ -448,7 +448,7 @@ try {
     holdRun=true; jobId='web:lab';
     await card.locator('.lab-toolbar button').first().click();
     await page.waitForFunction(()=>document.querySelector('.lab.busy button.working'));
-    assert.equal((await card.locator('button.working').textContent()).trim(),'Starting…');
+    assert.equal((await card.locator('button.working').textContent()).trim(),'Start…');
     assert.equal(await card.locator('.lab-footer [data-args]:not([disabled])').count(),0,'The other lab commands wait');
     assert.equal(await card.getAttribute('aria-busy'),'true');
     holdRun=false; releaseRun();

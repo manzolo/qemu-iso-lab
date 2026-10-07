@@ -363,9 +363,9 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 /* One row of equal buttons under the members (Manzolo, 2026-10-06: the mix of filled buttons,
    red Reset, text links and a "More lab actions" fold was not nice): the stack's power first,
    then Map, Consoles, Guide. Everything else is in the card's Actions ⋯ menu. */
-.lab-toolbar { display:flex; flex-wrap:wrap; gap:6px; border-top:1px solid var(--line); padding-top:14px; }
-.lab-toolbar button { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:6px 11px; font-size:13px; white-space:nowrap; transition:background .3s ease, color .3s ease, border-color .3s ease, opacity .3s ease; }
-.lab-toolbar button.primary { min-width:124px; justify-content:center; }
+.lab-toolbar { display:flex; flex-wrap:wrap; gap:5px; border-top:1px solid var(--line); padding-top:14px; }
+.lab-toolbar button { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:6px 9px; font-size:13px; white-space:nowrap; transition:background .3s ease, color .3s ease, border-color .3s ease, opacity .3s ease; }
+.lab-toolbar button.primary { justify-content:center; }
 .lab-toolbar button svg { width:15px; height:15px; flex-shrink:0; }
 .lab-toolbar button.primary svg { stroke-width:2.2; }
 /* The power button of every machine, the map's own (lab-map.js): click starts it headless,
@@ -1611,7 +1611,9 @@ let detailsSignature = "", labsSignature = "", labsOrder = [];
 // Lab commands in flight: the click itself (until /api/run answers with a job), then that job
 // while /api/jobs lists it running; any running `vmctl group <cmd> <lab>` job counts too.
 const labPending = new Map();  // lab -> {action, job, at}
-const LAB_WORKING = {up:"Starting…", down:"Stopping…", install:"Installing…", reset:"Resetting…", test:"Running tests…",
+// The stack's button keeps its own word while it works (the spinner replaces the power icon):
+// "Stopping…" was 40 px wider than "Stop" and pushed Guide to a second line (2026-10-07).
+const LAB_WORKING = {up:"Start…", down:"Stop…", install:"Install…", reset:"Resetting…", test:"Running tests…",
   status:"Reading status…", clean:"Cleaning…", checkpoint:"Saving reset point…", cluster:"Forming cluster…", map:"Generating map…"};
 function labWork(group) {
   const pending = labPending.get(group);
