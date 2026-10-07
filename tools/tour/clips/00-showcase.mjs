@@ -162,7 +162,7 @@ export async function run(d) {
   await d.cue("map");
   const target = d.vm(`cd ${DEMO} && python3 -c "import json; r=json.load(open('artifacts/labs/links/session.json')); print(r['members']['${DESKTOP}']['address'].split('/')[0])"`).trim();
   await d.focusTerminal();
-  await d.run(`vmctl shell ${SERVER} -- ping -c 25 -i 0.4 ${target}`, { wait: false });
+  await d.run(`vmctl shell ${SERVER} -- ping -c 45 -i 0.4 ${target}`, { wait: false });
   await d.focusBrowser();
   await p.bringToFront();
   d.page = p;
@@ -173,8 +173,14 @@ export async function run(d) {
   d.page = map;
   await map.locator("#map-live").filter({ hasText: /^Live/ }).waitFor({ timeout: 30000 });
   await d.sleep(1500);
-  await d.hover(map.locator(".traffic-label").first());
-  await d.sleep(6000);
+  // The private segment sits below the host and the NAT: scroll to it, rest on each NIC's traffic
+  // (the first take hovered the NAT label at the top, and the ping's cables stayed off screen).
+  await map.evaluate(() => document.querySelector(".segment-track")?.scrollIntoView({ block: "center", behavior: "smooth" }));
+  await d.sleep(2500);
+  await d.hover(map.locator(".nic.lan-nic .traffic-label").first());
+  await d.sleep(3500);
+  await d.hover(map.locator(".nic.lan-nic .traffic-label").nth(1));
+  await d.sleep(3500);
   await multi.close().catch(() => {});
   await map.close();
   d.page = p;

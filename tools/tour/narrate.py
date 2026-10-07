@@ -28,7 +28,9 @@ SPOKEN = {
            (r"…", ","), (r"\bVMs\b", "V Ms"), (r"\bVM\b", "V M")],
     # Italian words that XTTS reads the English way: console -> consolle (con-SOL-le), never the
     # buttons' own names (Open console, Consoles), which are English on the screen too.
-    "it": [(r"(?<!Open )\bconsole\b", "consolle"), (r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Canc", "Control Alt Canc"),
+    # console/consoles/GitHub: "consolle" and the English spelling both came out wrong in the
+    # showcase (Manzolo, 2026-10-07): say them the way an Italian says the English word.
+    "it": [(r"\b[Cc]onsoles?\b", "consòl"), (r"\bGitHub\b", "ghit-hab"), (r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Canc", "Control Alt Canc"),
            (r"…", ","), (r"\bVM\b", "V M"), (r"\bMy VMs\b", "My V Ms"),
            (r"(?i)\bmicrok8s\b", "micro k8s"),  # then the mixed-token rule spells k8s
            # English loanwords read letter by letter in Italian: "file" came out as "fi-le" (Manzolo, 2026-10-05).
