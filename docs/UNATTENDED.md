@@ -1150,7 +1150,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `mysql-lab` | The MySQL lab (vms/labs/mysql-lab/): `mysql-lab-server`, one cloud image with MySQL 8, a sample shop database (users, orders, a foreign key) and phpMyAdmin on http://127.0.0.1:8088/phpmyadmin: queries, joins, transactions, privileges, indexes, mysqldump, configuration |
 | `k8s-lab` | The Kubernetes lab (vms/labs/k8s-lab/): `k8s-lab-main`, `k8s-lab-node1`, `k8s-lab-node2`, three cloud images with MicroK8s 1.32 on the `k8s-lan` segment; the workers join by themselves at their first boot there (`k8s-lab-node.service`); NodePort 30080 on http://127.0.0.1:8089: anatomy, Deployment + Service, rolling update and rollback, drain, ConfigMap and Secret, a persistent volume |
 | `lvm-lab` | The LVM lab (vms/labs/lvm-lab/): `lvm-lab-server`, one cloud image with three empty 2 GiB extra disks |
-| `proxmox-lab` | The Proxmox lab: `proxmox-ve` (ZFS mirror over two disks) and `proxmox-lab-client` (Xfce + Firefox), joined by the `pve-lan` segment |
+| `proxmox-lab` | The Proxmox lab (vms/labs/proxmox-lab/): `proxmox-ve`, `proxmox-ve-node2`, `proxmox-ve-node3` (ZFS mirror over two disks each, cluster `pve-lab`) and `proxmox-lab-client` (Xfce + Firefox), joined by the `pve-lan` segment: the cluster, the LXC containers, ZFS replication (`pvesr`), HA with a planned migration, and a node powered off while its container restarts on another node (about 2.5 minutes, verified live 2026-10-07) |
 | `hobby-os` | Hobby operating systems to boot and explore, all manual live systems: `kolibrios`, `redox`, `menuetos`, and `serenityos` (a `disk_image` built from source). A `--group hobby-os` run records them as skipped (no unattended flow); boot one with `vmctl provision <name>` |
 | `smoke` | One profile per install flow that downloads its own medium, the lightest of each: `alpine-ci`, `ubuntu-server-ci`, `debian-server`, `almalinux-server`, `alpine-niri`, `arch-noctalia`, `opensuse-tumbleweed-autoyast`, `nixos-server`, `freebsd`. Run it before a full matrix: it answers "is every bootstrap flow still working" without the desktop installs |
 
@@ -1607,7 +1607,13 @@ proxmox-lab` does that step alone on a running stack; both are idempotent). `pve
   (`ssh-keyscan`) and runs `pvecm add 10.10.10.2 --link0 <its address> --use_ssh`, which asks nothing;
 - waits for `/etc/pve` to accept writes after every `pvecm` call: pmxcfs restarts and answers "I/O
   error" for a few seconds (the first run failed there appending the key, verified live);
-- checks `Quorate: Yes` with the expected node count.
+- checks `Quorate: Yes` with the expected node count;
+- authorizes every node's **vmctl key** (`artifacts/<vm>/ssh/id_ed25519.pub`) in the primary's
+  `authorized_keys`, before waiting for SSH on the others and again after the joins. After `pvecm add`
+  a node's `/root/.ssh/authorized_keys` is a link to the cluster's `/etc/pve/priv/authorized_keys`,
+  which held the primary's keys and the nodes' root RSA keys only: `vmctl shell` and the lab tests
+  were refused on node 2 and node 3 (found 2026-10-07; `vmctl group cluster proxmox-lab` repairs a
+  cluster formed before).
 
 Only node 1 carries the LXC apps: a node joining a cluster must hold no guests. Verified live on
 2026-09-24: `vmctl group install proxmox-lab` kept node 1 and the client, installed nodes 2 and 3

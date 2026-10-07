@@ -17,7 +17,7 @@ import subprocess
 import time
 from typing import Any
 
-from vmctl import config, proxmox, ssh, ui
+from vmctl import cloud_init, config, proxmox, ssh, ui
 from vmctl.errors import VMError
 
 QUORUM_WAIT_SEC = 180
@@ -138,14 +138,41 @@ def pin_hostname(vm: dict[str, Any], ip: str, dry_run: bool) -> None:
     _run(vm, script, dry_run)
 
 
+def project_key(vm: dict[str, Any], dry_run: bool) -> str | None:
+    """The public half of the key vmctl logs into this node with (``artifacts/<vm>/ssh``)."""
+    access = cloud_init.ssh_access_config(vm)
+    public = ssh.resolve_ssh_public_key(vm, access, dry_run=dry_run) if access is not None else None
+    if public is None or not public.is_file():
+        return None
+    return public.read_text(encoding="utf-8").strip() or None
+
+
+def authorize_project_keys(primary: dict[str, Any], nodes: dict[str, dict[str, Any]], dry_run: bool) -> None:
+    """Every node's vmctl key in the primary's authorized_keys. Once a node joins, its
+    /root/.ssh/authorized_keys becomes a link to the cluster's /etc/pve/priv/authorized_keys,
+    which holds the primary's keys plus the nodes' root keys: the joining node's own vmctl key
+    was gone, and `vmctl shell`/the lab tests were refused on node2 and node3 (verified live,
+    2026-10-07). On the primary before `pvecm create` the line is copied into the cluster file;
+    afterwards it lands there directly. Run first, so a cluster formed before this fix is repaired."""
+    for vm in nodes.values():
+        key = project_key(vm, dry_run)
+        if key is None:
+            continue
+        _run(primary, f"grep -qxF {shlex.quote(key)} /root/.ssh/authorized_keys || "
+                      f"echo {shlex.quote(key)} >> /root/.ssh/authorized_keys", dry_run)
+
+
 def form(cfg: dict[str, Any], names: list[str], timeout_sec: int, dry_run: bool = False) -> None:
     for cluster, entry in clusters(cfg, names).items():
         nodes = {name: config.get_vm(cfg, name) for name in entry["nodes"]}
         ui.print_header(f"Cluster {cluster}: {' + '.join(entry['nodes'])} (corosync on the lab segment)")
-        for name, vm in nodes.items():
-            ssh.wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
         primary = nodes[entry["primary"]]
         primary_ip = lan_ip(primary)
+        ssh.wait_for_ssh(primary, timeout_sec, dry_run=dry_run)
+        authorize_project_keys(primary, nodes, dry_run)
+        for name, vm in nodes.items():
+            if vm is not primary:
+                ssh.wait_for_ssh(vm, timeout_sec, dry_run=dry_run)
         if not dry_run and members_of(primary) == len(nodes):
             ui.print_status("ok", f"Cluster {cluster} already has its {len(nodes)} nodes")
             continue
@@ -169,6 +196,7 @@ def form(cfg: dict[str, Any], names: list[str], timeout_sec: int, dry_run: bool 
             _run(vm, f"ssh-keygen -R {primary_ip} >/dev/null 2>&1; ssh-keyscan -H {primary_ip} >> /root/.ssh/known_hosts 2>/dev/null", dry_run)
             _run(vm, f"pvecm add {primary_ip} --link0 {lan_ip(vm)} --use_ssh", dry_run)
             wait_writable(primary, dry_run)
+        authorize_project_keys(primary, nodes, dry_run)
         if dry_run:
             continue
         deadline = time.monotonic() + QUORUM_WAIT_SEC

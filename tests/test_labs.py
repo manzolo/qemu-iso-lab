@@ -57,7 +57,8 @@ class LabsTests(BaseVmctlTestCase):
         runbook = labs.model(cfg, "proxmox-lab")["runbook"]
         self.assertEqual([phase["title"] for phase in runbook],
                          ["Install", "Lab network", "ZFS pool (mirror)", "LXC containers", "Cluster pve-lab",
-                          "From the client", "Run the stack"])
+                          "From the client", "The cluster", "The containers", "ZFS replication",
+                          "High availability: a planned move", "A node dies, the container moves", "Run the stack"])
         writes = ("pvecm create", "pvecm add", "pct set", "pct migrate", "zpool offline", "zpool scrub",
                   "pve-community.sh", "vmctl group install", ">>")
         for phase in runbook:

@@ -25,13 +25,16 @@ LANGS = ("it", "en")
 # What the subtitles write and the voice should say instead.
 SPOKEN = {
     "en": [(r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Del", "Control Alt Delete"),
-           (r"…", ","), (r"\bVMs\b", "V Ms"), (r"\bVM\b", "V M")],
+           (r"…", ","), (r"\bVMs\b", "V Ms"), (r"\bVM\b", "V M"), (r"\bHA\b", "H A")],
     # Italian words that XTTS reads the English way: console -> consolle (con-SOL-le), never the
     # buttons' own names (Open console, Consoles), which are English on the screen too.
     # console/consoles/GitHub: "consolle" and the English spelling both came out wrong in the
     # showcase (Manzolo, 2026-10-07): say them the way an Italian says the English word.
     "it": [(r"\b[Cc]onsoles?\b", "consòl"), (r"\bGitHub\b", "ghit-hab"), (r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Canc", "Control Alt kanch"),
            # Manzolo, 2026-10-07: CPU, setup and Canc came out wrong in Italian.
+           # proxmox-lab (2026-10-07): HA would be the verb "ha" (a silent h), and "acca a" did not
+           # convince Manzolo either: say it in full, as the cues do. IT-Tools would be the pronoun "it".
+           (r"\bHA\b", "alta affidabilità"), (r"\bIT-Tools\b", "ai ti tùls"), (r"\bshutdown\b", "sciatdàun"),
            (r"\bCPUs?\b", "ci pi ù"), (r"\b[Ss]etup\b", "setàp"), (r"\bCanc\b", "kanch"),  # the soft final c: "kanch" chosen by ear among three samples
            (r"…", ","), (r"\bVM\b", "V M"), (r"\bMy VMs\b", "My V Ms"),
            (r"(?i)\bmicrok8s\b", "micro k8s"),  # then the mixed-token rule spells k8s

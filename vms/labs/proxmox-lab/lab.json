@@ -1,0 +1,168 @@
+{
+  "title": "Proxmox VE lab: a three-node cluster and a container that survives its node",
+  "summary": "Three Proxmox VE 9.2 nodes (ZFS mirror each) clustered over an isolated segment (10.10.10.0/24), and a Debian Xfce client with a browser on the same segment. Node 1 runs two LXC containers, IT-Tools and Glance. The exercises read the cluster, replicate a container's ZFS disk to the other nodes, put it under high availability, move it by hand, and finally power its node off: HA fences the dead node and starts the container on another one, with the same address, while the client keeps asking for the page.",
+  "members": [
+    "proxmox-ve",
+    "proxmox-ve-node2",
+    "proxmox-ve-node3",
+    "proxmox-lab-client"
+  ],
+  "exercises": [
+    {
+      "title": "The cluster",
+      "text": "Corosync keeps the three nodes in one cluster over the lab segment, and /etc/pve is the same file system on every node (pmxcfs). A cluster acts only while a majority of its nodes, the quorum, see each other: two of three is enough. The web GUI of any node manages all of them: https://127.0.0.1:8006 (node 1), 8007 (node 2), 8008 (node 3), root / lab.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "proxmox-ve",
+          "commands": [
+            "pvecm status | sed -n '/^Name/p;/^Nodes/p;/^Quorate/p'    # pve-lab, 3 nodes, Quorate: Yes",
+            "pvecm nodes",
+            "grep ring0_addr /etc/pve/corosync.conf    # corosync on 10.10.10.2-4, the lab segment",
+            "ls /etc/pve/nodes                       # one directory per node, the same on every node"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "The containers",
+      "text": "An LXC container shares the node's kernel: it starts in a second and needs a few hundred MB. CT 200 (IT-Tools) and CT 201 (Glance) run on node 1, their disks are ZFS datasets on local-zfs, and each has a second interface on the lab segment, where the client reaches it.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "proxmox-ve",
+          "commands": [
+            "pct list",
+            "pct config 200 | grep -E '^(hostname|memory|net1|rootfs)'",
+            "zfs list -o name,used,refer | grep subvol    # each container's root file system is a dataset",
+            "pct exec 200 -- ip -4 -o addr show eth1    # 10.10.10.20"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "proxmox-lab-client",
+          "commands": [
+            "curl -s http://10.10.10.20/ | grep -o '<title>.*</title>'    # IT-Tools",
+            "curl -s -o /dev/null -w '%{http_code}\\n' http://10.10.10.21:8080/    # Glance: 200"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "proxmox-ve-node2",
+          "commands": [
+            "zfs list -o name | grep subvol    # nothing: node 2 has no copy of either container"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ZFS replication",
+      "text": "Each node has its own disks: a container on local ZFS exists on one node only. A replication job sends its dataset to another node with zfs send, the first time whole and then every minute only the changes since the last snapshot. A copy that is at most a minute old is what lets another node start the container when this one is gone.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "proxmox-ve",
+          "commands": [
+            "pvesr create-local-job 200-0 proxmox-ve-node2 --schedule '*/1'",
+            "pvesr create-local-job 200-1 proxmox-ve-node3 --schedule '*/1'",
+            "pvesr schedule-now 200-0; pvesr schedule-now 200-1; sleep 15",
+            "pvesr status    # LastSync, a few seconds of Duration, State OK"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "proxmox-ve-node2",
+          "commands": [
+            "zfs list -t all -o name,used | grep 200    # the dataset and its __replicate_ snapshot: a copy, not a running container",
+            "pct list    # empty: the container still runs on node 1"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "High availability: a planned move",
+      "text": "ha-manager watches the resources it is given. The cluster elects one CRM master; each node's LRM starts and stops what it is told and arms a watchdog. A migration of a container is a restart migration: it stops on node 1, the last changes are replicated, and it starts on node 2 with the same configuration and address.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "proxmox-ve",
+          "commands": [
+            "ha-manager add ct:200 --state started --max_relocate 1 --max_restart 1",
+            "sleep 20; ha-manager status    # master, three lrm lines, service ct:200 (proxmox-ve, started)",
+            "ha-manager migrate ct:200 proxmox-ve-node2",
+            "sleep 40; ha-manager status | grep ct:200    # (proxmox-ve-node2, started)"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "proxmox-lab-client",
+          "commands": [
+            "curl -s http://10.10.10.20/ | grep -o '<title>.*</title>'    # the same page, now served by node 2"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "proxmox-ve-node2",
+          "commands": [
+            "pvesr status    # the job toward node 2 now points at node 1: replication follows the container",
+            "ha-manager migrate ct:200 proxmox-ve",
+            "sleep 40; ha-manager status | grep ct:200    # home again"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "A node dies, the container moves",
+      "text": "Pull the plug on node 1. The other two keep the quorum; after about a minute the HA master marks the service to be fenced, and when the dead node's lock expires (two minutes: by then its watchdog would have reset it, if it were only cut off) the container starts on a surviving node from the last replica. Whatever changed after the last sync is lost: that is the price of local storage. Glance, which is not under HA, simply stays down until node 1 returns.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "proxmox-lab-client",
+          "commands": [
+            "while true; do printf '%s ' $(date +%T); curl -s -m 2 http://10.10.10.20/ | grep -o '<title>IT Tools' || echo 'no answer'; sleep 5; done    # leave it running"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "host",
+          "commands": [
+            "vmctl stop proxmox-ve --force    # a power cut, not a shutdown"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "proxmox-ve-node2",
+          "commands": [
+            "watch -n 3 'ha-manager status'    # started, then fence, then (proxmox-ve-node2 or node3, started): about two and a half minutes",
+            "pvecm status | sed -n '/^Nodes/p;/^Quorate/p'    # 2 nodes, Quorate: Yes"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "host",
+          "commands": [
+            "vmctl group up proxmox-lab    # node 1 comes back and rejoins: the container stays where it is"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "proxmox-ve-node2",
+          "commands": [
+            "pvesr status    # the jobs now replicate from the container's new node; the one toward node 1 failed while it was off",
+            "pvesr schedule-now 200-0; sleep 15; pvesr status    # a failed job waits before retrying: run it now, before moving the container back",
+            "ha-manager migrate ct:200 proxmox-ve    # bring it home when you like"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "proxmox-ve",
+          "commands": [
+            "ha-manager crm-command node-maintenance enable proxmox-ve    # a planned maintenance: HA moves the resources away first",
+            "ha-manager crm-command node-maintenance disable proxmox-ve",
+            "ha-manager remove ct:200; for j in 200-0 200-1; do pvesr delete $j; done    # back to the lab as installed"
+          ]
+        }
+      ]
+    }
+  ]
+}

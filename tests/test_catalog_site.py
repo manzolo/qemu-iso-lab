@@ -111,7 +111,7 @@ class CatalogSiteTests(unittest.TestCase):
         self.assertIn('href="guide.en.html">EN</a>', guide)
         self.assertTrue(lvm["source"].endswith("/tree/main/vms/labs/lvm-lab"))
         self.assertTrue(labs["proxmox-lab"]["cluster"])
-        self.assertEqual(labs["proxmox-lab"]["tests"], 0)  # a lab by its segment, without content: no tests, no guides
+        self.assertEqual(labs["proxmox-lab"]["tests"], 5)
         page = (self.out / "index.html").read_text(encoding="utf-8")
         self.assertIn('<section id="labs"', page)
         self.assertIn("function labCard", page)

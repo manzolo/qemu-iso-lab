@@ -334,8 +334,12 @@ diagnosis above only exists because the disk was copied aside by hand while the 
    session notes; not started.
 10. Ideas not yet planned: the KDE history line (Kubuntu 8.04 → 24.04, KDE 3.5 → Plasma 6) beside the
     GNOME one; sway / i3 / river / labwc as bare compositors; Fedora Sway spin.
+    **Android** (added 2026-10-07, Manzolo: "segnamolo come distro da provare"): an Android-x86 /
+    BlissOS profile, then scrcpy (5.0: hardware decoding with VA-API) over `adb connect` to a
+    forwarded port as its console, smoother than VNC and with clipboard and audio; maybe an
+    android-lab later.
 11. Next labs (k3s cluster, multi-segment routing, highly available web, Samba AD) and the
-    Proxmox lab's extensions (ZFS replication + HA, a Ceph variant): [LAB_IDEAS.md](LAB_IDEAS.md).
+    Proxmox lab's extensions (a Ceph variant; ZFS replication + HA are its exercises 3-5 since 2026-10-07): [LAB_IDEAS.md](LAB_IDEAS.md).
 
 ## New profiles: batches B/C (2026-09-14)
 

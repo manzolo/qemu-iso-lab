@@ -38,6 +38,8 @@ class SpokenTests(unittest.TestCase):
         self.assertEqual(narrate.spoken("Le loro consoles, su GitHub.", "it"), "Le loro consòl, su ghit-hab,")
         self.assertEqual(narrate.spoken("Lancialo: tiralo su, poi segnalo guasto.", "it"), "Làncialo: tìralo su, poi ségnalo guasto,")
         self.assertEqual(narrate.spoken("Memoria, CPU e il setup: Ctrl+Alt+Canc.", "it"), "Memoria, ci pi ù e il setàp: Control Alt kanch,")
+        self.assertEqual(narrate.spoken("Gestito da HA, IT-Tools, nessuno shutdown.", "it"), "Gestito da alta affidabilità, ai ti tùls, nessuno sciatdàun,")
+        self.assertEqual(narrate.spoken("Managed by HA.", "en"), "Managed by H A,")
         self.assertEqual(narrate.spoken("Ed ecco il lab: tutto il catalogo!", "it"), "Ed ecco il lab: tutto il catalogo!")
         self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un fàil privato,")
         self.assertEqual(narrate.spoken("I file del profilo.", "it"), "I fàil del profilo,")

@@ -102,6 +102,7 @@ class LabContentTests(BaseVmctlTestCase):
             labs.model(self.cfg(), "netlab")
 
     def test_group_guide_prints_the_requested_language_and_list_carries_the_title(self):
+        shutil.rmtree(self.root / "vms" / "labs" / "proxmox-lab")  # a lab by its segment alone, no content
         cfg = self.cfg()
         with mock.patch.object(config, "load_config", return_value=cfg), mock.patch.object(lifecycle, "group_states", return_value={}):
             out = io.StringIO()

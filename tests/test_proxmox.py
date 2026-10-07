@@ -138,6 +138,27 @@ class ProxmoxTests(BaseVmctlTestCase):
         # Only node 1 carries the containers: a node that joins a cluster must hold no guests.
         self.assertEqual([name for name in names if cfg['vms'][name].get('lab_services')], ['proxmox-ve'])
 
+    def test_every_nodes_vmctl_key_is_authorized_on_the_primary_before_the_others_are_awaited(self):
+        # After a join a node's authorized_keys is the cluster's file: without its own key in
+        # there, vmctl was refused on node2 and node3 (2026-10-07). A rerun must repair that
+        # before it waits for SSH on them.
+        from vmctl import pvecluster, config, ssh
+        members = json.loads((ROOT / 'vms/profiles/proxmox-lab.json').read_text())['vms']
+        tracked = config.load_tracked(ROOT / 'vms/profiles')
+        cfg = {'vms': {name: tracked[name] for name in members}}
+        events = []
+        with mock.patch.object(pvecluster, 'project_key', side_effect=lambda vm, dry: f"key-{vm['proxmox_config']['fqdn']}"), \
+             mock.patch.object(pvecluster, '_run', side_effect=lambda vm, cmd, dry: events.append(('run', vm['proxmox_config']['fqdn'], cmd))), \
+             mock.patch.object(ssh, 'wait_for_ssh', side_effect=lambda vm, *a, **k: events.append(('wait', vm['proxmox_config']['fqdn']))):
+            pvecluster.form(cfg, list(cfg['vms']), 60, dry_run=True)
+        authorized = [e for e in events if e[0] == 'run' and 'authorized_keys' in e[2] and 'key-' in e[2]]
+        for node in ('proxmox-ve', 'proxmox-ve-node2', 'proxmox-ve-node3'):
+            fqdn = f'{node}.lab.internal'
+            self.assertTrue(any(e[1] == 'proxmox-ve.lab.internal' and f'key-{fqdn}' in e[2] for e in authorized), node)
+        first_other_wait = events.index(('wait', 'proxmox-ve-node2.lab.internal'))
+        self.assertLess(events.index(authorized[2]), first_other_wait)
+        self.assertEqual(events[0], ('wait', 'proxmox-ve.lab.internal'))
+
     def test_lab_members_share_the_runtime_segment_only(self):
         for name in ('proxmox-ve', 'proxmox-lab-client'):
             vm = self.profile(name)
