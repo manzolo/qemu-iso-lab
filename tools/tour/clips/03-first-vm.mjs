@@ -31,7 +31,7 @@ export async function setup(d) {
   await d.page.bringToFront();
   await d.page.goto(d.restartWeb());
   await d.page.locator("#search").waitFor();
-  await d.page.getByRole("button", { name: "Catalog", exact: true }).first().click();
+  await d.page.getByRole("tab", { name: /Catalog/ }).click();
   if (await d.page.locator("#search-clear").isVisible()) await d.page.locator("#search-clear").click();
   await d.page.locator("#log-dialog").evaluate((x) => x.open && x.close());
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1500 300 0.1");
@@ -76,7 +76,7 @@ export async function run(d) {
   await d.sleep(1500);
   await d.cue("mine");
   await d.click(p.locator("#search-clear"));
-  await d.click(p.getByRole("button", { name: "My VMs" }).first());
+  await d.click(p.getByRole("tab", { name: /My VMs/ }));
   await d.sleep(2000);
   await d.cue("next");
 }
