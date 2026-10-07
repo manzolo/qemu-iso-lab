@@ -16,7 +16,9 @@ dashboard or the CLI: the same profiles, machines and jobs, whichever you prefer
 **[Watch the tour](https://manzolo.github.io/qemu-iso-lab/tour.html)** ·
 **[Your first VM](docs/FIRST_VM.md)**
 
-[![QEMU ISO Lab web dashboard with selected VMs, live status and machine actions](docs/screenshots/web-dashboard.png)](docs/GALLERY.md)
+[![QEMU ISO Lab in four minutes: live preview, console in the browser, two VMs linked, the network map with the packet inspector, the power button](docs/screenshots/showcase.gif)](https://manzolo.github.io/qemu-iso-lab/tour.html)
+
+*▶ [Watch QEMU ISO Lab in four minutes](https://manzolo.github.io/qemu-iso-lab/tour.html) (narrated, English and Italian) · more screenshots in the [gallery](docs/GALLERY.md)*
 
 [Quick start](#quick-start) · [Explore](#explore) · [Interfaces](#choose-your-interface) ·
 [Labs](#labs) · [Customize](#make-it-yours) · [Docs](#documentation) · [Contribute](#development)
