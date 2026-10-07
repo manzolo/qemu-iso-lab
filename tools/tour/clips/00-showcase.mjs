@@ -33,8 +33,12 @@ export const cues = [
     it: "Le loro console affiancate. Link network le mette su una rete privata tutta loro." },
   { id: "info", en: "The i tells who has which address.",
     it: "La i dice chi ha quale indirizzo." },
-  { id: "map", en: "The map draws that network live. A ping between the two, and the cables light up.",
-    it: "La mappa disegna quella rete dal vivo. Un ping tra le due, e i cavi si accendono." },
+  { id: "map", en: "The map draws that network live: the two machines, their addresses, the private segment.",
+    it: "La mappa disegna quella rete dal vivo: le due macchine, i loro indirizzi, il segmento privato." },
+  { id: "sshmap", en: "From the map, SSH opens a terminal in the machine. A ping towards the other one, and the cables light up.",
+    it: "Dalla mappa, SSH apre un terminale nella macchina. Un ping verso l'altra, e i cavi si accendono." },
+  { id: "lens", en: "The lens on the cable opens the packet inspector, like Wireshark: the ICMP requests and replies, field by field.",
+    it: "La lente sul cavo apre l'ispettore dei pacchetti, come Wireshark: richieste e risposte ICMP, campo per campo." },
   { id: "power", en: "Every machine has its power button. Hold it for two seconds and the machine is forced off.",
     it: "Ogni macchina ha il suo pulsante di accensione. Tenuto premuto due secondi, la macchina si spegne subito." },
   { id: "again", en: "One click turns it back on, and the list follows it.",
@@ -42,6 +46,61 @@ export const cues = [
   { id: "end", en: "Labs, checkpoints, the catalog and much more: QEMU ISO Lab, on GitHub.",
     it: "Laboratori, checkpoint, il catalogo e molto altro: QEMU ISO Lab, su GitHub." },
 ];
+
+// The map part (Manzolo, 2026-10-07: the ping from the map's own SSH, then the lens and the ICMP
+// in the packet inspector). Exported so it can be rehearsed alone on the running pair.
+export async function mapPart(d, map) {
+  const target = d.vm(`cd ${DEMO} && python3 -c "import json; r=json.load(open('artifacts/labs/links/session.json')); print(r['members']['${DESKTOP}']['address'].split('/')[0])"`).trim();
+  await d.cue("map");
+  await map.locator("#map-live").filter({ hasText: /^Live/ }).waitFor({ timeout: 30000 });
+  await d.sleep(1200);
+  await map.evaluate(() => document.querySelector(".segment-track")?.scrollIntoView({ block: "center", behavior: "smooth" }));
+  await d.sleep(2200);
+  await d.hover(map.locator(`.nic.lan-nic[data-vm="${SERVER}"]`).first());
+  await d.sleep(1500);
+  await d.hover(map.locator(`.nic.lan-nic[data-vm="${DESKTOP}"]`).first());
+  await d.sleep(1500);
+
+  await d.cue("sshmap");
+  await d.click(map.locator(`.vm-action[data-vm="${SERVER}"][data-action="ssh"]`));
+  const win = map.locator(`.float-window[data-vm="${SERVER}"][data-action="ssh"]`);
+  await win.waitFor({ timeout: 15000 });
+  const term = map.frameLocator(`.float-window[data-vm="${SERVER}"][data-action="ssh"] iframe`);
+  await term.locator(".xterm-rows").filter({ hasText: /\$\s*$/m }).waitFor({ timeout: 45000 });
+  await d.click(win.locator("iframe"));
+  await d.sleep(600);
+  d.step(`ping -c 40 -i 0.5 ${target}`);
+  await d.type(` ping -c 40 -i 0.5 ${target}`, 70);
+  await d.key("Return");
+  await d.sleep(5000);
+  await d.click(win.locator(".float-min"));
+  await d.sleep(1000);
+  await map.evaluate(() => document.querySelector(".segment-track")?.scrollIntoView({ block: "center", behavior: "smooth" }));
+  await d.sleep(1500);
+  await d.hover(map.locator(`.nic.lan-nic[data-vm="${SERVER}"] .traffic-label`).first());
+  await d.sleep(3000);
+
+  await d.cue("lens");
+  await d.click(map.locator(`.nic.lan-nic[data-vm="${SERVER}"] .inspect-btn`).first());
+  await map.locator("#packet-inspector").waitFor({ state: "visible" });
+  await d.sleep(1500);
+  await d.click(map.locator('#packet-inspector .chip[data-proto="ICMP"]'));
+  await d.sleep(2500);
+  await d.hover(map.locator("#packet-inspector thead"));
+  await d.sleep(2000);
+  await d.click(map.locator("#packet-pause"));
+  await d.sleep(800);
+  await d.click(map.locator("tr.packet-row", { hasText: /ICMP/ }).first());
+  await map.locator("tr.packet-detail-row").waitFor();
+  await map.locator("tr.packet-detail-row").scrollIntoViewIfNeeded();
+  await d.sleep(1500);
+  await d.hover(map.locator(".packet-layers section").nth(1));
+  await d.sleep(1800);
+  await d.hover(map.locator(".packet-layers section").nth(2));
+  await d.sleep(1800);
+  await d.hover(map.locator(".packet-hex pre"));
+  await d.sleep(2500);
+}
 
 const iconOf = (p, vm) => p.locator(`#rows tr[data-vm="${vm}"] .vm-select`);
 const powerOf = (p, vm) => p.locator(`#rows tr[data-vm="${vm}"] [data-power]`);
@@ -159,10 +218,6 @@ export async function run(d) {
   await d.key("Escape");
   await d.sleep(500);
 
-  await d.cue("map");
-  const target = d.vm(`cd ${DEMO} && python3 -c "import json; r=json.load(open('artifacts/labs/links/session.json')); print(r['members']['${DESKTOP}']['address'].split('/')[0])"`).trim();
-  await d.focusTerminal();
-  await d.run(`vmctl shell ${SERVER} -- ping -c 45 -i 0.4 ${target}`, { wait: false });
   await d.focusBrowser();
   await p.bringToFront();
   d.page = p;
@@ -171,16 +226,7 @@ export async function run(d) {
   await d.click(p.locator('section.lab[data-lab="link:session"] [data-map]'));
   const map = await d.newestPage();
   d.page = map;
-  await map.locator("#map-live").filter({ hasText: /^Live/ }).waitFor({ timeout: 30000 });
-  await d.sleep(1500);
-  // The private segment sits below the host and the NAT: scroll to it, rest on each NIC's traffic
-  // (the first take hovered the NAT label at the top, and the ping's cables stayed off screen).
-  await map.evaluate(() => document.querySelector(".segment-track")?.scrollIntoView({ block: "center", behavior: "smooth" }));
-  await d.sleep(2500);
-  await d.hover(map.locator(".nic.lan-nic .traffic-label").first());
-  await d.sleep(3500);
-  await d.hover(map.locator(".nic.lan-nic .traffic-label").nth(1));
-  await d.sleep(3500);
+  await mapPart(d, map);
   await multi.close().catch(() => {});
   await map.close();
   d.page = p;
