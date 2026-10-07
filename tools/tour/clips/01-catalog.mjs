@@ -76,10 +76,16 @@ export async function run(d) {
   await d.sleep(1800);
 
   await d.cue("pick");
+  // Each card is centred before its click: the basket bar the first pick opens sits at the bottom
+  // and covered the second card's plus (2026-10-07 rehearsal: "1 picked" instead of 2).
   const picks = p.locator("article.card .pick");
-  await d.click(picks.nth(0));
-  await d.sleep(600);
-  await d.click(picks.nth(1));
+  for (const i of [0, 1]) {
+    await picks.nth(i).evaluate((el) => el.scrollIntoView({ block: "center", behavior: "smooth" }));
+    await d.sleep(700);
+    await d.click(picks.nth(i));
+    await d.sleep(600);
+  }
+  await p.locator("#basket-cmd").filter({ hasText: /arch-\S+ arch-/ }).waitFor({ timeout: 5000 });
   await d.sleep(800);
   await d.cue("basket");
   await d.hover(p.locator("#basket-cmd"));
