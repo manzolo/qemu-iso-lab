@@ -118,6 +118,8 @@ so `$` is PowerShell's, not the host shell's (single quotes on the host side).
 | The blinking cursor keeps "the screen stopped changing" from ever being true | wait on what the screen says, not on its hash |
 | The reboot `wsl --install` asks for ends the recording | record in segments, join them with ffmpeg's concat demuxer |
 | Edge's first start shows four pages | the Edge policies of `setup-studio.ps1` |
+| Edge asks "Save password?" over the Welcome form; "Restore pages" after the VM was reverted | `PasswordManagerEnabled 0` in `setup-studio.ps1`; set `exit_type` to `Normal` in the profile's `Preferences` before a take |
+| The desktop shortcut's terminal takes a few seconds to appear, and Edge opens behind it, not maximized | wait for the window by title, then `[Studio]::Front` and `ShowWindow(h, 3)` |
 | Localized words: `virsh domstate` says *terminato*, Windows answers in Italian | checks accept the localized words (or compare `LastBootUpTime`, a number) |
 | A snapshot keeps the agent of its day | copy `agent.ps1` again after a revert if it changed |
 | A fresh WSL Ubuntu has the `universe` lists missing until `apt update`: setup.sh skipped fzf, dialog, partclone... | fixed in vmctl: `host_setup.apt_lists_complete` (lists the native `Packages` files the suites' Release declares non-empty; while one is missing nothing is filtered) |

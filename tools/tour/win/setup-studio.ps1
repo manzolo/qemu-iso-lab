@@ -25,4 +25,6 @@ powercfg /change monitor-timeout-ac 0; powercfg /change standby-timeout-ac 0
 New-Item -Force 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' | Out-Null
 Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' HideFirstRunExperience 1
 Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' TranslateEnabled 0
+# No "Save password?" bubble over the Welcome form (02w take of 2026-10-07)
+Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' PasswordManagerEnabled 0
 "studio ready"
