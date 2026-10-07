@@ -31,7 +31,7 @@ export const cues = [
 export async function setup(d) {
   d.vm(`cd ${CHECKOUT} && for v in lubuntu-lab pihole-lab pfsense-lab; do ./bin/vmctl stop $v >/dev/null 2>&1; done; ./bin/vmctl group clean ${LAB} --yes >/dev/null 2>&1; true`);
   const ctx = d.page.context();
-  for (const p of ctx.pages()) if (p !== d.page && p.url() !== "about:blank") await p.close();
+  for (const p of ctx.pages()) if (p !== d.page) await p.close();  // a stray about:blank would be taken for the map's tab
   await d.page.goto("about:blank");
   await d.openTerminal();
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
