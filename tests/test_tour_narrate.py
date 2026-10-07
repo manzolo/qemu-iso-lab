@@ -32,7 +32,10 @@ class SpokenTests(unittest.TestCase):
         self.assertEqual(narrate.spoken("Si clona il repository… e si lancia vmctl.", "it"),
                          "Si clona il repository, e si lancia vm control,")
         self.assertEqual(narrate.spoken('Dice "pronto." (davvero.)', "it"), 'Dice "pronto," (davvero,),')
-        self.assertEqual(narrate.spoken("Apri la console. Poi Open console.", "it"), "Apri la consolle, Poi Open console,")
+        # console/consoles/GitHub the way an Italian says the English words (2026-10-07: "consolle"
+        # and the English spelling both came out wrong in the showcase).
+        self.assertEqual(narrate.spoken("Apri la console. Poi Open console.", "it"), "Apri la consòl, Poi Open consòl,")
+        self.assertEqual(narrate.spoken("Le loro consoles, su GitHub.", "it"), "Le loro consòl, su ghit-hab,")
         self.assertEqual(narrate.spoken("Ed ecco il lab: tutto il catalogo!", "it"), "Ed ecco il lab: tutto il catalogo!")
         self.assertEqual(narrate.spoken("…salvati in un file privato.", "it"), "salvati in un fàil privato,")
         self.assertEqual(narrate.spoken("I file del profilo.", "it"), "I fàil del profilo,")
