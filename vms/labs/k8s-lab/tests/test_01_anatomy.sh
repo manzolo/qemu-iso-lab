@@ -14,5 +14,8 @@ assert_contains "no node on the NAT address" "$(printf '%s\n' "$nodes" | grep -c
 calico=$(k get pods -n kube-system -l k8s-app=calico-node --no-headers)
 assert_contains "calico-node runs on three nodes" "$(printf '%s\n' "$calico" | grep -c ' Running ' || true)" "^3$"
 assert_contains "CoreDNS runs" "$(k get pods -n kube-system -l k8s-app=kube-dns --no-headers)" " Running "
+calico_on_main=$(k get pods -n kube-system -l k8s-app=calico-node --field-selector spec.nodeName=k8s-lab-main -o jsonpath='{.items[0].metadata.name}')
+assert_contains "kubectl logs of a pod on the control plane (its kubelet certificate names 172.20.6.1)" \
+    "$(on "$M" kubectl logs -n kube-system "$calico_on_main" --tail=1 >/dev/null 2>&1 && echo ok || echo failed)" "^ok$"
 assert_contains "node1 is a worker" "$(on k8s-lab-node1 microk8s status 2>&1 || true)" "acting as a node"
 report_results "Exercise 1"

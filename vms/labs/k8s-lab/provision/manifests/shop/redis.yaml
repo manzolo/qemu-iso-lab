@@ -1,0 +1,50 @@
+# The Kubernetes course, Redis: the shopping list's store. One replica (Redis is not a cluster
+# here), its append-only file on a claim, a Service that gives it the name "redis".
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 256Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: redis}
+  template:
+    metadata:
+      labels: {app: redis}
+    spec:
+      # On the control plane, always: a hostpath volume is a directory on one node's disk, so the
+      # pod could not follow a drain elsewhere anyway (it would wait Pending for its node).
+      nodeSelector: {kubernetes.io/hostname: k8s-lab-main}
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        args: ["--appendonly", "yes"]
+        ports:
+        - containerPort: 6379
+        resources:
+          requests: {cpu: 50m, memory: 32Mi}
+          limits: {memory: 128Mi}
+        volumeMounts:
+        - {name: data, mountPath: /data}
+      volumes:
+      - name: data
+        persistentVolumeClaim: {claimName: redis-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  selector: {app: redis}
+  ports:
+  - port: 6379

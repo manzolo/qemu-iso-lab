@@ -37,6 +37,25 @@ set_arg() {
 }
 set_arg kubelet --node-ip "$ME"
 [ "$ME" = "$MAIN" ] && set_arg kube-apiserver --advertise-address "$ME"
+
+# The kubelet serves on the certificate microk8s made at the install, when there was no segment NIC:
+# its names are 10.0.2.15 only, so `kubectl exec` and `kubectl logs` of a pod on this node failed
+# with "x509: certificate is valid for 10.0.2.15, not 172.20.6.1" (2026-10-08). A worker gets a new
+# one when it joins; the control plane never does, and the apiservice-kicker that would refresh the
+# server's certificates stands aside once --advertise-address is set. Sign it again, same key and
+# subject, with the segment address in it.
+CERTS=/var/snap/microk8s/current/certs
+if ! openssl x509 -in "$CERTS/kubelet.crt" -noout -ext subjectAltName 2>/dev/null | grep -q "IP Address:$ME\b"; then
+    host=$(hostname | tr '[:upper:]' '[:lower:]')
+    sans=$(openssl x509 -in "$CERTS/kubelet.crt" -noout -ext subjectAltName | tail -n1 | sed 's/IP Address:/IP:/g; s/ //g')
+    openssl req -new -sha256 -key "$CERTS/kubelet.key" -subj "/CN=system:node:$host/O=system:nodes" \
+        -addext "subjectAltName=$sans,IP:$ME" -out /tmp/k8s-lab-kubelet.csr
+    openssl x509 -req -sha256 -in /tmp/k8s-lab-kubelet.csr -CA "$CERTS/ca.crt" -CAkey "$CERTS/ca.key" \
+        -CAcreateserial -days 3650 -copy_extensions copy -out "$CERTS/kubelet.crt"
+    rm -f /tmp/k8s-lab-kubelet.csr
+    echo "k8s-lab: kubelet certificate signed again with $ME"
+    changed=1
+fi
 if [ "$changed" = 1 ]; then
     echo "k8s-lab: $ME on $SEG, restarting microk8s"
     snap restart microk8s

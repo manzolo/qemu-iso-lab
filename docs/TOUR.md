@@ -160,7 +160,10 @@ re-encoding: `tools/tour/publish.py --index-only`, then the media branch and the
 **Courses** (`export const series = "courses"`, `lab`, `order` = the episode) are slower series in
 several episodes after the lessons, one heading per course (`track` `<lab>-course`, e.g.
 `zfs-course`); their episodes link the lab's guide but stay off the lab's card.
-Two so far: `course-zfs-1..5` (`tools/tour/zfs-course.mjs`) and `course-git-1..6`
+Three so far: `course-zfs-1..5` (`tools/tour/zfs-course.mjs`), `course-k8s-1..8`
+(`tools/tour/k8s-course.mjs`, 2026-10-08: an app with Redis and RustFS in the namespace `shop`, the
+manifests in `vms/labs/k8s-lab/provision/manifests/shop/`, the browser panel showing which pod and
+node answered) and `course-git-1..6`
 (`tools/tour/git-course.mjs`, 2026-10-08: one repository, `~/first-repo`, from the first commit to
 git flow; each episode rebuilds the previous ones' state off camera). The Git course replaced the
 `lab-git` lesson (Manzolo, 2026-10-08); a new course's heading goes into `I18N.tracks` of

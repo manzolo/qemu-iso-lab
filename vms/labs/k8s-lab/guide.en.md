@@ -164,6 +164,51 @@ kubectl delete deployment mariadb && kubectl delete pvc mariadb-data && kubectl 
 
 Deleting the claim deletes the volume too (reclaim policy `Delete`).
 
+## The Kubernetes course: an application in eight episodes
+
+The eight episodes of the course (tour page, *Courses*) build one small application in the namespace
+`shop`, from manifests that the install copies to `~/k8s/shop` on the control plane: Redis for a
+shopping list, [RustFS](https://github.com/rustfs/rustfs) for notes and backups (an S3 object store
+like MinIO, which stopped publishing public images in 2025), and `app.py`, a Python app run from a
+ConfigMap on the stock image that says which pod, IP and node answered. Its page polls `/whoami` every
+second: the replicas take turns, a scale adds pods, a drained node disappears. The app is
+http://127.0.0.1:8089 on the host, the RustFS console http://127.0.0.1:8090/rustfs/console/
+(NodePort 30081; account `labadmin`, key `labsecret123`).
+
+```sh
+kubectl create namespace shop && kubectl config set-context --current --namespace=shop
+cd ~/k8s/shop
+kubectl create deployment hello --image=manzolo/demo-go:0.2.0 --replicas=3        # 2: a pod that says who it is
+kubectl create service nodeport hello --tcp=80:8080 --node-port=30080 && curl -s localhost:30080
+kubectl delete deployment hello && kubectl delete service hello
+
+kubectl apply -f redis.yaml                                                      # 3: claim, Deployment, Service
+kubectl run redis-test --image=redis:7-alpine --rm -i --restart=Never -- redis-cli -h redis ping
+kubectl create secret generic s3-credentials --from-literal=access-key=labadmin --from-literal=secret-key=labsecret123
+kubectl apply -f rustfs.yaml                                                     # 4: the object store
+kubectl create configmap shop-code --from-file=app.py --from-file=backup.py
+kubectl apply -f shop.yaml                                                       # 5: the app, three replicas
+kubectl logs -l app=shop --prefix --tail=4
+
+kubectl scale deployment shop --replicas=6                                       # 6: watch the page's panel
+kubectl drain k8s-lab-node2 --ignore-daemonsets --delete-emptydir-data && kubectl uncordon k8s-lab-node2
+kubectl set env deployment/shop TITLE='Weekend shopping' COLOR=purple && kubectl rollout undo deployment/shop
+
+kubectl scale deployment redis --replicas=0 && kubectl get endpoints shop        # 7: readiness empties the Service
+kubectl scale deployment redis --replicas=1
+microk8s enable metrics-server && kubectl top pods
+kubectl autoscale deployment shop --cpu-percent=50 --min=3 --max=9 && kubectl apply -f load.yaml
+kubectl get hpa                                                                  # up to nine replicas
+kubectl delete -f load.yaml
+
+kubectl apply -f backup.yaml                                                     # 8: Redis into RustFS, every 2 min
+kubectl create job --from=cronjob/redis-backup backup-now && kubectl logs job/backup-now
+kubectl delete namespace shop                                                    # everything, volumes included
+```
+
+Redis and RustFS are pinned to the control plane (`nodeSelector`): a `hostpath-storage` volume is a
+directory on one node's disk, so their pods could not follow a drain to another node anyway.
+
 ## Tests
 
 ```sh

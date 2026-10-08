@@ -876,9 +876,14 @@
       ]
     },
     "k8s-lab-main": {
-      "version": "1.1.0",
-      "fingerprint": "sha256:a92d9be2123dfe1d98106d65e24612bb1592a3f97254d985846fa7c51e603b08",
+      "version": "1.1.1",
+      "fingerprint": "sha256:ef7e4658b19bd2fb4cbb7db20a636a477e4182298fc7d6ddc2da15bb70bb9cba",
       "history": [
+        {
+          "version": "1.1.1",
+          "date": "2026-10-08",
+          "note": "k8s-lab-node: the control plane's kubelet certificate signed again with its segment address (kubectl exec/logs of its pods failed with x509); NodePort 30081 forwarded to 8090 on the main (the Kubernetes course's RustFS console)"
+        },
         {
           "version": "1.1.0",
           "date": "2026-10-04",
@@ -892,9 +897,14 @@
       ]
     },
     "k8s-lab-node1": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:d31f01539a212f209a5ff6b3249d793c5058e14ec9c7858efca617bb0295afc8",
+      "version": "1.0.1",
+      "fingerprint": "sha256:fb3b167fc8c727dd9448264ead64f72f1254f304518868c933feaa650a37e274",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-08",
+          "note": "k8s-lab-node: the control plane's kubelet certificate signed again with its segment address (kubectl exec/logs of its pods failed with x509); NodePort 30081 forwarded to 8090 on the main (the Kubernetes course's RustFS console)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-10-04",
@@ -903,9 +913,14 @@
       ]
     },
     "k8s-lab-node2": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:d2b5b9844c19bf81ca3bc401598f854cd9b055d2bbd80d58d2abd625fb74a42c",
+      "version": "1.0.1",
+      "fingerprint": "sha256:ed53cdaf73ab542cfb128c2a9984ac35394896647ad507005a6dc5a1aa01d821",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-08",
+          "note": "k8s-lab-node: the control plane's kubelet certificate signed again with its segment address (kubectl exec/logs of its pods failed with x509); NodePort 30081 forwarded to 8090 on the main (the Kubernetes course's RustFS console)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-10-04",

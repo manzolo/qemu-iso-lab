@@ -1,0 +1,58 @@
+# The Kubernetes course, the mini app: app.py from the ConfigMap shop-code on the stock Python
+# image (nothing to build), Redis and RustFS found by their Service names, the S3 keys from the
+# Secret, the pod's IP and node from the downward API. Readiness = Redis answers, so a pod that
+# cannot reach it leaves the Service; NodePort 30080 is http://127.0.0.1:8089 on the host.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop
+spec:
+  replicas: 3
+  selector:
+    matchLabels: {app: shop}
+  template:
+    metadata:
+      labels: {app: shop}
+    spec:
+      containers:
+      - name: shop
+        image: python:3.12-alpine
+        command: ["python", "-u", "/app/app.py"]
+        env:
+        - {name: REDIS_HOST, value: redis}
+        - {name: S3_ENDPOINT, value: "rustfs:9000"}
+        - name: S3_ACCESS_KEY
+          valueFrom: {secretKeyRef: {name: s3-credentials, key: access-key}}
+        - name: S3_SECRET_KEY
+          valueFrom: {secretKeyRef: {name: s3-credentials, key: secret-key}}
+        - name: POD_IP
+          valueFrom: {fieldRef: {fieldPath: status.podIP}}
+        - name: NODE_NAME
+          valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+        ports:
+        - {containerPort: 8080, name: http}
+        readinessProbe:
+          httpGet: {path: /ready, port: http}
+          periodSeconds: 3
+          failureThreshold: 2
+        livenessProbe:
+          httpGet: {path: /healthz, port: http}
+          periodSeconds: 10
+        resources:
+          requests: {cpu: 100m, memory: 32Mi}
+          limits: {cpu: 500m, memory: 128Mi}
+        volumeMounts:
+        - {name: code, mountPath: /app}
+      volumes:
+      - name: code
+        configMap: {name: shop-code}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop
+spec:
+  type: NodePort
+  selector: {app: shop}
+  ports:
+  - {port: 80, targetPort: http, nodePort: 30080}
