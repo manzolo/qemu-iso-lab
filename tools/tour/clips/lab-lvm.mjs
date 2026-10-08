@@ -4,7 +4,8 @@ export const series = "labs";  // a lab lesson, not a chapter of the tour
 const LAB = "lvm-lab";
 const VM = "lvm-lab-server";
 const CHECKOUT = "~/lab/demo/qemu-iso-lab";
-const DISKS = `DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2=="2G" && $3=="disk" {print $1}' | xargs); echo $DISKS`;
+// Rewritten 2026-10-07 in the approved style (docs/TOUR.md, "How a lesson types its commands").
+const DISKS_CMD = `DISKS=$(lsblk -dnpo NAME,SIZE | awk '$2=="2G" {print $1}')`;
 
 export const lab = "lvm-lab";  // the catalog lab this clip explains: the site links it from the lab card
 
@@ -15,8 +16,8 @@ export const cues = [
     it: "Si installa dal terminale: una cloud image più tre dischi da 2 gigabyte, pronti in un paio di minuti." },
   { id: "shell", en: "vmctl shell opens a session on the server. From here on, everything is plain LVM, the same on any Linux.",
     it: "vmctl shell apre una sessione sul server. Da qui in poi è LVM puro, uguale su qualsiasi Linux." },
-  { id: "disks", en: "lsblk lists the block devices: the system disk with its partitions, and three bare 2-gigabyte disks. We pick those by size, never by name.",
-    it: "lsblk elenca i dispositivi a blocchi: il disco di sistema con le sue partizioni, e tre dischi nudi da 2 gigabyte. Li scegliamo per dimensione, mai per nome." },
+  { id: "disks", en: "lsblk lists the block devices: the system disk with its partitions, and three bare 2-gigabyte disks. We keep those in a variable, DISKS, picked by size, never by name.",
+    it: "lsblk elenca i dispositivi a blocchi: il disco di sistema con le sue partizioni, e tre dischi nudi da 2 gigabyte. Li teniamo in una variabile, DISKS, scelti per dimensione, mai per nome." },
   { id: "layers", en: "LVM has three layers. Physical volumes: disks labelled for LVM. A volume group: the pool that adds them up. Logical volumes: the slices you format and mount.",
     it: "LVM ha tre strati. I physical volume: dischi etichettati per LVM. Il volume group: il serbatoio che li somma. I logical volume: le fette che formatti e monti." },
   { id: "pv", en: "pvcreate writes the LVM label on each disk. pvs shows them: three physical volumes, not yet in any group.",
@@ -54,7 +55,8 @@ const guest = (d, cmd, read = 3500) => d.guest(cmd, { read });
 
 export async function run(d) {
   await d.cue("intro");
-  await d.run("cd qemu-iso-lab");
+  await d.run("cd qemu-iso-lab", { record: false });
+  await d.clearScreen();
   await d.sleep(2500);
   await d.cue("install");
   const before = d.vm("cat /tmp/demo-prompt");
@@ -66,15 +68,20 @@ export async function run(d) {
   await d.sleep(1500);
 
   await d.cue("shell");
-  await d.run("clear");
+  await d.clearScreen();
   await d.session(VM);
   await d.cue("disks");
   await guest(d, "lsblk", 5000);
-  await guest(d, DISKS, 3500);
+  await guest(d, DISKS_CMD, 800);
+  await guest(d, "echo $DISKS", 3500);
   await d.cue("layers");
-  await guest(d, "sudo pvs; sudo vgs; sudo lvs    # nothing yet", 4000);
+  await d.clearScreen();
+  await guest(d, "sudo pvs", 1500);
+  await guest(d, "sudo vgs", 1500);
+  await guest(d, "sudo lvs", 3000);
 
   await d.cue("pv");
+  await d.clearScreen();
   await guest(d, "sudo pvcreate $DISKS", 2500);
   await guest(d, "sudo pvs", 3500);
   await d.cue("vg");
@@ -82,36 +89,52 @@ export async function run(d) {
   await guest(d, "sudo vgs labvg", 3500);
 
   await d.cue("lv");
+  await d.clearScreen();
   await guest(d, "sudo lvcreate -L 1G -n data labvg", 2500);
   await guest(d, "sudo lvcreate -L 1G -n logs labvg", 2500);
   await guest(d, "sudo lvs labvg", 3000);
   await d.cue("mount");
-  await guest(d, "sudo mkfs.ext4 -F -q /dev/labvg/data && sudo mkfs.xfs -f -q /dev/labvg/logs", 4000);
-  await guest(d, "sudo mkdir -p /mnt/lab-data /mnt/lab-logs && sudo mount /dev/labvg/data /mnt/lab-data && sudo mount /dev/labvg/logs /mnt/lab-logs", 2500);
-  await guest(d, "df -h /mnt/lab-data /mnt/lab-logs; sudo vgs labvg", 5000);
+  await d.clearScreen();
+  await guest(d, "sudo mkfs.ext4 -F -q /dev/labvg/data", 1500);
+  await guest(d, "sudo mkfs.xfs -f -q /dev/labvg/logs", 1500);
+  await guest(d, "sudo mkdir /mnt/lab-data /mnt/lab-logs", 500);
+  await guest(d, "sudo mount /dev/labvg/data /mnt/lab-data", 800);
+  await guest(d, "sudo mount /dev/labvg/logs /mnt/lab-logs", 800);
+  await guest(d, "df -h /mnt/lab-data /mnt/lab-logs", 4000);
+  await guest(d, "sudo vgs labvg", 3500);
 
   await d.cue("grow");
+  await d.clearScreen();
   await guest(d, "echo before-growth | sudo tee /mnt/lab-data/keep", 2000);
   await guest(d, "sudo lvextend -L +1G --resizefs labvg/data", 5000);
   await d.cue("grown");
-  await guest(d, "df -h /mnt/lab-data; cat /mnt/lab-data/keep", 5000);
+  await guest(d, "df -h /mnt/lab-data", 3500);
+  await guest(d, "cat /mnt/lab-data/keep", 3500);
 
   await d.cue("snap");
+  await d.clearScreen();
   await guest(d, "echo version-1 | sudo tee /mnt/lab-data/file", 1800);
   await guest(d, "sudo lvcreate -s -L 256M -n data-snap labvg/data", 2500);
-  await guest(d, "echo version-2 | sudo tee /mnt/lab-data/file    # the change to undo", 1800);
-  await guest(d, "sudo umount /mnt/lab-data; sudo lvconvert --merge labvg/data-snap", 3000);
-  await guest(d, "sudo lvchange -an labvg/data; sudo lvchange -ay labvg/data; sudo lvs labvg    # the snapshot is gone: merged", 4000);
-  await guest(d, "sudo mount /dev/labvg/data /mnt/lab-data; cat /mnt/lab-data/file    # version-1 again", 4500);
+  await guest(d, "echo version-2 | sudo tee /mnt/lab-data/file", 1800);
+  await guest(d, "sudo umount /mnt/lab-data", 800);
+  await guest(d, "sudo lvconvert --merge labvg/data-snap", 3000);
+  await guest(d, "sudo lvchange -an labvg/data", 800);
+  await guest(d, "sudo lvchange -ay labvg/data", 800);
+  await guest(d, "sudo lvs labvg", 4000);
+  await guest(d, "sudo mount /dev/labvg/data /mnt/lab-data", 800);
+  await guest(d, "cat /mnt/lab-data/file", 4500);
 
   await d.cue("teardown");
-  await guest(d, "sudo umount /mnt/lab-data /mnt/lab-logs; sudo vgremove -fy labvg", 3500);
-  await guest(d, "sudo pvremove -y $DISKS; sudo wipefs -a $DISKS", 3000);
+  await d.clearScreen();
+  await guest(d, "sudo umount /mnt/lab-data /mnt/lab-logs", 800);
+  await guest(d, "sudo vgremove -fy labvg", 3000);
+  await guest(d, "sudo pvremove -y $DISKS", 3000);
+  d.offCamera(VM, `for x in $(lsblk -dnpo NAME,SIZE | awk '$2=="2G" {print $1}'); do sudo wipefs -aq $x; done; sudo rmdir /mnt/lab-data /mnt/lab-logs`);
   await guest(d, "lsblk", 4000);
   await d.leave();
 
   await d.cue("tests");
-  await d.sleep(800);
+  await d.clearScreen();
   const before2 = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group test ${LAB}`, { wait: false });
   await d.sleep(6000);

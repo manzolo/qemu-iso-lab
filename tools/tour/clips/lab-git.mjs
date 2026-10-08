@@ -19,8 +19,8 @@ export const cues = [
     it: "Il tree è un elenco di directory: modo, tipo, hash, nome. Il blob sono i byte del file e nient'altro: niente nome, niente storia. Il nome vive nel tree." },
   { id: "branches", en: "A branch is a file with one hash in it. HEAD is a file naming the branch you are on. Creating a branch copies nothing; that is why it is instant.",
     it: "Un ramo è un file con dentro un hash. HEAD è un file che nomina il ramo su cui sei. Creare un ramo non copia niente: ecco perché è istantaneo." },
-  { id: "merge", en: "Merges: when both sides moved, Git writes a commit with two parents. feature/hello was merged like that; show prints the two parents.",
-    it: "I merge: quando entrambi i lati si sono mossi, Git scrive un commit con due genitori. feature/hello è stato unito così; show stampa i due genitori." },
+  { id: "merge", en: "Merges: when both sides moved, Git writes a commit with two parents. feature/hello was merged like that; cat-file prints the two parents.",
+    it: "I merge: quando entrambi i lati si sono mossi, Git scrive un commit con due genitori. feature/hello è stato unito così; cat-file stampa i due genitori." },
   { id: "conflict", en: "Now a conflict, made on purpose: two branches change the same line. The merge stops and Git writes both versions between markers.",
     it: "Ora un conflitto, fatto apposta: due rami cambiano la stessa riga. Il merge si ferma e Git scrive le due versioni fra i marcatori." },
   { id: "resolve", en: "You decide the content, add it, commit: the merge commit records the resolution. Then back to where we were.",
@@ -50,9 +50,15 @@ export async function setup(d) {
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
 }
 
+// Rewritten 2026-10-07 in the approved style (docs/TOUR.md, "How a lesson types its commands"):
+// one short command per step, no pipes into head/wc, no comments typed, the undos off camera.
+const say = (d, cmd, read = 3500) => d.guest(cmd, { read });
+const off = (d, cmd) => d.offCamera(VM, "cd ~/workspace && " + cmd);
+
 export async function run(d) {
   await d.cue("intro");
-  await d.run("cd qemu-iso-lab");
+  await d.run("cd qemu-iso-lab", { record: false });
+  await d.clearScreen();
   await d.sleep(3500);
   await d.cue("install");
   const before = d.vm("cat /tmp/demo-prompt");
@@ -64,61 +70,92 @@ export async function run(d) {
   await d.sleep(1500);
 
   await d.cue("anatomy");
-  await d.run("clear");
+  await d.clearScreen();
   await d.session(VM);
-  await d.guest("cd ~/workspace && ls -a .git", { read: 3000 });
-  await d.guest("ls /srv/git/lab.git    # the bare remote: the same files, no working tree", { read: 4000 });
+  await say(d, "cd ~/workspace", 500);
+  await say(d, "ls -a .git", 3000);
+  await say(d, "ls /srv/git/lab.git", 4000);
 
   await d.cue("objects");
-  await d.guest("clear; git log --oneline --graph --all | head -20", { read: 5000 });
-  await d.guest("git cat-file -p HEAD    # the commit object", { read: 5000 });
+  await d.clearScreen();
+  await say(d, "git log --oneline --graph --all -20", 5000);
+  await say(d, "git cat-file -p HEAD", 5000);
   await d.cue("treeblob");
-  await d.guest("git cat-file -p HEAD^{tree}    # the tree: a directory listing", { read: 4500 });
-  await d.guest("git cat-file -p HEAD:hello.txt    # the blob: bytes, no name", { read: 4000 });
+  await say(d, "git cat-file -p HEAD^{tree}", 4500);
+  await say(d, "git cat-file -p HEAD:hello.txt", 4000);
 
   await d.cue("branches");
-  await d.guest("clear; cat .git/HEAD; cat .git/refs/heads/main", { read: 4000 });
-  await d.guest("git branch -a", { read: 4000 });
+  await d.clearScreen();
+  await say(d, "cat .git/HEAD", 2500);
+  await say(d, "cat .git/refs/heads/main", 2500);
+  await say(d, "git branch -a", 4000);
 
   await d.cue("merge");
-  await d.guest("git log --merges --oneline", { read: 3500 });
-  await d.guest("git show --stat --format='%h %s%nMerge: %p' HEAD~3 | head -4", { read: 4500 });
+  await d.clearScreen();
+  await say(d, "git log --merges --oneline", 3500);
+  await say(d, "git cat-file -p HEAD~3", 5000);
 
   await d.cue("conflict");
-  await d.guest("clear; git switch -c branch-a && echo 'Version A' > clash.txt && git add clash.txt && git commit -q -m 'branch-a: clash.txt'", { read: 2000 });
-  await d.guest("git switch main && echo 'Version B' > clash.txt && git add clash.txt && git commit -q -m 'main: clash.txt'", { read: 2000 });
-  await d.guest("git merge branch-a; cat clash.txt    # the markers", { read: 5000 });
+  await d.clearScreen();
+  await say(d, "git switch -c branch-a", 1000);
+  await say(d, "echo 'Version A' > clash.txt", 500);
+  await say(d, "git add clash.txt", 500);
+  await say(d, "git commit -m 'branch-a: clash.txt'", 1500);
+  await say(d, "git switch main", 1000);
+  await say(d, "echo 'Version B' > clash.txt", 500);
+  await say(d, "git add clash.txt", 500);
+  await say(d, "git commit -m 'main: clash.txt'", 1500);
+  await d.clearScreen();
+  await say(d, "git merge branch-a", 3000);
+  await say(d, "cat clash.txt", 5000);
   await d.cue("resolve");
-  await d.guest("echo 'Resolved version' > clash.txt && git add clash.txt && git commit -q -m 'Merge: resolve clash.txt' && git log --oneline --graph -4", { read: 4500 });
-  await d.guest("git reset -q --hard origin/main && git branch -D branch-a    # back as it was", { read: 2500 });
+  await say(d, "echo 'Resolved version' > clash.txt", 500);
+  await say(d, "git add clash.txt", 500);
+  await say(d, "git commit -m 'Merge: resolve clash.txt'", 1500);
+  await say(d, "git log --oneline --graph -4", 4500);
+  off(d, "git reset -q --hard origin/main && git branch -D branch-a");
 
   await d.cue("stash");
-  await d.guest("clear; git switch feature/stash && echo 'More work in progress' >> wip.txt && git stash push -m 'WIP: my in-progress work'", { read: 2500 });
-  await d.guest("git status --short; cat wip.txt; git stash list", { read: 4000 });
-  await d.guest("git stash pop && cat wip.txt", { read: 3500 });
-  await d.guest("git checkout -- wip.txt && git switch main", { read: 1500 });
+  await d.clearScreen();
+  await say(d, "git switch feature/stash", 1000);
+  await say(d, "echo 'More work in progress' >> wip.txt", 500);
+  await say(d, "git stash push -m 'WIP: my in-progress work'", 2000);
+  await say(d, "git status --short", 2000);
+  await say(d, "git stash list", 3000);
+  await say(d, "git stash pop", 3000);
+  await say(d, "cat wip.txt", 3500);
+  off(d, "git checkout -- wip.txt && git switch main");
 
   await d.cue("remote");
-  await d.guest("clear; git remote -v", { read: 2500 });
-  await d.guest("git fetch origin && git log --oneline HEAD..origin/main    # there, not here (nothing)", { read: 3000 });
-  await d.guest("echo pushed > pushed.txt && git add pushed.txt && git commit -q -m 'Add pushed.txt' && git log --oneline origin/main..HEAD    # here, not pushed yet", { read: 4000 });
-  await d.guest("git reset -q --hard HEAD~1    # undo", { read: 1500 });
+  await d.clearScreen();
+  await say(d, "git remote -v", 2500);
+  await say(d, "git fetch origin", 1500);
+  await say(d, "git log --oneline HEAD..origin/main", 3000);
+  await say(d, "echo pushed > pushed.txt", 500);
+  await say(d, "git add pushed.txt", 500);
+  await say(d, "git commit -m 'Add pushed.txt'", 1500);
+  await say(d, "git log --oneline origin/main..HEAD", 4000);
+  off(d, "git reset -q --hard HEAD~1");
 
   await d.cue("rebase");
-  await d.guest("clear; git log --oneline --graph main feature/stash | head -8", { read: 5000 });
-  await d.guest("git log --merges main..feature/stash --oneline | wc -l    # 0: linear", { read: 3500 });
+  await d.clearScreen();
+  await say(d, "git log --oneline --graph -8 main feature/stash", 5000);
+  await say(d, "git log --merges --oneline main..feature/stash", 3500);
 
   await d.cue("gitflow");
-  await d.guest("clear; git flow version; git tag", { read: 3000 });
-  await d.guest("git log --oneline --merges main", { read: 3500 });
-  await d.guest("git log --oneline --graph develop -6", { read: 4500 });
+  await d.clearScreen();
+  await say(d, "git flow version", 2000);
+  await say(d, "git tag", 2500);
+  await say(d, "git log --oneline --merges main", 3500);
+  await say(d, "git log --oneline --graph -6 develop", 4500);
 
   await d.cue("reset");
+  await d.clearScreen();
   await d.guest("bash ~/reset-git-lab.sh", { read: 3000, timeout: 120000 });
   await d.leave();
 
   await d.cue("tests");
-  await d.run("clear");
+  await d.clearScreen();
   const before2 = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group test ${LAB}`, { wait: false });
   await d.sleep(6000);

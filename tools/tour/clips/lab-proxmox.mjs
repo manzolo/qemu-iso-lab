@@ -11,7 +11,18 @@ const N2 = "proxmox-ve-node2";
 const CLIENT = "proxmox-lab-client";
 const CHECKOUT = "~/lab/demo/qemu-iso-lab";
 const GUI = "https://127.0.0.1:8007/";  // node 2's GUI: it must survive node 1
-const HA = "ha-manager status | grep -E '^(master|service)'";
+const HA = "ha-manager status";
+// Off camera: until a replication job has a LastSync.
+const SYNCED = (job) => `until pvesr status | awk '$1=="${job}" && $4!="-"' | grep -q .; do sleep 3; done`;
+// The client's watch loop, written off camera and shown with cat (2026-10-07: a one-line while loop
+// typed on camera was unreadable).
+const WATCH = `cat > ~/watch.sh <<'EOF'
+while true; do
+  printf '%s ' $(date +%T)
+  curl -s -m 2 http://10.10.10.20/ | grep -o '<title>IT Tools' || echo 'no answer'
+  sleep 5
+done
+EOF`;
 
 export const cues = [
   { id: "intro", en: "Three Proxmox nodes in a cluster, and a client on the same network. One of the containers will survive the death of its node.",
@@ -58,7 +69,7 @@ export async function setup(d) {
   await d.page.bringToFront();
   await d.page.goto(d.restartWeb());
   await d.page.locator("#rows tr[data-vm]").first().waitFor({ timeout: 30000 });
-  await d.openTerminal();
+  await d.openTerminal(15);  // pvesr status is wide
   await d.focusBrowser();
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1500 300 0.1");
 }
@@ -119,23 +130,32 @@ export async function run(d) {
 
   await d.cue("cluster");
   await d.focusTerminal();
-  await d.run("cd qemu-iso-lab && clear");
+  await d.run("cd qemu-iso-lab", { record: false });
+  await d.clearScreen();
   await d.session(N1);
-  await guest(d, "pvecm status | sed -n '/^Name/p;/^Nodes/p;/^Quorate/p'", 3500);
+  await guest(d, "pvecm status", 6000);
   await guest(d, "grep ring0_addr /etc/pve/corosync.conf", 4500);
 
   await d.cue("containers");
-  await guest(d, "clear; pct list", 2500);
-  await guest(d, "pct config 200 | grep -E '^(hostname|net1|rootfs)'", 5000);
+  await d.clearScreen();
+  await guest(d, "pct list", 2500);
+  await guest(d, "pct config 200 | grep rootfs", 3500);
+  await guest(d, "pct config 200 | grep net1", 4000);
 
   await d.cue("replica");
-  await guest(d, "clear; pvesr create-local-job 200-0 proxmox-ve-node2 --schedule '*/1'", 800);
+  await d.clearScreen();
+  await guest(d, "pvesr create-local-job 200-0 proxmox-ve-node2 --schedule '*/1'", 800);
   await guest(d, "pvesr create-local-job 200-1 proxmox-ve-node3 --schedule '*/1'", 800);
-  await slow(d, "pvesr schedule-now 200-0; pvesr schedule-now 200-1; sleep 15", 500);
-  await guest(d, "pvesr status | cut -c1-90", 5000);
+  await guest(d, "pvesr schedule-now 200-0", 500);
+  await guest(d, "pvesr schedule-now 200-1", 500);
+  d.ff(6);
+  d.offCamera(N1, SYNCED("200-0") + "; " + SYNCED("200-1"));
+  d.ffEnd();
+  await guest(d, "pvesr status", 5000);
 
   await d.cue("ha");
-  await guest(d, "clear; ha-manager add ct:200 --state started --max_relocate 1 --max_restart 1", 800);
+  await d.clearScreen();
+  await guest(d, "ha-manager add ct:200 --state started --max_relocate 1 --max_restart 1", 800);
   d.ff(6);
   for (let i = 0; i < 40 && haWhere(d) !== `${N1}, started`; i++) await d.sleep(2000);
   d.ffEnd();
@@ -159,11 +179,14 @@ export async function run(d) {
 
   await d.cue("loop");
   await d.focusTerminal();
-  await d.run("clear");
+  d.offCamera(CLIENT, WATCH);
+  await d.clearScreen();
   await d.session(CLIENT);
-  await d.type(" clear; while true; do printf '%s ' $(date +%T); curl -s -m 2 http://10.10.10.20/ | grep -o '<title>IT Tools' || echo 'no answer'; sleep 5; done", 30);
+  await guest(d, "cat watch.sh", 5000);
+  d.step("bash watch.sh");
+  await d.type(" bash watch.sh", 40);
   await d.key("Return");
-  await d.sleep(9000);
+  await d.sleep(7000);
 
   await d.cue("kill");
   await d.focusBrowser();
@@ -198,17 +221,21 @@ export async function run(d) {
   await d.leave();
 
   await d.cue("back");
-  await d.run("clear");
-  await d.run(`vmctl group up ${LAB} 2>&1 | tail -3`, { wait: false });
+  await d.clearScreen();
+  await d.run(`vmctl group up ${LAB}`, { wait: false });
   d.ff(10);
   await d.sleep(3000);
   for (let i = 0; i < 300 && !/Nodes:\s*3/.test(shell(d, N2, "pvecm status")); i++) await d.sleep(2000);
   d.ffEnd();
   await d.sleep(1500);
-  await d.run("clear");
+  await d.clearScreen();
   await d.session(N2);
   // The job toward node 1 failed while it was off, and a failed job waits before it retries: run it now.
-  await slow(d, "pvesr schedule-now 200-0; until pvesr status | awk '$1==\"200-0\" && $4!=\"-\"' | grep -q .; do sleep 3; done; pvesr status | cut -c1-90", 4000, 8);
+  await guest(d, "pvesr schedule-now 200-0", 500);
+  d.ff(8);
+  d.offCamera(N2, SYNCED("200-0"));
+  d.ffEnd();
+  await guest(d, "pvesr status", 5000);
   await guest(d, "ha-manager migrate ct:200 proxmox-ve", 500);
   d.ff(6);
   for (let i = 0; i < 60 && haWhere(d) !== `${N1}, started`; i++) await d.sleep(2000);
@@ -217,7 +244,7 @@ export async function run(d) {
   await d.leave();
 
   await d.cue("tests");
-  await d.run("clear");
+  await d.clearScreen();
   const before = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group test ${LAB}`, { wait: false });
   await d.sleep(6000);

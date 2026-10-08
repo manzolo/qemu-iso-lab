@@ -6,7 +6,7 @@ echo ""; echo "${BOLD}Exercise 3 — a failed disk, replaced${RESET}"; echo ""
 md_teardown; trap md_teardown EXIT
 on mdadm-lab-server "sudo mdadm --create /dev/md0 --size=256M --run --level=1 --raid-devices=2 $DISK1 $DISK2" >/dev/null 2>&1
 md_settle
-on mdadm-lab-server "sudo mkfs.ext4 -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file >/dev/null" >/dev/null
+on mdadm-lab-server "sudo mkfs.ext4 -F -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file >/dev/null" >/dev/null
 assert "one member is marked faulty" on mdadm-lab-server sudo mdadm /dev/md0 --fail "$DISK1"
 assert_contains "the array is degraded" "$(on mdadm-lab-server cat /proc/mdstat || true)" "\[U_\]|\[_U\]"
 assert_contains "the file is still readable" "$(on mdadm-lab-server cat /mnt/raid1/file || true)" "^mirrored$"

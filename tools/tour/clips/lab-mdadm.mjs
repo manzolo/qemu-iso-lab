@@ -5,16 +5,20 @@ export const lab = "mdadm-lab";
 const LAB = "mdadm-lab";
 const VM = "mdadm-lab-server";
 const CHECKOUT = "~/lab/demo/qemu-iso-lab";
-const DISKS = `DISKS=$(lsblk -dnpo NAME,SIZE,TYPE | awk '$2=="2G" && $3=="disk" {print $1}' | xargs); echo $DISKS`;
-const D = (n) => `$(echo $DISKS | cut -d' ' -f${n})`;
+// Rewritten 2026-10-07 in the approved style (docs/TOUR.md, "How a lesson types its commands"):
+// the disks named on camera (DISKS, then set -- for $1..$4), one short command per step, the
+// waits for a sync off camera.
+const DISKS_CMD = `DISKS=$(lsblk -dnpo NAME,SIZE | awk '$2=="2G" {print $1}')`;
 
 export const cues = [
   { id: "intro", en: "RAID keeps your data when a disk dies. mdadm is the Linux kernel's own software RAID, no controller needed. The mdadm lab is one server with four empty disks: we build arrays, break them, and watch them heal.",
     it: "Il RAID tiene i tuoi dati quando un disco muore. mdadm è il RAID software del kernel Linux, senza controller. Il lab mdadm è un server con quattro dischi vuoti: costruiamo array, li rompiamo e li guardiamo guarire." },
   { id: "install", en: "One cloud image plus four 2-gigabyte disks.",
     it: "Una cloud image più quattro dischi da 2 gigabyte." },
-  { id: "anatomy", en: "The four lab disks, picked by size. /proc/mdstat is the dashboard: the RAID levels the kernel can run, and no array yet. Our arrays use only 256 megabytes of each disk, so every sync takes seconds.",
-    it: "I quattro dischi del lab, scelti per dimensione. /proc/mdstat è il cruscotto: i livelli RAID che il kernel sa gestire, e ancora nessun array. I nostri array usano solo 256 megabyte di ogni disco, così ogni sincronizzazione dura pochi secondi." },
+  { id: "disks", en: "The four lab disks, picked by size into a variable, DISKS; set gives them short names, dollar one to dollar four.",
+    it: "I quattro dischi del lab, scelti per dimensione in una variabile, DISKS; set dà loro nomi brevi, da dollaro uno a dollaro quattro." },
+  { id: "anatomy", en: "/proc/mdstat is the dashboard: the RAID levels the kernel can run, and no array yet. Our arrays use only 256 megabytes of each disk, so every sync takes seconds.",
+    it: "/proc/mdstat è il cruscotto: i livelli RAID che il kernel sa gestire, e ancora nessun array. I nostri array usano solo 256 megabyte di ogni disco, così ogni sincronizzazione dura pochi secondi." },
   { id: "raid1", en: "A mirror: two disks, every block written to both. The first sync copies one disk onto the other; U U means both members are up. The array is a block device like any other.",
     it: "Un mirror: due dischi, ogni blocco scritto su entrambi. La prima sincronizzazione copia un disco sull'altro; U U vuol dire che i membri sono su entrambi. L'array è un dispositivo a blocchi come un altro." },
   { id: "mount", en: "Format it, mount it, write a file.",
@@ -48,12 +52,19 @@ export async function setup(d) {
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
 }
 
-// mdadm syncs on 2 GiB disks take seconds: wait for /proc/mdstat to settle before reading it.
-const WAIT = "while grep -qE 'resync|recovery|reshape' /proc/mdstat; do sleep 1; done";
+const say = (d, cmd, read = 4500) => d.guest(cmd, { read });
+// Off camera, in the server: the waits for a sync (seconds on 256 MB members), fast-forwarded.
+const off = (d, cmd) => d.offCamera(VM, cmd);
+async function settle(d) {
+  d.ff(6);
+  off(d, "while grep -qE 'resync|recovery|reshape' /proc/mdstat; do sleep 1; done");
+  d.ffEnd();
+}
 
 export async function run(d) {
   await d.cue("intro");
-  await d.run("cd qemu-iso-lab");
+  await d.run("cd qemu-iso-lab", { record: false });
+  await d.clearScreen();
   await d.sleep(3500);
   await d.cue("install");
   const before = d.vm("cat /tmp/demo-prompt");
@@ -64,52 +75,90 @@ export async function run(d) {
   d.ffEnd();
   await d.sleep(1500);
 
-  await d.cue("anatomy");
-  await d.run("clear");
+  await d.cue("disks");
+  await d.clearScreen();
   await d.session(VM);
-  await d.guest(DISKS, { read: 3000 });
-  await d.guest("cat /proc/mdstat", { read: 4000 });
+  await say(d, "lsblk -dpo NAME,SIZE", 4000);
+  await say(d, DISKS_CMD, 800);
+  await say(d, "set -- $DISKS", 800);
+  await say(d, "echo $1 $2 $3 $4", 3500);
+  await d.cue("anatomy");
+  await say(d, "cat /proc/mdstat", 5000);
 
   await d.cue("raid1");
-  await d.guest(`sudo mdadm --create /dev/md0 --size=256M --run --level=1 --raid-devices=2 ${D(1)} ${D(2)}`, { read: 2500 });
-  await d.guest(`${WAIT}; cat /proc/mdstat`, { read: 5000, timeout: 180000 });
-  await d.guest("sudo mdadm --detail /dev/md0 | grep -E 'Raid Level|Array Size|State :|Active|Working'", { read: 4500 });
+  await d.clearScreen();
+  await say(d, "sudo mdadm --create /dev/md0 --level=1 --raid-devices=2 --size=256M --run $1 $2", 2500);
+  await settle(d);
+  await say(d, "cat /proc/mdstat", 5000);
   await d.cue("mount");
-  await d.guest("sudo mkfs.ext4 -F -q /dev/md0 && sudo mkdir -p /mnt/raid1 && sudo mount /dev/md0 /mnt/raid1 && echo mirrored | sudo tee /mnt/raid1/file", { read: 3500 });
+  await d.clearScreen();
+  await say(d, "sudo mkfs.ext4 -F -q /dev/md0", 1000);
+  await say(d, "sudo mkdir /mnt/raid1", 500);
+  await say(d, "sudo mount /dev/md0 /mnt/raid1", 800);
+  await say(d, "echo mirrored | sudo tee /mnt/raid1/file", 3000);
 
   await d.cue("fail");
-  await d.guest(`clear; sudo mdadm /dev/md0 --fail ${D(1)} && cat /proc/mdstat`, { read: 5000 });
-  await d.guest("cat /mnt/raid1/file    # still readable, degraded", { read: 3500 });
+  await d.clearScreen();
+  await say(d, "sudo mdadm /dev/md0 --fail $1", 1500);
+  await say(d, "cat /proc/mdstat", 5000);
+  await say(d, "cat /mnt/raid1/file", 3500);
   await d.cue("replace");
-  await d.guest(`sudo mdadm /dev/md0 --remove ${D(1)} && sudo mdadm /dev/md0 --add ${D(1)}`, { read: 2000 });
-  await d.guest(`${WAIT}; cat /proc/mdstat`, { read: 5000, timeout: 180000 });
+  await d.clearScreen();
+  await say(d, "sudo mdadm /dev/md0 --remove $1", 1500);
+  await say(d, "sudo mdadm /dev/md0 --add $1", 1500);
+  await settle(d);
+  await say(d, "cat /proc/mdstat", 5000);
 
   await d.cue("raid5");
-  await d.guest(`clear; sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; sudo mdadm --zero-superblock ${D(1)} ${D(2)}`, { read: 2000 });
-  await d.guest("sudo mdadm --create /dev/md1 --size=256M --run --level=5 --raid-devices=3 --spare-devices=1 $DISKS", { read: 2500 });
-  await d.guest(`${WAIT}; sudo mdadm --detail /dev/md1 | grep -E 'Raid Level|Array Size|State :|Active|Spare'`, { read: 5500, timeout: 300000 });
-  await d.guest("sudo mkfs.ext4 -F -q /dev/md1 && sudo mkdir -p /mnt/raid5 && sudo mount /dev/md1 /mnt/raid5 && echo striped | sudo tee /mnt/raid5/file", { read: 3000 });
+  off(d, `sudo umount /mnt/raid1; sudo mdadm --stop /dev/md0; for x in $(lsblk -dnpo NAME,SIZE | awk '$2=="2G" {print $1}'); do sudo mdadm --zero-superblock $x; sudo wipefs -aq $x; done`);
+  await d.clearScreen();
+  await say(d, "sudo mdadm --create /dev/md1 --level=5 --raid-devices=3 --spare-devices=1 --size=256M --run $DISKS", 2500);
+  await settle(d);
+  await say(d, "sudo mdadm --detail /dev/md1", 9000);
+  await d.clearScreen();
+  await say(d, "sudo mkfs.ext4 -F -q /dev/md1", 1000);
+  await say(d, "sudo mkdir /mnt/raid5", 500);
+  await say(d, "sudo mount /dev/md1 /mnt/raid5", 800);
+  await say(d, "echo striped | sudo tee /mnt/raid5/file", 2500);
 
   await d.cue("spare");
-  await d.guest(`clear; sudo mdadm /dev/md1 --fail ${D(2)} && sleep 2 && cat /proc/mdstat    # the spare rebuilds, unasked`, { read: 5000 });
-  await d.guest(`${WAIT}; sudo mdadm --detail /dev/md1 | grep -E 'State :|Active|Working|Failed|Spare'; cat /mnt/raid5/file`, { read: 5500, timeout: 300000 });
+  await d.clearScreen();
+  await say(d, "sudo mdadm /dev/md1 --fail $2", 2000);
+  await say(d, "cat /proc/mdstat", 5000);
+  await settle(d);
+  await say(d, "cat /proc/mdstat", 5000);
+  await say(d, "cat /mnt/raid5/file", 3000);
 
   await d.cue("grow");
-  await d.guest(`clear; sudo mdadm /dev/md1 --remove ${D(2)} && sudo mdadm /dev/md1 --add ${D(2)} && sudo mdadm --grow /dev/md1 --raid-devices=4 && cat /proc/mdstat    # reshape`, { read: 5000 });
-  await d.guest(`${WAIT}; sudo mdadm --detail /dev/md1 | grep -E 'Raid Devices|Array Size'`, { read: 4000, timeout: 600000 });
-  await d.guest("sudo resize2fs /dev/md1 2>/dev/null; df -h /mnt/raid5    # from 512 to 768 MiB, still mounted", { read: 5000 });
+  await d.clearScreen();
+  await say(d, "sudo mdadm /dev/md1 --remove $2", 1000);
+  await say(d, "sudo mdadm /dev/md1 --add $2", 1000);
+  await say(d, "sudo mdadm --grow /dev/md1 --raid-devices=4", 2000);
+  await say(d, "cat /proc/mdstat", 4500);
+  await settle(d);
+  await say(d, "sudo resize2fs /dev/md1", 2500);
+  await say(d, "df -h /mnt/raid5", 5000);
 
   await d.cue("assemble");
-  await d.guest("clear; sudo mdadm --detail --scan", { read: 3500 });
-  await d.guest("sudo umount /mnt/raid5 && sudo mdadm --stop /dev/md1 && cat /proc/mdstat", { read: 3500 });
-  await d.guest("sudo mdadm --assemble --scan && cat /proc/mdstat && sudo mount /dev/md1 /mnt/raid5 && cat /mnt/raid5/file", { read: 5000 });
+  await d.clearScreen();
+  await say(d, "sudo mdadm --detail --scan", 4000);
+  await say(d, "sudo umount /mnt/raid5", 500);
+  await say(d, "sudo mdadm --stop /dev/md1", 1500);
+  await say(d, "sudo mdadm --assemble --scan", 2000);
+  await say(d, "sudo mount /dev/md1 /mnt/raid5", 800);
+  await say(d, "cat /mnt/raid5/file", 4000);
 
   await d.cue("teardown");
-  await d.guest("sudo umount /mnt/raid5; sudo mdadm --stop /dev/md1; for d in $DISKS; do sudo mdadm --zero-superblock $d; sudo wipefs -a $d; done; cat /proc/mdstat; lsblk", { read: 5000 });
+  await d.clearScreen();
+  await say(d, "sudo umount /mnt/raid5", 500);
+  await say(d, "sudo mdadm --stop /dev/md1", 1500);
+  await say(d, "sudo mdadm --zero-superblock $DISKS", 1500);
+  await say(d, "cat /proc/mdstat", 4000);
+  off(d, `for x in $(lsblk -dnpo NAME,SIZE | awk '$2=="2G" {print $1}'); do sudo wipefs -aq $x; done; sudo rmdir /mnt/raid1 /mnt/raid5`);
   await d.leave();
 
   await d.cue("tests");
-  await d.run("clear");
+  await d.clearScreen();
   const before2 = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group test ${LAB}`, { wait: false });
   await d.sleep(6000);

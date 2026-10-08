@@ -21,8 +21,10 @@ export const cues = [
     it: "Dentro una transazione la nuova riga c'è, ma niente è definitivo: ROLLBACK la annulla. E la chiave esterna rifiuta di cancellare un utente che ha ancora degli ordini." },
   { id: "privileges", en: "An account gets exactly what it needs: reader may SELECT from testdb and nothing else. The INSERT is denied.",
     it: "Un account riceve esattamente ciò che gli serve: reader può fare SELECT su testdb e nient'altro. L'INSERT viene negato." },
-  { id: "admin", en: "EXPLAIN shows how a query runs: every row read before the index, straight to the match after it. mysqldump writes the database as SQL, and reading it back restores it.",
-    it: "EXPLAIN mostra come viene eseguita una query: ogni riga letta prima dell'indice, dritto al risultato dopo. mysqldump scrive il database come SQL, e rileggerlo lo ripristina." },
+  { id: "admin", en: "A second database, testlab, with a students table. EXPLAIN shows how a query runs: every row read before the index, straight to the match after it.",
+    it: "Un secondo database, testlab, con una tabella students. EXPLAIN mostra come viene eseguita una query: ogni riga letta prima dell'indice, dritto al risultato dopo." },
+  { id: "dump", en: "mysqldump writes the database as SQL statements. Drop the table, read the file back, and the table is there again.",
+    it: "mysqldump scrive il database come istruzioni SQL. Cancelliamo la tabella, rileggiamo il file, e la tabella torna." },
   { id: "phpmyadmin", en: "The same data in the browser: phpMyAdmin, forwarded to the host. Log in as labuser and open the users table.",
     it: "Gli stessi dati nel browser: phpMyAdmin, inoltrato all'host. Entra come labuser e apri la tabella users." },
   { id: "tests", en: "Six tests, one per exercise, each leaving the database as the lab hands it to you.",
@@ -40,9 +42,23 @@ export async function setup(d) {
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
 }
 
+// Rewritten 2026-10-07 in the approved style (docs/TOUR.md, "How a lesson types its commands"): the
+// SQL typed in the mysql client, a clause per line, instead of squeezed into mysql -e "...".
+const say = (d, cmd, read = 4000) => d.guest(cmd, { read });
+// A line typed into the mysql client (no shell prompt to wait for).
+async function sql(d, line, ms = 2500) {
+  d.step(line);
+  await d.type(" " + line, 40);
+  await d.sleep(250);
+  await d.key("Return");
+  await d.sleep(ms);
+}
+const off = (d, cmd) => d.offCamera(VM, cmd);
+
 export async function run(d) {
   await d.cue("intro");
-  await d.run("cd qemu-iso-lab");
+  await d.run("cd qemu-iso-lab", { record: false });
+  await d.clearScreen();
   await d.sleep(3500);
   await d.cue("install");
   const before = d.vm("cat /tmp/demo-prompt");
@@ -54,38 +70,78 @@ export async function run(d) {
   await d.sleep(1500);
 
   await d.cue("anatomy");
-  await d.run("clear");
+  await d.clearScreen();
   await d.session(VM);
-  await d.guest("systemctl is-active mysql; mysql --version", { read: 3000 });
-  await d.guest("sudo mysql -e 'SHOW DATABASES;'    # root, over the socket", { read: 3500 });
-  await d.guest("mysql testdb -e 'SHOW TABLES; DESCRIBE users;'    # labuser, from ~/.my.cnf", { read: 5000 });
+  await say(d, "systemctl is-active mysql", 2000);
+  await sql(d, "sudo mysql", 2500);
+  await sql(d, "SHOW DATABASES;", 3500);
+  await sql(d, "exit", 1000);
+  await d.clearScreen();
+  await sql(d, "mysql testdb", 2500);
+  await sql(d, "SHOW TABLES;", 2500);
+  await sql(d, "DESCRIBE users;", 4500);
 
   await d.cue("queries");
-  await d.guest("clear; mysql testdb -e 'SELECT * FROM users;'", { read: 3500 });
-  await d.guest("mysql testdb -e \"SELECT name, email FROM users WHERE name LIKE 'A%';\"", { read: 3000 });
-  await d.guest("mysql testdb -e 'SELECT product, amount FROM orders ORDER BY amount DESC;'", { read: 3500 });
+  await d.clearScreen();
+  await sql(d, "SELECT * FROM users;", 3500);
+  await sql(d, "SELECT name, email FROM users WHERE name LIKE 'A%';", 3500);
+  await sql(d, "SELECT product, amount FROM orders ORDER BY amount DESC;", 4500);
 
   await d.cue("joins");
-  await d.guest("clear; mysql testdb -e 'SELECT u.name, o.product, o.amount FROM users u JOIN orders o ON o.user_id = u.id;'", { read: 4000 });
-  await d.guest("mysql testdb -e 'SELECT u.name, o.product FROM users u LEFT JOIN orders o ON o.user_id = u.id;'    # Dana: NULL", { read: 4500 });
-  await d.guest("mysql testdb -e 'SELECT u.name, COUNT(o.id) AS orders, SUM(o.amount) AS total FROM users u LEFT JOIN orders o ON o.user_id = u.id GROUP BY u.id;'", { read: 5000 });
+  await d.clearScreen();
+  await sql(d, "SELECT u.name, o.product, o.amount", 400);
+  await sql(d, "FROM users u", 400);
+  await sql(d, "JOIN orders o ON o.user_id = u.id;", 5000);
+  await d.clearScreen();
+  await sql(d, "SELECT u.name, o.product", 400);
+  await sql(d, "FROM users u", 400);
+  await sql(d, "LEFT JOIN orders o ON o.user_id = u.id;", 5500);
+  await d.clearScreen();
+  await sql(d, "SELECT u.name, COUNT(o.id) AS orders, SUM(o.amount) AS total", 400);
+  await sql(d, "FROM users u LEFT JOIN orders o ON o.user_id = u.id", 400);
+  await sql(d, "GROUP BY u.id;", 5500);
 
   await d.cue("transactions");
-  await d.guest("clear; mysql testdb -e \"START TRANSACTION; INSERT INTO users (name) VALUES ('Ghost'); SELECT COUNT(*) FROM users; ROLLBACK; SELECT COUNT(*) FROM users;\"", { read: 5000 });
-  await d.guest("mysql testdb -e \"DELETE FROM users WHERE name = 'Alice';\"    # refused: Alice has orders", { read: 4500 });
+  await d.clearScreen();
+  await sql(d, "START TRANSACTION;", 1000);
+  await sql(d, "INSERT INTO users (name) VALUES ('Ghost');", 1500);
+  await sql(d, "SELECT COUNT(*) FROM users;", 3000);
+  await sql(d, "ROLLBACK;", 1000);
+  await sql(d, "SELECT COUNT(*) FROM users;", 3500);
+  await sql(d, "DELETE FROM users WHERE name = 'Alice';", 5000);
+  await sql(d, "exit", 1000);
 
   await d.cue("privileges");
-  await d.guest("clear; sudo mysql -e \"CREATE USER 'reader'@'localhost' IDENTIFIED BY 'readerpass'; GRANT SELECT ON testdb.* TO 'reader'@'localhost'; SHOW GRANTS FOR 'reader'@'localhost';\"", { read: 4000 });
-  await d.guest("mysql -u reader -p'readerpass' testdb -e 'SELECT COUNT(*) FROM users;'    # allowed", { read: 3000 });
-  await d.guest("mysql -u reader -p'readerpass' testdb -e \"INSERT INTO users (name) VALUES ('x');\"    # denied", { read: 3500 });
-  await d.guest("sudo mysql -e \"DROP USER 'reader'@'localhost';\"", { read: 1500 });
+  await d.clearScreen();
+  await sql(d, "sudo mysql", 2500);
+  await sql(d, "CREATE USER 'reader'@'localhost' IDENTIFIED BY 'readerpass';", 1500);
+  await sql(d, "GRANT SELECT ON testdb.* TO 'reader'@'localhost';", 1500);
+  await sql(d, "exit", 1000);
+  await d.clearScreen();
+  await sql(d, "mysql -u reader -preaderpass testdb", 2500);
+  await sql(d, "SELECT COUNT(*) FROM users;", 3000);
+  await sql(d, "INSERT INTO users (name) VALUES ('x');", 4500);
+  await sql(d, "exit", 1000);
+  off(d, `sudo mysql -e "DROP USER 'reader'@'localhost';"`);
 
   await d.cue("admin");
-  await d.guest("clear; sudo mysql -e \"CREATE DATABASE testlab; GRANT ALL ON testlab.* TO 'labuser'@'localhost';\" && mysql testlab -e \"CREATE TABLE students (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100), grade INT); INSERT INTO students (name, grade) VALUES ('Ann', 28), ('Ben', 24), ('Cleo', 30);\"", { read: 2000 });
-  await d.guest("mysql testlab -e 'EXPLAIN SELECT * FROM students WHERE grade = 30\\G' | grep -E 'type|key:|rows'    # before the index", { read: 4000 });
-  await d.guest("mysql testlab -e 'CREATE INDEX idx_grade ON students (grade); EXPLAIN SELECT * FROM students WHERE grade = 30\\G' | grep -E 'type|key:|rows'    # after", { read: 4500 });
-  await d.guest("mysqldump --no-tablespaces testlab > ~/testlab.sql && grep -c INSERT ~/testlab.sql && mysql testlab -e 'DROP TABLE students;' && mysql testlab < ~/testlab.sql && mysql testlab -e 'SELECT * FROM students;'", { read: 5000 });
-  await d.guest("sudo mysql -e 'DROP DATABASE testlab;'; rm ~/testlab.sql", { read: 1000 });
+  off(d, `sudo mysql -e "CREATE DATABASE testlab; GRANT ALL ON testlab.* TO 'labuser'@'localhost';"; mysql testlab -e "CREATE TABLE students (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100), grade INT); INSERT INTO students (name, grade) VALUES ('Ann', 28), ('Ben', 24), ('Cleo', 30);"`);
+  await d.clearScreen();
+  await sql(d, "mysql testlab", 2500);
+  await sql(d, "SELECT * FROM students;", 3500);
+  await sql(d, "EXPLAIN SELECT * FROM students WHERE grade = 30;", 5500);
+  await sql(d, "CREATE INDEX idx_grade ON students (grade);", 1500);
+  await sql(d, "EXPLAIN SELECT * FROM students WHERE grade = 30;", 6000);
+  await sql(d, "exit", 1000);
+
+  await d.cue("dump");
+  await d.clearScreen();
+  await say(d, "mysqldump --no-tablespaces testlab > testlab.sql", 1500);
+  await say(d, "grep INSERT testlab.sql", 4500);
+  await say(d, "mysql testlab -e 'DROP TABLE students;'", 1500);
+  await say(d, "mysql testlab < testlab.sql", 1500);
+  await say(d, "mysql testlab -e 'SELECT * FROM students;'", 5000);
+  off(d, "sudo mysql -e 'DROP DATABASE testlab;'; rm -f ~/testlab.sql");
   await d.leave();
 
   await d.cue("phpmyadmin");
@@ -109,7 +165,7 @@ export async function run(d) {
   await d.focusTerminal();
 
   await d.cue("tests");
-  await d.run("clear");
+  await d.clearScreen();
   const before2 = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group test ${LAB}`, { wait: false });
   await d.sleep(6000);

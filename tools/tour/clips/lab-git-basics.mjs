@@ -45,9 +45,14 @@ export async function setup(d) {
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
 }
 
+// Rewritten 2026-10-07 in the approved style (docs/TOUR.md, "How a lesson types its commands"):
+// one short command per step, no comments typed on screen (the voice says them).
+const say = (d, cmd, read = 3500) => d.guest(cmd, { read });
+
 export async function run(d) {
   await d.cue("intro");
-  await d.run("cd qemu-iso-lab");
+  await d.run("cd qemu-iso-lab", { record: false });
+  await d.clearScreen();
   await d.sleep(4000);
   await d.cue("install");
   const before = d.vm("cat /tmp/demo-prompt");
@@ -57,53 +62,89 @@ export async function run(d) {
   for (let i = 0; i < 900 && d.vm("cat /tmp/demo-prompt") === before; i++) await d.sleep(1000);
   d.ffEnd();
   await d.sleep(1500);
-  await d.run("clear");
+  await d.clearScreen();
   await d.session(VM);
 
   await d.cue("who");
-  await d.guest("git --version", { read: 2500 });
-  await d.guest("git config --global --list    # name and e-mail: in every commit", { read: 4000 });
+  await say(d, "git --version", 2500);
+  await say(d, "git config --global --list", 4500);
 
   await d.cue("init");
-  await d.guest("clear; mkdir -p ~/first-repo && cd ~/first-repo && git init -b main", { read: 3500 });
-  await d.guest("git status    # nothing tracked yet", { read: 4000 });
+  await d.clearScreen();
+  await say(d, "mkdir ~/first-repo", 500);
+  await say(d, "cd ~/first-repo", 500);
+  await say(d, "git init -b main", 3000);
+  await say(d, "git status", 4000);
 
   await d.cue("add");
-  await d.guest("echo 'Shopping list' > list.txt && git status    # untracked", { read: 4500 });
-  await d.guest("git add list.txt && git status    # staged, ready to commit", { read: 4500 });
-  await d.guest("git commit -m 'Start the shopping list' && git log --oneline", { read: 4500 });
+  await d.clearScreen();
+  await say(d, "echo 'Shopping list' > list.txt", 800);
+  await say(d, "git status", 4000);
+  await say(d, "git add list.txt", 800);
+  await say(d, "git status", 4000);
+  await say(d, "git commit -m 'Start the shopping list'", 2500);
+  await say(d, "git log --oneline", 3500);
 
   await d.cue("diff");
-  await d.guest("clear; echo 'milk' >> list.txt && echo 'bread' >> list.txt && git diff", { read: 5500 });
-  await d.guest("git add list.txt && git commit -m 'Add milk and bread' && git log --oneline", { read: 4500 });
+  await d.clearScreen();
+  await say(d, "echo 'milk' >> list.txt", 500);
+  await say(d, "echo 'bread' >> list.txt", 500);
+  await say(d, "git diff", 5000);
+  await say(d, "git add list.txt", 500);
+  await say(d, "git commit -m 'Add milk and bread'", 2500);
+  await say(d, "git log --oneline", 3500);
 
   await d.cue("undo");
-  await d.guest("clear; echo 'oops' >> list.txt && git diff --stat", { read: 3500 });
-  await d.guest("git restore list.txt && git diff --stat    # back to the last commit (nothing)", { read: 4000 });
-  await d.guest("echo 'eggs' >> list.txt && git add list.txt && git restore --staged list.txt && git status --short", { read: 4500 });
-  await d.guest("git commit -am 'Add eggs'    # -a: every tracked file that changed", { read: 3500 });
+  await d.clearScreen();
+  await say(d, "echo 'oops' >> list.txt", 500);
+  await say(d, "git diff", 3500);
+  await say(d, "git restore list.txt", 800);
+  await say(d, "git diff", 2500);
+  await say(d, "echo 'eggs' >> list.txt", 500);
+  await say(d, "git add list.txt", 500);
+  await say(d, "git restore --staged list.txt", 800);
+  await say(d, "git status --short", 3500);
+  await say(d, "git commit -am 'Add eggs'", 3000);
 
   await d.cue("branch");
-  await d.guest("clear; git switch -c weekend", { read: 3000 });
-  await d.guest("echo 'cake' >> list.txt && git commit -am 'Weekend: cake'", { read: 3000 });
-  await d.guest("git switch main && cat list.txt    # no cake on main", { read: 4000 });
+  await d.clearScreen();
+  await say(d, "git switch -c weekend", 2500);
+  await say(d, "echo 'cake' >> list.txt", 500);
+  await say(d, "git commit -am 'Weekend: cake'", 2500);
+  await say(d, "git switch main", 1500);
+  await say(d, "cat list.txt", 4000);
 
   await d.cue("merge");
-  await d.guest("git merge weekend && cat list.txt", { read: 4500 });
-  await d.guest("git log --oneline --graph && git branch -d weekend", { read: 5000 });
+  await d.clearScreen();
+  await say(d, "git merge weekend", 3000);
+  await say(d, "cat list.txt", 3000);
+  await say(d, "git log --oneline --graph", 4500);
+  await say(d, "git branch -d weekend", 2500);
 
   await d.cue("ignore");
-  await d.guest("clear; echo 'scratch' > notes.tmp && printf '*.tmp\\n' > .gitignore && git status --short    # notes.tmp is not listed", { read: 5000 });
-  await d.guest("git add .gitignore && git commit -m 'Ignore temporary files'", { read: 3000 });
+  await d.clearScreen();
+  await say(d, "echo 'scratch' > notes.tmp", 500);
+  await say(d, "git status --short", 3000);
+  await say(d, "echo '*.tmp' > .gitignore", 500);
+  await say(d, "git status --short", 4500);
+  await say(d, "git add .gitignore", 500);
+  await say(d, "git commit -m 'Ignore temporary files'", 3000);
 
   await d.cue("remote");
-  await d.guest("clear; git init --bare ~/first-remote.git    # a server is a bare repository", { read: 3500 });
-  await d.guest("git remote add origin ~/first-remote.git && git push -u origin main", { read: 5000 });
+  await d.clearScreen();
+  await say(d, "git init --bare ~/first-remote.git", 3000);
+  await say(d, "git remote add origin ~/first-remote.git", 800);
+  await say(d, "git push -u origin main", 5000);
 
   await d.cue("clone");
-  await d.guest("clear; git clone ~/first-remote.git ~/first-clone && git -C ~/first-clone log --oneline", { read: 5000 });
-  await d.guest("echo 'coffee' >> list.txt && git commit -am 'Add coffee' && git push", { read: 4500 });
-  await d.guest("git -C ~/first-clone pull && cat ~/first-clone/list.txt", { read: 5000 });
+  await d.clearScreen();
+  await say(d, "git clone ~/first-remote.git ~/first-clone", 2500);
+  await say(d, "git -C ~/first-clone log --oneline", 4000);
+  await say(d, "echo 'coffee' >> list.txt", 500);
+  await say(d, "git commit -am 'Add coffee'", 2000);
+  await say(d, "git push", 3500);
+  await say(d, "git -C ~/first-clone pull", 3000);
+  await say(d, "cat ~/first-clone/list.txt", 5000);
   await d.leave();
 
   await d.cue("end");

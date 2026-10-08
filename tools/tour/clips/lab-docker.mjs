@@ -17,8 +17,8 @@ export const cues = [
     it: "Un'immagine è il modello in sola lettura, fatto a strati: history mostra come è stata costruita alpine." },
   { id: "run", en: "docker run starts a container from it. With --rm it is removed when the command ends; with -d it stays up: here nginx, its port 80 published on 8080.",
     it: "docker run ne avvia un container. Con --rm viene rimosso quando il comando finisce; con -d resta su: qui nginx, con la porta 80 pubblicata sulla 8080." },
-  { id: "inside", en: "exec runs a second process inside, logs reads what the main one printed, inspect shows how it was configured. rm -f stops and removes it.",
-    it: "exec esegue un secondo processo dentro, logs legge cosa ha stampato il principale, inspect mostra com'è configurato. rm -f lo ferma e lo rimuove." },
+  { id: "inside", en: "exec runs a second process inside, logs reads what the main one printed, port shows how it is published. rm -f stops and removes it.",
+    it: "exec esegue un secondo processo dentro, logs legge cosa ha stampato il principale, port mostra come è pubblicato. rm -f lo ferma e lo rimuove." },
   { id: "volumes", en: "A container's own layer disappears with it. A named volume survives: one container writes, a second one reads.",
     it: "Lo strato proprio di un container sparisce con lui. Un volume con nome sopravvive: un container scrive, un secondo legge." },
   { id: "compose", en: "Compose describes several containers in one file: image, ports, volumes. up -d brings them up together, down takes them away.",
@@ -40,9 +40,18 @@ export async function setup(d) {
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
 }
 
+// Rewritten 2026-10-07 in the approved style (docs/TOUR.md, "How a lesson types its commands"):
+// one short command per step, the files of compose and build written off camera and shown with
+// cat, the cleanups off camera.
+const say = (d, cmd, read = 3500) => d.guest(cmd, { read });
+const off = (d, cmd) => d.offCamera(VM, cmd);
+const COMPOSE = `mkdir -p ~/compose-demo/html && echo '<h1>hello from compose</h1>' > ~/compose-demo/html/index.html && printf 'services:\\n  web:\\n    image: nginx:1.27-alpine\\n    pull_policy: never\\n    ports:\\n      - "8081:80"\\n    volumes:\\n      - ./html:/usr/share/nginx/html:ro\\n' > ~/compose-demo/compose.yaml`;
+const DOCKERFILE = `mkdir -p ~/build-demo && printf 'FROM alpine:3.20\\nRUN echo built-in-the-lab > /message\\nCMD ["cat", "/message"]\\n' > ~/build-demo/Dockerfile`;
+
 export async function run(d) {
   await d.cue("intro");
-  await d.run("cd qemu-iso-lab");
+  await d.run("cd qemu-iso-lab", { record: false });
+  await d.clearScreen();
   await d.sleep(3500);
   await d.cue("install");
   const before = d.vm("cat /tmp/demo-prompt");
@@ -54,58 +63,63 @@ export async function run(d) {
   await d.sleep(1500);
 
   await d.cue("anatomy");
-  await d.run("clear");
+  await d.clearScreen();
   await d.session(VM);
-  await d.guest("systemctl is-active docker; docker version --format 'server {{.Server.Version}}'", { read: 2500 });
-  await d.guest("docker info --format '{{.Driver}} storage, {{.Containers}} containers, {{.Images}} images'", { read: 2500 });
-  await d.guest("id -nG | tr ' ' '\\n' | grep -x docker    # why no sudo is needed", { read: 3000 });
+  await say(d, "systemctl is-active docker", 2000);
+  await say(d, "docker version", 5000);
+  await say(d, "groups", 3500);
 
   await d.cue("images");
-  await d.guest("docker image ls", { read: 3500 });
-  await d.guest("docker image history alpine:3.20", { read: 4000 });
+  await d.clearScreen();
+  await say(d, "docker image ls", 3500);
+  await say(d, "docker image history alpine:3.20", 4500);
 
   await d.cue("run");
-  await d.guest("docker run --rm --pull never alpine:3.20 cat /etc/os-release | head -2", { read: 3000 });
-  await d.guest("docker run -d --name lab-web -p 8080:80 --pull never nginx:1.27-alpine", { read: 2000 });
-  await d.guest("docker ps", { read: 3000 });
-  await d.guest("curl -s localhost:8080 | grep -o '<title>.*</title>'", { read: 3000 });
+  await d.clearScreen();
+  await say(d, "docker run --rm alpine:3.20 cat /etc/os-release", 3500);
+  await say(d, "docker run -d --name lab-web -p 8080:80 nginx:1.27-alpine", 2000);
+  await say(d, "docker ps", 3500);
+  await say(d, "curl -sI localhost:8080", 3500);
 
   await d.cue("inside");
-  await d.guest("docker exec lab-web nginx -v", { read: 2000 });
-  await d.guest("docker logs --tail 3 lab-web", { read: 3000 });
-  await d.guest("docker inspect -f '{{.State.Status}} {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' lab-web", { read: 3000 });
-  await d.guest("docker rm -f lab-web", { read: 2000 });
+  await d.clearScreen();
+  await say(d, "docker exec lab-web nginx -v", 2500);
+  await say(d, "docker logs lab-web", 3500);
+  await say(d, "docker port lab-web", 3000);
+  await say(d, "docker rm -f lab-web", 2000);
 
   await d.cue("volumes");
-  await d.guest("docker volume create lab-data", { read: 1500 });
-  await d.guest("docker run --rm --pull never -v lab-data:/data alpine:3.20 sh -c 'echo kept > /data/note'", { read: 2000 });
-  await d.guest("docker run --rm --pull never -v lab-data:/data alpine:3.20 cat /data/note    # a second container reads it", { read: 3500 });
-  await d.guest("docker volume rm lab-data", { read: 1500 });
+  await d.clearScreen();
+  await say(d, "docker volume create lab-data", 1500);
+  await say(d, "docker run --rm -v lab-data:/data alpine:3.20 touch /data/kept", 2000);
+  await say(d, "docker run --rm -v lab-data:/data alpine:3.20 ls /data", 3500);
+  await say(d, "docker volume rm lab-data", 1500);
 
   await d.cue("compose");
-  await d.guest("mkdir -p ~/compose-demo/html && echo '<h1>hello from compose</h1>' > ~/compose-demo/html/index.html", { read: 1200 });
-  await d.guest(`cat > ~/compose-demo/compose.yaml <<'EOF'
-services:
-  web:
-    image: nginx:1.27-alpine
-    pull_policy: never
-    ports:
-      - "8081:80"
-    volumes:
-      - ./html:/usr/share/nginx/html:ro
-EOF`, { read: 3000, delay: 20 });
-  await d.guest("cd ~/compose-demo && docker compose up -d", { read: 2500 });
-  await d.guest("docker compose ps; curl -s localhost:8081", { read: 4000 });
-  await d.guest("docker compose down && cd && rm -rf ~/compose-demo", { read: 2500 });
+  off(d, COMPOSE);
+  await d.clearScreen();
+  await say(d, "cd ~/compose-demo", 500);
+  await say(d, "cat compose.yaml", 5000);
+  await say(d, "docker compose up -d", 2500);
+  await say(d, "docker compose ps", 3500);
+  await say(d, "curl -s localhost:8081", 3500);
+  await say(d, "docker compose down", 2500);
+  await say(d, "cd", 300);
+  off(d, "rm -rf ~/compose-demo");
 
   await d.cue("build");
-  await d.guest("mkdir -p ~/build-demo && cd ~/build-demo && printf 'FROM alpine:3.20\\nRUN echo built-in-the-lab > /message\\nCMD [\"cat\", \"/message\"]\\n' > Dockerfile && cat Dockerfile", { read: 3500 });
-  await d.guest("docker build -q -t lab-hello . && docker run --rm lab-hello", { read: 3500, timeout: 120000 });
-  await d.guest("docker image rm lab-hello >/dev/null && cd && rm -rf ~/build-demo && docker ps -a", { read: 3000 });
+  off(d, DOCKERFILE);
+  await d.clearScreen();
+  await say(d, "cd ~/build-demo", 500);
+  await say(d, "cat Dockerfile", 4000);
+  await d.guest("docker build -t lab-hello .", { read: 3000, timeout: 120000 });
+  await say(d, "docker run --rm lab-hello", 3500);
+  await say(d, "cd", 300);
+  off(d, "docker image rm lab-hello; rm -rf ~/build-demo");
   await d.leave();
 
   await d.cue("tests");
-  await d.run("clear");
+  await d.clearScreen();
   const before2 = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group test ${LAB}`, { wait: false });
   await d.sleep(6000);

@@ -48,9 +48,42 @@ export async function setup(d) {
 
 const pubkey = (d, vm) => d.vm(`cd ${CHECKOUT} && ./bin/vmctl shell ${vm} -- cat publickey`).trim();
 
+// Rewritten 2026-10-07 in the approved style (docs/TOUR.md, "How a lesson types its commands"):
+// the keys in three short steps, each wg0.conf written off camera and shown with cat, one iptables
+// rule per command, the cleanups off camera.
+const say = (d, cmd, read = 3500) => d.guest(cmd, { read });
+const CLIENT_CONF = (serverKey) => `sudo tee /etc/wireguard/wg0.conf >/dev/null <<EOF
+[Interface]
+Address = 10.10.0.2/24
+PrivateKey = $(cat privatekey)
+
+[Peer]
+PublicKey = ${serverKey}
+Endpoint = 172.20.1.1:51820
+AllowedIPs = 10.10.0.1/32
+PersistentKeepalive = 25
+EOF`;
+const SERVER_CONF = (clientKey) => `sudo tee /etc/wireguard/wg0.conf >/dev/null <<EOF
+[Interface]
+Address = 10.10.0.1/24
+ListenPort = 51820
+PrivateKey = $(cat privatekey)
+
+[Peer]
+PublicKey = ${clientKey}
+AllowedIPs = 10.10.0.2/32
+EOF`;
+
+async function keys(d) {
+  await say(d, "wg genkey > privatekey", 800);
+  await say(d, "wg pubkey < privatekey > publickey", 800);
+  await say(d, "cat publickey", 3500);
+}
+
 export async function run(d) {
   await d.cue("intro");
-  await d.run("cd qemu-iso-lab");
+  await d.run("cd qemu-iso-lab", { record: false });
+  await d.clearScreen();
   await d.sleep(3000);
   await d.cue("install");
   const before = d.vm("cat /tmp/demo-prompt");
@@ -62,81 +95,75 @@ export async function run(d) {
   await d.sleep(1500);
 
   await d.cue("keys");
-  await d.run("clear");
+  await d.clearScreen();
   await d.session(SERVER);
-  await d.guest("wg genkey | tee privatekey | wg pubkey > publickey && cat publickey", { read: 4000 });
+  await keys(d);
   const serverKey = pubkey(d, SERVER);
   await d.leave();
 
   await d.cue("clientkeys");
+  await d.clearScreen();
   await d.session(CLIENT);
-  await d.guest("wg genkey | tee privatekey | wg pubkey > publickey && cat publickey", { read: 3500 });
+  await keys(d);
   const clientKey = pubkey(d, CLIENT);
   await d.cue("clientconf");
-  await d.guest(`sudo tee /etc/wireguard/wg0.conf >/dev/null <<EOF
-[Interface]
-Address = 10.10.0.2/24
-PrivateKey = $(cat privatekey)
-
-[Peer]
-PublicKey = ${serverKey}
-Endpoint = 172.20.1.1:51820
-AllowedIPs = 10.10.0.1/32
-PersistentKeepalive = 25
-EOF`, { read: 5000, delay: 20 });
+  d.offCamera(CLIENT, CLIENT_CONF(serverKey));
+  await d.clearScreen();
+  await say(d, "sudo cat /etc/wireguard/wg0.conf", 7000);
   await d.cue("clientup");
-  await d.guest("sudo wg-quick up wg0", { read: 2500 });
-  await d.guest("ping -c 2 -W 2 10.10.0.1    # nobody home yet", { read: 3000 });
+  await say(d, "sudo wg-quick up wg0", 2500);
+  await say(d, "ping -c 2 -W 2 10.10.0.1", 3500);
   await d.leave();
 
   await d.cue("serverconf");
+  d.offCamera(SERVER, SERVER_CONF(clientKey));
+  await d.clearScreen();
   await d.session(SERVER);
-  await d.guest(`sudo tee /etc/wireguard/wg0.conf >/dev/null <<EOF
-[Interface]
-Address = 10.10.0.1/24
-ListenPort = 51820
-PrivateKey = $(cat privatekey)
-
-[Peer]
-PublicKey = ${clientKey}
-AllowedIPs = 10.10.0.2/32
-EOF`, { read: 4000, delay: 20 });
-  await d.guest("sudo wg-quick up wg0", { read: 2500 });
-  await d.guest("sleep 3; sudo wg show", { read: 5000 });
+  await say(d, "sudo cat /etc/wireguard/wg0.conf", 6000);
+  await say(d, "sudo wg-quick up wg0", 2500);
+  d.offCamera(SERVER, "sleep 3");
+  await say(d, "sudo wg show", 5000);
   await d.leave();
 
   await d.cue("ping");
+  await d.clearScreen();
   await d.session(CLIENT);
-  await d.guest("ping -c 3 10.10.0.1", { read: 3500 });
-  await d.guest("sudo wg-quick down wg0 && ping -c 1 -W 2 10.10.0.1; sudo wg-quick up wg0", { read: 4000 });
+  await say(d, "ping -c 3 10.10.0.1", 3500);
+  await say(d, "sudo wg-quick down wg0", 1500);
+  await say(d, "ping -c 1 -W 2 10.10.0.1", 3000);
+  await say(d, "sudo wg-quick up wg0", 2000);
   await d.leave();
 
   await d.cue("wire");
+  await d.clearScreen();
   await d.session(SERVER);
   // The client pings through the tunnel while the server captures: started out of frame, on the host.
   d.vm(`cd ${CHECKOUT} && (setsid -f ./bin/vmctl shell ${CLIENT} -- 'sleep 2; ping -c 6 -i 0.7 10.10.0.1' >/dev/null 2>&1 </dev/null; true)`);
-  await d.guest("sudo timeout 6 tcpdump -ni vpn-lan udp port 51820 -c 6    # while the client pings 10.10.0.1", { read: 4500, timeout: 30000 });
+  await d.guest("sudo tcpdump -ni vpn-lan -c 6 udp port 51820", { read: 4500, timeout: 30000 });
   await d.cue("inside");
   d.vm(`cd ${CHECKOUT} && (setsid -f ./bin/vmctl shell ${CLIENT} -- 'sleep 2; ping -c 6 -i 0.7 10.10.0.1' >/dev/null 2>&1 </dev/null; true)`);
-  await d.guest("sudo timeout 6 tcpdump -ni wg0 -c 6    # the same pings, in clear", { read: 4500, timeout: 30000 });
+  await d.guest("sudo tcpdump -ni wg0 -c 6", { read: 4500, timeout: 30000 });
 
   await d.cue("fence");
-  await d.guest("sudo iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT; sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT; sudo iptables -A INPUT -p udp --dport 51820 -j ACCEPT; sudo iptables -A INPUT -j DROP", { read: 2500 });
-  await d.guest("sudo iptables -L INPUT -n -v", { read: 4500 });
+  await d.clearScreen();
+  await say(d, "sudo iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT", 800);
+  await say(d, "sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT", 800);
+  await say(d, "sudo iptables -A INPUT -p udp --dport 51820 -j ACCEPT", 800);
+  await say(d, "sudo iptables -A INPUT -j DROP", 1000);
+  await say(d, "sudo iptables -L INPUT -n -v", 5000);
   await d.leave();
 
   await d.cue("fenced");
+  await d.clearScreen();
   await d.session(CLIENT);
-  await d.guest("ping -c 1 -W 2 172.20.1.1 || echo 'dropped by the server, as intended'", { read: 3500 });
-  await d.guest("ping -c 2 10.10.0.1    # the tunnel still works", { read: 3500 });
-  await d.guest("sudo wg-quick down wg0; sudo rm -f /etc/wireguard/wg0.conf privatekey publickey", { read: 2000 });
+  await say(d, "ping -c 1 -W 2 172.20.1.1", 3500);
+  await say(d, "ping -c 2 10.10.0.1", 3500);
   await d.leave();
-  await d.session(SERVER);
-  await d.guest("sudo iptables -F; sudo wg-quick down wg0; sudo rm -f /etc/wireguard/wg0.conf privatekey publickey", { read: 2500 });
-  await d.leave();
+  d.offCamera(CLIENT, "sudo wg-quick down wg0; sudo rm -f /etc/wireguard/wg0.conf privatekey publickey");
+  d.offCamera(SERVER, "sudo iptables -F; sudo wg-quick down wg0; sudo rm -f /etc/wireguard/wg0.conf privatekey publickey");
 
   await d.cue("tests");
-  await d.run("clear");
+  await d.clearScreen();
   const before2 = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group test ${LAB}`, { wait: false });
   await d.sleep(6000);

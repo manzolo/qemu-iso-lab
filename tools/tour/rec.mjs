@@ -163,6 +163,13 @@ const d = {
     // The ssh line vmctl prints and the login banner are noise on camera: a clean screen.
     await d.clearScreen();
   },
+  // A shell script run in a lab VM off camera (cleanups, waits, files a lesson then shows with cat):
+  // handed over through a quoted heredoc, so neither the studio's shell nor ssh expands its $ or
+  // its quotes (a JSON-quoted command lost awk's $1 to the studio's shell, 2026-10-07).
+  offCamera(vmName, script, checkout = "~/lab/demo/qemu-iso-lab") {
+    vm(`cat > /tmp/off-camera.sh <<'OFFCAMERA'\n${script}\nOFFCAMERA\n` +
+       `cd ${checkout} && ./bin/vmctl shell ${vmName} -- "bash -s" < /tmp/off-camera.sh >/tmp/off-camera.log 2>&1; true`);
+  },
   // Clears the screen with Ctrl+L: no "clear" typed on camera.
   async clearScreen() { await d.key("ctrl+l"); await sleep(400); },
   async guest(cmd, { read = 3500, delay = 40, timeout = 120000 } = {}) {

@@ -37,9 +37,11 @@ export async function setup(d) {
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
 }
 
+// Commands tidied 2026-10-07 to the approved style (docs/TOUR.md, "How a lesson types its commands").
 export async function run(d) {
   await d.cue("intro");
-  await d.run("cd qemu-iso-lab");
+  await d.run("cd qemu-iso-lab", { record: false });
+  await d.clearScreen();
   await d.sleep(3500);
   await d.cue("install");
   const before = d.vm("cat /tmp/demo-prompt");
@@ -51,27 +53,29 @@ export async function run(d) {
   await d.sleep(2000);
 
   await d.cue("pihole");
-  await d.run("clear");
+  await d.clearScreen();
   await d.session("pihole-lab");
   await d.guest("sudo pihole status", { read: 4000 });
-  await d.guest("sudo pihole-FTL --config dhcp.active; sudo pihole-FTL --config dhcp.start; sudo pihole-FTL --config dhcp.end", { read: 5000 });
+  await d.guest("sudo pihole-FTL --config dhcp.active", { read: 2000 });
+  await d.guest("sudo pihole-FTL --config dhcp.start", { read: 2000 });
+  await d.guest("sudo pihole-FTL --config dhcp.end", { read: 3000 });
   await d.leave();
 
   await d.cue("client");
   await d.session("lubuntu-lab");
-  await d.guest("resolvectl status | grep -A3 'Link.*enp'", { read: 4000 });
+  await d.guest("resolvectl dns", { read: 4000 });
   await d.guest("resolvectl query pfsense.qlan", { read: 3500 });
   await d.guest("resolvectl query example.org", { read: 3500, timeout: 30000 });
   await d.cue("route");
-  await d.guest("ip route | head -1", { read: 3000 });
-  await d.guest("curl -sI https://example.org | head -1    # through the pfSense NAT", { read: 3500, timeout: 30000 });
+  await d.guest("ip route", { read: 3500 });
+  await d.guest("curl -sI https://example.org", { read: 4000, timeout: 30000 });
   await d.leave();
 
   await d.cue("pfsense");
-  await d.run("clear");
-  await d.run("vmctl shell pfsense-lab -- 'ifconfig vtnet1 | grep inet'", { timeout: 60000 });
+  await d.clearScreen();
+  await d.run("vmctl shell pfsense-lab -- ifconfig vtnet1", { timeout: 60000 });
   await d.sleep(3000);
-  await d.run("vmctl shell pfsense-lab -- 'netstat -rn | head -5'", { timeout: 60000 });
+  await d.run("vmctl shell pfsense-lab -- netstat -rn -f inet", { timeout: 60000 });
   await d.sleep(4000);
 
   await d.cue("forwards");
@@ -89,7 +93,7 @@ export async function run(d) {
   await d.focusTerminal();
 
   await d.cue("tests");
-  await d.run("clear");
+  await d.clearScreen();
   const before2 = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group test ${LAB}`, { wait: false });
   await d.sleep(6000);

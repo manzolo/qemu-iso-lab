@@ -63,7 +63,7 @@ async function slow(d, cmd, read = 3500, factor = 6) {
   await d.sleep(read);
 }
 // Off camera, in the control plane: cleanups and waits the viewer does not need to watch.
-const off = (d, cmd) => d.vm(`cd ${CHECKOUT} && ./bin/vmctl shell ${VM} -- ${JSON.stringify(cmd)} >/dev/null 2>&1; true`);
+const off = (d, cmd) => d.offCamera(VM, cmd);
 async function offWait(d, cmd, factor = 8) {
   d.ff(factor);
   off(d, cmd);
