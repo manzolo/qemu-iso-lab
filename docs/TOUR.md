@@ -160,14 +160,18 @@ re-encoding: `tools/tour/publish.py --index-only`, then the media branch and the
 **Courses** (`export const series = "courses"`, `lab`, `order` = the episode) are slower series in
 several episodes after the lessons, one heading per course (`track` `<lab>-course`, e.g.
 `zfs-course`); their episodes link the lab's guide but stay off the lab's card.
+Two so far: `course-zfs-1..5` (`tools/tour/zfs-course.mjs`) and `course-git-1..6`
+(`tools/tour/git-course.mjs`, 2026-10-08: one repository, `~/first-repo`, from the first commit to
+git flow; each episode rebuilds the previous ones' state off camera). The Git course replaced the
+`lab-git` lesson (Manzolo, 2026-10-08); a new course's heading goes into `I18N.tracks` of
+`tools/build_catalog_site.py`.
 
 Besides the tour's chapters, a clip can be a **lesson on one lab**: `export const series = "labs"`
 and `export const lab = "<group>"` in the clip. Eight so far, one per lab with content:
 `lab-lvm` (LVM from scratch), `lab-vpn` (WireGuard by hand, the two captures, the iptables fence),
 `lab-ssh` (keys, port knocking, hardening, fail2ban, nmap), `lab-docker` (engine, images,
 run/exec/logs, volumes, Compose, a build), `lab-netlab` (Pi-hole, the desktop, pfSense, the
-forwards and the map), `lab-git` (Git from underneath: objects, refs, a conflict made and
-resolved, stash, remote, rebase, git flow, the reset), `lab-zfs` (a RAIDZ pool, a compressed
+forwards and the map), `lab-git-basics` (Git for beginners: the daily loop), `lab-zfs` (a RAIDZ pool, a compressed
 dataset, snapshots and rollback, a disk offline and its resilver, a scrub, send/receive, mirrors)
 and `lab-mdadm` (a RAID1 mirror, a failed and replaced disk, a RAID5 whose hot spare rebuilds by
 itself, an online grow, stop and assemble: every read of /proc/mdstat waits for the sync in the guest). The tour page lists the lessons in their own playlist after the tour, a lesson

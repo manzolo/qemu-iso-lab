@@ -32,8 +32,8 @@ export const cues = [
     it: "Un remote. Un server Git è soltanto un repository bare, qui una directory: su GitHub cambia solo l'indirizzo. remote add gli dà un nome, push manda il ramo." },
   { id: "clone", en: "clone makes a complete copy elsewhere, like a colleague would. One more commit, pushed; pull brings it into the copy.",
     it: "clone ne fa una copia completa altrove, come farebbe un collega. Un altro commit, pushato; pull lo porta nella copia." },
-  { id: "end", top: true, en: "That is the daily loop: status, add, commit, push, pull. The next lesson opens Git from underneath, on the lab's own repository; the guide has every command, in English and Italian.",
-    it: "Questo è il giro di ogni giorno: status, add, commit, push, pull. La prossima lezione apre Git da sotto, sul repository del lab; la guida ha ogni comando, in inglese e in italiano." },
+  { id: "end", top: true, en: "That is the daily loop: status, add, commit, push, pull. To go further, the Git course in six episodes takes it slowly; the guide has every command, in English and Italian.",
+    it: "Questo è il giro di ogni giorno: status, add, commit, push, pull. Per andare oltre c'è il corso Git in sei puntate, con calma; la guida ha ogni comando, in inglese e in italiano." },
 ];
 
 export async function setup(d) {

@@ -89,6 +89,7 @@ class CatalogSiteTests(unittest.TestCase):
         self.assertIn('"track": "storage"', tour)
         self.assertIn('storage: "Storage"', tour)
         self.assertIn('"zfs-course": "ZFS in cinque puntate"', tour)
+        self.assertIn('"git-course": "Git in sei puntate"', tour)
         self.assertIn('courses: "Corsi"', tour)
         self.assertIn('<li class="track"><h4>', tour)
         self.assertIsNone(labs["vpn-lab"]["clip"])
