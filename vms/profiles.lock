@@ -352,9 +352,14 @@
       ]
     },
     "centos-stream-10": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:bebd89c5ba50c8c56c869f08fec2430f2b4985a669dccfd490a9450de37ee63d",
+      "version": "1.0.2",
+      "fingerprint": "sha256:40c43335ee52f2030dcf6d217fd2399cf98d7ecb5007c9ace80036991ac7e862",
       "history": [
+        {
+          "version": "1.0.2",
+          "date": "2026-10-14",
+          "note": "Compose 20261013.0: 20260930.0 left the mirror (vendor SHA-256)"
+        },
         {
           "version": "1.0.1",
           "date": "2026-10-01",
@@ -1047,9 +1052,14 @@
       ]
     },
     "kubuntu-18.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:5e6d0a1bb85c3d2e2495132c4e9fcbcb6291499332e54d5390a97dd84e014231",
+      "version": "1.0.1",
+      "fingerprint": "sha256:d87e1c4caae7bbe29c25625fa745c646deda3d4c7e80daf6c4f388e88923ebd4",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-14",
+          "note": "18.04.6 server ISO moved to cdimage.ubuntu.com/ubuntu/releases/ (same SHA-256)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1204,9 +1214,14 @@
       ]
     },
     "lubuntu-18.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:ea52db5c067bc4b2d04e16f56770b015b6e3a4b364bde9b8432ba88269a448b3",
+      "version": "1.0.1",
+      "fingerprint": "sha256:ab5a3d9bc00e2703b99420a0734eab91de4814f41c125c8a12987311563c553d",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-14",
+          "note": "18.04.6 server ISO moved to cdimage.ubuntu.com/ubuntu/releases/ (same SHA-256)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -1995,9 +2010,14 @@
       ]
     },
     "ubuntu-18.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:fd068f11e299d85beb765d724a07cc25b715a94a917b530ea224abe7857bb4e7",
+      "version": "1.0.1",
+      "fingerprint": "sha256:147dd26d2a23ae3bc3dc45bffff530665444b79b045d9245932adfe852c7198d",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-14",
+          "note": "18.04.6 server ISO moved to cdimage.ubuntu.com/ubuntu/releases/ (same SHA-256)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",
@@ -2131,9 +2151,14 @@
       ]
     },
     "ubuntu-budgie-18.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:9ca2b291c8bd74160413faf98f6400da1a5c083af52bdb71529e08ad22d36ed3",
+      "version": "1.0.1",
+      "fingerprint": "sha256:822867e736bd4be8d9e7f5290e0014e7526a19e742d7e2cf6bfd6d48dae866aa",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-14",
+          "note": "18.04.6 server ISO moved to cdimage.ubuntu.com/ubuntu/releases/ (same SHA-256)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2286,9 +2311,14 @@
       ]
     },
     "ubuntu-mate-18.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:e7e2f4c6082ac4541bb938d1fef1d3341b92e71e2b3633e996fb9cc6d640cc7a",
+      "version": "1.0.1",
+      "fingerprint": "sha256:2f5b4bd1fc49c2b22c076c20ea87139652f262bc3cda8910c1a62e9f3cdc78cc",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-14",
+          "note": "18.04.6 server ISO moved to cdimage.ubuntu.com/ubuntu/releases/ (same SHA-256)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",
@@ -2643,9 +2673,14 @@
       ]
     },
     "xubuntu-18.04": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:22f9598370006cfd24c63970d9d92ca33d2d73863b686d411d74a4f6cfa564bb",
+      "version": "1.0.1",
+      "fingerprint": "sha256:854de707f90d8d19d8c22c452539eb601444bc9f71b09161e270c99ab2fb9567",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-14",
+          "note": "18.04.6 server ISO moved to cdimage.ubuntu.com/ubuntu/releases/ (same SHA-256)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-28",

@@ -57,7 +57,7 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `ubuntu-12.04` | `ubuntu-12.04.5-alternate-amd64.iso` | [Manifest](https://old-releases.ubuntu.com/releases/12.04.5/SHA256SUMS) |
 | `ubuntu-14.04` | `ubuntu-14.04.6-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/14.04/SHA256SUMS) |
 | `ubuntu-16.04` | `ubuntu-16.04.7-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/16.04/SHA256SUMS) |
-| `ubuntu-18.04` | `ubuntu-18.04.6-server-amd64.iso` | [Manifest](https://cdimage.ubuntu.com/releases/18.04/release/SHA256SUMS) |
+| `ubuntu-18.04` | `ubuntu-18.04.6-server-amd64.iso` | [Manifest](https://cdimage.ubuntu.com/ubuntu/releases/18.04/release/SHA256SUMS) |
 | `ubuntu-20.04` | `ubuntu-20.04.6-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/20.04/SHA256SUMS) |
 | `ubuntu-22.04` | `ubuntu-22.04.5-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04/SHA256SUMS) |
 | `ubuntu-26.04` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
@@ -159,7 +159,7 @@ MISSING void-live-x86_64-20250202-xfce.iso
 
 - `kali`: `kali-linux-2026.2-installer-netinst-amd64.iso`, SHA-256 `d32f929dacc48134a31461a09f2160d13ad1d26b820cee920446813ca979b39b`. [Vendor SHA256SUMS](https://cdimage.kali.org/kali-2026.2/SHA256SUMS); fetched through current/SHA256SUMS on 2026-09-13. [Official preseed examples](https://www.kali.org/docs/general-use/kali-preseeding/) and [Xfce answer file](https://gitlab.com/kalilinux/recipes/kali-preseed-examples/-/blob/main/xfce-default.cfg) provide the task selection and mirror.
 
-- `centos-stream-10`: `CentOS-Stream-10-20260930.0-x86_64-boot.iso`, SHA-256 `74eb19bda86f842911c2662945ff95d968d686a6e1ec3ebaa8a5b1037905a16a`. [Vendor SHA256SUM](https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/SHA256SUM), retrieved 2026-10-01 (found by tools/check_iso_urls.py: 20260914.0 had left the mirror). The dated ISO may age out of this rolling directory; update URL and vendor checksum together, never attach this hash to latest.
+- `centos-stream-10`: `CentOS-Stream-10-20261013.0-x86_64-boot.iso`, SHA-256 `c07fb80f942051447a5b257fd28eca34e5d27e57dec9be1bb81cc5bee4387b29`. [Vendor SHA256SUM](https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/iso/SHA256SUM), retrieved 2026-10-14 (found by tools/check_iso_urls.py: 20260914.0 left the mirror before 2026-10-01, 20260930.0 before 2026-10-12). The dated ISO may age out of this rolling directory; update URL and vendor checksum together, never attach this hash to latest.
 
 ## Batch B: FreeBSD
 
