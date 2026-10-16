@@ -590,6 +590,17 @@ class ServerTests(BaseVmctlTestCase):
         self.assertIn('new URL(location.origin + "/multi")', dashboard)
         self.assertIn("consoleEmbedded", dashboard)
 
+    def test_android_live_profiles_offer_the_live_session_not_an_install(self):
+        # Bliss has no disk install: the dashboard's provision left a host window waiting at the
+        # ISO's boot menu while the row said "Installing" (2026-10-16).
+        dashboard = (webui.WEB_DIR / "index.html").read_text(encoding="utf-8")
+        branch = dashboard.split("} else if (r.android_live && r.job_status !== \"running\") {", 1)[1].split("} else if (r.installed) {", 1)[0]
+        self.assertIn('args: ["android-live", n]', branch)
+        self.assertNotIn('"provision"', branch)
+        self.assertIn('terminal: ["android-console", n', dashboard)
+        vmtui = (Path(__file__).resolve().parents[1] / "bin" / "vmtui").read_text(encoding="utf-8")
+        self.assertIn('"android_live": bool(vm.get("android_live"))', vmtui)
+
     def test_file_endpoints_transfer_binary_and_require_authentication(self):
         from unittest import mock
 

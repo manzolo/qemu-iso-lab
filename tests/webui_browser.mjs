@@ -232,6 +232,22 @@ try {
   assert.equal(await page.locator('#rows [data-vm="debian-server"] .installation-status').textContent(),'Boot verified ✓');
   assert.equal(await page.locator('#workspace-nav button').evaluateAll(b=>b.map(x=>x.firstChild.textContent).join(',')),'My VMs,Catalog,Labs');
   assert.deepEqual(await page.locator('#workspace-nav .tab-count').allTextContents(),['1','5','2'],'The tabs count what they hold: running outside a lab, the catalog, labs (the fixture rows carry no lab here)');
+  const desktopBeforeAndroid = {...state.vms[1]};
+  Object.assign(state.vms[1], {android_live:true, installed:false, unattended_flow:null, ssh_port:null});
+  await page.evaluate(async()=>{ await refresh(true); selected='debian-server'; render(); });
+  assert(await page.getByRole('button', {name:'Start live session', exact:true}).isVisible());
+  const liveActions = await page.evaluate(()=>actionsFor(S.vms.find(r=>r.name==='debian-server')));
+  assert.deepEqual(liveActions.find(a=>a.label==='Start live session').args, ['android-live','debian-server']);
+  assert.equal(liveActions.find(a=>a.label==='Start live session').afterStart, 'detached');
+  assert.equal(liveActions.find(a=>a.label==='Start live session and open console here').afterStart, 'inline');
+  assert(!liveActions.some(a=>['provision','install'].includes(a.args?.[0])));
+  state.vms[1].running = true;
+  await page.evaluate(()=>refresh(true));
+  assert.deepEqual(await page.evaluate(()=>actionsFor(S.vms.find(r=>r.name==='debian-server')).find(a=>a.terminal).terminal),
+    ['android-console','debian-server','--fix-bliss-codecs','--no-audio']);
+  state.vms[1] = desktopBeforeAndroid;
+  await page.evaluate(async()=>{ await refresh(true); selected='arch-noctalia'; render(); });
+  check('Android live profiles show live-session actions and the host scrcpy console');
   await page.locator('[data-status-filter=running]').click();
   assert.deepEqual(await page.locator('#rows tr[data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia']);
   await page.locator('[data-status-filter=stopped]').click();

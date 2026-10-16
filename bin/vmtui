@@ -789,6 +789,8 @@ def facts(name, vm):
         "has_manual_iso": iso_source == "manual",
         # disk_image profiles (SerenityOS): no installer, vmctl prep turns the image into the disk.
         "has_disk_image": bool(vm.get("disk_image")),
+        # Android live media (Bliss): no disk install, vmctl android-live boots a temporary session.
+        "android_live": bool(vm.get("android_live")),
         "has_unattended_flow": bool(unattended_flow),
         "ssh_port": str(ssh_cfg.get("ssh_host_port") or ""),
         # Who SSH logs in as: the user recorded for the disk, else the profile's (vmctl guest-user).

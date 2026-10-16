@@ -60,6 +60,21 @@ def wait_for_boot(endpoint: str, timeout: float) -> None:
                   "Start the VM and check its VNC console and guest adbd TCP 5555 listener.")
 
 
+def poweroff(vm: dict[str, Any]) -> None:
+    """Ask only this guest to shut down, without waiting for Android to finish booting."""
+    endpoint = adb_endpoint(vm)
+    runtime.require_command("adb")
+    for command in (["adb", "connect", endpoint],
+                    ["adb", "-s", endpoint, "shell", "reboot", "-p"]):
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=5, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise VMError(f"ADB power-off request failed for {endpoint}: {exc}") from exc
+        if result.returncode:
+            detail = (result.stderr + "\n" + result.stdout).strip()[-500:]
+            raise VMError(f"ADB power-off request failed for {endpoint}: {detail or 'command rejected'}")
+
+
 def repair_bliss_codecs(endpoint: str, timeout: float) -> None:
     """Apply the opt-in, build-guarded workaround in guest tmpfs, never in the ISO."""
     script = (state.ROOT / "vms/profile-files/android/fix-bliss-codecs.sh").read_text()

@@ -8,10 +8,19 @@ apps, settings and files disappear when it stops. The disk is attached with QEMU
 `-snapshot`; an existing disk is not overwritten. Use `android-live` again for
 another session, rather than `start` (which boots an installed disk).
 
+`provision` and `install` reject Android live profiles before downloading media or
+changing disks, and point to `android-live`. Use `prep` to prepare files without
+starting a session.
+
 ```sh
 bin/vmctl android-live blissos-16
 bin/vmctl android-console blissos-16 --fix-bliss-codecs --no-audio
 ```
+
+`vmctl stop blissos-16` first asks Android to shut down with `adb shell reboot -p`
+on the profile's own ADB endpoint and waits for QEMU to exit. If ADB is unavailable
+or the guest does not exit, the usual shutdown fallbacks apply. `--force` skips
+ADB and stops the QEMU process directly; `--dry-run` sends no shutdown request.
 
 Requires QEMU/KVM, xorriso (or bsdtar), adb and scrcpy on the host. `vmctl setup`
 lists the optional Android tools; `vmctl setup --install adb scrcpy` installs the

@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import signal
 import subprocess
 import sys
 import unittest
@@ -166,6 +167,127 @@ class AndroidTests(BaseVmctlTestCase):
         self.assertTrue(run.call_args.kwargs["dry_run"])
         disk.assert_not_called()
         install.assert_not_called()
+
+    def test_manual_install_commands_refuse_live_profiles_before_side_effects(self):
+        for command in (["provision"], ["provision", "--no-start"], ["install"]):
+            for dry_run in (False, True):
+                with self.subTest(command=command, dry_run=dry_run), \
+                        mock.patch.object(runtime, "ensure_vm_dirs") as directories, \
+                        mock.patch.object(iso, "ensure_iso") as medium, \
+                        mock.patch.object(lifecycle, "ensure_vm_disk") as disk, \
+                        mock.patch.object(qemu, "common_args") as qemu_args, \
+                        mock.patch.object(lifecycle.vmstate, "begin_install") as install, \
+                        contextlib.redirect_stderr(io.StringIO()) as error:
+                    argv = (["--dry-run"] if dry_run else []) + [command[0], self.vm_name, *command[1:]]
+                    self.assertNotEqual(run_cli(argv), 0)
+                    self.assertIn(f"vmctl android-live {self.vm_name}", error.getvalue())
+                    self.assertIn(f"vmctl prep {self.vm_name}", error.getvalue())
+                    for operation in (directories, medium, disk, qemu_args, install):
+                        operation.assert_not_called()
+
+    def test_poweroff_targets_only_the_profile_adb_endpoint(self):
+        with mock.patch.object(runtime, "require_command") as require, \
+                mock.patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+            android.poweroff(self.vm_config)
+        require.assert_called_once_with("adb")
+        self.assertEqual([call.args[0] for call in run.call_args_list], [
+            ["adb", "connect", "127.0.0.1:2373"],
+            ["adb", "-s", "127.0.0.1:2373", "shell", "reboot", "-p"],
+        ])
+        self.assertTrue(all(call.kwargs["timeout"] == 5 for call in run.call_args_list))
+
+    def test_poweroff_reports_adb_errors_and_timeouts(self):
+        success = subprocess.CompletedProcess([], 0, "", "")
+        refused = subprocess.CompletedProcess([], 1, "", "device unauthorized")
+        for responses in ([refused], [success, refused], [subprocess.TimeoutExpired("adb", 5)],
+                          [OSError("adb disappeared")]):
+            with self.subTest(responses=responses), mock.patch.object(runtime, "require_command"), \
+                    mock.patch.object(subprocess, "run", side_effect=responses):
+                with self.assertRaisesRegex(VMError, "ADB power-off request failed"):
+                    android.poweroff(self.vm_config)
+        with mock.patch.object(runtime, "require_command", side_effect=VMError("Missing command: adb")), \
+                mock.patch.object(subprocess, "run") as run:
+            with self.assertRaisesRegex(VMError, "Missing command"):
+                android.poweroff(self.vm_config)
+            run.assert_not_called()
+
+    def test_stop_android_uses_adb_before_acpi_and_cleans_runtime_files(self):
+        pid_path = lifecycle.bootstrap_pid_path(self.vm_name)
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text("4242")
+        sock_path = qemu.qmp_socket_path(self.vm_config)
+        sock_path.parent.mkdir(parents=True, exist_ok=True)
+        sock_path.touch()
+        with mock.patch.object(lifecycle, "is_bootstrap_vm_running", return_value=(True, 4242, "qemu")), \
+                mock.patch.object(lifecycle, "process_cmdline", side_effect=["qemu", None]), \
+                mock.patch.object(android, "poweroff") as poweroff, \
+                mock.patch.object(qemu, "qmp_command") as acpi, \
+                mock.patch.object(lifecycle.os, "kill") as kill:
+            self.assertEqual(run_cli(["stop", self.vm_name]), 0)
+        self.assertEqual(poweroff.call_args.args[0]["meta"]["family"], "android")
+        poweroff.assert_called_once()
+        acpi.assert_not_called()
+        kill.assert_not_called()
+        self.assertFalse(pid_path.exists())
+        self.assertFalse(sock_path.exists())
+
+    def test_stop_android_force_and_dry_run_skip_adb(self):
+        for option in ("--force", "--dry-run"):
+            with self.subTest(option=option), \
+                    mock.patch.object(lifecycle, "is_bootstrap_vm_running", return_value=(True, 4242, "qemu")), \
+                    mock.patch.object(lifecycle, "process_cmdline", side_effect=["qemu", None]), \
+                    mock.patch.object(android, "poweroff") as poweroff, \
+                    mock.patch.object(lifecycle.os, "kill") as kill:
+                argv = ["--dry-run", "stop", self.vm_name] if option == "--dry-run" else ["stop", self.vm_name, option]
+                self.assertEqual(run_cli(argv), 0)
+                poweroff.assert_not_called()
+                if option == "--force":
+                    kill.assert_called_once_with(4242, signal.SIGTERM)
+                else:
+                    kill.assert_not_called()
+
+    def test_stop_android_falls_back_without_adb_grace_when_request_fails(self):
+        sock_path = self.root / "qmp.sock"
+        sock_path.touch()
+        events = []
+        def refused(vm):
+            events.append("adb")
+            raise VMError("ADB unavailable")
+        with mock.patch.object(android, "poweroff", side_effect=refused), \
+                mock.patch.object(lifecycle, "process_cmdline", side_effect=["qemu", "qemu", None]), \
+                mock.patch.object(qemu, "qmp_command", side_effect=lambda *a: events.append("acpi") or True), \
+                mock.patch.object(lifecycle.time, "sleep") as sleep, \
+                mock.patch.object(lifecycle.os, "kill") as kill:
+            self.assertEqual(lifecycle.stop_qemu_process(4242, "Stop", "Android", agent_vm=self.vm_config,
+                                                       qmp_socket=sock_path), 0)
+        self.assertEqual(events, ["adb", "acpi"])
+        sleep.assert_not_called()
+        kill.assert_not_called()
+
+    def test_stop_android_accepts_disconnect_after_guest_has_exited(self):
+        with mock.patch.object(android, "poweroff", side_effect=VMError("ADB disconnected")), \
+                mock.patch.object(lifecycle, "process_cmdline", side_effect=["qemu", None]), \
+                mock.patch.object(qemu, "qmp_command") as acpi, \
+                mock.patch.object(lifecycle.os, "kill") as kill:
+            self.assertEqual(lifecycle.stop_qemu_process(4242, "Stop", "Android", agent_vm=self.vm_config), 0)
+        acpi.assert_not_called()
+        kill.assert_not_called()
+
+    def test_stop_android_does_not_wait_forever_after_accepted_adb_request(self):
+        clock = {"now": 0, "alive": True}
+        def sleep(seconds):
+            clock["now"] += seconds
+        def terminate(pid, sig):
+            self.assertEqual(sig, signal.SIGTERM)
+            self.assertEqual(clock["now"], 3)
+            clock["alive"] = False
+        with mock.patch.object(android, "poweroff"), \
+                mock.patch.object(lifecycle, "process_cmdline", side_effect=lambda pid: "qemu" if clock["alive"] else None), \
+                mock.patch.object(lifecycle.time, "monotonic", side_effect=lambda: clock["now"]), \
+                mock.patch.object(lifecycle.time, "sleep", side_effect=sleep), \
+                mock.patch.object(lifecycle.os, "kill", side_effect=terminate):
+            self.assertEqual(lifecycle.stop_qemu_process(4242, "Stop", "Android", agent_vm=self.vm_config,
+                                                       grace_sec=3), 0)
 
     def test_live_boot_refuses_running_vm_before_downloading(self):
         with mock.patch.object(lifecycle, "is_bootstrap_vm_running", return_value=(True, 123, None)), \

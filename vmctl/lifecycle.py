@@ -286,6 +286,26 @@ def stop_qemu_process(
         # them. Force goes straight to the process, still SIGTERM first so QEMU closes the qcow2.
         ui.print_status("warn", "Force: skipping the graceful power-off (unsaved guest changes are lost)", ok=False)
 
+    # Android (including Bliss live sessions) may ignore ACPI; ask its OS before the
+    # generic guest-agent/ACPI fallbacks, using this profile's dedicated ADB forward.
+    if not force and agent_vm is not None and agent_vm.get("meta", {}).get("family") == "android":
+        from vmctl import android
+        ui.print_note("Asking Android to power off over ADB...")
+        try:
+            android.poweroff(agent_vm)
+        except VMError as exc:
+            # adbd can disconnect as shutdown takes effect. Check QEMU before falling back.
+            if process_cmdline(pid) is None:
+                return finalize_stop(f"Stopped {description} (Android powered off)")
+            ui.print_status("warn", str(exc), ok=False)
+        else:
+            deadline = time.monotonic() + grace
+            while time.monotonic() < deadline:
+                if process_cmdline(pid) is None:
+                    return finalize_stop(f"Stopped {description} (Android powered off over ADB)")
+                time.sleep(1)
+            ui.print_status("warn", f"{description} is still up after the ADB power-off request", ok=False)
+
     # The guest agent asks the operating system directly, so it works where ACPI is ignored
     # and where there is no SSH server to fall back on (Windows 7).
     if not force and agent_vm is not None and guest_agent.enabled(agent_vm):
@@ -1710,6 +1730,12 @@ def refuse_disk_image(vm: dict[str, Any], vm_name: str) -> None:
                       f"creates its disk from the image, vmctl start {vm_name} boots it")
 
 
+def refuse_android_live_install(vm: dict[str, Any], vm_name: str) -> None:
+    if vm.get("android_live"):
+        raise VMError(f"'{vm_name}' is an Android live profile: use vmctl android-live {vm_name} "
+                      f"to start a temporary session, or vmctl prep {vm_name} to prepare its files")
+
+
 def iso_boot_media(iso_path: Path, iso_first: bool) -> tuple[int, list[str]]:
     """The medium as a CD-ROM with an explicit place in the firmware boot order, and the main
     disk's place (OVMF ignores ``-boot order``; with bootindex both firmwares follow it)."""
@@ -1736,6 +1762,7 @@ def cmd_provision(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
     refuse_disk_image(vm, args.vm)
+    refuse_android_live_install(vm, args.vm)
     runtime.ensure_vm_dirs(args.vm)
 
     ui.print_header(f"Provision VM: {args.vm}")
@@ -1812,6 +1839,7 @@ def cmd_install(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
     refuse_disk_image(vm, args.vm)
+    refuse_android_live_install(vm, args.vm)
     runtime.ensure_vm_dirs(args.vm)
     iso_path = iso.ensure_iso(vm, dry_run=args.dry_run)
     disk_bootindex, media = interactive_installer_media(args.vm, iso_path, getattr(args, "boot_iso", False))

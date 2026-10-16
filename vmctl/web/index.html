@@ -1255,8 +1255,17 @@ function actionsFor(r) {
     if (r.ssh_port && !prefersSsh(r)) a.push({label:"Open SSH", ssh:true, icon:"terminal", tone:"info"});
     a.push({ label: "Live screenshot", screen: true, icon:"camera", tone:"info" });
     a.push({ label: "Host viewer", args: ["attach", n], icon:"external", tone:"info" });
+    if (r.android_live) a.push({ label: "Android console (scrcpy, host window)", terminal: ["android-console", n, "--fix-bliss-codecs", "--no-audio"], icon:"display", tone:"info" });
     a.push({ label: "Stop", args: ["stop", n], disabled:busy, icon:"stop", tone:"warn", warn:true });
     if (!busy) a.push({ label: "Force stop", args: ["stop", n, "--force"], danger: true, icon:"power", tone:"bad" });
+  } else if (r.android_live && r.job_status !== "running") {
+    // Android live (Bliss): no disk install, every boot is a temporary session (vmctl android-live).
+    if (r.iso_source === "manual") a.push({ label: "Get the ISO…", help: true, icon:"disc", tone:"warn" });
+    else {
+      a.push({ label: "Start live session", args: ["android-live", n], afterStart:"detached", icon:"play", tone:"ok" });
+      a.push({ label: "Start live session and open console here", args: ["android-live", n], afterStart:"inline", alternative:true, icon:"console", tone:"info" });
+      if (r.iso_source === "download") a.push({ label: "Download the ISO", args: ["fetch-iso", n], icon:"download", tone:"info" });
+    }
   } else if (r.installed) {
     a.push({ label: prefersSsh(r) ? "Start" : "Start in separate console", args: ["start", n, "--headless", "--background"], afterStart:prefersSsh(r) ? false : "detached", icon:"play", tone:"ok" });
     if (!prefersSsh(r)) a.push({label:"Start and open console here", args:["start",n,"--headless","--background"], afterStart:"inline", alternative:true, icon:"console", tone:"info"});
@@ -1888,7 +1897,7 @@ async function run(args, danger, afterStart = false, preconfirmed = false) {
   const consoleRequest = afterStart && vm ? {accepted:false, popup:afterStart === "detached" ? reserveConsoleWindow(vm) : null} : null;
   if (vm) { discardPendingConsole(vm); if (consoleRequest) pendingConsoles.set(vm, consoleRequest); }
   if (args[0] === "group" && args[2] && ["up", "install", "reset", "checkpoint", "test"].includes(args[1])) labsFollow.set(args[2], Date.now());
-  if (vm && args[0] === "start") rowsFollow.set(vm, Date.now());  // the row climbs under "Running first": the list follows it
+  if (vm && ["start", "android-live"].includes(args[0])) rowsFollow.set(vm, Date.now());  // the row climbs under "Running first": the list follows it
   const labGroup = args[0] === "group" && args[2] && S.labs.some(l => l.group === args[2]) ? args[2] : null;
   if (labGroup) { labPending.set(labGroup, {action:args[1], job:null, at:Date.now()}); render(); }
   if (vm) { submittingVms.add(vm); vmJobs.set(vm, {status:"running", command:args[0]}); jobsRevision++; render(); }
@@ -1928,6 +1937,7 @@ function runAction(r, a) {
   if (a.mine) return setMine(a.mine, [r.name]);
   if (a.hide) return setHidden(a.hide, [r.name]);
   if (a.protect) return setProtect(a.protect, [r.name]);
+  if (a.terminal) return api("/api/terminal", { args: a.terminal }).then((res) => toast(`Android console opened in ${res.terminal}.`), (e) => toast(e.message, true));
   return run(a.args, a.danger, a.afterStart);
 }
 
@@ -3054,6 +3064,7 @@ function recommendedCommands() {
   if (pal.scope !== "vm" || !r) return ["status", "list", "group", "doctor"];
   if (r.running) return ["stop", "attach", "show", "post-install", "checkpoint"];
   if (r.installed) return ["start", "checkpoint", "show", "clone", "flash"];
+  if (r.android_live) return ["android-live", "android-console", "fetch-iso", "show"];
   return [r.unattended_flow, "fetch-iso", "provision", "prep", "show"].filter(Boolean);
 }
 function commandSection(c) {
