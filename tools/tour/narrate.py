@@ -53,6 +53,10 @@ SPOKEN = {
            (r"(?i)\bmicrok8s\b", "micro k8s"),  # then the mixed-token rule spells k8s
            # English loanwords read letter by letter in Italian: "file" came out as "fi-le" (Manzolo, 2026-10-05).
            (r"\bfiles?\b", "fàil"), (r"\b[Cc]lients?\b", "claient"),  # read as Italian letters otherwise (2026-10-05)
+           # The pxe-lab lesson (2026-10-16): network-boot names as an Italian says them.
+           (r"\biPXE\b", "ai pìxi"), (r"\bPXE\b", "pìxi"), (r"\bpxelinux\b", "pìxi lìnux"), (r"\bdnsmasq\b", "di enne esse masc"),
+           (r"\bnginx\b", "engine ics"), (r"\binitrd\b", "init erre di"), (r"\blease\b", "lìis"), (r"\bNAT\b", "nat"),
+           (r"\bbroadcast\b", "bròdcast"), (r"\bdiscover\b", "discàver"), (r"\brequest\b", "riquèst"), (r"\backnowledge\b", "acnòlleg"),
            (r"/proc\b", "proc"), (r"\by\b", "ipsilon"), (r"\bkvm\b", "KVM"),
            (r"\bv(\d+(?:\.\d+)*)\b", r"vu \1"),  # a tag v1.0: "vu uno punto zero" (the version rule takes the rest)
            # Enclitic imperatives get the stress wrong ("aprìlo"): say them in two words (Manzolo, 2026-10-05).

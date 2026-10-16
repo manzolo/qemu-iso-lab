@@ -72,7 +72,7 @@ done
 cat > "$TFTP/pxelinux.cfg/default" <<EOF
 DEFAULT menu.c32
 PROMPT 0
-TIMEOUT 80
+TIMEOUT 300
 ONTIMEOUT install
 MENU TITLE pxe-lab :: Debian 13 over the network
 

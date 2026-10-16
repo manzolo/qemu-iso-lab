@@ -9,7 +9,7 @@
         "groups": [
           "pxe-lab"
         ],
-        "version": "1.0.0",
+        "version": "1.0.1",
         "verified": "2026-10-16"
       },
       "notes": "The network-boot server of the pxe-lab (vms/labs/pxe-lab/): dnsmasq answers DHCP and TFTP on the lab segment pxe-lan (172.20.9.0/24) and nowhere else, iPXE is chained to pxelinux and its menu, nginx serves the Debian 13 installer's kernel and initrd and the answers vmctl writes for each install, and NAT is the segment's only way to the Debian mirror. ~/setup-pxe-server.sh builds all of it and is also the reset. Ported from qlab's pxe-lab (the LAN moved from 192.168.100.0/24, which vmctl link uses, to 172.20.9.0/24).",

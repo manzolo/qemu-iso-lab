@@ -732,7 +732,11 @@ def _svg(lab: dict[str, Any], interactive: bool = False) -> str:
                 reason = "" if enabled else " · Start the VM first"
                 if action == "ssh" and not member["ssh"]:
                     reason = " · SSH is not configured"
+                # data-capable: the action exists for this member at all (SSH configured); lab-map.js
+                # enables it while the member runs, without reloading the page.
+                capable = action != "ssh" or bool(member["ssh"])
                 out.append(f'<g class="vm-action" role="button" data-vm="{esc(member["name"])}" data-action="{action}" '
+                           f'data-capable="{str(capable).lower()}" data-label="{label}" '
                            f'aria-disabled="{str(not enabled).lower()}" aria-label="{label}: {esc(member["name"])}{reason}" '
                            f'tabindex="{-1 if not enabled else 0}">'
                            f'<title>{label}{reason or " · Opens in a dialog on this page"}</title>'

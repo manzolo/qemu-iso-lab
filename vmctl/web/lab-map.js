@@ -1023,6 +1023,19 @@
       paintPower();
       renderInspector();
       document.getElementById('running-count').textContent = `${Object.values(data.states).filter(vm => vm.running).length} running`;
+      // SSH and Console follow the member's power: a VM started after the page loaded (from the
+      // host, or a reinstall such as the pxe-lab's) was left with disabled buttons until a reload.
+      map.querySelectorAll('.vm-action[data-capable]').forEach(node => {
+        const state = data.states[node.dataset.vm];
+        if (!state || node.dataset.action === 'vm') return;
+        const enabled = node.dataset.capable === 'true' && Boolean(state.running);
+        const reason = node.dataset.capable !== 'true' ? ' · SSH is not configured' : enabled ? '' : ' · Start the VM first';
+        node.setAttribute('aria-disabled', String(!enabled));
+        node.setAttribute('tabindex', enabled ? '0' : '-1');
+        node.setAttribute('aria-label', `${node.dataset.label}: ${node.dataset.vm}${reason}`);
+        const tip = node.querySelector('title');
+        if (tip) tip.textContent = `${node.dataset.label}${reason || ' · Opens in a dialog on this page'}`;
+      });
       document.querySelectorAll('[data-member]').forEach(row => {
         const vm = data.states[row.dataset.member];
         if (vm) {

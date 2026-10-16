@@ -1661,9 +1661,14 @@
       ]
     },
     "pxe-lab-server": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:380162c3a44855cc1b1a113098d695b00dfcf4e962fefd9fe2d5b5e3f77ffbff",
+      "version": "1.0.1",
+      "fingerprint": "sha256:32196f52617cc1a7ab0f7ae5f68e73950ca8a9b8b903b21120546fa9d23e039e",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-16",
+          "note": "pxelinux menu waits 30 s instead of 8 (time to see it on the console)"
+        },
         {
           "version": "1.0.0",
           "date": "2026-10-16",
