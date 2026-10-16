@@ -915,7 +915,8 @@ def common_args(
     disk_bootindex: int | None = None, network_phase: str = "runtime",
     serial_socket: Path | None = None, serial_log: Path | None = None,
 ) -> list[str]:
-    runtime.require_command("qemu-system-x86_64")
+    if not dry_run:
+        runtime.require_command("qemu-system-x86_64")
     # KVM normally exposes the host CPU, which is what a modern guest wants. A profile that names a
     # cpu_model means it: Windows 98 does not survive the feature set of a 2020s processor, and the
     # model it was written for is the point of the profile.

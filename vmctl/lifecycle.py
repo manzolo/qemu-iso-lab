@@ -1773,6 +1773,37 @@ def cmd_provision(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_android_live(args: argparse.Namespace) -> int:
+    """Boot the profile's Android live medium; all guest disk writes are temporary."""
+    from vmctl import android
+
+    vm = config.get_vm(config.load_config(), args.vm)
+    endpoint = android.adb_endpoint(vm)
+    append = vm.get("android_live", {}).get("append")
+    if not isinstance(append, str) or not append.strip():
+        raise VMError("android-live requires android_live.append in the profile")
+    runtime.ensure_vm_dirs(args.vm)
+    pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+    medium = iso.ensure_iso(vm, dry_run=args.dry_run)
+    kernel, initrd = iso.extract_installer_boot_artifacts(vm, medium, dry_run=args.dry_run)
+    if not args.dry_run:
+        ensure_vm_disk(vm)
+    command = qemu.common_args(
+        vm, None, headless=True, dry_run=args.dry_run,
+        allow_missing_disk=args.dry_run, enable_clipboard=False,
+        serial_socket=qemu.serial_socket_path(vm), serial_log=serial_log_path(args.vm),
+    )
+    command += ["-snapshot", "-cdrom", str(medium), "-kernel", str(kernel),
+                "-initrd", str(initrd), "-append", append]
+    pid = runtime.run_background(command, log_path, dry_run=args.dry_run,
+                                 stderr_path=companion_stderr_log_path(log_path))
+    if pid is not None:
+        pid_path.write_text(f"{pid}\n", encoding="utf-8")
+    ui.print_note("Temporary Android live session: changes are discarded when the VM stops.")
+    ui.print_note(f"ADB: {endpoint}; screen: vmctl attach {args.vm}; scrcpy: vmctl android-console {args.vm}")
+    return 0
+
+
 def cmd_install(args: argparse.Namespace) -> int:
     cfg = config.load_config()
     vm = config.get_vm(cfg, args.vm)
@@ -5223,6 +5254,9 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
     kvm_ok, kvm_detail = host_setup.kvm_status()
     ui.print_status("ok" if kvm_ok else "warn", f"{'KVM':<19} {kvm_detail}", ok=kvm_ok)
+    ui.print_note("Android console: Ubuntu packages may predate scrcpy 5.x. For 5.x and VA-API, "
+                  "use the official release at https://github.com/Genymobile/scrcpy/releases "
+                  "(instructions and checksums: docs/ANDROID.md).")
 
     efi_vms = [(name, vm) for name, vm in config.sorted_vm_items(cfg) if vm["firmware"]["type"] == "efi"]
     if not efi_vms:

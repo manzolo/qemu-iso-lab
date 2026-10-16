@@ -517,7 +517,7 @@ def extract_iso_member(iso_path: Path, member_path: str, dest_path: Path, dry_ru
 
 
 def _extract_member(iso_path: Path, member_path: str, dest_path: Path, dry_run: bool) -> None:
-    if shutil.which("xorriso"):
+    if dry_run or shutil.which("xorriso"):
         runtime.run(
             ["xorriso", "-osirrox", "on", "-indev", str(iso_path), "-extract", f"/{member_path}", str(dest_path)],
             dry_run=dry_run,

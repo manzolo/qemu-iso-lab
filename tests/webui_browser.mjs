@@ -16,6 +16,7 @@ const catalog = JSON.parse(execFileSync('python3', ['-c', 'import json; from vmc
 const machine = (name, extra = {}) => ({ name, label: 'Arch Linux + Noctalia 5', family:'arch', role:'desktop', memory_mb:8192, cpus:4, firmware:'EFI', running:false, installed:true, prepared:true, install_label:'verified', install_detail:'Boot verified by post-install; installed by bootstrap-archinstall.', disk_host:'7.8G', disk_capacity:'32G', iso_source:'cached', ssh_port:2226, has_ssh:true, has_archinstall:true, unattended_flow:'bootstrap-archinstall', ...extra });
 const state = { version:'0.4.0', vms:[machine('arch-noctalia',{running:true}),machine('debian-server',{role:'server'}),machine('proxmox-ve',{family:'proxmox',role:'hypervisor'}),machine('proxmox-ve-node2',{family:'proxmox',role:'hypervisor'}),machine('alpine-ci',{installed:false,prepared:false,install_label:'no disk'})], labs:[{group:'proxmox-lab', members:['proxmox-ve','proxmox-ve-node2'],start_order:['proxmox-ve','proxmox-ve-node2'],addresses:{'proxmox-ve':'10.10.10.2/24','proxmox-ve-node2':'10.10.10.3/24'}},{group:'new-lab',members:['alpine-ci'],start_order:['alpine-ci']}] };
 let requests = [], failRun = false, failState = false, sshLaunches = 0, overrideRevision = 1, savedOverride = {};
+const terminalRequests = [];
 let jobStatus = 'completed', jobCommand = 'vmctl start arch-noctalia --headless --background', cancelRequests = [], failCancel = false, cancelResult = true;
 let jobId = 'web:fixture', holdRun = false, releaseRun;
 let savedCheckpoints = [], checkpointBlocked = {create:'',restore:'',delete:''}, failCheckpoints = false;
@@ -93,6 +94,11 @@ const server = createServer(async (req,res) => {
     return res.end(JSON.stringify({job:'vm:arch-noctalia',command:guestCommands.at(-1).command}));
   }
   if (req.url.endsWith('/ssh-terminal')) { sshLaunches++; return res.end(JSON.stringify({terminal:'fixture'})); }
+  if (req.url === '/api/terminal') {
+    let body=''; for await (const chunk of req) body+=chunk;
+    terminalRequests.push(JSON.parse(body));
+    return res.end(JSON.stringify({terminal:'fixture'}));
+  }
   if (req.url.endsWith('/override')) {
     if (req.method === 'POST') { let body=''; for await (const chunk of req) body+=chunk; const data=JSON.parse(body); assert.equal(data.revision,String(overrideRevision)); savedOverride=data.override; overrideRevision++; }
     return res.end(JSON.stringify({name:'arch-noctalia',base:profileBase,effective:{...profileBase,...savedOverride},override:savedOverride,revision:String(overrideRevision),local_only:false}));
@@ -642,6 +648,16 @@ try {
   assert(!(await page.locator('#arg5').isChecked())); assert(await page.locator('#arg6').isChecked());
   assert((await page.locator('#preview').textContent()).includes('--no-expand'));
   await page.locator('#cmd-filter').press('Control+Enter'); await page.locator('#confirm-no').click(); assert.equal(requests.length,0); check('flash stays in the host terminal, device confirmation and exclusive expansion flags');
+  await page.locator('#cmd-filter').fill('android-console');
+  assert(await page.locator('#cmd-warning').isHidden());
+  assert(!(await page.locator('#cmd-head').textContent()).includes('overwrites'));
+  assert.equal(await page.locator('#device-cards').count(),0);
+  await page.locator('#cmd-run').click();
+  await page.waitForFunction(()=>!commandBusy);
+  assert.equal(terminalRequests.at(-1).args[0],'android-console');
+  assert(!(await page.locator('#confirm-dialog').evaluate(el=>el.open)));
+  assert.equal(requests.length,0);
+  check('Android console opens a host terminal without disk warnings or a detached job');
   await page.locator('#cmd-filter').fill('show'); await page.locator('#cmd-copy').click();
   assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'vmctl show arch-noctalia'); check('copy command');
   await page.locator('#cmd-filter').fill('does-not-exist'); assert(await page.locator('#cmd-run').isDisabled()); check('empty search');

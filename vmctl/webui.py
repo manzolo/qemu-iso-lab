@@ -50,10 +50,10 @@ from vmctl.errors import VMError
 DEFAULT_PORT = 8765
 WEB_DIR = Path(__file__).resolve().parent / "web"
 # Need an interactive terminal or sudo: excluded from the detached job endpoint.
-EXCLUDED_COMMANDS = {"web", "shell", "console", "flash", "import-device", "completion", "identity", "update"}  # identity: its own panel, no password in a job log; update: a git pull under the running server
+EXCLUDED_COMMANDS = {"web", "shell", "console", "android-console", "flash", "import-device", "completion", "identity", "update"}  # identity: its own panel, no password in a job log; update: a git pull under the running server
 # Discoverable in the command center and opened in a terminal window on the host (sudo and the
 # CLI's own questions happen there), never as a detached job.
-TERMINAL_COMMANDS = {"flash", "import-device"}
+TERMINAL_COMMANDS = {"flash", "import-device", "android-console"}
 # Delete or overwrite something: the browser asks first and the request must say it did.
 DESTRUCTIVE = {"clean", "delete-iso", "clean-reports", "clean-stale", "unexport-libvirt"}
 # group install deletes only the disks of members whose install never finished, so it asks only
@@ -941,7 +941,7 @@ class Handler(BaseHTTPRequestHandler):
                                                    force_stop=bool(body.get("force_stop")))})
             elif path == "/api/terminal":
                 command = prepare_terminal_command(list(body.get("args") or []))
-                self._json({"terminal": open_host_terminal(command, hold=True),
+                self._json({"terminal": open_host_terminal(command, hold=command[1] in {"flash", "import-device"}),
                             "command": shlex.join(["vmctl", *command[1:]])})
             elif path.startswith("/api/vm/") and path.endswith("/ssh-terminal"):
                 terminal = open_ssh_terminal(path[len("/api/vm/"):-len("/ssh-terminal")])

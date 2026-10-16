@@ -3121,7 +3121,7 @@ function renderCommandForm() {
     $("cmd-head").innerHTML = '<h3>No command selected</h3><p>Search by name, description or option, or choose another category.</p>';
     $("cmd-form").innerHTML = ""; $("preview").textContent = "—"; $("cmd-validation").textContent = "Choose a command to continue."; return;
   }
-  $("cmd-head").innerHTML = `<div class="eyebrow">${esc(c.group)} · ${esc(pal.scope === "vm" ? pal.vm : "workspace")}</div><h3>${esc(c.name)}</h3><p>${esc(c.help)}</p>${c.terminal_only ? '<div class="note"><b>Open in a terminal</b> runs it in a terminal window on the host: sudo asks for your password there and the CLI asks its own questions (expansion, resume). It overwrites the target: stop the VM first and check that the device is the right disk.</div>' : ""}`;
+  $("cmd-head").innerHTML = `<div class="eyebrow">${esc(c.group)} · ${esc(pal.scope === "vm" ? pal.vm : "workspace")}</div><h3>${esc(c.name)}</h3><p>${esc(c.help)}</p>${diskTerminal(c.name) ? '<div class="note"><b>Open in a terminal</b> runs it in a terminal window on the host: sudo asks for your password there and the CLI asks its own questions (expansion, resume). It overwrites the target: stop the VM first and check that the device is the right disk.</div>' : c.terminal_only ? '<div class="note">Opens scrcpy in the host desktop session. Start the Android VM first; see the Android guide for the Bliss codec workaround.</div>' : ""}`;
   if (c.name === "checkpoint") {
     $("cmd-form").innerHTML = `<div class="field"><label for="checkpoint-target">Target machine</label><select id="checkpoint-target">${S.vms.map(r => `<option value="${esc(r.name)}" ${r.name === pal.vm ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select><p class="help">Browse saved checkpoints, create a named copy, restore or delete. Results and operation logs stay in the manager.</p></div>`;
     $("checkpoint-target").onchange = preview;
@@ -3150,7 +3150,7 @@ function renderCommandForm() {
     $("cmd-form").querySelectorAll("[data-arg]").forEach((el) => { if (Object.hasOwn(draft.values, el.dataset.arg)) { if (el.type === "checkbox") el.checked = draft.values[el.dataset.arg]; else el.value = draft.values[el.dataset.arg]; } });
     if ($("cmd-advanced")) $("cmd-advanced").open = draft.advanced;
   }
-  if (c.terminal_only) loadDevices();
+  if (diskTerminal(c.name)) loadDevices();
   $("cmd-form").querySelectorAll("input,select").forEach((el) => (el.oninput = () => {
     const arg = c.args[Number(el.dataset.arg)];
     if (arg.flag === "--device") {
@@ -3215,9 +3215,10 @@ function buildArgs() {
   });
   return [...args, ...opts];
 }
+function diskTerminal(name) { return ["flash", "import-device"].includes(name); }
 function destructiveCommand(args) {
   const c = catalog.find((x) => x.name === args[0]);
-  return !!(c && (c.destructive || c.terminal_only || c.destructive_actions.includes(args[1]))) || groupInstallOverwrites(args).length > 0 || (args[0] === "check-vms" && args.includes("--clean-first"));
+  return !!(c && (c.destructive || diskTerminal(c.name) || c.destructive_actions.includes(args[1]))) || groupInstallOverwrites(args).length > 0 || (args[0] === "check-vms" && args.includes("--clean-first"));
 }
 function preview() {
   if (pal.cmd === "checkpoint") {
@@ -3236,12 +3237,12 @@ function preview() {
   $("cmd-run").disabled = commandBusy || !!missing.length || mismatch;
   $("cmd-copy").disabled = !!missing.length || mismatch;
   $("cmd-copy").textContent = c.terminal_only ? "Copy for terminal" : "Copy";
-  $("cmd-validation").textContent = missing.length ? "Required: " + missing.map((a) => a.flag || a.dest).join(", ") : mismatch ? "Device paths must match exactly." : c.terminal_only ? "Opens a terminal window on the host · sudo asks there" : "Ready · Ctrl / ⌘ + Enter to run";
+  $("cmd-validation").textContent = missing.length ? "Required: " + missing.map((a) => a.flag || a.dest).join(", ") : mismatch ? "Device paths must match exactly." : c.terminal_only ? (diskTerminal(c.name) ? "Opens a terminal window on the host · sudo asks there" : "Opens the Android console on the host") : "Ready · Ctrl / ⌘ + Enter to run";
   const danger = destructiveCommand(args);
   $("cmd-warning").classList.toggle("hidden", !danger);
   $("cmd-warning").textContent = danger ? (c.terminal_only ? "This command erases the target disk: what is on it cannot be recovered. You confirm here, then again in the terminal before it starts." : "This command deletes or overwrites data. Confirmation is required before running.") : "";
   $("cmd-run").classList.toggle("danger", danger); $("cmd-run").classList.toggle("primary", !danger);
-  $("cmd-run").textContent = c.terminal_only ? (commandBusy ? "Opening…" : "Review & open in a terminal ↗") : commandBusy ? "Starting…" : danger ? "Review & run…" : "Run command";
+  $("cmd-run").textContent = c.terminal_only ? (commandBusy ? "Opening…" : danger ? "Review & open in a terminal ↗" : "Open in a terminal ↗") : commandBusy ? "Starting…" : danger ? "Review & run…" : "Run command";
   const active = c.args.filter((a, i) => a.flag && (a.kind === "flag" ? $("arg" + i).checked : $("arg" + i).value.trim())).length;
   if ($("option-count")) $("option-count").textContent = active ? `(${active} set)` : `(${c.args.filter((a) => a.flag && !a.required).length} available)`;
 }
@@ -3253,10 +3254,13 @@ async function submitCommand() {
   const c = catalog.find((x) => x.name === pal.cmd);
   try {
     if (c.terminal_only) {
-      const args = buildArgs(), device = args[args.indexOf("--device") + 1], disk = (deviceCache || []).find((d) => d.path === device);
-      const facts = disk ? [["Disk", disk.path], ["Size", fmtBytes(disk.size)], ["Model", disk.model || "unknown"], ["Partitions", String((disk.children || []).length)], ...(disk.serial ? [["Serial", disk.serial]] : [])] : [["Device", device || "?"]];
-      if (!await askConfirm({ eyebrow: "Physical disk", title: `Overwrite ${device || "the target disk"}?`, message: "Everything on it is erased and cannot be recovered. A terminal window opens on the host and waits for Enter before the command starts; sudo may ask for your password there.", command: "vmctl " + args.join(" "), facts, button: "Open the terminal" })) return;
-      const res = await api("/api/terminal", { args }); toast(`Opened in ${res.terminal}: press Enter there to start (sudo may ask for your password).`);
+      const args = buildArgs();
+      if (diskTerminal(c.name)) {
+        const device = args[args.indexOf("--device") + 1], disk = (deviceCache || []).find((d) => d.path === device);
+        const facts = disk ? [["Disk", disk.path], ["Size", fmtBytes(disk.size)], ["Model", disk.model || "unknown"], ["Partitions", String((disk.children || []).length)], ...(disk.serial ? [["Serial", disk.serial]] : [])] : [["Device", device || "?"]];
+        if (!await askConfirm({ eyebrow: "Physical disk", title: `Overwrite ${device || "the target disk"}?`, message: "Everything on it is erased and cannot be recovered. A terminal window opens on the host and waits for Enter before the command starts; sudo may ask for your password there.", command: "vmctl " + args.join(" "), facts, button: "Open the terminal" })) return;
+      }
+      const res = await api("/api/terminal", { args }); toast(diskTerminal(c.name) ? `Opened in ${res.terminal}: press Enter there to start (sudo may ask for your password).` : `Android console opened in ${res.terminal}.`);
     }
     else await run(buildArgs());
   } catch (e) { toast(e.message, true); }

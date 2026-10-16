@@ -234,6 +234,17 @@
         }
       ]
     },
+    "blissos-16": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:62c8b1151b4a6e075f7c718310addcada1a28c2fe1e60a986dcf82c8253c9e0b",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-08",
+          "note": "Add Bliss OS Android live profile and ADB console"
+        }
+      ]
+    },
     "cachyos-desktop": {
       "version": "1.0.0",
       "fingerprint": "sha256:1965ecc17ab4cd0db8cd8b27460bbb0580f1dc321e9666cd5e30b2f984a69a32",

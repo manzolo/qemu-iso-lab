@@ -326,18 +326,21 @@ The page can delete disks and start anything `vmctl` can, so:
 - every API call needs the token printed at start (the page keeps it in `sessionStorage` and
   drops it from the address bar);
 - commands that need a terminal or sudo cannot run as detached jobs: `shell`, `console`, `flash`,
-  `import-device` (and `web` itself). **Flash** and **import-device** are terminal-only forms:
+  `import-device`, `android-console` (and `web` itself). **Flash** and **import-device** are terminal-only forms:
   the host's disks are listed under `--device` (`/api/devices` = `vmctl list-target-devices --json`,
   the system disk left out) as cards, and the selected one shows its partitions with size,
   filesystem, label, mount point and the unallocated space; `--confirm-device` is filled from
   the choice. Then **Open in a terminal**
   asks in the browser (the command and the disk's model, size and partition count), then starts
   the command in a terminal window on the host (`/api/terminal`, validated by the subcommand's
-  own parser, only those two commands). The terminal shows the command and **waits for Enter
+  own parser). The terminal shows the command and **waits for Enter
   before running it** (Ctrl-C aborts): sudo may still hold a valid timestamp, so without that
   stop a click would have overwritten the disk with no question at all. The CLI keeps its disk
   checks and its questions (expansion, resume); the window stays open at the end with the exit
   status. *Copy for terminal* remains for a host without a desktop;
+- **Android console** also opens a host terminal, without disk confirmation or sudo.
+  Run `android-live` first, then select `android-console` with the Bliss VM and
+  `--fix-bliss-codecs --no-audio`; see [ANDROID.md](ANDROID.md).
 - SSH has dedicated authenticated endpoints for its browser PTY and host terminal; neither
   accepts an arbitrary command from the browser;
 - destructive commands (`clean`, `delete-iso`, `clean-reports`, `checkpoint restore|delete`,

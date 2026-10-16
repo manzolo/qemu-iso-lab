@@ -112,7 +112,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_ubuntu_2604 = {"ubuntu-26.04"}
         # Ubuntu 26.10, the first interim release in the catalog (ubuntu-interim.json): live PASS the day after
         # its release, the 26.04 recipe unchanged.
-        verified_ubuntu_2610 = {"ubuntu-26.10"}
+        verified_ubuntu_2610 = {"ubuntu-26.10",
+                                "blissos-16"}  # Android again on its new ADB port 2373: android-live, android-console, scrcpy recording
         # The Proxmox lab, promoted like the network lab: four PASS from clean disks, then the
         # three nodes formed a quorate cluster over pve-lan (vmctl group cluster).
         verified_proxmox_lab = {"proxmox-ve", "proxmox-ve-node2", "proxmox-ve-node3", "proxmox-lab-client"}
@@ -222,6 +223,19 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                 continue
             self.assertNotIn(int(port), ports, f"{name} reuses port {port} of {ports.get(int(port))}")
             ports[int(port)] = name
+
+        # The same for every host forward, not only SSH: QEMU refuses to start on a taken port, and
+        # blissos-16's ADB forward sat on ubuntu-26.10's SSH port until the merge (2026-10-16). The one
+        # sharing allowed is a network-lab router publishing a member's SSH on its WAN.
+        owners: dict[int, str] = {}
+        for name, vm in cfg["vms"].items():
+            for port in sorted(vmctl.qemu.host_ports(vm)):
+                other = owners.get(port)
+                if other is not None:
+                    gateways = {(cfg["vms"][a].get("network_lab") or {}).get("gateway_vm") for a in (name, other)}
+                    self.assertTrue(gateways & {name, other}, f"{name} reuses host port {port} of {other}")
+                    continue
+                owners[port] = name
 
         # The Ubuntu desktop flavors: one autoinstall recipe, the desktop metapackage and an
         # autologin drop-in for the display manager that flavor ships.

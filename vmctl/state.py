@@ -22,6 +22,8 @@ HTTP_USER_AGENT: str = "vmctl/1.0 (+https://github.com/manzolo/qemu-iso-lab)"
 
 REQUIRED_COMMANDS = ["qemu-system-x86_64", "qemu-img", "python3"]
 OPTIONAL_COMMANDS = {
+    "adb": "Android guest access over its loopback TCP forward",
+    "scrcpy": "android-console; upstream 5.x adds hardware decoding (docs/ANDROID.md)",
     "ssh": "guest shell and SSH provisioning",
     "scp": "copying files during SSH provisioning",
     "ssh-keygen": "project-generated SSH keys",

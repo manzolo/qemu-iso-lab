@@ -42,6 +42,8 @@ TOOL_PACKAGES: dict[str, dict[str, str]] = {
     "partclone.exfat": {"apt": "partclone", "pacman": "partclone"},
     "sfdisk": {"apt": "fdisk", "pacman": "util-linux"},
     "ntfsresize": {"apt": "ntfs-3g", "pacman": "ntfs-3g"},
+    "adb": {"apt": "adb", "pacman": "android-tools"},
+    "scrcpy": {"apt": "scrcpy", "pacman": "scrcpy"},
 }
 TEXTUAL = "textual"
 # The upstream static virtiofsd (musl, no dependencies), for a distribution without a usable
@@ -63,6 +65,7 @@ SETUP_GROUPS: list[tuple[str, list[str]]] = [
     ("Required", ["qemu-system-x86_64", "qemu-img", "python3"]),
     ("Dashboard", ["textual", "fzf", "dialog"]),
     ("SSH", ["ssh", "scp", "ssh-keygen"]),
+    ("Android console", ["adb", "scrcpy"]),
     ("Installers", ["xorriso", "cloud-localds", "7z", "zstd", "growisofs", "virtiofsd"]),
     ("Viewer, libvirt", ["remote-viewer", "virsh", "swtpm"]),
     ("Disk import, flash", ["sgdisk", "sfdisk", "ntfsresize", "ddrescue", "ddrescuelog",

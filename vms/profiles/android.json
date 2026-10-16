@@ -1,0 +1,71 @@
+{
+  "vms": {
+    "blissos-16": {
+      "name": "Bliss OS 16.9.7 FOSS (Android 13, live)",
+      "meta": {
+        "slug": "blissos",
+        "family": "android",
+        "role": "desktop",
+        "release_model": "stable",
+        "status": "manual",
+        "manual": "live",
+        "verified": "2026-10-16",
+        "version": "1.0.0"
+      },
+      "iso": "isos/Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso",
+      "iso_url": "https://downloads.sourceforge.net/project/blissos-x86/Official/BlissOS16/FOSS/Generic/Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso",
+      "iso_sha256": "735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e",
+      "disk": {
+        "path": "artifacts/blissos-16/disk.qcow2",
+        "size": "16G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "q35",
+      "memory_mb": 3072,
+      "cpus": 2,
+      "networks": [
+        {
+          "type": "user",
+          "ssh": false,
+          "hostfwd": [
+            {
+              "host_port": 2373,
+              "guest_port": 5555
+            }
+          ]
+        }
+      ],
+      "audio": false,
+      "usb_tablet": true,
+      "video": {
+        "default": "virtio",
+        "variants": {
+          "virtio": [
+            "-device",
+            "virtio-vga",
+            "-display",
+            "gtk"
+          ]
+        },
+        "headless": [
+          "-device",
+          "virtio-vga",
+          "-display",
+          "none"
+        ]
+      },
+      "installer_boot": {
+        "kernel": "kernel",
+        "initrd": "initrd.img"
+      },
+      "android_live": {
+        "append": "root=/dev/ram0 SRC= DATA= HWC=drm_minigbm GRALLOC=minigbm_arcvm GRALLOC4_MINIGBM=1 SETUPWIZARD=0 console=ttyS0"
+      },
+      "notes": "Run vmctl android-live blissos-16, then vmctl android-console blissos-16 --fix-bliss-codecs --no-audio. Live session only: data is discarded at shutdown; no unattended disk installation. Select Launcher3 and Always on the first home chooser. Android 13 build from 2024; ADB is unauthenticated and forwarded only on loopback TCP 2373. scrcpy needs the opt-in temporary Codec2 linker workaround for this exact build; VNC remains available through vmctl attach. See docs/ANDROID.md."
+    }
+  }
+}

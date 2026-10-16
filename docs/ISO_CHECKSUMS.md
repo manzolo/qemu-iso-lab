@@ -2,8 +2,12 @@
 
 Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded in `iso_sha256` in the profiles, never derived from a local ISO. Debian 13.4.0, Fedora 42 and AlmaLinux 10.1 URLs now use official archives because the original current/release directories no longer serve those images. Their versions are unchanged.
 
+Bliss OS was added on 2026-10-08 using the adjacent vendor checksum retrieved
+on 2026-10-07 (not a locally invented pin).
+
 | Profile | ISO | Vendor checksum manifest |
 |---|---|---|
+| `blissos-16` | `Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso` | [Vendor SHA-256](https://sourceforge.net/projects/blissos-x86/files/Official/BlissOS16/FOSS/Generic/Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso.sha256/download) |
 | `almalinux-minimal` | `AlmaLinux-10.1-x86_64-minimal.iso` | [Manifest](https://repo.almalinux.org/vault/10.1/isos/x86_64/CHECKSUM) |
 | `almalinux-server` | `AlmaLinux-10.1-x86_64-minimal.iso` | [Manifest](https://repo.almalinux.org/vault/10.1/isos/x86_64/CHECKSUM) |
 | `alpine-ci` | `alpine-virt-3.24.1-x86_64.iso` | [Manifest](https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso.sha256) |

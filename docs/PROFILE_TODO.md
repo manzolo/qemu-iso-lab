@@ -349,13 +349,17 @@ diagnosis above only exists because the disk was copied aside by hand while the 
    session notes; not started.
 10. Ideas not yet planned: the KDE history line (Kubuntu 8.04 → 24.04, KDE 3.5 → Plasma 6) beside the
     GNOME one; sway / i3 / river / labwc as bare compositors; Fedora Sway spin.
-    **Android** (added 2026-10-07, Manzolo: "segnamolo come distro da provare"): an Android-x86 /
-    BlissOS profile, then scrcpy (5.0: hardware decoding with VA-API) over `adb connect` to a
-    forwarded port as its console, smoother than VNC and with clipboard and audio; maybe an
-    android-lab later. Started by Codex the same evening from `docs/prompts/android-lab.md` and
-    parked on the local branch `wip/android` (`vmctl/android.py`, `docs/ANDROID.md`, untested;
-    research notes in `artifacts/android-research/`, untracked): interrupted at its usage limit while
-    checking the swcodec linker configuration over adb. Resume with `git switch wip/android`.
+    **Android**: `blissos-16` now provides a temporary Bliss OS 16.9.7 / Android 13
+    live session (`vmctl android-live`) and a verified scrcpy console (2026-10-08).
+    `--fix-bliss-codecs --no-audio` enables the build-guarded tmpfs linker workaround;
+    virtio-gpu with mapper 4 is required. CLI boot, ADB, recording and windowed scrcpy
+    passed live; screenshot and details in [ANDROID.md](ANDROID.md). Persistent unattended
+    installation and android-lab are deferred; this change covers the profile and console.
+    Merged into main on 2026-10-16 with ADB on host port 2373 (2372 is `ubuntu-26.10`'s SSH; the
+    port test now covers every forward, not only SSH) and passed live again the same day:
+    `android-live`, `android-console --fix-bliss-codecs --no-audio --no-playback --record` with
+    scrcpy 5.0 (15 s, H.264 1280x800, the home chooser on screen). `vmctl stop` works but waits
+    out the 60 s ACPI grace: Bliss ignores the power button, harmless under `-snapshot`.
 11. Next labs (k3s cluster, multi-segment routing, highly available web, Samba AD) and the
     Proxmox lab's extensions (a Ceph variant; ZFS replication + HA are its exercises 3-5 since 2026-10-07): [LAB_IDEAS.md](LAB_IDEAS.md).
 

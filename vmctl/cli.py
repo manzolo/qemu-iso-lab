@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import vmctl
-from vmctl import clone, config, disk_inspect, flash, import_dev, lifecycle, local_identity, ui, updater, usage, webui
+from vmctl import android, clone, config, disk_inspect, flash, import_dev, lifecycle, local_identity, ui, updater, usage, webui
 from vmctl.errors import VMError
 
 
@@ -28,7 +28,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
      ["bootstrap-unattended", "bootstrap-cloudimg", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
-     ["start", "stop", "shell", "console", "agent", "attach", "link", "record"]),
+     ["start", "stop", "shell", "console", "android-live", "android-console", "agent", "attach", "link", "record"]),
     ("Libvirt", "hand an installed VM to virt-manager",
      ["export-libvirt", "unexport-libvirt"]),
     ("Network lab", "pfSense router + Pi-hole DNS + clients on an isolated LAN segment",
@@ -486,6 +486,20 @@ covers install, boot and desktop; it ends when the VM has been gone for that lon
     p.add_argument("--no-viewer", action="store_true", help="only expose the display on 127.0.0.1 and print the address; Ctrl-C to detach")
     p.add_argument("--wait", type=float, default=0, help="wait up to this many seconds for a newly started VM's display")
     p.set_defaults(func=lifecycle.cmd_attach)
+
+    p = _add(subparsers, "android-live", help="boot an Android live ISO in the background (temporary session, no installation)")
+    p.add_argument("vm", help=VM_HELP)
+    p.set_defaults(func=lifecycle.cmd_android_live)
+
+    p = _add(subparsers, "android-console", help="connect to an Android VM over ADB, wait for boot, then open scrcpy on the host")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=float, default=180, help="seconds to wait for Android to finish booting (default: 180)")
+    p.add_argument("--no-audio", action="store_true", help="disable audio forwarding (scrcpy 2.0+)")
+    p.add_argument("--fix-bliss-codecs", action="store_true", help="temporarily repair the verified Bliss 16.9.7 Codec2 linker configuration (guest root ADB; resets on reboot)")
+    p.add_argument("--record", metavar="FILE", help="also record the console to a host .mp4 or .mkv file")
+    p.add_argument("--no-playback", action="store_true", help="record without opening a window (requires --record and scrcpy 2.4+)")
+    p.add_argument("--time-limit", type=int, help="close scrcpy after this many seconds (scrcpy 2.1+)")
+    p.set_defaults(func=android.cmd_android_console)
 
     p = _add(subparsers, "agent", help="talk to the QEMU guest agent of a running VM (no SSH needed)")
     p.add_argument("vm", help=VM_HELP)
