@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from vmctl import state, ui
+from vmctl import state, ui, recent
 from vmctl.errors import VMError
 
 
@@ -177,6 +177,28 @@ def run(
     if show_command:
         ui.print_command(cmd)
     if not dry_run:
+        # Foreground QEMU needs its launch recorded while it is still running.
+        if stdout_log is None and stderr_log is None and recent.command_vm(cmd):
+            with subprocess.Popen(
+                cmd, stdin=subprocess.PIPE if stdin_text is not None else None,
+                stdout=(subprocess.PIPE if capture_error_output else subprocess.DEVNULL) if quiet else None,
+                stderr=(subprocess.PIPE if capture_error_output else subprocess.DEVNULL) if quiet else None,
+                text=stdin_text is not None or capture_error_output,
+            ) as process:
+                recent.record(cmd)
+                try:
+                    out, err = process.communicate(input=stdin_text, timeout=timeout_sec)
+                except subprocess.TimeoutExpired as exc:
+                    _stop(process)
+                    process.communicate()
+                    raise _timed_out(cmd, timeout_sec, None) from exc
+                except BaseException:
+                    process.kill()
+                    process.wait()
+                    raise
+                if process.returncode:
+                    raise subprocess.CalledProcessError(process.returncode, cmd, output=out, stderr=err)
+            return
         if quiet and stdout_log is None and stderr_log is None:
             try:
                 subprocess.run(
@@ -219,6 +241,7 @@ def run(
             )
             assert process.stdout is not None
             assert process.stderr is not None
+            recent.record(cmd)
 
             stdout_stream = None if quiet else sys.stdout
             stderr_stream = None if quiet else sys.stderr
@@ -309,6 +332,7 @@ def run_background(cmd: list[str], log_path: Path, dry_run: bool = False, stderr
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
+        recent.record(cmd)
         return process.pid
 
     ensure_parent(stderr_path)
@@ -320,6 +344,7 @@ def run_background(cmd: list[str], log_path: Path, dry_run: bool = False, stderr
             stderr=stderr_fh,
             start_new_session=True,
         )
+    recent.record(cmd)
     return process.pid
 
 

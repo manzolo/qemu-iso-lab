@@ -587,7 +587,9 @@ class Snapshot:
 
                 bridge = ClassicBridge()
                 rows = bridge.snapshot()
+                from vmctl import recent
                 for row in rows:
+                    row["last_started"] = recent.last_started(row["name"])
                     argv = tui_jobs.command(tui_jobs.job_dir(state.ROOT, row["name"]))
                     row["job_command"] = "guest-command" if is_guest_command(argv) else argv[1] if len(argv) > 1 and Path(argv[0]).name == "vmctl" else ""
                 self.value = {"vms": rows, "labs": bridge.labs(), "time": time.time()}

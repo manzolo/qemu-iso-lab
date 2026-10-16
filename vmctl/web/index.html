@@ -915,6 +915,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 </section>
 <nav id="workspace-nav" aria-label="Workspace" role="tablist">
   <button data-filter="mine" role="tab" aria-pressed="false" title="Your chosen profiles, plus running machines outside a lab">My VMs<span class="tab-count" id="tab-count-mine" hidden></span></button>
+  <button data-filter="recent" role="tab" aria-pressed="false" title="Last launched machines, newest first">Recent<span class="tab-count" id="tab-count-recent" hidden></span></button>
   <button data-filter="all" role="tab" class="active" aria-pressed="true">Catalog<span class="tab-count" id="tab-count-all" hidden></span></button>
   <button data-filter="labs" role="tab" aria-pressed="false">Labs<span class="tab-count" id="tab-count-labs" hidden></span></button>
 </nav>
@@ -935,7 +936,7 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 <div id="recording-controls" class="hidden"><span id="recording-status" role="status"></span><button id="recording-stop">Stop recording</button><button id="recording-open" class="hidden">Download recording</button><button id="recording-dismiss" class="hidden" aria-label="Dismiss recording notice" title="Dismiss this notice; the recording stays available in the console">×</button></div>
 <main id="profiles-view">
   <nav id="lab-navigation" class="lab-navigation hidden" aria-label="Lab navigation"><button id="back-to-labs">← Labs</button><span aria-hidden="true">/</span><span id="lab-origin" class="mono"></span><span aria-hidden="true">/</span><span id="lab-current-vm" class="mono" aria-current="page"></span></nav>
-  <section class="card"><div class="list-heading"><h2 id="list-title">Profiles</h2><label class="list-sort" for="vm-sort">Sort<select id="vm-sort"><option value="running">Running first</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="installed">Installed first</option></select></label></div>
+  <section class="card"><div class="list-heading"><h2 id="list-title">Profiles</h2><label class="list-sort hidden" id="recent-limit-label" for="recent-limit">Last<select id="recent-limit"><option value="5">5 VMs</option><option value="10" selected>10 VMs</option><option value="20">20 VMs</option></select></label><label class="list-sort" id="vm-sort-label" for="vm-sort">Sort<select id="vm-sort"><option value="running">Running first</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="installed">Installed first</option></select></label></div>
     <div id="labs-running" class="labs-running" hidden></div>
     <p id="selection-hint">Double-click to open · Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
     <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-console" title="Start the selected machines and open their consoles side by side on one page">Start in console</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
@@ -1525,7 +1526,7 @@ function setStatusFilter(name) {
 }
 function scopeRows() {
   const members = filter === "lab" ? S.labs.find(lab => lab.group === labProfile?.group)?.members || [] : null;
-  return S.vms.filter(r => (!members || members.includes(r.name))
+  return (filter === "recent" ? recentRows() : S.vms).filter(r => (!members || members.includes(r.name))
     // My VMs: the selection, plus what runs outside a declared lab (catalog.in_my_vms): a running
     // lab's members stay in the Labs view, the "Labs running" line below the title leads there.
     && (filter !== "mine" || r.mine || (r.running && !r.lab))
@@ -1533,6 +1534,20 @@ function scopeRows() {
     // lab's machines sat on top of the catalog under Running first).
     && (filter !== "all" || !r.lab)
     && (statusFilter === "hidden" && filter === "all" ? r.hidden : !r.hidden || r.running || r.installed));
+}
+function recentRows() {
+  return S.vms.filter(r => Number.isFinite(r.last_started) && r.last_started > 0 && (!r.hidden || r.running || r.installed))
+    .sort((a, b) => b.last_started - a.last_started || a.name.localeCompare(b.name))
+    .slice(0, Number($("recent-limit").value));
+}
+function recentEmptyMessage() {
+  if (S.vms.some(r => !Object.hasOwn(r, "last_started")))
+    return "Restart vmctl web to load launch history, then open the new URL it prints. Running VMs keep running.";
+  return "No recent launches yet. Start a VM from the Catalog, My VMs, Labs or the terminal to see it here.";
+}
+function recentLaunch(r) {
+  if (filter !== "recent") return "";
+  return `<span class="profile-desc" title="${esc(new Date(r.last_started * 1000).toISOString())}">Last launched: ${esc(new Date(r.last_started * 1000).toLocaleString())}</span>`;
 }
 function matchesStatus(r, mode = statusFilter) {
   const busy = withVMJob(r).job_status === "running";
@@ -1544,7 +1559,7 @@ function visible() {
   const order = $("vm-sort").value;
   return scopeRows().filter(r => matchesStatus(r) && words.every(w => (r.name + " " + r.label + " " + r.family).toLowerCase().includes(w)))
     .sort((x, y) => {
-      const priority = order === "running" ? Number(!!y.running) - Number(!!x.running)
+      const priority = filter === "recent" ? y.last_started - x.last_started : order === "running" ? Number(!!y.running) - Number(!!x.running)
         : order === "installed" ? Number(!!y.installed) - Number(!!x.installed) : 0;
       return priority || (order === "name-desc" ? -1 : 1) * x.name.localeCompare(y.name, "en", { numeric:true, sensitivity:"base" });
     });
@@ -1575,12 +1590,14 @@ function render() {
   $("search-clear").classList.toggle("hidden", !$("search").value);
   const all = S.vms, withData = all.filter((r) => r.installed).length, running = all.filter((r) => r.running).length;
   $("summary").textContent = `${withData} installed · ${S.labs.length} labs`;
-  for (const [id, n] of [["mine", all.filter(r => r.mine || (r.running && !r.lab)).length], ["all", all.filter(r => !r.lab && !r.hidden).length], ["labs", S.labs.length]]) {
+  for (const [id, n] of [["mine", all.filter(r => r.mine || (r.running && !r.lab)).length], ["recent", recentRows().length], ["all", all.filter(r => !r.lab && !r.hidden).length], ["labs", S.labs.length]]) {
     const chip = $("tab-count-" + id); chip.textContent = n; chip.hidden = !all.length;
   }
   $("total-count").textContent = filter === "all" ? all.length : withData; $("total-label").textContent = filter === "all" ? "Profiles" : "Installed"; $("running-count").textContent = running;
   $("disk-count").textContent = new Set([...knownJobs.filter(j => j.status === "running").map(j => j.id), ...all.filter(r => withVMJob(r).job_status === "running").map(r => "vm:" + r.name)]).size;
   const labs = filter === "labs", inLab = filter === "lab" && !!labProfile;
+  $("recent-limit-label").classList.toggle("hidden", filter !== "recent");
+  $("vm-sort-label").classList.toggle("hidden", filter === "recent");
   $("profiles-view").classList.toggle("lab-profile", inLab);
   $("lab-navigation").classList.toggle("hidden", !inLab);
   $("search").placeholder = inLab ? "Search machines in this lab…" : labs ? "Search labs or machines…" : "Search profiles or distributions…";
@@ -1598,7 +1615,7 @@ function render() {
   if (labs) return renderLabs();
   const rows = visible();
   const total = scopeRows().length;
-  $("list-title").textContent = `${inLab ? "Lab machines" : filter === "mine" ? "My VMs" : statusFilter === "hidden" ? "Hidden profiles" : "Catalog"} · ${rows.length === total ? total : rows.length + " / " + total}`;
+  $("list-title").textContent = `${inLab ? "Lab machines" : filter === "recent" ? "Recent" : filter === "mine" ? "My VMs" : statusFilter === "hidden" ? "Hidden profiles" : "Catalog"} · ${rows.length === total ? total : rows.length + " / " + total}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
   if (inLab) {
     $("lab-origin").textContent = labProfile.group;
@@ -1609,8 +1626,8 @@ function render() {
   if (dragVm || dragState.start || powerHold) return;
   const focused = document.activeElement, focusedVm = focused.closest?.("#rows [data-vm]")?.dataset.vm;
   const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : focused.matches(".vm-power") ? ".vm-power" : null;
-  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.hidden ? '<span class="style-tag" title="Hidden from the lists: shown here because it runs or holds a disk, or because the Hidden filter is on">hidden</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : r.manual === "todo" ? '<span class="style-tag todo" title="Manual for now: its automation is still to write (the notes say which flow)">to automate</span>' : '<span class="style-tag" title="' + ({live:"Live media: it boots, it does not install itself", image:"A ready disk image: it boots", template:"An import template, not an installer", ci:"The CI boot check", twin:"You install it by hand; " + esc(r.automated_as) + " installs the same system itself"}[r.manual] || "You install it by hand") + '">manual' + (r.manual === "twin" ? " · see " + esc(r.automated_as) : "") + '</span>'}</span><span class="profile-desc">${esc(r.label)}</span></span>${linkHandle(r)}</span></td><td><span class="state-cell">${powerButton(r)}<span>${stateBadge(r)}${installationBadge(r, true)}</span></span></td><td class="mono">${ram(r)}</td></tr>`; }).join("")
-    || `<tr><td colspan="4" class="s-muted">${filter === "mine" && !$("search").value ? "No matching VMs. Browse the Catalog to add profiles to My VMs, or clear the filters." : "No matching profiles."}</td></tr>`);
+  updateProfileRows(rows.map((r) => { const [s, c] = stateOf(r); return `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.hidden ? '<span class="style-tag" title="Hidden from the lists: shown here because it runs or holds a disk, or because the Hidden filter is on">hidden</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : r.manual === "todo" ? '<span class="style-tag todo" title="Manual for now: its automation is still to write (the notes say which flow)">to automate</span>' : '<span class="style-tag" title="' + ({live:"Live media: it boots, it does not install itself", image:"A ready disk image: it boots", template:"An import template, not an installer", ci:"The CI boot check", twin:"You install it by hand; " + esc(r.automated_as) + " installs the same system itself"}[r.manual] || "You install it by hand") + '">manual' + (r.manual === "twin" ? " · see " + esc(r.automated_as) : "") + '</span>'}</span><span class="profile-desc">${esc(r.label)}</span>${recentLaunch(r)}</span>${linkHandle(r)}</span></td><td><span class="state-cell">${powerButton(r)}<span>${stateBadge(r)}${installationBadge(r, true)}</span></span></td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+    || `<tr><td colspan="4" class="s-muted" style="white-space:normal">${filter === "recent" && !total ? recentEmptyMessage() : filter === "mine" && !$("search").value ? "No matching VMs. Browse the Catalog to add profiles to My VMs, or clear the filters." : "No matching profiles."}</td></tr>`);
   bindStateLogs($("rows"));
   followClimbedRow();
   if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
@@ -3662,6 +3679,14 @@ document.addEventListener("pointerdown",e => { if (!$("vm-context").contains(e.t
 window.addEventListener("resize",closeContext);
 
 // --- wiring
+try {
+  const saved = localStorage.getItem("vmctl-recent-limit");
+  if (["5", "10", "20"].includes(saved)) $("recent-limit").value = saved;
+} catch (_) { /* storage is optional */ }
+$("recent-limit").onchange = () => {
+  try { localStorage.setItem("vmctl-recent-limit", $("recent-limit").value); } catch (_) { /* storage is optional */ }
+  checkedVms.clear(); selectionAnchor = ""; render(); $("list").scrollTop = 0;
+};
 document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
 document.querySelectorAll("[data-filter]").forEach((b) => (b.onclick = () => { setFilter(b.dataset.filter); }));
 document.querySelectorAll("[data-status-filter]").forEach(b => b.onclick = () => setStatusFilter(b.dataset.statusFilter));

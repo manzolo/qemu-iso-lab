@@ -51,6 +51,8 @@ class ConsoleCommandTests(BaseVmctlTestCase):
              mock.patch.object(vmctl.runtime, "run_background", return_value=4242) as run_background:
             self.assertEqual(self.vmctl.cmd_start(args), 0)
         cmd = run_background.call_args.args[0]
+        from vmctl import recent
+        self.assertEqual(recent.command_vm(cmd), self.vm_name)
         self.assertTrue(any(f"path={vmctl.qemu.serial_socket_path(self.vm_config)}" in a for a in cmd))
         self.assertTrue(any(f"logfile={self.root / 'artifacts/testvm/logs/serial.log'}" in a for a in cmd))
         self.assertNotIn("stdio,id=char0,signal=off", cmd)

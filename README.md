@@ -86,6 +86,11 @@ More recipes and daily commands: [Quick reference](docs/QUICK_REFERENCE.md).
 | **[Terminal dashboard](docs/VMTUI.md)** | `vmtui` | Search, live status and contextual actions; `--classic` for fzf/dialog menus. |
 | **[Command line](docs/QUICK_REFERENCE.md)** | `vmctl --help` | Install, start, stop, clone and automate directly from your shell. |
 
+The **Recent** tab shows the last 5, 10 (default), or 20 distinct VMs launched,
+newest first. Starting a VM again moves it to the top. Launch timestamps are saved
+on the host, including launches from the CLI and TUI, and survive browser restarts.
+History starts with launches made after this feature is installed.
+
 The web dashboard serves locally on `127.0.0.1:8765`; `vmctl web --lan` enables
 HTTPS access from your network. Closing its terminal stops the dashboard, while VMs keep running.
 

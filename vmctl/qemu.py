@@ -17,7 +17,7 @@ from pathlib import Path
 
 from typing import Any
 
-from vmctl import state, ui, runtime, cloud_init
+from vmctl import state, ui, runtime, cloud_init, recent
 from vmctl.errors import VMError
 
 
@@ -934,6 +934,10 @@ def common_args(
     machine_extra, memory_objects, shared_device = shared_dir_args(vm)
     args = ["qemu-system-x86_64", "-m", str(vm["memory_mb"]), "-cpu", cpu_model, "-smp", str(vm["cpus"]),
             "-machine", machine_arg(vm, accel=accel) + machine_extra, "-boot", "menu=on"]
+    from vmctl import vmstate
+    vm_name = vmstate.vm_name_for(vm)
+    if vm_name:
+        args += ["-name", "vmctl:" + vm_name]
     if accel == "kvm":
         args.insert(1, "-enable-kvm")
     args += memory_objects
@@ -1033,6 +1037,7 @@ def run_and_expect(
         log_file = log_path.open("w", encoding="utf-8", errors="replace")
         ui.print_kv("serial log", str(log_path))
     process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    recent.record(cmd)
     assert process.stdout is not None
     assert process.stdin is not None
     captured: list[str] = []
