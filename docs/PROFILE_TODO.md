@@ -53,6 +53,21 @@ Every tracked profile has `meta.status`:
 
 Recorded dates:
 
+- 2026-10-16: `ubuntu-26.10` (Stonking Stingray, released 2026-10-15), the first interim release
+  in the catalog, in its own file `ubuntu-interim.json` (base `ubuntu-26.10-base`, `release_model:
+  interim`, SSH 2372) and outside `ubuntu-releases`, which stays one desktop per LTS. The
+  `ubuntu-26.04` recipe unchanged; first live run `bootstrap-unattended --timeout 3600` PASS in
+  10.5 minutes including the ISO download (`verify-desktop`: an active local graphical session;
+  the guest reports Ubuntu 26.10, kernel 7.3.0-9, GNOME Shell 51.0). Harmless on the serial log:
+  the live initramfs's multipathd complains about `/etc/multipath/bindings`, and
+  `systemd-networkd-wait-online` times out in the live system before subiquity carries on.
+  The run also showed that no autoinstall profile honoured the `locale` block's language: the
+  section carried no `locale` field, so `apply_locale` skipped it and the guest came up in
+  en_US.UTF-8 with Italian keyboard and time zone. `config.LOCALE_FIELDS_ADDED` now adds it, and
+  `autoinstall_language_command` installs the translations (`check-language-support`, with
+  `language-pack-<ll>` as the fallback): with `it_IT.UTF-8` alone GNOME showed an Italian date
+  and an English desktop.
+
 - 2026-09-26: the full matrix from clean disks (`vmctl clean --all`, then `check-vms
   --parallel auto --timeout 3600`, `artifacts/check-vms/20260925-223107/`, 2 h 36 min): 53 PASS,
   0 FAIL, 48 SKIP (36 manual profiles without `ci.expect`, 8 experimental, 2 without a disk to

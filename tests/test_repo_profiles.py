@@ -110,6 +110,9 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # First live run of the profile added the same day: 26.04's subiquity installs
         # ubuntu-desktop straight from autoinstall "packages" and gdm3.service still answers.
         verified_ubuntu_2604 = {"ubuntu-26.04"}
+        # Ubuntu 26.10, the first interim release in the catalog (ubuntu-interim.json): live PASS the day after
+        # its release, the 26.04 recipe unchanged.
+        verified_ubuntu_2610 = {"ubuntu-26.10"}
         # The Proxmox lab, promoted like the network lab: four PASS from clean disks, then the
         # three nodes formed a quorate cluster over pve-lan (vmctl group cluster).
         verified_proxmox_lab = {"proxmox-ve", "proxmox-ve-node2", "proxmox-ve-node3", "proxmox-lab-client"}
@@ -165,7 +168,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                     self.assertIn(twin["meta"]["status"], ("unattended", "experimental"), name)
             else:
                 self.assertNotIn("manual", vm["meta"], name)
-            expected_date = ("2026-10-04" if name in verified_1004
+            expected_date = ("2026-10-16" if name in verified_ubuntu_2610
+                             else "2026-10-04" if name in verified_1004
                              else "2026-10-03" if name in verified_1003
                              else "2026-10-02" if name in verified_1002
                              else "2026-10-01" if name in verified_1001

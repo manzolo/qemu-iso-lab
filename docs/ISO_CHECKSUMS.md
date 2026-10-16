@@ -61,6 +61,7 @@ Checksums retrieved from the vendor manifests on 2026-09-07. Hashes are recorded
 | `ubuntu-20.04` | `ubuntu-20.04.6-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/20.04/SHA256SUMS) |
 | `ubuntu-22.04` | `ubuntu-22.04.5-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/22.04/SHA256SUMS) |
 | `ubuntu-26.04` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
+| `ubuntu-26.10` | `ubuntu-26.10-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/26.10/SHA256SUMS) |
 | `ubuntu-desktop-live` | `ubuntu-26.04-desktop-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |
 | `ubuntu-mate-24.04` | `ubuntu-24.04.4-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/24.04.4/SHA256SUMS) |
 | `ubuntu-niri` | `ubuntu-26.04-live-server-amd64.iso` | [Manifest](https://releases.ubuntu.com/resolute/SHA256SUMS) |

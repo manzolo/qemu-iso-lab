@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import os
 import re
+import shlex
 import sys
 from datetime import date
 from typing import Any, cast
@@ -254,6 +255,30 @@ def preseed_locale_command(language: str) -> str:
             f"locale-gen {language} >/dev/null 2>&1 || locale-gen >/dev/null 2>&1; update-locale LANG={language}) || true")
 
 
+# Fields the locale block sets even when the section does not carry them: the renderer has a
+# default instead. No autoinstall profile names `locale` (cloud_init falls back to en_US.UTF-8),
+# so until 2026-10-16 every Ubuntu autoinstall came up in English under an Italian locale block
+# while keyboard and time zone moved (ubuntu-26.10, the first live run).
+LOCALE_FIELDS_ADDED: dict[str, frozenset[str]] = {"autoinstall": frozenset({"locale"})}
+
+
+def autoinstall_language_command(language: str) -> str | None:
+    """The autoinstall late command that installs the translations of *language* in the target:
+    subiquity sets the system locale but adds no language pack, so GNOME came up half English
+    under it_IT.UTF-8 (ubuntu-26.10, 2026-10-16). The list is Ubuntu's own
+    (``check-language-support``, which knows the desktop installed: GNOME, KDE, LibreOffice),
+    ``language-pack-<ll>`` the fallback where that tool is missing (a server install). English
+    needs nothing. Never fatal: an unknown language installs all the same."""
+    code = language.split(".")[0].split("@")[0].split("_")[0]
+    if not code or code == "en":
+        return None
+    install = "DEBIAN_FRONTEND=noninteractive apt-get install -y -q"
+    script = (f"apt-get update -q >/dev/null 2>&1; "
+              f"pkgs=$(check-language-support -l {code} 2>/dev/null); "
+              f"{install} language-pack-{code} $pkgs || {install} language-pack-{code} || true")
+    return "curtin in-target --target=/target -- sh -c " + shlex.quote(script)
+
+
 def apply_locale(vm: dict[str, Any], locale: dict[str, str], explicit: dict[str, Any]) -> None:
     """Move the language, keyboard and time zone of every installer section the profile has to
     the ``locale`` block, like ``apply_identity``: only the fields the section already carries,
@@ -265,9 +290,18 @@ def apply_locale(vm: dict[str, Any], locale: dict[str, str], explicit: dict[str,
             continue
         explicit_section = explicit.get(section)
         kept: dict[str, Any] = explicit_section if isinstance(explicit_section, dict) else {}
+        added = LOCALE_FIELDS_ADDED.get(section, frozenset())
         for key, value in values.items():
-            if key in sec and key not in kept:
+            if (key in sec or key in added) and key not in kept:
                 sec[key] = value
+    autoinstall = vm.get("autoinstall")
+    if isinstance(autoinstall, dict) and isinstance(autoinstall.get("locale"), str):
+        # the section's final language: the block's, or a per-VM override's that won over it
+        language_command = autoinstall_language_command(autoinstall["locale"])
+        late = autoinstall.get("late_commands")
+        late = list(late) if isinstance(late, list) else []
+        if language_command and language_command not in late:
+            autoinstall["late_commands"] = [*late, language_command]
     preseed = vm.get("preseed_config")
     if isinstance(preseed, dict) and locale.get("language"):
         command = preseed_locale_command(locale["language"])

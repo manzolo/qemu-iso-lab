@@ -2128,6 +2128,17 @@
         }
       ]
     },
+    "ubuntu-26.10": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c383cf264afc4ce3df9f7edb300cb242bf398b73c53b3d6e6decb475b4bf1911",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-16",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "ubuntu-8.04": {
       "version": "1.0.0",
       "fingerprint": "sha256:133bed0020727c29069c98a9d4e43bca4eeaacd6019d69ec0732c0cf83494b44",

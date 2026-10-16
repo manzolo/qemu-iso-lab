@@ -1,0 +1,60 @@
+{
+  "bases": {
+    "ubuntu-26.10-base": {
+      "extends": "ubuntu-desktop-base",
+      "meta": {
+        "release_model": "interim"
+      },
+      "iso": "isos/ubuntu-26.10-live-server-amd64.iso",
+      "iso_url": "https://releases.ubuntu.com/26.10/ubuntu-26.10-live-server-amd64.iso",
+      "iso_sha256": "c8e9d797f718404bdb1e282f8466fe6f5f2e9f03c814bdf11b31326d45200929",
+      "vmport": false,
+      "disk": {
+        "size": "35G"
+      }
+    }
+  },
+  "vms": {
+    "ubuntu-26.10": {
+      "name": "Ubuntu 26.10 Desktop (unattended, autoinstall)",
+      "extends": "ubuntu-26.10-base",
+      "meta": {
+        "slug": "ubuntu",
+        "status": "unattended",
+        "verified": "2026-10-16",
+        "version": "1.0.0"
+      },
+      "notes": "Ubuntu 26.10 (Stonking Stingray, interim release of 2026-10-15): Ubuntu Server 26.10 autoinstall plus the ubuntu-desktop metapackage, the same recipe as ubuntu-26.04 (gdm3 autologin drop-in, the user in the autologin and nopasswdlogin groups, a ttyS0 getty, a post-install that asserts an active local graphical session). The interim releases live in ubuntu-interim.json, outside the LTS series of ubuntu-releases: nine months of support, then the next one replaces it. Live PASS 2026-10-16 in 10.5 min on the day after the release (kernel 7.3, GNOME Shell 51, systemd 261): the 26.04 recipe works unchanged, subiquity resolves ubuntu-desktop from autoinstall 'packages' and gdm3.service still answers as an alias of gdm.service.",
+      "autoinstall": {
+        "hostname": "ubuntu-2610",
+        "packages": [
+          "ubuntu-desktop",
+          "spice-vdagent",
+          "qemu-guest-agent"
+        ]
+      },
+      "cloud_init": {
+        "hostname": "ubuntu-2610",
+        "write_files": [
+          {
+            "path": "/etc/gdm3/custom.conf",
+            "permissions": "0644",
+            "content": "[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin={{user}}\n"
+          }
+        ],
+        "runcmd": [
+          "for dm in gdm3 gdm lightdm sddm; do systemctl list-unit-files \"$dm.service\" >/dev/null 2>&1 && systemctl enable \"$dm\" && break; done",
+          "groupadd -f autologin; groupadd -f nopasswdlogin; usermod -aG autologin,nopasswdlogin {{user}} || true",
+          "systemctl enable --now serial-getty@ttyS0.service"
+        ]
+      },
+      "ssh_provision": {
+        "hostname": "ubuntu-2610",
+        "ssh_host_port": 2372,
+        "post_install_run": [
+          "~/bin/verify-desktop --user \"{{user}}\" --service gdm3.service --package-manager dpkg --package ubuntu-desktop"
+        ]
+      }
+    }
+  }
+}

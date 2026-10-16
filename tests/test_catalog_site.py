@@ -180,7 +180,7 @@ class CatalogSiteTests(unittest.TestCase):
         release, exact, ubuntu, debian, desktop, arch, all_profiles, empty = json.loads(result.stdout)
         self.assertEqual(release[0], "ubuntu-26.04")
         by_name = {p["name"]: p for p in self.data["profiles"]}
-        self.assertTrue(all("ubuntu" in name and "26.04" in by_name[name]["label"] for name in release), release)
+        self.assertTrue(all("ubuntu" in name and ("26.04" in by_name[name]["label"] or "26.10" in by_name[name]["label"]) for name in release), release)  # 26.10 joined 2026-10-16
         self.assertIn("kubuntu-26.04", release)
         self.assertNotIn("ubuntu-24.04", release)
         self.assertEqual(exact[0], "ubuntu-26.04")

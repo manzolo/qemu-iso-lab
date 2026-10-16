@@ -134,12 +134,19 @@ class LocaleRenderingTests(BaseVmctlTestCase):
                     self.assertEqual(files["late_command.sh"].count(run), 1)  # run once (the WARN message names it too)
                 if "autounattend.xml" in files:
                     self.assertNotIn("<UILanguage>it-IT</UILanguage>", files["autounattend.xml"])  # the medium's language stays
+                if vm.get("autoinstall") is not None:
+                    # the base sections carry no `locale`: the language must arrive all the same (2026-10-16)
+                    self.assertIn('"locale": "it_IT.UTF-8"', files["user-data"])
+                    self.assertEqual(files["user-data"].count("check-language-support -l it "), 1)  # GNOME was half English without the packs
 
     def test_the_default_carries_no_personal_locale_and_the_identity_reaches_every_flow(self):
         for name, (vm, files) in self.rendered({"vms": {}}).items():
             with self.subTest(name=name, variant="default"):
                 self.assertNotIn(config.preseed_locale_command(LOCALE["language"]), files.get("late_command.sh", ""))
                 self.assertNotIn(PROBE_USER, "\n".join(files.values()))
+                if vm.get("autoinstall") is not None:
+                    self.assertIn('"locale": "en_US.UTF-8"', files["user-data"])
+                    self.assertNotIn("check-language-support", files["user-data"])
         for name, (vm, files) in self.rendered(PERSONAL).items():
             text = "\n".join(files.values())
             with self.subTest(name=name, variant="personal"):
