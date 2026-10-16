@@ -168,7 +168,7 @@ let startWanted = readHash().start;
 // Opened from a lab card (#lab=<group>): the page is that lab's, and shows its addresses.
 const labName = readHash().lab;
 let S = { vms: [] }, loaded = false;  // the dashboard snapshot (/api/state); loaded once it arrived
-const local = new Map();              // name -> "start" | "stop" | "link" submitted here, until the state shows it
+const local = new Map(), localAt = new Map();              // name -> "start" | "stop" | "link" submitted here, until the state shows it
 const frames = new Map();             // name -> pane element (iframes must survive re-renders)
 // Drops inside a console are handled by that iframe. Forward drops on its outer
 // title bar to the same handler, without ever broadcasting files to other panes.
@@ -305,7 +305,7 @@ async function paneAction(name, act) {
 async function startVm(name) {
   const r = rowOf(name);
   if (!r || r.running || busy(r) || !r.installed) return;
-  local.set(name, "start"); render();
+  local.set(name, "start"); localAt.set(name, Date.now()); render();
   try { await api("/api/run", { args: ["start", name, "--headless", "--background"] }); }
   catch (e) { local.delete(name); toast(e.message, true); }
   schedulePoll(0);
@@ -316,6 +316,10 @@ function renderPane(name) {
   if (r && !icon.innerHTML) icon.innerHTML = catalogIcon(osIconKey(r));
   // Clear a local verdict once the state agrees with it.
   if (local.get(name) === "start" && r?.running) local.delete(name);
+  // A start whose job failed never runs: past the snapshot cache (4 s) a failed, cancelled or
+  // interrupted job ends "Starting…", and a minute without the VM ends it anyway.
+  const age = Date.now() - (localAt.get(name) || 0);
+  if (local.get(name) === "start" && r && ((age > 6000 && /^(failed|cancelled|interrupted)/.test(r.job_status || "")) || age > 60000)) { local.delete(name); toast(`${name} did not start: see its job log in the dashboard.`, true); }
   if (local.get(name) === "stop" && r && !r.running) local.delete(name);
   const starting = local.get(name) === "start", stopping = local.get(name) === "stop";
   let state, cls;

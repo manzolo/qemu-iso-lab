@@ -144,7 +144,7 @@ const server = createServer(async (req,res) => {
     let body=''; for await (const chunk of req) body+=chunk;
     if (holdRun) await new Promise(resolve=>releaseRun=resolve);
     requests.push(JSON.parse(body)); res.statusCode=failRun ? 400 : 200;
-    if (!failRun) { if (dynamicVmJobs && ['start','stop'].includes(requests.at(-1).args[0])) jobId='vm:'+requests.at(-1).args[1]; jobStatus='running'; jobCommand='vmctl '+requests.at(-1).args.join(' '); }
+    if (!failRun) { if (dynamicVmJobs && ['start','android-live','stop'].includes(requests.at(-1).args[0])) jobId='vm:'+requests.at(-1).args[1]; jobStatus='running'; jobCommand='vmctl '+requests.at(-1).args.join(' '); }
     return res.end(JSON.stringify(failRun ? {error:'Fixture rejected the command'} : {job:jobId,command:jobCommand}));
   }
   res.statusCode=404; res.end('{}');
@@ -287,13 +287,60 @@ try {
   assert.equal(liveActions.find(a=>a.label==='Start live session').afterStart, 'detached');
   assert.equal(liveActions.find(a=>a.label==='Start live session and open console here').afterStart, 'inline');
   assert(!liveActions.some(a=>['provision','install'].includes(a.args?.[0])));
+  const beforeLiveJob = [jobId, jobStatus, jobCommand, dynamicVmJobs, requests.slice()];
+  dynamicVmJobs = true;
+  const livePopupEvent = page.waitForEvent('popup');
+  await page.getByRole('button', {name:'Start live session', exact:true}).click();
+  const livePopup = await livePopupEvent;
+  await page.waitForFunction(()=>!submittingVms.size);
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(), 'Starting');
+  assert.equal(await page.locator('#activity-label').textContent(), 'Starting…');
+  assert.match(await page.locator('#job-bar-status').textContent(), /Starting/);
+  assert(!livePopup.isClosed(), 'The reserved Android console stays open during startup');
+  jobStatus = 'completed';
+  await page.evaluate(()=>refreshJobs());
+  await page.waitForFunction(()=>stateRefresh===null && !jobsRefreshing);
+  for (let poll=0; poll<2; poll++) {
+    await page.evaluate(async()=>{ await refreshJobs(); await refresh(true); });
+    assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(), 'Starting', 'A completed live-launch job plus stale stopped state is still Starting');
+    assert(await page.locator('#job-bar').isVisible());
+    assert.equal(await page.getByRole('button', {name:'Start live session', exact:true}).count(), 0);
+    assert(!livePopup.isClosed());
+  }
+  failState = true;
+  await page.evaluate(()=>refresh(true));
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(), 'Starting');
+  failState = false;
   state.vms[1].running = true;
   await page.evaluate(()=>refresh(true));
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(), 'Running');
+  assert(await page.locator('#job-bar').isHidden());
+  await livePopup.waitForFunction(()=>document.getElementById('vnc-status')?.textContent==='Connected');
+  await livePopup.close();
   assert.deepEqual(await page.evaluate(()=>actionsFor(S.vms.find(r=>r.name==='debian-server')).find(a=>a.terminal).terminal),
     ['android-console','debian-server','--fix-bliss-codecs','--no-audio']);
+  // A command which exits without a confirmed VM must explain the mismatch, not show Stopped.
+  state.vms[1].running = false;
+  await page.evaluate(async()=>{ await refresh(true); await run(['android-live','debian-server'], false, 'inline'); });
+  jobStatus = 'completed';
+  await page.evaluate(()=>refreshJobs());
+  await page.waitForFunction(()=>vmJobs.get('debian-server')?.confirming && stateRefresh===null && !jobsRefreshing);
+  await page.evaluate(async()=>{ vmJobs.get('debian-server').finishedAt=Date.now()-31000; await refresh(true); });
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(), 'Start not confirmed');
+  assert.equal(await page.evaluate(()=>pendingConsoles.size), 0);
+  assert(await page.locator('#vnc-dialog').isHidden());
+  await page.evaluate(()=>run(['android-live','debian-server'], false, 'inline'));
+  jobStatus = 'failed (1)';
+  // run() starts its own job refresh: a second call while it is in flight returns at once.
+  await page.waitForFunction(()=>stateRefresh===null && !jobsRefreshing);
+  await page.evaluate(()=>refreshJobs());
+  assert.match(await page.locator('#details .operation-note').textContent(), /Operation failed/);
+  assert.equal(await page.evaluate(()=>pendingConsoles.size), 0);
+  [jobId, jobStatus, jobCommand, dynamicVmJobs, requests] = beforeLiveJob;
+  await page.evaluate(()=>{ vmJobs.delete('debian-server'); });
   state.vms[1] = desktopBeforeAndroid;
-  await page.evaluate(async()=>{ await refresh(true); selected='arch-noctalia'; render(); });
-  check('Android live profiles show live-session actions and the host scrcpy console');
+  await page.evaluate(async()=>{ await refreshJobs(); await refresh(true); selected='arch-noctalia'; render(); });
+  check('Android live startup stays Starting through stale state and disconnects, confirms console opening, and reports failed or unconfirmed launches');
   await page.locator('[data-status-filter=running]').click();
   assert.deepEqual(await page.locator('#rows tr[data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia']);
   await page.locator('[data-status-filter=stopped]').click();
@@ -523,7 +570,11 @@ try {
     await page.waitForFunction(()=>document.getElementById('activity-command')?.textContent==='vmctl group up proxmox-lab');
     await page.evaluate(()=>refreshJobs());
     assert(await card.evaluate(n=>n.classList.contains('busy')),'Busy while the job runs');
-    jobStatus='completed'; await page.evaluate(()=>refreshJobs());
+    // The job ends before a fresh snapshot shows the members: the card keeps its word meanwhile.
+    failState=true; jobStatus='completed'; await page.evaluate(()=>refreshJobs());
+    await page.waitForFunction(()=>stateRefresh===null && !jobsRefreshing);
+    assert(await card.evaluate(n=>n.classList.contains('busy')),'Busy until a snapshot read after the job');
+    failState=false; await page.evaluate(()=>refresh(true));
     await page.waitForFunction(()=>!document.querySelector('.lab.busy'));
     assert.equal((await card.locator('.lab-toolbar button').first().textContent()).trim(),'Start');
     [jobId,jobStatus,jobCommand]=saved; requests=[];

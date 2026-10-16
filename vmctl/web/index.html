@@ -1162,6 +1162,8 @@ function toast(msg, err) { const t = $("toast"); t.textContent = msg; t.classNam
 
 const vmJobs = new Map(), submittingVms = new Set(), checkedVms = new Set();
 let selectionAnchor = "", bulkBusy = false;
+// Live boots have the same pending/confirmed power transition as installed-disk boots.
+function jobAction(command) { return command === "android-live" ? "start" : command; }
 function withVMJob(r) {
   const job = vmJobs.get(r.name);
   return job ? {...r, job_status:job.confirming ? "running" : job.status, job_command:job.command} : r;
@@ -1176,11 +1178,11 @@ function operationNote(r) {
   let note = "";
   if (job?.unconfirmed) note = "The command finished, but the requested VM state was not confirmed. Check the operation log before trying again.";
   else if (job?.confirming) note = "Command finished · checking the VM state. Controls will update when confirmed.";
-  else if (current.job_status === "running" && current.job_command === "start") note = "Starting the VM · waiting for the process to start. The guest OS may still be booting when it shows Running.";
+  else if (current.job_status === "running" && jobAction(current.job_command) === "start") note = "Starting the VM · waiting for the process to start. The guest OS may still be booting when it shows Running.";
   else if (current.job_status === "running" && current.job_command === "stop") note = "Waiting for the guest to shut down. Force stop powers it off immediately.";
   else if (current.job_status === "running" && current.job_command === "clean") note = "Removing the VM disk and generated files. The operation log shows each removed path; checkpoints are kept unless requested.";
   else if (job?.status === "unavailable") note = "The operation is no longer listed. Its log may have been removed; the current VM state is shown above.";
-  else if (job && ["start","stop"].includes(job.command) && !["running","completed"].includes(job.status)) note = "Operation " + job.status + ". Check the operation log; the VM state is shown above.";
+  else if (job && ["start","stop"].includes(jobAction(job.command)) && !["running","completed"].includes(job.status)) note = "Operation " + job.status + ". Check the operation log; the VM state is shown above.";
   return note ? `<p class="operation-note" role="status">${esc(note)}</p>` : "";
 }
 function bindStateLogs(container) {
@@ -1192,12 +1194,12 @@ function installationJob(r) {
 function activeJobLabel(r) {
   if (cancellingJobs.has("vm:" + r.name)) return "Stopping now";
   if (installationJob(r)) return "Installing";
-  return ({start:"Starting", stop:"Stopping", clean:"Cleaning disk", "fetch-iso":"Downloading ISO", prep:"Preparing", checkpoint:"Checkpoint in progress", clone:"Cloning"})[r.job_command] || "Working";
+  return ({start:"Starting", stop:"Stopping", clean:"Cleaning disk", "fetch-iso":"Downloading ISO", prep:"Preparing", checkpoint:"Checkpoint in progress", clone:"Cloning"})[jobAction(r.job_command)] || "Working";
 }
 function stateOf(r) {
   r = withVMJob(r);
   const job = r.job_status;
-  if (job === "running") { const label = activeJobLabel(r); return [label, r.job_command === "start" ? "s-info" : "s-warn"]; }
+  if (job === "running") { const label = activeJobLabel(r); return [label, jobAction(r.job_command) === "start" ? "s-info" : "s-warn"]; }
   const tracked = vmJobs.get(r.name);
   if (tracked?.unconfirmed) return [r.running ? "Still running" : "Start not confirmed", "s-warn"];
   if (r.running) return ["Running", "s-live"];
@@ -1290,7 +1292,7 @@ function actionsFor(r) {
   if (busy) {
     a.forEach(action => { if (action.args) action.disabled = true; });
     a.push({ label:installationJob(r) ? "Installation log" : "View operation log", job:"vm:" + n, icon:"log", tone:"info" });
-    const forceStop = ["start","stop"].includes(r.job_command);
+    const forceStop = ["start","stop"].includes(jobAction(r.job_command));
     if (vmJobs.get(n)?.confirming) a.push({label:"Force stop", args:["stop",n,"--force"], danger:true, primary:true, icon:"power", tone:"bad"});
     else a.push({ label:forceStop ? "Force stop" : "Cancel job", cancelJob:"vm:" + n, forceStop, primary:true, danger:forceStop, icon:"power", tone:"bad", disabled:submittingVms.has(n) || cancellingJobs.has("vm:"+n) });
   }
@@ -1645,7 +1647,10 @@ function labWork(group) {
   const pending = labPending.get(group);
   if (pending) {
     const job = pending.job && knownJobs.find(j => j.id === pending.job);
-    if ((job && job.status !== "running") || (!job && Date.now() - pending.at > 20000)) labPending.delete(group);
+    // A finished job keeps the card's word until a snapshot read after it shows the members: the
+    // cached one still has them stopped, and the card flashed Stopped/Start between the two.
+    if (job && job.status !== "running" && !pending.doneAt) { pending.doneAt = Date.now(); refresh(true); }
+    if ((pending.doneAt && (freshStateFrom >= pending.doneAt || Date.now() - pending.doneAt > 30000)) || (!job && !pending.doneAt && Date.now() - pending.at > 20000)) labPending.delete(group);
     else return pending.action;
   }
   for (const job of knownJobs) {
@@ -1884,7 +1889,7 @@ function openStartedConsoles() {
   for (const [name, request] of pendingConsoles) {
     if (!request.accepted || submittingVms.has(name)) continue;
     const job = vmJobs.get(name), row = S.vms.find(r => r.name === name);
-    if (!job || job.command !== "start" || job.unconfirmed || !["running","completed"].includes(job.status)) {
+    if (!job || jobAction(job.command) !== "start" || job.unconfirmed || !["running","completed"].includes(job.status)) {
       discardPendingConsole(name); continue;
     }
     if (job.status !== "completed" || job.confirming || !row?.running) continue;
@@ -1914,7 +1919,7 @@ async function run(args, danger, afterStart = false, preconfirmed = false) {
   const consoleRequest = afterStart && vm ? {accepted:false, popup:afterStart === "detached" ? reserveConsoleWindow(vm) : null} : null;
   if (vm) { discardPendingConsole(vm); if (consoleRequest) pendingConsoles.set(vm, consoleRequest); }
   if (args[0] === "group" && args[2] && ["up", "install", "reset", "checkpoint", "test"].includes(args[1])) labsFollow.set(args[2], Date.now());
-  if (vm && ["start", "android-live"].includes(args[0])) rowsFollow.set(vm, Date.now());  // the row climbs under "Running first": the list follows it
+  if (vm && jobAction(args[0]) === "start") rowsFollow.set(vm, Date.now());  // the row climbs under "Running first": the list follows it
   const labGroup = args[0] === "group" && args[2] && S.labs.some(l => l.group === args[2]) ? args[2] : null;
   if (labGroup) { labPending.set(labGroup, {action:args[1], job:null, at:Date.now()}); render(); }
   if (vm) { submittingVms.add(vm); vmJobs.set(vm, {status:"running", command:args[0]}); jobsRevision++; render(); }
@@ -2033,9 +2038,9 @@ function renderJobBar() {
   const vm = barJob.id.startsWith("vm:") ? barJob.id.slice(3) : "";
   const tracked = vmJobs.get(vm), command = barJob.command.split(/\s+/)[1];
   const cancelling = cancellingJobs.has(barJob.id);
-  const label = cancelling ? "Cancelling…" : tracked?.confirming ? "Checking VM state…" : ({start:"Starting…",stop:"Stopping…",clean:"Cleaning disk…","fetch-iso":"Downloading ISO…",prep:"Preparing…"})[command] || "Job in progress…";
+  const label = cancelling ? "Cancelling…" : tracked?.confirming ? "Checking VM state…" : ({start:"Starting…",stop:"Stopping…",clean:"Cleaning disk…","fetch-iso":"Downloading ISO…",prep:"Preparing…"})[jobAction(command)] || "Job in progress…";
   $("job-bar-status").textContent = label + (vm ? " · " + vm : "");
-  $("job-bar-status").className = "state busy " + (command === "start" ? "s-info" : "s-warn");
+  $("job-bar-status").className = "state busy " + (jobAction(command) === "start" ? "s-info" : "s-warn");
   $("job-bar-command").textContent = barJob.command;
   $("job-bar-command").title = barJob.command;
   $("job-bar-cancel").textContent = tracked?.confirming ? "Force stop" : cancelling ? "Cancelling…" : "Cancel job";
@@ -2058,7 +2063,7 @@ function renderActivity() {
   $("activity").dataset.status = j.status === "running" ? "running" : j.status === "completed" ? "completed" : "failed";
   $("activity-symbol").textContent = j.status === "running" ? "" : j.status === "completed" ? "✓" : "!";
   const action = j.command.split(/\s+/)[1];
-  $("activity-label").textContent = cancelling ? "Cancelling…" : j.status === "running" ? ({start:"Starting…",stop:"Stopping…",clean:"Cleaning disk…","fetch-iso":"Downloading…",prep:"Preparing…"})[action] || "Working…" : j.status === "completed" ? "Completed" : "Needs attention";
+  $("activity-label").textContent = cancelling ? "Cancelling…" : j.status === "running" ? ({start:"Starting…",stop:"Stopping…",clean:"Cleaning disk…","fetch-iso":"Downloading…",prep:"Preparing…"})[jobAction(action)] || "Working…" : j.status === "completed" ? "Completed" : "Needs attention";
   $("activity-toggle").setAttribute("aria-label", `Latest activity: ${$("activity-label").textContent}. ${j.command}`);
   $("activity-toggle").title = j.command;
   $("activity-status").textContent = tracked?.confirming ? "Command finished · checking VM state" : cancelling ? "Cancelling…" : ({running:"Running in background", completed:"Completed", cancelled:"Cancelled", interrupted:"Interrupted"})[j.status] || j.status;
@@ -2102,7 +2107,7 @@ async function refreshJobs() {
       if (submittingVms.has(vm)) continue;
       if (vmJobs.get(vm)?.status === "running" && job.status !== "running") finished = true;
       const previous = vmJobs.get(vm), command = job.command.split(/\s+/)[1] || "";
-      const lifecycle = ["start", "stop"].includes(command);
+      const lifecycle = ["start", "stop"].includes(jobAction(command));
       // A completed command and a cached VM snapshot are separate observations.
       // Keep the transition until a fresh snapshot requested after completion confirms it.
       const confirming = lifecycle && job.status === "completed" && previous?.command === command
@@ -2490,7 +2495,7 @@ async function retryConsole(generation, reason) {
   const info = await inspectConsole(consoleVm, generation);
   if (generation !== consoleGeneration || !$("vnc-dialog").open) return;
   const row = S.vms.find(r => r.name === consoleVm), current = row && withVMJob(row);
-  const restarting = current?.job_status === "running" && (current.job_command === "start" || installationJob(current));
+  const restarting = current?.job_status === "running" && (jobAction(current.job_command) === "start" || installationJob(current));
   if (info?.running === false && !restarting) {
     const vm = consoleVm;
     if (consoleEmbedded) { consoleStatus("Stopped", "s-muted", vm + " is stopped. The console comes back by itself when it runs again."); return; }
@@ -3965,7 +3970,7 @@ document.addEventListener("keydown", (e) => {
   const rows = visible(), i = rows.findIndex((r) => r.name === selected);
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const r = rows[Math.max(0, Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; if (r) { selected = r.name; render(); document.querySelector("tr.sel")?.scrollIntoView({ block: "nearest" }); } }
 });
-let stateRefresh = null, freshRequested = false;
+let stateRefresh = null, freshRequested = false, freshStateFrom = 0;  // when the last fresh snapshot was requested
 // Offline: no answer at all (vmctl web stopped: fetch rejects with no status) is said at once; an
 // HTTP error only from the second failure in a row (a busy server is not a dead one); 401 means a
 // new server with a new token, which this page's URL can never reach.
@@ -3999,17 +4004,18 @@ async function refresh(fresh = false) {
     do {
       const force = freshRequested, revision = jobsRevision;
       freshRequested = false;
-      const pending = new Map([...vmJobs].filter(([,j]) => j.confirming || j.unconfirmed));
+      const pending = new Map([...vmJobs].filter(([,j]) => j.confirming || j.unconfirmed)), requestedAt = Date.now();
       try {
         const next = await api("/api/state" + (force ? "?fresh=1" : ""));
         if (revision !== jobsRevision) { freshRequested = true; continue; }
         S = next;
+        if (force) freshStateFrom = requestedAt;
         // The first snapshot decides the opening view: My VMs while the selection has names.
         if (!filterSettled) { filterSettled = true; if (S.vms.some(r => r.mine)) setFilter("mine"); }
         if (force) for (const [name, job] of pending) {
           const current = vmJobs.get(name), row = S.vms.find(r => r.name === name);
           if (!row || !(current?.confirming || current?.unconfirmed) || current.finishedAt !== job.finishedAt) continue;
-          const confirmed = row.running === (job.command === "start");
+          const confirmed = row.running === (jobAction(job.command) === "start");
           if (confirmed || (current.confirming && Date.now() - job.finishedAt > 30000)) {
             current.confirming = false; current.unconfirmed = !confirmed;
           }
