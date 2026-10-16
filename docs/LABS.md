@@ -8,6 +8,7 @@ with its own unattended install; the lab adds the segment, the start order, the 
 | Lab | Members | RAM | Install | Guide |
 |---|---|---|---|---|
 | `netlab` | pfSense router, Pi-hole DNS, Lubuntu desktop client | ~8 GB | `vmctl group install netlab` | [NETWORK-LAB.md](NETWORK-LAB.md) |
+| `pxe-lab` | PXE server (dnsmasq, iPXE, nginx, NAT), a client with an empty disk that installs Debian 13 over the network | ~2 GB | `vmctl group install pxe-lab` | [guide](../vms/labs/pxe-lab/guide.en.md), [network boot](#network-boot-bootstrap-netboot) |
 | `proxmox-lab` | three Proxmox VE 9.2 nodes (ZFS mirror, clustered over `pve-lan`), Debian Xfce client with a browser | ~12 GB | `vmctl group install proxmox-lab` | [UNATTENDED.md](UNATTENDED.md#proxmox-ve-bootstrap-proxmox-and-the-proxmox-lab) |
 
 Both are part of the validation matrix: `vmctl check-vms --group netlab` or `--group proxmox-lab`
@@ -167,6 +168,36 @@ a job; it sits under *More lab actions* with *Status*). On the lab card the butt
 lab, its title in the network bar and each member's address on the lab's segment next to its name. `check-vms` runs the tests too: when every member of a lab with tests was in the run and
 passed, the members start on their fresh disks and a `lab-<name>` row records the outcome (SKIP
 when a member did not pass), like the `cluster-<name>` row of a Proxmox cluster.
+
+## Network boot (`bootstrap-netboot`)
+
+A lab member can install itself over the network from another member, the way the `pxe-lab`
+client does. Its profile has no `iso`; instead:
+
+```json
+"networks": [
+  {"id": "lan", "type": "segment", "name": "pxe-lan", "boot": true},
+  {"id": "nat", "type": "user", "ssh": true}
+],
+"netboot_config": {
+  "server": "pxe-lab-server",
+  "payload_dir": "/srv/pxe/www/debian",
+  "payload_url": "http://172.20.9.1/debian",
+  "ready_command": "systemctl is-active --quiet dnsmasq nginx"
+},
+"preseed_config": { "...": "the d-i answers, as for bootstrap-preseed" }
+```
+
+`"boot": true` marks the NIC the firmware netboots from (one per profile, on a segment: QEMU's NAT
+has no PXE server). `vmctl bootstrap-netboot <vm>` starts the server when it is not running (and
+stops it again at the end), waits for `ready_command`, renders the preseed and its late script
+with the d-i renderer of `bootstrap-preseed` and copies them into `payload_dir` over SSH, then
+boots the client from the netboot NIC (`bootindex=1`, its iPXE ROM). The disk keeps the plain
+`if=virtio` attachment of every other boot: pinning it with a bootindex moves every NIC one PCI
+slot, and the interface names the installer writes no longer match the installed system.
+`vmctl start` pins nothing and boots the disk. The completion token on the serial console, the natural power-off and the SSH
+post-install over the second NIC are those of every other flow. vmctl never answers DHCP on the
+segment: DHCP, TFTP, the boot menu and the installer are the lab's, which is what the lab teaches.
 
 ## Your own lab
 

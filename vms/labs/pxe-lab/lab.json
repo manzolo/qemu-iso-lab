@@ -1,0 +1,105 @@
+{
+  "title": "PXE lab: a machine with an empty disk installs Debian over the network",
+  "summary": "A server and a diskless client on an isolated segment (172.20.9.0/24). The server is every piece of a network install: dnsmasq answers DHCP and TFTP on the segment only, iPXE is chained to pxelinux and its menu, nginx serves the Debian 13 installer and its answers, NAT is the segment's way to the mirror. The client has no ISO: its firmware falls through the empty disk to the network, and vmctl bootstrap-netboot installs it end to end. The exercises follow one boot through each component, and the map's packet inspector shows them on the wire. Ported from qlab's pxe-lab.",
+  "members": ["pxe-lab-server", "pxe-lab-client"],
+  "exercises": [
+    {
+      "title": "dnsmasq: DHCP and TFTP on the lab segment, nowhere else",
+      "text": "One program answers both DHCP (67/udp) and TFTP (69/udp). It must never answer on the NAT side: a second DHCP server on someone's network is an outage. interface= and bind-dynamic keep it on pxe-lan; the DNS it hands the clients forwards to the server's own resolver.",
+      "blocks": [
+        {"kind": "check", "where": "pxe-lab-server", "commands": [
+          "cat /etc/dnsmasq.d/pxe-lab.conf",
+          "sudo ss -ulpn | grep dnsmasq          # 67 on pxe-lan only, 69 and 53 on 172.20.9.1 (and loopback)",
+          "ip -4 -br addr                        # enp0s3 is QEMU's NAT, pxe-lan the lab segment"
+        ]}
+      ]
+    },
+    {
+      "title": "What TFTP serves: a small boot loader and its menu",
+      "text": "TFTP is slow and has no security: it carries only the boot loader (lpxelinux.0, 90 KB), its modules and the menu. Anything big (the 40 MB initrd) goes over HTTP. The client can read the TFTP root like the firmware does.",
+      "blocks": [
+        {"kind": "check", "where": "pxe-lab-server", "commands": [
+          "ls -l /srv/pxe/tftp /srv/pxe/tftp/pxelinux.cfg",
+          "cat /srv/pxe/tftp/pxelinux.cfg/default    # KERNEL and INITRD are http:// URLs"
+        ]},
+        {"kind": "do", "where": "pxe-lab-client", "commands": [
+          "curl -s tftp://172.20.9.1/pxelinux.cfg/default | head -5    # the menu, fetched like the firmware does"
+        ]},
+        {"kind": "check", "where": "pxe-lab-server", "commands": [
+          "sudo journalctl -u dnsmasq --since -2min | grep sent    # dnsmasq-tftp logs every file it hands out"
+        ]}
+      ]
+    },
+    {
+      "title": "DORA: Discover, Offer, Request, Ack",
+      "text": "Four messages give the client its address and tell it where to boot from: option 67 (the boot file) and, for iPXE (option 175 in its request), an http:// URL instead of a TFTP file. log-dhcp writes every option. Open the lab map's packet inspector on pxe-lan with the filter 'port 67 or port 68' to see the same exchange on the wire.",
+      "blocks": [
+        {"kind": "do", "where": "pxe-lab-server", "commands": [
+          "sudo journalctl -u dnsmasq -f    # leave it running"
+        ]},
+        {"kind": "do", "where": "pxe-lab-client", "commands": [
+          "IF=$(ip -o -4 addr | awk '/172\\.20\\.9\\./ {print $2}'); echo $IF    # the NIC on the lab segment",
+          "sudo ifdown $IF; sudo ifup $IF    # release and ask again: a full DORA"
+        ]},
+        {"kind": "check", "where": "pxe-lab-server", "commands": [
+          "cat /var/lib/misc/dnsmasq.leases    # expiry, MAC, address, hostname"
+        ]}
+      ]
+    },
+    {
+      "title": "From the firmware to the installer: iPXE, pxelinux, HTTP",
+      "text": "QEMU's NIC boot ROM is iPXE. dnsmasq recognises it (option 175) and sends it boot.ipxe over HTTP; the script chains lpxelinux.0 over TFTP, pxelinux shows the menu, and the menu loads the installer's kernel and initrd over HTTP with BOOTIF on the kernel line, so the installer configures the NIC that netbooted and not the client's NAT one.",
+      "blocks": [
+        {"kind": "check", "where": "pxe-lab-client", "commands": [
+          "curl -s http://172.20.9.1/boot.ipxe",
+          "curl -sI http://172.20.9.1/debian/initrd.gz | grep -i length    # 40 MB: HTTP, not TFTP",
+          "sudo grep -o 'BOOTIF=[^ ]*' /var/log/installer/syslog | head -1    # what the installer was told"
+        ]},
+        {"kind": "check", "where": "pxe-lab-server", "commands": [
+          "sudo tail -5 /var/log/nginx/pxe-lab.access.log"
+        ]}
+      ]
+    },
+    {
+      "title": "The answers: a preseed served over HTTP",
+      "text": "The installer asks no questions because every answer is in preseed.cfg, fetched with url= from the menu. vmctl writes it into the server's web root before each install (the user, the project key, the completion token); its late script comes over HTTP too.",
+      "blocks": [
+        {"kind": "check", "where": "pxe-lab-server", "commands": [
+          "ls -l /srv/pxe/www/debian",
+          "grep -E '^d-i (netcfg|mirror|partman-auto)/' /srv/pxe/www/debian/preseed.cfg"
+        ]},
+        {"kind": "check", "where": "pxe-lab-client", "commands": [
+          "sudo grep -m1 'preseed.cfg' /var/log/installer/syslog"
+        ]}
+      ]
+    },
+    {
+      "title": "The gateway: NAT for the segment",
+      "text": "The segment has no route out of its own. The server forwards and masquerades through its NAT NIC, so the installer reached deb.debian.org; dnsmasq answered its DNS. Bind a request to the client's segment NIC to take that path again.",
+      "blocks": [
+        {"kind": "check", "where": "pxe-lab-server", "commands": [
+          "sysctl net.ipv4.ip_forward",
+          "sudo iptables -t nat -L POSTROUTING -v -n"
+        ]},
+        {"kind": "do", "where": "pxe-lab-client", "commands": [
+          "IF=$(ip -o -4 addr | awk '/172\\.20\\.9\\./ {print $2}'); echo $IF",
+          "curl -s --interface $IF -o /dev/null -w '%{http_code}\\n' http://deb.debian.org/debian/dists/trixie/Release"
+        ]},
+        {"kind": "try", "where": "pxe-lab-server", "commands": [
+          "sudo sysctl -w net.ipv4.ip_forward=0    # the client's request through the segment now hangs; =1 brings it back"
+        ]}
+      ]
+    },
+    {
+      "title": "Install it again, over the network",
+      "text": "From the host: vmctl wipes the client, writes fresh answers into the server and boots the empty disk ahead of the network. Follow it on the client's console, in dnsmasq's log and in the map's packet inspector (port 67 or port 68 or port 69 or port 80).",
+      "blocks": [
+        {"kind": "do", "where": "host", "commands": [
+          "vmctl stop pxe-lab-client",
+          "vmctl clean pxe-lab-client",
+          "vmctl bootstrap-netboot pxe-lab-client    # about ten minutes; the server keeps running"
+        ]}
+      ]
+    }
+  ]
+}

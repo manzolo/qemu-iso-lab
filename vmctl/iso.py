@@ -349,16 +349,27 @@ def _fetch(url: str, destination: Path) -> None:
         raise VMError(f"Failed to download '{url}': {exc}") from exc
 
 
+def has_medium(vm: dict[str, Any]) -> bool:
+    """Whether the profile starts from a file at all: a netboot client (``netboot_config``) has
+    none, its installer comes over the lab segment from the PXE server."""
+    return bool(vm.get("iso") or vm.get("disk_image"))
+
+
 def medium_path(vm: dict[str, Any]) -> Path:
     """The file a profile starts from: its ISO, or the prepared disk image of a ``disk_image``
     profile (SerenityOS publishes no ISO: its image is built from source, then becomes the disk)."""
+    if not has_medium(vm):
+        raise VMError(f"{vm.get('name') or 'this profile'} has no ISO or disk image: it installs over the network (vmctl bootstrap-netboot)")
     image = vm.get("disk_image")
     return runtime.resolve_path(str(image["path"] if image else vm["iso"]))
 
 
 def iso_source_kind(vm: dict[str, Any]) -> str:
     """``cached`` (the file is there), ``download`` (vmctl can fetch it) or ``manual`` (only the
-    user can provide it: Windows media, signed vendor links). No network is used to decide."""
+    user can provide it: Windows media, signed vendor links), or ``network`` (no medium at all:
+    a netboot client installs from its lab's PXE server). No network is used to decide."""
+    if not has_medium(vm):
+        return "network"
     if medium_path(vm).is_file():
         return "cached"
     if vm.get("disk_image"):
@@ -430,6 +441,8 @@ def published_sha256(vm: dict[str, Any]) -> str | None:
 
 
 def ensure_iso(vm: dict[str, Any], dry_run: bool = False) -> Path:
+    if not has_medium(vm):
+        medium_path(vm)  # raises: the profile installs over the network, there is nothing to fetch
     if vm.get("disk_image"):
         # A raw disk image must never go through the ISO checks below: they delete an "invalid" ISO.
         image = medium_path(vm)

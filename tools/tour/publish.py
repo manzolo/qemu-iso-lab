@@ -76,7 +76,7 @@ def main() -> None:
 LAB_TRACKS = [
     ("basics", ["git-lab", "ssh-lab"]),
     ("storage", ["lvm-lab", "mdadm-lab", "zfs-lab"]),
-    ("network", ["netlab", "vpn-lab"]),
+    ("network", ["netlab", "vpn-lab", "pxe-lab"]),
     ("services", ["mysql-lab", "docker-lab", "k8s-lab"]),
     ("virtualization", ["proxmox-lab"]),
 ]

@@ -26,7 +26,7 @@ COMMAND_GROUPS: list[tuple[str, str, list[str]]] = [
     ("Install by hand", "boot an installer and drive it yourself",
      ["provision", "fetch-iso", "iso", "prep", "install", "install-archinstall", "install-unattended", "install-omarchy"]),
     ("Install unattended", "headless, serial-console driven, ends with the VM installed and provisioned",
-     ["bootstrap-unattended", "bootstrap-cloudimg", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
+     ["bootstrap-unattended", "bootstrap-cloudimg", "bootstrap-netboot", "bootstrap-omarchy", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-archinstall", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98", "post-install", "cancel-install"]),
     ("Run", "use a VM that is already installed",
      ["start", "stop", "shell", "console", "android-live", "android-console", "agent", "attach", "link", "record"]),
     ("Libvirt", "hand an installed VM to virt-manager",
@@ -219,6 +219,11 @@ removes only files under isos/, never a medium set here.""")
     p.add_argument("vm", help=VM_HELP)
     p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the first boot to complete (default: 1800)")
     p.set_defaults(func=lifecycle.cmd_bootstrap_cloudimg)
+
+    p = _add(subparsers, "bootstrap-netboot", help="install a lab member over the network: PXE from the lab's server (DHCP, TFTP, d-i), then post-install")
+    p.add_argument("vm", help=VM_HELP)
+    p.add_argument("--timeout", type=int, default=1800, help="seconds to wait for the install to complete (default: 1800)")
+    p.set_defaults(func=lifecycle.cmd_bootstrap_netboot)
 
     p = _add(subparsers, "bootstrap-preseed", help="fully automated Debian preseed install + post-install via serial console")
     p.add_argument("vm", help=VM_HELP)

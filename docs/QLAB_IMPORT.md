@@ -34,7 +34,9 @@ Next, in this order:
    written by `group install`, *Reset lab…* on the card; checkpoints now carry `extra_disks` and keep
    cloud-image overlays as overlays (docs/LABS.md#reset-lab).
 3. **pam-lab** (three VMs with OpenLDAP; never lock out the key-based sudo vmctl needs).
-4. **F6 network boot + pxe-lab** (the last foundation, the biggest).
+4. ~~**F6 network boot + pxe-lab**~~ done 2026-10-16: `"boot": true` on a segment NIC, `netboot_config`,
+   `vmctl bootstrap-netboot` (docs/LABS.md#network-boot-bootstrap-netboot); the pxe-lab with the Debian
+   profile, BIOS client. Ubuntu (casper + autoinstall over HTTP) and Windows (wimboot) are still to do.
 5. Then the other qlab plugins (dns, dhcp, firewall, nginx, postgres, raid, samba, systemd, git...):
    most are one-server labs that fit the docker-lab/lvm-lab pattern unchanged.
 

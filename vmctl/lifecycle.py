@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, cloudimg, ubiquity, cloud_init, config, freebsd, guest_agent, opnsense, slackware, void, agama, popos, mediacheck, haiku, host_setup, iso, labs, libvirt, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
+from vmctl import alpine, archinstall, autoyast, catalog, recorder, checkpoint, clone, cloudimg, ubiquity, cloud_init, config, freebsd, guest_agent, opnsense, slackware, void, agama, popos, mediacheck, haiku, host_setup, iso, labs, libvirt, netboot, netlab, nixos, omarchy, pearos, pfsense, preseed, kickstart, proxmox, pvecluster, qemu, reactos, report, profiledoc, runtime, scheduler, ssh, state, ui, vmstate, windows, windows98, windowsnt4, windowsxp, vmlink
 from vmctl.errors import VMError
 from vmctl import tui_jobs
 from vmctl import isofile
@@ -441,6 +441,8 @@ def local_test_mode(vm: dict[str, Any]) -> tuple[str, str]:
     role = str(meta.get("role") or "").strip()
     if role == "import-template":
         return ("skip", "import-template profile")
+    if netboot.netboot_config(vm) is not None:
+        return ("bootstrap-netboot", "PXE install from the lab's server + post-install")
     if omarchy.omarchy_config(vm) is not None:
         if cloud_init.ssh_access_config(vm) is not None:
             return ("bootstrap-omarchy", "Omarchy cidata install + post-install")
@@ -618,7 +620,7 @@ def local_test_clean_candidates(selected_names: list[str], cfg: dict[str, Any]) 
     for vm_name in selected_names:
         vm = config.get_vm(cfg, vm_name)
         mode, _ = local_test_mode(vm)
-        if mode in {"bootstrap-unattended", "bootstrap-cloudimg", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
+        if mode in {"bootstrap-unattended", "bootstrap-cloudimg", "bootstrap-netboot", "bootstrap-omarchy", "bootstrap-archinstall", "bootstrap-preseed", "bootstrap-ubiquity", "bootstrap-kickstart", "bootstrap-autoyast", "bootstrap-alpine", "bootstrap-pearos", "bootstrap-nixos", "bootstrap-windows", "bootstrap-pfsense", "bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-reactos", "bootstrap-windowsxp", "bootstrap-windows2000", "bootstrap-windowsnt4", "bootstrap-windows98"}:
             candidates.append(vm_name)
     return candidates
 
@@ -823,8 +825,8 @@ def run_local_test_vm(
         if prep_note is not None:
             detail = f"{detail}; {prep_note}"
         return ("passed", detail)
-    if mode in {"bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-cloudimg"}:
-        handler = {"bootstrap-cloudimg": cmd_bootstrap_cloudimg, "bootstrap-freebsd": cmd_bootstrap_freebsd, "bootstrap-opnsense": cmd_bootstrap_opnsense, "bootstrap-slackware": cmd_bootstrap_slackware, "bootstrap-void": cmd_bootstrap_void, "bootstrap-agama": cmd_bootstrap_agama, "bootstrap-popos": cmd_bootstrap_popos,
+    if mode in {"bootstrap-freebsd", "bootstrap-opnsense", "bootstrap-slackware", "bootstrap-void", "bootstrap-agama", "bootstrap-popos", "bootstrap-haiku", "bootstrap-proxmox", "bootstrap-cloudimg", "bootstrap-netboot"}:
+        handler = {"bootstrap-cloudimg": cmd_bootstrap_cloudimg, "bootstrap-netboot": cmd_bootstrap_netboot, "bootstrap-freebsd": cmd_bootstrap_freebsd, "bootstrap-opnsense": cmd_bootstrap_opnsense, "bootstrap-slackware": cmd_bootstrap_slackware, "bootstrap-void": cmd_bootstrap_void, "bootstrap-agama": cmd_bootstrap_agama, "bootstrap-popos": cmd_bootstrap_popos,
                    "bootstrap-haiku": cmd_bootstrap_haiku, "bootstrap-proxmox": cmd_bootstrap_proxmox}[mode]
         try:
             handler(
@@ -1301,6 +1303,8 @@ def disk_status(vm: dict[str, Any]) -> tuple[str, str, str]:
 
 
 def iso_status(vm: dict[str, Any]) -> str:
+    if not iso.has_medium(vm):
+        return "-"  # a netboot client: the installer comes over the network
     iso_path = iso.medium_path(vm)
     return "ready" if iso_path.is_file() else "missing"
 
@@ -3420,6 +3424,86 @@ def lab_unexport(names: list[str], uri: str, args: argparse.Namespace) -> int:
     for name in reversed(names):
         cmd_unexport_libvirt(argparse.Namespace(vm=name, name=None, connect=uri, dry_run=args.dry_run))
     ui.print_status("ok", "Network lab is back on plain QEMU: vmctl lab up")
+    return 0
+
+
+NETBOOT_READY_TRIES = 30
+
+
+def cmd_bootstrap_netboot(args: argparse.Namespace) -> int:
+    """``vmctl bootstrap-netboot <vm>``: install a VM over the network from its lab's PXE server
+    (vmctl/netboot.py). The server must be installed; it is started for the install when it is not
+    running, and stopped again afterwards. vmctl copies the d-i answers to the server and boots the
+    client from its netboot NIC; the lab does DHCP, TFTP and the installer."""
+    cfg = config.load_config()
+    vm = resolved_vm(args, cfg)
+    nb = netboot.check_profile(cfg, args.vm, vm)
+    server_name = str(nb["server"])
+    server = config.get_vm(cfg, server_name)
+    runtime.ensure_vm_dirs(args.vm)
+    ui.print_header(f"Bootstrap over the network (PXE from {server_name}): {args.vm}")
+    if not args.dry_run and vmstate.summary(server_name, server)["label"] not in INSTALLED_LABELS:
+        raise VMError(f"{args.vm} installs from {server_name}, which is not installed: "
+                      f"vmctl group install <lab> installs the server first (or vmctl bootstrap-cloudimg {server_name})")
+    timeout = int(getattr(args, "timeout", 1800))
+    started_server = running_qemu_pid(server_name, server) is None and not args.dry_run
+    if args.dry_run:
+        ui.print_note(f"Would start the PXE server {server_name} if it is not running (vmctl start {server_name} --headless --background)")
+    if started_server:
+        ui.print_note(f"Starting the PXE server {server_name} for the install (stopped again afterwards)")
+        cmd_start(argparse.Namespace(vm=server_name, headless=True, background=True, video=None,
+                                     cloud_init=False, spice_port=None, dry_run=args.dry_run))
+    try:
+        ssh.wait_for_ssh(server, timeout, dry_run=args.dry_run)
+        ready = str(nb.get("ready_command") or "true")
+        for attempt in range(NETBOOT_READY_TRIES):
+            try:
+                runtime.run(ssh.remote_shell_cmd(server, ready, dry_run=args.dry_run), dry_run=args.dry_run,
+                            quiet=True, show_command=attempt == 0, timeout_sec=30)
+                break
+            except (VMError, subprocess.CalledProcessError):
+                if attempt == NETBOOT_READY_TRIES - 1:
+                    raise VMError(f"{server_name} is not ready to serve the netboot ({ready} kept failing)") from None
+                time.sleep(2)
+        for filename, content in netboot.payloads(args.vm, vm).items():
+            runtime.run(netboot.upload_command(server, str(nb["payload_dir"]), filename, dry_run=args.dry_run),
+                        dry_run=args.dry_run, stdin_text=content)
+        ui.print_status("ok", f"Answers for {args.vm} served by {server_name} at {netboot.payload_url(nb, 'preseed.cfg')}")
+
+        disk_exists = runtime.resolve_path(vm["disk"]["path"]).exists()
+        ensure_vm_disk(vm, dry_run=args.dry_run)
+        vmstate.begin_install(args.vm, "bootstrap-netboot", dry_run=args.dry_run)
+        reset_vm_nvram(vm, dry_run=args.dry_run)
+        install_qemu_args = qemu.common_args(
+            vm, None, dry_run=args.dry_run, accel=automation_accel(vm), headless=True, serial_stdio=True,
+            no_reboot=True, allow_missing_disk=args.dry_run and not disk_exists, enable_clipboard=False,
+            network_phase="install", nic_bootindex=netboot.NIC_BOOTINDEX,
+        )
+        ui.print_note(f"Booting {args.vm} from the network (segment {netboot.boot_nic(vm)['name']}) — waiting for the completion token...")
+        serial_log = runtime.resolve_path(f"artifacts/{args.vm}/logs/bootstrap-serial.log")
+        qemu.run_and_expect(
+            install_qemu_args, expected_text=netboot.BOOTSTRAP_COMPLETE_TOKEN, timeout_sec=timeout,
+            dry_run=args.dry_run, log_path=serial_log, fail_on=preseed.DI_FAILURES,
+        )
+        vmstate.complete_install(args.vm, "bootstrap-netboot", vm, dry_run=args.dry_run)
+        ui.print_status("ok", "Installation complete — starting installed VM for post-install")
+        # The server stays up through the post-install: the client takes its lab address from its DHCP.
+        pid_path, log_path = prepare_background_vm_slot(args.vm, dry_run=args.dry_run)
+        run_qemu_args = qemu.common_args(
+            vm, None, dry_run=args.dry_run, accel=automation_accel(vm), headless=True,
+            allow_missing_disk=args.dry_run, network_phase="install",
+            serial_socket=qemu.serial_socket_path(vm),
+            serial_log=runtime.resolve_path(f"artifacts/{args.vm}/logs/post-install-serial.log"),
+        )
+        pid = runtime.run_background(run_qemu_args, log_path, dry_run=args.dry_run, stderr_path=companion_stderr_log_path(log_path))
+        if pid is not None:
+            pid_path.write_text(f"{pid}\n", encoding="utf-8")
+            ui.print_kv("pid", str(pid))
+        report.phase(args, "post-install")
+        run_post_install(args.vm, vm, timeout, dry_run=args.dry_run)
+    finally:
+        if started_server:
+            cmd_stop(argparse.Namespace(vm=server_name, dry_run=args.dry_run))
     return 0
 
 

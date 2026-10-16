@@ -53,6 +53,17 @@ Every tracked profile has `meta.status`:
 
 Recorded dates:
 
+- 2026-10-16: the pxe-lab (`pxe-lab-server`, `pxe-lab-client`) and F6 of docs/QLAB_IMPORT.md,
+  network boot: `vmctl bootstrap-netboot`. From clean disks, `vmctl group install pxe-lab` installed
+  the server (cloud image + `setup-pxe-server.sh`), then the client over the network (iPXE ROM →
+  dnsmasq DHCP → boot.ipxe over HTTP → lpxelinux.0 over TFTP → menu → Debian 13 d-i over HTTP,
+  the preseed and late script written by vmctl into the server's web root, the mirror through the
+  server's NAT), and `vmctl group test pxe-lab` passed 6/6 scripts, 55 checks. Three runs before
+  that each found one thing: dnsmasq on Ubuntu had no upstream DNS (`no-resolv` + `server=127.0.0.53`),
+  a disk bootindex shifted every NIC one PCI slot so the installed system's interface names did not
+  match the installer's (the disk now keeps `if=virtio`, only the NIC gets `bootindex=1`), and the
+  segment address arrives two seconds after SSH (dhcpcd probes it first: the check waits).
+
 - 2026-10-16: `ubuntu-26.10` (Stonking Stingray, released 2026-10-15), the first interim release
   in the catalog, in its own file `ubuntu-interim.json` (base `ubuntu-26.10-base`, `release_model:
   interim`, SSH 2372) and outside `ubuntu-releases`, which stays one desktop per LTS. The

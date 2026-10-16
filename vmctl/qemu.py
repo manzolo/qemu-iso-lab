@@ -443,9 +443,12 @@ def network_specs(vm: dict[str, Any], phase: str = "runtime") -> list[dict[str, 
         if mode != "user":
             raise VMError(f"Unsupported network mode: {mode}")
         return [{"id": "n1", "type": "user", "phase": "both", "ssh": True, "hostfwd": [], "legacy": True,
-                 "device": str(vm.get("network_device", "virtio-net-pci")), "mac": None, "name": None, "mcast": None}]
+                 "device": str(vm.get("network_device", "virtio-net-pci")), "mac": None, "name": None, "mcast": None,
+                 "boot": False}]
     if not isinstance(raw, list) or not raw:
         raise VMError("networks must be a non-empty list of NIC objects")
+    if sum(1 for entry in raw if isinstance(entry, dict) and entry.get("boot")) > 1:
+        raise VMError("networks: at most one NIC may declare \"boot\": true (the one the firmware netboots from)")
     specs: list[dict[str, Any]] = []
     ssh_seen = False
     for index, entry in enumerate(raw):
@@ -480,6 +483,7 @@ def network_specs(vm: dict[str, Any], phase: str = "runtime") -> list[dict[str, 
             "id": str(entry.get("id") or f"net{slot}"), "type": kind, "phase": nic_phase, "ssh": ssh,
             "hostfwd": forwards, "legacy": False, "device": str(entry.get("device") or vm.get("network_device", "virtio-net-pci")),
             "mac": mac or default_nic_mac(vm, slot), "name": name, "mcast": entry.get("mcast"),
+            "boot": bool(entry.get("boot", False)),
         })
     if not specs:
         raise VMError(f"networks: no NIC is active in the {phase} phase")
@@ -573,7 +577,10 @@ def host_ports(vm: dict[str, Any], phase: str | None = None) -> frozenset[int]:
     return frozenset(ports)
 
 
-def network_args(vm: dict[str, Any], phase: str = "runtime") -> list[str]:
+def network_args(vm: dict[str, Any], phase: str = "runtime", nic_bootindex: int | None = None) -> list[str]:
+    """The ``-netdev``/``-device`` pairs of *vm*. *nic_bootindex* puts the NIC that declares
+    ``"boot": true`` in the firmware boot order (its iPXE option ROM netboots: ``bootstrap-netboot``);
+    without it no NIC is pinned and the disk boots."""
     args: list[str] = []
     ssh_cfg = cloud_init.ssh_access_config(vm)
     for spec in network_specs(vm, phase):
@@ -588,6 +595,8 @@ def network_args(vm: dict[str, Any], phase: str = "runtime") -> list[str]:
         device = f"{spec['device']},netdev={spec['id']}"
         if not spec["legacy"]:
             device += f",mac={spec['mac']}"
+        if nic_bootindex is not None and spec["boot"]:
+            device += f",bootindex={nic_bootindex}"
         args += ["-netdev", netdev, "-device", device]
     return args
 
@@ -913,7 +922,7 @@ def common_args(
     headless: bool = False, serial_stdio: bool = False, no_reboot: bool = False,
     allow_missing_disk: bool = False, enable_clipboard: bool = True, spice_port: int | None = None,
     disk_bootindex: int | None = None, network_phase: str = "runtime",
-    serial_socket: Path | None = None, serial_log: Path | None = None,
+    serial_socket: Path | None = None, serial_log: Path | None = None, nic_bootindex: int | None = None,
 ) -> list[str]:
     if not dry_run:
         runtime.require_command("qemu-system-x86_64")
@@ -976,7 +985,7 @@ def common_args(
                           "-device", "virtserialport,bus=clipboard-serial.0,chardev=vdagent0,name=com.redhat.spice.0"]
         if not headless:
             args += clipboard_args  # Preserve the existing windowed PCI layout.
-    args += network_args(vm, network_phase)
+    args += network_args(vm, network_phase, nic_bootindex=nic_bootindex)
     args += shared_dir_vvfat_args(vm, network_phase)
     if shared_device:
         # virtiofsd must be listening before QEMU starts: it is launched here, right before the caller

@@ -146,7 +146,9 @@ echo "{BOOTSTRAP_COMPLETE_TOKEN}"
 # Let d-i natural poweroff happen
 """
 
-def render_preseed(vm_name: str, vm: dict[str, Any]) -> str:
+def render_preseed(vm_name: str, vm: dict[str, Any], late_script_url: str | None = None) -> str:
+    """The preseed.cfg of *vm*. *late_script_url*: the installer fetches late_command.sh over HTTP
+    (``bootstrap-netboot``: the preseed itself arrives with ``url=``, nothing is in the initrd)."""
     cfg = preseed_config(vm)
     if cfg is None:
         raise VMError("VM profile does not define preseed_config")
@@ -186,6 +188,8 @@ def render_preseed(vm_name: str, vm: dict[str, Any]) -> str:
         partman_disk = f"d-i partman-auto/disk string {disk_device}\n"
         grub_bootdev = str(cfg.get("grub_bootdev") or disk_device).strip()
     extra_block = ("\n# preseed_config.extra\n" + "\n".join(extra_lines) + "\n") if extra_lines else ""
+    late_fetch = (f"wget -q -O /target/tmp/late_command.sh {late_script_url}" if late_script_url
+                  else "cp /late_command.sh /target/tmp/late_command.sh")
 
     pw_directive = ""
     if password_hash:
@@ -240,7 +244,7 @@ d-i grub-installer/only_debian boolean true
 d-i grub-installer/with_other_os boolean true
 d-i grub-installer/bootdev  string {grub_bootdev}
 
-d-i preseed/late_command string cp /late_command.sh /target/tmp/late_command.sh; chmod +x /target/tmp/late_command.sh; in-target /tmp/late_command.sh
+d-i preseed/late_command string {late_fetch}; chmod +x /target/tmp/late_command.sh; in-target /tmp/late_command.sh
 
 d-i finish-install/reboot_in_progress note
 d-i debian-installer/exit/poweroff boolean true

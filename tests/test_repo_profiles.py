@@ -113,7 +113,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # Ubuntu 26.10, the first interim release in the catalog (ubuntu-interim.json): live PASS the day after
         # its release, the 26.04 recipe unchanged.
         verified_ubuntu_2610 = {"ubuntu-26.10",
-                                "blissos-16"}  # Android again on its new ADB port 2373: android-live, android-console, scrcpy recording
+                                "blissos-16",  # Android again on its new ADB port 2373: android-live, android-console, scrcpy recording
+                                "pxe-lab-server", "pxe-lab-client"}  # pxe-lab from clean disks: the client installed over the network, group test 6/6, 55 checks
         # The Proxmox lab, promoted like the network lab: four PASS from clean disks, then the
         # three nodes formed a quorate cluster over pve-lan (vmctl group cluster).
         verified_proxmox_lab = {"proxmox-ve", "proxmox-ve-node2", "proxmox-ve-node3", "proxmox-lab-client"}

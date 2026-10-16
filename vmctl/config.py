@@ -414,6 +414,8 @@ def validate_vm_profile(name: str, vm: dict[str, Any]) -> list[str]:
     for key in ("name", "iso", "disk", "firmware", "video", "memory_mb", "cpus"):
         if key == "iso" and "disk_image" in vm:
             continue  # the medium is a prepared disk image (SerenityOS: built, never installed)
+        if key == "iso" and "netboot_config" in vm:
+            continue  # the installer comes over the lab segment from the PXE server (bootstrap-netboot)
         if key not in vm:
             err(f"missing required field '{key}'")
     image = vm.get("disk_image")

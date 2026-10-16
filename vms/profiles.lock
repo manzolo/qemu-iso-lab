@@ -1649,6 +1649,28 @@
         }
       ]
     },
+    "pxe-lab-client": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:0c3bee8c127b7e6874752ccdd2432bee4455633cd1abd25da09623231526e2af",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-16",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "pxe-lab-server": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:380162c3a44855cc1b1a113098d695b00dfcf4e962fefd9fe2d5b5e3f77ffbff",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-16",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "reactos": {
       "version": "1.0.0",
       "fingerprint": "sha256:c2507bfee538ffdeeca10fbf591485de3f30a76bb4b4c721fa2611d2c179b185",

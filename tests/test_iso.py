@@ -441,6 +441,9 @@ class IsoArchiveTests(BaseVmctlTestCase):
         # The rule this commit set: vmctl downloads what has a public source, and a medium only
         # the user can provide carries iso_help (Windows, the retro media, pearOS's signed links).
         for name, vm in vmctl.config.load_tracked(ROOT / "vms/profiles").items():  # resolved over their bases
+            if not vmctl.iso.has_medium(vm):
+                self.assertIn("netboot_config", vm, f"{name}: no iso and no disk_image, and it does not netboot")
+                continue  # installs over the network from its lab's server (bootstrap-netboot)
             with self.subTest(profile=name):
                 has_source = vm.get("iso_url") or vm.get("iso_urls") or vm.get("iso_discovery")
                 help_text = vm.get("iso_help") or (vm.get("disk_image") or {}).get("help")  # a built image says how
