@@ -1001,6 +1001,21 @@ pre.check { border-left:4px solid var(--ok); } pre.do { border-left:4px solid va
 .kind { display:inline-block; min-width:44px; text-align:center; font-size:11px; font-weight:700; text-transform:uppercase;
         border-radius:6px; padding:1px 6px; margin-right:6px; color:var(--bg); }
 .kind.do { background:var(--accent); } .kind.check { background:var(--ok); } .kind.try { background:var(--warn); }
+pre .line { display:block; position:relative; padding-right:34px; margin:0 -6px; padding-left:6px; border-radius:4px; }
+pre .line:hover { background:rgba(127,127,127,.12); }
+pre .copy { position:absolute; top:50%; right:3px; width:24px; height:22px; margin-top:-11px; padding:0; display:grid; place-items:center;
+            border:1px solid var(--accent); border-radius:5px; background:var(--card); color:var(--accent); cursor:pointer;
+            opacity:0; transition:opacity .12s, background .12s; }
+/* two overlapping sheets, the usual "copy" icon, drawn with the button's own colour */
+pre .copy::before { content:""; width:13px; height:13px; background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linejoin='round'%3E%3Crect x='8' y='8' width='13' height='13' rx='2'/%3E%3Cpath d='M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3'/%3E%3C/svg%3E") center/contain no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linejoin='round'%3E%3Crect x='8' y='8' width='13' height='13' rx='2'/%3E%3Cpath d='M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3'/%3E%3C/svg%3E") center/contain no-repeat; }
+pre .line:hover .copy, pre .copy:focus-visible { opacity:1; }
+pre .copy:hover { background:var(--accent); color:var(--card); }
+pre .copy.done { opacity:1; color:var(--ok); border-color:var(--ok); background:var(--card); }
+pre .copy.done::before { -webkit-mask:none; mask:none; background:none; content:"✓"; width:auto; height:auto; font:bold 13px/1 sans-serif; }
+pre .copy.fail { opacity:1; color:var(--warn); border-color:var(--warn); }
+@media (hover:none) { pre .copy { opacity:.6; } }
 .toc { columns:2; margin:6px 0 10px; padding-left:22px; } .toc li { margin:2px 0; }
 """
 
@@ -1152,11 +1167,58 @@ def render_html(lab: dict[str, Any], generated: datetime | None = None, *, inter
 <h2>Runbook</h2>
 <p class="sub">Start order: {order}. Every command below comes from the same profiles as the map, in the order you would run them: <b>run</b> changes something, <b>check</b> is read-only, <b>try</b> is a reversible experiment.</p>
 {_runbook_html(lab.get("runbook") or [])}
-</main><script id="lab-map-script">{(Path(__file__).parent / "web" / "lab-map.js").read_text()}</script></body></html>
+</main><script id="copy-script">{_COPY_JS}</script><script id="lab-map-script">{(Path(__file__).parent / "web" / "lab-map.js").read_text()}</script></body></html>
 """
 
 
 KIND_LABELS = {"do": "run", "check": "check", "try": "try"}
+
+
+_TRAILING_COMMENT = re.compile(r"\s{2,}#.*$")
+
+# The guides' and the map's command blocks: a hover button copies one command line, without the
+# aligned "    # comment" the guides put after it (Manzolo, 2026-10-17).
+_COPY_JS = """document.addEventListener("click", async (event) => {
+  const button = event.target.closest("button.copy");
+  if (!button) return;
+  const text = button.dataset.copy;
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch (e) {  // no clipboard API outside a secure context (an exported map opened from a file)
+    const area = document.createElement("textarea");
+    area.value = text; area.style.position = "fixed"; area.style.opacity = "0";
+    document.body.append(area); area.select();
+    try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+    area.remove();
+  }
+  button.classList.remove("done", "fail"); button.classList.add(ok ? "done" : "fail");
+  button.title = ok ? "Copied" : "Copy failed: select the line instead";
+  clearTimeout(button._reset);
+  button._reset = setTimeout(() => { button.classList.remove("done", "fail"); button.title = "Copy"; }, 1500);
+});"""
+
+
+def copy_text(line: str) -> str:
+    """What the copy button of a code line puts on the clipboard: the command without its aligned
+    trailing comment; nothing for a blank or comment-only line."""
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return ""
+    return _TRAILING_COMMENT.sub("", line).strip()
+
+
+def code_block(lines: list[str], kind: str = "") -> str:
+    """A ``<pre>`` with one block-level span per line and, on a command line, a copy button
+    (escaped like everything else: the attribute carries the command, the text the whole line)."""
+    esc = html.escape
+    rows = []
+    for line in lines:
+        command = copy_text(line)
+        button = (f'<button class="copy" type="button" title="Copy" aria-label="Copy: {esc(command)}" data-copy="{esc(command)}"></button>'
+                  if command else "")
+        rows.append(f'<span class="line">{esc(line) or " "}{button}</span>')
+    attr = f' class="{kind}"' if kind else ""
+    return f"<pre{attr}>{''.join(rows)}</pre>"
 
 
 def _runbook_html(sections: list[dict[str, Any]]) -> str:
@@ -1176,7 +1238,7 @@ def _runbook_html(sections: list[dict[str, Any]]) -> str:
                 label = esc(where)
             kind = block.get("kind", "do")
             parts.append(f'<div class="where"><span class="kind {kind}">{KIND_LABELS.get(kind, kind)}</span> {label}</div>'
-                         f'<pre class="{kind}">{esc(chr(10).join(block["commands"]))}</pre>')
+                         + code_block(block["commands"], kind))
     return "\n".join(parts)
 
 
@@ -1220,7 +1282,7 @@ def render_markdown(text: str) -> str:
             while i < len(lines) and not lines[i].startswith("```"):
                 body.append(lines[i])
                 i += 1
-            out.append(f"<pre>{html.escape(chr(10).join(body))}</pre>")
+            out.append(code_block(body))
             i += 1
             continue
         heading = re.match(r"^(#{1,4})\s+(.*)$", line)
@@ -1292,7 +1354,7 @@ main pre {{ white-space:pre-wrap; }}
 <body><main>
 <p class="sub">{group} · guide · {langs} · <code>{html.escape(content["guides"][lang])}</code></p>
 {body}
-</main></body></html>
+</main><script id="copy-script">{_COPY_JS}</script></body></html>
 """
 
 

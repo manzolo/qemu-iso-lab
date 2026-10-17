@@ -224,9 +224,24 @@ class GuidePageTests(BaseVmctlTestCase):
         self.assertIn(" rel <b>b</b> <code>&lt;i&gt;</code>", out)
         self.assertIn("<th>a</th><th>b</th></tr></thead><tbody><tr><td>1</td><td><code>2</code></td>", out)
         self.assertIn("<ul><li>one</li><li>two</li></ul>", out)
-        self.assertIn("<pre>&lt;x&gt; &amp; y</pre>", out)
+        self.assertIn('<pre><span class="line">&lt;x&gt; &amp; y<button class="copy" type="button" title="Copy" '
+                      'aria-label="Copy: &lt;x&gt; &amp; y" data-copy="&lt;x&gt; &amp; y"></button></span></pre>', out)
         self.assertIn("<blockquote>note</blockquote>", out)
         self.assertNotIn("javascript:", labs.render_markdown("[x](javascript:alert(1))"))
+
+    def test_command_lines_get_a_copy_button_without_their_trailing_comment(self):
+        self.assertEqual(labs.copy_text("vmctl group install docker-lab    # a cloud image"), "vmctl group install docker-lab")
+        self.assertEqual(labs.copy_text("curl -s localhost:8080 | grep '<title>'"), "curl -s localhost:8080 | grep '<title>'")
+        self.assertEqual(labs.copy_text("echo a#b # one space is part of the command"), "echo a#b # one space is part of the command")
+        self.assertEqual(labs.copy_text("   # only a comment"), "")
+        self.assertEqual(labs.copy_text("  "), "")
+        block = labs.code_block(["sudo ifup $IF  # again", "", "# note", 'echo "x" > f'], "do")
+        self.assertTrue(block.startswith('<pre class="do"><span class="line">sudo ifup $IF  # again<button class="copy"'))
+        self.assertIn('data-copy="sudo ifup $IF"', block)
+        self.assertIn('<span class="line"> </span><span class="line"># note</span>', block)
+        self.assertIn('data-copy="echo &quot;x&quot; &gt; f"', block)
+        self.assertEqual(block.count('class="copy"'), 2)
+        self.assertIn("navigator.clipboard.writeText", labs._COPY_JS)
 
     def test_every_tracked_guide_renders_and_the_page_links_the_other_language(self):
         shutil.copytree(ROOT / "vms" / "labs", self.root / "vms" / "labs")
