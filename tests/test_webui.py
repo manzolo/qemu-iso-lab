@@ -504,6 +504,28 @@ class ServerTests(BaseVmctlTestCase):
         self.assertEqual(conn.getresponse().status, 401)
         conn.close()
 
+    def test_recent_removal_requires_token_validates_and_invalidates_snapshot(self):
+        from vmctl import recent
+        recent.record(["qemu-system-x86_64", "-name", "vmctl:testvm"])
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+        conn.request('POST', '/api/recent', body=json.dumps({'name': 'testvm'}))
+        self.assertEqual(conn.getresponse().status, 401)
+        conn.close()
+        self.assertIsNotNone(recent.last_started('testvm'))
+        self.server.RequestHandlerClass.snapshot.value = {'stale': True}
+        for body, status in (({'name': '../escape'}, 400), ({'name': 'nope'}, 400),
+                             ({'name': []}, 400), ({}, 400), ({'name': 'testvm'}, 200),
+                             ({'name': 'testvm'}, 200)):
+            with self.subTest(body=body):
+                conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+                conn.request('POST', '/api/recent', body=json.dumps(body), headers={'X-Vmctl-Token': 'secret-token'})
+                response = conn.getresponse()
+                self.assertEqual(response.status, status)
+                response.read()
+                conn.close()
+        self.assertIsNone(recent.last_started('testvm'))
+        self.assertIsNone(self.server.RequestHandlerClass.snapshot.value)
+
     def test_catalog_endpoint_needs_the_token_validates_and_invalidates_cached_state(self):
         conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
         conn.request('POST', '/api/catalog', body=json.dumps({'action': 'add', 'names': ['testvm']}))

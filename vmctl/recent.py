@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from vmctl import state
+from vmctl.errors import VMError
 
 
 def command_vm(cmd: list[str]) -> str | None:
@@ -54,3 +55,10 @@ def last_started(name: str) -> float | None:
         return stamp / 1_000_000_000 if 0 < stamp < 10**20 else None
     except (OSError, ValueError):
         return None
+
+
+def remove(name: str) -> None:
+    """Forget a launch; the next actual launch records the profile again."""
+    if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", name):
+        raise VMError("Invalid profile name")
+    (state.ROOT / "artifacts" / ".recent" / name).unlink(missing_ok=True)

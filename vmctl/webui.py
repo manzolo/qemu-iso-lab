@@ -982,6 +982,16 @@ class Handler(BaseHTTPRequestHandler):
                 with self.snapshot.lock:
                     self.snapshot.value = None
                 self._json(result)
+            elif path == "/api/recent":
+                from vmctl import recent
+                recent_name = body.get("name")
+                if not isinstance(recent_name, str) or not recent_name:
+                    raise VMError("name must be a profile name")
+                config.get_vm(config.load_config(), recent_name)
+                recent.remove(recent_name)
+                with self.snapshot.lock:
+                    self.snapshot.value = None
+                self._json({"removed": recent_name})
             elif path == "/api/catalog":
                 # My VMs: {"action": add|remove|set|clear, "names": [...]}; the selection is validated
                 # against the catalog and saved in local.json, then the snapshot is rebuilt.

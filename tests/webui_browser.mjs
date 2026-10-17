@@ -139,6 +139,11 @@ const server = createServer(async (req,res) => {
     for (const vm of state.vms) { const named=data.names.includes(vm.name); if (data.action==='add' && named && !vm.mine) { vm.mine=true; added.push(vm.name); } if (data.action==='remove' && named && vm.mine) { vm.mine=false; removed.push(vm.name); } }
     return res.end(JSON.stringify({selected:state.vms.filter(v=>v.mine).map(v=>v.name), added, removed}));
   }
+  if (req.url === '/api/recent') {
+    let body=''; for await (const chunk of req) body+=chunk;
+    const {name}=JSON.parse(body); state.vms.find(v=>v.name===name).last_started=null;
+    return res.end(JSON.stringify({removed:name}));
+  }
   if (req.url === '/api/shutdown') { let body=''; for await (const chunk of req) body+=chunk; shutdownRequests.push(JSON.parse(body)); return res.end(JSON.stringify({stopping:true})); }
   if (req.url === '/api/run') {
     let body=''; for await (const chunk of req) body+=chunk;
@@ -200,8 +205,19 @@ try {
   assert.equal(requests.length,0,'Opening a map action does not submit a lifecycle job');
   await linked.close();
   check('map deep links open browser SSH, explain stopped VMs, select the right lab member; detached SSH and panel-only views');
+  // The first snapshot held back: placeholder rows and panel, not an empty table; all gone once it arrives.
+  holdState=true;
   await page.goto(`http://127.0.0.1:${server.address().port}/?token=fixture`);
+  await page.locator('#rows .skeleton-row').first().waitFor();
+  assert.equal(await page.locator('#list-title').textContent(),'Loading profiles…');
+  assert.equal(await page.locator('#list').getAttribute('aria-busy'),'true');
+  assert(await page.locator('#details .sk').count() > 0,'The machine panel waits with placeholders too');
+  holdState=false; stateWaiters.splice(0).forEach(resolve=>resolve());
   await page.locator('#rows [data-vm]').first().waitFor();
+  assert.equal(await page.locator('#rows .skeleton-row').count(),0);
+  assert.equal(await page.locator('#list').getAttribute('aria-busy'),null);
+  assert.equal(await page.locator('#details .sk').count(),0);
+  check('the first load shows placeholder rows and panel, replaced by the profiles');
   const rowNames = () => page.locator('#rows tr[data-vm]').evaluateAll(rows=>rows.map(row=>row.dataset.vm));
   assert.equal(await page.locator('#vm-sort').inputValue(),'running');
   assert.deepEqual(await rowNames(),['arch-noctalia','alpine-ci','debian-server','proxmox-ve','proxmox-ve-node2']);
@@ -257,7 +273,10 @@ try {
   await page.locator('#search').fill('recent-15');
   assert.deepEqual(await rowNames(), ['recent-15']);
   await page.locator('#search').fill('debian');
-  assert.deepEqual(await rowNames(), [], 'Search filters the last N, not the entire history');
+  assert.deepEqual(await rowNames(), ['debian-server'], 'Matches outside the last N appear in Catalog');
+  assert.equal(await page.locator('#tab-count-recent').textContent(), '0 / 5');
+  assert.match(await page.locator('#list-title').textContent(), /Recent · 0 \/ 5 · \+1 in Catalog/);
+  assert.match(await page.locator('#rows [data-group=catalog]').textContent(), /More matches in Catalog · 1/);
   await page.locator('#search').fill('');
   await page.locator('[data-status-filter=running]').click();
   assert.deepEqual(await rowNames(), ['arch-noctalia']);
@@ -277,6 +296,19 @@ try {
   await page.evaluate(()=>refresh(true));
   await page.locator('[data-filter=all]').click();
   assert.equal(await page.locator('#vm-sort').inputValue(), 'running');
+  state.vms[0].last_started=1900000000;
+  await page.evaluate(()=>refresh(true));
+  await page.locator('[data-filter=recent]').click();
+  await page.locator('#rows [data-vm="arch-noctalia"]').click({button:'right'});
+  await page.locator('#vm-context button', {hasText:'Remove from Recent'}).click();
+  await page.waitForFunction(()=>S.vms.find(v=>v.name==='arch-noctalia').last_started===null);
+  assert.deepEqual(await rowNames(), []);
+  assert.equal(await page.locator('#tab-count-recent').textContent(), '0');
+  await page.reload();
+  await page.locator('[data-filter=recent]').click();
+  assert.deepEqual(await rowNames(), [], 'Removal survives refresh and reload');
+  assert(state.vms[0].running && state.vms[0].installed, 'Removing history leaves the guest alone');
+  await page.locator('[data-filter=all]').click();
   check('recent launches: empty state, newest first, unique rows, limits, filters and reload persistence');
   const desktopBeforeAndroid = {...state.vms[1]};
   Object.assign(state.vms[1], {android_live:true, installed:false, unattended_flow:null, ssh_port:null});
@@ -1473,6 +1505,57 @@ try {
   await page.locator('[data-filter="mine"]').click();
   assert.deepEqual(await page.locator('#rows [data-vm]').evaluateAll(rows=>rows.map(r=>r.dataset.vm)),['arch-noctalia','debian-server']);
   assert.match(await page.locator('#list-title').textContent(),/^My VMs/);
+  const searchFixtures = [
+    machine('ubuntu-26.04', {mine:true, family:'ubuntu'}),
+    machine('ubuntu-26.10', {family:'ubuntu', installed:false, prepared:false, last_started:null}),
+    machine('ubuntu-hidden', {family:'ubuntu', hidden:true, installed:false}),
+    machine('ubuntu-lab', {family:'ubuntu', lab:'fixture-lab'})
+  ];
+  state.vms.push(...searchFixtures);
+  await page.evaluate(()=>refresh(true));
+  await page.locator('#search').fill('UBU');
+  assert.deepEqual(await rowNames(), ['ubuntu-26.04','ubuntu-26.10']);
+  assert.equal(await page.locator('#tab-count-mine').textContent(), '1 / 3');
+  for (const width of [1440,1100,916,768,720,390]) {
+    await page.setViewportSize({width,height:965});
+    const columns = await page.locator('#rows [data-vm="ubuntu-26.10"]').evaluate(row => {
+      const list = document.getElementById('list'), cells = [...row.cells].filter(cell=>getComputedStyle(cell).display!=='none');
+      return {right:cells.at(-1).getBoundingClientRect().right, edge:list.getBoundingClientRect().right,
+        overflow:list.scrollWidth>list.clientWidth};
+    });
+    assert(Math.abs(columns.right-columns.edge)<2, `Rows fill the table at ${width}px without a phantom column`);
+    assert(!columns.overflow, `No horizontal scroll at ${width}px`);
+    if (width===916) {
+      const status=page.locator('#rows [data-vm="ubuntu-26.04"] .installation-status');
+      assert(await status.evaluate(el=>el.getBoundingClientRect().right<=el.closest('td').getBoundingClientRect().right), 'Boot verified fits the state column');
+      await shot('catalog-search-916');
+    }
+  }
+  await shot('catalog-search');
+  assert.equal(await page.locator('#rows [data-group=catalog]').count(), 1);
+  await page.evaluate(()=>refresh(true));
+  assert.equal(await page.locator('#rows [data-group=catalog]').count(), 1, 'Polling reuses the section');
+  await page.locator('#rows [data-vm="ubuntu-26.10"] .profile-name').click();
+  assert.equal(await page.locator('#details .name').textContent(), 'ubuntu-26.10');
+  assert(await page.locator('#profile-mine').isVisible());
+  await page.locator('#search').focus();
+  await page.locator('#search').press('ArrowUp');
+  assert.equal(await page.locator('#details .name').textContent(), 'ubuntu-26.04');
+  await page.locator('[data-status-filter=install]').click();
+  assert.deepEqual(await rowNames(), ['ubuntu-26.10']);
+  await page.locator('[data-status-filter=running]').click();
+  assert.deepEqual(await rowNames(), []);
+  await page.locator('[data-status-filter=all]').click();
+  await page.locator('#search').fill('ubuntu 26.10');
+  assert.deepEqual(await rowNames(), ['ubuntu-26.10']);
+  assert(!(await page.locator('#rows').textContent()).includes('1970'));
+  await page.locator('#search').fill('   ');
+  assert.equal(await page.locator('#rows [data-group=catalog]').count(), 0);
+  await page.locator('#search-clear').click();
+  assert(!(await rowNames()).includes('ubuntu-26.10'));
+  state.vms=state.vms.filter(v=>!searchFixtures.includes(v));
+  await page.evaluate(()=>refresh(true));
+  check('search includes distinct Catalog matches, filters, counts, selection and keyboard navigation');
   assert(await page.locator('#labs-running').isHidden(),'No lab running, no line');
   // A running member of a declared lab stays in the Labs view: one line leads there.
   const labVm=state.vms.find(v=>v.name==='proxmox-ve'); labVm.running=true; labVm.lab='proxmox-lab';

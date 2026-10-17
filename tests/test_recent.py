@@ -31,6 +31,28 @@ class RecentTests(unittest.TestCase):
         self.assertFalse((self.root / "artifacts/testvm").exists())
         self.assertEqual(len(list((self.root / "artifacts/.recent").iterdir())), 2)
 
+    def test_remove_preserves_other_history_and_guest_data_and_allows_new_launch(self):
+        recent.record(self.cmd)
+        recent.record([str(self.executable), "-name", "vmctl:other"])
+        disk = self.root / "artifacts/testvm/disk.qcow2"
+        disk.parent.mkdir()
+        disk.write_bytes(b"guest data")
+        recent.remove("testvm")
+        recent.remove("testvm")
+        self.assertIsNone(recent.last_started("testvm"))
+        self.assertIsNotNone(recent.last_started("other"))
+        self.assertEqual(disk.read_bytes(), b"guest data")
+        recent.record(self.cmd)
+        self.assertIsNotNone(recent.last_started("testvm"))
+
+    def test_remove_rejects_unsafe_names_and_reports_write_errors(self):
+        for name in ("../escape", "/tmp/escape", "", None):
+            with self.subTest(name=name), self.assertRaises(VMError):
+                recent.remove(name)
+        with mock.patch.object(Path, "unlink", side_effect=PermissionError("read only")):
+            with self.assertRaises(PermissionError):
+                recent.remove("testvm")
+
     def test_foreground_and_logged_launches_record(self):
         for logged in (False, True):
             with self.subTest(logged=logged):
