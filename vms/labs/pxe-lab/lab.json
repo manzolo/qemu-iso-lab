@@ -1,7 +1,7 @@
 {
   "title": "PXE lab: a machine with an empty disk installs Debian over the network",
   "summary": "A server and a diskless client on an isolated segment (172.20.9.0/24). The server is every piece of a network install: dnsmasq answers DHCP and TFTP on the segment only, iPXE is chained to pxelinux and its menu, nginx serves the Debian 13 installer and its answers, NAT is the segment's way to the mirror. The client has no ISO: its firmware falls through the empty disk to the network, and vmctl bootstrap-netboot installs it end to end. The exercises follow one boot through each component, and the map's packet inspector shows them on the wire. Ported from qlab's pxe-lab.",
-  "members": ["pxe-lab-server", "pxe-lab-client"],
+  "members": ["pxe-lab-server", "pxe-lab-client", "pxe-lab-client-efi"],
   "exercises": [
     {
       "title": "dnsmasq: DHCP and TFTP on the lab segment, nowhere else",
@@ -91,8 +91,25 @@
       ]
     },
     {
+      "title": "UEFI: the same network, another boot loader",
+      "text": "pxe-lab-client-efi boots OVMF instead of SeaBIOS. Its firmware's PXE says so in DHCP option 93 (client-arch 7, x86-64 UEFI), and dnsmasq answers with Debian's shim (bootnetx64.efi) instead of pxelinux, a BIOS program. The shim loads GRUB over TFTP (from the TFTP root, where the server keeps a copy), GRUB reads its own menu (grub.cfg) from its built-in prefix and loads the installer over HTTP, with BOOTIF built from the MAC it netbooted with. The UEFI client's answers sit in debian-efi/, so the two clients never overwrite each other's.",
+      "blocks": [
+        {"kind": "check", "where": "pxe-lab-server", "commands": [
+          "grep -E 'efi64|dhcp-boot' /etc/dnsmasq.d/pxe-lab.conf",
+          "ls -l /srv/pxe/tftp/debian-installer/amd64",
+          "cat /srv/pxe/tftp/debian-installer/amd64/grub/grub.cfg",
+          "sudo journalctl -u dnsmasq --no-pager | grep -E 'Arch:00007|bootnetx64|grubx64' | tail -5    # the UEFI client's netboot, until the server reboots (exercise 8 makes a new one)"
+        ]},
+        {"kind": "check", "where": "pxe-lab-client-efi", "commands": [
+          "ls /sys/firmware/efi    # exists only on a UEFI boot",
+          "sudo efibootmgr    # the firmware's boot entries: debian, written by the installer",
+          "sudo grep -o 'BOOTIF=[^ ]*' /var/log/installer/syslog | head -1"
+        ]}
+      ]
+    },
+    {
       "title": "Install it again, over the network",
-      "text": "From the host: vmctl wipes the client, writes fresh answers into the server and boots the empty disk ahead of the network. Follow it on the client's console, in dnsmasq's log and in the map's packet inspector (port 67 or port 68 or port 69 or port 80).",
+      "text": "From the host: vmctl wipes a client, writes fresh answers into the server and boots the empty disk from the network. Follow it on the client's console, in dnsmasq's log and in the map's packet inspector (port 67 or port 68 or port 69 or port 80). The same works for pxe-lab-client-efi, through GRUB.",
       "blocks": [
         {"kind": "do", "where": "host", "commands": [
           "vmctl stop pxe-lab-client",

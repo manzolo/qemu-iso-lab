@@ -5,6 +5,8 @@
 #   dnsmasq  DHCP + TFTP, on the lab segment (pxe-lan, 172.20.9.0/24) and nowhere else
 #   iPXE     QEMU's NIC boot ROM is iPXE: it is told to fetch boot.ipxe over HTTP (option 175),
 #            which chains pxelinux over TFTP so the menu and a real TFTP transfer happen
+#   GRUB     a UEFI firmware (DHCP option 93, client-arch 7 or 9) gets Debian's shim + GRUB over
+#            TFTP instead, and GRUB's own menu: pxelinux is a BIOS program
 #   nginx    the Debian installer's kernel and initrd (40 MB: HTTP, not TFTP) and the answers
 #            (preseed.cfg, late_command.sh) that vmctl writes for each install
 #   NAT      the segment has no other way out: the installer reaches the Debian mirror through here
@@ -25,7 +27,7 @@ IMAGES="https://deb.debian.org/debian/dists/${SUITE}/main/installer-amd64/curren
 export DEBIAN_FRONTEND=noninteractive
 
 echo "==> pxe-lab: directories"
-install -d -m 755 "$TFTP/pxelinux.cfg" "$WWW/debian"
+install -d -m 755 "$TFTP/pxelinux.cfg" "$TFTP/debian-installer/amd64" "$WWW/debian" "$WWW/debian-efi"
 
 # dnsmasq's configuration comes first: the package starts the service as it installs, and with
 # its defaults it would bind port 53 everywhere, where systemd-resolved already listens.
@@ -53,10 +55,15 @@ server=127.0.0.53
 enable-tftp
 tftp-root=$TFTP
 
-# A plain PXE ROM gets pxelinux over TFTP. iPXE says who it is with option 175: it gets a script
-# over HTTP instead, or dnsmasq would hand it the boot loader again, forever.
+# A plain BIOS PXE ROM gets pxelinux over TFTP. A UEFI firmware says so with option 93
+# (client-arch 7 or 9, x86-64) and gets Debian's shim, which loads GRUB from the same directory.
+# iPXE says who it is with option 175: it gets a script over HTTP instead, or dnsmasq would hand
+# it the boot loader again, forever. The tags exclude each other: one boot file per client.
 dhcp-match=set:ipxe,175
-dhcp-boot=tag:!ipxe,lpxelinux.0
+dhcp-match=set:efi64,option:client-arch,7
+dhcp-match=set:efi64,option:client-arch,9
+dhcp-boot=tag:!ipxe,tag:!efi64,lpxelinux.0
+dhcp-boot=tag:!ipxe,tag:efi64,debian-installer/amd64/bootnetx64.efi
 dhcp-boot=tag:ipxe,http://$LAN_IP/boot.ipxe
 EOF
 
@@ -101,8 +108,45 @@ wget -q -O "$work/netboot.tar.gz" "$IMAGES/netboot/netboot.tar.gz"
 expected=$(awk '$2 == "./netboot/netboot.tar.gz" {print $1}' "$work/SHA256SUMS")
 actual=$(sha256sum "$work/netboot.tar.gz" | cut -d' ' -f1)
 [ -n "$expected" ] && [ "$expected" = "$actual" ] || { echo "netboot.tar.gz: checksum mismatch" >&2; exit 1; }
-tar -xzf "$work/netboot.tar.gz" -C "$work" ./debian-installer/amd64/linux ./debian-installer/amd64/initrd.gz
+tar -xzf "$work/netboot.tar.gz" -C "$work" ./debian-installer/amd64/linux ./debian-installer/amd64/initrd.gz \
+    ./debian-installer/amd64/bootnetx64.efi ./debian-installer/amd64/grubx64.efi ./debian-installer/amd64/grub
 install -m 644 "$work/debian-installer/amd64/linux" "$work/debian-installer/amd64/initrd.gz" "$WWW/debian/"
+
+echo "==> pxe-lab: UEFI boot loader and menu (TFTP)"
+# Debian's paths, kept under the TFTP root: the GRUB image looks for its modules and grub.cfg in
+# debian-installer/amd64/grub on the server it came from.
+rm -rf "$TFTP/debian-installer/amd64/grub"
+cp -a "$work/debian-installer/amd64/bootnetx64.efi" "$work/debian-installer/amd64/grubx64.efi" \
+    "$work/debian-installer/amd64/grub" "$TFTP/debian-installer/amd64/"
+# The shim asks for grubx64.efi at the TFTP root when dnsmasq serves it (from a slirp bench it
+# asked in its own directory): a copy there, and GRUB still finds its prefix (verified live).
+cp -f "$work/debian-installer/amd64/grubx64.efi" "$TFTP/grubx64.efi"
+cat > "$TFTP/debian-installer/amd64/grub/grub.cfg" <<'EOF'
+# pxe-lab: the UEFI twin of pxelinux.cfg/default, for clients that netbooted with option 93.
+serial --unit=0 --speed=115200
+terminal_input console serial
+terminal_output console serial
+set default=0
+set timeout=30
+insmod http
+insmod regexp
+
+menuentry 'Install Debian (automated, preseed, UEFI)' {
+    # BOOTIF in d-i's form (01-aa-bb-cc-dd-ee-ff) from the MAC GRUB netbooted with, so the
+    # installer configures this NIC and not the client's other one.
+    regexp --set=1:m1 --set=2:m2 --set=3:m3 --set=4:m4 --set=5:m5 --set=6:m6 '^(..):(..):(..):(..):(..):(..)$' "$net_default_mac"
+    echo 'Loading the Debian installer over HTTP...'
+    # Kernel and initrd over HTTP, like the BIOS menu. UEFI clients have their own answers
+    # (debian-efi/): the BIOS client and this one can be installed one after the other.
+    linux (http,LAN_IP)/debian/linux auto=true priority=critical url=http://LAN_IP/debian-efi/preseed.cfg netcfg/choose_interface=auto BOOTIF=01-$m1-$m2-$m3-$m4-$m5-$m6 hostname=pxe-lab-client-efi domain=pxe.lab locale=en_US.UTF-8 language=en country=US keymap=us DEBIAN_FRONTEND=text console=ttyS0,115200 --- console=ttyS0,115200
+    initrd (http,LAN_IP)/debian/initrd.gz
+}
+
+menuentry 'Boot from the local disk' {
+    exit
+}
+EOF
+sed -i "s/LAN_IP/$LAN_IP/g" "$TFTP/debian-installer/amd64/grub/grub.cfg"
 
 cat > "$WWW/boot.ipxe" <<EOF
 #!ipxe
@@ -110,9 +154,14 @@ cat > "$WWW/boot.ipxe" <<EOF
 # pxelinux over TFTP, so the menu and a TFTP transfer really happen. Option 210 is pxelinux's
 # path prefix: without it pxelinux looks for its modules under the HTTP URL it came from.
 set 210:string tftp://$LAN_IP/
+# pxelinux is a BIOS program: iPXE running on UEFI firmware takes GRUB, like the firmware's own PXE.
+iseq \${platform} efi && goto efi || goto bios
+:efi
+chain tftp://$LAN_IP/debian-installer/amd64/bootnetx64.efi || goto direct
+:bios
 chain tftp://$LAN_IP/lpxelinux.0 || goto direct
 :direct
-# pxelinux is a BIOS program: a UEFI client ends up here and boots the installer directly.
+# Neither boot loader started: boot the installer directly.
 echo pxe-lab: pxelinux unavailable, booting the Debian installer directly
 kernel http://$LAN_IP/debian/linux auto=true priority=critical url=http://$LAN_IP/debian/preseed.cfg netcfg/choose_interface=auto BOOTIF=01-\${netX/mac:hexhyp} hostname=pxe-lab-client domain=pxe.lab locale=en_US.UTF-8 language=en country=US keymap=us DEBIAN_FRONTEND=text console=ttyS0,115200 --- console=ttyS0,115200
 initrd http://$LAN_IP/debian/initrd.gz

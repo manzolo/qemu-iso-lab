@@ -10,28 +10,34 @@ server is an Ubuntu 24.04 cloud image.
 | VM | Role | Segment `pxe-lan` | SSH from the host |
 |---|---|---|---|
 | `pxe-lab-server` | dnsmasq (DHCP, DNS, TFTP), nginx, NAT | 172.20.9.1 | `vmctl shell pxe-lab-server` (127.0.0.1:2374) |
-| `pxe-lab-client` | empty disk, installs Debian 13 over the network | DHCP, 172.20.9.100-200 | `vmctl shell pxe-lab-client` (127.0.0.1:2375) |
+| `pxe-lab-client` | BIOS, empty disk, installs Debian 13 over the network | DHCP, 172.20.9.100-200 | `vmctl shell pxe-lab-client` (127.0.0.1:2375) |
+| `pxe-lab-client-efi` | the same with UEFI (OVMF): GRUB instead of pxelinux | DHCP, 172.20.9.100-200 | `vmctl shell pxe-lab-client-efi` (127.0.0.1:2376) |
 
-Each VM has two NICs: QEMU's NAT, for the host's SSH, and `pxe-lan`, the segment the two share.
-The client netboots from `pxe-lan` only; its installer is told which NIC that was (BOOTIF), so it
-never configures the NAT one by mistake.
+Each VM has two NICs: QEMU's NAT, for the host's SSH, and `pxe-lan`, the segment they share.
+The clients netboot from `pxe-lan` only; their installer is told which NIC that was (BOOTIF), so
+it never configures the NAT one by mistake. The two clients differ only in their firmware, which
+is the point: one network, two boot loaders.
+
+The server's menus name the client they install (the BIOS menu `pxe-lab-client`, the GRUB one
+`pxe-lab-client-efi`) and each firmware has its own answers directory: one client per firmware.
 
 ## Start
 
 ```bash
-vmctl group install pxe-lab       # the server (a cloud image, two minutes), then the client over the network (about ten)
+vmctl group install pxe-lab       # the server (a cloud image, two minutes), then each client over the network (about ten each)
 vmctl group status pxe-lab
 vmctl group map pxe-lab --open    # the map: live traffic per NIC, the packet inspector, the exercises
 ```
 
-`group install` installs the server first. The client's install is `vmctl bootstrap-netboot
-pxe-lab-client`: it starts the server if it is not running, writes the client's answers into the
-server's web root, and boots the client from its `pxe-lan` NIC.
+`group install` installs the server first. A client's install is `vmctl bootstrap-netboot
+pxe-lab-client` (or `pxe-lab-client-efi`): it starts the server if it is not running, writes the
+client's answers into the server's web root, and boots the client from its `pxe-lan` NIC.
 
 ## One boot, step by step
 
-1. **The firmware.** For the install, the NIC is the first boot device. Its boot ROM is iPXE
-   (QEMU's network cards all carry it).
+1. **The firmware.** For the install, the NIC is the first boot device. On the BIOS client its
+   boot ROM is iPXE (QEMU's network cards all carry it); on the UEFI client it is OVMF's own PXE,
+   which takes the road of exercise 7.
 2. **DHCP.** iPXE broadcasts a DISCOVER on `pxe-lan`. dnsmasq OFFERs an address from
    172.20.9.100-200 and, because the request carries option 175 (iPXE), a boot file that is an
    `http://` URL: `boot.ipxe`. REQUEST and ACK confirm it.
@@ -107,8 +113,9 @@ sudo tail -5 /var/log/nginx/pxe-lab.access.log                      # on the ser
 ```
 
 `boot.ipxe` sets option 210, pxelinux's path prefix: without it pxelinux would look for its
-modules under the HTTP URL it came from. If the chain fails (a UEFI client cannot run pxelinux,
-a BIOS program), the script boots the installer directly.
+modules under the HTTP URL it came from. pxelinux is a BIOS program: an iPXE running on UEFI
+firmware chains GRUB instead (exercise 7), and if no boot loader starts at all, the script boots
+the installer directly.
 
 ## Exercise 5: the answers
 
@@ -138,7 +145,29 @@ curl -s --interface $IF -o /dev/null -w '%{http_code}\n' http://deb.debian.org/d
 `sudo sysctl -w net.ipv4.ip_forward=0` on the server and the same request hangs; `=1` brings it
 back.
 
-## Exercise 7: install it again
+## Exercise 7: UEFI, the same network with another boot loader
+
+`pxe-lab-client-efi` boots OVMF. Its firmware's PXE says so in DHCP option 93 (client-arch 7,
+x86-64 UEFI), and dnsmasq answers with Debian's shim, `bootnetx64.efi`, instead of pxelinux:
+
+```bash
+grep -E 'efi64|dhcp-boot' /etc/dnsmasq.d/pxe-lab.conf                          # on the server
+ls -l /srv/pxe/tftp/debian-installer/amd64
+cat /srv/pxe/tftp/debian-installer/amd64/grub/grub.cfg
+```
+
+The shim asks for `grubx64.efi` at the TFTP root (the server keeps a copy there), GRUB reads its
+modules and `grub.cfg` from its built-in prefix, `debian-installer/amd64/grub`, and the menu loads the installer over HTTP: `(http,172.20.9.1)/debian/linux`. GRUB
+knows the MAC it netbooted with (`$net_default_mac`, `aa:bb:…`) and `regexp` rewrites it in
+d-i's BOOTIF form, `01-aa-bb-…`. The answers come from `debian-efi/`, next to the BIOS client's.
+
+```bash
+ls /sys/firmware/efi                                                # on pxe-lab-client-efi: UEFI only
+sudo efibootmgr                                                     # the installer's "debian" entry
+sudo grep -o 'BOOTIF=[^ ]*' /var/log/installer/syslog | head -1
+```
+
+## Exercise 8: install it again
 
 From the host:
 
@@ -150,7 +179,8 @@ vmctl bootstrap-netboot pxe-lab-client
 
 Watch it on the client's console (`vmctl attach pxe-lab-client`, or the map's Console button),
 in `journalctl -u dnsmasq -f` on the server, and in the packet inspector with
-`port 67 or port 68 or port 69 or port 80`.
+`port 67 or port 68 or port 69 or port 80`. The same three commands reinstall
+`pxe-lab-client-efi`, through GRUB.
 
 ## Tests
 
@@ -158,13 +188,13 @@ in `journalctl -u dnsmasq -f` on the server, and in the packet inspector with
 vmctl group test pxe-lab
 ```
 
-Six scripts under `vms/labs/pxe-lab/tests/`, one per exercise: dnsmasq's confinement, the TFTP
+Seven scripts under `vms/labs/pxe-lab/tests/`, one per exercise: dnsmasq's confinement, the TFTP
 root and a TFTP transfer, a full DORA, the iPXE chain and the installer's kernel line, the
-installed client, the gateway.
+installed client, the gateway, the UEFI client and its GRUB.
 
 ## Reset
 
 ```bash
-vmctl group reset pxe-lab           # both machines back to the lab-start checkpoint
+vmctl group reset pxe-lab           # every machine back to the lab-start checkpoint
 sudo bash ~/setup-pxe-server.sh     # on the server: configuration and files written again
 ```

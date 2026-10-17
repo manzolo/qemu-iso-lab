@@ -1660,10 +1660,26 @@
         }
       ]
     },
-    "pxe-lab-server": {
-      "version": "1.0.1",
-      "fingerprint": "sha256:32196f52617cc1a7ab0f7ae5f68e73950ca8a9b8b903b21120546fa9d23e039e",
+    "pxe-lab-client-efi": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:a286fd046137c603a8b9782ae9002ddc972c5bf583ff727177a440347f641589",
       "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-17",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "pxe-lab-server": {
+      "version": "1.1.0",
+      "fingerprint": "sha256:b227e6aa835b5dcdb9066ff4f246e723192e15c5671c734c9de40bed9611077d",
+      "history": [
+        {
+          "version": "1.1.0",
+          "date": "2026-10-16",
+          "note": "UEFI clients: dnsmasq tells them apart by option 93 and serves Debian's shim + GRUB over TFTP (grubx64.efi also at the root, where the shim asks for it) with a pxe-lab grub.cfg (installer over HTTP, BOOTIF from the netboot MAC, answers in debian-efi/); boot.ipxe takes GRUB on EFI"
+        },
         {
           "version": "1.0.1",
           "date": "2026-10-16",

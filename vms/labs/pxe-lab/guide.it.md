@@ -10,28 +10,34 @@ un'immagine cloud Ubuntu 24.04.
 | VM | Ruolo | Segmento `pxe-lan` | SSH dall'host |
 |---|---|---|---|
 | `pxe-lab-server` | dnsmasq (DHCP, DNS, TFTP), nginx, NAT | 172.20.9.1 | `vmctl shell pxe-lab-server` (127.0.0.1:2374) |
-| `pxe-lab-client` | disco vuoto, installa Debian 13 dalla rete | DHCP, 172.20.9.100-200 | `vmctl shell pxe-lab-client` (127.0.0.1:2375) |
+| `pxe-lab-client` | BIOS, disco vuoto, installa Debian 13 dalla rete | DHCP, 172.20.9.100-200 | `vmctl shell pxe-lab-client` (127.0.0.1:2375) |
+| `pxe-lab-client-efi` | lo stesso con UEFI (OVMF): GRUB al posto di pxelinux | DHCP, 172.20.9.100-200 | `vmctl shell pxe-lab-client-efi` (127.0.0.1:2376) |
 
-Ogni VM ha due schede: il NAT di QEMU, per l'SSH dall'host, e `pxe-lan`, il segmento che le due
-condividono. Il client si avvia dalla rete solo da `pxe-lan`; il suo installer riceve il nome di
-quella scheda (BOOTIF), così non configura per errore quella del NAT.
+Ogni VM ha due schede: il NAT di QEMU, per l'SSH dall'host, e `pxe-lan`, il segmento che
+condividono. I client si avviano dalla rete solo da `pxe-lan`; il loro installer riceve il nome di
+quella scheda (BOOTIF), così non configura per errore quella del NAT. I due client differiscono
+solo per il firmware, ed è proprio questo il punto: una rete, due boot loader.
+
+I menu del server nominano il client che installano (quello BIOS `pxe-lab-client`, quello di GRUB
+`pxe-lab-client-efi`) e ogni firmware ha la sua cartella di risposte: un client per firmware.
 
 ## Avvio
 
 ```bash
-vmctl group install pxe-lab       # il server (immagine cloud, due minuti), poi il client dalla rete (una decina)
+vmctl group install pxe-lab       # il server (immagine cloud, due minuti), poi ogni client dalla rete (una decina ciascuno)
 vmctl group status pxe-lab
 vmctl group map pxe-lab --open    # la mappa: traffico per scheda, l'ispettore dei pacchetti, gli esercizi
 ```
 
-`group install` installa prima il server. L'installazione del client è `vmctl bootstrap-netboot
-pxe-lab-client`: accende il server se è spento, scrive le risposte del client nella radice web del
-server e avvia il client dalla scheda `pxe-lan`.
+`group install` installa prima il server. L'installazione di un client è `vmctl bootstrap-netboot
+pxe-lab-client` (o `pxe-lab-client-efi`): accende il server se è spento, scrive le risposte del
+client nella radice web del server e avvia il client dalla scheda `pxe-lan`.
 
 ## Un avvio, passo per passo
 
-1. **Il firmware.** Per l'installazione la scheda di rete è il primo dispositivo di avvio. La sua
-   ROM è iPXE (tutte le schede di rete di QEMU la hanno).
+1. **Il firmware.** Per l'installazione la scheda di rete è il primo dispositivo di avvio. Sul
+   client BIOS la sua ROM è iPXE (tutte le schede di rete di QEMU la hanno); sul client UEFI è il
+   PXE di OVMF, che prende la strada dell'esercizio 7.
 2. **DHCP.** iPXE manda un DISCOVER in broadcast su `pxe-lan`. dnsmasq risponde con un OFFER:
    un indirizzo tra 172.20.9.100 e 200 e, siccome la richiesta porta l'opzione 175 (iPXE), un file
    di avvio che è un URL `http://`: `boot.ipxe`. REQUEST e ACK lo confermano.
@@ -107,8 +113,9 @@ sudo tail -5 /var/log/nginx/pxe-lab.access.log                      # sul server
 ```
 
 `boot.ipxe` imposta l'opzione 210, il prefisso dei percorsi di pxelinux: senza, pxelinux
-cercherebbe i suoi moduli sotto l'URL HTTP da cui è arrivato. Se la catena fallisce (un client
-UEFI non può eseguire pxelinux, che è un programma BIOS), lo script avvia direttamente l'installer.
+cercherebbe i suoi moduli sotto l'URL HTTP da cui è arrivato. pxelinux è un programma BIOS: un
+iPXE che gira su firmware UEFI passa invece a GRUB (esercizio 7), e se non parte nessun boot
+loader lo script avvia direttamente l'installer.
 
 ## Esercizio 5: le risposte
 
@@ -138,7 +145,31 @@ curl -s --interface $IF -o /dev/null -w '%{http_code}\n' http://deb.debian.org/d
 Con `sudo sysctl -w net.ipv4.ip_forward=0` sul server la stessa richiesta resta appesa; `=1` la
 fa ripartire.
 
-## Esercizio 7: reinstallarlo
+## Esercizio 7: UEFI, la stessa rete con un altro boot loader
+
+`pxe-lab-client-efi` si avvia con OVMF. Il PXE del suo firmware lo dichiara nell'opzione DHCP 93
+(client-arch 7, UEFI x86-64), e dnsmasq risponde con lo shim di Debian, `bootnetx64.efi`, invece
+di pxelinux:
+
+```bash
+grep -E 'efi64|dhcp-boot' /etc/dnsmasq.d/pxe-lab.conf                          # sul server
+ls -l /srv/pxe/tftp/debian-installer/amd64
+cat /srv/pxe/tftp/debian-installer/amd64/grub/grub.cfg
+```
+
+Lo shim chiede `grubx64.efi` nella radice TFTP (il server ne tiene lì una copia), GRUB legge
+moduli e `grub.cfg` dal suo prefisso incorporato, `debian-installer/amd64/grub`, e il menu carica l'installer via HTTP: `(http,172.20.9.1)/debian/linux`. GRUB conosce
+il MAC con cui si è avviato dalla rete (`$net_default_mac`, `aa:bb:…`) e `regexp` lo riscrive nella
+forma BOOTIF di d-i, `01-aa-bb-…`. Le risposte arrivano da `debian-efi/`, accanto a quelle del
+client BIOS.
+
+```bash
+ls /sys/firmware/efi                                                # su pxe-lab-client-efi: solo UEFI
+sudo efibootmgr                                                     # la voce "debian" dell'installer
+sudo grep -o 'BOOTIF=[^ ]*' /var/log/installer/syslog | head -1
+```
+
+## Esercizio 8: reinstallarlo
 
 Dall'host:
 
@@ -150,7 +181,8 @@ vmctl bootstrap-netboot pxe-lab-client
 
 Seguilo sulla console del client (`vmctl attach pxe-lab-client`, o il pulsante Console della
 mappa), in `journalctl -u dnsmasq -f` sul server e nell'ispettore dei pacchetti con
-`port 67 or port 68 or port 69 or port 80`.
+`port 67 or port 68 or port 69 or port 80`. Gli stessi tre comandi reinstallano
+`pxe-lab-client-efi`, passando da GRUB.
 
 ## Test
 
@@ -158,13 +190,13 @@ mappa), in `journalctl -u dnsmasq -f` sul server e nell'ispettore dei pacchetti 
 vmctl group test pxe-lab
 ```
 
-Sei script in `vms/labs/pxe-lab/tests/`, uno per esercizio: dnsmasq chiuso nel segmento, la
+Sette script in `vms/labs/pxe-lab/tests/`, uno per esercizio: dnsmasq chiuso nel segmento, la
 radice TFTP e un trasferimento TFTP, un DORA completo, la catena iPXE e la riga del kernel
-dell'installer, il client installato, il gateway.
+dell'installer, il client installato, il gateway, il client UEFI e il suo GRUB.
 
 ## Ripristino
 
 ```bash
-vmctl group reset pxe-lab           # le due macchine tornano al checkpoint lab-start
+vmctl group reset pxe-lab           # tutte le macchine tornano al checkpoint lab-start
 sudo bash ~/setup-pxe-server.sh     # sul server: configurazione e file scritti di nuovo
 ```

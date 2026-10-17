@@ -9,8 +9,8 @@
         "groups": [
           "pxe-lab"
         ],
-        "version": "1.0.1",
-        "verified": "2026-10-16"
+        "version": "1.1.0",
+        "verified": "2026-10-17"
       },
       "notes": "The network-boot server of the pxe-lab (vms/labs/pxe-lab/): dnsmasq answers DHCP and TFTP on the lab segment pxe-lan (172.20.9.0/24) and nowhere else, iPXE is chained to pxelinux and its menu, nginx serves the Debian 13 installer's kernel and initrd and the answers vmctl writes for each install, and NAT is the segment's only way to the Debian mirror. ~/setup-pxe-server.sh builds all of it and is also the reset. Ported from qlab's pxe-lab (the LAN moved from 192.168.100.0/24, which vmctl link uses, to 172.20.9.0/24).",
       "memory_mb": 1024,
@@ -146,6 +146,112 @@
           "test -f /etc/debian_version",
           "for i in $(seq 30); do ip -4 -br addr | grep -q ' 172\\.20\\.9\\.' && exit 0; sleep 2; done; exit 1",
           "grep -q pxe-lab-client /etc/hostname"
+        ]
+      }
+    },
+    "pxe-lab-client-efi": {
+      "name": "PXE lab UEFI client (empty disk, OVMF, Debian 13 installed over the network through GRUB)",
+      "meta": {
+        "slug": "debian",
+        "family": "debian",
+        "role": "client",
+        "release_model": "stable",
+        "status": "unattended",
+        "groups": [
+          "pxe-lab"
+        ],
+        "verified": "2026-10-17",
+        "version": "1.0.0"
+      },
+      "notes": "The UEFI twin of pxe-lab-client in the pxe-lab (vms/labs/pxe-lab/): OVMF instead of SeaBIOS. Its firmware's own PXE (EDK2, DHCP option 93 = 7) gets Debian's shim and GRUB over TFTP from pxe-lab-server instead of pxelinux, and GRUB's menu loads the Debian 13 installer over HTTP with BOOTIF built from the MAC it netbooted with. Its answers live in their own directory (debian-efi/), so the two clients never overwrite each other's; the server's GRUB menu names this client. The disk is laid out by an explicit recipe (ESP 538 MB, swap 512 MB, the rest to /): d-i's atomic recipe on an 8 GB disk under UEFI gave the root the whole disk past the ESP and stopped on 'Unable to satisfy all constraints on the partition' (verified live, 2026-10-16).",
+      "disk": {
+        "path": "artifacts/{{name}}/disk.qcow2",
+        "size": "8G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/{{name}}/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 1024,
+      "cpus": 2,
+      "audio": false,
+      "usb_tablet": true,
+      "video": {
+        "default": "std",
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "networks": [
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "pxe-lan",
+          "boot": true
+        },
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        }
+      ],
+      "netboot_config": {
+        "server": "pxe-lab-server",
+        "payload_dir": "/srv/pxe/www/debian-efi",
+        "payload_url": "http://172.20.9.1/debian-efi",
+        "ready_command": "systemctl is-active --quiet dnsmasq nginx pxe-lab-nat && ip -4 addr show pxe-lan | grep -q 172.20.9.1/"
+      },
+      "preseed_config": {
+        "hostname": "pxe-lab-client-efi",
+        "domain": "pxe.lab",
+        "username": "lab",
+        "fullname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "locale": "en_US.UTF-8",
+        "language": "en",
+        "country": "US",
+        "mirror_hostname": "deb.debian.org",
+        "mirror_directory": "/debian",
+        "tasks": [
+          "standard"
+        ],
+        "packages": [
+          "openssh-server",
+          "sudo",
+          "curl",
+          "ca-certificates",
+          "locales",
+          "qemu-guest-agent"
+        ],
+        "upgrade": "none",
+        "disk_device": "/dev/vda",
+        "late_commands": [
+          "for n in /sys/class/net/*; do i=${n##*/}; [ \"$i\" = lo ] && continue; grep -qs \"^iface $i \" /etc/network/interfaces || printf '\\nallow-hotplug %s\\niface %s inet dhcp\\n' \"$i\" \"$i\" >> /etc/network/interfaces; done",
+          "systemctl enable serial-getty@ttyS0.service"
+        ],
+        "extra": [
+          "d-i grub-installer/force-efi-extra-removable boolean true",
+          "d-i partman-auto/expert_recipe string pxelab :: 538 538 1075 free $iflabel{ gpt } $reusemethod{ } method{ efi } format{ } . 1000 10000 -1 ext4 $primary{ } $bootable{ } method{ format } format{ } use_filesystem{ } filesystem{ ext4 } mountpoint{ / } . 512 512 1024 linux-swap method{ swap } format{ } ."
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_host_port": 2376,
+        "post_install_run": [
+          "test -f /etc/debian_version",
+          "for i in $(seq 30); do ip -4 -br addr | grep -q ' 172\\.20\\.9\\.' && exit 0; sleep 2; done; exit 1",
+          "grep -q pxe-lab-client-efi /etc/hostname",
+          "test -d /sys/firmware/efi"
         ]
       }
     }

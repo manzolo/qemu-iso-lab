@@ -114,7 +114,10 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # its release, the 26.04 recipe unchanged.
         verified_ubuntu_2610 = {"ubuntu-26.10",
                                 "blissos-16",  # Android again on its new ADB port 2373: android-live, android-console, scrcpy recording
-                                "pxe-lab-server", "pxe-lab-client"}  # pxe-lab from clean disks: the client installed over the network, group test 6/6, 55 checks
+                                "pxe-lab-client"}  # pxe-lab from clean disks: the client installed over the network, group test 6/6, 55 checks
+        # The pxe-lab's UEFI client (OVMF: option 93, Debian's shim + GRUB over TFTP) and the server
+        # that serves both firmwares: the lab from clean disks again, group test 7/7, 75 checks.
+        verified_pxe_uefi = {"pxe-lab-server", "pxe-lab-client-efi"}
         # The Proxmox lab, promoted like the network lab: four PASS from clean disks, then the
         # three nodes formed a quorate cluster over pve-lan (vmctl group cluster).
         verified_proxmox_lab = {"proxmox-ve", "proxmox-ve-node2", "proxmox-ve-node3", "proxmox-lab-client"}
@@ -170,7 +173,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                     self.assertIn(twin["meta"]["status"], ("unattended", "experimental"), name)
             else:
                 self.assertNotIn("manual", vm["meta"], name)
-            expected_date = ("2026-10-16" if name in verified_ubuntu_2610
+            expected_date = ("2026-10-17" if name in verified_pxe_uefi
+                             else "2026-10-16" if name in verified_ubuntu_2610
                              else "2026-10-04" if name in verified_1004
                              else "2026-10-03" if name in verified_1003
                              else "2026-10-02" if name in verified_1002

@@ -8,7 +8,8 @@ script=$(on pxe-lab-client curl -s http://172.20.9.1/boot.ipxe)
 assert_contains "boot.ipxe is an iPXE script" "$script" "^#!ipxe"
 assert_contains "it chains pxelinux over TFTP" "$script" "chain tftp://172\.20\.9\.1/lpxelinux\.0"
 assert_contains "it sets pxelinux's path prefix (option 210)" "$script" "set 210:string tftp://172\.20\.9\.1/"
-assert_contains "a UEFI client falls back to the installer itself" "$script" "kernel http://172\.20\.9\.1/debian/linux"
+assert_contains "iPXE on UEFI firmware takes GRUB instead" "$script" "chain tftp://172\.20\.9\.1/debian-installer/amd64/bootnetx64\.efi"
+assert_contains "if no boot loader starts, the installer boots directly" "$script" "kernel http://172\.20\.9\.1/debian/linux"
 size=$(on pxe-lab-client "curl -sI http://172.20.9.1/debian/initrd.gz | tr -d '\\r' | awk 'tolower(\$1)==\"content-length:\" {print \$2}'")
 assert "the initrd is served over HTTP (${size:-0} bytes)" test "${size:-0}" -gt 10000000
 # grep in the guest: the installer's syslog is large, and a grep -q quitting early on a host pipe
