@@ -65,9 +65,9 @@ class Windows98Tests(BaseVmctlTestCase):
         text = vmctl.windows98.render_msbatch("testvm", self.vm_config)
         answer = configparser.ConfigParser(interpolation=None)
         answer.read_string(text)
-        # "ID prodotto ... (facoltativo)" in the help of Microsoft's own Batch 98 on the CD
-        self.assertEqual(answer["Setup"]["ProductID"], "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE")
-        self.assertNotIn("ProductKey", text, "that is the later Windows spelling")
+        # The [Setup] writer in Microsoft's Batch 98 uses ProductKey, despite its UI label.
+        self.assertEqual(answer["Setup"]["ProductKey"], '"AAAAA-BBBBB-CCCCC-DDDDD-EEEEE"')
+        self.assertNotIn("ProductID", text)
         # [Network] holds the computer name: with Network=0 Setup finds it missing and, installing
         # from MS-DOS, asks for what is missing - the user information page that stopped every run.
         self.assertEqual(answer["Setup"]["Network"], "1")
@@ -85,10 +85,11 @@ class Windows98Tests(BaseVmctlTestCase):
                 self.assertNotIn("ProductKey=", text)
                 self.assertNotIn("ProductID=", text)
 
-    def test_the_first_logon_script_escapes_its_token_and_powers_the_guest_off(self):
+    def test_the_first_logon_script_types_its_token_and_powers_the_guest_off(self):
         script = vmctl.windows98.render_setup_script(self.vm_config).decode("cp850")
-        self.assertIn("echo ==^> Windows 98 installation complete!> COM1", script)
-        self.assertNotIn("echo ==>", script)
+        # command.com has no escape for '>': the token travels as a file on the CD
+        self.assertIn("type D:\\VMCTL.TOK > COM1", script)
+        self.assertNotIn("==", script)
         self.assertTrue(script.rstrip().endswith("rundll32.exe user.exe,exitwindows"))
 
     def test_boot_image_is_found_through_the_catalog(self):
@@ -150,6 +151,7 @@ class Windows98Tests(BaseVmctlTestCase):
         xorriso = [call.args[0] for call in run.call_args_list if call.args[0][0] == "xorriso"][0]
         self.assertIn(vmctl.windows98.ANSWER_PATH, xorriso)
         self.assertIn(vmctl.windows98.SCRIPT_PATH, xorriso)
+        self.assertIn(vmctl.windows98.TOKEN_PATH, xorriso)
         self.assertIn(vmctl.windows98.BOOT_IMAGE_PATH, xorriso)
         self.assertIn("emul_type=diskette", xorriso)
         # xorriso refuses an existing -outdev and silently leaves the old CD in place

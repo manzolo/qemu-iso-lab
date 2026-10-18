@@ -2750,9 +2750,14 @@
       ]
     },
     "windows-98": {
-      "version": "1.0.0",
+      "version": "1.0.1",
       "fingerprint": "sha256:896e1a7755fff800b40ae19383862a42df83fb7f300d56f33053055d77775455",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-18",
+          "note": "ProductKey (the field Batch 98 writes); the completion token TYPEd from a file, command.com has no escape for '>'"
+        },
         {
           "version": "1.0.0",
           "date": "2026-09-27",

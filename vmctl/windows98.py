@@ -47,6 +47,9 @@ ANSWER_PATH = "/MSBATCH.INF"
 # Outside the f-string: a backslash inside its braces is a SyntaxError before Python 3.12.
 DEFAULT_INSTALL_DIR = "c:\\windows"
 SCRIPT_PATH = "/VMCTL.BAT"
+# The token as a file the script TYPEs to COM1: command.com has no escape for '>' ('^>' printed
+# "==^" and redirected the rest into a file called Windows, verified live 2026-10-18).
+TOKEN_PATH = "/VMCTL.TOK"
 BOOT_IMAGE_PATH = "/BOOT.IMG"
 CD_DRIVE_ID = "w98cd0"
 # The CD's own boot menu, which defaults to the hard disk and stops an unattended boot.
@@ -208,13 +211,11 @@ def render_msbatch(vm_name: str, vm: dict[str, Any]) -> str:
         "Uninstall=0",
         "NoPrompt2Boot=1",
     ]
-    # "ID prodotto - casella in cui digitare il numero di identificazione del prodotto
-    # (facoltativo)", says the help of Microsoft's own Batch 98 on this CD: the key is ProductID,
-    # and it is optional - it is not what makes Setup stop.
-    # With the wrong field Setup falls back to interactive registration despite Display=0.
+    # Batch 98 labels this "ID prodotto" in its UI, but its [Setup] writer emits ProductKey.
+    # ProductID is not the answer-file key (verified against tools/RESKIT/BATCH/BATCH.EXE).
     product_key = str(cfg.get("product_key") or "").strip()
     if product_key:
-        lines.append(f"ProductID={_ini_value(product_key)}")
+        lines.append(f'ProductKey="{_ini_value(product_key)}"')
     lines += [
         "",
         "[System]",
@@ -250,9 +251,9 @@ def render_setup_script(vm: dict[str, Any]) -> bytes:
     cfg = windows98_config(vm) or {}
     lines = ["@echo off"]
     lines += [str(command) for command in cfg.get("setup_commands", [])]
+    drive = _ini_value(cfg.get("script_drive", "D:"))
     lines += [
-        # '>' is a redirection for command.com as well, so the token is echoed escaped.
-        f"echo {BOOTSTRAP_COMPLETE_TOKEN.replace('>', '^>')}> COM1",
+        f"type {drive}{TOKEN_PATH.replace('/', chr(92))} > COM1",
         "rundll32.exe user.exe,exitwindows",
     ]
     return _dos_text(lines)
@@ -378,10 +379,11 @@ def ensure_install_iso(vm_name: str, vm: dict[str, Any], source_iso: Path, answe
     if not dry_run:
         work.mkdir(parents=True, exist_ok=True)
     boot_image = patch_boot_image(source_iso, work, vm, dry_run=dry_run)
-    answer_path, script_path = work / "MSBATCH.INF", work / "VMCTL.BAT"
+    answer_path, script_path, token_path = work / "MSBATCH.INF", work / "VMCTL.BAT", work / "VMCTL.TOK"
     if not dry_run:
         answer_path.write_text(answer.replace("\n", "\r\n"), encoding="cp850")
         script_path.write_bytes(script)
+        token_path.write_bytes(_dos_text([BOOTSTRAP_COMPLETE_TOKEN]))
     # xorriso refuses to overwrite an existing -outdev and leaves the old image in place, which is
     # indistinguishable from a successful build until the guest boots the wrong CD (verified).
     partial = dest.with_name(dest.name + ".part")
@@ -394,6 +396,7 @@ def ensure_install_iso(vm_name: str, vm: dict[str, Any], source_iso: Path, answe
                  # need the opposite, because their media carry names with a tilde.
                  "-map", str(answer_path), ANSWER_PATH,
                  "-map", str(script_path), SCRIPT_PATH,
+                 "-map", str(token_path), TOKEN_PATH,
                  "-map", str(boot_image), BOOT_IMAGE_PATH,
                  "-boot_image", "any", f"bin_path={BOOT_IMAGE_PATH}",
                  "-boot_image", "any", "emul_type=diskette",

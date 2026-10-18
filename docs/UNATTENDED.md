@@ -834,14 +834,19 @@ program, `JO.SYS`, shows "1. Avvio dal disco rigido / 2. Avvio dal CD-ROM" and
 defaults to the hard disk, which is why an unattended boot always came back
 where it started. Deleting that one file from the boot image makes DOS start
 directly, and the flow then sets the `CONFIG.SYS` menu timeout to zero and
-replaces `AUTOEXEC.BAT` with one that finds the CD, runs `FDISK /MBR` (the only
-non-interactive thing FDISK does, and what puts Microsoft's boot code on the
-disk for the installed system) and starts Setup with the answer file. Both files
+replaces `AUTOEXEC.BAT` with one that finds the CD and starts Setup with the
+full path to the answer file. It keeps our MBR: `FDISK /MBR` would replace the
+boot code that hands control back to the BIOS while C: is not bootable. Both files
 are written CRLF: DOS obeys nothing in a batch file with Unix line endings — it
 prints `OFF` instead of running `@ECHO OFF`.
 
 **The answer file uses `ProductKey="xxxxx-xxxxx-xxxxx-xxxxx-xxxxx"` in `[Setup]`,**
 as emitted by Microsoft's own `tools/RESKIT/BATCH/BATCH.EXE` on the CD.
+The Italian UI label "ID prodotto" is not the INF field name: the executable's
+UTF-16 strings place `ProductKey` in its `[Setup]` writer. Its `BATCH98.CHM`
+help (`automate_settings.htm`) explicitly documents `setup c:\msbatch.inf`
+from DOS and requires the full path. `userinfo.htm` says DOS Setup asks for
+*missing* information, not that unattended DOS installation is unsupported.
 `ProductID` is not the installation-key field: using it leaves Setup without
 the supplied key and can stop at the user-information page even when the name
 and organization are prefilled and `[NameAndOrg] Display=0` is set. The key belongs in
@@ -857,9 +862,23 @@ bootstrap. They do not update an installer that is already running.
 previous installation.
 
 The profile pins `cpu_model: pentium3`: under KVM `common_args` otherwise
-exposes the host CPU, whose feature set Windows 98 does not survive. It is the
-only profile in the catalogue that names a CPU, and naming one is now what it
-takes to override the KVM default.
+exposes the host CPU, whose feature set Windows 98 does not survive. An explicit CPU model overrides the KVM default.
+
+**Where it stops (2026-10-18, two live runs).** With `ProductKey` the DOS stage, the file copy and
+the first reboot run by themselves; then Setup opens the *Avvio guidato* wizard - Informazioni
+utente, Contratto di Licenza, Codice "Product Key", Fine - with name, organization and key already
+filled in from MSBATCH.INF, and waits on each page anyway (`[NameAndOrg] Display=0` and
+`ShowEula=0` are ignored there). The key is valid: pressing Avanti moves on with no error. Rewriting
+`ProductType=9` (the OEM kind) to 1 in the CD's SETUPPP.INF, which travels in the PRECOPY1/2.CAB
+set, changed nothing: Setup read the rewritten cabinets and showed the same four pages, which fits
+the reports that Windows 98 takes the product type from SETUPX.DLL. Five keystrokes (Enter, Alt+A,
+Enter, Enter, Enter) get past it, and the rest finishes alone: RunOnce, the token on COM1 and the
+guest's own shutdown, 37 minutes in all. Automating those pages means a screen pilot like Haiku's.
+
+**The completion token is a file the script TYPEs to COM1** (`VMCTL.TOK` on the CD):
+`command.com` has no escape for `>`, and `echo ==^>` printed `==^` and redirected the rest of the
+line into a file called `Windows`, so the host never saw a complete token (first seen on 2026-10-18,
+the first run that ever reached the first logon).
 
 Install only, like ReactOS and Windows XP: no SSH server exists for this guest.
 

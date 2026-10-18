@@ -84,7 +84,7 @@
         "groups": [
           "windows-retro"
         ],
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "iso": "isos/windows98.iso",
       "disk": {
