@@ -132,6 +132,7 @@ tr.row.sel .profile-desc { color:#c0d9d2; }
 .catalog-icon svg { display:block; width:22px; height:22px; pointer-events:none; }
 .link-handle { flex:0 0 30px; width:30px; height:30px; padding:5px; margin-left:auto; color:var(--accent); background:transparent; border:1px solid var(--line); opacity:0; cursor:grab; touch-action:none; }
 .link-handle svg { width:18px; height:18px; pointer-events:none; }
+.link-handle .network-socket { display:block; width:24px; height:24px; margin:-3px; }
 .row:hover .link-handle,.row.sel .link-handle,.row:focus-within .link-handle { opacity:1; }
 .link-handle:hover { background:#25453f; border-color:var(--accent); }
 @media (hover:none) { .link-handle { opacity:1; } }
@@ -139,10 +140,21 @@ tr.row.sel .profile-desc { color:#c0d9d2; }
 #selection-link.warn { color:var(--warn); }
 #link-target,#unlink-segment { width:100%; margin:10px 0 20px; }
 body.dragging { user-select:none; cursor:grabbing; }
-#drag-ghost .link-handle { opacity:1; }
-#drag-ghost { position:fixed; z-index:60; display:flex; align-items:center; gap:8px; padding:4px 10px 4px 4px; background:#182537; border:1px solid #3d526b; border-radius:12px; box-shadow:0 10px 30px #0008; pointer-events:none; font-size:12px; }
+#drag-ghost { position:fixed; z-index:61; max-width:280px; padding:7px 10px; background:#182537; color:var(--accent); border:1px solid currentColor; border-radius:8px; box-shadow:0 4px 16px #0008; pointer-events:none; font-size:12px; overflow-wrap:anywhere; }
+#drag-ghost.unlink,#network-cable.unlink { color:var(--warn); }
+#network-cable { position:fixed; inset:0; width:100%; height:100%; z-index:60; pointer-events:none; color:var(--accent); overflow:visible; }
+#network-cable .cable-shadow { fill:none; stroke:#071019; stroke-width:9; stroke-linecap:round; }
+#network-cable .cable-wire { fill:none; stroke:currentColor; stroke-width:5; stroke-linecap:round; }
+#network-cable .cable-shine { fill:none; stroke:#fff; stroke-opacity:.35; stroke-width:1.5; stroke-linecap:round; }
+#network-cable .cable-plug { fill:#182537; stroke:currentColor; stroke-width:1.5; stroke-linejoin:round; }
+#network-cable .plug-contacts { fill:none; stroke:#f0cb78; stroke-width:1.5; }
 #rows.linking tr[data-vm] { opacity:.55; }
+#rows.linking tr.link-source { opacity:1; }
+#rows.linking .link-handle { opacity:1; }
+#rows.linking .link-source .link-handle,#rows.linking .drop-target .link-handle { background:#25453f; border-color:var(--accent); box-shadow:0 0 12px #7cdec744; }
 #rows.linking tr.drop-target { opacity:1; outline:2px solid var(--accent); outline-offset:-2px; background:#1c3a33; }
+#rows.linking tr.drop-target.unlink { outline-color:var(--warn); }
+#rows.linking .drop-target.unlink .link-handle { color:var(--warn); border-color:var(--warn); }
 .lab.session .lab-order { margin:0 0 12px; }
 .catalog-icon.large { width:46px; height:46px; flex-basis:46px; border-radius:13px; }
 .catalog-icon.large svg { width:30px; height:30px; }
@@ -3826,7 +3838,7 @@ $("list").addEventListener("scroll", hideHoverShot);
 // Drag a machine's network button onto another machine: `vmctl link a b`, a private segment for
 // this session. Pointer events, not the browser's native drag and drop: Chromium on Wayland loses the
 // drop (the rows dimmed, nothing happened), and pointers also work on touch screens.
-const networkGlyph = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="5" rx="1"/><path d="M12 8v5M5 16v-3h14v3"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/></svg>';
+const networkSocketGlyph = '<svg class="network-socket" viewBox="0 0 24 24" aria-hidden="true"><rect x="1.5" y="2.5" width="21" height="19" rx="2.5" fill="#425564" stroke="currentColor"/><path d="M4 5h16v10h-4v4H8v-4H4Z" fill="#03090f" stroke="#92a7b5" stroke-width=".8"/><path d="M6.5 5.5v4M8 5.5v4M9.5 5.5v4M11 5.5v4M12.5 5.5v4M14 5.5v4M15.5 5.5v4M17 5.5v4" stroke="#f0cb78" stroke-width=".9"/><path d="M10 18h4" stroke="#687c8b"/></svg>';
 // --- The power button of every machine (My VMs, Catalog, lab cards), the map's own: a click starts
 // a stopped VM headless in the background, a click on a running one asks before the shutdown (with
 // Force as an option), holding it two seconds forces it off at once, a click while a job works on
@@ -3878,7 +3890,7 @@ document.addEventListener("click", async (e) => {
   if (answer) run(answer.option ? ["stop", r.name, "--force"] : ["stop", r.name], !!answer.option, false, true);
 }, true);
 function linkHandle(r) {
-  return r.running || r.installed ? `<button class="link-handle" aria-label="Network connections for ${esc(r.name)}" title="Network · click to choose a VM, or drag to link / unlink">${networkGlyph}</button>` : "";
+  return r.running || r.installed ? `<button class="link-handle" aria-label="Network connections for ${esc(r.name)}" title="Network · click to choose a VM, or drag to link / unlink">${networkSocketGlyph}</button>` : "";
 }
 let suppressLinkClick = false;
 function openLinkPicker(source) {
@@ -3892,14 +3904,39 @@ function openLinkPicker(source) {
   $("link-review").onclick = () => { const target = $("link-target").value; $("link-dialog").close(); confirmLink(source, target); };
   $("link-dialog").showModal(); $("link-target").focus();
 }
-const dragState = { start: null, ghost: null };
+const dragState = { start: null, ghost: null, cable: null, point: null };
 function endDrag() {
   dragVm = null; dragState.start = null; hover.muted = null;
   document.body.classList.remove("dragging");
   $("rows").classList.remove("linking");
-  $("rows").querySelectorAll("tr.drop-target").forEach((row) => row.classList.remove("drop-target"));
+  $("rows").querySelectorAll("tr.drop-target,tr.link-source").forEach((row) => row.classList.remove("drop-target", "link-source", "unlink"));
   dragState.ghost?.remove(); dragState.ghost = null;
+  dragState.cable?.remove(); dragState.cable = null; dragState.point = null;
   render();
+}
+function drawNetworkCable(x, y) {
+  const d = dragState.start, cable = dragState.cable;
+  if (!d || !cable) return;
+  dragState.point = {x, y};
+  const tr = dropTargetAt(x, y, d.vm);
+  const unlink = !!tr && networkFor([d.vm, tr.dataset.vm]).action === "unlink";
+  $("rows").querySelectorAll("tr.drop-target").forEach(row => row.classList.remove("drop-target", "unlink"));
+  tr?.classList.add("drop-target"); tr?.classList.toggle("unlink", unlink);
+  cable.classList.toggle("unlink", unlink); dragState.ghost.classList.toggle("unlink", unlink);
+  const source = d.icon.getBoundingClientRect(), target = tr?.querySelector(".link-handle")?.getBoundingClientRect();
+  const sx = source.x + source.width / 2, sy = source.y + source.height / 2;
+  const tx = target ? target.x + target.width / 2 : x, ty = target ? target.y + target.height / 2 : y;
+  // A little slack makes the cable readable even between vertically aligned network ports.
+  const bend = Math.min(160, Math.max(55, Math.hypot(tx - sx, ty - sy) * .4));
+  const path = `M ${sx} ${sy} C ${sx + bend} ${sy}, ${tx + bend} ${ty}, ${tx + 18} ${ty}`;
+  cable.querySelectorAll(".cable-shadow,.cable-wire,.cable-shine").forEach(p => p.setAttribute("d", path));
+  cable.querySelector(".cable-source").setAttribute("cx", sx);
+  cable.querySelector(".cable-source").setAttribute("cy", sy);
+  cable.querySelector(".cable-plug").setAttribute("transform", `translate(${tx} ${ty})`);
+  dragState.ghost.textContent = tr ? `Release to ${unlink ? "unlink" : "connect"} · ${tr.dataset.vm}` : `${d.vm} · Drag to another VM`;
+  const label = dragState.ghost.getBoundingClientRect();
+  dragState.ghost.style.left = Math.max(8, Math.min(x + 24, innerWidth - label.width - 8)) + "px";
+  dragState.ghost.style.top = Math.max(8, Math.min(y + 24, innerHeight - label.height - 8)) + "px";
 }
 function dropTargetAt(x, y, source) {
   const tr = document.elementFromPoint(x, y)?.closest?.("tr[data-vm]"), vm = tr?.dataset.vm;
@@ -3918,15 +3955,21 @@ document.addEventListener("pointermove", (e) => {
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
     dragVm = d.vm; hideHoverShot(); hover.muted = d.vm;
     document.body.classList.add("dragging"); $("rows").classList.add("linking");
-    const ghost = document.createElement("div"); ghost.id = "drag-ghost"; ghost.innerHTML = d.icon.outerHTML + `<span class="mono">${esc(d.vm)}</span>`;
+    d.icon.closest("tr").classList.add("link-source");
+    const cable = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    cable.id = "network-cable"; cable.setAttribute("aria-hidden", "true");
+    cable.innerHTML = '<path class="cable-shadow"/><path class="cable-wire"/><path class="cable-shine"/><circle class="cable-source" r="4" fill="currentColor"/><g class="cable-plug"><path d="M18 -4h7v8h-7" fill="currentColor"/><path d="M4 -7h13l3 3v8l-3 3H4Z"/><path d="M0 -5h4v10H0Z"/><path d="M7 -7v-3h7v3"/><path class="plug-contacts" d="M1 -3h6M1 0h6M1 3h6"/></g>';
+    document.body.appendChild(cable); dragState.cable = cable;
+    const ghost = document.createElement("div"); ghost.id = "drag-ghost"; ghost.setAttribute("aria-hidden", "true");
     document.body.appendChild(ghost); dragState.ghost = ghost;
   }
-  dragState.ghost.style.left = e.clientX + 14 + "px"; dragState.ghost.style.top = e.clientY - 16 + "px";
-  const tr = dropTargetAt(e.clientX, e.clientY, d.vm);
-  $("rows").querySelectorAll("tr.drop-target").forEach((row) => { if (row !== tr) row.classList.remove("drop-target"); });
-  tr?.classList.add("drop-target");
+  drawNetworkCable(e.clientX, e.clientY);
   e.preventDefault();
 });
+document.addEventListener("scroll", () => {
+  if (dragState.point) drawNetworkCable(dragState.point.x, dragState.point.y);
+}, true);
+window.addEventListener("resize", () => { if (dragState.start) endDrag(); });
 document.addEventListener("pointerup", async (e) => {
   const d = dragState.start; if (!d) return;
   if (!dragVm) { dragState.start = null; return; }  // a plain click on the icon

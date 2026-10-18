@@ -466,17 +466,38 @@ try {
   assert.equal(requests.length,0);
   const startHandle=await network.boundingBox(), targetIcon=await page.locator('#rows [data-vm="debian-server"] .catalog-icon').boundingBox();
   await page.mouse.move(startHandle.x+10,startHandle.y+10); await page.mouse.down();
+  await page.mouse.move(startHandle.x+50,startHandle.y+10);
+  const looseCable=await page.locator('#network-cable .cable-wire').getAttribute('d');
+  assert(looseCable.startsWith(`M ${startHandle.x+startHandle.width/2} ${startHandle.y+startHandle.height/2} C `));
+  assert.equal(await page.locator('#network-cable').evaluate(el=>getComputedStyle(el).pointerEvents),'none');
   await page.mouse.move(targetIcon.x+10,targetIcon.y+10,{steps:8});
+  assert.notEqual(await page.locator('#network-cable .cable-wire').getAttribute('d'),looseCable);
+  const targetPort=await page.locator('#rows [data-vm="debian-server"] .link-handle').boundingBox();
+  assert.equal(await page.locator('#network-cable .cable-plug').getAttribute('transform'),`translate(${targetPort.x+targetPort.width/2} ${targetPort.y+targetPort.height/2})`);
+  assert.equal(await page.locator('#drag-ghost').textContent(),'Release to connect · debian-server');
+  assert(await page.locator('#rows [data-vm="debian-server"] .network-socket').isVisible());
+  assert(await network.locator('.network-socket').isVisible());
+  await page.screenshot({path:root+'artifacts/webui-review/network-cable-drag.png'});
   await page.waitForTimeout(600);
   assert(!(await page.locator('#hover-shot').isVisible()));
   await page.evaluate(()=>refresh());
   assert(await page.locator('#rows [data-vm="debian-server"]').evaluate(el=>el.classList.contains('drop-target')));
   await page.mouse.up();
+  assert.equal(await page.locator('#network-cable,#drag-ghost').count(),0);
+  assert(await page.locator('#rows [data-vm="debian-server"] .network-socket').isVisible());
   assert.equal(await page.locator('#confirm-command').textContent(),'vmctl link arch-noctalia debian-server');
   await page.locator('#confirm-no').click();
   await network.hover(); await page.mouse.down(); await page.mouse.move(targetIcon.x+10,targetIcon.y+10,{steps:8});
   await page.keyboard.press('Escape'); await page.mouse.up();
   assert(!(await page.locator('#drag-ghost').count()));
+  assert.equal(await page.locator('#network-cable,.link-source,.drop-target').count(),0);
+  for (const event of ['pointercancel','blur']) {
+    await network.hover(); await page.mouse.down();
+    await page.mouse.move(targetIcon.x+10,targetIcon.y+10,{steps:8});
+    await page.evaluate(type=>(type==='blur'?window:document).dispatchEvent(new Event(type)),event);
+    await page.mouse.up();
+    assert.equal(await page.locator('#network-cable,#drag-ghost,.link-source,.drop-target').count(),0);
+  }
   assert.equal(requests.length,0);
   check('network picker supports keyboard; dedicated drag survives polling, suppresses preview and cancels with Escape');
   const states = await page.evaluate(() => {
@@ -1385,7 +1406,10 @@ try {
     const from=await page.locator('#rows [data-vm="arch-noctalia"] .link-handle').boundingBox();
     const to=await page.locator('#rows [data-vm="debian-server"] .catalog-icon').boundingBox();
     await page.mouse.move(from.x+10,from.y+10); await page.mouse.down();
-    await page.mouse.move(to.x+10,to.y+10,{steps:8}); await page.mouse.up();
+    await page.mouse.move(to.x+10,to.y+10,{steps:8});
+    assert.equal(await page.locator('#drag-ghost').textContent(),'Release to unlink · debian-server');
+    assert(await page.locator('#network-cable').evaluate(el=>el.classList.contains('unlink')));
+    await page.mouse.up();
   };
   const beforePair=requests.length;
   await dragPair();
