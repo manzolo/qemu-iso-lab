@@ -1,0 +1,1 @@
+../../vpn-lab/tests/test_02_wireguard_keys.sh

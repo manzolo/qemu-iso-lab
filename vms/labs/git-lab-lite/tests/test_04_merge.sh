@@ -1,0 +1,1 @@
+../../git-lab/tests/test_04_merge.sh

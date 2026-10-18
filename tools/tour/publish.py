@@ -74,9 +74,9 @@ def main() -> None:
 # jumble): one heading per track on tour.html, the labs of a track in this order, a lab's own
 # lessons by their `order`. A lab missing here goes last, with a warning: add it where it belongs.
 LAB_TRACKS = [
-    ("basics", ["git-lab", "ssh-lab"]),
+    ("basics", ["git-lab", "ssh-lab", "git-lab-lite", "ssh-lab-lite"]),
     ("storage", ["lvm-lab", "mdadm-lab", "zfs-lab"]),
-    ("network", ["netlab", "vpn-lab", "pxe-lab"]),
+    ("network", ["netlab", "vpn-lab", "pxe-lab", "vpn-lab-lite"]),
     ("services", ["mysql-lab", "docker-lab", "k8s-lab"]),
     ("virtualization", ["proxmox-lab"]),
 ]

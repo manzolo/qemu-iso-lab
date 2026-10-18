@@ -1,0 +1,1 @@
+../../ssh-lab/tests/test_04_fail2ban.sh

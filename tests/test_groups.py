@@ -251,10 +251,10 @@ class RepositoryGroupTests(unittest.TestCase):
     def test_declared_groups_exist_and_are_documented(self):
         declared = sorted({group for _, vm in vmctl.config.sorted_vm_items(self.cfg)
                            for group in vmctl.config.declared_groups(vm)})
-        self.assertEqual(declared, ["arch-releases", "centos-releases", "debian-only", "debian-releases", "docker-lab", "edubuntu-releases", "git-lab", "hobby-os", "k8s-lab", "kali", "kubuntu-releases",
-                                    "lubuntu-releases", "lvm-lab", "mdadm-lab", "mysql-lab", "netlab", "proxmox-lab", "pxe-lab", "slackware-releases", "smoke", "ssh-lab", "ubuntu", "ubuntu-budgie-releases",
+        self.assertEqual(declared, ["arch-releases", "centos-releases", "debian-only", "debian-releases", "docker-lab", "edubuntu-releases", "git-lab", "git-lab-lite", "hobby-os", "k8s-lab", "kali", "kubuntu-releases",
+                                    "lite", "lubuntu-releases", "lvm-lab", "mdadm-lab", "mysql-lab", "netlab", "proxmox-lab", "pxe-lab", "slackware-releases", "smoke", "ssh-lab", "ssh-lab-lite", "ubuntu", "ubuntu-budgie-releases",
                                     "ubuntu-cinnamon-releases", "ubuntu-flavors", "ubuntu-mate-releases", "ubuntu-releases",
-                                    "ubuntu-unity-releases", "vpn-lab", "windows-retro", "xubuntu-releases", "zfs-lab"])
+                                    "ubuntu-unity-releases", "vpn-lab", "vpn-lab-lite", "windows-retro", "xubuntu-releases", "zfs-lab"])
         documentation = (ROOT / "docs" / "UNATTENDED.md").read_text(encoding="utf-8")
         for group in declared:
             self.assertIn(f"`{group}`", documentation, f"{group} is not documented")

@@ -29,6 +29,27 @@ from tests._common import BaseVmctlTestCase  # noqa: E402
 
 
 class PostInstallTests(BaseVmctlTestCase):
+    def test_disabled_cloud_init_does_not_wait_forever_on_openrc(self):
+        with mock.patch.object(vmctl.runtime, 'run') as run, \
+                mock.patch.object(vmctl.ssh, 'ssh_base_cmd', return_value=['ssh']):
+            vmctl.ssh.wait_for_guest_post_install_ready(self.vm_config)
+        command = run.call_args_list[0].args[0][-1]
+        # Execute the generated guard against a sandbox marker. A fake cloud-init
+        # fails loudly if the disabled branch ever calls it.
+        marker = self.root / 'cloud-init.disabled'
+        marker.touch()
+        command = command.replace('/etc/cloud/cloud-init.disabled', str(marker))
+        fake = self.root / 'cloud-init'
+        called = self.root / 'called'
+        fake.write_text(f'#!/bin/sh\ntouch {called}\nexit 1\n')
+        fake.chmod(0o755)
+        # remote_shell_cmd wraps sh -lc; extract its argument without invoking a login shell.
+        import shlex
+        body = shlex.split(command)[-1]
+        subprocess.run(['sh', '-c', body], check=True,
+                       env={'PATH': str(self.root) + ':/usr/bin:/bin', 'HOME': str(self.root)})
+        self.assertFalse(called.exists())
+
     def test_ssh_base_cmd_allows_missing_private_key_in_dry_run_mode(self):
         self.vm_config["cloud_init"] = {
             "user": "tester",

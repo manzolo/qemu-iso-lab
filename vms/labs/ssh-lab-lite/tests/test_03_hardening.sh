@@ -1,0 +1,1 @@
+../../ssh-lab/tests/test_03_hardening.sh

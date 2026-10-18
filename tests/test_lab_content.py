@@ -51,6 +51,27 @@ class LabContentTests(BaseVmctlTestCase):
                 subprocess.run(["bash", "-n", str(path)], check=True)
             self.assertIn(group, labs.lab_groups(cfg))
 
+    def test_shared_lite_tests_redirect_only_their_members_and_segment(self):
+        # Run real bash helpers with a fake vmctl: no host VM, local.json or network.
+        directory = self.root / 'vms/labs/vpn-lab-lite/tests'
+        script = directory / 'probe.sh'
+        script.write_text('''#!/bin/bash
+source "$(dirname "${BASH_SOURCE[0]}")/../../_common.sh"
+on vpn-lab-client 'tcpdump -ni vpn-lan'
+assert 'indirect call also maps' on vpn-lab-server true
+on unrelated true
+''')
+        fake = self.root / 'fake-vmctl'
+        log = self.root / 'calls'
+        fake.write_text('#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n')
+        fake.chmod(0o755)
+        subprocess.run(['bash', str(script)], check=True, capture_output=True,
+                       env={'PATH': '/usr/bin:/bin', 'HOME': str(self.root),
+                            'VMCTL': str(fake), 'CALL_LOG': str(log), 'NO_COLOR': '1'})
+        self.assertEqual(log.read_text().splitlines(), [
+            'shell vpn-lab-client-lite -- tcpdump -ni vpn-lan-lite',
+            'shell vpn-lab-server-lite -- true', 'shell unrelated -- true'])
+
     def test_the_exercises_join_the_runbook_before_the_stack_and_reach_the_map(self):
         lab = labs.model(self.cfg(), "netlab")
         titles = [phase["title"] for phase in lab["runbook"]]

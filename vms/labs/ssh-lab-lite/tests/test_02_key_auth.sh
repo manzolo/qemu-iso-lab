@@ -1,0 +1,1 @@
+../../ssh-lab/tests/test_02_key_auth.sh

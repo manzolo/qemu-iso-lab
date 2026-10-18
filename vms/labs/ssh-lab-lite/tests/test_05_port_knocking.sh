@@ -1,0 +1,1 @@
+../../ssh-lab/tests/test_05_port_knocking.sh

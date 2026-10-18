@@ -1,0 +1,1 @@
+../../vpn-lab/tests/test_03_wireguard_tunnel.sh

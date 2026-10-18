@@ -118,6 +118,11 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         # The pxe-lab's UEFI client (OVMF: option 93, Debian's shim + GRUB over TFTP) and the server
         # that serves both firmwares: the lab from clean disks again, group test 7/7, 75 checks.
         verified_pxe_uefi = {"pxe-lab-server", "pxe-lab-client-efi"}
+        # The low-resource bases (Alpine NoCloud, Debian 12 genericcloud, Ubuntu 20.04/22.04 minimal) and
+        # the lite labs on them, from clean disks: ssh-lab-lite 6/6, git-lab-lite 10/10, vpn-lab-lite 5/5.
+        verified_lite = {"alpine-cloud", "debian-12-cloud", "ubuntu-20.04-cloud", "ubuntu-22.04-cloud",
+                         "ssh-lab-server-lite", "ssh-lab-client-lite", "git-lab-server-lite",
+                         "vpn-lab-server-lite", "vpn-lab-client-lite"}
         # The Proxmox lab, promoted like the network lab: four PASS from clean disks, then the
         # three nodes formed a quorate cluster over pve-lan (vmctl group cluster).
         verified_proxmox_lab = {"proxmox-ve", "proxmox-ve-node2", "proxmox-ve-node3", "proxmox-lab-client"}
@@ -173,7 +178,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                     self.assertIn(twin["meta"]["status"], ("unattended", "experimental"), name)
             else:
                 self.assertNotIn("manual", vm["meta"], name)
-            expected_date = ("2026-10-17" if name in verified_pxe_uefi
+            expected_date = ("2026-10-18" if name in verified_lite
+                             else "2026-10-17" if name in verified_pxe_uefi
                              else "2026-10-16" if name in verified_ubuntu_2610
                              else "2026-10-04" if name in verified_1004
                              else "2026-10-03" if name in verified_1003

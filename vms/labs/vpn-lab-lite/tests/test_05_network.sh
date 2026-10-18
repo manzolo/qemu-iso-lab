@@ -1,0 +1,1 @@
+../../vpn-lab/tests/test_05_network.sh

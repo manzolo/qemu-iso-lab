@@ -1017,11 +1017,11 @@ the same name on a Windows 98 startup disk (`271741af…dfc5`, `6bc3f4c4…9217`
 
 ## Cloud images (`bootstrap-cloudimg`)
 
-Ubuntu and Debian publish *cloud images*: a system already installed, configured at first boot
+Ubuntu, Debian and Alpine publish *cloud images*: a system already installed, configured at first boot
 by cloud-init. For a small server (the lab members ported from qlab, [QLAB_IMPORT.md](QLAB_IMPORT.md))
 that replaces an 8-15 minute install with a boot of a couple of minutes. The profile carries
 `cloudimg_config` (`username`, `password_hash`, `realname`, `hostname`, `packages`, `write_files`,
-`runcmd`, `timezone`/`locale`/`keyboard`, optional `image_format`) and names the image with the
+`runcmd`, `timezone`/`locale`/`keyboard`, optional `image_format` and `family`: `ubuntu` (default), `debian`, `alpine`) and names the image with the
 ISO fields: `iso` is the cached file under `isos/`, `iso_url` the download, `iso_sha256_url` the
 vendor's `SHA256SUMS` (a `release/` image moves with every build; `iso.published_sha256` takes the
 line that names this file, see [ISO_CHECKSUMS.md](ISO_CHECKSUMS.md)). `vmctl/cloudimg.py`:
@@ -1049,8 +1049,24 @@ The identity and `locale` blocks of local.json reach `cloudimg_config` like ever
 section (`config.USER_IDENTITY_FIELDS`, `config.locale_values`). The first profile is
 `ubuntu-24.04-cloud` (Ubuntu 24.04 minimal, 1 GB, SSH 2358, in `smoke`). First live run
 2026-10-02: PASS, 49 s from the seed to the verified SSH post-install after a 266 MB download
-(cloud-init finished its final stage at 28 s of uptime and powered off by itself); Debian's `genericcloud` image publishes `SHA512SUMS` only, so it waits for a `sha512`
-field.
+(cloud-init finished its final stage at 28 s of uptime and powered off by itself).
+
+Additional bases: `ubuntu-22.04-cloud-base`, `ubuntu-20.04-cloud-base`,
+`debian-12-cloud-base` and `alpine-cloud-base`, with standalone profiles named without `-base`.
+Debian uses `iso_sha512_url` to select its qcow2 entry in the vendor's `SHA512SUMS`;
+Alpine uses a versioned NoCloud BIOS URL and a fixed vendor `iso_sha512` (about 174 MiB).
+Both checksum algorithms validate cached images and new downloads; fixed pins take precedence.
+A multi-entry checksum manifest without the requested filename is an error.
+
+Alpine uses OpenRC and ash: wheel membership and sudo are explicit, ttyS0 is in inittab,
+and the cloud-init services are removed from their runlevels after provisioning (the disabled
+marker is retained too). cloud-init's Alpine power-state implementation selects the appropriate
+shutdown command. Locale/keyboard modules intended for Ubuntu are omitted on Alpine.
+`segment_eni()` writes a separate `/etc/network/vmctl-<segment>` interfaces file and an OpenRC
+`local.d` script which finds the NIC by MAC, names it and calls `ifup -i` on every boot;
+it leaves the NAT NIC configuration intact. Ubuntu uses netplan; Debian installs `netplan.io`
+and enables systemd-networkd for these segment files. Runtime-only NICs need no seed on later boots.
+The [lite labs](LABS.md#labs-on-a-small-pc) use Alpine at 256 MiB and Debian at 384 MiB per VM.
 
 ## The completion-token rule
 
@@ -1149,6 +1165,10 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `pxe-lab` | The PXE lab (vms/labs/pxe-lab/): `pxe-lab-server` (dnsmasq DHCP + TFTP on the segment, iPXE chained to pxelinux for BIOS, Debian's shim + GRUB for UEFI by DHCP option 93, nginx, NAT), `pxe-lab-client` (BIOS) and `pxe-lab-client-efi` (OVMF), empty disks that install Debian 13 over the network with `bootstrap-netboot` (docs/LABS.md#network-boot-bootstrap-netboot) |
 | `mdadm-lab` | The mdadm lab (vms/labs/mdadm-lab/): `mdadm-lab-server`, one cloud image with four empty 2 GB disks for Linux software RAID: a mirror, a failed disk, a RAID5 with a hot spare, a grow, stop/assemble |
 | `mysql-lab` | The MySQL lab (vms/labs/mysql-lab/): `mysql-lab-server`, one cloud image with MySQL 8, a sample shop database (users, orders, a foreign key) and phpMyAdmin on http://127.0.0.1:8088/phpmyadmin: queries, joins, transactions, privileges, indexes, mysqldump, configuration |
+| `lite` | The low-resource labs, for a host with little RAM: every member of `ssh-lab-lite`, `git-lab-lite` and `vpn-lab-lite` (docs/LABS.md) |
+| `ssh-lab-lite` | `ssh-lab` on Debian 12 cloud images (`ssh-lab-server-lite`, `ssh-lab-client-lite`, 384 MB each: the exercises need systemd and fail2ban), the same tests on its own `ssh-lan-lite` segment |
+| `git-lab-lite` | `git-lab` on an Alpine cloud image (`git-lab-server-lite`, 256 MB), the same tests |
+| `vpn-lab-lite` | `vpn-lab` on Alpine cloud images (`vpn-lab-server-lite`, `vpn-lab-client-lite`, 256 MB each, `tun` loaded at boot for OpenVPN), the same tests on its own `vpn-lan-lite` segment |
 | `k8s-lab` | The Kubernetes lab (vms/labs/k8s-lab/): `k8s-lab-main`, `k8s-lab-node1`, `k8s-lab-node2`, three cloud images with MicroK8s 1.32 on the `k8s-lan` segment; the workers join by themselves at their first boot there (`k8s-lab-node.service`); NodePort 30080 on http://127.0.0.1:8089: anatomy, Deployment + Service, rolling update and rollback, drain, ConfigMap and Secret, a persistent volume |
 | `lvm-lab` | The LVM lab (vms/labs/lvm-lab/): `lvm-lab-server`, one cloud image with three empty 2 GiB extra disks |
 | `proxmox-lab` | The Proxmox lab (vms/labs/proxmox-lab/): `proxmox-ve`, `proxmox-ve-node2`, `proxmox-ve-node3` (ZFS mirror over two disks each, cluster `pve-lab`) and `proxmox-lab-client` (Xfce + Firefox), joined by the `pve-lan` segment: the cluster, the LXC containers, ZFS replication (`pvesr`), HA with a planned migration, and a node powered off while its container restarts on another node (about 2.5 minutes, verified live 2026-10-07) |
@@ -1726,7 +1746,7 @@ what went wrong first (all verified live on 2026-09-24):
 ## Groups as stacks and the lab map (`vmctl group`)
 
 A declared group (`meta.groups`) can be run as one stack. A **lab** is a group whose members are
-all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab`, `vpn-lab`, `ssh-lab`, `docker-lab`, `lvm-lab`, `git-lab`, `zfs-lab`, `mdadm-lab`, `mysql-lab`, `k8s-lab` and `pxe-lab` (`vmctl group list --labs`).
+all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab`, `vpn-lab`, `ssh-lab`, `docker-lab`, `lvm-lab`, `git-lab`, `zfs-lab`, `mdadm-lab`, `mysql-lab`, `k8s-lab`, `pxe-lab` and the low-resource `ssh-lab-lite`, `git-lab-lite`, `vpn-lab-lite` (`vmctl group list --labs`).
 
 ```bash
 vmctl group list [--labs] [--json]

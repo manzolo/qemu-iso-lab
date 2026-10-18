@@ -1,0 +1,305 @@
+{
+  "vms": {
+    "ssh-lab-server-lite": {
+      "name": "ssh-lab-server-lite (Debian 12)",
+      "extends": "debian-12-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "ssh-lab-lite",
+          "lite"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-18"
+      },
+      "notes": "Low-memory counterpart of ssh-lab-server; exercises and tests in vms/labs/ssh-lab-lite/. Independent runtime segment; original lab tests are shared.",
+      "cloudimg_config": {
+        "packages": [
+          "openssh-server",
+          "fail2ban",
+          "knockd",
+          "iptables",
+          "rsyslog"
+        ],
+        "write_files": [
+          {
+            "path": "/etc/fail2ban/jail.local",
+            "permissions": "0644",
+            "content": "[DEFAULT]\nignoreip = 127.0.0.1/8 10.0.2.0/24\nbantime = 600\nfindtime = 600\nmaxretry = 3\n\n[sshd]\nenabled = true\nport = ssh\nbackend = systemd\n"
+          },
+          {
+            "path": "/etc/knockd.conf",
+            "permissions": "0644",
+            "content": "[options]\n\tUseSyslog\n\n[openSSH]\n\tsequence    = 7000,8000,9000\n\tseq_timeout = 5\n\tcommand     = /usr/sbin/iptables -I KNOCKD_SSH -s %IP% -p tcp --dport 22 -j ACCEPT\n\ttcpflags    = syn\n\n[closeSSH]\n\tsequence    = 9000,8000,7000\n\tseq_timeout = 5\n\tcommand     = /usr/sbin/iptables -D KNOCKD_SSH -s %IP% -p tcp --dport 22 -j ACCEPT\n\ttcpflags    = syn\n"
+          },
+          {
+            "path": "/usr/local/sbin/ssh-lab-knock-chain",
+            "permissions": "0755",
+            "content": "#!/bin/sh\n# SSH from the lab segment starts closed; a knock from the client opens it for that address.\n# vmctl's own SSH arrives on the NAT NIC (10.0.2.x) and never enters this chain.\niptables -N KNOCKD_SSH 2>/dev/null || iptables -F KNOCKD_SSH\niptables -A KNOCKD_SSH -j DROP\niptables -C INPUT -s 172.20.2.0/24 -p tcp --dport 22 -j KNOCKD_SSH 2>/dev/null || iptables -I INPUT -s 172.20.2.0/24 -p tcp --dport 22 -j KNOCKD_SSH\n"
+          },
+          {
+            "path": "/etc/systemd/system/ssh-lab-knock-chain.service",
+            "permissions": "0644",
+            "content": "[Unit]\nDescription=ssh-lab: SSH from the lab segment closed until a port knock\nBefore=knockd.service\nAfter=network-pre.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/local/sbin/ssh-lab-knock-chain\n\n[Install]\nWantedBy=multi-user.target\n"
+          },
+          {
+            "path": "/etc/systemd/system/knockd.service.d/vmctl.conf",
+            "permissions": "0644",
+            "content": "[Unit]\nAfter=network-online.target ssh-lab-knock-chain.service\nWants=network-online.target\n\n[Service]\n# ssh-lan-lite appears only at the runtime boot: retry until it is there.\nRestart=on-failure\nRestartSec=5\n"
+          },
+          {
+            "path": "/etc/default/knockd",
+            "permissions": "0644",
+            "content": "START_KNOCKD=1\nKNOCKD_OPTS=\"-i ssh-lan-lite\"\n"
+          }
+        ],
+        "runcmd": [
+          "systemctl enable rsyslog fail2ban ssh-lab-knock-chain.service knockd.service"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2381,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "systemctl is-active ssh",
+          "systemctl is-active fail2ban",
+          "test -x /usr/sbin/knockd",
+          "test -f /etc/netplan/60-vmctl-ssh-lan-lite.yaml",
+          "grep -rq '10.0.2.0/24' /etc/fail2ban/jail.d/ /etc/fail2ban/jail.local"
+        ]
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "ssh-lan-lite",
+          "phase": "runtime",
+          "address": "172.20.2.1/24"
+        }
+      ],
+      "memory_mb": 384,
+      "disk": {
+        "size": "4G"
+      }
+    },
+    "ssh-lab-client-lite": {
+      "name": "ssh-lab-client-lite (Debian 12)",
+      "extends": "debian-12-cloud-base",
+      "meta": {
+        "role": "client",
+        "status": "unattended",
+        "groups": [
+          "ssh-lab-lite",
+          "lite"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-18"
+      },
+      "notes": "Low-memory counterpart of ssh-lab-client; exercises and tests in vms/labs/ssh-lab-lite/. Independent runtime segment; original lab tests are shared.",
+      "cloudimg_config": {
+        "packages": [
+          "openssh-client",
+          "nmap",
+          "knockd",
+          "sshpass"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2382,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "command -v nmap knock sshpass",
+          "test -f /etc/netplan/60-vmctl-ssh-lan-lite.yaml"
+        ]
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "ssh-lan-lite",
+          "phase": "runtime",
+          "address": "172.20.2.2/24"
+        }
+      ],
+      "memory_mb": 384,
+      "disk": {
+        "size": "4G"
+      }
+    },
+    "git-lab-server-lite": {
+      "name": "git-lab-server-lite (Alpine)",
+      "extends": "alpine-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "git-lab-lite",
+          "lite"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-18"
+      },
+      "notes": "Low-memory counterpart of git-lab-server; exercises and tests in vms/labs/git-lab-lite/. Independent runtime segment; original lab tests are shared.",
+      "memory_mb": 256,
+      "cpus": 1,
+      "disk": {
+        "size": "4G"
+      },
+      "cloudimg_config": {
+        "packages": [
+          "git",
+          "git-flow",
+          "tree"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2383,
+        "copy_from_host": [
+          {
+            "source": "vms/labs/git-lab/provision/setup-git-lab.sh",
+            "dest": "/home/{{user}}/setup-git-lab.sh",
+            "dest_mode": "755"
+          },
+          {
+            "source": "vms/labs/git-lab/provision/reset-git-lab.sh",
+            "dest": "/home/{{user}}/reset-git-lab.sh",
+            "dest_mode": "755"
+          }
+        ],
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "git --version && git flow version",
+          "bash ~/setup-git-lab.sh",
+          "test -d ~/workspace/.git && test -d /srv/git/lab.git",
+          "cd ~/workspace && git log --oneline main | wc -l | grep -qvE '^[0-5]$'",
+          "cd ~/workspace && git tag | grep -qx v1.0"
+        ]
+      }
+    },
+    "vpn-lab-server-lite": {
+      "name": "vpn-lab-server-lite (Alpine)",
+      "extends": "alpine-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "vpn-lab-lite",
+          "lite"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-18"
+      },
+      "notes": "Low-memory counterpart of vpn-lab-server; exercises and tests in vms/labs/vpn-lab-lite/. Independent runtime segment; original lab tests are shared. Alpine's virt kernel does not load tun by itself: the profile lists it in /etc/modules, or OpenVPN finds no /dev/net/tun (the WireGuard exercises work either way).",
+      "cloudimg_config": {
+        "packages": [
+          "wireguard-tools",
+          "openvpn",
+          "iptables",
+          "curl",
+          "procps"
+        ],
+        "runcmd": [
+          "grep -qx tun /etc/modules || echo tun >> /etc/modules",
+          "modprobe tun"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2384,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "command -v wg wg-quick openvpn tcpdump iptables",
+          "test -c /dev/net/tun",
+          "test -f /etc/network/vmctl-vpn-lan-lite"
+        ]
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "vpn-lan-lite",
+          "phase": "runtime",
+          "address": "172.20.1.1/24"
+        }
+      ],
+      "memory_mb": 256,
+      "disk": {
+        "size": "4G"
+      }
+    },
+    "vpn-lab-client-lite": {
+      "name": "vpn-lab-client-lite (Alpine)",
+      "extends": "alpine-cloud-base",
+      "meta": {
+        "role": "client",
+        "status": "unattended",
+        "groups": [
+          "vpn-lab-lite",
+          "lite"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-18"
+      },
+      "notes": "Low-memory counterpart of vpn-lab-client; exercises and tests in vms/labs/vpn-lab-lite/. Independent runtime segment; original lab tests are shared. Alpine's virt kernel does not load tun by itself: the profile lists it in /etc/modules, or OpenVPN finds no /dev/net/tun (the WireGuard exercises work either way).",
+      "cloudimg_config": {
+        "packages": [
+          "wireguard-tools",
+          "openvpn",
+          "iptables",
+          "curl",
+          "procps"
+        ],
+        "runcmd": [
+          "grep -qx tun /etc/modules || echo tun >> /etc/modules",
+          "modprobe tun"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2385,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "command -v wg wg-quick openvpn tcpdump iptables",
+          "test -c /dev/net/tun",
+          "test -f /etc/network/vmctl-vpn-lan-lite"
+        ]
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "vpn-lan-lite",
+          "phase": "runtime",
+          "address": "172.20.1.2/24"
+        }
+      ],
+      "memory_mb": 256,
+      "disk": {
+        "size": "4G"
+      }
+    }
+  }
+}

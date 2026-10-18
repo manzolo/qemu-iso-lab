@@ -40,8 +40,8 @@ Next, in this order:
 5. Then the other qlab plugins (dns, dhcp, firewall, nginx, postgres, raid, samba, systemd, git...):
    most are one-server labs that fit the docker-lab/lvm-lab pattern unchanged.
 
-Open points found on the way: Debian's genericcloud image publishes SHA512SUMS only (needs an
-`iso_sha512` field before a Debian member); a guide's relative links (`../../docs/...`) render as
+Debian's SHA512SUMS support and the Alpine/Debian lite labs landed on 2026-10-18
+(see [LABS.md](LABS.md#labs-on-a-small-pc)). Open points: a guide's relative links (`../../docs/...`) render as
 text on the guide page. The lab rows in the matrix: the first full run (2026-10-03, 171 PASS) had
 every member pass but all five `lab-<name>` rows fail on "Disk image not found", because the row
 cleanup removed each member's disk before the lab tests; fixed in 0.17.4 (a passing member waits

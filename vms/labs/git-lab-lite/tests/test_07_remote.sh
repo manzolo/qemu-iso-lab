@@ -1,0 +1,1 @@
+../../git-lab/tests/test_07_remote.sh

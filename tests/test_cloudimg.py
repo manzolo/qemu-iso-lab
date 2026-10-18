@@ -213,3 +213,38 @@ class PublishedSumsTests(unittest.TestCase):
         response.__enter__.return_value.read.return_value = f"{other}  openSUSE-Tumbleweed-NET-x86_64-Current.iso\n".encode()
         with mock.patch("urllib.request.urlopen", return_value=response):
             self.assertEqual(iso.published_sha256({"iso": "isos/x.iso", "iso_sha256_url": "https://example.test/x.sha256"}), other)
+
+
+class CloudFamilyTests(unittest.TestCase):
+    def test_alpine_seed_uses_openrc_ash_and_mac_matched_eni(self):
+        vm = config.load_tracked(ROOT / 'vms/profiles')['vpn-lab-server-lite']
+        cloudimg.check_profile('vpn-lab-server-lite', vm)
+        data = json.loads(cloudimg.render_user_data('vpn-lab-server-lite', vm, [KEY]).split('\n', 1)[1])
+        self.assertEqual(data['users'][0]['shell'], '/bin/ash')
+        self.assertEqual(data['users'][0]['groups'], 'wheel')
+        self.assertIn('sudo', data['packages'])
+        self.assertNotIn('locale', data)
+        self.assertNotIn('keyboard', data)
+        files = {f['path']: f['content'] for f in data['write_files']}
+        self.assertFalse(any('/netplan/' in path for path in files))
+        self.assertIn('address 172.20.1.1/24', files['/etc/network/vmctl-vpn-lan-lite'])
+        script = files['/etc/local.d/vmctl-segments.start']
+        self.assertIn(cloudimg.qemu.network_specs(vm, 'runtime')[1]['mac'], script)
+        self.assertIn('ifup -i /etc/network/vmctl-vpn-lan-lite vpn-lan-lite', script)
+        provision = files[cloudimg.PROVISION_SCRIPT]
+        self.assertNotIn('systemctl', provision)
+        self.assertIn('rc-update --all del', provision)
+        self.assertIn('ttyS0::respawn:', provision)
+        self.assertIn('${LINENO:-unknown}', provision)
+        self.assertLess(provision.index('sync\n'), provision.index(cloudimg.BOOTSTRAP_COMPLETE_TOKEN))
+        self.assertEqual(data['power_state']['mode'], 'poweroff')
+
+    def test_debian_installs_netplan_and_enables_its_renderer(self):
+        vm = config.load_tracked(ROOT / 'vms/profiles')['ssh-lab-server-lite']
+        data = json.loads(cloudimg.render_user_data('ssh-lab-server-lite', vm, [KEY]).split('\n', 1)[1])
+        self.assertIn('netplan.io', data['packages'])
+        self.assertIn('systemctl enable systemd-networkd', data['write_files'][-1]['content'])
+        self.assertIn('/etc/netplan/60-vmctl-ssh-lan-lite.yaml', [f['path'] for f in data['write_files']])
+        vm['cloudimg_config']['family'] = 'typo'
+        with self.assertRaisesRegex(VMError, 'family'):
+            cloudimg.check_profile('bad', vm)

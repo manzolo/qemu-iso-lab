@@ -1,0 +1,1 @@
+../../vpn-lab/tests/test_01_vpn_anatomy.sh

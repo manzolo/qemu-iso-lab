@@ -70,6 +70,171 @@
         "user": "lab",
         "ssh_key": null
       }
+    },
+    "ubuntu-22.04-cloud-base": {
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "status": "experimental"
+      },
+      "iso": "isos/ubuntu-22.04-minimal-cloudimg-amd64.img",
+      "iso_url": "https://cloud-images.ubuntu.com/minimal/releases/jammy/release/ubuntu-22.04-minimal-cloudimg-amd64.img",
+      "iso_sha256_url": "https://cloud-images.ubuntu.com/minimal/releases/jammy/release/SHA256SUMS"
+    },
+    "ubuntu-20.04-cloud-base": {
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "status": "experimental"
+      },
+      "iso": "isos/ubuntu-20.04-minimal-cloudimg-amd64.img",
+      "iso_url": "https://cloud-images.ubuntu.com/minimal/releases/focal/release/ubuntu-20.04-minimal-cloudimg-amd64.img",
+      "iso_sha256_url": "https://cloud-images.ubuntu.com/minimal/releases/focal/release/SHA256SUMS"
+    },
+    "alpine-cloud-base": {
+      "meta": {
+        "slug": "alpine",
+        "family": "alpine",
+        "release_model": "stable",
+        "status": "experimental"
+      },
+      "iso": "isos/nocloud_alpine-3.22.4-x86_64-bios-cloudinit-r0.qcow2",
+      "iso_url": "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/cloud/nocloud_alpine-3.22.4-x86_64-bios-cloudinit-r0.qcow2",
+      "disk": {
+        "path": "artifacts/{{name}}/disk.qcow2",
+        "size": "4G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "bios"
+      },
+      "machine": "q35",
+      "memory_mb": 256,
+      "cpus": 1,
+      "network": "user",
+      "audio": false,
+      "usb_tablet": true,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "cloudimg_config": {
+        "hostname": "{{name}}",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "packages": [
+          "openssh",
+          "sudo",
+          "bash",
+          "nano",
+          "iproute2",
+          "iputils",
+          "tcpdump",
+          "net-tools",
+          "openssh-sftp-server",
+          "tzdata"
+        ],
+        "family": "alpine"
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_key": null
+      },
+      "iso_sha512": "d0ddf1faae4d44aee3ad6621f166bd414c2f99b6974fb455408612d59cbb31a5390ca259800ac0c6b60505493880ed6de8beb986f6d0883b26c8e84ce75a266c"
+    },
+    "debian-12-cloud-base": {
+      "meta": {
+        "slug": "debian",
+        "family": "debian",
+        "release_model": "stable",
+        "status": "experimental"
+      },
+      "iso": "isos/debian-12-genericcloud-amd64.qcow2",
+      "iso_url": "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2",
+      "disk": {
+        "path": "artifacts/{{name}}/disk.qcow2",
+        "size": "10G",
+        "format": "qcow2",
+        "interface": "virtio"
+      },
+      "firmware": {
+        "type": "efi",
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+        "vars_template": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+        "vars_path": "artifacts/{{name}}/OVMF_VARS.fd"
+      },
+      "machine": "q35",
+      "memory_mb": 384,
+      "cpus": 1,
+      "network": "user",
+      "audio": false,
+      "usb_tablet": true,
+      "video": {
+        "default": "safe",
+        "installer_order": [
+          "std",
+          "safe"
+        ],
+        "variants": {
+          "std": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ],
+          "safe": [
+            "-vga",
+            "std",
+            "-display",
+            "gtk"
+          ]
+        }
+      },
+      "cloudimg_config": {
+        "hostname": "{{name}}",
+        "username": "lab",
+        "realname": "Lab User",
+        "password_hash": "$6$labsalt0$POq.mGL6qhDmEnplwYiYiuKyYy.U8EuL0G.ROmcWjbMIHXpKeoKRB6MI2ObMDS3NHOQiB/R9E4pAiaNp5HKou/",
+        "timezone": "UTC",
+        "locale": "en_US.UTF-8",
+        "keyboard": "us",
+        "packages": [
+          "openssh-server",
+          "sudo",
+          "nano",
+          "iputils-ping",
+          "tcpdump",
+          "net-tools",
+          "netplan.io"
+        ],
+        "family": "debian",
+        "runcmd": [
+          "systemctl enable systemd-networkd"
+        ]
+      },
+      "ssh_provision": {
+        "user": "lab",
+        "ssh_key": null
+      },
+      "iso_sha512_url": "https://cloud.debian.org/images/cloud/bookworm/latest/SHA512SUMS"
     }
   },
   "vms": {
@@ -95,6 +260,103 @@
           "systemctl is-active serial-getty@ttyS0.service",
           "df -h / | tail -1",
           "command -v tcpdump nano"
+        ]
+      }
+    },
+    "ubuntu-22.04-cloud": {
+      "name": "Ubuntu 22.04 Server (cloud image)",
+      "extends": "ubuntu-22.04-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "ubuntu"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-18"
+      },
+      "notes": "Ubuntu 22.04 minimal cloud image, configured by NoCloud. See docs/UNATTENDED.md.",
+      "ssh_provision": {
+        "ssh_host_port": 2377,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "systemctl is-active ssh",
+          "systemctl is-active serial-getty@ttyS0.service",
+          "df -h / | tail -1",
+          "command -v tcpdump nano"
+        ]
+      }
+    },
+    "ubuntu-20.04-cloud": {
+      "name": "Ubuntu 20.04 Server (cloud image)",
+      "extends": "ubuntu-20.04-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "ubuntu"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-18"
+      },
+      "notes": "Ubuntu 20.04 minimal cloud image, configured by NoCloud. See docs/UNATTENDED.md.",
+      "ssh_provision": {
+        "ssh_host_port": 2378,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "systemctl is-active ssh",
+          "systemctl is-active serial-getty@ttyS0.service",
+          "df -h / | tail -1",
+          "command -v tcpdump nano"
+        ]
+      }
+    },
+    "alpine-cloud": {
+      "name": "alpine-cloud (cloud image)",
+      "extends": "alpine-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "lite"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-18"
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2379,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "command -v sudo nano tcpdump",
+          "rc-service sshd status",
+          "! rc-update show | grep -E 'cloud-(init|config|final)'",
+          "grep -q '^ttyS0::' /etc/inittab"
+        ]
+      }
+    },
+    "debian-12-cloud": {
+      "name": "debian-12-cloud (cloud image)",
+      "extends": "debian-12-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "lite"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-18"
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2380,
+        "post_install_run": [
+          "id {{user}}",
+          "test -f /etc/cloud/cloud-init.disabled",
+          "command -v sudo nano tcpdump",
+          "systemctl is-active ssh",
+          "systemctl is-active serial-getty@ttyS0.service"
         ]
       }
     }

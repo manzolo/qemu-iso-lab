@@ -227,3 +227,21 @@ the architecture. With the current image (Snapshot20260930) `opensuse-tumbleweed
 | `opensuse-tumbleweed-autoyast`, `opensuse-tumbleweed-kde`, `opensuse-tumbleweed-net` | `openSUSE-Tumbleweed-NET-x86_64-Current.iso` | [.sha256](https://ftp.gwdg.de/pub/opensuse/tumbleweed/iso/openSUSE-Tumbleweed-NET-x86_64-Current.iso.sha256) |
 | `ubuntu-24.04-cloud` | `ubuntu-24.04-minimal-cloudimg-amd64.img` (a cloud image, not an ISO: `bootstrap-cloudimg`; the `release/` build moves, and `SHA256SUMS` lists every file of the directory, so `published_sha256` takes the line naming this one) | [SHA256SUMS](https://cloud-images.ubuntu.com/minimal/releases/noble/release/SHA256SUMS) |
 | `opensuse-slowroll` | `openSUSE-Slowroll-DVD-x86_64-Media.iso` | [.sha256](https://ftp.gwdg.de/pub/opensuse/slowroll/iso/openSUSE-Slowroll-DVD-x86_64-Media.iso.sha256) |
+
+## Cloud bases added 2026-10-18
+
+- Alpine 3.22.4 BIOS NoCloud (`alpine-cloud-base`): fixed
+  [official qcow2](https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/cloud/nocloud_alpine-3.22.4-x86_64-bios-cloudinit-r0.qcow2),
+  `iso_sha512` copied from its [vendor SHA-512](https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/cloud/nocloud_alpine-3.22.4-x86_64-bios-cloudinit-r0.qcow2.sha512).
+  The file contains a bare 128-digit SHA-512, not SHA-512/256; no discovery and no locally computed pin.
+  The published cloud-init variant is about 174 MiB (larger than Tiny Cloud).
+- Debian 12 genericcloud: [official SHA512SUMS](https://cloud.debian.org/images/cloud/bookworm/latest/SHA512SUMS),
+  selected by the exact `debian-12-genericcloud-amd64.qcow2` filename through `iso_sha512_url`.
+  The moving `latest` URL is checked on use, like Ubuntu's moving release images.
+- Ubuntu 22.04 minimal: [Jammy SHA256SUMS](https://cloud-images.ubuntu.com/minimal/releases/jammy/release/SHA256SUMS).
+- Ubuntu 20.04 minimal: [Focal SHA256SUMS](https://cloud-images.ubuntu.com/minimal/releases/focal/release/SHA256SUMS).
+
+`iso_sha512` verifies a fixed digest; `iso_sha512_url` performs the same published-manifest lookup
+as `iso_sha256_url`, pins downloads and checks cached images. Offline use retains the existing
+warning/cache behavior. Multi-file manifests must contain the requested filename; a single-file
+manifest can use the vendor's other filename (the openSUSE Current/Snapshot convention).

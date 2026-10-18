@@ -80,6 +80,11 @@ def validate_iso_file(path: Path, vm: dict[str, Any] | None = None) -> list[str]
         actual_sha1 = hash_file(path, "sha1")
         if actual_sha1.lower() != str(expected_sha1).lower():
             problems.append(f"sha1 is {actual_sha1}, expected {expected_sha1}")
+    expected_sha512 = vm.get("iso_sha512")
+    if expected_sha512:
+        actual_sha512 = hash_file(path, "sha512")
+        if actual_sha512.lower() != str(expected_sha512).lower():
+            problems.append(f"sha512 is {actual_sha512}, expected {expected_sha512}")
     expected_md5 = vm.get("iso_md5")  # Slackware publishes MD5 (plus a GPG signature) for its DVDs
     if expected_md5:
         actual_md5 = hash_file(path, "md5")
@@ -417,7 +422,16 @@ def published_sha256(vm: dict[str, Any]) -> str | None:
     repository's installation system no longer matched, YaST could not detect the architecture
     and refused ``grub2-efi`` in a dialog nobody answered (three Tumbleweed rows, 2026-10-01/02).
     None without the field, or when the file cannot be read: offline, the cache is used as it is."""
-    url = vm.get("iso_sha256_url")
+    return _published_checksum(vm, "sha256", 64)
+
+
+def published_sha512(vm: dict[str, Any]) -> str | None:
+    """The SHA-512 counterpart of published_sha256 (Debian genericcloud)."""
+    return _published_checksum(vm, "sha512", 128)
+
+
+def _published_checksum(vm: dict[str, Any], algorithm: str, length: int) -> str | None:
+    url = vm.get(f"iso_{algorithm}_url")
     if not url:
         return None
     try:
@@ -427,16 +441,22 @@ def published_sha256(vm: dict[str, Any]) -> str | None:
     except (OSError, ValueError) as exc:
         ui.print_status("warn", f"Cannot read {ui.pretty_url(str(url))} ({exc}): the cached ISO is used without checking that it is current", ok=False)
         return None
-    match = re.search(r"\b[0-9a-fA-F]{64}\b", text)
+    pattern = rf"[0-9a-fA-F]{{{length}}}"
+    match = re.search(rf"\b{pattern}\b", text)
     if match is None:
-        ui.print_status("warn", f"No SHA-256 in {ui.pretty_url(str(url))}: the cached ISO is used without checking that it is current", ok=False)
+        ui.print_status("warn", f"No {algorithm.upper()} in {ui.pretty_url(str(url))}: the cached ISO is used without checking that it is current", ok=False)
         return None
     # A SUMS file with several entries (cloud-images.ubuntu.com) names each file: take ours, not the first.
     names = {Path(str(vm.get("iso") or "")).name, str(vm.get("iso_url") or "").rsplit("/", 1)[-1]} - {""}
+    entries = []
     for line in text.splitlines():
-        entry = re.match(r"\s*([0-9a-fA-F]{64})\s+\*?(\S.*?)\s*$", line)
+        entry = re.match(rf"\s*({pattern})\s+\*?(\S.*?)\s*$", line)
         if entry and Path(entry.group(2)).name in names:
             return entry.group(1).lower()
+        if entry:
+            entries.append(entry)
+    if len(entries) > 1:
+        raise VMError(f"No checksum for {', '.join(sorted(names))} in {url}")
     return match.group(0).lower()
 
 
@@ -451,14 +471,17 @@ def ensure_iso(vm: dict[str, Any], dry_run: bool = False) -> Path:
             return image
         raise VMError(missing_iso_message(vm))
     iso_path = runtime.resolve_path(vm["iso"])
-    published = None if dry_run else published_sha256(vm)
-    if published and not vm.get("iso_sha256"):
-        # The checksum the vendor publishes today pins both the cached copy and a new download.
-        vm = {**vm, "iso_sha256": published}
+    published_urls = []
+    for algorithm, lookup in (("sha256", published_sha256), ("sha512", published_sha512)):
+        published = None if dry_run else lookup(vm)
+        if published and not vm.get(f"iso_{algorithm}"):
+            # Pin both the cached copy and every download candidate.
+            vm = {**vm, f"iso_{algorithm}": published}
+            published_urls.append(str(vm[f"iso_{algorithm}_url"]))
     if iso_path.is_file():
         problems = validate_iso_file(iso_path, vm)
-        if problems and published:
-            ui.print_note(f"{ui.pretty_url(str(vm['iso_sha256_url']))} names a newer image than the cached one")
+        if problems and published_urls:
+            ui.print_note(f"{', '.join(ui.pretty_url(url) for url in published_urls)} names a newer image than the cached one")
         if problems:
             ui.print_status("warn", f"Removing invalid cached ISO: {ui.pretty_path(iso_path)} ({'; '.join(problems)})", ok=False)
             if not dry_run:

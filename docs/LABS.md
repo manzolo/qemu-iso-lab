@@ -50,6 +50,45 @@ something the exercises should always start from; `--name` keeps several. A clou
 reset point is an overlay on its base image, so it costs only what the install changed; extra disks
 (lvm, zfs, mdadm, the Proxmox mirror) are part of it.
 
+## Labs on a small PC
+
+The `-lite` labs have separate profiles and segments, so they can coexist with the original labs.
+They keep the same exercises and run the original tests through symlinks. `_common.sh` redirects
+only the shared test's own members to their `-lite` profiles and translates the segment interface
+names. Guides and runbooks name the lite members directly; no change to the lab membership model.
+Git's provision scripts are shared with the original lab.
+
+| Lab | Base | RAM per member | Total guest RAM |
+|---|---|---|---|
+| `git-lab-lite` | Alpine 3.22 NoCloud | 256 MiB | 256 MiB |
+| `vpn-lab-lite` | Alpine 3.22 NoCloud | 256 MiB | 512 MiB |
+| `ssh-lab-lite` | Debian 12 genericcloud | 384 MiB | 768 MiB |
+
+Git includes bash and git-flow; VPN includes iproute2, WireGuard, OpenVPN and iptables.
+SSH uses Debian because its exercises teach systemd service management, journal-backed fail2ban
+and knockd units. No Ubuntu-specific exercise has been silently removed. Guest RAM excludes QEMU
+and host overhead; run one lab at a time on a small PC. Each member has one CPU and a 4 GiB sparse disk.
+Alpine's pinned qcow2 is about 174 MiB, shared by its overlays.
+
+```bash
+vmctl group install git-lab-lite
+vmctl group test git-lab-lite
+vmctl group down git-lab-lite
+vmctl group install vpn-lab-lite
+vmctl group test vpn-lab-lite
+vmctl group down vpn-lab-lite
+vmctl group install ssh-lab-lite
+vmctl group test ssh-lab-lite
+vmctl group down ssh-lab-lite
+vmctl check-vms --group lite --report
+```
+
+`lite` also includes the standalone `alpine-cloud` and `debian-12-cloud` smoke profiles.
+Ubuntu 20.04 and 22.04 standalone cloud profiles retain 1024 MiB and belong to `ubuntu`.
+The lite segments are `vpn-lan-lite` and `ssh-lan-lite`; their private addresses match the original
+exercises but their multicast networks and SSH ports are independent (2381–2385).
+The live evidence and verification dates are in [PROFILE_TODO.md](PROFILE_TODO.md).
+
 ## The network map
 
 `vmctl group map <lab>` writes one self-contained HTML page under `artifacts/labs/<lab>/`: the

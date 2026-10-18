@@ -53,6 +53,17 @@ Every tracked profile has `meta.status`:
 
 Recorded dates:
 
+- 2026-10-18: the low-resource cloud bases and the lite labs (`lite` group). `alpine-cloud`
+  (Alpine 3.22 NoCloud, 256 MB, OpenRC), `debian-12-cloud` (genericcloud, SHA512SUMS through the new
+  `iso_sha512`/`iso_sha512_url`), `ubuntu-22.04-cloud` and `ubuntu-20.04-cloud` each passed
+  `bootstrap-cloudimg` in about a minute (Alpine's first try failed, the second passed in 68 s). Then from
+  clean disks: `ssh-lab-lite` on Debian 12 (384 MB per member) 6/6 scripts, 29 checks; `git-lab-lite` on
+  Alpine 10/10, 67 checks; `vpn-lab-lite` on Alpine (256 MB per member) 5/5, 34 checks. Two things the
+  first run found: knockd lives in /usr/sbin, outside a user's PATH on Debian (the check tests the file),
+  and Alpine's virt kernel does not load `tun` by itself, so OpenVPN found no /dev/net/tun while
+  WireGuard worked (the profiles list `tun` in /etc/modules). The lite labs reuse the full labs' tests
+  through symlinks; `_common.sh` maps the member and segment names.
+
 - 2026-10-16: the pxe-lab (`pxe-lab-server`, `pxe-lab-client`) and F6 of docs/QLAB_IMPORT.md,
   network boot: `vmctl bootstrap-netboot`. From clean disks, `vmctl group install pxe-lab` installed
   the server (cloud image + `setup-pxe-server.sh`), then the client over the network (iPXE ROM →

@@ -44,6 +44,17 @@
         }
       ]
     },
+    "alpine-cloud": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c92a1b8b13f4edcb0d9ef70e1bf2d34d47693f16376b9632c8095593faf84605",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-18",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "alpine-niri": {
       "version": "1.0.0",
       "fingerprint": "sha256:0a4a6a3ecf93abd162e385a62ef6e8fc0e9cc8bb32e96c7903b0f14e3b3f02a0",
@@ -412,6 +423,17 @@
         {
           "version": "1.0.0",
           "date": "2026-09-28",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "debian-12-cloud": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:231e56f919a145298be32af70e3949f00f21a28b7ca3775f63984743f31d7620",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-18",
           "note": "first versioned catalog"
         }
       ]
@@ -866,6 +888,17 @@
           "version": "1.0.0",
           "date": "2026-10-03",
           "note": "git-lab: one cloud image with git and git-flow, the repository prepared by the post-install (ported from qlab)"
+        }
+      ]
+    },
+    "git-lab-server-lite": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:eebfaad5a5eb89a35d3ba2c0c21622b8b51d10b070493d8acdc4cce2b74e1ba4",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-18",
+          "note": "first versioned catalog"
         }
       ]
     },
@@ -1954,6 +1987,17 @@
         }
       ]
     },
+    "ssh-lab-client-lite": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:0f91730e02b979ad827d43b509dc80f1aea86d59bbc571490989398c0e97eacf",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-18",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "ssh-lab-server": {
       "version": "1.0.2",
       "fingerprint": "sha256:79a6a50ba7122ffc69f95d35354ab778e63ae026c035fb7db274f64075dc8a45",
@@ -1971,6 +2015,17 @@
         {
           "version": "1.0.0",
           "date": "2026-10-02",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ssh-lab-server-lite": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:eef08ebd30737bb51c1db5ce3b266dfb1d66815148913337d8f8f001716ef528",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-18",
           "note": "first versioned catalog"
         }
       ]
@@ -2106,6 +2161,17 @@
         }
       ]
     },
+    "ubuntu-20.04-cloud": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:0de7f189820d03dd84149d9e11e6b52ebd5d113ce36ab739ff679a14688e13d0",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-18",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "ubuntu-20.04-desktop": {
       "version": "1.0.0",
       "fingerprint": "sha256:374fb9d8fbb795e0893bbb19d8ae47bc8fad2d4b38faa179897e605f253ec52e",
@@ -2129,6 +2195,17 @@
         {
           "version": "1.0.0",
           "date": "2026-09-27",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "ubuntu-22.04-cloud": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:8266f777697c84602d92c882443b5d45e96acdd4d4a8fd34a5fe700aef5e1292",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-18",
           "note": "first versioned catalog"
         }
       ]
@@ -2563,6 +2640,17 @@
         }
       ]
     },
+    "vpn-lab-client-lite": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c8ecc23d94583b70b85d14f41f675f4018c6f78f5a91dbd41ac5905583f83085",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-18",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
     "vpn-lab-server": {
       "version": "1.0.0",
       "fingerprint": "sha256:56d41e2d490fa502f9d2d676eff56b8b075052451abc7f30e4885aa07f1870c4",
@@ -2570,6 +2658,17 @@
         {
           "version": "1.0.0",
           "date": "2026-10-02",
+          "note": "first versioned catalog"
+        }
+      ]
+    },
+    "vpn-lab-server-lite": {
+      "version": "1.0.0",
+      "fingerprint": "sha256:c6eaac56fdf3ad1c14f05ea49df94b980303db40a325547a9ccd78a2a66669f4",
+      "history": [
+        {
+          "version": "1.0.0",
+          "date": "2026-10-18",
           "note": "first versioned catalog"
         }
       ]

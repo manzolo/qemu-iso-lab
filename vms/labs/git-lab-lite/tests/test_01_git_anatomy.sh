@@ -1,0 +1,1 @@
+../../git-lab/tests/test_01_git_anatomy.sh

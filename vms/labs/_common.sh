@@ -16,6 +16,8 @@ set -euo pipefail
 
 LAB_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VMCTL="${VMCTL:-$(cd "$LAB_COMMON_DIR/../.." && pwd)/bin/vmctl}"
+LAB_TEST_GROUP="${BASH_SOURCE[1]%/tests/*}"
+LAB_TEST_GROUP="${LAB_TEST_GROUP##*/}"
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
     RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; BOLD=$'\033[1m'; RESET=$'\033[0m'
@@ -31,6 +33,21 @@ log_info() { printf '%s  [INFO]%s %s\n' "$YELLOW" "$RESET" "$*"; }
 
 on() {
     local vm="$1"; shift
+    # The lite labs symlink these same tests. Only their own original members
+    # are redirected; distinct segment names isolate them from the full labs.
+    local arg
+    case "$LAB_TEST_GROUP:$vm" in
+        ssh-lab-lite:ssh-lab-*|git-lab-lite:git-lab-*|vpn-lab-lite:vpn-lab-*)
+            vm="${vm}-lite"
+            local -a args=()
+            for arg in "$@"; do
+                arg="${arg//vpn-lan/vpn-lan-lite}"
+                arg="${arg//ssh-lan/ssh-lan-lite}"
+                args+=("$arg")
+            done
+            set -- "${args[@]}"
+            ;;
+    esac
     "$VMCTL" shell "$vm" -- "$@"
 }
 

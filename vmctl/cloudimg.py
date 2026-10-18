@@ -38,6 +38,15 @@ PROVISION_SCRIPT = "/var/lib/vmctl/provision.sh"
 IMAGE_FORMATS = ("qcow2", "raw")
 # What the minimal images lack and every lab guide uses, as in qlab.
 DEFAULT_PACKAGES = ["openssh-server", "sudo", "nano", "iputils-ping", "tcpdump", "net-tools"]
+ALPINE_PACKAGES = ["openssh", "sudo", "bash", "nano", "iproute2", "iputils", "tcpdump", "net-tools"]
+
+
+def family(vm: dict[str, Any]) -> str:
+    """Guest userspace, independent of the catalog's display metadata."""
+    value = str((cloudimg_config(vm) or {}).get("family") or "ubuntu")
+    if value not in ("ubuntu", "debian", "alpine"):
+        raise VMError(f"Unsupported cloudimg_config.family: {value}")
+    return value
 
 
 def cloudimg_config(vm: dict[str, Any]) -> dict[str, Any] | None:
@@ -62,6 +71,7 @@ def check_profile(vm_name: str, vm: dict[str, Any]) -> None:
     cfg = cloudimg_config(vm)
     if cfg is None:
         raise VMError(f"VM '{vm_name}' does not define cloudimg_config")
+    family(vm)
     if not str(cfg.get("username") or "").strip() or not str(cfg.get("password_hash") or "").strip():
         raise VMError(f"{vm_name}: cloudimg_config needs username and password_hash")
     if image_format(vm) not in IMAGE_FORMATS:
@@ -133,13 +143,22 @@ def render_provision_script(vm_name: str, vm: dict[str, Any]) -> str:
     cfg = cloudimg_config(vm) or {}
     lines = [_shell_line(entry) for entry in (cfg.get("runcmd") or [])]
     body = "\n".join(lines) + ("\n" if lines else "")
+    setup = "systemctl enable serial-getty@ttyS0.service >/dev/null 2>&1 || true\n"
+    disable = "touch /etc/cloud/cloud-init.disabled\n"
+    if family(vm) == "alpine":
+        setup = ("grep -q '^ttyS0::' /etc/inittab || "
+                 "echo 'ttyS0::respawn:/sbin/getty -L 115200 ttyS0 vt100' >> /etc/inittab\n"
+                 "rc-update add sshd default\nrc-update add local default\n")
+        # OpenRC's cloud-init services do not all honour systemd's disabled marker.
+        disable += ("for service in cloud-init-local cloud-init cloud-config cloud-final cloud-init-hotplugd; do\n"
+                    "    rc-update --all del \"$service\" 2>/dev/null || true\ndone\n")
     return f"""#!/bin/sh
 # vmctl: first-boot provisioning of {vm_name} (see vmctl/cloudimg.py); cloud-init powers off after it.
 set -eu
-trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "{BOOTSTRAP_FAILED_TOKEN}: exit $rc at line $LINENO" | tee /dev/ttyS0; sync; fi' EXIT
-systemctl enable serial-getty@ttyS0.service >/dev/null 2>&1 || true
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "{BOOTSTRAP_FAILED_TOKEN}: exit $rc at line ${{LINENO:-unknown}}" | tee /dev/ttyS0; sync; fi' EXIT
+{setup}\
 {body}# Later boots carry no seed: without a datasource cloud-init would treat them as a new instance.
-touch /etc/cloud/cloud-init.disabled
+{disable}\
 sync
 echo "{BOOTSTRAP_COMPLETE_TOKEN}" | tee /dev/ttyS0
 """
@@ -163,21 +182,51 @@ def segment_netplan(vm: dict[str, Any]) -> list[dict[str, Any]]:
     return files
 
 
+def segment_eni(vm: dict[str, Any]) -> list[dict[str, Any]]:
+    """Alpine: find runtime NICs by MAC, name them, then ifup their ENI stanza.
+
+    local runs after networking on every boot, including when the seed is gone. The
+    NAT interface remains owned by the image/cloud-init's original interfaces file.
+    """
+    raw = {str(n.get("id") or ""): n for n in vm.get("networks") or []}
+    files: list[dict[str, Any]] = []
+    script = "#!/bin/sh\nset -eu\n"
+    for spec in qemu.network_specs(vm, "runtime") if vm.get("networks") else []:
+        address = str(raw.get(spec["id"], {}).get("address") or "").strip()
+        if spec["type"] != "segment" or not address:
+            continue
+        name = re.sub(r"[^a-z0-9]+", "-", str(spec["name"]).lower()).strip("-") or "segment"
+        name = name[:15]  # Linux IFNAMSIZ (including NUL).
+        path = f"/etc/network/vmctl-{name}"
+        files.append({"path": path, "permissions": "0644",
+                      "content": f"auto {name}\niface {name} inet static\n    address {address}\n"})
+        script += ("for link in /sys/class/net/*; do\n"
+                   f"    [ \"$(cat \"$link/address\")\" = {shlex.quote(spec['mac'])} ] || continue\n"
+                   "    iface=${link##*/}\n"
+                   f"    if [ \"$iface\" != {name} ]; then\n"
+                   f"        ip link set \"$iface\" down\n        ip link set \"$iface\" name {name}\n    fi\n"
+                   f"    ifup -i {path} {name}\ndone\n")
+    if files:
+        files.append({"path": "/etc/local.d/vmctl-segments.start", "permissions": "0755", "content": script})
+    return files
+
+
 def render_user_data(vm_name: str, vm: dict[str, Any], keys: list[str]) -> str:
     cfg = cloudimg_config(vm) or {}
     username = str(cfg["username"]).strip()
     hostname = str(cfg.get("hostname") or vm_name).strip()
+    alpine = family(vm) == "alpine"
     user: dict[str, Any] = {
         "name": username,
         "gecos": str(cfg.get("realname") or username),
-        "shell": "/bin/bash",
-        "groups": "adm,sudo",
+        "shell": "/bin/ash" if alpine else "/bin/bash",
+        "groups": "wheel" if alpine else "adm,sudo",
         "sudo": ["ALL=(ALL) NOPASSWD:ALL"],
         "lock_passwd": False,
         "passwd": str(cfg["password_hash"]).strip(),
         "ssh_authorized_keys": [key.strip() for key in keys if key.strip()],
     }
-    write_files = segment_netplan(vm) + [dict(entry) for entry in (cfg.get("write_files") or [])]
+    write_files = (segment_eni(vm) if alpine else segment_netplan(vm)) + [dict(entry) for entry in (cfg.get("write_files") or [])]
     write_files.append({"path": PROVISION_SCRIPT, "permissions": "0755", "content": render_provision_script(vm_name, vm)})
     payload: dict[str, Any] = {
         # A name with dots (ubuntu-24.04-cloud) is a host name here, not host + domain: without
@@ -190,16 +239,16 @@ def render_user_data(vm_name: str, vm: dict[str, Any], keys: list[str]) -> str:
         "ssh_pwauth": True,
         "package_update": True,
         "package_upgrade": False,
-        "packages": [str(p) for p in (cfg.get("packages") or DEFAULT_PACKAGES)],
+        "packages": [str(p) for p in (cfg.get("packages") or (ALPINE_PACKAGES if alpine else DEFAULT_PACKAGES))],
         "write_files": write_files,
         "runcmd": [["sh", PROVISION_SCRIPT]],
         # After runcmd, the last module of the final stage: the natural power-off the host waits for.
         "power_state": {"mode": "poweroff", "timeout": 60, "condition": True},
     }
     for key, field in (("timezone", "timezone"), ("locale", "locale")):
-        if str(cfg.get(field) or "").strip():
+        if str(cfg.get(field) or "").strip() and not (alpine and key == "locale"):
             payload[key] = str(cfg[field]).strip()
-    if str(cfg.get("keyboard") or "").strip():
+    if str(cfg.get("keyboard") or "").strip() and not alpine:
         payload["keyboard"] = {"layout": str(cfg["keyboard"]).strip()}
     return "#cloud-config\n" + json.dumps(payload, indent=2) + "\n"
 

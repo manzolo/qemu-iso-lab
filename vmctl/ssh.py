@@ -322,7 +322,7 @@ def wait_for_guest_post_install_ready(
 
     ui.print_note("Waiting for cloud-init to finish")
     cloud_init_wait = (
-        "if command -v cloud-init >/dev/null 2>&1; then "
+        "if [ ! -e /etc/cloud/cloud-init.disabled ] && command -v cloud-init >/dev/null 2>&1; then "
         "sudo cloud-init status --wait || true; "
         "fi"
     )

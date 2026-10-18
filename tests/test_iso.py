@@ -467,3 +467,55 @@ class DownloadProgressTests(unittest.TestCase):
         lines = out.getvalue().splitlines()
         self.assertEqual([line.split()[1] for line in lines], [f"{n}%" for n in range(10, 101, 10)])
         self.assertNotIn("\r", out.getvalue())
+
+
+class Sha512Tests(BaseVmctlTestCase):
+    def response(self, text):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = text.encode()
+        return mock.patch.object(urllib.request, 'urlopen', return_value=response)
+
+    def test_pinned_sha512_accepts_vendor_case_and_rejects_corruption(self):
+        path = self.root / 'image.qcow2'
+        path.write_bytes(b'cloud-image')
+        pin = hashlib.sha512(path.read_bytes()).hexdigest().upper()
+        self.assertEqual(vmctl.iso.validate_iso_file(path, {'iso_sha512': pin}), [])
+        path.write_bytes(b'corrupt')
+        self.assertIn('sha512', vmctl.iso.validate_iso_file(path, {'iso_sha512': pin})[0])
+
+    def test_lookup_selects_filename_and_pins_replacement_download(self):
+        vm = {**self.vm_config, 'iso_sha512_url': 'https://example.invalid/SHA512SUMS'}
+        path = self.root / vm['iso']
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'old')
+        digest = hashlib.sha512(b'new').hexdigest()
+        sums = f"{'b' * 128}  another.qcow2\n{digest.upper()} *{path.name}\n"
+        with self.response(sums), mock.patch.object(vmctl.iso, 'download_file') as download:
+            vmctl.iso.ensure_iso(vm)
+        self.assertFalse(path.exists())
+        self.assertEqual(download.call_args.kwargs['vm']['iso_sha512'], digest)
+        # A multi-file SUMS must not silently select another image's checksum.
+        with self.response(sums), self.assertRaises(VMError):
+            vmctl.iso.published_sha512({**vm, 'iso': 'missing.qcow2', 'iso_url': 'https://example.invalid/missing.qcow2'})
+
+    def test_current_offline_dry_run_and_bare_alpine_manifest(self):
+        vm = {**self.vm_config, 'iso_sha512_url': 'https://example.invalid/image.sha512'}
+        path = self.root / vm['iso']
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'current')
+        digest = hashlib.sha512(b'current').hexdigest()
+        with self.response(digest + '\n'), mock.patch.object(vmctl.iso, 'download_file') as download:
+            self.assertEqual(vmctl.iso.published_sha512(vm), digest)
+            vmctl.iso.ensure_iso(vm)
+            download.assert_not_called()
+        with mock.patch.object(urllib.request, 'urlopen', side_effect=OSError('offline')):
+            self.assertEqual(vmctl.iso.ensure_iso(vm), path)
+        with mock.patch.object(urllib.request, 'urlopen') as network:
+            vmctl.iso.ensure_iso(vm, dry_run=True)
+            network.assert_not_called()
+        with self.response('not a checksum'):
+            self.assertIsNone(vmctl.iso.published_sha512(vm))
+        # A fixed pin wins over a moving manifest.
+        with self.response('a' * 128), mock.patch.object(vmctl.iso, 'download_file') as download:
+            vmctl.iso.ensure_iso({**vm, 'iso_sha512': digest})
+            download.assert_not_called()
