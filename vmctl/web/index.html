@@ -424,6 +424,38 @@ pre.log .l-head { color:var(--accent); font-weight:700; } pre.log .l-ok { color:
 .machine-icon { display:grid; place-items:center; width:42px; height:42px; border-radius:12px; color:var(--accent); background:#203b42; border:1px solid #365955; }
 .machine-icon svg { width:24px; height:24px; }
 .resources { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:18px 0; }
+/* The activity meter: what the VM's QEMU process is doing now (CPU, memory, disk), from /api/stats.
+   The third column is wide enough for it already: a VM that starts never moves the columns. */
+#list th:nth-child(3) { min-width:88px; }
+.row-load { display:flex; align-items:center; gap:6px; margin-top:3px; font:11px ui-monospace,monospace; color:var(--muted); white-space:nowrap; }
+.row-load:empty { display:none; }
+.load-bar { position:relative; display:inline-block; width:30px; height:5px; border-radius:3px; background:#24324480; overflow:hidden; }
+.load-bar b { position:absolute; inset:0 auto 0 0; background:var(--live); border-radius:3px; transition:width .6s ease; }
+.row-load.quiet, .vm-activity.quiet .va-note { color:var(--warn); }
+.row-load.quiet .load-bar b { background:var(--warn); }
+.vm-activity { margin:-6px 0 18px; padding:10px 14px; background:#101926; border:1px solid var(--line); border-radius:9px; }
+.vm-activity[hidden] { display:none; }
+.va-head { display:flex; justify-content:flex-start; align-items:center; margin-bottom:8px; color:var(--muted); font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
+.va-head .va-toggle { margin-left:10px; padding:3px 9px; font-size:11px; font-weight:500; letter-spacing:0; text-transform:none; }
+.va-head.va-off { margin:0; }
+.va-head.va-off > span:first-child + .va-toggle { margin-left:auto; }
+.va-head.va-off .va-pulse::before { animation:none; background:var(--muted); }
+.va-head .va-pulse { margin-left:auto; display:inline-flex; align-items:center; gap:6px; letter-spacing:.06em; font-weight:500; text-transform:none; }
+.va-head .va-pulse::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--live); box-shadow:0 0 0 0 #5ee08e66; animation:va-pulse 2s infinite; }
+.vm-activity.quiet .va-head .va-pulse::before { background:var(--warn); animation:none; }
+@keyframes va-pulse { 70% { box-shadow:0 0 0 7px #5ee08e00; } 100% { box-shadow:0 0 0 0 #5ee08e00; } }
+@media (prefers-reduced-motion: reduce) { .va-head .va-pulse::before { animation:none; } .load-bar b { transition:none; } }
+.va-grid { display:grid; grid-template-columns:42px 1fr auto; align-items:center; gap:8px 10px; font-size:12px; }
+.va-grid dt { color:var(--muted); font-size:11px; }
+.va-grid dd { margin:0; }
+.va-grid .value { font:12px ui-monospace,monospace; text-align:right; white-space:nowrap; }
+.vm-activity svg.va-spark { display:block; width:100%; height:28px; color:var(--live); }
+.vm-activity.quiet svg.va-spark { color:var(--warn); }
+.vm-activity .va-mem { width:100%; height:7px; }
+.vm-activity .va-disk { grid-column:span 2; font:12px ui-monospace,monospace; color:var(--text); white-space:nowrap; }
+.vm-activity .va-disk .va-sep { margin:0 8px; }
+.vm-activity .va-disk span { color:var(--muted); margin-right:4px; }
+.va-note { margin:10px 0 0; font-size:12px; color:var(--muted); }
 .resource { background:#101926; border:1px solid var(--line); border-radius:9px; padding:10px; }
 .resource strong { font:600 16px ui-monospace,monospace; display:block; }
 .resource span { color:var(--muted); font-size:10px; }
@@ -1640,6 +1672,94 @@ function renderLoading() {
   if ($("rows").dataset.loading !== "1") { $("rows").innerHTML = rows; $("rows").dataset.loading = "1"; }
   if (!$("details").querySelector(".sk")) $("details").innerHTML = `<p class="loading-note" role="status">Reading the state of every profile, disk and lab…</p><span class="sk sk-line w45"></span><span class="sk sk-line w80"></span><span class="sk sk-block"></span><span class="sk sk-block"></span><span class="sk sk-line w60"></span>`;
 }
+// --- Activity meter: CPU, memory and disk of every running VM's QEMU process (/api/stats), every
+// 2 s while a VM runs and the page is visible, and only once the user turns it on (the panel's
+// "Show CPU · RAM · disk", remembered in localStorage; off by default: no poll at all, Manzolo). The cells are painted in place: the 5 s render keeps
+// its markup, so a poll never rebuilds the list. A minute of CPU history per VM feeds the sparkline;
+// "quiet" (no CPU, no disk for QUIET_AFTER_S) is the hint that an install is waiting for something.
+const vmStats = new Map(), cpuHistory = new Map();
+const STATS_HISTORY = 30, QUIET_AFTER_S = 120;
+let statsBusy = false, statsOn = false;
+try { statsOn = localStorage.getItem("vmctl-activity") === "on"; } catch (_) { /* private window: off */ }
+function setStatsOn(on) {
+  statsOn = on;
+  try { localStorage.setItem("vmctl-activity", on ? "on" : "off"); } catch (_) { /* kept for this page only */ }
+  if (!on) { vmStats.clear(); cpuHistory.clear(); }
+  paintLoads();
+  if (on) refreshStats();
+}
+async function refreshStats() {
+  if (!statsOn || statsBusy || document.hidden || !stateLoaded || !S.vms.some(r => r.running)) return;
+  statsBusy = true;
+  try {
+    const data = await api("/api/stats");
+    for (const name of [...vmStats.keys()]) if (!data.vms[name]) { vmStats.delete(name); cpuHistory.delete(name); }
+    for (const [name, s] of Object.entries(data.vms)) {
+      vmStats.set(name, s);
+      if (s.cpu_percent !== null) cpuHistory.set(name, [...(cpuHistory.get(name) || []), s.cpu_percent].slice(-STATS_HISTORY));
+    }
+    paintLoads();
+  } catch (_) { /* the next poll tries again; the meter keeps its last values */ }
+  finally { statsBusy = false; }
+}
+function humanBytes(n, digits = 1) {
+  if (n === null || n === undefined) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0; while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return (i ? n.toFixed(n >= 100 ? 0 : digits) : Math.round(n)) + " " + units[i];
+}
+const humanRate = n => n === null || n === undefined ? "—" : humanBytes(n) + "/s";
+function quietFor(s) {
+  const m = Math.floor(s / 60);
+  return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : m ? `${m} min` : `${s} s`;
+}
+function rowLoadHtml(name) {
+  const s = statsOn && vmStats.get(name);
+  if (!s || s.cpu_percent === null) return "";
+  const cpu = Math.round(s.cpu_percent);
+  return `<i class="load-bar" aria-hidden="true"><b style="width:${Math.max(cpu ? 4 : 0, cpu)}%"></b></i><span aria-label="CPU ${cpu}%">${cpu}%</span>`;
+}
+function sparkline(values) {
+  const base = '<path d="M0 27.5H100" stroke="currentColor" stroke-opacity=".25" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>';
+  if (values.length < 2) return `<svg class="va-spark" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">${base}</svg>`;
+  const step = 100 / (STATS_HISTORY - 1), x0 = 100 - step * (values.length - 1);
+  const pts = values.map((v, i) => [x0 + i * step, 26 - Math.min(100, v) / 100 * 24]);
+  const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  return `<svg class="va-spark" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">${base}<path d="${line} L100 28 L${x0.toFixed(1)} 28Z" fill="currentColor" fill-opacity=".14"/><path d="${line}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+}
+function paintActivity() {
+  const box = $("vm-activity");
+  if (!box) return;
+  const s = vmStats.get(box.dataset.vm);
+  box.hidden = false;
+  if (!statsOn || !s) {
+    box.classList.remove("quiet");
+    box.innerHTML = `<div class="va-head va-off"><span>Activity</span>${statsOn ? '<span class="va-pulse">measuring…</span>' : ""}<button class="va-toggle" aria-pressed="${statsOn}" title="${statsOn ? "Stop measuring" : "CPU, memory and disk of the running VMs, read from their QEMU processes every 2 s"}">${statsOn ? "Hide" : "Show CPU · RAM · disk"}</button></div>`;
+    box.querySelector(".va-toggle").onclick = () => setStatsOn(!statsOn);
+    return;
+  }
+  const quiet = s.idle_seconds >= QUIET_AFTER_S, cpu = s.cpu_percent === null ? null : Math.round(s.cpu_percent);
+  const mem = s.memory_bytes ? Math.min(100, s.rss_bytes / s.memory_bytes * 100) : 0;
+  box.classList.toggle("quiet", quiet);
+  box.innerHTML = `<div class="va-head"><span>Activity</span><span class="va-pulse">${quiet ? "quiet for " + quietFor(s.idle_seconds) : "live"}</span><button class="va-toggle" aria-pressed="true" title="Stop measuring">Hide</button></div>
+    <dl class="va-grid">
+      <dt>CPU</dt><dd>${sparkline(cpuHistory.get(box.dataset.vm) || [])}</dd><dd class="value">${cpu === null ? "…" : cpu + " %"}</dd>
+      <dt>RAM</dt><dd><i class="load-bar va-mem" aria-hidden="true"><b style="width:${mem.toFixed(1)}%"></b></i></dd><dd class="value">${humanBytes(s.rss_bytes)}${s.memory_bytes ? " / " + humanBytes(s.memory_bytes, 0) : ""}</dd>
+      <dt>Disk</dt><dd class="va-disk"><span>read</span>${humanRate(s.read_bps)}<span class="va-sep">·</span><span>write</span>${humanRate(s.write_bps)}</dd>
+    </dl>
+    ${quiet ? `<p class="va-note">No CPU or disk activity for ${quietFor(s.idle_seconds)}: the guest may be waiting for input. Look at its console.</p>` : ""}`;
+  box.querySelector(".va-toggle").onclick = () => setStatsOn(false);
+}
+function paintLoads() {
+  $("rows").querySelectorAll("[data-load]").forEach(el => {
+    const s = vmStats.get(el.dataset.load), html = rowLoadHtml(el.dataset.load);
+    if (el.innerHTML !== html) el.innerHTML = html;
+    const quiet = !!s && s.idle_seconds >= QUIET_AFTER_S;
+    el.classList.toggle("quiet", quiet);
+    el.title = s ? `QEMU process: CPU ${s.cpu_percent ?? "…"}% of ${S.vms.find(r => r.name === el.dataset.load)?.cpus || "?"} vCPUs · RAM ${humanBytes(s.rss_bytes)} · disk read ${humanRate(s.read_bps)}, write ${humanRate(s.write_bps)}${quiet ? " · quiet for " + quietFor(s.idle_seconds) : ""}` : "";
+  });
+  paintActivity();
+}
 function render() {
   $("search-clear").classList.toggle("hidden", !$("search").value);
   if (!stateLoaded) return renderLoading();
@@ -1688,7 +1808,7 @@ function render() {
   const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : focused.matches(".vm-power") ? ".vm-power" : null;
   updateProfileRows(rows.map((r, index) => { const [s, c] = stateOf(r);
     const heading = catalog.length && index === primary.length ? `<tr class="search-group" data-group="catalog"><td colspan="2">More matches in Catalog · ${catalog.length}</td><td aria-hidden="true"></td></tr>` : "";
-    return heading + `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.hidden ? '<span class="style-tag" title="Hidden from the lists: shown here because it runs or holds a disk, or because the Hidden filter is on">hidden</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : r.manual === "todo" ? '<span class="style-tag todo" title="Manual for now: its automation is still to write (the notes say which flow)">to automate</span>' : '<span class="style-tag" title="' + ({live:"Live media: it boots, it does not install itself", image:"A ready disk image: it boots", template:"An import template, not an installer", ci:"The CI boot check", twin:"You install it by hand; " + esc(r.automated_as) + " installs the same system itself"}[r.manual] || "You install it by hand") + '">manual' + (r.manual === "twin" ? " · see " + esc(r.automated_as) : "") + '</span>'}</span><span class="profile-desc">${esc(r.label)}</span>${recentLaunch(r)}</span>${linkHandle(r)}</span></td><td><span class="state-cell">${powerButton(r)}<span>${stateBadge(r)}${installationBadge(r, true)}</span></span></td><td class="mono">${ram(r)}</td></tr>`; }).join("")
+    return heading + `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.hidden ? '<span class="style-tag" title="Hidden from the lists: shown here because it runs or holds a disk, or because the Hidden filter is on">hidden</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : r.manual === "todo" ? '<span class="style-tag todo" title="Manual for now: its automation is still to write (the notes say which flow)">to automate</span>' : '<span class="style-tag" title="' + ({live:"Live media: it boots, it does not install itself", image:"A ready disk image: it boots", template:"An import template, not an installer", ci:"The CI boot check", twin:"You install it by hand; " + esc(r.automated_as) + " installs the same system itself"}[r.manual] || "You install it by hand") + '">manual' + (r.manual === "twin" ? " · see " + esc(r.automated_as) : "") + '</span>'}</span><span class="profile-desc">${esc(r.label)}</span>${recentLaunch(r)}</span>${linkHandle(r)}</span></td><td><span class="state-cell">${powerButton(r)}<span>${stateBadge(r)}${installationBadge(r, true)}</span></span></td><td><span class="mono">${ram(r)}</span>${r.running ? `<span class="row-load" data-load="${esc(r.name)}">${rowLoadHtml(r.name)}</span>` : ""}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted" style="white-space:normal">${filter === "recent" && !total ? recentEmptyMessage() : filter === "mine" && !$("search").value ? "No matching VMs. Browse the Catalog to add profiles to My VMs, or clear the filters." : "No matching profiles."}</td></tr>`);
   bindStateLogs($("rows"));
   followClimbedRow();
@@ -1767,6 +1887,7 @@ function renderDetails() {
     ${alternativeActions ? `<details class="start-options" data-section="start"><summary>Other ways to start</summary><div class="actions">${alternativeActions}</div></details>` : ""}
     ${prefersSsh(r) && !r.running && r.installed ? '<p class="operation-note">Open SSH after the guest has booted.</p>' : ""}
     <div class="access">${factList(access)}</div>
+    ${r.running ? `<section class="vm-activity" id="vm-activity" data-vm="${esc(r.name)}" aria-label="Activity of ${esc(r.name)}" hidden></section>` : ""}
     <div class="resources"><div class="resource"><strong>${esc(memory)}</strong><span>Memory</span></div><div class="resource"><strong>${esc(r.cpus)}</strong><span>vCPUs</span></div><div class="resource"><strong>${esc(r.disk_capacity || "—")}</strong><span>Disk capacity</span>${r.prepared ? `<em>${esc(r.disk_host || "?")} on host</em>` : ""}</div></div>
     ${section("checkpoints", "Checkpoints", `<p class="help">${r.has_checkpoints ? "Saved checkpoints available." : "Save a restore point before changing this machine."}</p><div class="actions"><button data-command="checkpoint">Manage checkpoints…</button></div>`, r.has_checkpoints ? "saved" : "")}
     ${section("network", "Network", network.length ? factList(network) + '<button id="machine-link">Connect another VM…</button>' : `<p class="help">No private VM links.</p><button id="machine-link" ${!r.installed && !r.running ? "disabled" : ""}>Connect another VM…</button>`, network.length ? `${network.length} link${network.length === 1 ? "" : "s"}` : "")}
@@ -1776,6 +1897,7 @@ function renderDetails() {
     ${section("maintenance", "Maintenance", `<div class="actions">${buttons(a => isExtra(a) && !a.alternative && a.args?.[0] !== "checkpoint")}${r.installed ? '<button data-command="clone">Clone machine…</button>' : ""}</div>`)}
     <div class="more-commands">${more}</div>`;
   $("details").querySelectorAll("details").forEach(el => { el.open = expanded.includes(el.dataset.section); });
+  paintActivity();
   bindStateLogs($("details"));
   if ($("ssh-open")) $("ssh-open").onclick = () => openSsh(r);
   $("machine-link").onclick = () => openLinkPicker(r.name);
@@ -4145,7 +4267,7 @@ async function refresh(fresh = false) {
   }
   const cmds = decodeURIComponent((location.hash.match(/^#commands=(.*)$/) || [])[1] || "");
   if (location.hash.startsWith("#commands=")) { if (cmds) { selected = cmds; render(); } openCommands(cmds); }
-  setInterval(refresh, 5000); setInterval(refreshJobs, 3000);
+  setInterval(refresh, 5000); setInterval(refreshJobs, 3000); setInterval(refreshStats, 2000); refreshStats();
 })();
 </script>
 </body>

@@ -19,6 +19,8 @@ let requests = [], failRun = false, failState = false, sshLaunches = 0, override
 const terminalRequests = [];
 let jobStatus = 'completed', jobCommand = 'vmctl start arch-noctalia --headless --background', cancelRequests = [], failCancel = false, cancelResult = true;
 let jobId = 'web:fixture', holdRun = false, releaseRun;
+let statsCalls = 0;
+const stats = {'arch-noctalia':{pid:4242,cpu_percent:37.4,rss_bytes:1288490188,memory_bytes:8589934592,read_bps:2097152,write_bps:4194304,idle_seconds:0}};
 let savedCheckpoints = [], checkpointBlocked = {create:'',restore:'',delete:''}, failCheckpoints = false;
 let hideJobs = false, recording = null, recordingExports = [], failExport = false;
 let clipboardChannel = true, consoleRunning = true, failConsoleInfo = false, failFiles = false;
@@ -104,6 +106,7 @@ const server = createServer(async (req,res) => {
     return res.end(JSON.stringify({name:'arch-noctalia',base:profileBase,effective:{...profileBase,...savedOverride},override:savedOverride,revision:String(overrideRevision),local_only:false}));
   }
   if (req.url.startsWith('/api/state')) { const body=JSON.stringify(failState ? {error:'fixture offline'} : state); if (holdState) await new Promise(resolve=>stateWaiters.push(resolve)); res.statusCode=failState ? (failState===true ? 503 : failState) : 200; return res.end(body); }
+  if (req.url === '/api/stats') { statsCalls++; return res.end(JSON.stringify({vms:stats,time:1789900000})); }
   if (req.url === '/api/commands') return res.end(JSON.stringify(catalog));
   if (req.url.endsWith('/checkpoints')) {
     res.statusCode = failCheckpoints ? 503 : 200;
@@ -218,6 +221,32 @@ try {
   assert.equal(await page.locator('#list').getAttribute('aria-busy'),null);
   assert.equal(await page.locator('#details .sk').count(),0);
   check('the first load shows placeholder rows and panel, replaced by the profiles');
+  // The activity meter: off until asked (no poll at all), then a CPU bar on the running row and the
+  // Activity card in its panel; quiet turns amber; Hide stops it again.
+  await page.locator('#rows [data-vm="arch-noctalia"] .profile-desc').click();
+  await page.locator('#vm-activity .va-toggle').filter({hasText:'Show CPU · RAM · disk'}).waitFor();
+  await page.waitForTimeout(2500);
+  assert.equal(statsCalls,0,'Off by default: the page never asks for /api/stats');
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .row-load').textContent(),'');
+  await page.locator('#vm-activity .va-toggle').click();
+  await page.locator('#rows [data-vm="arch-noctalia"] .row-load').filter({hasText:'37%'}).waitFor();
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .row-load [aria-label]').getAttribute('aria-label'),'CPU 37%');
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .row-load').count(),0,'A stopped VM has no meter');
+  await page.locator('#vm-activity .va-grid').waitFor();
+  assert.match(await page.locator('#vm-activity').textContent(),/37 %[\s\S]*1\.2 GB \/ 8 GB[\s\S]*read2\.0 MB\/s[\s\S]*write4\.0 MB\/s/);
+  assert.equal(await page.locator('#activity').count(),1,'The jobs Activity button keeps its own id');
+  Object.assign(stats['arch-noctalia'],{cpu_percent:0,read_bps:0,write_bps:0,idle_seconds:400});
+  await page.locator('#vm-activity.quiet').waitFor({timeout:5000});
+  assert.match(await page.locator('#vm-activity .va-note').textContent(),/No CPU or disk activity for 6 min/);
+  assert(await page.locator('#rows [data-vm="arch-noctalia"] .row-load.quiet').count());
+  Object.assign(stats['arch-noctalia'],{cpu_percent:37.4,read_bps:2097152,write_bps:4194304,idle_seconds:0});
+  assert.equal(await page.evaluate(()=>localStorage.getItem('vmctl-activity')),'on');
+  await page.locator('#vm-activity .va-toggle').filter({hasText:'Hide'}).click();
+  await page.locator('#vm-activity .va-toggle').filter({hasText:'Show CPU · RAM · disk'}).waitFor();
+  assert.equal(await page.locator('#rows [data-vm="arch-noctalia"] .row-load').textContent(),'');
+  const callsWhenOff = statsCalls; await page.waitForTimeout(2500);
+  assert.equal(statsCalls,callsWhenOff,'Hide stops the poll');
+  check('activity meter: off by default with no poll, Show starts it (row bar, Activity card with CPU, RAM and disk, quiet after two minutes), Hide stops it');
   const rowNames = () => page.locator('#rows tr[data-vm]').evaluateAll(rows=>rows.map(row=>row.dataset.vm));
   assert.equal(await page.locator('#vm-sort').inputValue(),'running');
   assert.deepEqual(await rowNames(),['arch-noctalia','alpine-ci','debian-server','proxmox-ve','proxmox-ve-node2']);

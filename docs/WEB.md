@@ -348,11 +348,24 @@ The page can delete disks and start anything `vmctl` can, so:
   them without that confirmation; a confirmed command that has a `--yes` gets it, because a job
   has no terminal to answer on.
 
+## Activity meter
+
+Off by default. The panel of a running machine has an *Activity* card with one button, *Show CPU · RAM ·
+disk*; once pressed (the choice is remembered in the browser, *Hide* turns it off and stops the polling)
+every running machine shows a small CPU bar in the list's *RAM / CPU* column, and the card: a minute of CPU history, the memory QEMU actually holds against the VM's RAM, and
+the disk read and write rates. All of it comes from the host's `/proc` for the VM's QEMU process
+(`vmctl/vmstats.py`), every 2 s while it is on, a VM runs and the page is visible; nothing is asked of the
+guest, so it works during an installer and on systems with no agent at all. After two minutes with
+no CPU and no disk the card and the bar turn amber with *quiet for N min*: an install that sits on a
+dialog shows up at once (Windows NT 4's "Configurazione del computer" stall, row 24 of
+NT4_PITFALLS.md, read 0 % and 0 B/s). Windows 9x never idles its CPU, so there the disk is the signal.
+
 ## API
 
 | Method | Path | What |
 |---|---|---|
 | GET | `/api/state` | dashboard rows (the TUI snapshot) and labs; `?fresh=1` skips the 4 s cache |
+| GET | `/api/stats` | the activity meter: for every running VM of the cached snapshot, its QEMU process's CPU (% of the VM's vCPUs), resident memory, disk read/write rates and `idle_seconds` (CPU under 3 % and disk under 64 KB/s since then), from /proc; never touches the guest |
 | GET | `/api/commands` | catalog: group, help, arguments, exclusive option groups and `terminal_only` |
 | POST | `/api/run` | `{"args": ["start", "vm", "--headless"], "confirmed": false}` → `{"job", "command"}` |
 | GET | `/api/jobs` | recent jobs, running first |

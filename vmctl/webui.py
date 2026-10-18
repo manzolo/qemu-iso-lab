@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from vmctl import catalog, checkpoint, config, integration, isofile, local_identity, profile_overrides, qemu, runtime, state, tui_jobs, ui, web_files, web_recording, web_transfers
+from vmctl import catalog, checkpoint, config, integration, isofile, local_identity, profile_overrides, qemu, runtime, state, tui_jobs, ui, vmstats, web_files, web_recording, web_transfers
 from vmctl.errors import VMError
 
 DEFAULT_PORT = 8765
@@ -609,6 +609,7 @@ class Handler(BaseHTTPRequestHandler):
     connections = integration.ConnectionCache()
     uploads = web_files.UploadSessions()
     transfers = web_transfers.Transfers()
+    stats = vmstats.Sampler()
 
     activity: Activity
 
@@ -690,6 +691,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/state":
                 self._json({**self.snapshot.get(fresh="fresh" in query), "version": _version()})
+            elif path == "/api/stats":
+                # The activity meter: CPU, memory and disk of every running VM, from its QEMU's /proc.
+                # The PIDs come from the cached snapshot; this never forces the expensive refresh.
+                rows = (self.snapshot.value or self.snapshot.get())["vms"]
+                self._json({"vms": vmstats.for_rows(self.stats, rows), "time": time.time()})
             elif path == "/api/commands":
                 self._json(command_catalog())
             elif path == "/api/identity":
