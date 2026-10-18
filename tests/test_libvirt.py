@@ -1,6 +1,7 @@
 import argparse
 import subprocess
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from unittest import mock
 
 from _common import BaseVmctlTestCase, enter_context
@@ -187,6 +188,80 @@ class LibvirtTests(BaseVmctlTestCase):
         with mock.patch("builtins.print") as printed:
             libvirt.warn_foreign_owner(self.vm_config)
         printed.assert_not_called()
+
+    def pool_virsh(self, existing=""):
+        """libvirtd's side of --copy-to-pool: a dir pool under the temp root, volumes as files."""
+        pool = self.root / "pool"
+        def virsh(command, **kwargs):
+            if command[0] != "virsh":
+                if command[:2] == ["qemu-img", "convert"]:
+                    Path(command[-1]).write_bytes(b"flat")
+                return
+            action = command[3:]
+            if "stdout_log" in kwargs:
+                out = {"pool-dumpxml": f"<pool type='dir'><target><path>{pool}</path></target></pool>",
+                       "vol-list": f" Name   Path\n----------\n {existing}  {pool}/{existing}\n" if existing else " Name Path\n----\n",
+                       }.get(action[0], "")
+                kwargs["stdout_log"].write_text(out)
+            elif action[0] == "vol-create":
+                volume = ET.parse(action[2]).getroot()
+                self.modes[volume.findtext("name")] = volume.findtext("target/permissions/mode")
+            elif action[0] == "vol-upload":
+                self.uploaded[action[3]] = Path(action[4]).read_bytes()
+        self.uploaded, self.modes = {}, {}
+        self.run.side_effect = virsh
+        return pool
+
+    def test_copy_to_pool_makes_an_independent_domain(self):
+        disk = self.create_disk()
+        code, template, vars_raw = [self.root / n for n in ("code.fd", "template.fd", "vars.fd")]
+        self.vm_config["firmware"] = {"type": "efi", "code": str(code), "vars_template": str(template), "vars_path": str(vars_raw)}
+        self.write_config_dir()
+        vars_raw.write_bytes(b"vmctl vars")
+        enter_context(self, mock.patch.object(qemu, "resolve_efi_firmware", return_value=(code, template, vars_raw)))
+        pool = self.pool_virsh()
+        lifecycle.cmd_export_libvirt(self.args("--copy-to-pool"))
+        self.assertEqual(sorted(self.uploaded), ["testvm-OVMF_CODE.qcow2", "testvm-OVMF_VARS.qcow2", "testvm.qcow2"])
+        self.assertEqual(self.uploaded["testvm.qcow2"], b"disk", "the profile's disk itself is uploaded, no staging copy")
+        # libvirt hands QEMU the disk and the vars at start, never the read-only loader.
+        self.assertEqual(self.modes, {"testvm.qcow2": "0600", "testvm-OVMF_CODE.qcow2": "0644", "testvm-OVMF_VARS.qcow2": "0600"})
+        self.assertEqual(list(disk.parent.glob(".pool-*")), [], "volume definitions removed")
+        xml = ET.parse(self.root / "artifacts/testvm/libvirt/testvm.xml").getroot()
+        self.assertEqual(xml.find("devices/disk/source").get("file"), str(pool / "testvm.qcow2"))
+        self.assertEqual(xml.findtext("os/nvram"), str(pool / "testvm-OVMF_VARS.qcow2"))
+        self.assertEqual(xml.find(f"metadata/{{{libvirt.METADATA_NS}}}export").get("mode"), "copy")
+        self.assertEqual(disk.read_text(), "disk")
+        self.assertEqual(list((self.root / "artifacts/testvm/libvirt").glob(".pool-*")), [], "staging copies removed")
+        commands = [c.args[0] for c in self.run.call_args_list]
+        self.assertIn(["virsh", "--connect", "qemu:///system", "pool-refresh", "default"], commands)
+        self.assertNotIn("--remove-all-storage", str(commands))
+
+    def test_copy_to_pool_flattens_an_overlay_and_refuses_taken_volumes(self):
+        disk = self.create_disk()
+        disk.write_bytes(b"QFI\xfb" + bytes(4) + (512).to_bytes(8, "big"))
+        self.pool_virsh(existing="other.qcow2")
+        lifecycle.cmd_export_libvirt(self.args("--copy-to-pool", "--pool", "default"))
+        self.assertEqual(self.uploaded["testvm.qcow2"], b"flat", "a cloud-image overlay is flattened first")
+        self.pool_virsh(existing="testvm.qcow2")
+        with self.assertRaisesRegex(VMError, "already has testvm.qcow2"):
+            lifecycle.cmd_export_libvirt(self.args("--copy-to-pool"))
+        self.assertEqual(self.uploaded, {})
+        with self.assertRaisesRegex(VMError, "drop --no-define"):
+            lifecycle.cmd_export_libvirt(self.args("--copy-to-pool", "--no-define"))
+
+    def test_a_copied_domain_neither_guards_the_disk_nor_unexports(self):
+        copy = f"<domain xmlns:v='{libvirt.METADATA_NS}'><metadata><v:export mode='copy' profile='testvm'/></metadata></domain>"
+        outputs = {"list": "testvm\n", "dumpxml": copy}
+        def virsh(command, **kwargs):
+            if "stdout_log" in kwargs:
+                kwargs["stdout_log"].write_text(outputs.get(command[3], ""))
+        self.run.side_effect = virsh
+        self.assertFalse(lifecycle.libvirt_domain_defined("testvm"))
+        with self.assertRaisesRegex(VMError, "independent copy"):
+            lifecycle.cmd_unexport_libvirt(cli.build_parser().parse_args(["unexport-libvirt", "testvm"]))
+        self.assertNotIn("undefine", str([c.args[0] for c in self.run.call_args_list]))
+        outputs["dumpxml"] = "<domain/>"
+        self.assertTrue(lifecycle.libvirt_domain_defined("testvm"))
 
     def test_active_libvirt_domain_refused(self):
         with mock.patch.object(libvirt, "virsh_output", return_value="testvm\n"):

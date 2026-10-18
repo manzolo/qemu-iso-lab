@@ -12,7 +12,7 @@ virsh --connect qemu:///system domifaddr debian-server
 
 The export writes `artifacts/<profile>/libvirt/<domain>.xml` and defines a
 persistent domain. The existing disk is referenced by absolute path; it is
-never copied. Open the same `qemu:///system` connection in virt-manager.
+never copied (see `--copy-to-pool` below for an independent copy). Open the same `qemu:///system` connection in virt-manager.
 The host needs libvirt/virsh and permissions to define domains, plus access
 for the libvirt QEMU account to the disk, firmware and any shared directory.
 Windows TPM emulation also requires swtpm; shared directories require virtiofsd.
@@ -26,6 +26,8 @@ Options:
 | `--no-define` | Generate XML only, without invoking virsh |
 | `--autostart` | Enable domain autostart after defining it |
 | `--replace` | Replace an existing **stopped** domain; otherwise duplicates are an error |
+| `--copy-to-pool` | Copy the disk (and the EFI firmware) into a libvirt pool instead: an independent VM |
+| `--pool POOL` | The directory pool receiving the copy, default `default` |
 | `--dry-run` | Print XML and planned commands, without writing files or changing libvirt |
 
 Export refuses a missing disk or a guest detected running by PID, disk use or
@@ -46,6 +48,34 @@ Repeat `--name` and `--connect` when unexporting a custom domain. Unexport calls
 NVRAM bytes because libvirt otherwise deletes that file. Replacement uses the
 same preservation procedure. No command uses `--remove-all-storage`.
 The generated XML remains as a reference; it is not a VM snapshot or backup.
+
+### An independent copy in a libvirt pool
+
+```bash
+vmctl export-libvirt debian-server --copy-to-pool [--pool default] [--name debian-libvirt]
+```
+
+The disk becomes the volume `<domain>.<ext>` of the pool and, for an EFI profile, the firmware
+`<domain>-OVMF_CODE.qcow2` / `<domain>-OVMF_VARS.qcow2` (qcow2, snapshots work as below). The
+volumes are created and filled through libvirtd (`vol-create-as` + `vol-upload --sparse`, then
+`pool-refresh`), so the pool directory may belong to root: the user needs only the connection. The
+volumes are root's `0600`, except the read-only loader, created `0644`: libvirt gives QEMU the disk
+and the variables at start, never the loader. A
+cloud-image overlay is flattened first (`qemu-img convert`), so the volume does not point back into
+`isos/`. Existing volumes of those names are refused, never overwritten.
+
+vmctl's own disk is only read: the profile keeps working with vmctl at the same time, and the two
+VMs diverge from then on. The domain carries `<metadata><vmctl:export mode="copy"/></metadata>`:
+vmctl does not treat a copy as owning the profile's disk (clean, checkpoint, clone go on even when
+the domain has the profile's name) and `unexport-libvirt` refuses it. It is libvirt's alone:
+
+```bash
+virsh --connect qemu:///system undefine debian-server --nvram
+virsh --connect qemu:///system vol-delete --pool default debian-server.qcow2   # and the OVMF volumes
+```
+
+Never `--remove-all-storage`. Give the copy a different `--name` when the profile is also exported
+linked. A dir/fs/netfs pool is required; `--no-define` cannot be combined with it.
 
 ### Snapshots in virt-manager
 

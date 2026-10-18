@@ -5508,7 +5508,7 @@ def cmd_clean(args: argparse.Namespace) -> int:
             if name in guarded:
                 ui.print_note(f"{name}: protected, left as it is (vmctl unprotect {name})")
                 continue
-            if name in exported:
+            if name in exported and libvirt_domain_defined(name):
                 ui.print_note(f"{name}: defined in libvirt, left as it is (vmctl unexport-libvirt {name})")
                 continue
             cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
@@ -5543,8 +5543,15 @@ def libvirt_domain_names(uri: str = "qemu:///system") -> set[str]:
 
 
 def libvirt_domain_defined(vm_name: str, uri: str = "qemu:///system") -> bool:
-    """Whether the VM was handed to libvirt (export-libvirt): its disk is then libvirt's to run."""
-    return libvirt.domain_name(vm_name) in libvirt_domain_names(uri)
+    """Whether the VM was handed to libvirt (export-libvirt): its disk is then libvirt's to run.
+    A domain of the same name exported with --copy-to-pool runs its own copy and does not count."""
+    name = libvirt.domain_name(vm_name)
+    if name not in libvirt_domain_names(uri):
+        return False
+    try:
+        return not libvirt.domain_is_copy(uri, name)
+    except (VMError, subprocess.CalledProcessError, OSError):
+        return True
 
 
 def refuse_if_libvirt(vm_name: str, action: str) -> None:
