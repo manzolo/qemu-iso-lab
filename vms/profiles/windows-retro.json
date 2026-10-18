@@ -86,6 +86,7 @@
         ],
         "version": "1.0.1"
       },
+      "notes": "Where it stands (2026-10-18): experimental, almost unattended. The DOS stage, the file copy, the first reboot, the hardware setup, the first-logon script, the completion token on COM1 and the guest's own shutdown all run by themselves (rc 0 in 37 minutes). One thing still needs a hand: after the first reboot Setup opens the 'Avvio guidato' wizard (Informazioni utente, Contratto di Licenza, Codice Product Key, Fine) with every field already filled in from MSBATCH.INF and waits on each page; answer it from the console with Enter, Alt+A, Enter, Enter, Enter. Tried and ruled out: ProductID instead of ProductKey, [NameAndOrg] Display=0 / ShowEula=0, and ProductType=1 in the CD's SETUPPP.INF (PRECOPY1/2.CAB rewritten: same pages). Next step: a screen pilot like the Haiku flow's that recognises the four pages and presses those keys. Details in docs/UNATTENDED.md, section Windows 98.",
       "iso": "isos/windows98.iso",
       "disk": {
         "path": "artifacts/windows-98/disk.qcow2",
