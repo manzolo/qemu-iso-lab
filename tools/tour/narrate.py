@@ -38,6 +38,8 @@ SPOKEN = {
            # Manzolo, 2026-10-07: CPU, setup and Canc came out wrong in Italian.
            # proxmox-lab (2026-10-07): HA would be the verb "ha" (a silent h), and "acca a" did not
            # convince Manzolo either: say it in full, as the cues do. IT-Tools would be the pronoun "it".
+           # SSH as one word: letter by letter, "esse esse acca" stumbled (Manzolo, 2026-10-19).
+           (r"\bSSH\b", "essesseacca"),
            (r"\bHA\b", "alta affidabilità"), (r"\bIT-Tools\b", "ai ti tùls"), (r"\bshutdown\b", "sciatdàun"),
            # The ZFS course (2026-10-07): the commands in lower case, the options, paths and columns,
            # and the English words an Italian voice reads letter by letter.

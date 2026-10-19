@@ -58,7 +58,7 @@ class SpokenTests(unittest.TestCase):
         self.assertEqual(narrate.spoken("KVM, /proc, i socket Unix: y, poi il gruppo kvm.", "it"),
                          "cappa vu emme, proc, i socket Unix: ipsilon, poi il gruppo cappa vu emme,")
         self.assertEqual(narrate.spoken("Su Windows vive in WSL2; SSH, TCP e DNS; QEMU, ISO e NAT restano parole.", "it"),
-                         "Su Windows vive in doppia vu esse elle due; esse esse acca, ti ci pi e di enne esse; QEMU, ISO e NAT restano parole,")
+                         "Su Windows vive in doppia vu esse elle due; essesseacca, ti ci pi e di enne esse; QEMU, ISO e NAT restano parole,")
         self.assertEqual(narrate.spoken("Prossimo passo:", "it"), "Prossimo passo:")
         for cue in ("Prima VM in 24.04.", "Tre nodi, 8 vCPU, porta 2222."):
             text = narrate.spoken(cue, "it")

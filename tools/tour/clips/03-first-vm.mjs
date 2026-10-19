@@ -43,7 +43,7 @@ export async function run(d) {
   await d.click(p.locator("#search"));
   await d.type("cloud", 150);
   await d.sleep(800);
-  await d.click(p.locator(`tr.row[data-vm="${VMNAME}"]`));
+  await d.click(p.locator(`tr.row[data-vm="${VMNAME}"] .profile-text`));
   await d.sleep(800);
   await d.cue("details");
   await d.hover(p.locator("#details"));

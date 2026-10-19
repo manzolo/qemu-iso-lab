@@ -40,6 +40,10 @@ export async function setup(d) {
   const domain = process.env.TOUR_DOMAIN || "lubuntu22-studio";
   const user = (process.env.TOUR_VM || "").split("@")[0] || "manzolo";
   execSync(`virsh qemu-agent-command ${domain} '{"execute":"guest-exec","arguments":{"path":"/bin/sh","arg":["-c","mkdir -p ${HOME} && chown ${user}:${user} ${HOME}"]}}'`, { stdio: "ignore" });
+  // Since the Android profiles (v0.26.9) setup also wants adb and scrcpy from apt, and sudo would
+  // stop the take at a password prompt: installed off screen as root, so the scene keeps its two
+  // optional tools (virtiofsd, Textual) that need no password (2026-10-19).
+  await rootCommand(domain, "dpkg -s adb scrcpy >/dev/null 2>&1 || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq adb scrcpy)", 600);
   d.vm(`pkill -f 'vmct[l] web'; rm -rf ${HOME}/qemu-iso-lab ${HOME}/.local ~/lab/demo/qemu-iso-lab ~/.local/share/applications/qemu-iso-lab.desktop; mkdir -p ~/lab/demo; rm -f /tmp/demo-prompt`);
   // The clip's shell: demo.bashrc with the demo home (the real session's menu still gets the entry).
   d.vm(`cat > ${RC} <<'EOF'
@@ -58,6 +62,21 @@ EOF`);
   await d.page.goto("about:blank");
   await openDemoTerminal(d);
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
+}
+
+// A root command in the studio through the guest agent, waited for (guest-exec returns at once).
+async function rootCommand(domain, command, seconds) {
+  const agent = (payload) => JSON.parse(execSync(`virsh qemu-agent-command ${domain} '${JSON.stringify(payload)}'`).toString()).return;
+  const { pid } = agent({ execute: "guest-exec", arguments: { path: "/bin/sh", arg: ["-c", command] } });
+  for (let i = 0; i < seconds; i++) {
+    const status = agent({ execute: "guest-exec-status", arguments: { pid } });
+    if (status.exited) {
+      if (status.exitcode !== 0) throw new Error(`studio root command failed (${status.exitcode}): ${command}`);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(`studio root command still running after ${seconds} s: ${command}`);
 }
 
 // openTerminal() with this clip's rcfile.

@@ -38,6 +38,8 @@ export async function setup(d) {
   await d.page.keyboard.press("Escape").catch(() => {});
   await d.page.goto(d.restartWeb());
   await d.page.locator("#search").waitFor();
+  // A click on Labs before the first state arrives is overridden by it (the tab stays on Catalog).
+  await d.page.locator("#rows tr[data-vm]").first().waitFor();
   await d.page.locator("#vnc-dialog").evaluate((x) => x.open && x.close()).catch(() => {});
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1500 300 0.1");
 }

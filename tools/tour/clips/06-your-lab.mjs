@@ -66,6 +66,16 @@ export async function setup(d) {
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
 }
 
+async function settle(locator, seconds = 45) {
+  let last = "", same = 0;
+  for (let i = 0; i < seconds * 2 && same < 6; i++) {
+    const box = JSON.stringify(await locator.boundingBox().catch(() => null));
+    same = box === last && box !== "null" ? same + 1 : 0;
+    last = box;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
 async function waitJob(d, pattern, extra = "true") {
   for (let i = 0; i < 1800; i++) {
     const s = d.vm(`if pgrep -f '${pattern}' >/dev/null; then echo busy; elif ${extra}; then echo done; else echo busy; fi`).trim();
@@ -126,6 +136,9 @@ export async function run(d) {
   await d.sleep(1000);
 
   await d.cue("tests");
+  // Right after the install the members turn Starting -> Running and the cards re-sort a few times:
+  // wait until this card has kept its place for three polls before clicking (2026-10-19).
+  await settle(card());
   await card().scrollIntoViewIfNeeded();
   // Run tests lives in the card's Actions menu since v0.25 (one toolbar per card).
   await d.click(card().locator(".lab-menu"));

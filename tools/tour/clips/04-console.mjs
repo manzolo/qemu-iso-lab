@@ -26,7 +26,7 @@ export async function setup(d) {
   await d.page.bringToFront();
   await d.page.goto(d.restartWeb());
   await d.page.locator("#search").waitFor();
-  await d.page.locator(`tr.row[data-vm="${VMNAME}"]`).click();
+  await d.page.locator(`tr.row[data-vm="${VMNAME}"] .profile-text`).click();
   await d.page.locator("#details").getByRole("button", { name: /Open console/ }).waitFor();
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1500 300 0.1");
 }
