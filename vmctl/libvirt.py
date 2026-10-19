@@ -415,14 +415,82 @@ def warn_foreign_owner(vm: dict[str, Any]) -> None:
         print(f"    chown {os.getuid()}:{os.getgid()} " + " ".join(shlex.quote(str(path)) for path in foreign))
 
 
+def copy_volumes(xml: ET.Element, name: str) -> list[Path]:
+    """The pool volumes copy_to_pool made for this domain, read from its XML: the disk, loader and
+    vars named after the domain (`<name>.<ext>`, `<name>-OVMF_*`). Anything else the domain was
+    given later in virt-manager (an ISO, a second disk) is not ours to delete."""
+    paths = [node.get("file") for node in xml.findall("devices/disk[@device='disk']/source")]
+    paths += [xml.findtext("os/loader"), xml.findtext("os/nvram")]
+    found: list[Path] = []
+    for text in paths:
+        if not text:
+            continue
+        path = Path(text)
+        if (path.stem == name or path.name.startswith(f"{name}-")) and path not in found:
+            found.append(path)
+    return found
+
+
+def take_back_copy(args: argparse.Namespace, vm: dict[str, Any], name: str) -> int:
+    """unexport-libvirt of a --copy-to-pool domain: the copy comes back to vmctl, like a linked
+    export does. Its disk (and EFI vars) are downloaded through libvirtd (the pool may be root's)
+    over the profile's disk, and only once they are in place the domain is undefined and the
+    volumes it was made with deleted; never --remove-all-storage. A vmctl disk with data diverged
+    from the copy since the export, so taking the copy over it needs --replace."""
+    uri = args.connect
+    if name in virsh_output(uri, "list", "--name").splitlines():
+        raise VMError(f"Libvirt domain '{name}' is running; shut it down first")
+    xml = ET.fromstring(virsh_output(uri, "dumpxml", name))
+    volumes = copy_volumes(xml, name)
+    disks = [path for path in volumes if path.name not in (f"{name}-{FIRMWARE_CODE}", f"{name}-{FIRMWARE_VARS}")]
+    if len(disks) != 1:
+        raise VMError(f"Libvirt domain '{name}' does not have the one disk volume --copy-to-pool made "
+                      f"({', '.join(map(str, disks)) or 'none'}): bring it back by hand")
+    nvram_text = xml.findtext("os/nvram")
+    nvram_volume = Path(nvram_text) if nvram_text and Path(nvram_text) in volumes else None
+    disk = runtime.resolve_path(vm["disk"]["path"])
+    if vmstate.disk_facts(vm)["has_data"] and not getattr(args, "replace", False):
+        raise VMError(f"vmctl has its own disk of {args.vm} with data ({disk}): it and the libvirt copy went separate ways "
+                      f"after the export. --replace takes the copy over it (vmctl checkpoint create {args.vm} first to keep it)")
+    ui.print_note(f"'{name}' is an independent copy (export-libvirt --copy-to-pool): it comes back as vmctl's disk of "
+                  f"{args.vm} ({disk}), then the domain is undefined and its volumes deleted:"
+                  + "".join(f"\n    {path}" for path in volumes))
+    if not getattr(args, "yes", False) and not runtime.confirm_default_no(f"Bring the libvirt copy '{name}' back into vmctl?"):
+        raise VMError("Not confirmed (pass --yes to skip the question in scripts)")
+    runtime.ensure_parent(disk)
+    staged_disk = disk.parent / f".libvirt-{name}{disk.suffix}.part"
+    staged_vars = disk.parent / f".libvirt-{name}-vars.qcow2.part"
+    raw_vars: Path | None = None
+    try:
+        runtime.run(["virsh", "--connect", uri, "vol-download", str(disks[0]), str(staged_disk), "--sparse"])
+        if nvram_volume is not None and vm["firmware"].get("type") == "efi":
+            nvram = qemu.resolve_efi_firmware(vm["firmware"])[2]
+            runtime.ensure_parent(nvram)
+            raw_vars = nvram.parent / f".libvirt-{name}-vars.raw.part"
+            runtime.run(["virsh", "--connect", uri, "vol-download", str(nvram_volume), str(staged_vars)])
+            runtime.run(["qemu-img", "convert", "-f", "qcow2", "-O", "raw", str(staged_vars), str(raw_vars)])
+            os.replace(raw_vars, nvram)
+        os.replace(staged_disk, disk)
+    finally:
+        for leftover in (staged_disk, staged_vars, raw_vars):
+            if leftover is not None:
+                leftover.unlink(missing_ok=True)
+    vmstate.record_origin(args.vm, "libvirt", f"copy {name}")
+    # --keep-nvram: the vars are one of the volumes deleted below, like the disk.
+    runtime.run(["virsh", "--connect", uri, "undefine", name, "--keep-nvram", "--snapshots-metadata"])
+    for path in volumes:
+        runtime.run(["virsh", "--connect", uri, "vol-delete", str(path)])
+    ui.print_status("ok", f"Libvirt copy '{name}' is vmctl's disk of {args.vm} again; domain and volumes removed")
+    return 0
+
+
 def unexport(args: argparse.Namespace, vm: dict[str, Any]) -> int:
     name = domain_name(args.name or args.vm)
     exported_nvram: Path | None = None
     if not args.dry_run:
         runtime.require_command("virsh")
         if domain_is_copy(args.connect, name):
-            raise VMError(f"Libvirt domain '{name}' is an independent copy (export-libvirt --copy-to-pool): vmctl does not own it. "
-                          f"Delete it with virsh --connect {args.connect} undefine {name} --nvram and virsh vol-delete of its volumes")
+            return take_back_copy(args, vm, name)
         nvram_text = ET.fromstring(virsh_output(args.connect, "dumpxml", name) or "<domain/>").findtext("os/nvram")
         exported_nvram = Path(nvram_text) if nvram_text else None
     undefine(args.connect, name, args.dry_run)

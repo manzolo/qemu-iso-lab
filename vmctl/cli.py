@@ -453,6 +453,9 @@ drag it onto another machine) and from a multiple selection (Link network).""")
             p.add_argument("--autostart", action="store_true", help="enable libvirt autostart")
             p.add_argument("--copy-to-pool", action="store_true", help="copy the disk (and EFI firmware) into a libvirt storage pool instead of referencing artifacts/: an independent VM, vmctl's own disk stays usable")
             p.add_argument("--pool", default="default", help="with --copy-to-pool: the libvirt directory pool receiving the volumes (default: default)")
+        else:
+            p.add_argument("--yes", action="store_true", help="a domain exported with --copy-to-pool comes back as vmctl's disk and its volumes are deleted: do not ask")
+            p.add_argument("--replace", action="store_true", help="with a --copy-to-pool domain: take the copy over a vmctl disk that has data of its own")
         p.set_defaults(func=handler)
 
     p = _add(subparsers, "shell", help="SSH into a running VM, or run one command in it: vmctl shell <vm> -- <command> (its exit status is returned)")

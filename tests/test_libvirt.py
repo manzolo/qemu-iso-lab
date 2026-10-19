@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest import mock
 
 from _common import BaseVmctlTestCase, enter_context
+import vmctl.vmstate
 from vmctl import cli, libvirt, lifecycle, qemu, runtime
 from vmctl.errors import VMError
 
@@ -249,17 +250,61 @@ class LibvirtTests(BaseVmctlTestCase):
         with self.assertRaisesRegex(VMError, "drop --no-define"):
             lifecycle.cmd_export_libvirt(self.args("--copy-to-pool", "--no-define"))
 
-    def test_a_copied_domain_neither_guards_the_disk_nor_unexports(self):
-        copy = f"<domain xmlns:v='{libvirt.METADATA_NS}'><metadata><v:export mode='copy' profile='testvm'/></metadata></domain>"
-        outputs = {"list": "testvm\n", "dumpxml": copy}
+    def test_a_copied_domain_does_not_guard_the_disk_and_unexport_brings_it_back(self):
+        pool = "/var/lib/libvirt/images"
+        code, template, vars_raw = [self.root / n for n in ("code.fd", "template.fd", "vars.fd")]
+        self.vm_config["firmware"] = {"type": "efi", "code": str(code), "vars_template": str(template), "vars_path": str(vars_raw)}
+        self.write_config_dir()
+        enter_context(self, mock.patch.object(qemu, "resolve_efi_firmware", return_value=(code, template, vars_raw)))
+        copy = (f"<domain xmlns:v='{libvirt.METADATA_NS}'><metadata><v:export mode='copy' profile='testvm'/></metadata>"
+                f"<os><loader>{pool}/testvm-OVMF_CODE.qcow2</loader><nvram>{pool}/testvm-OVMF_VARS.qcow2</nvram></os>"
+                f"<devices><disk device='disk'><source file='{pool}/testvm.qcow2'/></disk>"
+                f"<disk device='disk'><source file='{pool}/added-later.qcow2'/></disk>"
+                f"<disk device='cdrom'><source file='{pool}/testvm.iso'/></disk></devices></domain>")
+        outputs = {"list": "", "dumpxml": copy}
         def virsh(command, **kwargs):
             if "stdout_log" in kwargs:
                 kwargs["stdout_log"].write_text(outputs.get(command[3], ""))
+            elif command[3:4] == ["vol-download"]:
+                Path(command[5]).write_bytes(b"copy of " + Path(command[4]).name.encode())
+            elif command[:2] == ["qemu-img", "convert"]:
+                Path(command[-1]).write_bytes(b"raw " + Path(command[-2]).read_bytes())
         self.run.side_effect = virsh
         self.assertFalse(lifecycle.libvirt_domain_defined("testvm"))
-        with self.assertRaisesRegex(VMError, "independent copy"):
-            lifecycle.cmd_unexport_libvirt(cli.build_parser().parse_args(["unexport-libvirt", "testvm"]))
-        self.assertNotIn("undefine", str([c.args[0] for c in self.run.call_args_list]))
+        def unexport(*extra):
+            lifecycle.cmd_unexport_libvirt(cli.build_parser().parse_args(["unexport-libvirt", "testvm", *extra]))
+        def changes():
+            return [c.args[0] for c in self.run.call_args_list if "stdout_log" not in c.kwargs]
+        # vmctl's own disk has data: the two went separate ways, the copy never overwrites it unasked.
+        disk = self.create_disk()
+        disk.write_bytes(b"vmctl" + bytes(vmctl.vmstate.DATA_MIN_BYTES))
+        with self.assertRaisesRegex(VMError, "--replace"):
+            unexport("--yes")
+        self.assertEqual((changes(), disk.read_bytes()[:5]), ([], b"vmctl"))
+        disk.unlink()
+        with mock.patch.object(runtime, "confirm_default_no", return_value=False):
+            with self.assertRaisesRegex(VMError, "Not confirmed"):
+                unexport()
+        self.assertEqual(changes(), [])
+        unexport("--yes")
+        virsh_cmd = ["virsh", "--connect", "qemu:///system"]
+        staged_vars = disk.parent / ".libvirt-testvm-vars.qcow2.part"
+        self.assertEqual(changes(), [
+            [*virsh_cmd, "vol-download", f"{pool}/testvm.qcow2", str(disk.parent / ".libvirt-testvm.qcow2.part"), "--sparse"],
+            [*virsh_cmd, "vol-download", f"{pool}/testvm-OVMF_VARS.qcow2", str(staged_vars)],
+            ["qemu-img", "convert", "-f", "qcow2", "-O", "raw", str(staged_vars), str(vars_raw.parent / ".libvirt-testvm-vars.raw.part")],
+            [*virsh_cmd, "undefine", "testvm", "--keep-nvram", "--snapshots-metadata"],
+            [*virsh_cmd, "vol-delete", f"{pool}/testvm.qcow2"],
+            [*virsh_cmd, "vol-delete", f"{pool}/testvm-OVMF_CODE.qcow2"],
+            [*virsh_cmd, "vol-delete", f"{pool}/testvm-OVMF_VARS.qcow2"]],
+            "copied back first, then only the volumes the copy was made with; never --remove-all-storage")
+        self.assertEqual(disk.read_bytes(), b"copy of testvm.qcow2")
+        self.assertEqual(vars_raw.read_bytes(), b"raw copy of testvm-OVMF_VARS.qcow2")
+        self.assertEqual(list(disk.parent.glob(".libvirt-*")) + list(vars_raw.parent.glob(".libvirt-*")), [])
+        self.assertEqual(vmctl.vmstate.load("testvm")["origin"]["kind"], "libvirt")
+        outputs["list"] = "testvm\n"
+        with self.assertRaisesRegex(VMError, "running"):
+            unexport("--yes", "--replace")
         outputs["dumpxml"] = "<domain/>"
         self.assertTrue(lifecycle.libvirt_domain_defined("testvm"))
 

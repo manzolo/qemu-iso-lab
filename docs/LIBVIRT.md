@@ -67,11 +67,19 @@ cloud-image overlay is flattened first (`qemu-img convert`), so the volume does 
 vmctl's own disk is only read: the profile keeps working with vmctl at the same time, and the two
 VMs diverge from then on. The domain carries `<metadata><vmctl:export mode="copy"/></metadata>`:
 vmctl does not treat a copy as owning the profile's disk (clean, checkpoint, clone go on even when
-the domain has the profile's name) and `unexport-libvirt` refuses it. It is libvirt's alone:
+the domain has the profile's name). `unexport-libvirt` on a copy **brings it back**: the disk
+volume (and the EFI vars, converted back to raw) are downloaded through libvirtd over vmctl's disk
+of the profile (`vol-download --sparse`, staged next to it and renamed), the record says the disk
+came from the libvirt copy, and only then the domain is undefined (`--keep-nvram`) and the volumes
+the copy was made with (`<domain>.<ext>`, `<domain>-OVMF_*`, read from the domain's XML) deleted
+with `virsh vol-delete`. It lists them and asks (`--yes` skips the question; the web confirms
+first). A disk or ISO attached later in virt-manager is left alone, and a running domain is refused.
+When vmctl's own disk of the profile still holds data, the two went separate ways after the export
+and the command refuses: `--replace` takes the copy over it (`vmctl checkpoint create <vm>` first
+to keep the vmctl one).
 
 ```bash
-virsh --connect qemu:///system undefine debian-server --nvram
-virsh --connect qemu:///system vol-delete --pool default debian-server.qcow2   # and the OVMF volumes
+vmctl unexport-libvirt debian-server --name debian-libvirt [--replace]
 ```
 
 Never `--remove-all-storage`. Give the copy a different `--name` when the profile is also exported

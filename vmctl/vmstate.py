@@ -459,7 +459,7 @@ def describe(record: dict[str, Any], facts: dict[str, Any], catalog_version: str
     elif out["install_state"] == "started":
         out["label"] = LABEL_UNVERIFIED
         out["detail"] = f"installer booted by hand on {_day(out['install_at'])}; completion is not tracked"
-    elif out["origin_kind"] in ("import", "restore", "clone", "image"):
+    elif out["origin_kind"] in ("import", "restore", "clone", "image", "libvirt"):
         out["label"] = LABEL_UNVERIFIED
         out["detail"] = f"disk from {out['origin_kind']} of {out['origin_source']} on {_day(out['origin_at'])}, not verified here"
     else:
