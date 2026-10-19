@@ -40,6 +40,8 @@ SPOKEN = {
            # convince Manzolo either: say it in full, as the cues do. IT-Tools would be the pronoun "it".
            # SSH as one word: letter by letter, "esse esse acca" stumbled (Manzolo, 2026-10-19).
            (r"\bSSH\b", "essesseacca"),
+           # Alpine as "alpain": "àlpain" and "èlpain" came out "aplein"; "àlpàin" chosen by ear (Manzolo, 2026-10-19).
+           (r"\bAlpine\b", "àlpàin"),
            (r"\bHA\b", "alta affidabilità"), (r"\bIT-Tools\b", "ai ti tùls"), (r"\bshutdown\b", "sciatdàun"),
            # The ZFS course (2026-10-07): the commands in lower case, the options, paths and columns,
            # and the English words an Italian voice reads letter by letter.
