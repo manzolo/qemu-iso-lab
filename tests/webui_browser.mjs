@@ -274,7 +274,7 @@ try {
   assert.equal(await page.locator('#details .name').textContent(),'arch-noctalia');
   await shot('dashboard'); check('dashboard and profile');
   assert.equal(await page.locator('#rows [data-vm="debian-server"] .state').textContent(),'Stopped');
-  assert.equal(await page.locator('#rows [data-vm="debian-server"] .installation-status').textContent(),'Boot verified ✓');
+  assert.equal(await page.locator('#rows [data-vm="debian-server"] .installation-status').getAttribute('aria-label'),'Boot verified');
   assert.equal(await page.locator('#workspace-nav button').evaluateAll(b=>b.map(x=>x.firstChild.textContent).join(',')),'My VMs,Recent,Catalog,Labs');
   assert.deepEqual(await page.locator('#workspace-nav .tab-count').allTextContents(),['1','0','5','2'],'The tabs count what they hold, including launches recorded by the host');
   await page.locator('[data-filter=recent]').click();
@@ -304,7 +304,7 @@ try {
   await page.locator('#search').fill('debian');
   assert.deepEqual(await rowNames(), ['debian-server'], 'Matches outside the last N appear in Catalog');
   assert.equal(await page.locator('#tab-count-recent').textContent(), '0 / 5');
-  assert.match(await page.locator('#list-title').textContent(), /Recent · 0 \/ 5 · \+1 in Catalog/);
+  assert.match(await page.locator('#list-title').textContent(), /Recent · 0 results of 5 · \+1 in Catalog/);
   assert.match(await page.locator('#rows [data-group=catalog]').textContent(), /More matches in Catalog · 1/);
   await page.locator('#search').fill('');
   await page.locator('[data-status-filter=running]').click();
@@ -1531,9 +1531,28 @@ try {
     await page.setViewportSize({width,height:900});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     assert(await page.locator('#list').evaluate(el=>el.scrollWidth<=el.clientWidth));
+    assert(await page.locator('#rows .row-actions button').evaluateAll(buttons=>buttons.every(b=>{
+      const box=b.getBoundingClientRect(), cell=b.closest('td').getBoundingClientRect();
+      return box.width>=30 && box.left>=cell.left && box.right<=cell.right;
+    })), `Row actions stay visible within their cells at ${width}px`);
+    if (width<=1050) {
+      assert(!(await page.locator('#machine-panel').isVisible()));
+      await page.locator('#machine-preview-open').click();
+      assert(await page.locator('#machine-drawer').evaluate(el=>el.open));
+      assert(await page.locator('#machine-panel').isVisible());
+      await page.keyboard.press('F10');
+      assert(await page.locator('#cmd-dialog').evaluate(el=>el.open));
+      await page.locator('#cmd-dialog [data-close]').click();
+    }
     const primary = await page.locator('#details .main-action').boundingBox();
     if (width>720) assert(primary.y+primary.height<700);
     await shot('dashboard-'+width);
+    if (width<=1050) {
+      await page.locator('#machine-locate').click();
+      await page.waitForFunction(()=>!document.getElementById('machine-drawer').open);
+      await page.waitForFunction(()=>document.querySelector('#rows tr.sel')===document.activeElement);
+      await shot('dashboard-list-'+width);
+    }
     await page.locator('#all-commands').click();
     await page.locator('#cmd-filter').fill('start');
     const dialog=await page.locator('#cmd-dialog').boundingBox(), run=await page.locator('#cmd-run').boundingBox();
@@ -1542,6 +1561,32 @@ try {
     await shot('commands-'+width); await page.locator('#cmd-dialog [data-close]').click();
   }
   check('six viewport sizes keep profiles, primary actions and execution footer within bounds');
+  await page.locator('#machine-preview-open').click();
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(()=>document.getElementById('machine-panel').parentElement.id==='profiles-view');
+  assert(await page.locator('#machine-preview-open').evaluate(el=>el===document.activeElement));
+  await page.locator('#machine-preview-open').click();
+  await page.setViewportSize({width:1440,height:1000});
+  await page.waitForFunction(()=>!document.getElementById('machine-drawer').open);
+  await page.locator('#machine-panel').waitFor({state:'visible'});
+  await page.locator('#ssh-copy-quick').click();
+  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'bin/vmctl shell arch-noctalia');
+  check('responsive inspector restores focus on Escape, reveals the selected row and returns to the desktop on resize; SSH copy uses the configured CLI');
+  await page.evaluate(()=>{
+    knownJobs=Array.from({length:12},(_,i)=>({id:'history:'+i,status:i===11?'running':'completed',command:'vmctl stop demo-'+i,updated:1789900000+i}));
+    renderJobHistory();
+  });
+  assert.equal(await page.locator('#job-rows tr').count(),6);
+  assert.equal(await page.locator('#job-rows tr').first().getAttribute('data-job'),'history:11');
+  await page.locator('#jobs-more').click();
+  assert.equal(await page.locator('#job-rows tr').count(),12);
+  await page.locator('#jobs-more').click();
+  assert.equal(await page.locator('#job-rows tr').count(),6);
+  await page.locator('#job-rows [data-job-log]').first().click();
+  assert(await page.locator('#log-title').textContent().then(t=>t.includes('vmctl stop demo-11')));
+  await page.locator('#log-dialog [data-close]').click();
+  await page.evaluate(()=>refreshJobs());
+  check('history keeps running jobs and five completed entries, expands and collapses, and retains full commands in logs');
   await page.evaluate(()=>{activityJob={id:'web:fixture',command:'vmctl show arch-noctalia',status:'completed'};renderActivity();});
   await page.locator('#activity-toggle').click();
   await page.locator('#activity-dismiss').click(); assert(!(await page.locator('#activity').isVisible()));
@@ -1590,7 +1635,9 @@ try {
   assert.equal(await page.locator('#rows [data-group=catalog]').count(), 1, 'Polling reuses the section');
   await page.locator('#rows [data-vm="ubuntu-26.10"] .profile-name').click();
   assert.equal(await page.locator('#details .name').textContent(), 'ubuntu-26.10');
+  await page.locator('#machine-preview-open').click();
   assert(await page.locator('#profile-mine').isVisible());
+  await page.keyboard.press('Escape');
   await page.locator('#search').focus();
   await page.locator('#search').press('ArrowUp');
   assert.equal(await page.locator('#details .name').textContent(), 'ubuntu-26.04');
@@ -1626,7 +1673,9 @@ try {
   assert(await page.locator('#labs-running').isHidden());
   await row('debian-server').click();
   assert.equal(await page.locator('#profile-mine').textContent(),'★');
+  await page.locator('#machine-preview-open').click();
   await page.locator('#profile-mine').click();
+  await page.keyboard.press('Escape');
   await page.waitForFunction(()=>document.querySelectorAll('#rows .mine-mark').length===0);
   assert.deepEqual(requests.at(-1),{catalog:{action:'remove',names:['debian-server']}});
   assert.equal(await page.locator('[data-filter].active').getAttribute('data-filter'),'all');  // an empty selection leaves My VMs
@@ -1690,6 +1739,38 @@ try {
     [jobId,jobStatus,jobCommand]=saved; requests=[]; dynamicVmJobs=false; await page.evaluate(()=>refreshJobs());
     check('power button: start headless, confirmed shutdown, two-second hold forces it off, never selects the row');
   }
+  // Row actions target their own VM, including with the inspector hidden and another selection.
+  await page.evaluate(()=>refresh(true));
+  await page.waitForFunction(()=>!S.vms.find(v=>v.name==='debian-server').running);
+  await page.setViewportSize({width:600,height:900});
+  await page.locator('#rows [data-vm="debian-server"] .profile-name').click();
+  const rowSelected = await page.locator('#rows tr.sel').getAttribute('data-vm');
+  const quick = (vm, action) => page.locator(`#rows [data-vm="${vm}"] [data-row-action="${action}"]`);
+  assert(await quick('debian-server','console').isDisabled());
+  assert(await quick('debian-server','ssh').isDisabled());
+  await quick('arch-noctalia','console').click();
+  await page.waitForFunction(()=>document.getElementById('vnc-status').textContent==='Connected');
+  assert.equal(await page.evaluate(()=>consoleVm),'arch-noctalia');
+  await page.locator('#vnc-close').click();
+  await quick('arch-noctalia','ssh').focus();
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(()=>document.getElementById('terminal-status').textContent==='Session open');
+  assert.equal(await page.locator('#terminal-title').textContent(),'arch-noctalia');
+  await page.locator('#terminal-close').click();
+  assert.equal(await page.locator('#rows tr.sel').getAttribute('data-vm'),rowSelected);
+  await page.locator('#search').fill('alpine-ci');
+  assert.match(await quick('alpine-ci','setup').getAttribute('title'),/Install automatically/);
+  const newVm=state.vms.find(v=>v.name==='alpine-ci');
+  newVm.prepared=true; await page.evaluate(()=>refresh(true));
+  assert.equal(await page.locator('#rows [data-power="alpine-ci"]').count(),0,'An empty prepared disk still needs installation');
+  failRun=true;
+  await quick('alpine-ci','setup').click();
+  await page.waitForFunction(()=>document.getElementById('toast').textContent.includes('Fixture rejected'));
+  assert.deepEqual(requests.at(-1).args,['bootstrap-archinstall','alpine-ci']);
+  failRun=false; newVm.prepared=false;
+  await page.evaluate(()=>{vmJobs.clear();});
+  await page.locator('#search').fill(''); await page.evaluate(()=>refresh(true));
+  check('row icons open the correct console and SSH without selecting, disable unavailable connections and install new or empty disks');
   await page.setViewportSize({width:1440,height:1000});
   state.vms[0].running=false; jobId='vm:arch-noctalia'; jobStatus='completed';
   await page.evaluate(()=>{vmJobs.clear();}); await page.evaluate(()=>refresh(true));

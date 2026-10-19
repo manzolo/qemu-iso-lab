@@ -951,6 +951,93 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
 #console-connection[data-state=Disconnected] .console-connection-symbol { animation:none; border-color:var(--warn); }
 .console-connection-actions { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:22px; }
 @media(prefers-reduced-motion:reduce) { .console-connection-symbol { animation:none; } }
+
+/* Compact workspace, with an on-demand inspector when two columns no longer fit. */
+.overview { padding-top:16px; padding-bottom:12px; }
+.overview .eyebrow { display:none; }
+.overview h2 { font-size:24px; }
+.metrics { gap:0; flex-wrap:wrap; }
+.metric { display:flex; align-items:baseline; gap:6px; min-width:0; padding:0 16px; background:none; border:0; border-radius:0; }
+.metric + .metric { border-left:1px solid var(--line); }
+.metric:last-child { padding-right:0; }
+.metric strong { font-size:18px; }
+.metric span { font-size:12px; }
+#workspace-nav { padding-bottom:0; }
+#workspace-nav button { padding-top:8px; padding-bottom:9px; }
+#selection-hint { font-size:12px; margin:0; padding:10px 18px; }
+.list-heading h2 { text-transform:none; letter-spacing:0; font-size:13px; }
+#list { max-height:560px; }
+#list th { z-index:1; font-size:12px; }
+#list td { border-bottom-color:#ffffff09; padding-top:14px; padding-bottom:14px; }
+.profile-name { font-size:14px; }
+.profile-desc { font-size:12px; max-width:380px; }
+.style-tag { border:0; background:none; font-size:9px; }
+.style-tag.auto { background:none; color:var(--muted); }
+tr.row.sel td { background:#193b36; box-shadow:none; }
+tr.row.sel td:first-child { box-shadow:inset 3px 0 var(--accent); }
+tr.row.sel:hover td { background:#20473f; }
+.state-cell { justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.state-cell > span { min-width:0; }
+.row-status { display:block; }
+.state-cell > .row-actions:last-child { display:flex; flex-direction:row; align-items:center; gap:6px; }
+.row-actions button { display:grid; place-items:center; flex:0 0 30px; width:30px; height:30px; padding:0; border:1px solid var(--line); border-radius:8px; background:#101926; }
+.row-actions button:hover:not(:disabled) { background:#25453f; border-color:var(--accent); }
+.row-actions button:disabled { opacity:.35; }
+#rows .row-actions .vm-power { order:0; flex-basis:30px; }
+.row-actions .vm-power-slot { display:none; }
+@media(max-width:1250px) { .state-cell { flex-direction:column; align-items:flex-start; gap:8px; } }
+.state-cell .installation-status.verified { display:inline; margin-left:7px; color:var(--accent); }
+#rows .vm-power,#rows .vm-power-slot { order:2; flex-shrink:0; }
+.resources { gap:0; background:#101926; border-radius:10px; padding:12px 0; }
+.resource { background:none; border:0; border-radius:0; padding:0 12px; }
+.resource + .resource { border-left:1px solid var(--line); }
+.resource span,.resource em { font-size:11px; }
+.access { background:none; border:0; padding:2px 0 8px; }
+.machine-tools { border-top-color:#ffffff0d; }
+#details .main-action { width:100%; }
+#machine-locate { margin:4px 0 12px; padding:0; background:none; color:var(--accent); font-size:12px; }
+#machine-preview { display:none; }
+#machine-drawer { inset:0 0 0 auto; margin:0; width:min(440px,100%); max-width:100%; height:100dvh; max-height:100dvh; border-radius:16px 0 0 16px; overflow:auto; }
+#machine-drawer > header { position:sticky; top:0; z-index:2; background:var(--panel); }
+#machine-drawer #machine-panel { border:0; border-radius:0; box-shadow:none; }
+body:has(#machine-drawer[open]) { overflow:hidden; }
+#jobs .section-heading { padding-top:12px; padding-bottom:12px; }
+#jobs td { padding-top:10px; padding-bottom:10px; }
+#jobs .job-title { font-weight:500; }
+#jobs .job-time { font-size:12px; white-space:nowrap; }
+#jobs-more { display:block; margin:10px auto; background:none; color:var(--accent); }
+#jobs-more[hidden],#jobs.collapsed #jobs-more { display:none; }
+@media(max-width:1050px) {
+  main { grid-template-columns:minmax(0,1fr); }
+  body:not(.panel-only) main:not(.lab-profile) > #machine-panel { display:none; }
+  #machine-preview { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--line); background:#19302f; }
+  #machine-preview span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+  #machine-preview button { flex-shrink:0; }
+  .lab-profile #machine-preview,body.panel-only #machine-preview { display:none; }
+  #list { max-height:60dvh; }
+  #list th:first-child { width:65%; }
+  .profile-name { font-size:14px; }
+  .state { font-size:12px; padding:0; }
+  .state.s-live { padding:2px 9px; }
+  .overview { gap:12px; }
+}
+@media(max-width:720px) {
+  .overview { padding:16px; gap:10px; }
+  .metrics { gap:0; }
+  .metric { flex:none; padding:0 12px; gap:5px; }
+  .metric:first-child { padding-left:0; }
+  .metric strong { font-size:16px; }
+  .metric span { font-size:11px; }
+  #selection-hint { font-size:11px; padding:8px 12px; }
+  #list td { padding:12px 10px; }
+  .profile-name { font-size:12px; }
+  .profile-desc { font-size:11px; }
+  .state-cell { gap:8px; }
+  .state-cell .state { font-size:11px; }
+  #list th:first-child { width:60%; }
+  #jobs .section-heading p { display:none; }
+}
+
 </style>
 </head>
 <body>
@@ -993,15 +1080,17 @@ body:has(#job-bar:not(.hidden)) { padding-bottom:100px; }
   <nav id="lab-navigation" class="lab-navigation hidden" aria-label="Lab navigation"><button id="back-to-labs">← Labs</button><span aria-hidden="true">/</span><span id="lab-origin" class="mono"></span><span aria-hidden="true">/</span><span id="lab-current-vm" class="mono" aria-current="page"></span></nav>
   <section class="card"><div class="list-heading"><h2 id="list-title">Profiles</h2><label class="list-sort hidden" id="recent-limit-label" for="recent-limit">Last<select id="recent-limit"><option value="5">5 VMs</option><option value="10" selected>10 VMs</option><option value="20">20 VMs</option></select></label><label class="list-sort" id="vm-sort-label" for="vm-sort">Sort<select id="vm-sort"><option value="running">Running first</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="installed">Installed first</option></select></label></div>
     <div id="labs-running" class="labs-running" hidden></div>
-    <p id="selection-hint">Double-click to open · Ctrl / ⌘ + click · Shift + click for a range · Click an icon to toggle</p>
+    <div id="machine-preview"><span id="machine-preview-name">Select a profile</span><button id="machine-preview-open" aria-haspopup="dialog">Details →</button></div>
+    <p id="selection-hint" title="Ctrl / ⌘ + click to toggle selection · Shift + click for a range">Select a machine for details · Double-click to open · Click icons to select multiple</p>
     <div id="selection-bar" class="hidden" aria-label="Selected machines"><strong id="selection-count" role="status"></strong><button id="selection-start" title="Start the selected machines (F2)">Start</button><button id="selection-stop" title="Stop the selected machines (F8)">Stop</button><button id="selection-console" title="Start the selected machines and open their consoles side by side on one page">Start in console</button><button id="selection-link">Link network</button><button id="selection-mine">My VMs</button><button id="selection-clear">Clear</button></div>
     <div id="list"><table><thead><tr><th>Profile</th><th>State</th><th>RAM / CPU</th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
   <section class="card" id="machine-panel" tabindex="-1" aria-label="Machine details"><div class="profile-heading"><h2>Machine</h2><button id="profile-protect" class="hidden" aria-label="Protect this disk">🔓</button><button id="profile-mine" class="hidden" aria-label="Add to My VMs">☆</button><button id="profile-edit" title="Customize this profile locally">Customize</button></div><div id="details"><p class="s-muted">Select a profile.</p></div></section>
 </main>
+<dialog id="machine-drawer" aria-labelledby="machine-drawer-title"><header><h1 id="machine-drawer-title">Machine details</h1><button id="machine-drawer-close" data-close>Close</button></header></dialog>
 <div id="labs-view" class="labs hidden"></div>
 <section id="jobs" class="card collapsed"><div class="section-heading"><div><h2><button id="jobs-toggle" type="button" aria-expanded="false" aria-controls="jobs-body"><span class="jobs-chevron" aria-hidden="true">▸</span>Recent activity</button></h2><p>Jobs from the web and TUI keep running when you close this page.</p></div><span id="job-count" class="chip">0 jobs</span></div>
-  <div class="table-wrap" id="jobs-body"><table aria-label="Recent jobs"><tbody id="job-rows"><tr><td colspan="4" class="s-muted">No jobs yet. Start a machine or run a command to see its progress here.</td></tr></tbody></table></div>
+  <div class="table-wrap" id="jobs-body"><table aria-label="Recent jobs"><tbody id="job-rows"><tr><td colspan="4" class="s-muted">No jobs yet. Start a machine or run a command to see its progress here.</td></tr></tbody></table></div><button id="jobs-more" hidden aria-expanded="false" aria-controls="job-rows">Show all activity</button>
 </section>
 
 <dialog id="log-dialog" aria-labelledby="log-title"><header><h1 id="log-title">Job</h1><span><button id="log-cancel" class="danger hidden">Cancel job</button> <button data-close>Close</button></span></header>
@@ -1269,6 +1358,7 @@ function installationOf(r) {
 function installationBadge(r, inRow = false) {
   const [label, color] = installationOf(r);
   const detail = [r.install_detail, r.verify_at ? "Verified: " + r.verify_at : ""].filter(Boolean).join(" · ");
+  if (inRow && label === "Boot verified ✓") return `<span class="installation-status verified" title="${esc([label, detail].filter(Boolean).join(" · "))}" aria-label="Boot verified">✓</span>`;
   return `<span class="installation-status ${color}"${detail && !inRow ? ` title="${esc(detail)}"` : ""}>${esc(label)}</span>`;
 }
 function prefersSsh(r) {
@@ -1795,7 +1885,7 @@ function render() {
   if (labs) return renderLabs();
   const {primary, catalog} = profileResults(), rows = [...primary, ...catalog];
   const total = scopeRows().length;
-  $("list-title").textContent = `${inLab ? "Lab machines" : filter === "recent" ? "Recent" : filter === "mine" ? "My VMs" : statusFilter === "hidden" ? "Hidden profiles" : "Catalog"} · ${primary.length === total ? total : primary.length + " / " + total}${catalog.length ? " · +" + catalog.length + " in Catalog" : ""}`;
+  $("list-title").textContent = `${inLab ? "Lab machines" : filter === "recent" ? "Recent" : filter === "mine" ? "My VMs" : statusFilter === "hidden" ? "Hidden profiles" : "Catalog"} · ${primary.length === total ? total : primary.length + (primary.length === 1 ? " result of " : " results of ") + total}${catalog.length ? " · +" + catalog.length + " in Catalog" : ""}`;
   if (!rows.find((r) => r.name === selected) && rows.length) selected = rows[0].name;
   if (inLab) {
     $("lab-origin").textContent = labProfile.group;
@@ -1805,17 +1895,32 @@ function render() {
   // aborts the drop silently (the 5 s state poll did exactly that on a drag longer than a few seconds).
   if (dragVm || dragState.start || powerHold) return;
   const focused = document.activeElement, focusedVm = focused.closest?.("#rows [data-vm]")?.dataset.vm;
-  const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : focused.matches(".vm-power") ? ".vm-power" : null;
+  const focusSelector = focused.matches(".link-handle") ? ".link-handle" : focused.matches(".vm-select") ? ".vm-select" : focused.matches(".vm-power") ? ".vm-power" : focused.hasAttribute("data-row-action") ? `[data-row-action="${focused.dataset.rowAction}"]` : null;
   updateProfileRows(rows.map((r, index) => { const [s, c] = stateOf(r);
     const heading = catalog.length && index === primary.length ? `<tr class="search-group" data-group="catalog"><td colspan="2">More matches in Catalog · ${catalog.length}</td><td aria-hidden="true"></td></tr>` : "";
-    return heading + `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.hidden ? '<span class="style-tag" title="Hidden from the lists: shown here because it runs or holds a disk, or because the Hidden filter is on">hidden</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : r.manual === "todo" ? '<span class="style-tag todo" title="Manual for now: its automation is still to write (the notes say which flow)">to automate</span>' : '<span class="style-tag" title="' + ({live:"Live media: it boots, it does not install itself", image:"A ready disk image: it boots", template:"An import template, not an installer", ci:"The CI boot check", twin:"You install it by hand; " + esc(r.automated_as) + " installs the same system itself"}[r.manual] || "You install it by hand") + '">manual' + (r.manual === "twin" ? " · see " + esc(r.automated_as) : "") + '</span>'}</span><span class="profile-desc">${esc(r.label)}</span>${recentLaunch(r)}</span>${linkHandle(r)}</span></td><td><span class="state-cell">${powerButton(r)}<span>${stateBadge(r)}${installationBadge(r, true)}</span></span></td><td><span class="mono">${ram(r)}</span>${r.running ? `<span class="row-load" data-load="${esc(r.name)}">${rowLoadHtml(r.name)}</span>` : ""}</td></tr>`; }).join("")
+    return heading + `<tr class="row${r.name === selected ? " sel" : ""}${checkedVms.has(r.name) ? " multi" : ""}${r.running ? " on" : ""}" data-vm="${esc(r.name)}" tabindex="0" aria-selected="${checkedVms.size ? checkedVms.has(r.name) : r.name === selected}" aria-label="${esc(r.name + ", " + s + ". Right-click for actions.")}"><td><span class="profile-identity"><button class="vm-select" aria-label="${checkedVms.has(r.name) ? "Deselect" : "Select"} ${esc(r.name)}" aria-pressed="${checkedVms.has(r.name)}">${catalogIcon(osIconKey(r))}</button><span class="profile-text"><span class="profile-name mono">${esc(r.name)}${r.mine ? '<span class="mine-mark" title="In My VMs">★</span>' : ""}${r.hidden ? '<span class="style-tag" title="Hidden from the lists: shown here because it runs or holds a disk, or because the Hidden filter is on">hidden</span>' : ""}${r.protected ? '<span class="protect-mark" title="' + (r.protected_by === "star" ? "Protected: in My VMs with a disk (remove the star to unlock)" : "Protected: clean, reinstall and checkpoint restore refuse it") + '">🔒</span>' : ""}${r.unattended_flow ? '<span class="style-tag auto" title="Installs itself: ' + esc(r.unattended_flow) + '">unattended</span>' : r.manual === "todo" ? '<span class="style-tag todo" title="Manual for now: its automation is still to write (the notes say which flow)">to automate</span>' : '<span class="style-tag" title="' + ({live:"Live media: it boots, it does not install itself", image:"A ready disk image: it boots", template:"An import template, not an installer", ci:"The CI boot check", twin:"You install it by hand; " + esc(r.automated_as) + " installs the same system itself"}[r.manual] || "You install it by hand") + '">manual' + (r.manual === "twin" ? " · see " + esc(r.automated_as) : "") + '</span>'}</span><span class="profile-desc">${esc(r.label)}</span>${recentLaunch(r)}</span>${linkHandle(r)}</span></td><td><span class="state-cell"><span class="row-status">${stateBadge(r)}${installationBadge(r, true)}</span>${rowActions(r)}</span></td><td><span class="mono">${ram(r)}</span>${r.running ? `<span class="row-load" data-load="${esc(r.name)}">${rowLoadHtml(r.name)}</span>` : ""}</td></tr>`; }).join("")
     || `<tr><td colspan="4" class="s-muted" style="white-space:normal">${filter === "recent" && !total ? recentEmptyMessage() : filter === "mine" && !$("search").value ? "No matching VMs. Browse the Catalog to add profiles to My VMs, or clear the filters." : "No matching profiles."}</td></tr>`);
   bindStateLogs($("rows"));
   followClimbedRow();
   if (focusedVm && focusSelector) [...$("rows").querySelectorAll("tr")].find(row => row.dataset.vm === focusedVm)?.querySelector(focusSelector)?.focus({preventScroll:true});
   renderDetails();
+  $("machine-preview-name").textContent = rows.length ? selected : "No matching machines";
+  $("machine-preview-open").disabled = !rows.length;
 }
 let detailsSignature = "", labsSignature = "", labsOrder = [];
+const inspectorWidth = matchMedia("(max-width:1050px)");
+$("machine-preview-open").onclick = () => {
+  $("machine-drawer").append($("machine-panel"));
+  $("machine-drawer").showModal();
+  $("machine-drawer-close").focus();
+};
+$("machine-drawer").addEventListener("close", () => {
+  $("profiles-view").append($("machine-panel"));
+});
+inspectorWidth.addEventListener("change", () => {
+  if (!inspectorWidth.matches && $("machine-drawer").open) $("machine-drawer").close();
+});
+
 // Lab commands in flight: the click itself (until /api/run answers with a job), then that job
 // while /api/jobs lists it running; any running `vmctl group <cmd> <lab>` job counts too.
 const labPending = new Map();  // lab -> {action, job, at}
@@ -1866,7 +1971,7 @@ function renderDetails() {
   $("details").dataset.vm = r.name;
   const factList = facts => `<dl class="facts">${facts.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
   const section = (id, label, content, count = "") => `<details class="machine-tools" data-section="${id}"><summary>${label}${count ? `<span class="count">${esc(count)}</span>` : ""}</summary>${content}</details>`;
-  const actionButton = (x,i) => `<button aria-label="${esc(x.label)}" data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label)}</span>${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
+  const actionButton = (x,i) => `<button aria-label="${esc(x.label)}" title="${esc(x.label)}" data-action="${i}" ${x.disabled ? "disabled" : ""} class="${x.danger ? "danger" : x.warn ? "warn" : i === 0 ? "primary main-action" : ""}"><span class="al">${actionIcon(x)}${esc(x.label === "Start in separate console" ? "Start" : x.label)}</span>${fkeyOf(x) ? `<kbd>${fkeyOf(x)}</kbd>` : ""}</button>`;
   const isExtra = a => !a.primary && (a.danger || a.screen || a.alternative || ["attach","checkpoint"].includes(a.args?.[0]));
   const buttons = predicate => actions.map((a,i) => predicate(a) ? actionButton(a,i) : "").join("");
   const mainActions = buttons(a => !isExtra(a) && !a.recent && !a.mine && !a.protect && !a.hide && !a.form);
@@ -1874,21 +1979,22 @@ function renderDetails() {
   const more = buttons(a => a.form);
   const access = [
     ...((r.logins || []).length ? [["Login", r.logins.map(l => `<span class="mono">${esc(l.user)}</span> / ${l.password ? `<span class="mono">${esc(l.password)}</span>` : '<span class="s-muted">no password</span>'}${l.note ? ` <span class="s-muted login-note" title="${esc(l.note)}">· ${esc(l.note.length > 28 ? l.note.slice(0, 27) + "…" : l.note)}</span>` : ""}`).join("<br>")]] : []),
-    ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">${esc(r.ssh_user || "")}${r.ssh_user ? "@" : ""}127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options (F4)" aria-label="Open SSH console options">Options…</button></span>` + (r.installed_user && r.profile_user && r.installed_user !== r.profile_user ? `<br><span class="s-warn">installed as ${esc(r.installed_user)}; the profile names ${esc(r.profile_user)} now (reinstall to move the disk to it)</span>` : "") : "Not configured"]
+    ["SSH", r.ssh_port ? `<span class="ssh-access"><span class="mono">${esc(r.ssh_user || "")}${r.ssh_user ? "@" : ""}127.0.0.1:${esc(r.ssh_port)}</span><button class="ssh-shortcut" id="ssh-copy-quick" title="Copy the SSH command" aria-label="Copy SSH command">Copy</button><button class="ssh-shortcut" id="ssh-open" title="Open SSH connection options (F4)" aria-label="Open SSH console options">Options…</button></span>` + (r.installed_user && r.profile_user && r.installed_user !== r.profile_user ? `<br><span class="s-warn">installed as ${esc(r.installed_user)}; the profile names ${esc(r.profile_user)} now (reinstall to move the disk to it)</span>` : "") : "Not configured"]
   ];
   const config = [["Firmware", esc(r.firmware)],
     ...(r.profile_version ? [["Profile", `<span class="mono">${esc(r.profile_version)}</span>` + (r.installed_version && r.installed_version !== r.profile_version ? ` <span class="s-warn">on the disk: ${esc(r.installed_version)} · reinstall for the changes</span>` : r.installed_version ? ' <span class="s-muted">· on the disk</span>' : "")]] : []),
     ["ISO", {cached:"Ready to use",download:"Available to download",manual:"Provided manually"}[r.iso_source] || (r.iso_ready ? "Ready to use" : "Not cached")]];
   const network = (r.links || []).map(l => [esc(l.segment), `<span class="mono">${esc(l.address)}</span>${l.up ? "" : ' <span class="s-warn">at next start</span>'}<br><span class="s-muted">With</span> ${l.peers.map(p => `${esc(p.name)} <span class="mono">${esc(p.address)}</span>${p.up ? "" : ' <span class="s-muted">(off)</span>'}`).join(", ")} <button class="ssh-shortcut" data-unlink="${esc(l.segment)}" title="Unplug this machine from the segment">Unlink</button>`]);
   $("details").innerHTML = `<div class="profile-top">${catalogIcon(osIconKey(r), true)}<div class="profile-title"><div class="name mono">${esc(r.name)}</div><div class="desc">${esc(r.label)}</div></div></div>
+    <button id="machine-locate" title="Scroll to the selected machine">Show in list ↑</button>
     <div class="machine-state">${stateBadge(r)}${installationBadge(r)}</div>
     <div class="actions primary-actions">${mainActions}</div>
     ${operationNote(r)}
     ${alternativeActions ? `<details class="start-options" data-section="start"><summary>Other ways to start</summary><div class="actions">${alternativeActions}</div></details>` : ""}
     ${prefersSsh(r) && !r.running && r.installed ? '<p class="operation-note">Open SSH after the guest has booted.</p>' : ""}
-    <div class="access">${factList(access)}</div>
     ${r.running ? `<section class="vm-activity" id="vm-activity" data-vm="${esc(r.name)}" aria-label="Activity of ${esc(r.name)}" hidden></section>` : ""}
     <div class="resources"><div class="resource"><strong>${esc(memory)}</strong><span>Memory</span></div><div class="resource"><strong>${esc(r.cpus)}</strong><span>vCPUs</span></div><div class="resource"><strong>${esc(r.disk_capacity || "—")}</strong><span>Disk capacity</span>${r.prepared ? `<em>${esc(r.disk_host || "?")} on host</em>` : ""}</div></div>
+    <div class="access">${factList(access)}</div>
     ${section("checkpoints", "Checkpoints", `<p class="help">${r.has_checkpoints ? "Saved checkpoints available." : "Save a restore point before changing this machine."}</p><div class="actions"><button data-command="checkpoint">Manage checkpoints…</button></div>`, r.has_checkpoints ? "saved" : "")}
     ${section("network", "Network", network.length ? factList(network) + '<button id="machine-link">Connect another VM…</button>' : `<p class="help">No private VM links.</p><button id="machine-link" ${!r.installed && !r.running ? "disabled" : ""}>Connect another VM…</button>`, network.length ? `${network.length} link${network.length === 1 ? "" : "s"}` : "")}
     ${section("configuration", "Configuration", factList(config) + '<button id="machine-config">Edit configuration…</button>')}
@@ -1899,7 +2005,16 @@ function renderDetails() {
   $("details").querySelectorAll("details").forEach(el => { el.open = expanded.includes(el.dataset.section); });
   paintActivity();
   bindStateLogs($("details"));
+  $("machine-locate").onclick = () => {
+    const drawer = $("machine-drawer");
+    if (drawer.open) drawer.close();
+    requestAnimationFrame(() => { const row = $("rows").querySelector("tr.sel"); row?.scrollIntoView({block:"nearest"}); row?.focus({preventScroll:true}); });
+  };
   if ($("ssh-open")) $("ssh-open").onclick = () => openSsh(r);
+  if ($("ssh-copy-quick")) $("ssh-copy-quick").onclick = async () => {
+    try { await navigator.clipboard.writeText("bin/vmctl shell " + shellQuote(r.name)); toast("SSH command copied"); }
+    catch (_) { openSsh(r); }
+  };
   $("machine-link").onclick = () => openLinkPicker(r.name);
   $("machine-config").onclick = () => openProfileEditor(r.name);
   $("details").querySelectorAll("[data-command]").forEach(b => b.onclick = async () => { if (b.dataset.command === "checkpoint") return openCheckpoints(r.name); await openCommands(r.name); selectCommand(b.dataset.command); });
@@ -2311,13 +2426,31 @@ async function refreshJobs() {
     if (activityJob) activityJob = jobs.find(j => j.id === activityJob.id) || activityJob;
     else activityJob = jobs.find(j => j.status === "running") || null;
     renderActivity();
-    $("job-count").textContent = `${jobs.length} jobs`;
-    const rows = jobs.map((j) => `<tr data-job="${esc(j.id)}" data-cmd="${esc(j.command)}"><td><span class="chip ${esc(j.status.split(" ")[0])}">${esc(j.status)}</span></td><td class="mono job-command">${esc(j.command)}</td><td class="s-muted">${new Date(j.updated * 1000).toLocaleTimeString()}</td><td><div class="job-controls"><button data-job-log>View log</button>${j.status === "running" ? `<button data-job-cancel class="danger" ${cancellingJobs.has(j.id) ? "disabled" : ""}>${cancellingJobs.has(j.id) ? "Cancelling…" : "Cancel job"}</button>` : ""}</div></td></tr>`).join("")
-      || '<tr><td colspan="4" class="s-muted">No jobs yet.</td></tr>';
-    if ($("job-rows")._rows !== rows) { $("job-rows").innerHTML = rows; $("job-rows")._rows = rows; }
+    renderJobHistory();
   } catch (e) { /* the state refresh reports errors */ }
   finally { jobsRefreshing = false; }
 }
+let showAllJobs = false;
+function jobTitle(command) {
+  const parts = command.split(/\s+/), action = parts[0] === "vmctl" ? parts[1] : "";
+  const label = {start:"Start", stop:"Shut down", install:"Install", prep:"Prepare", "export-libvirt":"Export to libvirt", "unexport-libvirt":"Remove from libvirt", clone:"Clone", checkpoint:"Checkpoint", "boot-check":"Boot check"}[action];
+  return label && parts[2] && !parts[2].startsWith("-") ? `${label} · ${parts[2]}` : command;
+}
+function renderJobHistory() {
+  const jobs = [...knownJobs].sort((a,b) => Number(b.status === "running") - Number(a.status === "running") || b.updated - a.updated);
+  let completed = 0;
+  const displayed = showAllJobs ? jobs : jobs.filter(j => j.status === "running" || completed++ < 5);
+  $("job-count").textContent = `${jobs.length} jobs`;
+  $("jobs-more").hidden = jobs.length <= displayed.length && !showAllJobs;
+  $("jobs-more").textContent = showAllJobs ? "Show less" : `Show all ${jobs.length} jobs`;
+  $("jobs-more").setAttribute("aria-expanded", String(showAllJobs));
+  const rows = displayed.map(j => {
+    const date = new Date(j.updated * 1000), title = jobTitle(j.command);
+    return `<tr data-job="${esc(j.id)}" data-cmd="${esc(j.command)}"><td><span class="chip ${esc(j.status.split(" ")[0])}">${esc(j.status)}</span></td><td class="job-command"><span class="job-title" title="${esc(j.command)}">${esc(title)}</span></td><td class="s-muted job-time" title="${esc(date.toLocaleString())}">${esc(date.toLocaleDateString(undefined,{month:"short",day:"numeric"}))}<br>${esc(date.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}))}</td><td><div class="job-controls"><button data-job-log>View log</button>${j.status === "running" ? `<button data-job-cancel class="danger" ${cancellingJobs.has(j.id) ? "disabled" : ""}>${cancellingJobs.has(j.id) ? "Cancelling…" : "Cancel job"}</button>` : ""}</div></td></tr>`;
+  }).join("") || '<tr><td colspan="4" class="s-muted">No jobs yet.</td></tr>';
+  if ($("job-rows")._rows !== rows) { $("job-rows").innerHTML = rows; $("job-rows")._rows = rows; }
+}
+$("jobs-more").onclick = () => { showAllJobs = !showAllJobs; renderJobHistory(); };
 $("job-rows").onclick = (e) => {
   const row = e.target.closest("[data-job]");
   if (!row) return;
@@ -3971,6 +4104,26 @@ function powerButton(r) {
   const label = busy ? `${r.name}: ${activeJobLabel(current)} · open the log` : r.running ? `Shut down ${r.name} (hold 2 s to force it off)` : `Start ${r.name} headless`;
   return `<button type="button" class="vm-power${r.running ? " on" : ""}${busy ? " busy" : ""}" data-power="${esc(r.name)}" aria-label="${esc(label)}" title="${esc(label)}"${busy ? ' aria-busy="true"' : ""}>${consoleIcon("power")}<svg class="power-ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16.5" pathLength="100"/></svg></button>`;
 }
+// Reuse the panel actions: a new/empty disk needs installation, not a normal disk boot.
+function rowQuickActions(r) {
+  const current = withVMJob(r), actions = actionsFor(r);
+  const setup = !r.running && !r.installed
+    ? current.job_status === "running" ? actions.find(a => a.job) : mainAction(r)
+    : null;
+  return {
+    ...(setup && !setup.form ? {setup} : {}),
+    console: {label:r.running ? "Open console" : "Console available when running", console:true, icon:"console", tone:"info", disabled:!r.running},
+    ssh: {label:!r.ssh_port ? "SSH not configured" : r.running ? "Open SSH" : "SSH available when running", ssh:true, icon:"terminal", tone:"info", disabled:!r.running || !r.ssh_port}
+  };
+}
+function rowActions(r) {
+  const power = r.running || r.installed ? powerButton(r) : '<span class="vm-power-slot" aria-hidden="true"></span>';
+  const buttons = Object.entries(rowQuickActions(r)).map(([key, a]) => {
+    const label = a.label + " · " + r.name;
+    return `<button type="button" data-row-action="${key}" title="${esc(label)}" aria-label="${esc(label)}"${a.disabled ? " disabled" : ""}>${actionIcon(a)}</button>`;
+  }).join("");
+  return `<span class="row-actions" role="group" aria-label="Actions for ${esc(r.name)}">${power}${buttons}</span>`;
+}
 // While a button is held the lists are not rebuilt (render() and renderLabs() return early): the
 // job that a lab member's start just submitted used to replace the button mid-hold, and the ring
 // stopped as if the finger had lifted (Manzolo, 2026-10-06). A hold that fired suppresses the
@@ -4132,7 +4285,7 @@ function mainAction(r) {
   return actionsFor(r).find(a => !a.disabled && !a.alternative && !a.danger && !a.warn && !a.job && !a.cancelJob && !a.recent && !a.mine && !a.hide && !a.protect && !a.screen && !(a.args && a.args[0] === "checkpoint"));
 }
 $("rows").ondblclick = (e) => {
-  if (e.target.closest(".link-handle, .vm-select, .vm-power")) return;
+  if (e.target.closest(".link-handle, .vm-select, .row-actions")) return;
   const tr = e.target.closest("[data-vm]"), r = tr && S.vms.find(v => v.name === tr.dataset.vm);
   if (!r) return;
   const action = mainAction(r);
@@ -4140,7 +4293,20 @@ $("rows").ondblclick = (e) => {
   selected = r.name; checkedVms.clear(); render();
   runAction(r, action);
 };
-$("rows").onclick = (e) => { if (suppressLinkClick) return; if (e.target.closest(".link-handle")) { openLinkPicker(e.target.closest("[data-vm]").dataset.vm); return; } const tr = e.target.closest("[data-vm]"); if (tr) selectRow(tr.dataset.vm, e); };
+$("rows").onclick = (e) => {
+  if (suppressLinkClick) return;
+  const tr = e.target.closest("[data-vm]");
+  if (!tr) return;
+  const button = e.target.closest("[data-row-action]");
+  if (button) {
+    const r = S.vms.find(v => v.name === tr.dataset.vm), action = r && rowQuickActions(r)[button.dataset.rowAction];
+    if (action) runAction(r, action);
+    return;
+  }
+  if (e.target.closest(".row-actions")) return;
+  if (e.target.closest(".link-handle")) return openLinkPicker(tr.dataset.vm);
+  selectRow(tr.dataset.vm, e);
+};
 function setJobsOpen(open, remember = true) {
   $("jobs").classList.toggle("collapsed", !open);
   $("jobs-toggle").setAttribute("aria-expanded", String(open));
@@ -4152,7 +4318,7 @@ $("search-clear").onclick = () => { $("search").value = ""; $("search").oninput(
 $("search").oninput = () => { checkedVms.clear(); selectionAnchor = ""; render(); };
 $("search").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); $("search").value = ""; render(); $("search").blur(); } });
 document.addEventListener("keydown", (e) => {
-  if (document.querySelector("dialog[open]")) return;
+  if (document.querySelector("dialog[open]:not(#machine-drawer)")) return;
   const inField = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
   const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
   if (/^F\d+$/.test(e.key) && plain && !e.shiftKey) {
@@ -4160,7 +4326,7 @@ document.addEventListener("keydown", (e) => {
     if (e.key === "F10") { e.preventDefault(); return openCommands(selected); }
     // With a multiple selection, F2/F8 start/stop the selection (the toolbar's buttons, same
     // confirmation); every other key keeps acting on the machine in the details panel.
-    if (checkedVms.size && (e.key === "F2" || e.key === "F8")) {
+    if (!$("machine-drawer").open && checkedVms.size && (e.key === "F2" || e.key === "F8")) {
       e.preventDefault();
       const action = e.key === "F2" ? "start" : "stop";
       if (!bulkBusy && !bulkTargets(action).length) toast(`No selected machine can be ${action === "start" ? "started" : "stopped"} now.`, true);
@@ -4175,6 +4341,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k" && !inField) { e.preventDefault(); openCommands(selected); return; }
+  if ($("machine-drawer").open) return;
   if (e.key === "/" && document.activeElement !== $("search")) { e.preventDefault(); $("search").focus(); return; }
   // Typing anywhere filters the list: the search box takes focus on the first letter.
   if (e.key.length === 1 && e.key !== " " && plain && !inField) { $("search").focus(); return; }
