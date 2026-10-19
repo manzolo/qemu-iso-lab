@@ -5410,7 +5410,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 
 def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: bool = False, check_libvirt: bool = True,
-             allow_starred: bool = False) -> None:
+             allow_starred: bool = False, keep_libvirt_copies: bool = True) -> None:
     vmstate.refuse_if_protected(name, "delete its disk", allow_starred=allow_starred)
     if check_libvirt:
         refuse_if_libvirt(name, "delete the disk")
@@ -5470,6 +5470,11 @@ def clean_vm(name: str, vm: dict[str, Any], dry_run: bool = False, checkpoints: 
         for entry in sorted(base.iterdir()):
             if entry.name == checkpoint.CHECKPOINTS_DIR:
                 continue
+            if entry.name == libvirt.COPIES_DIR and keep_libvirt_copies:
+                # The SSH keys of export --copy-to-pool copies: unexport-libvirt brings them back.
+                ui.print_note(f"Keeping {entry}: the SSH keys of a libvirt copy (export-libvirt --copy-to-pool), "
+                              f"back with vmctl unexport-libvirt {name}")
+                continue
             ui.print_note(f"Removing {entry}")
             if not dry_run:
                 if entry.is_dir() and not entry.is_symlink():
@@ -5523,7 +5528,8 @@ def cmd_clean(args: argparse.Namespace) -> int:
     vmstate.refuse_if_protected(name, "delete its disk", allow_starred=starred)  # before the force-stop, not after it
     refuse_if_libvirt(name, "delete the disk")
     cmd_stop(argparse.Namespace(vm=name, dry_run=args.dry_run, force=True))
-    clean_vm(name, vm, dry_run=args.dry_run, checkpoints=remove_profile or checkpoints, allow_starred=starred)
+    clean_vm(name, vm, dry_run=args.dry_run, checkpoints=remove_profile or checkpoints, allow_starred=starred,
+             keep_libvirt_copies=not remove_profile)
     if remove_profile:
         clone.delete_local_profile(name, dry_run=args.dry_run)
     return 0

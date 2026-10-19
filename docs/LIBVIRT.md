@@ -78,6 +78,11 @@ When vmctl's own disk of the profile still holds data, the two went separate way
 and the command refuses: `--replace` takes the copy over it (`vmctl checkpoint create <vm>` first
 to keep the vmctl one).
 
+The guest on the copy knows the profile's SSH key, so the export keeps the key pair and the record
+(the guest user) under `artifacts/<vm>/libvirt-copies/<domain>/`, which `vmctl clean` leaves alone
+like the checkpoints (`clean --remove-profile` removes it). Taking the copy back puts them in place
+again: a copy brought back after a clean still opens over SSH.
+
 ```bash
 vmctl unexport-libvirt debian-server --name debian-libvirt [--replace]
 ```

@@ -5,6 +5,7 @@ import argparse
 import os
 import re
 import shlex
+import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -306,6 +307,51 @@ def upload_volume(uri: str, pool: str, volume: str, source: Path, dry_run: bool,
     runtime.run(["virsh", "--connect", uri, "vol-upload", "--pool", pool, volume, str(source), "--sparse"], dry_run=dry_run)
 
 
+# Where an export --copy-to-pool keeps what the guest on the copy expects from vmctl: the SSH key
+# pair it was installed with and the record (the guest user). `vmctl clean` skips this directory, as
+# it skips the checkpoints, so a copy taken back after a clean still opens over SSH (2026-10-19).
+COPIES_DIR = "libvirt-copies"
+
+
+def copy_keep_dir(vm_name: str, domain: str) -> Path:
+    return runtime.vm_artifact_base(vm_name) / COPIES_DIR / domain
+
+
+def keep_for_copy(vm_name: str, domain: str) -> None:
+    keep = copy_keep_dir(vm_name, domain)
+    if keep.exists():
+        shutil.rmtree(keep)
+    keep.mkdir(parents=True)
+    keep.chmod(0o700)
+    keys = runtime.vm_artifact_base(vm_name) / "ssh"
+    if keys.is_dir():
+        shutil.copytree(keys, keep / "ssh")
+    record = vmstate.state_path(vm_name)
+    if record.is_file():
+        shutil.copy2(record, keep / "state.json")
+
+
+def restore_for_copy(vm_name: str, domain: str) -> None:
+    """The copy is vmctl's disk again: its SSH keys and guest user come back with it."""
+    keep = copy_keep_dir(vm_name, domain)
+    if not keep.is_dir():
+        return
+    if (keep / "ssh").is_dir():
+        keys = runtime.vm_artifact_base(vm_name) / "ssh"
+        if keys.exists():
+            shutil.rmtree(keys)
+        shutil.copytree(keep / "ssh", keys)
+    if (keep / "state.json").is_file():
+        guest = runtime.load_json_file(keep / "state.json").get("guest")
+        if isinstance(guest, dict) and guest.get("user"):
+            record = vmstate.load(vm_name)
+            record["guest"] = guest
+            vmstate.save(vm_name, record)
+    shutil.rmtree(keep)
+    if not any(keep.parent.iterdir()):
+        keep.parent.rmdir()
+
+
 def copy_to_pool(args: argparse.Namespace, vm: dict[str, Any], name: str, disk: Path) -> tuple[Path, tuple[Path, Path] | None]:
     """--copy-to-pool: the disk (an overlay flattened first) and the EFI firmware become volumes of
     the pool, named after the domain; the profile's disk is only read. Returns their paths."""
@@ -371,6 +417,8 @@ def export(args: argparse.Namespace, vm: dict[str, Any]) -> int:
             replace_existing = True
     if copy:
         disk_copy, firmware = copy_to_pool(args, vm, name, disk)
+        if not args.dry_run:
+            keep_for_copy(args.vm, name)
         xml = render_domain_xml(name, vm, firmware, disk_path=disk_copy, copied_from=args.vm)
     else:
         xml = render_domain_xml(name, vm, export_firmware(args.vm, vm, args.dry_run))
@@ -476,6 +524,7 @@ def take_back_copy(args: argparse.Namespace, vm: dict[str, Any], name: str) -> i
             if leftover is not None:
                 leftover.unlink(missing_ok=True)
     vmstate.record_origin(args.vm, "libvirt", f"copy {name}")
+    restore_for_copy(args.vm, name)
     # --keep-nvram: the vars are one of the volumes deleted below, like the disk.
     runtime.run(["virsh", "--connect", uri, "undefine", name, "--keep-nvram", "--snapshots-metadata"])
     for path in volumes:

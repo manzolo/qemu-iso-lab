@@ -220,8 +220,13 @@ class LibvirtTests(BaseVmctlTestCase):
         self.write_config_dir()
         vars_raw.write_bytes(b"vmctl vars")
         enter_context(self, mock.patch.object(qemu, "resolve_efi_firmware", return_value=(code, template, vars_raw)))
+        keys = self.root / "artifacts/testvm/ssh"
+        keys.mkdir(parents=True)
+        (keys / "id_ed25519").write_text("private")
         pool = self.pool_virsh()
         lifecycle.cmd_export_libvirt(self.args("--copy-to-pool"))
+        self.assertEqual((self.root / "artifacts/testvm/libvirt-copies/testvm/ssh/id_ed25519").read_text(), "private",
+                         "the copy's guest knows this key: kept where clean does not reach")
         self.assertEqual(sorted(self.uploaded), ["testvm-OVMF_CODE.qcow2", "testvm-OVMF_VARS.qcow2", "testvm.qcow2"])
         self.assertEqual(self.uploaded["testvm.qcow2"], b"disk", "the profile's disk itself is uploaded, no staging copy")
         # libvirt hands QEMU the disk and the vars at start, never the read-only loader.
@@ -281,7 +286,13 @@ class LibvirtTests(BaseVmctlTestCase):
         with self.assertRaisesRegex(VMError, "--replace"):
             unexport("--yes")
         self.assertEqual((changes(), disk.read_bytes()[:5]), ([], b"vmctl"))
-        disk.unlink()
+        keep = self.root / "artifacts/testvm/libvirt-copies/testvm"
+        (keep / "ssh").mkdir(parents=True)
+        (keep / "ssh/id_ed25519").write_text("copy key")
+        (keep / "state.json").write_text('{"guest": {"user": "someone", "recorded_by": "install"}}')
+        lifecycle.clean_vm("testvm", self.vm_config)
+        self.assertFalse(disk.exists())
+        self.assertTrue((keep / "ssh/id_ed25519").is_file(), "clean keeps a copy's SSH keys")
         with mock.patch.object(runtime, "confirm_default_no", return_value=False):
             with self.assertRaisesRegex(VMError, "Not confirmed"):
                 unexport()
@@ -302,6 +313,9 @@ class LibvirtTests(BaseVmctlTestCase):
         self.assertEqual(vars_raw.read_bytes(), b"raw copy of testvm-OVMF_VARS.qcow2")
         self.assertEqual(list(disk.parent.glob(".libvirt-*")) + list(vars_raw.parent.glob(".libvirt-*")), [])
         self.assertEqual(vmctl.vmstate.load("testvm")["origin"]["kind"], "libvirt")
+        self.assertEqual(vmctl.vmstate.load("testvm")["guest"]["user"], "someone")
+        self.assertEqual((self.root / "artifacts/testvm/ssh/id_ed25519").read_text(), "copy key")
+        self.assertFalse(keep.parent.exists(), "the kept keys are vmctl's again")
         outputs["list"] = "testvm\n"
         with self.assertRaisesRegex(VMError, "running"):
             unexport("--yes", "--replace")
