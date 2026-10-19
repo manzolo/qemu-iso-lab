@@ -29,14 +29,21 @@ Any X11 desktop VM works; the clips assume Lubuntu (LXQt, qterminal) at 1600x900
 host, `host-passthrough` CPU) because the demo installs VMs inside it. Size: 8 vCPU, 16 GB RAM
 (two lab members and the desktop), a data disk of 100 GB or more for `~/lab/`.
 
-The maintainer's is the libvirt VM **`lubuntu22-studio`** (hostname `lubuntu-studio`), a clone of
-the `lubuntu22` lab VM kept for this, on libvirt's `default` network (NAT + DHCP: no lab router
-needed). Its address comes from the lease:
+The maintainer's is the libvirt VM **`lubuntu-studio`**: Lubuntu 24.04 (LXQt, still X11, which
+xdotool, x11grab and xrandr need), born as a clone of the `lubuntu22` lab VM and upgraded in place
+from 22.04 on 2026-10-19 (`lubuntu22-studio` until then), on libvirt's `default` network (NAT +
+DHCP: no lab router needed). Its address comes from the lease:
 
 ```bash
-virsh start lubuntu22-studio
-virsh domifaddr lubuntu22-studio --source lease     # 192.168.122.x
+virsh start lubuntu-studio
+virsh domifaddr lubuntu-studio --source lease     # 192.168.122.x
 ```
+
+On 24.04 `setup.sh` also installs `python3-xlib` (`mv.py` glides the pointer in one process: one
+`xdotool` per step, starved by ffmpeg, stretched a 0.8 s glide to 14 s in the video) and removes
+xscreensaver; `session.sh` turns DPMS off. For clip 9 the studio also runs libvirt
+(`libvirt-daemon-system`, `virt-manager`, the pool `default`; on this demo-only VM the socket is
+opened to every local user and NetworkManager ignores `vnet*`/`virbr*`).
 
 A clone of a VM whose netplan matches its NIC by MAC gets no address at all (the clone has a new
 MAC): the studio's netplan matches `en*` with `dhcp4: true`; when SSH is out of reach, the QEMU
@@ -217,8 +224,8 @@ sheet of each segment (`ffmpeg -vf fps=1/5,tile=10x13`) before editing `RANGES`/
 The mysql-lab lesson took four takes, each lost to something a rehearsal would have shown. The order
 now, for every lesson:
 
-1. **Restore the studio's snapshot** `pronta-per-registrare` (virt-manager, or `virsh snapshot-revert
-   lubuntu22-studio pronta-per-registrare`), start it, `git pull` in `~/lab/demo/qemu-iso-lab`,
+1. **Restore the studio's snapshot** `pulita` (virt-manager, or `virsh snapshot-revert
+   lubuntu-studio pulita`), start it, `git pull` in `~/lab/demo/qemu-iso-lab`,
    `tools/tour/session.sh`. Taken with the VM off: its virtiofs share forbids a running snapshot.
    Do not open a viewer on the studio while recording: it resizes the screen.
 2. **The lab works in the studio**, not only on the host: `vmctl group install <lab>` and `vmctl group

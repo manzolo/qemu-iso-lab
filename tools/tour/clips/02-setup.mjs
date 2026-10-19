@@ -1,7 +1,7 @@
 // Clip 2 since v0.20.0: the one-line installer (README Quick start) instead of clone + ./setup.sh.
 // The shell of this clip has HOME=/home/demo (never a real name on screen: the installer prints the
 // home in "Cloning into" and the welcome); the directory is created once per studio session by
-// setup() through the libvirt guest agent (TOUR_DOMAIN, default lubuntu22-studio), owned by the SSH
+// setup() through the libvirt guest agent (TOUR_DOMAIN, default lubuntu-studio), owned by the SSH
 // user, and the menu entry goes to the real session's XDG_DATA_HOME so the applications menu shows
 // it. Clips 3-6 keep finding the demo at ~/lab/demo/qemu-iso-lab: a symlink to the new checkout.
 import { execSync } from "node:child_process";
@@ -37,7 +37,7 @@ const HOME = "/home/demo";
 const RC = "~/lab/video/demo-home.bashrc";
 
 export async function setup(d) {
-  const domain = process.env.TOUR_DOMAIN || "lubuntu22-studio";
+  const domain = process.env.TOUR_DOMAIN || "lubuntu-studio";
   const user = (process.env.TOUR_VM || "").split("@")[0] || "manzolo";
   execSync(`virsh qemu-agent-command ${domain} '{"execute":"guest-exec","arguments":{"path":"/bin/sh","arg":["-c","mkdir -p ${HOME} && chown ${user}:${user} ${HOME}"]}}'`, { stdio: "ignore" });
   // Since the Android profiles (v0.26.9) setup also wants adb and scrcpy from apt, and sudo would

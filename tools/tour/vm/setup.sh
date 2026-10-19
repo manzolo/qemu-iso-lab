@@ -6,7 +6,9 @@
 set -eu
 cd "$(dirname "$0")"
 sudo apt-get update -qq
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg xdotool qterminal curl git python3 >/dev/null
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg xdotool qterminal curl git python3 python3-xlib >/dev/null
+# Lubuntu 24.04 ships xscreensaver: it would blank or lock the screen in the middle of a take.
+sudo DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq xscreensaver xscreensaver-data >/dev/null 2>&1 || true
 snap list chromium >/dev/null 2>&1 || sudo snap install chromium
 chmod +x mv.py chrome.sh open-in-cdp.sh
 ini="$HOME/.config/qterminal.org/qterminal.ini"
