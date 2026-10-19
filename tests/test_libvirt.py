@@ -22,6 +22,50 @@ class LibvirtTests(BaseVmctlTestCase):
         enter_context(self, mock.patch("shutil.which", return_value="/fake/virsh"))
         self.run = enter_context(self, mock.patch.object(runtime, "run"))
 
+    @staticmethod
+    def version_output(version):
+        # A newer client can connect to an older daemon; QEMU's version is unrelated.
+        return ("Compiled against library: libvirt 12.0.0\n"
+                "Using library: libvirt 12.0.0\nUsing API: QEMU 12.0.0\n"
+                "Running hypervisor: QEMU 6.2.0\n"
+                f"Running against daemon: {version}\n")
+
+    def test_firmware_version_threshold_uses_daemon_and_c_locale(self):
+        uri = "qemu+ssh://server/system"
+        for version, expected in (("8.0.0", "raw"), ("9.1.9", "raw"), ("9.2.0", "qcow2"),
+                                  ("9.10.0", "qcow2"), ("12.0.0", "qcow2")):
+            with self.subTest(version=version):
+                def virsh(command, **kwargs):
+                    self.assertEqual(command, ["env", "LC_ALL=C", "virsh", "--connect", uri, "version", "--daemon"])
+                    kwargs["stdout_log"].write_text(self.version_output(version))
+                self.run.side_effect = virsh
+                self.assertEqual(libvirt.export_firmware_format(uri), expected)
+
+    def test_unreadable_version_keeps_qcow2(self):
+        for output in ("", "unrecognized", self.version_output("unknown"),
+                       "Using library: libvirt 8.0.0\nUsing API: QEMU 8.0.0\nRunning hypervisor: QEMU 6.2.0\n"):
+            with self.subTest(output=output), mock.patch.object(libvirt, "virsh_output", return_value=output):
+                self.assertEqual(libvirt.export_firmware_format("qemu:///system"), "qcow2")
+        for error in (OSError("missing"), subprocess.CalledProcessError(1, "virsh"), VMError("unavailable")):
+            with self.subTest(error=error), mock.patch.object(libvirt, "virsh_output", side_effect=error):
+                self.assertEqual(libvirt.export_firmware_format("qemu:///system"), "qcow2")
+
+    def test_offline_efi_exports_keep_qcow2_without_queries(self):
+        self.create_disk()
+        self.vm_config["firmware"] = {"type": "efi"}
+        paths = tuple(self.root / filename for filename in ("code.fd", "template.fd", "vars.fd"))
+        for flags in (("--no-define",), ("--dry-run",), ("--dry-run", "--copy-to-pool")):
+            with self.subTest(flags=flags), mock.patch.object(qemu, "resolve_efi_firmware", return_value=paths), \
+                    mock.patch.object(libvirt, "virsh_output") as query:
+                self.run.reset_mock()
+                libvirt.export(self.args(*flags), self.vm_config)
+                query.assert_not_called()
+                converts = [c.args[0] for c in self.run.call_args_list if c.args[0][:2] == ["qemu-img", "convert"]]
+                self.assertEqual(len(converts), 2)
+                self.assertTrue(all(c[4:6] == ["-O", "qcow2"] for c in converts))
+                if "--dry-run" in flags:
+                    self.assertTrue(all(c.kwargs.get("dry_run") for c in self.run.call_args_list))
+
     def test_bios_sata_xml(self):
         self.vm_config["disk"].update(interface="sata", format="vhd")
         self.vm_config["network_device"] = "e1000e"
@@ -146,6 +190,16 @@ class LibvirtTests(BaseVmctlTestCase):
         self.assertEqual((self.root / "vars.fd").read_bytes(), b"vars")
 
     def test_efi_export_hands_libvirt_qcow2_firmware_and_unexport_brings_the_vars_back(self):
+        self.check_linked_firmware("qcow2")
+
+    def test_linked_efi_export_on_libvirt_8_uses_raw_and_unexports_it(self):
+        self.check_linked_firmware("raw", "8.0.0")
+
+    def test_linked_efi_export_on_libvirt_12_uses_qcow2_and_unexports_it(self):
+        self.check_linked_firmware("qcow2", "12.0.0")
+
+    def check_linked_firmware(self, fmt, version=None):
+        suffix = "qcow2" if fmt == "qcow2" else "fd"
         # libvirt takes virt-manager's snapshots of a pflash VM only with qcow2 variables
         # (and a loader in the same format); vmctl keeps its raw file.
         self.create_disk()
@@ -154,28 +208,46 @@ class LibvirtTests(BaseVmctlTestCase):
         self.write_config_dir()
         vars_raw.write_bytes(b"vmctl vars")
         enter_context(self, mock.patch.object(qemu, "resolve_efi_firmware", return_value=(code, template, vars_raw)))
-        lifecycle.cmd_export_libvirt(self.args("--no-define"))
+        def export_virsh(command, **kwargs):
+            if "stdout_log" in kwargs:
+                output = self.version_output(version) if "version" in command else ""
+                kwargs["stdout_log"].write_text(output)
+        self.run.side_effect = export_virsh
+        with mock.patch.object(libvirt.ui, "print_note") as note:
+            lifecycle.cmd_export_libvirt(self.args(*([] if version else ["--no-define"])))
+        raw_notes = [call.args[0] for call in note.call_args_list if "raw firmware" in call.args[0]]
+        self.assertEqual(bool(raw_notes), fmt == "raw")
+        if raw_notes:
+            self.assertIn("libvirt 8.0.0", raw_notes[0])
+            self.assertIn("internal snapshots are not available", raw_notes[0])
         copies = self.root / "artifacts/testvm/libvirt"
         converts = [c.args[0] for c in self.run.call_args_list if c.args[0][0] == "qemu-img"]
-        self.assertEqual(converts, [["qemu-img", "convert", "-f", "raw", "-O", "qcow2", str(code), str(copies / "OVMF_CODE.qcow2")],
-                                    ["qemu-img", "convert", "-f", "raw", "-O", "qcow2", str(vars_raw), str(copies / "OVMF_VARS.qcow2")]])
+        self.assertEqual(converts, [["qemu-img", "convert", "-f", "raw", "-O", fmt, str(code), str(copies / f"OVMF_CODE.{suffix}")],
+                                    ["qemu-img", "convert", "-f", "raw", "-O", fmt, str(vars_raw), str(copies / f"OVMF_VARS.{suffix}")]])
         xml = ET.parse(copies / "testvm.xml").getroot()
-        self.assertEqual((xml.find("os/loader").get("format"), xml.find("os/nvram").get("format")), ("qcow2", "qcow2"))
-        self.assertEqual(xml.findtext("os/nvram"), str((copies / "OVMF_VARS.qcow2").resolve()))
-        # Back: the qcow2 variables (changed by the guest in libvirt) become vmctl's raw file again.
-        (copies / "OVMF_VARS.qcow2").write_bytes(b"qcow2 vars"); (copies / "OVMF_CODE.qcow2").write_bytes(b"code")
+        self.assertEqual((xml.find("os/loader").get("format"), xml.find("os/nvram").get("format")), (fmt, fmt) if fmt == "qcow2" else (None, None))
+        self.assertEqual(xml.findtext("os/nvram"), str((copies / f"OVMF_VARS.{suffix}").resolve()))
+        self.assertEqual(xml.findtext("os/loader"), str((copies / f"OVMF_CODE.{suffix}").resolve()))
+        # Back: variables changed by the guest are preserved across undefine and restored as raw.
+        (copies / f"OVMF_VARS.{suffix}").write_bytes(b"guest vars")
+        (copies / f"OVMF_CODE.{suffix}").write_bytes(b"code")
         self.run.reset_mock()
         def virsh(command, **kwargs):
             if "stdout_log" in kwargs:
-                out = {"dumpxml": f"<domain><os><nvram>{copies}/OVMF_VARS.qcow2</nvram></os></domain>"}.get(command[3], "")
+                out = {"dumpxml": f"<domain><os><nvram>{copies}/OVMF_VARS.{suffix}</nvram></os></domain>"}.get(command[3], "")
                 kwargs["stdout_log"].write_text(out)
+            elif command[:2] == ["qemu-img", "convert"]:
+                Path(command[-1]).write_bytes(b"raw " + Path(command[-2]).read_bytes())
+            elif command[3] == "undefine":
+                (copies / f"OVMF_VARS.{suffix}").unlink()
         self.run.side_effect = virsh
         lifecycle.cmd_unexport_libvirt(cli.build_parser().parse_args(["unexport-libvirt", "testvm"]))
         commands = [c.args[0] for c in self.run.call_args_list]
         self.assertIn(["virsh", "--connect", "qemu:///system", "undefine", "testvm", "--nvram", "--snapshots-metadata"], commands)
-        self.assertIn(["qemu-img", "convert", "-f", "qcow2", "-O", "raw", str(copies / "OVMF_VARS.qcow2"), str(vars_raw)], commands)
-        self.assertFalse((copies / "OVMF_VARS.qcow2").exists())
-        self.assertFalse((copies / "OVMF_CODE.qcow2").exists())
+        self.assertIn(["qemu-img", "convert", "-f", fmt, "-O", "raw", str(copies / f"OVMF_VARS.{suffix}"), str(vars_raw)], commands)
+        self.assertEqual(vars_raw.read_bytes(), b"raw guest vars")
+        self.assertFalse((copies / f"OVMF_VARS.{suffix}").exists())
+        self.assertFalse((copies / f"OVMF_CODE.{suffix}").exists())
 
     def test_unexport_names_the_chown_when_libvirt_kept_the_disk(self):
         # A snapshot revert left windows-11's disk to libvirt-qemu (2026-10-04): vmctl start then
@@ -190,17 +262,20 @@ class LibvirtTests(BaseVmctlTestCase):
             libvirt.warn_foreign_owner(self.vm_config)
         printed.assert_not_called()
 
-    def pool_virsh(self, existing=""):
+    def pool_virsh(self, existing="", version=None):
         """libvirtd's side of --copy-to-pool: a dir pool under the temp root, volumes as files."""
         pool = self.root / "pool"
         def virsh(command, **kwargs):
+            if command[:2] == ["env", "LC_ALL=C"]:
+                command = command[2:]
             if command[0] != "virsh":
                 if command[:2] == ["qemu-img", "convert"]:
                     Path(command[-1]).write_bytes(b"flat")
                 return
             action = command[3:]
             if "stdout_log" in kwargs:
-                out = {"pool-dumpxml": f"<pool type='dir'><target><path>{pool}</path></target></pool>",
+                out = {"version": self.version_output(version) if version else "",
+                       "pool-dumpxml": f"<pool type='dir'><target><path>{pool}</path></target></pool>",
                        "vol-list": f" Name   Path\n----------\n {existing}  {pool}/{existing}\n" if existing else " Name Path\n----\n",
                        }.get(action[0], "")
                 kwargs["stdout_log"].write_text(out)
@@ -214,6 +289,13 @@ class LibvirtTests(BaseVmctlTestCase):
         return pool
 
     def test_copy_to_pool_makes_an_independent_domain(self):
+        self.check_pool_firmware("qcow2", "12.0.0")
+
+    def test_copy_to_pool_on_libvirt_8_uses_raw(self):
+        self.check_pool_firmware("raw", "8.0.0")
+
+    def check_pool_firmware(self, fmt, version):
+        suffix = "qcow2" if fmt == "qcow2" else "fd"
         disk = self.create_disk()
         code, template, vars_raw = [self.root / n for n in ("code.fd", "template.fd", "vars.fd")]
         self.vm_config["firmware"] = {"type": "efi", "code": str(code), "vars_template": str(template), "vars_path": str(vars_raw)}
@@ -223,24 +305,33 @@ class LibvirtTests(BaseVmctlTestCase):
         keys = self.root / "artifacts/testvm/ssh"
         keys.mkdir(parents=True)
         (keys / "id_ed25519").write_text("private")
-        pool = self.pool_virsh()
+        pool = self.pool_virsh(version=version)
         lifecycle.cmd_export_libvirt(self.args("--copy-to-pool"))
         self.assertEqual((self.root / "artifacts/testvm/libvirt-copies/testvm/ssh/id_ed25519").read_text(), "private",
                          "the copy's guest knows this key: kept where clean does not reach")
-        self.assertEqual(sorted(self.uploaded), ["testvm-OVMF_CODE.qcow2", "testvm-OVMF_VARS.qcow2", "testvm.qcow2"])
+        self.assertEqual(sorted(self.uploaded), [f"testvm-OVMF_CODE.{suffix}", f"testvm-OVMF_VARS.{suffix}", "testvm.qcow2"])
         self.assertEqual(self.uploaded["testvm.qcow2"], b"disk", "the profile's disk itself is uploaded, no staging copy")
         # libvirt hands QEMU the disk and the vars at start, never the read-only loader.
-        self.assertEqual(self.modes, {"testvm.qcow2": "0600", "testvm-OVMF_CODE.qcow2": "0644", "testvm-OVMF_VARS.qcow2": "0600"})
+        self.assertEqual(self.modes, {"testvm.qcow2": "0600", f"testvm-OVMF_CODE.{suffix}": "0644", f"testvm-OVMF_VARS.{suffix}": "0600"})
         self.assertEqual(list(disk.parent.glob(".pool-*")), [], "volume definitions removed")
         xml = ET.parse(self.root / "artifacts/testvm/libvirt/testvm.xml").getroot()
         self.assertEqual(xml.find("devices/disk/source").get("file"), str(pool / "testvm.qcow2"))
-        self.assertEqual(xml.findtext("os/nvram"), str(pool / "testvm-OVMF_VARS.qcow2"))
+        expected_format = fmt if fmt == "qcow2" else None
+        self.assertEqual(xml.find("os/loader").get("format"), expected_format)
+        self.assertEqual(xml.find("os/nvram").get("format"), expected_format)
+        self.assertEqual(xml.findtext("os/loader"), str(pool / f"testvm-OVMF_CODE.{suffix}"))
+        self.assertEqual(xml.findtext("os/nvram"), str(pool / f"testvm-OVMF_VARS.{suffix}"))
         self.assertEqual(xml.find(f"metadata/{{{libvirt.METADATA_NS}}}export").get("mode"), "copy")
         self.assertEqual(disk.read_text(), "disk")
         self.assertEqual(list((self.root / "artifacts/testvm/libvirt").glob(".pool-*")), [], "staging copies removed")
         commands = [c.args[0] for c in self.run.call_args_list]
         self.assertIn(["virsh", "--connect", "qemu:///system", "pool-refresh", "default"], commands)
         self.assertNotIn("--remove-all-storage", str(commands))
+        converts = [c for c in commands if c[:2] == ["qemu-img", "convert"]]
+        staging = self.root / "artifacts/testvm/libvirt"
+        self.assertEqual(converts, [
+            ["qemu-img", "convert", "-f", "raw", "-O", fmt, str(code), str(staging / f".pool-testvm-OVMF_CODE.{suffix}")],
+            ["qemu-img", "convert", "-f", "raw", "-O", fmt, str(vars_raw), str(staging / f".pool-testvm-OVMF_VARS.{suffix}")]])
 
     def test_copy_to_pool_flattens_an_overlay_and_refuses_taken_volumes(self):
         disk = self.create_disk()
@@ -256,15 +347,22 @@ class LibvirtTests(BaseVmctlTestCase):
             lifecycle.cmd_export_libvirt(self.args("--copy-to-pool", "--no-define"))
 
     def test_a_copied_domain_does_not_guard_the_disk_and_unexport_brings_it_back(self):
+        self.check_take_back_copy("qcow2")
+
+    def test_take_back_raw_copy(self):
+        self.check_take_back_copy("raw")
+
+    def check_take_back_copy(self, fmt):
+        suffix = "qcow2" if fmt == "qcow2" else "fd"
         pool = "/var/lib/libvirt/images"
         code, template, vars_raw = [self.root / n for n in ("code.fd", "template.fd", "vars.fd")]
         self.vm_config["firmware"] = {"type": "efi", "code": str(code), "vars_template": str(template), "vars_path": str(vars_raw)}
         self.write_config_dir()
         enter_context(self, mock.patch.object(qemu, "resolve_efi_firmware", return_value=(code, template, vars_raw)))
         copy = (f"<domain xmlns:v='{libvirt.METADATA_NS}'><metadata><v:export mode='copy' profile='testvm'/></metadata>"
-                f"<os><loader>{pool}/testvm-OVMF_CODE.qcow2</loader><nvram>{pool}/testvm-OVMF_VARS.qcow2</nvram></os>"
+                f"<os><loader>{pool}/testvm-OVMF_CODE.{suffix}</loader><nvram>{pool}/testvm-OVMF_VARS.{suffix}</nvram></os>"
                 f"<devices><disk device='disk'><source file='{pool}/testvm.qcow2'/></disk>"
-                f"<disk device='disk'><source file='{pool}/added-later.qcow2'/></disk>"
+                f"<disk device='disk'><source file='{pool}/testvm-added-later.qcow2'/></disk>"
                 f"<disk device='cdrom'><source file='{pool}/testvm.iso'/></disk></devices></domain>")
         outputs = {"list": "", "dumpxml": copy}
         def virsh(command, **kwargs):
@@ -299,18 +397,18 @@ class LibvirtTests(BaseVmctlTestCase):
         self.assertEqual(changes(), [])
         unexport("--yes")
         virsh_cmd = ["virsh", "--connect", "qemu:///system"]
-        staged_vars = disk.parent / ".libvirt-testvm-vars.qcow2.part"
+        staged_vars = disk.parent / f".libvirt-testvm-vars.{suffix}.part"
         self.assertEqual(changes(), [
             [*virsh_cmd, "vol-download", f"{pool}/testvm.qcow2", str(disk.parent / ".libvirt-testvm.qcow2.part"), "--sparse"],
-            [*virsh_cmd, "vol-download", f"{pool}/testvm-OVMF_VARS.qcow2", str(staged_vars)],
-            ["qemu-img", "convert", "-f", "qcow2", "-O", "raw", str(staged_vars), str(vars_raw.parent / ".libvirt-testvm-vars.raw.part")],
+            [*virsh_cmd, "vol-download", f"{pool}/testvm-OVMF_VARS.{suffix}", str(staged_vars)],
+            ["qemu-img", "convert", "-f", fmt, "-O", "raw", str(staged_vars), str(vars_raw.parent / ".libvirt-testvm-vars.raw.part")],
             [*virsh_cmd, "undefine", "testvm", "--keep-nvram", "--snapshots-metadata"],
             [*virsh_cmd, "vol-delete", f"{pool}/testvm.qcow2"],
-            [*virsh_cmd, "vol-delete", f"{pool}/testvm-OVMF_CODE.qcow2"],
-            [*virsh_cmd, "vol-delete", f"{pool}/testvm-OVMF_VARS.qcow2"]],
+            [*virsh_cmd, "vol-delete", f"{pool}/testvm-OVMF_CODE.{suffix}"],
+            [*virsh_cmd, "vol-delete", f"{pool}/testvm-OVMF_VARS.{suffix}"]],
             "copied back first, then only the volumes the copy was made with; never --remove-all-storage")
         self.assertEqual(disk.read_bytes(), b"copy of testvm.qcow2")
-        self.assertEqual(vars_raw.read_bytes(), b"raw copy of testvm-OVMF_VARS.qcow2")
+        self.assertEqual(vars_raw.read_bytes(), f"raw copy of testvm-OVMF_VARS.{suffix}".encode())
         self.assertEqual(list(disk.parent.glob(".libvirt-*")) + list(vars_raw.parent.glob(".libvirt-*")), [])
         self.assertEqual(vmctl.vmstate.load("testvm")["origin"]["kind"], "libvirt")
         self.assertEqual(vmctl.vmstate.load("testvm")["guest"]["user"], "someone")

@@ -56,7 +56,10 @@ vmctl export-libvirt debian-server --copy-to-pool [--pool default] [--name debia
 ```
 
 The disk becomes the volume `<domain>.<ext>` of the pool and, for an EFI profile, the firmware
-`<domain>-OVMF_CODE.qcow2` / `<domain>-OVMF_VARS.qcow2` (qcow2, snapshots work as below). The
+`<domain>-OVMF_CODE.qcow2` / `<domain>-OVMF_VARS.qcow2` on libvirt 9.2.0 or newer.
+Older libvirt receives raw copies named `<domain>-OVMF_CODE.fd` / `<domain>-OVMF_VARS.fd`,
+with no `format` attributes on the XML loader/NVRAM. The same version selection and snapshot
+limitations described below apply to both linked exports and pool copies. The
 volumes are created and filled through libvirtd (`vol-create-as` + `vol-upload --sparse`, then
 `pool-refresh`), so the pool directory may belong to root: the user needs only the connection. The
 volumes are root's `0600`, except the read-only loader, created `0644`: libvirt gives QEMU the disk
@@ -68,7 +71,7 @@ vmctl's own disk is only read: the profile keeps working with vmctl at the same 
 VMs diverge from then on. The domain carries `<metadata><vmctl:export mode="copy"/></metadata>`:
 vmctl does not treat a copy as owning the profile's disk (clean, checkpoint, clone go on even when
 the domain has the profile's name). `unexport-libvirt` on a copy **brings it back**: the disk
-volume (and the EFI vars, converted back to raw) are downloaded through libvirtd over vmctl's disk
+volume (and the EFI vars, read as qcow2 or raw according to their filename and restored as raw) are downloaded through libvirtd over vmctl's disk
 of the profile (`vol-download --sparse`, staged next to it and renamed), the record says the disk
 came from the libvirt copy, and only then the domain is undefined (`--keep-nvram`) and the volumes
 the copy was made with (`<domain>.<ext>`, `<domain>-OVMF_*`, read from the domain's XML) deleted
@@ -90,14 +93,29 @@ vmctl unexport-libvirt debian-server --name debian-libvirt [--replace]
 Never `--remove-all-storage`. Give the copy a different `--name` when the profile is also exported
 linked. A dir/fs/netfs pool is required; `--no-define` cannot be combined with it.
 
-### Snapshots in virt-manager
+### EFI firmware compatibility and snapshots in virt-manager
 
 An EFI profile is exported with its firmware as **qcow2 copies** under `artifacts/<vm>/libvirt/`
-(`OVMF_CODE.qcow2`, `OVMF_VARS.qcow2`, converted from vmctl's raw files at every export): libvirt
-takes internal snapshots of a pflash VM only with qcow2 variables and a loader in the same format.
-With them virt-manager's snapshots work, with the VM running too (memory included, a revert in
-seconds). Unexport converts the variables back into vmctl's raw file (whatever the guest changed in
-libvirt is kept), removes the copies and undefines with `--snapshots-metadata`: the snapshots stay
+(`OVMF_CODE.qcow2`, `OVMF_VARS.qcow2`, converted from vmctl's raw files at every export) when the
+connected libvirt daemon is **9.2.0 or newer**. This is the version that introduced qcow2 pflash
+firmware and NVRAM support: see the [9.2.0 release notes](https://lists.libvirt.org/archives/list/announce@lists.libvirt.org/thread/R5LDEXEG2NJTUGCU7GSD4P6FBAOFMED2/)
+and [domain XML documentation](https://libvirt.org/formatdomain.html#bios-bootloader).
+vmctl checks `virsh --connect URI version --daemon`, not `domcapabilities`, whose loader enums
+do not reliably advertise formats. It uses the daemon version, independently of the client library
+and QEMU versions. `--no-define`, `--dry-run` and an unreadable version keep the qcow2 default.
+
+On older libvirt (for example Ubuntu 22.04's 8.0.0), the copies are **raw** `OVMF_CODE.fd` and
+`OVMF_VARS.fd`, and neither XML element has a `format` attribute. Older libvirt discards that
+attribute and would pass qcow2 bytes to QEMU as raw pflash, leaving the guest unable to boot.
+The export prints a note with the libvirt version: virt-manager's internal snapshots are unavailable
+with raw firmware.
+
+QCOW2 firmware support alone does not guarantee internal snapshots: libvirt also needs support
+for that operation. With libvirt 12, virt-manager's internal snapshots work with qcow2 variables
+and a loader in the same format, with the VM running too (memory included, a revert in seconds).
+Unexport recognizes both `.qcow2` and `.fd` copies, restores the variables into vmctl's raw file
+(whatever the guest changed in libvirt is kept), removes the copies and undefines with
+`--snapshots-metadata`: any snapshots stay
 inside the disk's qcow2 (`qemu-img snapshot -l`), vmctl boots the disk as it is, and
 `qemu-img snapshot -d` removes one. A Windows profile (`hyperv: true`) gets the Hyper-V
 enlightenments as an explicit list, not `mode='passthrough'`, which libvirt refuses to snapshot

@@ -6,6 +6,7 @@ import os
 import re
 import shlex
 import shutil
+import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -80,10 +81,11 @@ def render_domain_xml(name: str, vm: dict[str, Any], firmware: tuple[Path, Path]
     fw = vm["firmware"]
     if fw["type"] == "efi":
         if firmware is not None:
-            # qcow2 copies (export_firmware): libvirt takes internal snapshots of a pflash VM only
-            # with its variables in qcow2, and wants the loader in the same format.
-            ET.SubElement(os, "loader", readonly="yes", type="pflash", format="qcow2").text = xml_path(firmware[0])
-            ET.SubElement(os, "nvram", format="qcow2").text = xml_path(firmware[1])
+            # Old libvirt ignores format: it must receive raw bytes, without the attribute.
+            loader_format = {"format": "qcow2"} if firmware_format(firmware[0]) == "qcow2" else {}
+            vars_format = {"format": "qcow2"} if firmware_format(firmware[1]) == "qcow2" else {}
+            ET.SubElement(os, "loader", {"readonly": "yes", "type": "pflash", **loader_format}).text = xml_path(firmware[0])
+            ET.SubElement(os, "nvram", vars_format).text = xml_path(firmware[1])
         else:
             code, _, nvram = qemu.resolve_efi_firmware(fw)
             ET.SubElement(os, "loader", readonly="yes", type="pflash").text = str(code.resolve())
@@ -151,36 +153,64 @@ FIRMWARE_CODE = "OVMF_CODE.qcow2"
 FIRMWARE_VARS = "OVMF_VARS.qcow2"
 
 
-def export_firmware(vm_name: str, vm: dict[str, Any], dry_run: bool, prefix: str = "") -> tuple[Path, Path] | None:
-    """The EFI firmware of an exported VM as qcow2 copies under artifacts/<vm>/libvirt/: with the
-    raw vars vmctl uses, virt-manager's snapshots are refused ("internal snapshots of a VM with
-    pflash based firmware require QCOW2 nvram format", libvirt 12, 2026-10-04). The variables are
-    converted from vmctl's own file at every export and converted back by unexport. A ``prefix``
+def export_firmware_format(uri: str | None) -> str:
+    """QCOW2 pflash needs libvirt >= 9.2.0 (https://libvirt.org/news.html#v9-2-0).
+
+    domcapabilities does not advertise this. Query the connected daemon, not the client library
+    or QEMU version. Offline exports and unreadable versions keep the historical qcow2 default.
+    """
+    if uri is None:
+        return "qcow2"
+    try:
+        output = virsh_output(uri, "version", "--daemon")
+    except (OSError, subprocess.CalledProcessError, VMError):
+        return "qcow2"
+    match = re.search(r"^Running against daemon:\s*(\d+)\.(\d+)\.(\d+)\s*$", output, re.MULTILINE)
+    if match and tuple(map(int, match.groups())) < (9, 2, 0):
+        ui.print_note(f"libvirt {'.'.join(match.groups())}: raw firmware; virt-manager internal snapshots are not available.")
+        return "raw"
+    return "qcow2"
+
+
+def firmware_names(fmt: str) -> tuple[str, str]:
+    return (FIRMWARE_CODE, FIRMWARE_VARS) if fmt == "qcow2" else ("OVMF_CODE.fd", "OVMF_VARS.fd")
+
+
+def firmware_format(path: Path) -> str:
+    return "qcow2" if path.suffix == ".qcow2" else "raw"
+
+
+def export_firmware(vm_name: str, vm: dict[str, Any], dry_run: bool, prefix: str = "",
+                    fmt: str = "qcow2") -> tuple[Path, Path] | None:
+    """EFI copies under artifacts/<vm>/libvirt/, qcow2 for snapshots or raw for older libvirt.
+    The variables are converted from vmctl's own file at every export and back by unexport. A ``prefix``
     names staging copies (--copy-to-pool) that leave the copies of a linked export alone."""
     if vm["firmware"].get("type") != "efi":
         return None
     code, template, nvram = qemu.resolve_efi_firmware(vm["firmware"])
     base = runtime.vm_artifact_base(vm_name) / "libvirt"
-    code_copy, vars_copy = base / f"{prefix}{FIRMWARE_CODE}", base / f"{prefix}{FIRMWARE_VARS}"
+    code_name, vars_name = firmware_names(fmt)
+    code_copy, vars_copy = base / f"{prefix}{code_name}", base / f"{prefix}{vars_name}"
     if not dry_run:
         base.mkdir(parents=True, exist_ok=True)
     source_vars = nvram if dry_run or nvram.is_file() else template
-    runtime.run(["qemu-img", "convert", "-f", "raw", "-O", "qcow2", str(code), str(code_copy)], dry_run=dry_run)
-    runtime.run(["qemu-img", "convert", "-f", "raw", "-O", "qcow2", str(source_vars), str(vars_copy)], dry_run=dry_run)
+    runtime.run(["qemu-img", "convert", "-f", "raw", "-O", fmt, str(code), str(code_copy)], dry_run=dry_run)
+    runtime.run(["qemu-img", "convert", "-f", "raw", "-O", fmt, str(source_vars), str(vars_copy)], dry_run=dry_run)
     return code_copy, vars_copy
 
 
 def import_firmware(vm_name: str, vm: dict[str, Any], exported_nvram: Path | None, dry_run: bool) -> None:
-    """Back from libvirt: the qcow2 variables (what the guest changed while there) become vmctl's
+    """Back from libvirt: the exported variables (what the guest changed while there) become vmctl's
     raw file again, and the copies go."""
-    if exported_nvram is None or exported_nvram.name != FIRMWARE_VARS or vm["firmware"].get("type") != "efi":
+    if exported_nvram is None or exported_nvram.name not in (FIRMWARE_VARS, "OVMF_VARS.fd") or vm["firmware"].get("type") != "efi":
         return
+    fmt = firmware_format(exported_nvram)
     _, _, nvram = qemu.resolve_efi_firmware(vm["firmware"])
     if exported_nvram.is_file() or dry_run:
-        runtime.run(["qemu-img", "convert", "-f", "qcow2", "-O", "raw", str(exported_nvram), str(nvram)], dry_run=dry_run)
+        runtime.run(["qemu-img", "convert", "-f", fmt, "-O", "raw", str(exported_nvram), str(nvram)], dry_run=dry_run)
     if not dry_run:
         exported_nvram.unlink(missing_ok=True)
-        (exported_nvram.parent / FIRMWARE_CODE).unlink(missing_ok=True)
+        (exported_nvram.parent / firmware_names(fmt)[0]).unlink(missing_ok=True)
 
 
 def segment_names(vm: dict[str, Any]) -> list[str]:
@@ -225,7 +255,11 @@ def virsh_output(uri: str, *args: str) -> str:
     """Keep queries on runtime.run too, so all virsh access is mockable."""
     with tempfile.TemporaryDirectory(prefix="vmctl-virsh-") as tmp:
         output = Path(tmp) / "stdout"
-        runtime.run(["virsh", "--connect", uri, *args], quiet=True, stdout_log=output)
+        command = ["virsh", "--connect", uri, *args]
+        if args and args[0] == "version":
+            # The version labels are translated; keep parsing independent of the user's locale.
+            command = ["env", "LC_ALL=C", *command]
+        runtime.run(command, quiet=True, stdout_log=output)
         return output.read_text() if output.exists() else ""
 
 
@@ -352,7 +386,8 @@ def restore_for_copy(vm_name: str, domain: str) -> None:
         keep.parent.rmdir()
 
 
-def copy_to_pool(args: argparse.Namespace, vm: dict[str, Any], name: str, disk: Path) -> tuple[Path, tuple[Path, Path] | None]:
+def copy_to_pool(args: argparse.Namespace, vm: dict[str, Any], name: str, disk: Path,
+                 firmware_fmt: str = "qcow2") -> tuple[Path, tuple[Path, Path] | None]:
     """--copy-to-pool: the disk (an overlay flattened first) and the EFI firmware become volumes of
     the pool, named after the domain; the profile's disk is only read. Returns their paths."""
     uri, pool, dry_run = args.connect, args.pool, args.dry_run
@@ -363,7 +398,7 @@ def copy_to_pool(args: argparse.Namespace, vm: dict[str, Any], name: str, disk: 
     volumes = [f"{name}{suffix}"]
     efi = vm["firmware"].get("type") == "efi"
     if efi:
-        volumes += [f"{name}-{FIRMWARE_CODE}", f"{name}-{FIRMWARE_VARS}"]
+        volumes += [f"{name}-{filename}" for filename in firmware_names(firmware_fmt)]
     if not dry_run:
         taken = sorted(set(volumes) & pool_volumes(uri, pool))
         if taken:
@@ -383,7 +418,7 @@ def copy_to_pool(args: argparse.Namespace, vm: dict[str, Any], name: str, disk: 
         upload_volume(uri, pool, volumes[0], source, dry_run)
         firmware = None
         if efi:
-            staged = export_firmware(args.vm, vm, dry_run, prefix=f".pool-{name}-")
+            staged = export_firmware(args.vm, vm, dry_run, prefix=f".pool-{name}-", fmt=firmware_fmt)
             assert staged is not None
             upload_volume(uri, pool, volumes[1], staged[0], dry_run, mode="0644")
             upload_volume(uri, pool, volumes[2], staged[1], dry_run)
@@ -415,13 +450,16 @@ def export(args: argparse.Namespace, vm: dict[str, Any]) -> int:
             if not args.replace:
                 raise VMError(f"Libvirt domain '{name}' already exists; use --replace")
             replace_existing = True
+    firmware_fmt = "qcow2"
+    if vm["firmware"].get("type") == "efi":
+        firmware_fmt = export_firmware_format(None if args.no_define or args.dry_run else args.connect)
     if copy:
-        disk_copy, firmware = copy_to_pool(args, vm, name, disk)
+        disk_copy, firmware = copy_to_pool(args, vm, name, disk, firmware_fmt)
         if not args.dry_run:
             keep_for_copy(args.vm, name)
         xml = render_domain_xml(name, vm, firmware, disk_path=disk_copy, copied_from=args.vm)
     else:
-        xml = render_domain_xml(name, vm, export_firmware(args.vm, vm, args.dry_run))
+        xml = render_domain_xml(name, vm, export_firmware(args.vm, vm, args.dry_run, fmt=firmware_fmt))
     if args.dry_run:
         print(xml, end="")
         ui.print_note(f"Would write {destination}")
@@ -468,13 +506,16 @@ def copy_volumes(xml: ET.Element, name: str) -> list[Path]:
     vars named after the domain (`<name>.<ext>`, `<name>-OVMF_*`). Anything else the domain was
     given later in virt-manager (an ISO, a second disk) is not ours to delete."""
     paths = [node.get("file") for node in xml.findall("devices/disk[@device='disk']/source")]
-    paths += [xml.findtext("os/loader"), xml.findtext("os/nvram")]
+    paths = [text for text in paths if text and Path(text).stem == name]
+    firmware = [xml.findtext("os/loader"), xml.findtext("os/nvram")]
+    firmware_files = {f"{name}-{filename}" for fmt in ("qcow2", "raw") for filename in firmware_names(fmt)}
+    paths += [text for text in firmware if text and Path(text).name in firmware_files]
     found: list[Path] = []
     for text in paths:
         if not text:
             continue
         path = Path(text)
-        if (path.stem == name or path.name.startswith(f"{name}-")) and path not in found:
+        if path not in found:
             found.append(path)
     return found
 
@@ -490,7 +531,8 @@ def take_back_copy(args: argparse.Namespace, vm: dict[str, Any], name: str) -> i
         raise VMError(f"Libvirt domain '{name}' is running; shut it down first")
     xml = ET.fromstring(virsh_output(uri, "dumpxml", name))
     volumes = copy_volumes(xml, name)
-    disks = [path for path in volumes if path.name not in (f"{name}-{FIRMWARE_CODE}", f"{name}-{FIRMWARE_VARS}")]
+    firmware_files = {f"{name}-{filename}" for fmt in ("qcow2", "raw") for filename in firmware_names(fmt)}
+    disks = [path for path in volumes if path.name not in firmware_files]
     if len(disks) != 1:
         raise VMError(f"Libvirt domain '{name}' does not have the one disk volume --copy-to-pool made "
                       f"({', '.join(map(str, disks)) or 'none'}): bring it back by hand")
@@ -507,7 +549,8 @@ def take_back_copy(args: argparse.Namespace, vm: dict[str, Any], name: str) -> i
         raise VMError("Not confirmed (pass --yes to skip the question in scripts)")
     runtime.ensure_parent(disk)
     staged_disk = disk.parent / f".libvirt-{name}{disk.suffix}.part"
-    staged_vars = disk.parent / f".libvirt-{name}-vars.qcow2.part"
+    vars_suffix = nvram_volume.suffix if nvram_volume is not None else ".qcow2"
+    staged_vars = disk.parent / f".libvirt-{name}-vars{vars_suffix}.part"
     raw_vars: Path | None = None
     try:
         runtime.run(["virsh", "--connect", uri, "vol-download", str(disks[0]), str(staged_disk), "--sparse"])
@@ -516,7 +559,7 @@ def take_back_copy(args: argparse.Namespace, vm: dict[str, Any], name: str) -> i
             runtime.ensure_parent(nvram)
             raw_vars = nvram.parent / f".libvirt-{name}-vars.raw.part"
             runtime.run(["virsh", "--connect", uri, "vol-download", str(nvram_volume), str(staged_vars)])
-            runtime.run(["qemu-img", "convert", "-f", "qcow2", "-O", "raw", str(staged_vars), str(raw_vars)])
+            runtime.run(["qemu-img", "convert", "-f", firmware_format(nvram_volume), "-O", "raw", str(staged_vars), str(raw_vars)])
             os.replace(raw_vars, nvram)
         os.replace(staged_disk, disk)
     finally:
