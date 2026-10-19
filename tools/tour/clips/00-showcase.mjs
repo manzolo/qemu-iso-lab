@@ -140,7 +140,7 @@ export async function run(d) {
   await d.sleep(800);
 
   await d.cue("install");
-  await d.click(p.getByRole("button", { name: "Install automatically" }));
+  await d.click(p.locator("#details").getByRole("button", { name: "Install automatically" }));
   await d.sleep(2500);
   await d.cue("log");
   await d.click(p.locator("#job-bar-log"));
@@ -171,7 +171,7 @@ export async function run(d) {
   await d.sleep(600);
 
   await d.cue("console");
-  await d.click(p.getByRole("button", { name: /Open console/ }));
+  await d.click(p.locator("#details").getByRole("button", { name: /Open console/ }));
   await p.locator("#vnc-screen canvas").waitFor({ timeout: 30000 });
   await d.sleep(4000);
   await d.hover(p.locator("#vnc-keyboard"));

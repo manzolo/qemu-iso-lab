@@ -52,7 +52,7 @@ export async function run(d) {
   await d.click(p.locator("#profile-mine"));
   await d.sleep(1500);
   await d.cue("install");
-  await d.click(p.getByRole("button", { name: "Install automatically" }));
+  await d.click(p.locator("#details").getByRole("button", { name: "Install automatically" }));
   await d.sleep(2500);
   await d.cue("log");
   await d.click(p.locator("#job-bar-log"));

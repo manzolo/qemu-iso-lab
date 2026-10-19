@@ -27,14 +27,14 @@ export async function setup(d) {
   await d.page.goto(d.restartWeb());
   await d.page.locator("#search").waitFor();
   await d.page.locator(`tr.row[data-vm="${VMNAME}"]`).click();
-  await d.page.getByRole("button", { name: /Open console/ }).waitFor();
+  await d.page.locator("#details").getByRole("button", { name: /Open console/ }).waitFor();
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1500 300 0.1");
 }
 
 export async function run(d) {
   const p = d.page;
   await d.cue("open");
-  await d.click(p.getByRole("button", { name: /Open console/ }));
+  await d.click(p.locator("#details").getByRole("button", { name: /Open console/ }));
   await p.locator("#vnc-screen canvas").waitFor({ timeout: 30000 });
   await d.sleep(2500);
   await d.cue("login");
