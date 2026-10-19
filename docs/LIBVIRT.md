@@ -114,12 +114,22 @@ QCOW2 firmware support alone does not guarantee internal snapshots: libvirt also
 for that operation. With libvirt 12, virt-manager's internal snapshots work with qcow2 variables
 and a loader in the same format, with the VM running too (memory included, a revert in seconds).
 Unexport recognizes both `.qcow2` and `.fd` copies, restores the variables into vmctl's raw file
-(whatever the guest changed in libvirt is kept), removes the copies and undefines with
-`--snapshots-metadata`: any snapshots stay
+(whatever the guest changed in libvirt is kept, except the boot options: see below), removes the
+copies and undefines with `--snapshots-metadata`: any snapshots stay
 inside the disk's qcow2 (`qemu-img snapshot -l`), vmctl boots the disk as it is, and
 `qemu-img snapshot -d` removes one. A Windows profile (`hyperv: true`) gets the Hyper-V
 enlightenments as an explicit list, not `mode='passthrough'`, which libvirt refuses to snapshot
 running; `evmcs` only on Intel hosts.
+
+**The EFI boot options do not come back.** Under libvirt the firmware records boot options for
+libvirt's devices (another PCI layout). Back in vmctl OVMF drops the disk's option, whose path is
+gone, and appends the new one after the UEFI Shell already in the list: with Ubuntu 22.04's OVMF
+the machine then stopped at `Shell>` (debian-12-cloud from libvirt 8.0, 2026-10-19). So both
+unexport and taking a copy back delete `BootOrder`, `BootNext` and every `Boot####` from the
+returned variables, the way the firmware deletes a variable (a state bit cleared, the store
+otherwise untouched), and keep all the others. At the next boot the firmware rebuilds the options
+for vmctl's devices, the Shell last, as on a first boot; the systems vmctl installs all carry the
+removable-media loader (`\EFI\BOOT\BOOTX64.EFI`) that this relies on.
 
 After a snapshot revert libvirt may not give the disk back to its owner: unexport checks and, if the
 disk or the variables belong to another user (libvirt-qemu), prints the `chown` to run as root

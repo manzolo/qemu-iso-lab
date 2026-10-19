@@ -6,6 +6,7 @@ import os
 import re
 import shlex
 import shutil
+import struct
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
@@ -209,8 +210,52 @@ def import_firmware(vm_name: str, vm: dict[str, Any], exported_nvram: Path | Non
     if exported_nvram.is_file() or dry_run:
         runtime.run(["qemu-img", "convert", "-f", fmt, "-O", "raw", str(exported_nvram), str(nvram)], dry_run=dry_run)
     if not dry_run:
+        if nvram.is_file() and forget_boot_options(nvram):
+            ui.print_note(BOOT_OPTIONS_NOTE)
         exported_nvram.unlink(missing_ok=True)
         (exported_nvram.parent / firmware_names(fmt)[0]).unlink(missing_ok=True)
+
+
+# OVMF's variable store (authenticated format, every OVMF_VARS build here): the store header follows
+# the firmware volume header, then the variables, each a 60-byte header + UTF-16 name + data. A
+# variable is deleted by clearing a bit of its state byte, as the firmware does on flash.
+AUTH_VARIABLE_STORE = bytes.fromhex("782cf3aa7b949a43a1802e144ec37792")  # gEfiAuthenticatedVariableGuid
+VARIABLE_HEADER_SIZE = 60
+VAR_ADDED = 0x3F
+VAR_DELETED_MASK = 0xFD
+BOOT_OPTION = re.compile(r"Boot(Order|Next|[0-9A-F]{4})")
+
+
+def forget_boot_options(vars_file: Path) -> bool:
+    """Delete BootOrder, BootNext and every Boot#### of the variables coming back from libvirt,
+    keeping all the other variables. Those options name libvirt's devices: back in vmctl OVMF drops
+    the disk's (its PCI path is gone), appends the new one after the UEFI Shell already in the list
+    and stops at Shell> (debian-12-cloud, libvirt 8.0 and Ubuntu 22.04's OVMF, 2026-10-19). Without
+    them the firmware rebuilds the options for vmctl's devices, the Shell last, as on a first boot.
+    Returns whether something was deleted."""
+    data = bytearray(vars_file.read_bytes())
+    fv_header = int.from_bytes(data[0x30:0x32], "little")
+    if data[fv_header:fv_header + 16] != AUTH_VARIABLE_STORE:
+        return False
+    store_end = fv_header + int.from_bytes(data[fv_header + 16:fv_header + 20], "little")
+    offset, changed = fv_header + 0x1C, False
+    while offset + VARIABLE_HEADER_SIZE <= store_end:
+        start_id, state = struct.unpack_from("<HB", data, offset)
+        if start_id != 0x55AA:
+            break
+        name_size, data_size = struct.unpack_from("<II", data, offset + 0x24)
+        name_at = offset + VARIABLE_HEADER_SIZE
+        name = bytes(data[name_at:name_at + name_size]).decode("utf-16le", "replace").rstrip("\0")
+        if state == VAR_ADDED and BOOT_OPTION.fullmatch(name):
+            data[offset + 2] = state & VAR_DELETED_MASK
+            changed = True
+        offset = (name_at + name_size + data_size + 3) & ~3
+    if changed:
+        vars_file.write_bytes(bytes(data))
+    return changed
+
+
+BOOT_OPTIONS_NOTE = "EFI boot options of libvirt's devices forgotten: the firmware rebuilds them for vmctl's at the next boot"
 
 
 def segment_names(vm: dict[str, Any]) -> list[str]:
@@ -560,6 +605,8 @@ def take_back_copy(args: argparse.Namespace, vm: dict[str, Any], name: str) -> i
             raw_vars = nvram.parent / f".libvirt-{name}-vars.raw.part"
             runtime.run(["virsh", "--connect", uri, "vol-download", str(nvram_volume), str(staged_vars)])
             runtime.run(["qemu-img", "convert", "-f", firmware_format(nvram_volume), "-O", "raw", str(staged_vars), str(raw_vars)])
+            if forget_boot_options(raw_vars):
+                ui.print_note(BOOT_OPTIONS_NOTE)
             os.replace(raw_vars, nvram)
         os.replace(staged_disk, disk)
     finally:

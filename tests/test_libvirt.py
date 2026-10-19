@@ -420,6 +420,38 @@ class LibvirtTests(BaseVmctlTestCase):
         outputs["dumpxml"] = "<domain/>"
         self.assertTrue(lifecycle.libvirt_domain_defined("testvm"))
 
+    def test_boot_options_from_libvirt_are_forgotten(self):
+        # The OVMF vars libvirt 8 handed back: BootOrder names libvirt's disk path; everything else stays.
+        import struct
+        def variable(name, data, state=libvirt.VAR_ADDED):
+            raw_name = (name + "\0").encode("utf-16le")
+            header = struct.pack("<HBxI8s16sI", 0x55AA, state, 7, bytes(8), bytes(16), 0)
+            header += struct.pack("<II16s", len(raw_name), len(data), bytes(16))
+            blob = header + raw_name + data
+            return blob + bytes(-len(blob) % 4)
+        fv = bytearray(0x48)
+        fv[0x30:0x32] = (0x48).to_bytes(2, "little")
+        names = ["BootOrder", "Boot0000", "Boot0001", "Boot0007", "BootOrder", "SbatLevel", "Timeout"]
+        body = b"".join(variable(n, b"data", state=0x3C if i == 0 else libvirt.VAR_ADDED) for i, n in enumerate(names))
+        store = libvirt.AUTH_VARIABLE_STORE + (0x1C + len(body) + 64).to_bytes(4, "little") + bytes(8) + body
+        vars_file = self.root / "vars.fd"
+        vars_file.write_bytes(bytes(fv) + store + b"\xff" * 64)
+        size = vars_file.stat().st_size
+        self.assertTrue(libvirt.forget_boot_options(vars_file))
+        data = vars_file.read_bytes()
+        states, offset = {}, 0x48 + 0x1C
+        while data[offset:offset + 2] == b"\xaa\x55":
+            name_size, data_size = struct.unpack_from("<II", data, offset + 0x24)
+            name = data[offset + 60:offset + 60 + name_size].decode("utf-16le").rstrip("\0")
+            states.setdefault(name, []).append(data[offset + 2])
+            offset = (offset + 60 + name_size + data_size + 3) & ~3
+        self.assertEqual(states, {"BootOrder": [0x3C, 0x3D], "Boot0000": [0x3D], "Boot0001": [0x3D], "Boot0007": [0x3D],
+                                  "SbatLevel": [libvirt.VAR_ADDED], "Timeout": [libvirt.VAR_ADDED]})
+        self.assertEqual(vars_file.stat().st_size, size)
+        self.assertFalse(libvirt.forget_boot_options(vars_file), "nothing left to forget")
+        vars_file.write_bytes(b"not an OVMF store")
+        self.assertFalse(libvirt.forget_boot_options(vars_file))
+
     def test_active_libvirt_domain_refused(self):
         with mock.patch.object(libvirt, "virsh_output", return_value="testvm\n"):
             with self.assertRaisesRegex(VMError, "running"):
