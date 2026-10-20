@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# A private temporary kcadm config; no dependency on a previous shell's login.
+set -euo pipefail
+cfg=$(mktemp)
+trap 'rm -f "$cfg"' EXIT
+/opt/keycloak/bin/kcadm.sh config credentials --config "$cfg" \
+    --server http://127.0.0.1:8080 --realm master --user admin --password admin-lab-pass >/dev/null
+/opt/keycloak/bin/kcadm.sh "$@" --config "$cfg"

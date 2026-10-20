@@ -1183,6 +1183,7 @@ The rest are declared by hand in `meta.groups`, because no other field expresses
 | `zfs-lab` | The ZFS lab (vms/labs/zfs-lab/): `zfs-lab-server`, one cloud image with four empty 2 GB disks for a RAIDZ pool, datasets, snapshots, a resilver, a scrub, send/receive and mirrors |
 | `pxe-lab` | The PXE lab (vms/labs/pxe-lab/): `pxe-lab-server` (dnsmasq DHCP + TFTP on the segment, iPXE chained to pxelinux for BIOS, Debian's shim + GRUB for UEFI by DHCP option 93, nginx, NAT), `pxe-lab-client` (BIOS) and `pxe-lab-client-efi` (OVMF), empty disks that install Debian 13 over the network with `bootstrap-netboot` (docs/LABS.md#network-boot-bootstrap-netboot) |
 | `mdadm-lab` | The mdadm lab (vms/labs/mdadm-lab/): `mdadm-lab-server`, one cloud image with four empty 2 GB disks for Linux software RAID: a mirror, a failed disk, a RAID5 with a hot spare, a grow, stop/assemble |
+| `keycloak-lab` | Keycloak 26.4.7 with PostgreSQL and a Python OIDC app, two cloud images on `keycloak-lan` (2048 + 512 MiB): installation, realms, clients, users, roles, Authorization Code + PKCE, JWT validation, SSO logout, client credentials, refresh and protocol errors. [Guide](../vms/labs/keycloak-lab/guide.en.md) |
 | `mysql-lab` | The MySQL lab (vms/labs/mysql-lab/): `mysql-lab-server`, one cloud image with MySQL 8, a sample shop database (users, orders, a foreign key) and phpMyAdmin on http://127.0.0.1:8088/phpmyadmin: queries, joins, transactions, privileges, indexes, mysqldump, configuration |
 | `lite` | The low-resource labs, for a host with little RAM: every member of `ssh-lab-lite`, `git-lab-lite` and `vpn-lab-lite` (docs/LABS.md) |
 | `ssh-lab-lite` | `ssh-lab` on Debian 12 cloud images (`ssh-lab-server-lite`, `ssh-lab-client-lite`, 384 MB each: the exercises need systemd and fail2ban), the same tests on its own `ssh-lan-lite` segment |
@@ -1765,7 +1766,7 @@ what went wrong first (all verified live on 2026-09-24):
 ## Groups as stacks and the lab map (`vmctl group`)
 
 A declared group (`meta.groups`) can be run as one stack. A **lab** is a group whose members are
-all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab`, `vpn-lab`, `ssh-lab`, `docker-lab`, `lvm-lab`, `git-lab`, `zfs-lab`, `mdadm-lab`, `mysql-lab`, `k8s-lab`, `pxe-lab` and the low-resource `ssh-lab-lite`, `git-lab-lite`, `vpn-lab-lite` (`vmctl group list --labs`).
+all on a network segment, or with their own content under vms/labs/: today `netlab`, `proxmox-lab`, `vpn-lab`, `ssh-lab`, `docker-lab`, `lvm-lab`, `git-lab`, `zfs-lab`, `mdadm-lab`, `mysql-lab`, `keycloak-lab`, `k8s-lab`, `pxe-lab` and the low-resource `ssh-lab-lite`, `git-lab-lite`, `vpn-lab-lite` (`vmctl group list --labs`).
 
 ```bash
 vmctl group list [--labs] [--json]

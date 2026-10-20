@@ -1,0 +1,146 @@
+{
+  "vms": {
+    "keycloak-lab-server": {
+      "name": "Keycloak lab server (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "server",
+        "status": "unattended",
+        "groups": [
+          "keycloak-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-20"
+      },
+      "notes": "Keycloak 26.4.7, Java 21 and PostgreSQL. Admin console http://127.0.0.1:18080, admin / admin-lab-pass. Development HTTP on the private lab only.",
+      "memory_mb": 2048,
+      "cpus": 2,
+      "disk": {
+        "size": "8G"
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true,
+          "hostfwd": [
+            {
+              "host_port": 18080,
+              "guest_port": 8080
+            }
+          ]
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "keycloak-lan",
+          "phase": "runtime",
+          "address": "172.20.20.1/24"
+        }
+      ],
+      "cloudimg_config": {
+        "packages": [
+          "openjdk-21-jre-headless",
+          "postgresql",
+          "curl",
+          "jq"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2390,
+        "copy_from_host": [
+          {
+            "source": "vms/labs/keycloak-lab/provision/setup-server.sh",
+            "dest": "/home/{{user}}/keycloak-lab/setup-server.sh",
+            "dest_mode": "755"
+          },
+          {
+            "source": "vms/labs/keycloak-lab/provision/kc-lab",
+            "dest": "/home/{{user}}/keycloak-lab/kc-lab",
+            "dest_mode": "755"
+          },
+          {
+            "source": "vms/labs/keycloak-lab/provision/realm.json",
+            "dest": "/home/{{user}}/keycloak-lab/realm.json",
+            "dest_mode": "644"
+          }
+        ],
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "bash ~/keycloak-lab/setup-server.sh",
+          "systemctl is-active keycloak postgresql"
+        ]
+      }
+    },
+    "keycloak-lab-client": {
+      "name": "Keycloak lab client (Ubuntu 24.04 cloud image)",
+      "extends": "ubuntu-cloud-base",
+      "meta": {
+        "role": "client",
+        "status": "unattended",
+        "groups": [
+          "keycloak-lab"
+        ],
+        "version": "1.0.0",
+        "verified": "2026-10-20"
+      },
+      "notes": "Python OIDC app: http://127.0.0.1:18081. Authorization Code + S256 PKCE; alice / alice-lab-pass has editor, bob / bob-lab-pass does not. curl and scripted browser in the guest; see vms/labs/keycloak-lab/.",
+      "memory_mb": 512,
+      "cpus": 1,
+      "disk": {
+        "size": "4G"
+      },
+      "networks": [
+        {
+          "id": "nat",
+          "type": "user",
+          "ssh": true,
+          "hostfwd": [
+            {
+              "host_port": 18081,
+              "guest_port": 8000
+            }
+          ]
+        },
+        {
+          "id": "lan",
+          "type": "segment",
+          "name": "keycloak-lan",
+          "phase": "runtime",
+          "address": "172.20.20.2/24"
+        }
+      ],
+      "cloudimg_config": {
+        "packages": [
+          "python3-flask",
+          "python3-requests",
+          "python3-jwt",
+          "python3-cryptography",
+          "gunicorn",
+          "curl",
+          "jq"
+        ]
+      },
+      "ssh_provision": {
+        "ssh_host_port": 2391,
+        "copy_from_host": [
+          {
+            "source": "vms/labs/keycloak-lab/provision/setup-client.sh",
+            "dest": "/home/{{user}}/keycloak-lab/setup-client.sh",
+            "dest_mode": "755"
+          },
+          {
+            "source": "vms/labs/keycloak-lab/provision/app.py",
+            "dest": "/home/{{user}}/keycloak-lab/app.py",
+            "dest_mode": "644"
+          }
+        ],
+        "post_install_run": [
+          "test -f /etc/cloud/cloud-init.disabled",
+          "bash ~/keycloak-lab/setup-client.sh",
+          "systemctl is-active oidc-app"
+        ]
+      }
+    }
+  }
+}

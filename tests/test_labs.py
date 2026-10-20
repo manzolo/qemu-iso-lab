@@ -18,7 +18,7 @@ class LabsTests(BaseVmctlTestCase):
 
     def test_only_groups_whose_members_all_share_a_segment_are_labs(self):
         cfg = self.tracked_config()
-        self.assertEqual(labs.lab_groups(cfg), ["docker-lab", "git-lab", "git-lab-lite", "k8s-lab", "lvm-lab", "mdadm-lab", "mysql-lab", "netlab", "proxmox-lab", "pxe-lab", "ssh-lab", "ssh-lab-lite", "vpn-lab", "vpn-lab-lite", "zfs-lab"])
+        self.assertEqual(labs.lab_groups(cfg), ["docker-lab", "git-lab", "git-lab-lite", "k8s-lab", "keycloak-lab", "lvm-lab", "mdadm-lab", "mysql-lab", "netlab", "proxmox-lab", "pxe-lab", "ssh-lab", "ssh-lab-lite", "vpn-lab", "vpn-lab-lite", "zfs-lab"])
 
     def test_lab_of_names_the_declared_lab_of_every_member_and_nobody_else(self):
         owners = labs.lab_of(self.tracked_config())
