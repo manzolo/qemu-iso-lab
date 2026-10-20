@@ -27,8 +27,8 @@ export const cues = [
     it: "I claim che l'app ha verificato: chi ha emesso il token, per chi, fino a quando, e i ruoli. Niente di questo è stato creduto prima che la firma tornasse." },
   { id: "roles", en: "Authorization: Alice has editor, so the editor page opens. Log out everywhere, log in as Bob: Bob is authenticated and gets 403. Same login, different permission.",
     it: "Autorizzazione: Alice ha editor, quindi la pagina dell'editor si apre. Logout ovunque, login come Bob: Bob è autenticato e prende 403. Stesso login, permesso diverso." },
-  { id: "service", en: "A service has no user: client credentials, a token for lab-service that lives five seconds. The app's API accepts it, introspection says active… and six seconds later, inactive.",
-    it: "Un servizio non ha un utente: client credentials, un token per lab-service che vive cinque secondi. L'API dell'app lo accetta, l'introspection dice attivo… e sei secondi dopo, non attivo." },
+  { id: "service", en: "A service has no user: client credentials, a token for lab-service that lives five seconds. Introspection says active, the app's API accepts a fresh one… and six seconds later, introspection says inactive.",
+    it: "Un servizio non ha un utente: client credentials, un token per lab-service che vive cinque secondi. L'introspection dice attivo, l'API dell'app ne accetta uno fresco… e sei secondi dopo, l'introspection dice non attivo." },
   { id: "errors", en: "Errors are the part worth reading: a wrong secret is 401 unauthorized client, a redirect address the client never declared is refused before any login, an expired token is 401 at the API.",
     it: "Gli errori sono la parte che vale la pena leggere: un segreto sbagliato è 401 unauthorized client, un indirizzo di ritorno che il client non ha dichiarato è rifiutato prima di qualunque login, un token scaduto è 401 all'API." },
   { id: "journal", en: "And the server's journal keeps every one of those attempts, with the client and the reason.",
@@ -101,12 +101,14 @@ export async function run(d) {
   await keycloakLogin(d, page, "admin", "admin-lab-pass").catch(() => {});
   await page.waitForLoadState("networkidle");
   await d.sleep(2500);
-  await page.goto(`${KC}/admin/master/console/#/lab/users`);
-  await page.waitForLoadState("networkidle");
-  await d.sleep(4500);
-  await page.goto(`${KC}/admin/master/console/#/lab/clients`);
-  await page.waitForLoadState("networkidle");
-  await d.sleep(4500);
+  // A realm's view needs a fresh load: changing only the hash on the open console kept the
+  // master realm on screen (probe of 2026-10-20), so each view goes through about:blank.
+  for (const view of ["users", "clients"]) {
+    await page.goto("about:blank");
+    await page.goto(`${KC}/admin/master/console/#/lab/${view}`);
+    await page.waitForLoadState("networkidle");
+    await d.sleep(4500);
+  }
   await page.goto("about:blank");
   await d.focusTerminal();
 
@@ -170,11 +172,15 @@ export async function run(d) {
   await d.cue("service");
   await d.clearScreen();
   await d.session(CLIENT);
+  // The service token lives five seconds: the rehearsal showed that typing three long lines at 40 ms a
+  // character outlives it (the first introspection was already inactive). The lines that use a token
+  // are typed fast, the token is minted right before each use, and the API gets a fresh one.
+  const fast = (cmd, read) => d.guest(cmd, { read, delay: 12 });
   await say(d, "P=http://172.20.20.1:8080/realms/lab/protocol/openid-connect", 1000);
-  await say(d, "TOKEN=$(curl -fsS \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=service-lab-secret | jq -r .access_token)", 1500);
-  await say(d, "curl -si -H \"Authorization: Bearer $TOKEN\" http://172.20.20.2:8000/api", 4000);
-  await say(d, "curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq '{active, client_id, aud, exp}'", 4500);
-  await say(d, "sleep 6; curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq", 5000);
+  await say(d, "TOKEN=$(curl -fsS \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=service-lab-secret | jq -r .access_token)", 800);
+  await fast("curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq '{active, client_id, aud, exp}'", 4500);
+  await fast("TOKEN=$(curl -fsS \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=service-lab-secret | jq -r .access_token); curl -si -H \"Authorization: Bearer $TOKEN\" http://172.20.20.2:8000/api | head -1", 3500);
+  await fast("sleep 6; curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq", 5000);
 
   await d.cue("errors");
   await d.clearScreen();
@@ -186,7 +192,7 @@ export async function run(d) {
   await d.cue("journal");
   await d.clearScreen();
   await d.session(SERVER);
-  await say(d, "sudo journalctl -u keycloak --no-pager -n 6 | cut -c1-150", 6500);
+  await say(d, "sudo journalctl -u keycloak --no-pager -n 4 | cut -c1-150", 6500);
   await d.leave();
 
   await d.cue("tests");
