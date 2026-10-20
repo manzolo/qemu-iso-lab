@@ -1031,9 +1031,14 @@
       ]
     },
     "keycloak-lab-client": {
-      "version": "1.0.0",
-      "fingerprint": "sha256:1ed55f268350af4f8ef28bd4ffd8d14c5c73c2c4720bdff8523fbc52edb4a644",
+      "version": "1.0.1",
+      "fingerprint": "sha256:ea52420e85fd191d095dce3f188e434447a36d5652a169400bf1ea42d9bfa106",
       "history": [
+        {
+          "version": "1.0.1",
+          "date": "2026-10-21",
+          "note": "App pages for the browser (styled home, protected, 403, session, token and expired-token pages); same JSON for curl and the tests"
+        },
         {
           "version": "1.0.0",
           "date": "2026-10-20",

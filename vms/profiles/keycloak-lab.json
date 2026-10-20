@@ -81,7 +81,7 @@
         "groups": [
           "keycloak-lab"
         ],
-        "version": "1.0.0",
+        "version": "1.0.1",
         "verified": "2026-10-20"
       },
       "notes": "Python OIDC app: http://127.0.0.1:18081. Authorization Code + S256 PKCE; alice / alice-lab-pass has editor, bob / bob-lab-pass does not. curl and scripted browser in the guest; see vms/labs/keycloak-lab/.",
