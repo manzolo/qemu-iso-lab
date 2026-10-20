@@ -49,7 +49,8 @@ SPOKEN = {
            # PostgreSQL and realm came out wrong in the Keycloak lesson (Manzolo, 2026-10-20): as an Italian says them.
            (r"\bPostgreSQL\b", "Postgres"), (r"\b[Rr]ealms?\b", "rialm"),
            # Lesson 2 of the Keycloak lab (2026-10-20): the English words of a client's card, as an Italian says them.
-           (r"\bCredentials\b", "credènscials"), (r"\bclaims?\b", "clèim"), (r"\bcallback\b", "còllbac"), (r"\bid\b", "i di"), (r"\bPython\b", "pàiton"),
+           (r"\bCredentials\b", "credènscials"), (r"\bclaims?\b", "clèim"), (r"\bcallback\b", "colbek"), (r"\bid\b", "i di"), (r"\bPython\b", "pàiton"),
+           (r"\b[Ll]ogout\b", "logaut"),  # Manzolo, 2026-10-20: «logout si deve leggere logaut»
            (r"\bHA\b", "alta affidabilità"), (r"\bIT-Tools\b", "ai ti tùls"), (r"\bshutdown\b", "sciatdàun"),
            # The ZFS course (2026-10-07): the commands in lower case, the options, paths and columns,
            # and the English words an Italian voice reads letter by letter.

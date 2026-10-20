@@ -20,10 +20,10 @@ export const cues = [
     it: "Keycloak è un posto solo che sa chi sei. Le app non vedono mai la tua password: ti mandano da lui e si fidano della risposta. Il lab ha due macchine: un server con Keycloak, e un client con una piccola app web." },
   { id: "install", en: "One command installs both, from cloud images. I will go fast here.",
     it: "Un comando le installa tutte e due, da immagini cloud. Qui vado veloce." },
-  { id: "app", en: "This is the app. It has no login form of its own: just a Login link.",
-    it: "Questa è l'app. Non ha un modulo di login suo: solo un collegamento, Login." },
-  { id: "kclogin", en: "The link brings you here, to Keycloak. The password goes to Keycloak, never to the app. I sign in as Alice.",
-    it: "Il collegamento ti porta qui, da Keycloak. La password la dai a Keycloak, mai all'app. Entro come Alice." },
+  { id: "app", en: "This is the app. It has no login form of its own: just a Login button.",
+    it: "Questa è l'app. Non ha un modulo di login suo: solo un pulsante, Login." },
+  { id: "kclogin", en: "The button brings you here, to Keycloak. The password goes to Keycloak, never to the app. I sign in as Alice.",
+    it: "Il pulsante ti porta qui, da Keycloak. La password la dai a Keycloak, mai all'app. Entro come Alice." },
   { id: "back", en: "Alice is in, and the app knows it without ever seeing her password. The protected page opens.",
     it: "Alice è dentro, e l'app lo sa senza aver mai visto la sua password. La pagina protetta si apre." },
   { id: "editok", en: "The editor page is for people with the role editor. Alice has it: it opens.",
@@ -157,7 +157,9 @@ export async function run(d) {
   await d.cue("token");
   await d.focusBrowser();
   await page.bringToFront();
-  await open(d, page, `${APP}/tokens`, 11000);
+  await open(d, page, `${APP}/tokens`, 3500);
+  await d.scroll(620, 1500);  // from the raw token down to the checked claims
+  await d.sleep(6500);
   await page.goto("about:blank");
   await d.focusTerminal();
   await d.cue("discovery");

@@ -141,9 +141,9 @@ export async function run(d) {
   await keycloakLogin(d, page, "alice", "alice-lab-pass");
   await d.sleep(1500);
   await d.cue("claims");
-  await open(d, page, `${APP}/tokens`, 1500);
-  await d.key("Tab"); await d.sleep(300); await d.key("space");  // Chromium's JSON viewer: its Pretty-print box is not in the page's DOM
-  await d.sleep(9000);
+  await open(d, page, `${APP}/tokens`, 3000);
+  await d.scroll(620, 1500);  // from the raw token down to the checked claims
+  await d.sleep(7000);
   await d.cue("logout");
   await open(d, page, `${APP}/actions`, 1500);
   await d.click(page.locator("form[action='/logout'] button"));
@@ -176,6 +176,8 @@ export async function run(d) {
   await d.cue("verdict");
   await say(d, "for t in \"$TOKEN\" \"$FALSO\"; do curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$t\" | jq -c '{active, exp}'; done", 8000);
   await d.leave();
+  // The lab's own setting back (the tests want the five-second service token), off camera
+  d.offCamera(SERVER, "SID=$(kc-lab get clients -r lab -q clientId=lab-service --fields id --format csv --noquotes 2>/dev/null) && kc-lab update clients/$SID -r lab -s 'attributes.\"access.token.lifespan\"=5' 2>/dev/null");
   await d.cue("end");
   await d.sleep(2000);
 }

@@ -174,7 +174,7 @@ def flow():
     check(send(old_cookie, 'GET', APP + '/protected').status_code == 200, 'first session is still active')
     old_csrf = csrf(old_cookie)
     result = follow(session, send(session, 'POST', APP + '/logout', data={'csrf': csrf(session)}))
-    check(result.status_code == 200 and '<h1>Keycloak lab</h1>' in result.text, 'RP logout returns home')
+    check(result.status_code == 200 and 'id="home"' in result.text, 'RP logout returns home')
     check(send(session, 'GET', APP + '/protected').status_code == 401, 'current session logged out')
     check(send(old_cookie, 'POST', APP + '/refresh', data={'csrf': old_csrf}).status_code == 400,
           'backchannel removed the first local session before introspection')
