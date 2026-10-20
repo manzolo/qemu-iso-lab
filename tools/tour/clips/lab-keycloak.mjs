@@ -1,4 +1,4 @@
-export const title = { en: "Who you are and what you may do: the Keycloak lab", it: "Chi sei e cosa puoi fare: il lab Keycloak" };
+export const title = { en: "One login for every app: the Keycloak lab", it: "Un login per tutte le app: il lab Keycloak" };
 export const series = "labs";
 export const lab = "keycloak-lab";
 
@@ -8,35 +8,54 @@ const CHECKOUT = "~/lab/demo/qemu-iso-lab";
 const KC = "http://127.0.0.1:18080";    // Keycloak, forwarded to the studio's loopback
 const APP = "http://127.0.0.1:18081";   // the OIDC app on the client, same forward
 
+// Rewritten 2026-10-20 evening after Manzolo's verdict on the first take: long silences (one sentence
+// per section, then eight commands typed with nobody speaking), a robotic explanation, no thread for
+// someone who has never seen this. Now: the thread of a beginner (the problem, the idea, then the
+// login SEEN as Alice and Bob, and only then behind the scenes), a sentence for every command or
+// page that appears, half the commands, and the install covered by the voice at 30x.
 export const cues = [
-  { id: "intro", en: "Who you are and what you may do are two different questions. Keycloak answers the first for every app you own: one login, one place for users and roles. The lab is a server with Keycloak and a client with a small web app that trusts it.",
-    it: "Chi sei e cosa puoi fare sono due domande diverse. Keycloak risponde alla prima per tutte le tue app: un login, un posto per utenti e ruoli. Nel lab: un server con Keycloak e un client con una piccola app web." },
-  { id: "install", en: "Two cloud images: the server at 172.20.20.1 with Keycloak 26.4.7 and PostgreSQL, the client at 172.20.20.2 with the app, curl and jq. The install downloads the official archive and checks its hash.",
-    it: "Due cloud image: il server con Keycloak e PostgreSQL, il client con l'app, curl e jq. L'installazione scarica l'archivio ufficiale e ne controlla l'impronta." },
-  { id: "anatomy", en: "On the server: a systemd service, Keycloak's own version, PostgreSQL behind it instead of the development store, and port 8080. kc-lab wraps kcadm, the command-line admin, with a fresh login every time.",
-    it: "Sul server: un servizio systemd, la versione di Keycloak, PostgreSQL dietro, la porta 8080. kc-lab avvolge kcadm, l'amministrazione da riga di comando." },
-  { id: "console", en: "The same server in the browser: the admin console, forwarded to port 18080. The realm lab is the lab's fixture: two users, Alice and Bob, two clients, and the role editor.",
-    it: "Lo stesso server nel browser: la console di amministrazione, inoltrata sulla porta 18080. Il realm lab è la dotazione del lab: due utenti, Alice e Bob, due client, e il ruolo editor." },
-  { id: "kcadm", en: "What the console does with clicks, kcadm does with commands: a practice realm, a public client, a user with a password, a role, the role on the user. Then the practice realm goes away.",
-    it: "Quello che la console fa coi clic, kcadm lo fa coi comandi: un realm di prova, un client pubblico, un utente con la password, un ruolo, il ruolo sull'utente. Poi il realm di prova se ne va." },
-  { id: "discovery", en: "From the client: discovery. One address tells an app every endpoint of the realm, and the JWKS publishes the public keys that sign the tokens. That is how the app verifies a token without ever asking the server.",
-    it: "Dal client: la discovery. Un solo indirizzo dice a un'app ogni endpoint del realm, e il JWKS pubblica le chiavi che firmano i token: così l'app verifica un token senza chiedere al server." },
-  { id: "flow", en: "The app, on port 18081. Login sends the browser to Keycloak: the password is typed there, never in the app. Alice comes back with a code; the app trades it for the tokens with its secret and PKCE verifier, and keeps them.",
-    it: "Login manda il browser a Keycloak: la password si scrive lì, mai nell'app. Alice torna con un codice; l'app lo scambia con i token, col suo segreto e il verifier PKCE, e li tiene per sé." },
-  { id: "claims", en: "The claims the app verified: who issued the token, for whom, until when, and the roles. Nothing here was trusted before the signature checked out.",
-    it: "I claim che l'app ha verificato: chi ha emesso il token, per chi, fino a quando, e i ruoli. Niente di questo è stato creduto prima che la firma tornasse." },
-  { id: "roles", en: "Authorization: Alice has editor, so the editor page opens. Log out everywhere, log in as Bob: Bob is authenticated and gets 403. Same login, different permission.",
-    it: "Autorizzazione: Alice ha editor, quindi la pagina dell'editor si apre. Logout ovunque, login come Bob: Bob è autenticato e prende 403. Stesso login, permesso diverso." },
-  { id: "service", en: "A service has no user: client credentials, a token for lab-service that lives five seconds. Introspection says active, the app's API accepts a fresh one… and six seconds later, introspection says inactive.",
-    it: "Un servizio non ha un utente: client credentials, un token per lab-service che vive cinque secondi. L'introspection dice attivo, l'API ne accetta uno fresco… e sei secondi dopo, non attivo." },
-  { id: "errors", en: "Errors are the part worth reading: a wrong secret is 401 unauthorized client, a redirect address the client never declared is refused before any login, an expired token is 401 at the API.",
-    it: "Gli errori vanno letti: segreto sbagliato, 401 unauthorized client; un indirizzo di ritorno mai dichiarato è rifiutato prima del login; un token scaduto è 401 all'API." },
-  { id: "journal", en: "And the server's journal keeps every one of those attempts, with the client and the reason.",
-    it: "E il journal del server tiene ognuno di quei tentativi, col client e il motivo." },
-  { id: "tests", en: "Seven tests, one per exercise, drive the real login form and the real tokens, and tell you if the lab still behaves.",
-    it: "Sette test, uno per esercizio, guidano il vero modulo di login e i veri token, e ti dicono se il lab si comporta ancora bene." },
-  { id: "end", top: true, en: "Every command is in the guide, in English and Italian, from the lab's card.",
-    it: "Ogni comando è nella guida, in inglese e in italiano, dalla card del lab." },
+  { id: "problem", en: "Every app you use asks who you are. If each one keeps its own passwords, you have ten passwords, and whoever runs them has ten places to add or remove a person.",
+    it: "Ogni app che usi ti chiede chi sei. Se ognuna si tiene le sue password, tu hai dieci password, e chi le gestisce ha dieci posti dove aggiungere o togliere una persona." },
+  { id: "idea", en: "Keycloak is one place that knows who you are. The apps never see your password: they send you to Keycloak and trust its answer. The lab has two machines: a server with Keycloak, and a client with a small web app.",
+    it: "Keycloak è un posto solo che sa chi sei. Le app non vedono mai la tua password: ti mandano da lui e si fidano della risposta. Il lab ha due macchine: un server con Keycloak, e un client con una piccola app web." },
+  { id: "install", en: "One command installs both, from cloud images. I will go fast here.",
+    it: "Un comando le installa tutte e due, da immagini cloud. Qui vado veloce." },
+  { id: "app", en: "This is the app. It has no login form of its own: just a Login link.",
+    it: "Questa è l'app. Non ha un modulo di login suo: solo un collegamento, Login." },
+  { id: "kclogin", en: "The link brings you here, to Keycloak. The password goes to Keycloak, never to the app. I sign in as Alice.",
+    it: "Il collegamento ti porta qui, da Keycloak. La password la dai a Keycloak, mai all'app. Entro come Alice." },
+  { id: "back", en: "Alice is in, and the app knows it without ever seeing her password. The protected page opens.",
+    it: "Alice è dentro, e l'app lo sa senza aver mai visto la sua password. La pagina protetta si apre." },
+  { id: "editok", en: "The editor page is for people with the role editor. Alice has it: it opens.",
+    it: "La pagina dell'editor è per chi ha il ruolo editor. Alice ce l'ha: si apre." },
+  { id: "bob", en: "I log out, and sign in as Bob.",
+    it: "Esco, ed entro come Bob." },
+  { id: "edit403", en: "Bob signed in just like Alice, but he has no editor role: 403, forbidden. This is the difference between authentication, who you are, and authorization, what you may do.",
+    it: "Bob è entrato come Alice, ma non ha il ruolo editor: 403, vietato. È la differenza tra autenticazione, chi sei, e autorizzazione, cosa puoi fare." },
+  { id: "console", en: "Behind all this is the server. Its admin console is where Alice, Bob and the role editor were created.",
+    it: "Dietro c'è il server. La sua console di amministrazione è dove Alice, Bob e il ruolo editor sono stati creati." },
+  { id: "users", en: "A realm is a world of its own, with its users and its apps. Ours is called lab: two users.",
+    it: "Un realm è un mondo a sé, con i suoi utenti e le sue app. Il nostro si chiama lab: due utenti." },
+  { id: "clients", en: "And the registered apps. lab-web is ours, with the address Keycloak may send the browser back to. An app that is not in this list cannot ask for a login.",
+    it: "E le app registrate. lab-web è la nostra, con l'indirizzo a cui Keycloak può rimandare il browser. Un'app che non è in questa lista non può chiedere un login." },
+  { id: "cli", en: "The same things can be done from the command line, with kcadm. Here I give Bob the role editor.",
+    it: "Le stesse cose si fanno da riga di comando, con kcadm. Qui do a Bob il ruolo editor." },
+  { id: "cliback", en: "Now Bob has it. And I take it back at once: in the lab, Bob stays without.",
+    it: "Ora Bob ce l'ha. E glielo tolgo subito: nel lab, Bob resta senza." },
+  { id: "token", en: "What did the app receive instead of a password? A token: a signed ticket from Keycloak. Inside: who issued it, for whom, until when, and the roles. The app checks the signature and trusts it.",
+    it: "Che cosa ha ricevuto l'app, al posto della password? Un token: un biglietto firmato da Keycloak. Dentro: chi l'ha emesso, per chi, fino a quando, e i ruoli. L'app controlla la firma e si fida." },
+  { id: "discovery", en: "How does the app know the keys that check the signature? It asks Keycloak, at a public address: the discovery.",
+    it: "Come fa l'app a conoscere le chiavi per controllare la firma? Le chiede a Keycloak, a un indirizzo pubblico: la discovery." },
+  { id: "service", en: "Not only people: a program can identify itself too, with a secret of its own. This token lives five seconds, and right now it is active.",
+    it: "Non solo persone: anche un programma può farsi riconoscere, con un segreto suo. Questo token vive cinque secondi, e in questo momento è attivo." },
+  { id: "expired", en: "Six seconds later it is worth nothing. A stolen token is worth little too.",
+    it: "Sei secondi dopo non vale più niente. Anche un token rubato vale poco." },
+  { id: "wrong", en: "And with a wrong secret, Keycloak says no: 401.",
+    it: "E con un segreto sbagliato, Keycloak dice di no: 401." },
+  { id: "tests", en: "The lab has seven tests that do all of this on their own, the login included, and tell you if it still works.",
+    it: "Il lab ha sette test che rifanno tutto questo da soli, login compreso, e ti dicono se funziona ancora." },
+  { id: "end", top: true, en: "Commands and explanations are in the guide, in English and Italian, from the lab's card.",
+    it: "Comandi e spiegazioni sono nella guida, in italiano e in inglese, dalla card del lab." },
 ];
 
 export async function setup(d) {
@@ -49,14 +68,13 @@ export async function setup(d) {
   d.vm("DISPLAY=:0 ~/lab/video/mv.py 1550 120 0.1");
 }
 
-// In the approved style (docs/TOUR.md, "How a lesson types its commands"): the lab's own commands,
-// one per line, the cleanups off camera.
-const say = (d, cmd, read = 3500) => d.guest(cmd, { read });
+const say = (d, cmd, read = 3000) => d.guest(cmd, { read });
+const fast = (d, cmd, read = 3000) => d.guest(cmd, { read, delay: 12 });
 
 // Keycloak's login form (realm lab): username, password, Sign in; back to the app when done.
 async function keycloakLogin(d, page, user, password) {
   await page.locator("#username").waitFor({ timeout: 60000 });
-  await d.sleep(1200);
+  await d.sleep(800);
   await d.click(page.locator("#username"));
   await d.type(user);
   await d.click(page.locator("#password"));
@@ -65,145 +83,108 @@ async function keycloakLogin(d, page, user, password) {
   await page.waitForURL(/127\.0\.0\.1:18081/, { timeout: 60000 });
   await page.waitForLoadState("networkidle");
 }
+const open = async (d, page, url, ms) => { await page.goto(url); await page.waitForLoadState("networkidle"); await d.sleep(ms); };
 
 export async function run(d) {
   const page = d.page;
-  await d.cue("intro");
+  // The problem and the idea, over the empty terminal
+  await d.cue("problem");
   await d.run("cd qemu-iso-lab", { record: false });
   await d.clearScreen();
-  await d.sleep(4000);
+  await d.sleep(10000);
+  await d.cue("idea");
+  await d.sleep(13000);
   await d.cue("install");
   const before = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group install ${LAB} --yes`, { wait: false });
-  await d.sleep(5000);
-  d.ff(12);
+  await d.sleep(2500);
+  d.ff(30);
   for (let i = 0; i < 1500 && d.vm("cat /tmp/demo-prompt") === before; i++) await d.sleep(1000);
   d.ffEnd();
-  // Keycloak (Java) comes up well after SSH does, more so under the studio's nested KVM: the anatomy
-  // commands must find it listening, so the wait stays off camera.
+  // Keycloak (Java) comes up well after SSH does: wait for it off camera before anyone uses it
   d.offCamera(SERVER, "for i in $(seq 1 150); do curl -fsS http://127.0.0.1:8080/realms/lab/.well-known/openid-configuration >/dev/null 2>&1 && break; sleep 2; done");
-  await d.sleep(1500);
 
-  await d.cue("anatomy");
-  await d.clearScreen();
-  await d.session(SERVER);
-  await say(d, "systemctl is-active keycloak postgresql", 2500);
-  await say(d, "/opt/keycloak/bin/kc.sh --version", 4000);
-  await say(d, "sudo -u postgres psql -d keycloak -c 'SELECT name FROM realm;'", 3500);
-  await say(d, "ss -ltn | grep -E ':(8080|5432) '", 3000);
-  await say(d, "kc-lab get realms/lab --fields realm,enabled", 4500);
-  await d.leave();
-
-  await d.cue("console");
+  // Seen as a user: Alice, then Bob
+  await d.cue("app");
   await d.focusBrowser();
   await page.bringToFront();
-  await page.goto(`${KC}/admin/master/console/`);
-  await keycloakLogin(d, page, "admin", "admin-lab-pass").catch(() => {});
-  await page.waitForLoadState("networkidle");
-  await d.sleep(2500);
-  // A realm's view needs a fresh load: changing only the hash on the open console kept the
-  // master realm on screen (probe of 2026-10-20), so each view goes through about:blank.
-  for (const view of ["users", "clients"]) {
-    await page.goto("about:blank");
-    await page.goto(`${KC}/admin/master/console/#/lab/${view}`);
-    await page.waitForLoadState("networkidle");
-    await d.sleep(4500);
-  }
-  await page.goto("about:blank");
-  await d.focusTerminal();
-
-  await d.cue("kcadm");
-  await d.clearScreen();
-  await d.session(SERVER);
-  await say(d, "kc-lab create realms -s realm=practice-cli -s enabled=true", 2500);
-  await say(d, "kc-lab create clients -r practice-cli -s clientId=practice-web -s publicClient=true -s standardFlowEnabled=true", 2500);
-  await say(d, "kc-lab create users -r practice-cli -s username=learner -s enabled=true", 2500);
-  await say(d, "kc-lab set-password -r practice-cli --username learner --new-password learner-lab-pass", 2000);
-  await say(d, "kc-lab create roles -r practice-cli -s name=reader", 2000);
-  await say(d, "kc-lab add-roles -r practice-cli --uusername learner --rolename reader", 2000);
-  await say(d, "kc-lab get-roles -r practice-cli --uusername learner", 4500);
-  await say(d, "kc-lab delete realms/practice-cli", 2500);
-  await d.leave();
-
-  await d.cue("discovery");
-  await d.clearScreen();
-  await d.session(CLIENT);
-  await say(d, "curl -fsS http://172.20.20.1:8080/realms/lab/.well-known/openid-configuration | jq '{issuer, authorization_endpoint, token_endpoint, jwks_uri}'", 6500);
-  await say(d, "curl -fsS http://172.20.20.1:8080/realms/lab/protocol/openid-connect/certs | jq '.keys[] | {kid, alg, use}'", 6000);
-  await d.leave();
-
-  await d.cue("flow");
-  await d.focusBrowser();
-  await page.bringToFront();
-  await page.goto(`${APP}/`);
-  await page.waitForLoadState("networkidle");
-  await d.sleep(2500);
+  await open(d, page, `${APP}/`, 2500);
   await d.click(page.locator("a[href='/login']"));
+  await d.cue("kclogin");
   await keycloakLogin(d, page, "alice", "alice-lab-pass");
-  await d.sleep(2500);
-  await page.goto(`${APP}/protected`);
-  await page.waitForLoadState("networkidle");
-  await d.sleep(3500);
-  await d.cue("claims");
-  await page.goto(`${APP}/tokens`);
-  await page.waitForLoadState("networkidle");
-  await d.sleep(7000);
-
-  await d.cue("roles");
-  await page.goto(`${APP}/edit`);
-  await page.waitForLoadState("networkidle");
-  await d.sleep(3500);
-  await page.goto(`${APP}/actions`);
-  await page.waitForLoadState("networkidle");
+  await d.cue("back");
   await d.sleep(1500);
+  await open(d, page, `${APP}/protected`, 4000);
+  await d.cue("editok");
+  await open(d, page, `${APP}/edit`, 4000);
+  await d.cue("bob");
+  await open(d, page, `${APP}/actions`, 800);
   await d.click(page.locator("form[action='/logout'] button"));
   await page.waitForURL(/127\.0\.0\.1:18081\/?$/, { timeout: 60000 });
   await page.waitForLoadState("networkidle");
-  await d.sleep(2000);
+  await d.sleep(800);
   await d.click(page.locator("a[href='/login']"));
   await keycloakLogin(d, page, "bob", "bob-lab-pass");
-  await d.sleep(1500);
-  await page.goto(`${APP}/edit`);
+  await d.cue("edit403");
+  await open(d, page, `${APP}/edit`, 9000);
+
+  // Behind the scenes: the console, then the command line
+  await d.cue("console");
+  await open(d, page, `${KC}/admin/master/console/`, 500);
+  await keycloakLogin(d, page, "admin", "admin-lab-pass").catch(() => {});
   await page.waitForLoadState("networkidle");
-  await d.sleep(5000);
+  await d.sleep(2500);
+  await d.cue("users");
+  // a realm's view needs a fresh load: changing only the hash kept the master realm on screen
+  await page.goto("about:blank");
+  await open(d, page, `${KC}/admin/master/console/#/lab/users`, 6000);
+  await d.cue("clients");
+  await page.goto("about:blank");
+  await open(d, page, `${KC}/admin/master/console/#/lab/clients`, 8000);
   await page.goto("about:blank");
   await d.focusTerminal();
 
-  await d.cue("service");
-  await d.clearScreen();
-  await d.session(CLIENT);
-  // The service token lives five seconds: the rehearsal showed that typing three long lines at 40 ms a
-  // character outlives it (the first introspection was already inactive). The lines that use a token
-  // are typed fast, the token is minted right before each use, and the API gets a fresh one.
-  const fast = (cmd, read) => d.guest(cmd, { read, delay: 12 });
-  await say(d, "P=http://172.20.20.1:8080/realms/lab/protocol/openid-connect", 1000);
-  await say(d, "TOKEN=$(curl -fsS \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=service-lab-secret | jq -r .access_token)", 800);
-  await fast("curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq '{active, client_id, aud, exp}'", 4500);
-  await fast("TOKEN=$(curl -fsS \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=service-lab-secret | jq -r .access_token); curl -si -H \"Authorization: Bearer $TOKEN\" http://172.20.20.2:8000/api | head -1", 3500);
-  await fast("sleep 6; curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq", 5000);
-
-  await d.cue("errors");
-  await d.clearScreen();
-  await say(d, "curl -si \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=wrong | head -1", 3000);
-  await say(d, "curl -siG \"$P/auth\" --data-urlencode client_id=lab-web --data-urlencode response_type=code --data-urlencode redirect_uri=http://not-allowed.invalid/callback | head -1", 3500);
-  await say(d, "curl -si -H \"Authorization: Bearer $TOKEN\" http://172.20.20.2:8000/api", 4500);
-  await d.leave();
-
-  await d.cue("journal");
+  await d.cue("cli");
   await d.clearScreen();
   await d.session(SERVER);
-  await say(d, "sudo journalctl -u keycloak --no-pager -n 4 | cut -c1-150", 6500);
+  await say(d, "kc-lab add-roles -r lab --uusername bob --rolename editor", 2500);
+  await d.cue("cliback");
+  await say(d, "kc-lab get-roles -r lab --uusername bob | grep name", 3000);
+  await say(d, "kc-lab remove-roles -r lab --uusername bob --rolename editor", 2500);
+  await d.leave();
+
+  // What the app received, and how it checks it
+  await d.cue("token");
+  await d.focusBrowser();
+  await page.bringToFront();
+  await open(d, page, `${APP}/tokens`, 11000);
+  await page.goto("about:blank");
+  await d.focusTerminal();
+  await d.cue("discovery");
+  await d.clearScreen();
+  await d.session(CLIENT);
+  await say(d, "curl -fsS http://172.20.20.1:8080/realms/lab/.well-known/openid-configuration | jq '{issuer, jwks_uri}'", 5000);
+
+  await d.cue("service");
+  await d.clearScreen();
+  await say(d, "P=http://172.20.20.1:8080/realms/lab/protocol/openid-connect", 800);
+  await say(d, "TOKEN=$(curl -fsS \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=service-lab-secret | jq -r .access_token)", 800);
+  await fast(d, "curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq '{active, client_id, exp}'", 4000);
+  await d.cue("expired");
+  await fast(d, "sleep 6; curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq", 4500);
+  await d.cue("wrong");
+  await fast(d, "curl -si \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=wrong | head -1", 4000);
   await d.leave();
 
   await d.cue("tests");
   await d.clearScreen();
   const before2 = d.vm("cat /tmp/demo-prompt");
   await d.run(`vmctl group test ${LAB}`, { wait: false });
-  await d.sleep(6000);
-  d.ff(6);
+  await d.sleep(4000);
+  d.ff(8);
   for (let i = 0; i < 900 && d.vm("cat /tmp/demo-prompt") === before2; i++) await d.sleep(1000);
   d.ffEnd();
-  await d.sleep(4000);
+  await d.sleep(3000);
   await d.cue("end");
   await d.sleep(2000);
 }
