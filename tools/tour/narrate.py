@@ -26,6 +26,8 @@ LANGS = ("it", "en")
 SPOKEN = {
     "en": [(r"qemu-iso-lab", "QEMU ISO Lab"), (r"\bvmctl\b", "vm control"), (r"Ctrl\+Alt\+Del", "Control Alt Delete"),
            (r"…", ","), (r"\bVMs\b", "V Ms"), (r"\bVM\b", "V M"), (r"\bHA\b", "H A"),
+           # The Keycloak lab (2026-10-20): the acronym and the admin CLI, letter by letter.
+           (r"\bPKCE\b", "P K C E"), (r"\bkcadm\b", "K C admin"), (r"\bkc-lab\b", "K C lab"),
            # The ZFS course (2026-10-07): options, paths and column names as one says them.
            (r"(?<![\w-])-nv\b", "dash n v"), (r"(?<![\w-])-([ri])\b", r"dash \1"), (r"\.zfs\b", "dot Z F S"),
            (r"/srv/web\b", "slash srv slash web"), (r"\bCKSUM\b", "checksum"), (r"\blz4\b", "L Z four"),
@@ -42,6 +44,8 @@ SPOKEN = {
            (r"\bSSH\b", "essesseacca"),
            # Alpine as "alpain": "àlpain" and "èlpain" came out "aplein"; "àlpàin" chosen by ear (Manzolo, 2026-10-19).
            (r"\bAlpine\b", "àlpàin"),
+           # The Keycloak lab (2026-10-20): PKCE, kcadm and kc-lab would be read as words.
+           (r"\bPKCE\b", "pi cappa ci e"), (r"\bkcadm\b", "cappa ci àdmin"), (r"\bkc-lab\b", "cappa ci lab"),
            (r"\bHA\b", "alta affidabilità"), (r"\bIT-Tools\b", "ai ti tùls"), (r"\bshutdown\b", "sciatdàun"),
            # The ZFS course (2026-10-07): the commands in lower case, the options, paths and columns,
            # and the English words an Italian voice reads letter by letter.
