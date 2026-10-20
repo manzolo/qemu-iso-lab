@@ -41,6 +41,8 @@ class SpokenTests(unittest.TestCase):
         # The Keycloak lab (2026-10-20): the acronym and the admin CLI, letter by letter in both languages.
         self.assertEqual(narrate.spoken("Il verifier PKCE; kcadm e kc-lab.", "it"), "Il verifier pi cappa ci e; cappa ci àdmin e cappa ci lab,")
         self.assertEqual(narrate.spoken("PKCE verifier; kcadm, kc-lab.", "en"), "P K C E verifier; K C admin, K C lab,")
+        self.assertEqual(narrate.spoken("PostgreSQL e un realm.", "it"), "Postgres e un rialm,")
+        self.assertEqual(narrate.spoken("PostgreSQL and a realm.", "en"), "Postgres and a realm,")
         self.assertEqual(narrate.spoken("Gestito da HA, IT-Tools, nessuno shutdown.", "it"), "Gestito da alta affidabilità, ai ti tùls, nessuno sciatdàun,")
         self.assertEqual(narrate.spoken("Managed by HA.", "en"), "Managed by H A,")
         # The ZFS course: commands in lower case, options, a path, a column.
