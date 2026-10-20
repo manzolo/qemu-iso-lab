@@ -153,6 +153,13 @@ export async function run(d) {
   await say(d, "kc-lab remove-roles -r lab --uusername bob --rolename editor", 2500);
   await d.leave();
 
+  // Bob's access token lives two minutes and the console took longer: renew it off camera (the browser is
+  // behind the terminal), with the app's own Refresh button.
+  await page.goto(`${APP}/actions`);
+  await page.locator("form[action='/refresh'] button").click();
+  await page.waitForURL(/\/protected$/, { timeout: 30000 });
+  await page.goto("about:blank");
+
   // What the app received, and how it checks it
   await d.cue("token");
   await d.focusBrowser();

@@ -213,8 +213,23 @@ def current():
 @app.get('/tokens')
 @app.get('/actions')
 def protected():
-    record, claims = current()
     html = wants_html()
+    try:
+        record, claims = current()
+    except jwt.ExpiredSignatureError:
+        record = sessions.get(request.cookies.get('lab_session'))
+        if not (html and record):
+            raise
+        # The access token lives two minutes; the refresh token much longer. The app does not renew it on its
+        # own: the lab shows the step (guide, exercise 6).
+        exp = jwt.decode(record['tokens']['access_token'], options={'verify_signature': False})['exp']
+        csrf = record['csrf']
+        return page('Token expired', f'<div class="card no"><h1>401 · the access token has expired</h1>'
+                    f'<p>It was valid until {escape(when(exp))}. The session with Keycloak is still open: the refresh '
+                    'token asks for a new access token without the password.</p>'
+                    f'<form method="post" action="/refresh"><input type="hidden" name="csrf" value="{csrf}">'
+                    '<button class="btn">Refresh token</button> <a class="btn alt" href="/login">Log in again</a></form>'
+                    '<p class="muted"><code>ExpiredSignatureError</code></p></div>', 401)
     if record is None:
         if html:
             return page('Login required', '<div class="card no"><h1>401 · who are you?</h1><p>This page needs a login, '
@@ -338,6 +353,10 @@ def api():
 
 @app.errorhandler(jwt.PyJWTError)
 def bad_token(error):
+    if wants_html():
+        return page('Token rejected', f'<div class="card no"><h1>401 · token rejected</h1><p>The app checked the token '
+                    f'and refused it.</p><p class="muted"><code>{escape(type(error).__name__)}</code></p>'
+                    '<p><a class="btn" href="/login">Login</a></p></div>', 401)
     return jsonify(error=type(error).__name__), 401
 
 
