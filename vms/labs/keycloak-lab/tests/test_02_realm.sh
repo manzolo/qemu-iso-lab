@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../_common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_keycloak.sh"   # waits for Keycloak and the app after a cold boot
 # Work in a uniquely named practice realm. Never reset the lab fixture before checking it.
 R="test-practice-$$"
 cleanup() { on keycloak-lab-server kc-lab delete "realms/$R" >/dev/null 2>&1 || true; }

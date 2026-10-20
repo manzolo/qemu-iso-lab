@@ -107,3 +107,18 @@ il lab verificato resta intenzionalmente HTTP; nessuna prova di messa in produzi
   1 s dopo `exp`: sul bordo. Ora aspetta 3 s dopo `exp` prima dell'introspection; 4/4 verdi da solo, poi la suite intera
   **7/7 script, 15 controlli**. Difetto della prova, non del lab.
 - Guide lette: it 381 righe, en 374; sette esercizi in `lab.json`; `docs/LABS.md` con la riga del lab (2560 MiB).
+
+## Nella studio di ripresa (2026-10-20 pomeriggio, procedura «Before a take» di docs/TOUR.md)
+
+- Ramo portato nel clone demo della studio con un `git bundle` (non era su GitHub); `vmctl group install keycloak-lab` a
+  freddo: installato. Subito dopo, `vmctl group test`: **2/7**, poi a macchine calde 7/7. Keycloak (Java) ascolta 12–24 s
+  dopo il boot del guest (journal: «started in 24.025s» al primo avvio, 12.1 s al secondo) e il runner dei test aspetta
+  solo SSH: i primi test lo trovavano spento.
+- Correzione: `tests/_keycloak.sh` aspetta, con tetto di 180 s, la discovery del realm sul server e l'app sul client
+  (`wait_for_stack`), e **tutti e sette** i test lo sorgono (01 e 02 non lo facevano). Un servizio fermo fa ancora
+  cadere i test (`fault-check.sh`, esercizio 01): l'attesa è limitata. Prova: `vmctl group reset keycloak-lab` (boot a
+  freddo dal checkpoint `lab-start`) e `vmctl group test` subito dopo, **7/7 in 94 s**; ripetuto una seconda volta.
+  Un primo tentativo con l'attesa solo nei test 03–07 non è bastato (1/7): non ne ho isolato il perché, la versione
+  completa sì.
+- Copione della lezione: `tools/tour/clips/lab-keycloak.mjs` (lint ok), con un'attesa fuori campo sulla discovery
+  prima dei comandi sul server.

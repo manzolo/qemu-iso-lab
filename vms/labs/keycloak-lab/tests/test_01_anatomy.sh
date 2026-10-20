@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../_common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_keycloak.sh"   # waits for Keycloak and the app after a cold boot
 assert 'Keycloak and PostgreSQL services are active' on keycloak-lab-server 'systemctl is-active --quiet keycloak postgresql'
 assert 'official Keycloak version is 26.4.7' on keycloak-lab-server '/opt/keycloak/bin/kc.sh --version | grep -F "26.4.7"'
 assert 'Keycloak uses PostgreSQL, not the development H2 store' on keycloak-lab-server "sudo -u postgres psql -d keycloak -tAc \"SELECT COUNT(*) FROM realm WHERE name='lab'\" | grep -qx 1"
