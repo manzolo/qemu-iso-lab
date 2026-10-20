@@ -1,0 +1,195 @@
+{
+  "title": "Keycloak lab: identity, OAuth 2.0 and OpenID Connect",
+  "summary": "Two Ubuntu guests on keycloak-lan: Keycloak 26.4.7 with PostgreSQL and a Python app using Authorization Code + S256 PKCE. Seven exercises teach installation, realms, clients, users, roles, discovery, JWT validation, sessions and single sign-out, service credentials, refresh and real protocol failures. Example credentials only; deliberately HTTP for local learning.",
+  "members": [
+    "keycloak-lab-server",
+    "keycloak-lab-client"
+  ],
+  "exercises": [
+    {
+      "title": "Install and inspect Keycloak",
+      "text": "Read the installation recipe: pinned official archive and SHA-256, Java 21, PostgreSQL and a systemd unit. This isolated lab deliberately uses start-dev and HTTP; the guides explain production hostname and TLS.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "keycloak-lab-server",
+          "commands": [
+            "cat ~/keycloak-lab/setup-server.sh",
+            "java -version; /opt/keycloak/bin/kc.sh --version",
+            "systemctl status keycloak postgresql --no-pager",
+            "systemctl cat keycloak",
+            "ss -ltn | grep -E \":(8080|5432) \"",
+            "sudo -u postgres psql -d keycloak -c 'SELECT name FROM realm;'",
+            "kc-lab get realms/lab --fields realm,enabled"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "host",
+          "commands": [
+            "xdg-open http://127.0.0.1:18080/admin/    # admin / admin-lab-pass"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Realm, clients, users and roles",
+      "text": "Use the console to create practice-console, a public client, learner and reader; repeat through kcadm in practice-cli. The independent lab realm remains the known test fixture. kc-lab wraps the real kcadm.sh with a temporary authenticated config.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "keycloak-lab-server",
+          "commands": [
+            "kc-lab create realms -s realm=practice-cli -s enabled=true",
+            "kc-lab create clients -r practice-cli -s clientId=practice-web -s publicClient=true -s standardFlowEnabled=true",
+            "kc-lab create users -r practice-cli -s username=learner -s enabled=true",
+            "kc-lab set-password -r practice-cli --username learner --new-password learner-lab-pass",
+            "kc-lab create roles -r practice-cli -s name=reader",
+            "kc-lab add-roles -r practice-cli --uusername learner --rolename reader"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "keycloak-lab-server",
+          "commands": [
+            "kc-lab get-roles -r practice-cli --uusername learner"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "keycloak-lab-server",
+          "commands": [
+            "kc-lab delete realms/practice-cli    # clean up only this practice realm"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "OIDC discovery, JWKS and claims",
+      "text": "Discovery advertises endpoints; JWKS supplies public signing keys. Decode a token to read it, but only signature, issuer, audience and expiry verification can authorize a request.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "keycloak-lab-client",
+          "commands": [
+            "curl -fsS http://172.20.20.1:8080/realms/lab/.well-known/openid-configuration | jq",
+            "curl -fsS http://172.20.20.1:8080/realms/lab/protocol/openid-connect/certs | jq"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "host",
+          "commands": [
+            "xdg-open http://127.0.0.1:18081/login    # alice / alice-lab-pass",
+            "xdg-open http://127.0.0.1:18081/tokens    # verified access and ID claims"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Authorization Code + PKCE and single sign-out",
+      "text": "The browser receives a code, the app exchanges it with its private verifier. Tokens stay in the app; its cookie carries only an opaque session ID. Login twice in the same browser to create two app sessions under one Keycloak SSO session; logout invalidates both.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "keycloak-lab-client",
+          "commands": [
+            "curl -si http://172.20.20.2:8000/login",
+            "less /opt/keycloak-lab/app.py"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "host",
+          "commands": [
+            "xdg-open http://127.0.0.1:18081/    # Login, Protected, Read token claims, Refresh / logout",
+            "vmctl group test keycloak-lab    # includes the complete HTML form flow and SSO logout"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Roles become application authorization",
+      "text": "Alice has editor and /edit returns 200. Bob can authenticate but has no editor role, so /edit returns 403. A role change affects newly minted tokens; existing signed access tokens keep their claims until refresh/expiry.",
+      "blocks": [
+        {
+          "kind": "check",
+          "where": "keycloak-lab-server",
+          "commands": [
+            "kc-lab get-roles -r lab --uusername alice",
+            "kc-lab get-roles -r lab --uusername bob"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "host",
+          "commands": [
+            "xdg-open http://127.0.0.1:18081/edit    # try Alice, logout, then Bob"
+          ]
+        },
+        {
+          "kind": "try",
+          "where": "keycloak-lab-server",
+          "commands": [
+            "kc-lab remove-roles -r lab --uusername alice --rolename editor    # new Alice login now gets 403",
+            "kc-lab add-roles -r lab --uusername alice --rolename editor    # restore before tests"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Service tokens, refresh, expiry and introspection",
+      "text": "Client credentials authenticates a service, not Alice. The service token lasts five seconds, carries lab-api as audience and has no refresh token. User tokens last 120 seconds and refresh tokens rotate; reuse is rejected.",
+      "blocks": [
+        {
+          "kind": "do",
+          "where": "keycloak-lab-client",
+          "commands": [
+            "P=http://172.20.20.1:8080/realms/lab/protocol/openid-connect",
+            "TOKEN=$(curl -fsS \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=service-lab-secret | jq -r .access_token)",
+            "curl -si -H \"Authorization: Bearer $TOKEN\" http://172.20.20.2:8000/api",
+            "curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq",
+            "sleep 6; curl -fsS \"$P/token/introspect\" -d client_id=lab-web -d client_secret=web-lab-secret --data-urlencode \"token=$TOKEN\" | jq"
+          ]
+        },
+        {
+          "kind": "do",
+          "where": "host",
+          "commands": [
+            "xdg-open http://127.0.0.1:18081/actions    # log in first, refresh the user token"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Read protocol errors",
+      "text": "Observe exact status codes and errors: invalid redirect 400, wrong secret 401 unauthorized_client, wrong verifier/reused code 400 invalid_grant, expired or tampered bearer 401. Tests also reject unsolicited callbacks and forged CSRF.",
+      "blocks": [
+        {
+          "kind": "try",
+          "where": "keycloak-lab-client",
+          "commands": [
+            "P=http://172.20.20.1:8080/realms/lab/protocol/openid-connect",
+            "curl -si \"$P/token\" -d grant_type=client_credentials -d client_id=lab-service -d client_secret=wrong",
+            "curl -siG \"$P/auth\" --data-urlencode client_id=lab-web --data-urlencode response_type=code --data-urlencode redirect_uri=http://not-allowed.invalid/callback",
+            "sleep 6; curl -si -H \"Authorization: Bearer $TOKEN\" http://172.20.20.2:8000/api"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "keycloak-lab-server",
+          "commands": [
+            "sudo journalctl -u keycloak --no-pager -n 40"
+          ]
+        },
+        {
+          "kind": "check",
+          "where": "keycloak-lab-client",
+          "commands": [
+            "sudo journalctl -u oidc-app --no-pager -n 40"
+          ]
+        }
+      ]
+    }
+  ]
+}

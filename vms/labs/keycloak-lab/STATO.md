@@ -96,3 +96,14 @@ il lab verificato resta intenzionalmente HTTP; nessuna prova di messa in produzi
   realm temporaneo poi eliminato. Le prove CLI restano nel test 02.
 - Suite unittest completa ancora in corso; prima di chiudere va controllato il
   suo riepilogo (ha segnalato un fallimento da diagnosticare).
+
+## Revisione del 2026-10-20 pomeriggio (Claude, dopo la fine del credito di Codex)
+
+- Codex si è fermato per il limite d'uso mentre aggiornava `tests/test_repo_profiles.py` (la modifica era già scritta);
+  tutto il resto era nel working tree, non committato. `python3 -m unittest discover -s tests`: 1611 test OK (47 skip).
+- `vmctl group test keycloak-lab`: `test_07_errors.sh` rosso 2 volte su 3 su «expired token introspects as inactive».
+  Misurato dal client: Keycloak risponde `active: true` fino a 0,9 s **dopo** `exp` (confronto a secondi interi sul suo
+  orologio), e l'orologio del server stava mezzo secondo indietro (NTP sincronizzato su tutti e due). La prova aspettava
+  1 s dopo `exp`: sul bordo. Ora aspetta 3 s dopo `exp` prima dell'introspection; 4/4 verdi da solo, poi la suite intera
+  **7/7 script, 15 controlli**. Difetto della prova, non del lab.
+- Guide lette: it 381 righe, en 374; sette esercizi in `lab.json`; `docs/LABS.md` con la riga del lab (2560 MiB).

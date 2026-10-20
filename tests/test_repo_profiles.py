@@ -120,6 +120,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
         verified_pxe_uefi = {"pxe-lab-server", "pxe-lab-client-efi"}
         # The low-resource bases (Alpine NoCloud, Debian 12 genericcloud, Ubuntu 20.04/22.04 minimal) and
         # the lite labs on them, from clean disks: ssh-lab-lite 6/6, git-lab-lite 10/10, vpn-lab-lite 5/5.
+        # Keycloak: clean group install, seven exercises, injected faults and cold restart.
+        verified_keycloak = {"keycloak-lab-server", "keycloak-lab-client"}
         verified_lite = {"alpine-cloud", "debian-12-cloud", "ubuntu-20.04-cloud", "ubuntu-22.04-cloud",
                          "ssh-lab-server-lite", "ssh-lab-client-lite", "git-lab-server-lite",
                          "vpn-lab-server-lite", "vpn-lab-client-lite"}
@@ -178,7 +180,8 @@ class RepositoryProfileCatalogTests(unittest.TestCase):
                     self.assertIn(twin["meta"]["status"], ("unattended", "experimental"), name)
             else:
                 self.assertNotIn("manual", vm["meta"], name)
-            expected_date = ("2026-10-18" if name in verified_lite
+            expected_date = ("2026-10-20" if name in verified_keycloak
+                             else "2026-10-18" if name in verified_lite
                              else "2026-10-17" if name in verified_pxe_uefi
                              else "2026-10-16" if name in verified_ubuntu_2610
                              else "2026-10-04" if name in verified_1004

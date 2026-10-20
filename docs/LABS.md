@@ -9,6 +9,7 @@ with its own unattended install; the lab adds the segment, the start order, the 
 |---|---|---|---|---|
 | `netlab` | pfSense router, Pi-hole DNS, Lubuntu desktop client | ~8 GB | `vmctl group install netlab` | [NETWORK-LAB.md](NETWORK-LAB.md) |
 | `pxe-lab` | PXE server (dnsmasq, iPXE, pxelinux and GRUB, nginx, NAT), a BIOS and a UEFI client with empty disks that install Debian 13 over the network | ~2 GB | `vmctl group install pxe-lab` | [guide](../vms/labs/pxe-lab/guide.en.md), [network boot](#network-boot-bootstrap-netboot) |
+| `keycloak-lab` | Keycloak 26.4.7 + PostgreSQL server, Python OIDC/PKCE app client on `keycloak-lan` | 2560 MiB (2048 + 512 MiB) | `vmctl group install keycloak-lab` | [IT](../vms/labs/keycloak-lab/guide.it.md), [EN](../vms/labs/keycloak-lab/guide.en.md) |
 | `proxmox-lab` | three Proxmox VE 9.2 nodes (ZFS mirror, clustered over `pve-lan`), Debian Xfce client with a browser | ~12 GB | `vmctl group install proxmox-lab` | [UNATTENDED.md](UNATTENDED.md#proxmox-ve-bootstrap-proxmox-and-the-proxmox-lab) |
 
 Both are part of the validation matrix: `vmctl check-vms --group netlab` or `--group proxmox-lab`
