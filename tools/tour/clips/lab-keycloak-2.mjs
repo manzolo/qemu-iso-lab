@@ -142,7 +142,7 @@ export async function run(d) {
   await d.sleep(1500);
   await d.cue("claims");
   await open(d, page, `${APP}/tokens`, 3000);
-  await d.scroll(620, 1500);  // from the raw token down to the checked claims
+  await d.scroll(540, 1500);  // from the raw token down to the checked claims
   await d.sleep(7000);
   await d.cue("logout");
   await open(d, page, `${APP}/actions`, 1500);

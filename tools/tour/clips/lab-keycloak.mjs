@@ -158,7 +158,7 @@ export async function run(d) {
   await d.focusBrowser();
   await page.bringToFront();
   await open(d, page, `${APP}/tokens`, 3500);
-  await d.scroll(620, 1500);  // from the raw token down to the checked claims
+  await d.scroll(540, 1500);  // from the raw token down to the checked claims
   await d.sleep(6500);
   await page.goto("about:blank");
   await d.focusTerminal();
